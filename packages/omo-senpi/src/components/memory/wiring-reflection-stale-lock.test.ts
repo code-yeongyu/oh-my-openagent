@@ -5,7 +5,17 @@ import { join } from "node:path"
 
 import { FactsExtractorRunner } from "./facts-runner"
 import {
-  activeRunId, afterMark, callerSite, cleanupStaleLockFixtures, deadPid, diagnosisMark, holderVerdict, hostDiesMidPublish, runReflect, settleTurn, staleLockFixture,
+  activeRunId,
+  afterMark,
+  callerSite,
+  cleanupStaleLockFixtures,
+  deadPid,
+  diagnosisMark,
+  holderVerdict,
+  hostDiesMidPublish,
+  runReflect,
+  settleTurn,
+  staleLockFixture,
   staleRunDiagnosis,
   type DiagnosisMark,
 } from "./wiring-reflection-stale-lock.test-support"
@@ -13,32 +23,36 @@ import {
 afterEach(cleanupStaleLockFixtures)
 
 describe("memory reflection stale active lock (#10377)", () => {
-  test.each([0, 1])("#given a session that already reconciled and a clock advancing %i ms per read #when the host dies mid-publish and the next /reflect finds the lock held #then the dead run is finalized and the lock released", async (tick) => {
-    // given
-    const item = await staleLockFixture()
-    await settleTurn(item)
-    expect(item.reconciles.count).toBe(1)
-    const pid = await deadPid()
-    let clock = Date.now()
-    const runId = await hostDiesMidPublish(item, pid, () => {
-      const now = clock
-      clock += tick
-      return now
-    })
-    const verdictBefore = await holderVerdict(item)
-    const mark = diagnosisMark(item)
+  test.each([0, 1])(
+    "#given a session that already reconciled and a clock advancing %i ms per read #when the host dies mid-publish and the next /reflect finds the lock held #then the dead run is finalized and the lock released",
+    async (tick) => {
+      // given
+      const item = await staleLockFixture()
+      await settleTurn(item)
+      expect(item.reconciles.count).toBe(1)
+      const pid = await deadPid()
+      let clock = Date.now()
+      const runId = await hostDiesMidPublish(item, pid, () => {
+        const now = clock
+        clock += tick
+        return now
+      })
+      const verdictBefore = await holderVerdict(item)
+      const mark = diagnosisMark(item)
 
-    // when
-    const reply = await runReflect(item)
+      // when
+      const reply = await runReflect(item)
 
-    // then: on failure the message names the branch that skipped the dead run (#11604)
-    expect(await staleRunDiagnosis(item, runId, { verdictBefore, surface: reply, mark })).toBe("finalized")
-    expect(await activeRunId(item)).not.toBe(runId)
-    expect(reply).toContain(`the previous run ${runId} had stopped without releasing its lock`)
-    const promoted = await activeRunId(item)
-    if (promoted === undefined) throw new Error("expected the queued request to become the active run")
-    expect(item.launched.map((run) => run.runId)).toContain(promoted)
-  }, 30_000)
+      // then: on failure the message names the branch that skipped the dead run (#11604)
+      expect(await staleRunDiagnosis(item, runId, { verdictBefore, surface: reply, mark })).toBe("finalized")
+      expect(await activeRunId(item)).not.toBe(runId)
+      expect(reply).toContain(`the previous run ${runId} had stopped without releasing its lock`)
+      const promoted = await activeRunId(item)
+      if (promoted === undefined) throw new Error("expected the queued request to become the active run")
+      expect(item.launched.map((run) => run.runId)).toContain(promoted)
+    },
+    30_000,
+  )
 
   test("#given a session that already reconciled #when the host dies mid-publish and a later turn settles #then the dead run is finalized", async () => {
     // given
@@ -53,7 +67,8 @@ describe("memory reflection stale active lock (#10377)", () => {
     await settleTurn(item)
 
     // then: on failure the message names the branch that skipped the dead run (#11604)
-    const surface = item.eventCtx.notices.map((notice) => `${notice.level}: ${notice.message}`).join(" | ") || "no notices"
+    const surface =
+      item.eventCtx.notices.map((notice) => `${notice.level}: ${notice.message}`).join(" | ") || "no notices"
     expect(await staleRunDiagnosis(item, runId, { verdictBefore, surface, mark })).toBe("finalized")
     expect(await activeRunId(item)).not.toBe(runId)
     expect(item.eventCtx.notices.filter((notice) => notice.message.includes("stale lock"))).toEqual([])
@@ -76,7 +91,9 @@ describe("memory reflection stale active lock (#10377)", () => {
     expect(await activeRunId(item)).toBe(runId)
     expect(reply).toContain("memory reflection is stuck on a stale lock")
     expect(reply).toContain("Next step: run /doctor")
-    const shown = item.eventCtx.notices.filter((notice) => notice.message.includes("memory reflection is stuck on a stale lock"))
+    const shown = item.eventCtx.notices.filter((notice) =>
+      notice.message.includes("memory reflection is stuck on a stale lock"),
+    )
     expect(shown.length).toBeGreaterThanOrEqual(2)
     expect(shown.every((notice) => notice.level === "warning")).toBe(true)
   }, 30_000)
@@ -115,7 +132,9 @@ describe("memory reflection stale active lock (#10377)", () => {
     // then
     expect(item.reconciles.count).toBe(reconcilesBefore + 1)
     expect(await activeRunId(item)).toBe(runId)
-    const shown = item.eventCtx.notices.filter((notice) => notice.message.includes("memory reflection is stuck on a stale lock"))
+    const shown = item.eventCtx.notices.filter((notice) =>
+      notice.message.includes("memory reflection is stuck on a stale lock"),
+    )
     expect(shown).toHaveLength(1)
     expect(shown[0]?.message).toContain("recovering it did not release the lock")
   }, 30_000)
@@ -139,7 +158,9 @@ describe("memory reflection stale active lock (#10377)", () => {
     expect(reply).toContain("active.lock could not be read (EACCES)")
     expect(reply).toContain("Next step: run /doctor")
     expect(await activeRunId(item)).toBe(runId)
-    const shown = item.eventCtx.notices.filter((notice) => notice.message.includes("active.lock could not be read (EACCES)"))
+    const shown = item.eventCtx.notices.filter((notice) =>
+      notice.message.includes("active.lock could not be read (EACCES)"),
+    )
     expect(shown.length).toBeGreaterThanOrEqual(1)
   }, 30_000)
 })
@@ -195,7 +216,9 @@ test("#given a Windows stack with backslash paths #when the stale-lock diagnosis
   const site = callerSite(stack)
 
   // then
-  expect(site).toBe("at reconcilePrelaunch (C:\\a\\omo\\packages\\omo-senpi\\src\\components\\memory\\worker\\run-reconciliation-prelaunch.ts:30:45)")
+  expect(site).toBe(
+    "at reconcilePrelaunch (C:\\a\\omo\\packages\\omo-senpi\\src\\components\\memory\\worker\\run-reconciliation-prelaunch.ts:30:45)",
+  )
 })
 
 test("#given a reconcile pass in flight when the mark is taken #when the diagnosis cuts the evidence #then that pass belongs before the mark (#11604)", async () => {
@@ -205,8 +228,12 @@ test("#given a reconcile pass in flight when the mark is taken #when the diagnos
   item.reconciles.onStart = (pass) => {
     seen.mark ??= diagnosisMark(item)
     item.reconciles.contention.push({
-      pass, read: "readState", waitTimeoutMs: 0, site: "in-flight pass",
-      lockPath: join(item.paths.locks, "reflection-scheduler.lock"), owner: { pid: process.pid },
+      pass,
+      read: "readState",
+      waitTimeoutMs: 0,
+      site: "in-flight pass",
+      lockPath: join(item.paths.locks, "reflection-scheduler.lock"),
+      owner: { pid: process.pid },
     })
     item.reconciles.errors.push({ pass, error: "in-flight error" })
   }

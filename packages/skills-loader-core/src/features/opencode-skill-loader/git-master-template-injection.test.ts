@@ -4,21 +4,21 @@ import { describe, it, expect, beforeEach, afterEach } from "bun:test"
 import { injectGitMasterConfig, parseBashEnvPrefix, buildShellAwareGitPrefix } from "./git-master-template-injection"
 
 const SAMPLE_TEMPLATE = [
-	"# Git Master Agent",
-	"",
-	"## MODE DETECTION (FIRST STEP)",
-	"",
-	"Analyze the request.",
-	"",
-	"```bash",
-	"git status",
-	"git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null",
-	"MERGE_BASE=$(git merge-base HEAD main)",
-	"GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash $MERGE_BASE",
-	"```",
-	"",
-	"```",
-	"</execution>",
+  "# Git Master Agent",
+  "",
+  "## MODE DETECTION (FIRST STEP)",
+  "",
+  "Analyze the request.",
+  "",
+  "```bash",
+  "git status",
+  "git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null",
+  "MERGE_BASE=$(git merge-base HEAD main)",
+  "GIT_SEQUENCE_EDITOR=: git rebase -i --autosquash $MERGE_BASE",
+  "```",
+  "",
+  "```",
+  "</execution>",
 ].join("\n")
 
 /** Dynamic fixture: a footer value no shipped default contains. */
@@ -30,230 +30,240 @@ const FOOTER_FIXTURE = "FOOTER_PROPAGATION_SENTINEL_9d41"
  * example actually ships instead of diffing two production outputs.
  */
 function bashCommitExampleLines(rendered: string): string[] {
-	const bashBlocks = [...rendered.matchAll(/```bash\r?\n([\s\S]*?)```/g)].map(
-		(match) => match[1],
-	)
-	return bashBlocks.flatMap((block) =>
-		block
-			.split("\n")
-			.filter((line) => / commit -m /.test(line)),
-	)
+  const bashBlocks = [...rendered.matchAll(/```bash\r?\n([\s\S]*?)```/g)].map((match) => match[1])
+  return bashBlocks.flatMap((block) => block.split("\n").filter((line) => / commit -m /.test(line)))
 }
 
 function restoreEnv(env: Record<string, string | undefined>): void {
-	for (const [key, value] of Object.entries(env)) {
-		if (value !== undefined) {
-			process.env[key] = value
-		} else {
-			delete process.env[key]
-		}
-	}
+  for (const [key, value] of Object.entries(env)) {
+    if (value !== undefined) {
+      process.env[key] = value
+    } else {
+      delete process.env[key]
+    }
+  }
 }
 
 function withUnixShell<T>(callback: () => T): T {
-	const originalPlatform = process.platform
-	const originalEnv = {
-		SHELL: process.env.SHELL,
-		PSModulePath: process.env.PSModulePath,
-		MSYSTEM: process.env.MSYSTEM,
-	}
+  const originalPlatform = process.platform
+  const originalEnv = {
+    SHELL: process.env.SHELL,
+    PSModulePath: process.env.PSModulePath,
+    MSYSTEM: process.env.MSYSTEM,
+  }
 
-	Object.defineProperty(process, "platform", { value: "linux" })
-	process.env.SHELL = "/bin/bash"
-	delete process.env.PSModulePath
-	delete process.env.MSYSTEM
+  Object.defineProperty(process, "platform", { value: "linux" })
+  process.env.SHELL = "/bin/bash"
+  delete process.env.PSModulePath
+  delete process.env.MSYSTEM
 
-	try {
-		return callback()
-	} finally {
-		Object.defineProperty(process, "platform", { value: originalPlatform })
-		restoreEnv(originalEnv)
-	}
+  try {
+    return callback()
+  } finally {
+    Object.defineProperty(process, "platform", { value: originalPlatform })
+    restoreEnv(originalEnv)
+  }
 }
 
 describe("#given git_env_prefix config", () => {
-	describe("#when default config (GIT_MASTER=1)", () => {
-		it("#then injects env prefix section before MODE DETECTION", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			}))
+  describe("#when default config (GIT_MASTER=1)", () => {
+    it("#then injects env prefix section before MODE DETECTION", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "GIT_MASTER=1",
+        }),
+      )
 
-			expect(result).toContain("GIT_MASTER=1 git status")
-			expect(result).toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("GIT_MASTER=1 git push")
+      expect(result).toContain("GIT_MASTER=1 git status")
+      expect(result).toContain("GIT_MASTER=1 git commit")
+      expect(result).toContain("GIT_MASTER=1 git push")
 
-			const prefixIndex = result.indexOf("GIT_MASTER=1 git status")
-			const modeIndex = result.indexOf("## MODE DETECTION")
-			expect(prefixIndex).toBeLessThan(modeIndex)
-		})
-	})
+      const prefixIndex = result.indexOf("GIT_MASTER=1 git status")
+      const modeIndex = result.indexOf("## MODE DETECTION")
+      expect(prefixIndex).toBeLessThan(modeIndex)
+    })
+  })
 
-	describe("#when git_env_prefix is empty string", () => {
-		it("#then does NOT inject env prefix section", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "",
-			}))
+  describe("#when git_env_prefix is empty string", () => {
+    it("#then does NOT inject env prefix section", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "",
+        }),
+      )
 
-			expect(result).not.toContain("GIT_MASTER=1")
-			expect(result).not.toContain("git_env_prefix")
-		})
-	})
+      expect(result).not.toContain("GIT_MASTER=1")
+      expect(result).not.toContain("git_env_prefix")
+    })
+  })
 
-	describe("#when git_env_prefix is custom value", () => {
-		it("#then injects custom prefix in section", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "MY_HOOK=active",
-			}))
+  describe("#when git_env_prefix is custom value", () => {
+    it("#then injects custom prefix in section", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "MY_HOOK=active",
+        }),
+      )
 
-			expect(result).toContain("MY_HOOK=active git status")
-			expect(result).toContain("MY_HOOK=active git commit")
-			expect(result).not.toContain("GIT_MASTER=1")
-		})
-	})
+      expect(result).toContain("MY_HOOK=active git status")
+      expect(result).toContain("MY_HOOK=active git commit")
+      expect(result).not.toContain("GIT_MASTER=1")
+    })
+  })
 
-	describe("#when git_env_prefix contains shell metacharacters", () => {
-		it("#then rejects the malicious value", () => {
-			expect(() =>
-				withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-					commit_footer: false,
-					include_co_authored_by: false,
-					git_env_prefix: "A=1; rm -rf /",
-				}))
-			).toThrow('git_env_prefix must be empty or use shell-safe env assignments like "GIT_MASTER=1"')
-		})
-	})
+  describe("#when git_env_prefix contains shell metacharacters", () => {
+    it("#then rejects the malicious value", () => {
+      expect(() =>
+        withUnixShell(() =>
+          injectGitMasterConfig(SAMPLE_TEMPLATE, {
+            commit_footer: false,
+            include_co_authored_by: false,
+            git_env_prefix: "A=1; rm -rf /",
+          }),
+        ),
+      ).toThrow('git_env_prefix must be empty or use shell-safe env assignments like "GIT_MASTER=1"')
+    })
+  })
 
-	describe("#when no config provided", () => {
-		it("#then uses default GIT_MASTER=1 prefix", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
+  describe("#when no config provided", () => {
+    it("#then uses default GIT_MASTER=1 prefix", () => {
+      const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
 
-			expect(result).toContain("GIT_MASTER=1 git status")
-		})
-	})
+      expect(result).toContain("GIT_MASTER=1 git status")
+    })
+  })
 })
 
 describe("#given git_env_prefix with commit footer", () => {
-	describe("#when both env prefix and a dynamic footer fixture are enabled", () => {
-		it("#then the injected commit example carries the fixture under the env prefix", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: FOOTER_FIXTURE,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			}))
+  describe("#when both env prefix and a dynamic footer fixture are enabled", () => {
+    it("#then the injected commit example carries the fixture under the env prefix", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: FOOTER_FIXTURE,
+          include_co_authored_by: false,
+          git_env_prefix: "GIT_MASTER=1",
+        }),
+      )
 
-			const examples = bashCommitExampleLines(result)
-			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+      const examples = bashCommitExampleLines(result)
+      const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
 
-			// the dynamic footer fixture propagated into a real commit example
-			expect(injected.length).toBeGreaterThan(0)
-			// every fixture-bearing example is env-prefixed
-			expect(injected.every((line) => line.startsWith("GIT_MASTER=1 git commit"))).toBe(true)
-			// co-author branch is off in this configuration
-			expect(examples.some((line) => line.includes("Co-authored-by:"))).toBe(false)
-		})
-	})
+      // the dynamic footer fixture propagated into a real commit example
+      expect(injected.length).toBeGreaterThan(0)
+      // every fixture-bearing example is env-prefixed
+      expect(injected.every((line) => line.startsWith("GIT_MASTER=1 git commit"))).toBe(true)
+      // co-author branch is off in this configuration
+      expect(examples.some((line) => line.includes("Co-authored-by:"))).toBe(false)
+    })
+  })
 
-	describe("#when the template already contains bare git commands in bash blocks", () => {
-		it("#then prefixes every git invocation in the final output", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			}))
+  describe("#when the template already contains bare git commands in bash blocks", () => {
+    it("#then prefixes every git invocation in the final output", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "GIT_MASTER=1",
+        }),
+      )
 
-			expect(result).toContain("GIT_MASTER=1 git status")
-			expect(result).toContain(
-				"GIT_MASTER=1 git merge-base HEAD main 2>/dev/null || GIT_MASTER=1 git merge-base HEAD master 2>/dev/null"
-			)
-			expect(result).toContain("MERGE_BASE=$(GIT_MASTER=1 git merge-base HEAD main)")
-			expect(result).toContain(
-				"GIT_SEQUENCE_EDITOR=: GIT_MASTER=1 git rebase -i --autosquash $MERGE_BASE"
-			)
-		})
-	})
+      expect(result).toContain("GIT_MASTER=1 git status")
+      expect(result).toContain(
+        "GIT_MASTER=1 git merge-base HEAD main 2>/dev/null || GIT_MASTER=1 git merge-base HEAD master 2>/dev/null",
+      )
+      expect(result).toContain("MERGE_BASE=$(GIT_MASTER=1 git merge-base HEAD main)")
+      expect(result).toContain("GIT_SEQUENCE_EDITOR=: GIT_MASTER=1 git rebase -i --autosquash $MERGE_BASE")
+    })
+  })
 
-	describe("#when env prefix disabled but footer enabled", () => {
-		it("#then the injected commit example stays unprefixed but carries the fixture", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: FOOTER_FIXTURE,
-				include_co_authored_by: false,
-				git_env_prefix: "",
-			}))
+  describe("#when env prefix disabled but footer enabled", () => {
+    it("#then the injected commit example stays unprefixed but carries the fixture", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: FOOTER_FIXTURE,
+          include_co_authored_by: false,
+          git_env_prefix: "",
+        }),
+      )
 
-			const examples = bashCommitExampleLines(result)
-			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+      const examples = bashCommitExampleLines(result)
+      const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
 
-			// the footer fixture still reaches a commit example without a prefix
-			expect(injected.length).toBeGreaterThan(0)
-			expect(injected.every((line) => !line.includes("GIT_MASTER=1"))).toBe(true)
-		})
-	})
+      // the footer fixture still reaches a commit example without a prefix
+      expect(injected.length).toBeGreaterThan(0)
+      expect(injected.every((line) => !line.includes("GIT_MASTER=1"))).toBe(true)
+    })
+  })
 
-	describe("#when the co-author flag is enabled alongside the footer", () => {
-		it("#then one prefixed commit example carries the fixture and the sisyphus-dev-ai trailer with git's dedup option", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: FOOTER_FIXTURE,
-				include_co_authored_by: true,
-				git_env_prefix: "GIT_MASTER=1",
-			}))
+  describe("#when the co-author flag is enabled alongside the footer", () => {
+    it("#then one prefixed commit example carries the fixture and the sisyphus-dev-ai trailer with git's dedup option", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: FOOTER_FIXTURE,
+          include_co_authored_by: true,
+          git_env_prefix: "GIT_MASTER=1",
+        }),
+      )
 
-			const examples = bashCommitExampleLines(result)
-			const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
+      const examples = bashCommitExampleLines(result)
+      const injected = examples.filter((line) => line.includes(FOOTER_FIXTURE))
 
-			expect(injected).toEqual([
-				`GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" -m "${FOOTER_FIXTURE}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
-			])
-			expect(result.split('--trailer "').length - 1).toBe(1)
-			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
-		})
-	})
+      expect(injected).toEqual([
+        `GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" -m "${FOOTER_FIXTURE}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
+      ])
+      expect(result.split('--trailer "').length - 1).toBe(1)
+      expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
+    })
+  })
 
-	describe("#when no config is provided", () => {
-		it("#then only the co-author trailer is injected, under the default prefix, and no footer", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
+  describe("#when no config is provided", () => {
+    it("#then only the co-author trailer is injected, under the default prefix, and no footer", () => {
+      const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE))
 
-			expect(result).toContain(
-				`GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
-			)
-			expect(result).not.toContain("Ultraworked with")
-			expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
-		})
-	})
+      expect(result).toContain(
+        `GIT_MASTER=1 git -c trailer.ifexists=addIfDifferent commit -m "{Commit Message}" --trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"`,
+      )
+      expect(result).not.toContain("Ultraworked with")
+      expect(result).not.toContain("clio-agent@sisyphuslabs.ai")
+    })
+  })
 
-	describe("#when include_co_authored_by is false and the footer is off", () => {
-		it("#then no attribution section is injected at all", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, { include_co_authored_by: false }))
+  describe("#when include_co_authored_by is false and the footer is off", () => {
+    it("#then no attribution section is injected at all", () => {
+      const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, { include_co_authored_by: false }))
 
-			expect(result).not.toContain("5.5 Commit Attribution")
-			expect(result).not.toMatch(/Co-authored-by:/i)
-		})
-	})
+      expect(result).not.toContain("5.5 Commit Attribution")
+      expect(result).not.toMatch(/Co-authored-by:/i)
+    })
+  })
 })
 
 describe("#given idempotency of prefixGitCommandsInBashCodeBlocks", () => {
-	describe("#when git_env_prefix is provided and template already has prefixed commands in env prefix section", () => {
-		it("#then does NOT double-prefix the already-prefixed commands", () => {
-			const result = withUnixShell(() => injectGitMasterConfig(SAMPLE_TEMPLATE, {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			}))
+  describe("#when git_env_prefix is provided and template already has prefixed commands in env prefix section", () => {
+    it("#then does NOT double-prefix the already-prefixed commands", () => {
+      const result = withUnixShell(() =>
+        injectGitMasterConfig(SAMPLE_TEMPLATE, {
+          commit_footer: false,
+          include_co_authored_by: false,
+          git_env_prefix: "GIT_MASTER=1",
+        }),
+      )
 
-			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git status")
-			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git add")
-			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git commit")
-			expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git push")
+      expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git status")
+      expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git add")
+      expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git commit")
+      expect(result).not.toContain("GIT_MASTER=1 GIT_MASTER=1 git push")
 
-			expect(result).toContain("GIT_MASTER=1 git status")
-			expect(result).toContain("GIT_MASTER=1 git add")
-			expect(result).toContain("GIT_MASTER=1 git commit")
-			expect(result).toContain("GIT_MASTER=1 git push")
-		})
-	})
+      expect(result).toContain("GIT_MASTER=1 git status")
+      expect(result).toContain("GIT_MASTER=1 git add")
+      expect(result).toContain("GIT_MASTER=1 git commit")
+      expect(result).toContain("GIT_MASTER=1 git push")
+    })
+  })
 })

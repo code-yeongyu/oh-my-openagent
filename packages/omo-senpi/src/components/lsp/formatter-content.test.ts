@@ -50,9 +50,13 @@ describe("formatter tool-result content", () => {
         const event = {
           toolCallId: "format-call",
           toolName,
-          input: toolName === "apply_patch"
-            ? { input: "*** Begin Patch\n*** Update File: sample.ts\n@@\n-const value=0\n+const value=1\n*** End Patch" }
-            : { path: filePath },
+          input:
+            toolName === "apply_patch"
+              ? {
+                  input:
+                    "*** Begin Patch\n*** Update File: sample.ts\n@@\n-const value=0\n+const value=1\n*** End Patch",
+                }
+              : { path: filePath },
           content: [original],
           isError: false,
         }
@@ -62,11 +66,11 @@ describe("formatter tool-result content", () => {
         const results = await pi.dispatch("tool_result", event)
 
         // then
-        expect(results).toEqual([{
-          content: diagnostics === "errors"
-            ? [original, textBlock, textBlock]
-            : [original, textBlock],
-        }])
+        expect(results).toEqual([
+          {
+            content: diagnostics === "errors" ? [original, textBlock, textBlock] : [original, textBlock],
+          },
+        ])
         expect(formattedPaths).toEqual([filePath])
         expect(diagnosedPaths).toEqual(diagnosticsEnabled ? [toolName === "apply_patch" ? "sample.ts" : filePath] : [])
         expect(event.content).toEqual([original])

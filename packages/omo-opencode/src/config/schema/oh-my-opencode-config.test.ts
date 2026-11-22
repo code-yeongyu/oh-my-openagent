@@ -129,12 +129,7 @@ describe("OhMyOpenCodeConfigSchema agent_order", () => {
     // then
     expect(result.success).toBe(true)
     if (result.success) {
-      expect(result.data.agent_order).toEqual([
-        "hephaestus",
-        "sisyphus",
-        "prometheus",
-        "atlas",
-      ])
+      expect(result.data.agent_order).toEqual(["hephaestus", "sisyphus", "prometheus", "atlas"])
     }
   })
 

@@ -46,11 +46,17 @@ export async function liveSessionPaths(socket: string, agentDir?: string): Promi
   }
   const sessions = reply.sessions
   if (!Array.isArray(sessions)) throw new Error(`list_sessions on ${socket} answered without a session list`)
-  return sessions.flatMap((row: unknown) => (isRecord(row) && typeof row.sessionPath === "string" ? [row.sessionPath] : []))
+  return sessions.flatMap((row: unknown) =>
+    isRecord(row) && typeof row.sessionPath === "string" ? [row.sessionPath] : [],
+  )
 }
 
 // A refusal answers undefined, exactly like no answer: both mean "holds nothing we can see".
-async function askDaemon(socket: string, request: HostReply, agentDir: string | undefined): Promise<HostReply | undefined> {
+async function askDaemon(
+  socket: string,
+  request: HostReply,
+  agentDir: string | undefined,
+): Promise<HostReply | undefined> {
   const reply = await askHost(socket, request, LIST_TIMEOUT_MS, agentDir === undefined ? {} : { agentDir })
   if (reply?.success !== true) return undefined
   return isRecord(reply.data) ? reply.data : {}

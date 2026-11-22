@@ -44,24 +44,39 @@ export function createTeamDeleteTool(
   void client
 
   return tool({
-    description: "Delete a completed or shutdown-approved team run. Pass force=true to tear it down even while members are still active.",
+    description:
+      "Delete a completed or shutdown-approved team run. Pass force=true to tear it down even while members are still active.",
     args: { teamRunId: tool.schema.string(), force: tool.schema.boolean().optional() },
     async execute(rawArgs, toolContext) {
       const args = TeamDeleteArgsSchema.parse(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
-      const { runtimeState, participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
+      const { runtimeState, participant } = await resolveParticipant(
+        args.teamRunId,
+        runtimeContext.sessionID,
+        config,
+        deps,
+      )
       const isOrphanedForceDelete = args.force === true && runtimeState.status === "orphaned"
       const isStuckDeletingForceDelete = args.force === true && runtimeState.status === "deleting"
       const isForceBypass = (isStuckDeletingForceDelete || isOrphanedForceDelete) && participant !== undefined
       if (!isForceBypass && participant?.role !== "lead") {
         throw new Error("team_delete is lead-only")
       }
-      return JSON.stringify({ teamRunId: args.teamRunId, teamName: runtimeState.teamName, deleted: true, ...(await deps.deleteTeam(args.teamRunId, config, tmuxMgr, backgroundManager, { force: args.force })) })
+      return JSON.stringify({
+        teamRunId: args.teamRunId,
+        teamName: runtimeState.teamName,
+        deleted: true,
+        ...(await deps.deleteTeam(args.teamRunId, config, tmuxMgr, backgroundManager, { force: args.force })),
+      })
     },
   })
 }
 
-export function createTeamShutdownRequestTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps): ToolDefinition {
+export function createTeamShutdownRequestTool(
+  config: TeamModeConfig,
+  client: OpencodeClient,
+  deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps,
+): ToolDefinition {
   void client
 
   return tool({
@@ -73,12 +88,21 @@ export function createTeamShutdownRequestTool(config: TeamModeConfig, client: Op
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
       if (participant?.role !== "lead") throw new Error("team_shutdown_request is lead-only")
       await deps.requestShutdownOfMember(args.teamRunId, args.targetMemberName, participant.memberName, config)
-      return JSON.stringify({ teamRunId: args.teamRunId, targetMemberName: args.targetMemberName, requesterName: participant.memberName, status: "shutdown_requested" })
+      return JSON.stringify({
+        teamRunId: args.teamRunId,
+        targetMemberName: args.targetMemberName,
+        requesterName: participant.memberName,
+        status: "shutdown_requested",
+      })
     },
   })
 }
 
-export function createTeamApproveShutdownTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps): ToolDefinition {
+export function createTeamApproveShutdownTool(
+  config: TeamModeConfig,
+  client: OpencodeClient,
+  deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps,
+): ToolDefinition {
   void client
 
   return tool({
@@ -88,14 +112,24 @@ export function createTeamApproveShutdownTool(config: TeamModeConfig, client: Op
       const args = TeamApproveShutdownArgsSchema.parse(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
-      if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName)) throw new Error("team_approve_shutdown: caller must be target member or team lead")
+      if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName))
+        throw new Error("team_approve_shutdown: caller must be target member or team lead")
       await deps.approveShutdown(args.teamRunId, args.memberName, participant.memberName, config)
-      return JSON.stringify({ teamRunId: args.teamRunId, memberName: args.memberName, approverName: participant.memberName, status: "shutdown_approved" })
+      return JSON.stringify({
+        teamRunId: args.teamRunId,
+        memberName: args.memberName,
+        approverName: participant.memberName,
+        status: "shutdown_approved",
+      })
     },
   })
 }
 
-export function createTeamRejectShutdownTool(config: TeamModeConfig, client: OpencodeClient, deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps): ToolDefinition {
+export function createTeamRejectShutdownTool(
+  config: TeamModeConfig,
+  client: OpencodeClient,
+  deps: TeamShutdownToolDeps = defaultTeamShutdownToolDeps,
+): ToolDefinition {
   void client
 
   return tool({
@@ -105,9 +139,16 @@ export function createTeamRejectShutdownTool(config: TeamModeConfig, client: Ope
       const args = TeamRejectShutdownArgsSchema.parse(rawArgs)
       const runtimeContext = toolContext as TeamLifecycleToolContext
       const { participant } = await resolveParticipant(args.teamRunId, runtimeContext.sessionID, config, deps)
-      if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName)) throw new Error("team_reject_shutdown: caller must be target member or team lead")
+      if (!participant || (participant.role !== "lead" && participant.memberName !== args.memberName))
+        throw new Error("team_reject_shutdown: caller must be target member or team lead")
       await deps.rejectShutdown(args.teamRunId, args.memberName, participant.memberName, args.reason, config)
-      return JSON.stringify({ teamRunId: args.teamRunId, memberName: args.memberName, rejectedBy: participant.memberName, reason: args.reason, status: "shutdown_rejected" })
+      return JSON.stringify({
+        teamRunId: args.teamRunId,
+        memberName: args.memberName,
+        rejectedBy: participant.memberName,
+        reason: args.reason,
+        status: "shutdown_rejected",
+      })
     },
   })
 }

@@ -107,7 +107,11 @@ describe("setup commandcode", () => {
 
     test("#when a key env var is set #then the preset joins the user's providers", () => {
       // given
-      const source = { providers: [{ id: "myco", config: { name: "MyCo" }, key: { key: "k", source: "s" } }], skipped: [], notices: [] }
+      const source = {
+        providers: [{ id: "myco", config: { name: "MyCo" }, key: { key: "k", source: "s" } }],
+        skipped: [],
+        notices: [],
+      }
 
       // when
       const planned = withCommandCodeProvider(source, { CMD_API_KEY: "k" })
@@ -137,7 +141,11 @@ describe("setup commandcode", () => {
 
     test("#when the user's own `commandcode` block was refused with a notice #then the preset is not added behind it", () => {
       // given
-      const source = { providers: [], skipped: ["commandcode"], notices: ["commandcode: could not read a fixed baseURL"] }
+      const source = {
+        providers: [],
+        skipped: ["commandcode"],
+        notices: ["commandcode: could not read a fixed baseURL"],
+      }
 
       // when
       const planned = withCommandCodeProvider(source, { CMD_API_KEY: "k" })

@@ -52,12 +52,15 @@ describe("run abandonment precedence", () => {
     // when
     const precedence = await checkRunAbandonmentPrecedence(runDir, "run-1", {
       getPidLiveness: () => {
-        writeFileSync(join(runDir, "publishing.json"), JSON.stringify({
-          version: 1,
-          runId: "run-1",
-          attempt: 1,
-          finishedAt: "2026-08-11T10:01:00.000Z",
-        }))
+        writeFileSync(
+          join(runDir, "publishing.json"),
+          JSON.stringify({
+            version: 1,
+            runId: "run-1",
+            attempt: 1,
+            finishedAt: "2026-08-11T10:01:00.000Z",
+          }),
+        )
         return "unknown"
       },
     })
@@ -73,7 +76,7 @@ describe("run abandonment precedence", () => {
 
     // when
     const precedence = await checkRunAbandonmentPrecedence(runDir, "run-1", {
-      getPidLiveness: (pid) => pid === 434343 ? "dead" : "unknown",
+      getPidLiveness: (pid) => (pid === 434343 ? "dead" : "unknown"),
     })
 
     // then

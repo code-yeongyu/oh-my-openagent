@@ -16,9 +16,7 @@ describe("findOpenCodeBinary node fallback safety", () => {
       .map((fileName) => ({ fileName, source: readFileSync(join(DOCTOR_CHECKS_DIR, fileName), "utf8") }))
 
     // when
-    const offenders = sources
-      .filter(({ source }) => RAW_BUN_RUNTIME_RE.test(source))
-      .map(({ fileName }) => fileName)
+    const offenders = sources.filter(({ source }) => RAW_BUN_RUNTIME_RE.test(source)).map(({ fileName }) => fileName)
 
     // then
     expect(offenders).toEqual([])

@@ -91,36 +91,47 @@ export async function runMixedEngineScenario(current, olderBin, artifacts) {
   const desk = join(sandbox.agentDir, "rpc", "desk.sock")
   const marker = "T14_FORBIDDEN_LAUNCH_MARKER"
   const provider = startMockCompletionsServer({
-    steps: [{
-      type: "text",
-      text: "desk child complete",
-      releaseWhen: () => existsSync(childRelease),
-      releaseTimeoutMs: 600_000,
-    }],
+    steps: [
+      {
+        type: "text",
+        text: "desk child complete",
+        releaseWhen: () => existsSync(childRelease),
+        releaseTimeoutMs: 600_000,
+      },
+    ],
   })
   let client
   const runtimeBin = join(dirname(current.pluginRoot), "omo")
   try {
     const baseUrl = await provider.ready
-    writeFileSync(join(sandbox.agentDir, "models.json"), `${JSON.stringify({
-      providers: {
-        "omo-http": {
-          name: "todo 14 local http mock",
-          api: "openai-completions",
-          baseUrl,
-          apiKey: "local-qa-only",
-          models: [{
-            id: "mock-1",
-            name: "Todo 14 HTTP mock",
-            reasoning: false,
-            input: ["text"],
-            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-            contextWindow: 200000,
-            maxTokens: 4096,
-          }],
+    writeFileSync(
+      join(sandbox.agentDir, "models.json"),
+      `${JSON.stringify(
+        {
+          providers: {
+            "omo-http": {
+              name: "todo 14 local http mock",
+              api: "openai-completions",
+              baseUrl,
+              apiKey: "local-qa-only",
+              models: [
+                {
+                  id: "mock-1",
+                  name: "Todo 14 HTTP mock",
+                  reasoning: false,
+                  input: ["text"],
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+                  contextWindow: 200000,
+                  maxTokens: 4096,
+                },
+              ],
+            },
+          },
         },
-      },
-    }, null, 2)}\n`)
+        null,
+        2,
+      )}\n`,
+    )
     replaceRuntimeBinary(olderBin, runtimeBin)
     const installedOlderSandbox = { ...sandbox, bin: runtimeBin }
     const ensured = runBin(
@@ -141,10 +152,7 @@ export async function runMixedEngineScenario(current, olderBin, artifacts) {
       modelId: "mock-1",
     })
     await client.promptAndSettle(opened.routingId, "spawn one task child")
-    const shardBefore = await waitFor(
-      () => workerEndpoint(sandbox, desk),
-      { timeoutMs: 180_000, intervalMs: 500 },
-    )
+    const shardBefore = await waitFor(() => workerEndpoint(sandbox, desk), { timeoutMs: 180_000, intervalMs: 500 })
     if (shardBefore === undefined) {
       const debug = { records: taskRecords(project), logs: hostLogs(sandbox), status: statusAll(sandbox) }
       writeFileSync(join(artifacts, "mixed-engine-debug.json"), `${JSON.stringify(debug, null, 2)}\n`)
@@ -155,11 +163,15 @@ export async function runMixedEngineScenario(current, olderBin, artifacts) {
     replaceRuntimeBinary(current.bin, runtimeBin)
     const installedCurrentSandbox = { ...sandbox, bin: runtimeBin }
     const currentHandoff = runBin(installedCurrentSandbox, ["daemon", "handoff", "--json"], { timeoutMs: 240_000 })
-    if (currentHandoff.status !== 0) throw new Error(`current handoff failed: ${currentHandoff.stderr || currentHandoff.stdout}`)
-    const shardAfter = await waitFor(() => {
-      const row = statusAll(sandbox).endpoints.find((entry) => entry.socket === shardBefore.socket)
-      return row !== undefined && row.instanceId !== shardBefore.instanceId ? row : undefined
-    }, { timeoutMs: 120_000, intervalMs: 500 })
+    if (currentHandoff.status !== 0)
+      throw new Error(`current handoff failed: ${currentHandoff.stderr || currentHandoff.stdout}`)
+    const shardAfter = await waitFor(
+      () => {
+        const row = statusAll(sandbox).endpoints.find((entry) => entry.socket === shardBefore.socket)
+        return row !== undefined && row.instanceId !== shardBefore.instanceId ? row : undefined
+      },
+      { timeoutMs: 120_000, intervalMs: 500 },
+    )
     if (shardAfter === undefined) throw new Error("outside current build did not hand the worker shard forward")
     replaceRuntimeBinary(olderBin, runtimeBin)
     const olderHandoff = runBin(installedOlderSandbox, ["daemon", "handoff", "--json"], { timeoutMs: 240_000 })
@@ -183,14 +195,23 @@ export async function runMixedEngineScenario(current, olderBin, artifacts) {
       endpoints: endpointSockets(sandbox),
     }
     writeFileSync(join(artifacts, "mixed-engine.json"), `${JSON.stringify(facts, null, 2)}\n`)
-    const ok = facts.desk_unchanged_during_in_host_spawn && facts.inherited_engine &&
-      facts.marker_absent && facts.no_worker_on_desk && facts.child_streaming_or_completed &&
+    const ok =
+      facts.desk_unchanged_during_in_host_spawn &&
+      facts.inherited_engine &&
+      facts.marker_absent &&
+      facts.no_worker_on_desk &&
+      facts.child_streaming_or_completed &&
       shardAfter.instanceId !== shardBefore.instanceId &&
       (olderHandoff.status !== 0 || /\b(?:reuse|refuse)\b/.test(olderHandoff.stdout))
     return {
       mixed_engine_host_spawns_shard: ok
         ? pass([join(artifacts, "mixed-engine.json")], facts)
-        : { status: "fail", evidence: [join(artifacts, "mixed-engine.json")], reason: "mixed-engine invariants failed", facts },
+        : {
+            status: "fail",
+            evidence: [join(artifacts, "mixed-engine.json")],
+            reason: "mixed-engine invariants failed",
+            facts,
+          },
     }
   } finally {
     replaceRuntimeBinary(current.bin, runtimeBin)

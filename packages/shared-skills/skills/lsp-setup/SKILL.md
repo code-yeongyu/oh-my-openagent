@@ -27,11 +27,11 @@ reference before installing or configuring anything**.
 | `.py .pyi` | `references/python/README.md` |
 | `.go` | `references/go/README.md` |
 | `.rs` | `references/rust/README.md` |
-| `.c .cpp .cc .cxx .h .hpp .hh .hxx` | `references/c-cpp/README.md` |
+| `.c .cpp .cc .cxx .c++ .h .hpp .hh .hxx .h++` | `references/c-cpp/README.md` |
 | `.java` | `references/java/README.md` |
 | `.kt .kts` | `references/kotlin/README.md` |
 | `.cs .razor .cshtml` | `references/csharp/README.md` |
-| `.swift` | `references/swift/README.md` |
+| `.swift .m .mm` | `references/swift/README.md` |
 | `.rb .rake .gemspec .ru` | `references/ruby/README.md` |
 | `.php` | `references/php/README.md` |
 | `.dart` | `references/dart/README.md` |
@@ -75,13 +75,20 @@ command -v <server-executable>   # e.g. typescript-language-server, gopls, rust-
 
 Most builtin servers need **no config** — they are resolved automatically by
 file extension. Write config only to: pick between competing servers, set a
-`priority`, pass `initialization` options, override `extensions`, set `env`, or
-`disable` a server.
+`priority`, pass `initialization` options, override `extensions`, set `env`
+(user config only), or `disable` a server.
 
-Two project-scoped config files, **identical JSON shape**:
+Config files per harness, **identical JSON shape**. Each harness reads the
+first project file that exists, plus one user file:
 
-- Codex harness → `.codex/lsp-client.json` (user: `~/.codex/lsp-client.json`)
-- OpenCode/omo harness → `.opencode/lsp.json` (also `.omo/lsp.json`)
+| Harness | Project config | User config |
+|---|---|---|
+| Codex | `.codex/lsp-client.json` | `$CODEX_HOME/lsp-client.json` (default `~/.codex/lsp-client.json`) |
+| OpenCode | `.opencode/lsp.json`, then `.omo/lsp.json`, then `.omo/lsp-client.json` | `lsp.json` in the OpenCode config dir (default `~/.config/opencode/lsp.json`) |
+| OmO native | `.omo/lsp-client.json`, then `.pi/lsp-client.json` | `~/.omo/lsp-client.json` (`~/.pi/lsp-client.json` when only that one exists) |
+
+A standalone `lsp-tools-mcp` launch reads the paths in
+`LSP_TOOLS_MCP_PROJECT_CONFIG` / `LSP_TOOLS_MCP_USER_CONFIG` instead.
 
 ```jsonc
 {
@@ -100,14 +107,16 @@ Two project-scoped config files, **identical JSON shape**:
 
 Rules enforced by `config-loader.ts`:
 
-- In a **project** config (`.codex/lsp-client.json`, `.opencode/lsp.json`) an
-  entry whose id is a **builtin** server inherits `command` automatically — you
-  only override `extensions` / `priority` / `initialization`. A non-builtin id
-  in a project config is **ignored**.
-- To define a **fully custom** (non-builtin) server with its own `command`, put
-  it in the **user** config (`~/.codex/lsp-client.json`, or the path set by
-  `LSP_TOOLS_MCP_USER_CONFIG`), where `command` + `extensions` are honored.
-- Project entries win over user entries; both win over builtin defaults.
+- In a **project** config an entry whose id is a **builtin** server inherits
+  `command` automatically — you only override `extensions` / `priority` /
+  `initialization` / `disabled`. Its `env` is dropped, and a non-builtin id in
+  a project config is **ignored**.
+- To set `env`, or to define a **fully custom** (non-builtin) server with its
+  own `command`, put it in the **user** config from the table above, where
+  `command` + `extensions` + `env` are honored.
+- Project entries win over user entries; both win over builtin defaults. A user
+  entry is skipped when an enabled project entry has the same id, so keep an id
+  that needs `env` out of the project config.
 
 Each language reference gives a ready-to-paste snippet.
 

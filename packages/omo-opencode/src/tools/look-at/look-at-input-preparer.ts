@@ -2,17 +2,8 @@ import { readFileSync } from "node:fs"
 import { basename } from "node:path"
 import { pathToFileURL } from "node:url"
 import type { LookAtArgs } from "./types"
-import {
-  extractBase64Data,
-  inferMimeTypeFromBase64,
-  inferMimeTypeFromFilePath,
-} from "./mime-type-inference"
-import {
-  needsConversion,
-  convertImageToJpeg,
-  convertBase64ImageToJpeg,
-  cleanupConvertedImage,
-} from "./image-converter"
+import { extractBase64Data, inferMimeTypeFromBase64, inferMimeTypeFromFilePath } from "./mime-type-inference"
+import { needsConversion, convertImageToJpeg, convertBase64ImageToJpeg, cleanupConvertedImage } from "./image-converter"
 import { log } from "../../shared"
 
 export interface LookAtFilePart {
@@ -35,9 +26,7 @@ export interface PreparedLookAtInput {
   cleanup(): void
 }
 
-type PrepareLookAtInputResult =
-  | { ok: true; value: PreparedLookAtInput }
-  | { ok: false; error: string }
+type PrepareLookAtInputResult = { ok: true; value: PreparedLookAtInput } | { ok: false; error: string }
 
 function getTemporaryConversionPath(error: unknown): string | null {
   if (!(error instanceof Error)) {
@@ -57,9 +46,7 @@ function getTemporaryConversionPath(error: unknown): string | null {
   return null
 }
 
-type ReadJsonTextPartResult =
-  | { ok: true; value: LookAtTextPart }
-  | { ok: false; error: string }
+type ReadJsonTextPartResult = { ok: true; value: LookAtTextPart } | { ok: false; error: string }
 
 function readJsonTextPart(filePath: string): ReadJsonTextPartResult {
   let fileContent: string
@@ -184,11 +171,12 @@ export function prepareLookAtInput(args: LookAtArgs): PrepareLookAtInputResult {
     })
   }
 
-  const sourceDescription = totalInputs > 1
-    ? `${totalInputs} files/images`
-    : imageDataList.length === 1
-      ? "clipboard/pasted image"
-      : filePaths[0]
+  const sourceDescription =
+    totalInputs > 1
+      ? `${totalInputs} files/images`
+      : imageDataList.length === 1
+        ? "clipboard/pasted image"
+        : filePaths[0]
 
   return {
     ok: true,

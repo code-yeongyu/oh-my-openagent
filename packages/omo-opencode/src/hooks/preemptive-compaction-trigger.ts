@@ -1,15 +1,9 @@
 import type { OhMyOpenCodeConfig } from "../config"
-import {
-  resolveActualContextLimit,
-  type ContextLimitModelCacheState,
-} from "../shared/context-limit-resolver"
+import { resolveActualContextLimit, type ContextLimitModelCacheState } from "../shared/context-limit-resolver"
 import { log } from "../shared/logger"
 
 import { resolveCompactionModel } from "./shared/compaction-model-resolver"
-import type {
-  CachedCompactionState,
-  PreemptiveCompactionContext,
-} from "./preemptive-compaction-types"
+import type { CachedCompactionState, PreemptiveCompactionContext } from "./preemptive-compaction-types"
 
 const PREEMPTIVE_COMPACTION_TIMEOUT_MS = 60_000
 const PREEMPTIVE_COMPACTION_THRESHOLD = 0.78
@@ -18,11 +12,7 @@ const PREEMPTIVE_COMPACTION_COOLDOWN_MS = 60_000
 declare function setTimeout(handler: () => void, timeout?: number): unknown
 declare function clearTimeout(timeoutID: unknown): void
 
-async function withTimeout<TValue>(
-  promise: Promise<TValue>,
-  timeoutMs: number,
-  errorMessage: string,
-): Promise<TValue> {
+async function withTimeout<TValue>(promise: Promise<TValue>, timeoutMs: number, errorMessage: string): Promise<TValue> {
   let timeoutID: unknown
 
   const timeoutPromise = new Promise<never>((_, reject) => {
@@ -65,11 +55,7 @@ export async function runPreemptiveCompactionIfNeeded(args: {
   const cached = tokenCache.get(sessionID)
   if (!cached) return
 
-  const actualLimit = resolveActualContextLimit(
-    cached.providerID,
-    cached.modelID,
-    modelCacheState,
-  )
+  const actualLimit = resolveActualContextLimit(cached.providerID, cached.modelID, modelCacheState)
 
   if (actualLimit === null) {
     log("[preemptive-compaction] Skipping preemptive compaction: unknown context limit for model", {
@@ -79,7 +65,9 @@ export async function runPreemptiveCompactionIfNeeded(args: {
     return
   }
 
-  const totalInputTokens = (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0)
+  // A cold-cache turn reports most of its prompt as cache.write; it occupies the window like any input.
+  const totalInputTokens =
+    (cached.tokens.input ?? 0) + (cached.tokens.cache?.read ?? 0) + (cached.tokens.cache?.write ?? 0)
   const usageRatio = totalInputTokens / actualLimit
   if (usageRatio < PREEMPTIVE_COMPACTION_THRESHOLD || !cached.modelID) return
 
@@ -119,20 +107,22 @@ export async function runPreemptiveCompactionIfNeeded(args: {
       modelID: cached.modelID,
       error: errorMessage,
     })
-    ctx.client.tui.showToast({
-      body: {
-        title: "Preemptive compaction failed",
-        message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${errorMessage}`,
-        variant: "warning",
-        duration: 10000,
-      },
-    }).catch((toastError: unknown) => {
-      const toastErrorMessage = String(toastError)
-      log("[preemptive-compaction] Failed to show toast", {
-        sessionID,
-        toastError: toastErrorMessage,
+    ctx.client.tui
+      .showToast({
+        body: {
+          title: "Preemptive compaction failed",
+          message: `Context window is above ${Math.round(PREEMPTIVE_COMPACTION_THRESHOLD * 100)}% and auto-compaction could not run. The session may grow large. Error: ${errorMessage}`,
+          variant: "warning",
+          duration: 10000,
+        },
       })
-      if (toastError instanceof Error) return
-    })
+      .catch((toastError: unknown) => {
+        const toastErrorMessage = String(toastError)
+        log("[preemptive-compaction] Failed to show toast", {
+          sessionID,
+          toastError: toastErrorMessage,
+        })
+        if (toastError instanceof Error) return
+      })
   }
 }

@@ -10,8 +10,8 @@
  * app/globals.css imports this file.
  */
 @theme {
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-timeless), "Pretendard Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
 
   /* §2 palette → Tailwind color utilities (bg-ink-1, text-text-mid, border-line, text-accent …) */
   --color-ink-0: var(--ink-0);
@@ -146,45 +146,45 @@
 
 @layer base {
   :root {
-    /* §2 The site is dark-only: UA controls, scrollbars and autofill render dark too. */
-    color-scheme: dark;
+    /* §2 Night by default; Day when the system is light or the home page's switch pins it (data-theme). */
+    color-scheme: light dark;
 
     /* §2 Ink (elevation is luminance, never shadow) */
-    --ink-0: #09090b;
-    --ink-1: #0e0e11;
-    --ink-2: #14141a;
-    --ink-3: #1b1b22;
+    --ink-0: #0f0e0d;
+    --ink-1: #141311;
+    --ink-2: #191816;
+    --ink-3: #211f1c;
 
     /* §2 Text */
-    --text-hi: #f5f5f7;
-    --text-mid: #c3c4c9;
-    --text-lo: #8b8c95;
-    --text-faint: #55565e;
+    --text-hi: #eeeeef;
+    --text-mid: #cdc9c0;
+    --text-lo: #a8a49b;
+    --text-faint: #6e6a62;
 
     /* §2 Hairlines */
-    --line-strong: rgba(255, 255, 255, 0.12);
-    --line: rgba(255, 255, 255, 0.08);
-    --line-faint: rgba(255, 255, 255, 0.04);
+    --line-strong: rgba(238, 238, 239, 0.16);
+    --line: rgba(238, 238, 239, 0.09);
+    --line-faint: rgba(238, 238, 239, 0.05);
     /* Form control boundary: 3:1 or better on every ink (WCAG 1.4.11, lib/input-boundary.test.ts). */
-    --line-input: rgba(255, 255, 255, 0.4);
+    --line-input: rgba(238, 238, 239, 0.4);
 
     /* §2 Accent — cyan means live */
-    --accent: #00d4ff;
-    --accent-hot: #e6fdff;
-    --accent-dim: #0ea5c4;
-    --accent-4: rgba(0, 212, 255, 0.04);
-    --accent-8: rgba(0, 212, 255, 0.08);
-    --accent-16: rgba(0, 212, 255, 0.16);
-    --accent-32: rgba(0, 212, 255, 0.32);
+    --accent: #7fcdd6;
+    --accent-hot: #e8fbfd;
+    --accent-dim: #5fb3bd;
+    --accent-4: rgba(127, 205, 214, 0.04);
+    --accent-8: rgba(127, 205, 214, 0.08);
+    --accent-16: rgba(127, 205, 214, 0.16);
+    --accent-32: rgba(127, 205, 214, 0.32);
 
     /* §2 Status — dots and 1px indicators only */
-    --status-ok: #10b981;
-    --status-busy: #f5c451;
-    --status-err: #ef4444;
+    --status-ok: #8fcf9a;
+    --status-busy: #e2b86b;
+    --status-err: #ef7d6b;
 
     /* §2 Code */
-    --code-bg: #0b0b0e;
-    --code-fg: #cdd6f4;
+    --code-bg: #121210;
+    --code-fg: #d8d4cb;
 
     /* §4 Spacing (4px base) */
     --space-1: 4px;
@@ -263,7 +263,7 @@
     --card-foreground: var(--text-hi);
     --popover: var(--ink-3);
     --popover-foreground: var(--text-hi);
-    --primary: var(--accent);
+    --primary: var(--text-hi);
     --primary-foreground: var(--ink-0);
     --secondary: var(--ink-2);
     --secondary-foreground: var(--text-hi);
@@ -279,11 +279,76 @@
     --focus-ring-offset: 2px;
 
     /* Typography families */
-    --font-geist-sans: var(--font-geist-sans);
-    --font-geist-mono: var(--font-geist-mono);
-    --font-heading: var(--font-geist-sans);
-    --font-body: var(--font-geist-sans);
-    --font-code: var(--font-geist-mono);
+    --font-heading: var(--font-timeless);
+    --font-body: var(--font-timeless);
+    --font-code: var(--font-jetbrains);
+  }
+}
+
+/* §2 Day: doriterm.com's light palette, chosen by the system or pinned by the home page's theme switch. */
+@layer base {
+  @media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+      --ink-0: #fbfaf7;
+      --ink-1: #f6f5f1;
+      --ink-2: #f0efea;
+      --ink-3: #e8e6e0;
+      --text-hi: #1b1b1e;
+      --text-mid: #3a3732;
+      --text-lo: #5c5850;
+      --text-faint: #9a958b;
+      --line-strong: rgba(27, 27, 30, 0.16);
+      --line: rgba(27, 27, 30, 0.09);
+      --line-faint: rgba(27, 27, 30, 0.05);
+      --line-input: rgba(27, 27, 30, 0.56);
+      --accent: #0b6e7a;
+      --accent-hot: #04424a;
+      --accent-dim: #0f8593;
+      --accent-4: rgba(11, 110, 122, 0.04);
+      --accent-8: rgba(11, 110, 122, 0.08);
+      --accent-16: rgba(11, 110, 122, 0.14);
+      --accent-32: rgba(11, 110, 122, 0.28);
+      --status-ok: #2f7a3e;
+      --status-busy: #8a5a00;
+      --status-err: #bf3a2b;
+      --code-bg: #fbfaf7;
+      --code-fg: #2a2723;
+    }
+  }
+  :root[data-theme="light"] {
+    --ink-0: #fbfaf7;
+    --ink-1: #f6f5f1;
+    --ink-2: #f0efea;
+    --ink-3: #e8e6e0;
+    --text-hi: #1b1b1e;
+    --text-mid: #3a3732;
+    --text-lo: #5c5850;
+    --text-faint: #9a958b;
+    --line-strong: rgba(27, 27, 30, 0.16);
+    --line: rgba(27, 27, 30, 0.09);
+    --line-faint: rgba(27, 27, 30, 0.05);
+    --line-input: rgba(27, 27, 30, 0.56);
+    --accent: #0b6e7a;
+    --accent-hot: #04424a;
+    --accent-dim: #0f8593;
+    --accent-4: rgba(11, 110, 122, 0.04);
+    --accent-8: rgba(11, 110, 122, 0.08);
+    --accent-16: rgba(11, 110, 122, 0.14);
+    --accent-32: rgba(11, 110, 122, 0.28);
+    --status-ok: #2f7a3e;
+    --status-busy: #8a5a00;
+    --status-err: #bf3a2b;
+    --code-bg: #fbfaf7;
+    --code-fg: #2a2723;
+  }
+}
+
+@layer base {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
   }
 }
 
@@ -331,7 +396,7 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-geist-sans);
+    font-family: var(--font-timeless);
   }
 
   /* §3 CJK base rules */
@@ -461,7 +526,7 @@
 
   /* §3 Eyebrow role */
   .eyebrow {
-    font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+    font-family: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
     font-size: 0.6875rem;
     font-weight: 500;
     line-height: 1.4;
@@ -842,7 +907,7 @@
   /* §3 v3 — Korean falls back from the Latin sans to a gothic web font (Pretendard); headings get more weight */
   [lang|="ko"] {
     font-family:
-      var(--font-geist-sans), "Pretendard Variable", Pretendard, "Apple SD Gothic Neo",
+      var(--font-timeless), "Pretendard Variable", Pretendard, "Apple SD Gothic Neo",
       "Noto Sans KR", ui-sans-serif, system-ui, sans-serif;
   }
   [lang|="ko"] :where(h1, h2) {

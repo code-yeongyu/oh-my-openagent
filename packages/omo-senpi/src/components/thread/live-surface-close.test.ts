@@ -1,0 +1,102 @@
+import { describe, expect, test } from "bun:test"
+import { withContractHost, type ContractHost } from "../../../../senpi-task/src/runners/rpc-host/testing/contract-host"
+import { controlRefusalOf } from "./control/port"
+import { createLiveThreadSurface, type LiveThreadSurface } from "./live-surface"
+
+// The contract host enforces the engine's own close rules (senpi 2026.11.5-1): a close from a connection that holds no
+// attachment is refused unknown_session, an attached close releases only the caller's hold, and unload_session with
+// force drains every hold.
+function surface(host: ContractHost): LiveThreadSurface {
+  return createLiveThreadSurface(undefined, {
+    env: { OMO_CODING_AGENT_DIR: host.root, SENPI_RPC_SOCKET: host.socket, SENPI_RPC_KEY_ROOT: host.root },
+    statusAll: async () => undefined,
+    registry: async () => [],
+  })
+}
+
+async function close(host: ContractHost): Promise<unknown> {
+  const client = surface(host)
+  if (client.closeSession === undefined) throw new Error("closeSession is missing")
+  const answer = await client.closeSession("rpc-1", "dur-selected")
+  expect(answer.dropped_deliveries).toEqual([])
+  return answer.outcome
+}
+
+const sentTypes = (host: ContractHost) =>
+  host.frames.map(({ frame }) => frame.type).filter((type) => type !== "get_protocol_info" && type !== "authenticate")
+
+describe("thread_close on this device's host: the session ends for every client that holds it", () => {
+  test("#given a session another client also holds #when it is closed #then the host ends it for every holder and the close answers closed", async () => {
+    await withContractHost({ auth: true, otherAttachments: 1 }, async (host) => {
+      expect(await close(host)).toBe("closed")
+      expect(host.live()).toBe(false)
+      expect(host.mutations).toEqual([
+        expect.objectContaining({
+          type: "unload_session",
+          sessionId: "rpc-1",
+          force: true,
+          children: "detach",
+          deliveries: "refuse",
+        }),
+      ])
+      expect(sentTypes(host).slice(0, 2)).toEqual(["attach_session", "unload_session"])
+    })
+  })
+
+  test("#given a session with no file yet that only this client would hold #when it is closed #then an attached close_session ends it", async () => {
+    await withContractHost({ auth: true, unwritten: true }, async (host) => {
+      expect(await close(host)).toBe("closed")
+      expect(host.live()).toBe(false)
+      expect(host.mutations.map((frame) => frame.type)).toEqual(["close_session"])
+    })
+  })
+
+  test("#given a session with no file yet that another client holds #when it is closed #then the answer says another client still holds it, decided by one get_state probe", async () => {
+    await withContractHost({ auth: true, unwritten: true, otherAttachments: 1 }, async (host) => {
+      expect(await close(host)).toBe("held_elsewhere")
+      expect(host.live()).toBe(true)
+      expect(sentTypes(host).filter((type) => type === "get_state" || type === "list_sessions")).toEqual(["get_state"])
+    })
+  })
+
+  test.each([
+    ["a reason the ladder does not know", "attached", "unsupported"],
+    ["a draining host", "host_draining", "host_unavailable"],
+  ] as const)(
+    "#given unload_session refused with %s #when it is closed #then the refusal is typed %s naming the reason, as on another device",
+    async (_label, reason, code) => {
+      await withContractHost({ auth: true, unloadRefusal: reason }, async (host) => {
+        const refused = await close(host).then(
+          () => undefined,
+          (error: unknown) => controlRefusalOf(error),
+        )
+        expect(refused).toMatchObject({ code, details: { command: "unload_session", reason } })
+        expect(host.mutations).toEqual([])
+      })
+    },
+  )
+
+  // #14169: the refusal must say which blocker the engine hit (a turn, a bash command, an unwritten delivery), because
+  // the caller reads the message, not only `details`. The engine's detail is data the ladder passes through.
+  test("#given an engine without unload_refuse_deliveries that refuses the unload work_pending #when it is closed #then the refusal carries the engine's detail, says the ids are unavailable, and nothing was interrupted (#14234)", async () => {
+    await withContractHost({ auth: true, unloadRefusal: "work_pending" }, async (host) => {
+      const refused = await close(host).then(
+        () => undefined,
+        (error: unknown) => controlRefusalOf(error),
+      )
+      expect(refused).toMatchObject({
+        code: "turn_active",
+        details: { reason: "work_pending", detail: "refused: work_pending", pending_deliveries: "unavailable" },
+      })
+      expect(refused?.message).toContain("refused: work_pending")
+      expect(host.mutations.filter((frame) => frame["interrupt"] === true)).toEqual([])
+    })
+  })
+
+  test("#given a session that already left the host #when it is closed #then nothing was live and nothing is mutated", async () => {
+    await withContractHost({ auth: true, attachRefusal: "unknown_session" }, async (host) => {
+      expect(await close(host)).toBe("not_live")
+      expect(host.mutations).toEqual([])
+    })
+  })
+})

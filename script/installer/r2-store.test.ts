@@ -8,19 +8,26 @@ describe("R2 text object writes", () => {
     { key: "channels/latest", type: "text/plain" },
   ])("retries transient write failure for $key", async ({ key, type }) => {
     const fetch = spyOn(globalThis, "fetch")
-      .mockResolvedValueOnce(new Response("<Error><Code>InternalError</Code><Message>retry</Message></Error>", { status: 502 }))
+      .mockResolvedValueOnce(
+        new Response("<Error><Code>InternalError</Code><Message>retry</Message></Error>", { status: 502 }),
+      )
       .mockResolvedValueOnce(new Response(null))
     const sleep = spyOn(Bun, "sleep").mockResolvedValue(undefined)
     const log = spyOn(console, "log").mockImplementation(() => {})
     try {
-      const store = createR2Store({ accountId: "dummy", accessKeyId: "test-key", secretAccessKey: "test-secret", bucket: "omo-releases" }, "dry-run/retry/")
+      const store = createR2Store(
+        { accountId: "dummy", accessKeyId: "test-key", secretAccessKey: "test-secret", bucket: "omo-releases" },
+        "dry-run/retry/",
+      )
       await store.write(key, "5.1.48\n", type)
       expect(fetch.mock.calls).toHaveLength(2)
       expect(sleep.mock.calls).toHaveLength(1)
-      const bodies = await Promise.all(fetch.mock.calls.map(async ([, init]) => {
-        if (!(init?.body instanceof Blob)) throw new Error("expected replayable Blob")
-        return init.body.text()
-      }))
+      const bodies = await Promise.all(
+        fetch.mock.calls.map(async ([, init]) => {
+          if (!(init?.body instanceof Blob)) throw new Error("expected replayable Blob")
+          return init.body.text()
+        }),
+      )
       expect(bodies).toEqual(["5.1.48\n", "5.1.48\n"])
     } finally {
       fetch.mockRestore()
@@ -31,7 +38,10 @@ describe("R2 text object writes", () => {
   test("marker and pointer use signed fixed-length PUTs within the scratch prefix", async () => {
     // given
     const fetch = spyOn(globalThis, "fetch").mockResolvedValue(new Response(null))
-    const store = createR2Store({ accountId: "dummy", accessKeyId: "test-key", secretAccessKey: "test-secret", bucket: "omo-releases" }, "dry-run/test/")
+    const store = createR2Store(
+      { accountId: "dummy", accessKeyId: "test-key", secretAccessKey: "test-secret", bucket: "omo-releases" },
+      "dry-run/test/",
+    )
     const objects = [
       { key: "releases/v5.1.48/.complete", body: '{"version":"5.1.48"}', type: "application/json" },
       { key: "channels/latest", body: "5.1.48\n", type: "text/plain" },

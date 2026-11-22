@@ -59,7 +59,8 @@ export function resolveChildEndpoint(ports: ChildEndpointPorts, spec: RpcRunnerS
   }
   // A JavaScript caller can still construct a runner without a resolver; that is a wiring bug, and
   // it fails LOUDLY here instead of reaching the operator daemon on `rpc.sock`.
-  if (typeof ports.shardResolver !== "function") throw shardIdentityMissing("the task host runner was built without a shard resolver")
+  if (typeof ports.shardResolver !== "function")
+    throw shardIdentityMissing("the task host runner was built without a shard resolver")
   const resolution = ports.shardResolver(spec)
   if (resolution.notice !== undefined) ports.notice(resolution.notice, resolution.socket)
   const { kind, key, ownerSessionId, ownerSessionFile, inherited } = resolution.shard
@@ -88,7 +89,11 @@ export function shardIdentityMissing(detail: string): RunnerError {
  */
 export async function admitChildStore(ports: ChildEndpointPorts): Promise<void> {
   try {
-    await registerStoreIndex({ indexPath: taskStoreIndexPath(ports.agentDir), storeDir: ports.storeDir, now: ports.now })
+    await registerStoreIndex({
+      indexPath: taskStoreIndexPath(ports.agentDir),
+      storeDir: ports.storeDir,
+      now: ports.now,
+    })
   } catch (error) {
     ports.notice("store_index_unavailable")
     throw new RunnerError({

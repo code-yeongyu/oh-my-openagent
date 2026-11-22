@@ -59,7 +59,11 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
         return runMemoryUnlock(ctx, identity, parsed.positionals.slice(1).join(" "), parsed.flags.get("force") === true)
       }
       if (parsed.positionals.length > 0) {
-        return respond(ctx, `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`, "error")
+        return respond(
+          ctx,
+          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`,
+          "error",
+        )
       }
 
       if (!hasGitRepo(identity)) {
@@ -73,7 +77,11 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
       const repo = openRepo(deps, identity)
       const head = await repo.head()
       if (head === null) {
-        return respond(ctx, `memory repository at ${identity.identityPaths.repo} has no commits yet; run /init`, "error")
+        return respond(
+          ctx,
+          `memory repository at ${identity.identityPaths.repo} has no commits yet; run /init`,
+          "error",
+        )
       }
 
       const porcelain = (await repo.status()).split(/\r?\n/).filter((line) => line.trim().length > 0)

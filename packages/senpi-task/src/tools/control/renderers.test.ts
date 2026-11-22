@@ -3,12 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { ThemeColor } from "@code-yeongyu/senpi"
 import { visibleWidth } from "@earendil-works/pi-tui"
 
-import {
-  renderTaskCancelCall,
-  renderTaskCancelResult,
-  renderTaskSendCall,
-  type ControlRenderTheme,
-} from "./renderers"
+import { renderTaskCancelCall, renderTaskCancelResult, renderTaskSendCall, type ControlRenderTheme } from "./renderers"
 import { toolResult } from "./tool-result"
 import type { CancelResultDetails } from "./types"
 
@@ -60,7 +55,8 @@ describe("control tool renderers", () => {
       renderTaskSendCall(
         {
           to: "builder",
-          message: "한국어 안내가 아주 길게 이어집니다.\nEnglish guidance also continues long enough to require truncation safely.",
+          message:
+            "한국어 안내가 아주 길게 이어집니다.\nEnglish guidance also continues long enough to require truncation safely.",
         },
         ANSI_THEME,
       ),
@@ -109,7 +105,10 @@ describe("control tool renderers", () => {
     )
     const reject = firstLine(
       renderTaskSendCall(
-        { to: "builder", message: { type: "shutdown_response", request_id: "req-2", approve: false, reason: "still testing" } },
+        {
+          to: "builder",
+          message: { type: "shutdown_response", request_id: "req-2", approve: false, reason: "still testing" },
+        },
         TEST_THEME,
       ),
       120,
@@ -218,5 +217,4 @@ describe("control tool renderers", () => {
     expect(lines.join("\n")).toContain("[warning]")
     expect(lines.join("\n")).toContain("[error]")
   })
-
 })

@@ -42,10 +42,16 @@ describe("lazy memory palace sidecar", () => {
     expect(result.loadsTotal).toBe(1)
     expect(result.lazy).toEqual(result.eager)
     const [opened, remote, unbound] = result.lazy as Array<Record<string, unknown>>
-    expect(opened?.execCalls).toEqual([{ command: "open", args: [expect.stringMatching(/[\\/]viewers[\\/]palace-<ts>\.html$/)] }])
+    expect(opened?.execCalls).toEqual([
+      { command: "open", args: [expect.stringMatching(/[\\/]viewers[\\/]palace-<ts>\.html$/)] },
+    ])
     expect(String(opened?.html)).toContain('id="omo-palace-data"')
-    expect(remote?.notifications).toEqual([{ message: expect.stringMatching(/[\\/]viewers[\\/]palace-<ts>\.html$/), level: "info" }])
-    expect(unbound?.notifications).toEqual([{ message: "memory is not bound in this session, so /palace has nothing to render", level: "warning" }])
+    expect(remote?.notifications).toEqual([
+      { message: expect.stringMatching(/[\\/]viewers[\\/]palace-<ts>\.html$/), level: "info" },
+    ])
+    expect(unbound?.notifications).toEqual([
+      { message: "memory is not bound in this session, so /palace has nothing to render", level: "warning" },
+    ])
   })
 
   test("#given a fresh process #when /people runs for the first time through its registration #then the sidecar loads once and every reply matches the direct runtime", async () => {
@@ -58,7 +64,9 @@ describe("lazy memory palace sidecar", () => {
     const [roster, , , miss] = result.lazy as Array<Record<string, unknown>>
     expect(roster?.notifications).toEqual([{ message: roster?.result, level: "info" }])
     expect(String(roster?.result)).toContain("jane-doe")
-    expect(miss?.notifications).toEqual([{ message: expect.stringContaining('no person matches "jane doh"'), level: "error" }])
+    expect(miss?.notifications).toEqual([
+      { message: expect.stringContaining('no person matches "jane doh"'), level: "error" },
+    ])
   })
 
   test("#given the full memory wiring #when a session starts and a turn settles #then the sidecar stays unloaded until /palace, which loads it exactly once", async () => {
@@ -74,11 +82,16 @@ describe("lazy memory palace sidecar", () => {
   })
 
   test("#given a sidecar that fails to load #when /palace runs #then an actionable error notification names the artifact and the fix", async () => {
-    const loader = createPalaceRuntimeLoader(() => Promise.reject(new Error("Cannot find module '#omo-memory-palace-runtime'")))
+    const loader = createPalaceRuntimeLoader(() =>
+      Promise.reject(new Error("Cannot find module '#omo-memory-palace-runtime'")),
+    )
     const pi = new MemoryFakeExtensionAPI()
     registerPalaceCommand(pi, () => undefined, undefined, loader)
     const notifications: Array<{ message: string; level?: string }> = []
-    const ctx: PalaceCommandContext = { hasUI: true, ui: { notify: (message, level) => notifications.push({ message, level }) } }
+    const ctx: PalaceCommandContext = {
+      hasUI: true,
+      ui: { notify: (message, level) => notifications.push({ message, level }) },
+    }
 
     await invokeHandler(pi, "palace", "", ctx)
 
@@ -91,7 +104,9 @@ describe("lazy memory palace sidecar", () => {
   })
 
   test("#given a sidecar that fails to load #when /people runs #then the actionable error is the reply and its error notification", async () => {
-    const loader = createPalaceRuntimeLoader(() => Promise.reject(new Error("unexpected token in omo-memory-palace.js")))
+    const loader = createPalaceRuntimeLoader(() =>
+      Promise.reject(new Error("unexpected token in omo-memory-palace.js")),
+    )
     const pi = new MemoryFakeExtensionAPI()
     registerPeopleCommand(pi, fakeDeps(undefined), loader)
     const ctx = fakeCommandContext()

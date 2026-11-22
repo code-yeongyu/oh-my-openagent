@@ -37,7 +37,8 @@ export async function installDefaultAgentRole(input: {
       if (!foreign && config !== null) {
         const next = splitTomlSections(config)
           .filter((section) => section.header === null || parseAgentHeaderName(section.header) !== "default")
-          .map((section) => section.text).join("")
+          .map((section) => section.text)
+          .join("")
         if (next !== config) await writeFileAtomic(configPath, next)
       }
       await rm(target)
@@ -46,7 +47,9 @@ export async function installDefaultAgentRole(input: {
     return null
   }
   if (foreign || (existing !== null && !owned)) {
-    throw new Error("Preserved user-owned agents.default / agents/default.toml. Move it aside to install the LazyCodex fallback, or set [codex].agents.default.disable = true in omo.jsonc. Explicit LazyCodex roles remain required.")
+    throw new Error(
+      "Preserved user-owned agents.default / agents/default.toml. Move it aside to install the LazyCodex fallback, or set [codex].agents.default.disable = true in omo.jsonc. Explicit LazyCodex roles remain required.",
+    )
   }
   const worker = await readFile(input.worker.path, "utf8")
   const content = worker.replace(/^name\s*=\s*["']lazycodex-worker-medium["']\s*$/m, 'name = "default"')

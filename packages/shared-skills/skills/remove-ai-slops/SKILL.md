@@ -72,12 +72,12 @@ The agent looks for these ten categories. The first three are stylistic, the nex
 10. **Oversized modules** — any source file exceeding **250 pure LOC** (non-blank, non-comment lines). This is an architectural defect, not a style preference. Measure: `awk '!/^[[:space:]]*$/ && !/^[[:space:]]*(#|\/\/)/' <file> | wc -l`.
 
    **When found, do NOT just flag it. Execute a full modular refactoring:**
-   1. Run `check-no-excuse-rules.py` recursively on scope to list all violations.
+   1. List every oversized file in scope: run the `awk` measure above on each source file. For `.py` files you may instead run the `programming` skill's Python checker (`uv run <programming skill dir>/scripts/python/check-no-excuse-rules.py <paths>`, rule `oversized-module`); it scans only `.py` files, so it never covers another language.
    2. For each oversized file, identify distinct responsibilities (single-responsibility principle).
    3. Plan the split: name each new file after the concept it owns (never `utils.py`, `helpers.py`, `common.py`, `part_1.py`).
    4. Present the split plan to the user before executing.
    5. Extract into clean modules with explicit `__init__.py` re-exports (re-exports ONLY, no logic in `__init__.py`).
-   6. Verify: run `check-no-excuse-rules.py` again — every file must be ≤250 pure LOC. Run tests, typecheck, lint.
+   6. Verify: re-measure exactly as in step 1 — every file must be ≤250 pure LOC. Run tests, typecheck, lint.
 
    **Forbidden escapes**:
    - Counting blanks/comments toward budget.
@@ -86,7 +86,7 @@ The agent looks for these ten categories. The first three are stylistic, the nex
    - "It's generated" — only valid if the file lives in a build output directory.
    - "230 LOC, close enough" — a 230-LOC file about to grow is already over. Split now.
 
-   KEEP: genuinely self-contained single-responsibility scripts (e.g., a standalone CLI checker). Opt out with `# noqa: SIZE_OK` in first 5 lines and a comment explaining why.
+   KEEP: genuinely self-contained single-responsibility scripts (e.g., a standalone CLI checker). Opt out with the language's SIZE_OK marker in the first 10 lines (`# noqa: SIZE_OK` in Python, the form the Python checker reads; `// allow: SIZE_OK` in `//`-comment languages) and a comment explaining why.
 
 ---
 
@@ -106,7 +106,7 @@ A pass is complete only when all applicable gates are green. Skip gates that are
 
 ## Process
 
-### Phase 0: Plan with TodoWrite
+### Phase 0: Plan with the todo tool
 
 Create todos for all phases below. Mark `in_progress` one at a time.
 
@@ -246,8 +246,8 @@ If any gate fails or any checklist item flips:
 
 1. Identify the specific change that caused the failure.
 2. Explain why it broke things.
-3. `git checkout` the affected file (or use `git diff` + targeted `Edit` to revert just the problematic hunk).
-4. If genuine slop remains after revert, edit the file directly yourself — in parallel per file via multiple Edit calls — applying only the changes you can prove are safe.
+3. `git checkout` the affected file (or use `git diff` + targeted `edit` to revert just the problematic hunk).
+4. If genuine slop remains after revert, edit the file directly yourself — in parallel per file via multiple `edit` calls — applying only the changes you can prove are safe.
 5. Re-run the failing gate and re-walk the checklist for the affected file.
 6. Repeat until all gates green AND checklist clean.
 

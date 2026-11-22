@@ -4,13 +4,16 @@
 
 import { join } from "node:path"
 
+import {
+  KIBITZER_ENCODED_SESSION_PATTERN,
+  KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE,
+  kibitzerSidecarOwnerLockPathFor,
+  kibitzerSidecarsRoot,
+} from "@oh-my-opencode/memory-core"
+
 export const KIBITZER_WAKES_FILENAME = "wakes.ndjson"
-export const OWNER_LOCK_PURPOSE = "recall-sidecar"
-export const PRUNE_TOMBSTONE_PREFIX = ".prune-"
-export const ENCODED_SESSION_PATTERN = /^[A-Za-z0-9_-]+$/
-const SIDECARS_DIRNAME = "sidecars"
-const OWNER_LOCK_PREFIX = "recall-sidecar."
-const OWNER_LOCK_SUFFIX = ".lock"
+export const OWNER_LOCK_PURPOSE = KIBITZER_SIDECAR_OWNER_LOCK_PURPOSE
+const ENCODED_SESSION_PATTERN = KIBITZER_ENCODED_SESSION_PATTERN
 
 /** Unpadded URL-safe base64 of the id's UTF-8 bytes: injective, and every output is a safe path segment. */
 export function encodeKibitzerSessionId(sessionId: string): string {
@@ -22,10 +25,6 @@ export function decodeKibitzerSidecarDirName(name: string): string | undefined {
   if (!ENCODED_SESSION_PATTERN.test(name)) return undefined
   const bytes = Buffer.from(name, "base64url")
   return bytes.toString("base64url") === name ? bytes.toString("utf8") : undefined
-}
-
-export function kibitzerSidecarsRoot(recallDir: string): string {
-  return join(recallDir, SIDECARS_DIRNAME)
 }
 
 /**
@@ -45,6 +44,4 @@ export function kibitzerSidecarOwnerLockPath(locksDir: string, sessionId: string
   return ownerLockPathFor(locksDir, encodeKibitzerSessionId(sessionId))
 }
 
-export function ownerLockPathFor(locksDir: string, encodedSession: string): string {
-  return join(locksDir, `${OWNER_LOCK_PREFIX}${encodedSession}${OWNER_LOCK_SUFFIX}`)
-}
+export const ownerLockPathFor = kibitzerSidecarOwnerLockPathFor

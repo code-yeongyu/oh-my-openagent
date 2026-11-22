@@ -63,7 +63,9 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     expect(result.config.task?.host_engine_policy).toBe("upgrade")
     expect(result.config.agents?.sisyphus?.model).toBe("anthropic/claude-opus-5")
     expect(result.sources.find((source) => source.path === path)?.loaded).toBe(true)
-    expect(result.diagnostics).toEqual([expect.objectContaining({ kind: "invalid-value", path, issuePaths: ["task.host_engine_policy"] })])
+    expect(result.diagnostics).toEqual([
+      expect.objectContaining({ kind: "invalid-value", path, issuePaths: ["task.host_engine_policy"] }),
+    ])
   })
 
   test("#given one invalid field inside agents.oracle #when loading #then only that field is dropped and the agent's other fields survive", () => {
@@ -148,7 +150,9 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     const fixture = makeFixture()
     const path = writeUserConfig(fixture, {
       bogus_top: 1,
-      teams: { alpha: { members: [{ kind: "category", name: "worker", category: "quick", prompt: "go", extra: "x" }] } },
+      teams: {
+        alpha: { members: [{ kind: "category", name: "worker", category: "quick", prompt: "go", extra: "x" }] },
+      },
     })
 
     // when
@@ -168,7 +172,9 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     const fixture = makeFixture()
     writeUserConfig(fixture, {
       "[senpi]": { task: { host_engine_policy: 42, default_concurrency: 2 } },
-      profiles: { fast: { task: { max_depth: -1, ttl_ms: 1000 }, agents: { explore: { model: "openai/gpt-6-luna" } } } },
+      profiles: {
+        fast: { task: { max_depth: -1, ttl_ms: 1000 }, agents: { explore: { model: "openai/gpt-6-luna" } } },
+      },
     })
 
     // when
@@ -186,7 +192,10 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     // given
     const fixture = makeFixture()
     writeUserConfig(fixture, { task: { default_concurrency: 4 } })
-    const projectPath = writeProjectConfig(fixture, { task: { default_concurrency: "many" }, agents: { oracle: { model: 1 } } })
+    const projectPath = writeProjectConfig(fixture, {
+      task: { default_concurrency: "many" },
+      agents: { oracle: { model: 1 } },
+    })
 
     // when
     const result = load(fixture)
@@ -203,7 +212,7 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     // given
     const fixture = makeFixture()
     const userPath = writeUserConfig(fixture, "[1, 2]")
-    const projectPath = writeProjectConfig(fixture, "{ \"task\": ")
+    const projectPath = writeProjectConfig(fixture, '{ "task": ')
 
     // when
     const result = load(fixture)
@@ -211,7 +220,10 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     // then
     expect(result.layers).toHaveLength(0)
     expect(result.config.task?.default_concurrency).toBe(5)
-    expect(result.diagnostics.map((d) => [d.kind, d.path])).toEqual([["validation", userPath], ["parse", projectPath]])
+    expect(result.diagnostics.map((d) => [d.kind, d.path])).toEqual([
+      ["validation", userPath],
+      ["parse", projectPath],
+    ])
   })
 
   test("#given a partial team spec that is valid per file but invalid once merged #when loading #then only that team is dropped instead of resetting the whole config", () => {
@@ -226,7 +238,11 @@ describe("loadOmoConfig prunes only the invalid path in every section", () => {
     expect(result.config.task?.default_concurrency).toBe(3)
     expect(result.config.teams?.alpha).toBeUndefined()
     expect(result.diagnostics).toEqual([
-      expect.objectContaining({ kind: "invalid-value", path: MERGED_CONFIG_DIAGNOSTIC_PATH, issuePaths: ["teams.alpha"] }),
+      expect.objectContaining({
+        kind: "invalid-value",
+        path: MERGED_CONFIG_DIAGNOSTIC_PATH,
+        issuePaths: ["teams.alpha"],
+      }),
     ])
   })
 })

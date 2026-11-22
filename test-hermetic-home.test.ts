@@ -4,7 +4,14 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { isAbsolute, join, relative } from "node:path"
-import { probeSocket, runCheckThenTeardown, shardsCreatedBy, type SocketState, stopRunTaskHosts, type TaskHostEngine } from "./test-hermetic-home"
+import {
+  probeSocket,
+  runCheckThenTeardown,
+  shardsCreatedBy,
+  type SocketState,
+  stopRunTaskHosts,
+  type TaskHostEngine,
+} from "./test-hermetic-home"
 
 describe("hermetic memory home (#9469)", () => {
   test("the preload pins memory inside the temporary home", () => {
@@ -40,7 +47,18 @@ describe("hermetic git config (#11742)", () => {
     for (const [key, value] of repoConfig) git("config", key, value)
     writeFileSync(join(dir, "file.txt"), "content\n")
     git("add", "-A")
-    const result = git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "-q", "-m", "probe")
+    const result = git(
+      "-c",
+      "user.name=t",
+      "-c",
+      "user.email=t@t",
+      "-c",
+      "commit.gpgsign=false",
+      "commit",
+      "-q",
+      "-m",
+      "probe",
+    )
     expect(result.status, result.stderr).toBe(0)
     expect(result.stderr).toContain("built-in: git commit")
     return result.stderr
@@ -94,7 +112,10 @@ describe("shardsCreatedBy (#9673)", () => {
   test("reports a shard naming this pid whose created_at cannot be parsed", () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-shards-"))
     dirs.push(dir)
-    writeFileSync(join(dir, "p-abc.meta.json"), JSON.stringify({ created_by_pid: process.pid, created_at: "not a date" }))
+    writeFileSync(
+      join(dir, "p-abc.meta.json"),
+      JSON.stringify({ created_by_pid: process.pid, created_at: "not a date" }),
+    )
     expect(shardsCreatedBy(dir, process.pid, startedAt)).toEqual([join(dir, "p-abc.meta.json")])
   })
 
@@ -111,9 +132,12 @@ describe("runCheckThenTeardown (#9766)", () => {
 
   test("#given the check throws #when run #then the teardown still runs and the check error is thrown", async () => {
     let tornDown = false
-    const run = runCheckThenTeardown(async () => fail("shards")(), () => {
-      tornDown = true
-    })
+    const run = runCheckThenTeardown(
+      async () => fail("shards")(),
+      () => {
+        tornDown = true
+      },
+    )
 
     await expect(run).rejects.toThrow("shards")
     expect(tornDown).toBe(true)
@@ -136,9 +160,12 @@ describe("runCheckThenTeardown (#9766)", () => {
 
   test("#given an async teardown that rejects #when run #then the rejection is thrown", async () => {
     await expect(
-      runCheckThenTeardown(async () => {}, async () => {
-        throw new Error("async leftovers")
-      }),
+      runCheckThenTeardown(
+        async () => {},
+        async () => {
+          throw new Error("async leftovers")
+        },
+      ),
     ).rejects.toThrow("async leftovers")
   })
 })
@@ -186,7 +213,12 @@ describe("stopRunTaskHosts (#11630)", () => {
     const dir = mkdtempSync(join(tmpdir(), "omo-agent-"))
     dirs.push(dir)
     let loaded = false
-    await stopRunTaskHosts(dir, { loadEngine: async () => { loaded = true; return engine({}) } })
+    await stopRunTaskHosts(dir, {
+      loadEngine: async () => {
+        loaded = true
+        return engine({})
+      },
+    })
     expect(loaded).toBe(false)
   })
 
@@ -194,13 +226,14 @@ describe("stopRunTaskHosts (#11630)", () => {
     const pid = sleeper()
     const stops: unknown[] = []
     await stopRunTaskHosts(agentDirWithHosts(), {
-      loadEngine: async () => engine({
-        stopHost: async (options) => {
-          stops.push(options)
-          process.kill(pid, "SIGTERM")
-          return { action: "stopped", pid }
-        },
-      }),
+      loadEngine: async () =>
+        engine({
+          stopHost: async (options) => {
+            stops.push(options)
+            process.kill(pid, "SIGTERM")
+            return { action: "stopped", pid }
+          },
+        }),
     })
     expect(stops).toEqual([expect.objectContaining({ socket: "/run/a.sock", force: true })])
   })
@@ -214,13 +247,17 @@ describe("stopRunTaskHosts (#11630)", () => {
   test("#given a terminal endpoint #when torn down #then only rpc hosts are stopped", async () => {
     const stopped: string[] = []
     await stopRunTaskHosts(agentDirWithHosts(), {
-      loadEngine: async () => engine({
-        listHostEndpoints: async () => [{ socket: "/run/t.sock", endpoint_kind: "tui" }, { socket: null, endpoint_kind: "rpc_host" }],
-        stopHost: async (options) => {
-          stopped.push(options.socket)
-          return { action: "refuse", reason: "unknown_owner" }
-        },
-      }),
+      loadEngine: async () =>
+        engine({
+          listHostEndpoints: async () => [
+            { socket: "/run/t.sock", endpoint_kind: "tui" },
+            { socket: null, endpoint_kind: "rpc_host" },
+          ],
+          stopHost: async (options) => {
+            stopped.push(options.socket)
+            return { action: "refuse", reason: "unknown_owner" }
+          },
+        }),
     })
     expect(stopped).toEqual([])
   })
@@ -261,12 +298,21 @@ describe("stopRunTaskHosts (#11630)", () => {
     await stopRunTaskHosts(agentDirWithHosts(), {
       deadlineMs: 200,
       engineWaitMs: 5_000,
-      loadEngine: () => new Promise((resolve) => setTimeout(() => resolve(engine({
-        stopHost: async (options) => {
-          stopped.push(options.socket)
-          return { action: "refuse", reason: "unknown_owner" }
-        },
-      })), 400)),
+      loadEngine: () =>
+        new Promise((resolve) =>
+          setTimeout(
+            () =>
+              resolve(
+                engine({
+                  stopHost: async (options) => {
+                    stopped.push(options.socket)
+                    return { action: "refuse", reason: "unknown_owner" }
+                  },
+                }),
+              ),
+            400,
+          ),
+        ),
       probeSocket: socketIs("gone"),
     })
     expect(stopped).toEqual(["/run/a.sock"])
@@ -322,16 +368,23 @@ describe("probeSocket (#11630)", () => {
     expect(await probeSocket(socketPath(), 1_000)).toBe("gone")
   })
 
-  test.skipIf(process.platform === "win32")("#given a socket file its listener left behind #when probed #then it is gone", async () => {
-    const path = socketPath()
-    // A host killed outright leaves its socket file with nothing listening on it.
-    const holder = spawn(process.execPath, ["-e", `require("node:net").createServer().listen(${JSON.stringify(path)}, () => console.log("ready"))`], {
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-    await new Promise<void>((resolve) => holder.stdout.once("data", () => resolve()))
-    const exited = new Promise((resolve) => holder.once("exit", resolve))
-    holder.kill("SIGKILL")
-    await exited
-    expect(await probeSocket(path, 1_000)).toBe("gone")
-  })
+  test.skipIf(process.platform === "win32")(
+    "#given a socket file its listener left behind #when probed #then it is gone",
+    async () => {
+      const path = socketPath()
+      // A host killed outright leaves its socket file with nothing listening on it.
+      const holder = spawn(
+        process.execPath,
+        ["-e", `require("node:net").createServer().listen(${JSON.stringify(path)}, () => console.log("ready"))`],
+        {
+          stdio: ["ignore", "pipe", "ignore"],
+        },
+      )
+      await new Promise<void>((resolve) => holder.stdout.once("data", () => resolve()))
+      const exited = new Promise((resolve) => holder.once("exit", resolve))
+      holder.kill("SIGKILL")
+      await exited
+      expect(await probeSocket(path, 1_000)).toBe("gone")
+    },
+  )
 })

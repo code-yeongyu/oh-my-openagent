@@ -8,6 +8,18 @@ import type { HostRetryFallbackProfile } from "./rpc-host/session-transport"
  * A one-model child gets fallback off. The overlay replaces the user's `retry.fallbackChains` wholesale,
  * so the user's chains never reach a child either.
  */
+/** The designated models in try order, as a refusal names them: `a -> b -> c`. */
+export function designatedChainText(model: string, fallbackModels: readonly string[]): string {
+  return [model, ...fallbackModels].join(" -> ")
+}
+
+/** The designated models a profile from {@link designatedFallbackProfile} holds, in try order. */
+export function designatedChainOf(profile: HostRetryFallbackProfile): string {
+  const chains = Object.entries(profile.fallbackChains)
+  const [model, fallbacks] = chains.find(([, chain]) => chain.length > 0) ?? chains[0] ?? ["", []]
+  return designatedChainText(model, fallbacks)
+}
+
 export function designatedFallbackProfile(model: string, fallbackModels: readonly string[]): HostRetryFallbackProfile {
   const tombstones = [model, ...fallbackModels]
     .map((selector) => splitModelDecorators(selector).base)

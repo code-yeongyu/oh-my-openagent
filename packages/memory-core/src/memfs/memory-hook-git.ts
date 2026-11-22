@@ -38,7 +38,11 @@ export function parseRawZ(output: string): StagedEntry[] {
     const [, dstMode = "", srcBlob = "", dstBlob = "", status = ""] = meta.slice(1).split(" ")
     const first = tokens[index++] ?? ""
     const base = { status, srcBlob, dstBlob, dstMode }
-    entries.push(status.startsWith("R") || status.startsWith("C") ? { ...base, from: first, path: tokens[index++] ?? "" } : { ...base, path: first })
+    entries.push(
+      status.startsWith("R") || status.startsWith("C")
+        ? { ...base, from: first, path: tokens[index++] ?? "" }
+        : { ...base, path: first },
+    )
   }
   return entries
 }
@@ -64,7 +68,10 @@ export function mergeHeads(cwd: string): string[] {
   if (path === undefined || path === "") return []
   try {
     const absolute = path.startsWith("/") || /^[A-Za-z]:/.test(path) ? path : join(cwd, path)
-    return readFileSync(absolute, "utf8").split("\n").map((line) => line.trim()).filter(Boolean)
+    return readFileSync(absolute, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
   } catch {
     return []
   }

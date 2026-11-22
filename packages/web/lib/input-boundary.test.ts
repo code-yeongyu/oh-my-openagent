@@ -16,3 +16,18 @@ describe("form control boundary token", () => {
     },
   )
 })
+
+describe("form control boundary token in the Day palette", () => {
+  test.each(INKS)(
+    "#given the Day palette pinned by the theme switch #when the --input border is drawn on %s #then it still meets 3:1",
+    (ink) => {
+      const night = readRootTokens()
+      const day = readRootTokens(undefined, ':root[data-theme="light"]')
+      const tokens = new Map([...night, ...day])
+
+      const ratio = contrastRatio(resolveColor(tokens, "--input"), resolveColor(tokens, ink))
+
+      expect(ratio).toBeGreaterThanOrEqual(3)
+    },
+  )
+})

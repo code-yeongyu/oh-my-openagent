@@ -5,14 +5,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-const GIT_IDENTITY = [
-  "-c",
-  "user.name=QA",
-  "-c",
-  "user.email=qa@example.invalid",
-  "-c",
-  "commit.gpgsign=false",
-]
+const GIT_IDENTITY = ["-c", "user.name=QA", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false"]
 
 const createdDirs: string[] = []
 
@@ -71,11 +64,7 @@ export function advanceCommits(
     )
     for (const fileIndex of touchedFileIndexes) {
       const content = sourceFile(100 + step + 1)
-      stream.push(
-        `M 100644 inline src/file${fileIndex}.ts`,
-        `data ${Buffer.byteLength(content)}`,
-        content,
-      )
+      stream.push(`M 100644 inline src/file${fileIndex}.ts`, `data ${Buffer.byteLength(content)}`, content)
     }
     stream.push("")
   }
@@ -88,12 +77,7 @@ export function sourceFile(lines: number): string {
   return Array.from({ length: lines }, (_, index) => `export const value${index} = ${index}`).join("\n")
 }
 
-export function makeDirWithSourceFiles(
-  root: string,
-  relativeDir: string,
-  fileCount: number,
-  linesPerFile = 3,
-): void {
+export function makeDirWithSourceFiles(root: string, relativeDir: string, fileCount: number, linesPerFile = 3): void {
   for (let index = 0; index < fileCount; index++) {
     writeFileAt(root, join(relativeDir, `file${index}.ts`), sourceFile(linesPerFile))
   }

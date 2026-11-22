@@ -15,10 +15,7 @@ import type { LiveDeliveryClient } from "./tools/messaging"
 import { BackgroundManager } from "../background-agent/manager"
 import type { BackgroundTask, LaunchInput } from "../background-agent/types"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
-import {
-  clearAllSessionPromptParams,
-  getSessionPromptParams,
-} from "../../shared/session-prompt-params-state"
+import { clearAllSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { getRuntimeStateDir, resolveBaseDir } from "./team-registry/paths"
 import { createLaunchConcurrencyProbe } from "./test-support/async-test-helpers"
 import type { TeamSpec } from "./types"
@@ -63,9 +60,11 @@ function createSpec(name: string, leadAgentId: string, members: TeamSpec["member
 function createClient(aliveSessionIds: ReadonlySet<string>): MockClient {
   return {
     session: {
-      get: mock(async ({ path: { id } }: { path: { id: string } }) => aliveSessionIds.has(id)
-        ? { data: { id } }
-        : { error: Object.assign(new Error("session not found"), { status: 404 }) }),
+      get: mock(async ({ path: { id } }: { path: { id: string } }) =>
+        aliveSessionIds.has(id)
+          ? { data: { id } }
+          : { error: Object.assign(new Error("session not found"), { status: 404 }) },
+      ),
     },
   } as MockClient
 }
@@ -73,18 +72,26 @@ function createClient(aliveSessionIds: ReadonlySet<string>): MockClient {
 function createManager(launchImpl?: (input: LaunchInput) => Promise<BackgroundTask>) {
   const manager = Object.create(BackgroundManager.prototype) as BackgroundManager
   let launchCount = 0
-  manager.launch = mock((input: LaunchInput) => launchImpl?.(input) ?? Promise.resolve({
-    id: `task-${++launchCount}`,
-    sessionId: `ses_mock_${randomUUID()}`,
-    status: "running",
-  } as BackgroundTask))
+  manager.launch = mock(
+    (input: LaunchInput) =>
+      launchImpl?.(input) ??
+      Promise.resolve({
+        id: `task-${++launchCount}`,
+        sessionId: `ses_mock_${randomUUID()}`,
+        status: "running",
+      } as BackgroundTask),
+  )
   manager.getTask = mock(() => undefined)
   manager.cancelTask = mock(async () => true)
   manager.getTasksByParentSession = mock(() => [])
   return manager
 }
 
-function createContext(directory: string, manager: BackgroundManager, aliveSessionIds: ReadonlySet<string>): ExecutorContext {
+function createContext(
+  directory: string,
+  manager: BackgroundManager,
+  aliveSessionIds: ReadonlySet<string>,
+): ExecutorContext {
   return { client: createClient(aliveSessionIds), manager, directory }
 }
 
@@ -108,7 +115,9 @@ afterEach(async () => {
   resolveMemberMock.mockClear()
   SessionCategoryRegistry.clear()
   clearAllSessionPromptParams()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directory) => rm(directory, { recursive: true, force: true })),
+  )
 })
 
 describe("team-mode integration", () => {
@@ -117,10 +126,31 @@ describe("team-mode integration", () => {
     const baseDir = await createBaseDir()
     const config = createConfig(baseDir)
     const manager = createManager()
-    const runtime = await createTeamRun(createSpec("echo-team", "echo", [{ kind: "subagent_type", name: "echo", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), config, manager)
+    const runtime = await createTeamRun(
+      createSpec("echo-team", "echo", [
+        { kind: "subagent_type", name: "echo", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_lead",
+      createContext(baseDir, manager, new Set(["ses_lead"])),
+      config,
+      manager,
+    )
 
     // when
-    const delivered = await sendMessage({ version: 1, messageId: randomUUID(), from: "echo", to: "echo", kind: "message", body: "hello", timestamp: Date.now() }, runtime.teamRunId, config, { isLead: true, activeMembers: ["echo"] })
+    const delivered = await sendMessage(
+      {
+        version: 1,
+        messageId: randomUUID(),
+        from: "echo",
+        to: "echo",
+        kind: "message",
+        body: "hello",
+        timestamp: Date.now(),
+      },
+      runtime.teamRunId,
+      config,
+      { isLead: true, activeMembers: ["echo"] },
+    )
     const status = await aggregateStatus(runtime.teamRunId, config)
     await deleteTeam(runtime.teamRunId, config, undefined, manager)
 
@@ -138,11 +168,21 @@ describe("team-mode integration", () => {
     const baseDir = await createBaseDir()
     const config = createConfig(baseDir)
     const manager = createManager()
-    const runtime = await createTeamRun(createSpec("pipeline-team", "lead", [
-      { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-      { kind: "subagent_type", name: "worker", subagent_type: "atlas", backendType: "in-process", isActive: true },
-    ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), config, manager)
-    const createdTask = await createTask(runtime.teamRunId, { subject: "X", description: "Ship X", blocks: [], blockedBy: [], status: "pending" }, config)
+    const runtime = await createTeamRun(
+      createSpec("pipeline-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
+        { kind: "subagent_type", name: "worker", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_lead",
+      createContext(baseDir, manager, new Set(["ses_lead"])),
+      config,
+      manager,
+    )
+    const createdTask = await createTask(
+      runtime.teamRunId,
+      { subject: "X", description: "Ship X", blocks: [], blockedBy: [], status: "pending" },
+      config,
+    )
 
     // when
     const claimedTask = await claimTask(runtime.teamRunId, createdTask.id, "worker", config)
@@ -164,12 +204,54 @@ describe("team-mode integration", () => {
     const config = createConfig(baseDir)
     const manager = createManager()
     const context = createContext(baseDir, manager, aliveSessionIds)
-    const aliveRuntime = await createTeamRun(createSpec("alive-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true }]), "ses_alive", context, config, manager)
-    const deadRuntime = await createTeamRun(createSpec("dead-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_dead", context, config, manager)
-    const stuckRuntime = await createTeamRun(createSpec("stuck-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_stuck", context, config, manager)
-    const deletingRuntime = await createTeamRun(createSpec("deleting-team", "lead", [{ kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true }]), "ses_delete", context, config, manager)
-    await saveRuntimeState({ ...(await loadRuntimeState(stuckRuntime.teamRunId, config)), status: "creating", createdAt: Date.now() - 40 * 60 * 1000 }, config)
-    await saveRuntimeState({ ...(await loadRuntimeState(deletingRuntime.teamRunId, config)), status: "deleting" }, config)
+    const aliveRuntime = await createTeamRun(
+      createSpec("alive-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
+      ]),
+      "ses_alive",
+      context,
+      config,
+      manager,
+    )
+    const deadRuntime = await createTeamRun(
+      createSpec("dead-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_dead",
+      context,
+      config,
+      manager,
+    )
+    const stuckRuntime = await createTeamRun(
+      createSpec("stuck-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_stuck",
+      context,
+      config,
+      manager,
+    )
+    const deletingRuntime = await createTeamRun(
+      createSpec("deleting-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_delete",
+      context,
+      config,
+      manager,
+    )
+    await saveRuntimeState(
+      {
+        ...(await loadRuntimeState(stuckRuntime.teamRunId, config)),
+        status: "creating",
+        createdAt: Date.now() - 40 * 60 * 1000,
+      },
+      config,
+    )
+    await saveRuntimeState(
+      { ...(await loadRuntimeState(deletingRuntime.teamRunId, config)), status: "deleting" },
+      config,
+    )
 
     // when
     const report = await resumeAllTeams(context, config)
@@ -196,25 +278,27 @@ describe("team-mode integration", () => {
       directory?: string
     }
     const recorded: RecordedPrompt[] = []
-    const promptAsyncSpy = mock(async (input: {
-      path: { id: string }
-      body: {
-        parts: Array<{ type: string; text?: string }>
-        agent?: string
-        model?: { providerID: string; modelID: string }
-        variant?: string
-      }
-      query?: { directory: string }
-    }) => {
-      recorded.push({
-        sessionId: input.path.id,
-        agent: input.body.agent,
-        model: input.body.model,
-        variant: input.body.variant,
-        directory: input.query?.directory,
-      })
-      return undefined
-    })
+    const promptAsyncSpy = mock(
+      async (input: {
+        path: { id: string }
+        body: {
+          parts: Array<{ type: string; text?: string }>
+          agent?: string
+          model?: { providerID: string; modelID: string }
+          variant?: string
+        }
+        query?: { directory: string }
+      }) => {
+        recorded.push({
+          sessionId: input.path.id,
+          agent: input.body.agent,
+          model: input.body.model,
+          variant: input.body.variant,
+          directory: input.query?.directory,
+        })
+        return undefined
+      },
+    )
     const recordingClient = {
       session: {
         get: mock(async ({ path: { id } }: { path: { id: string } }) => ({ data: { id } })),
@@ -223,22 +307,36 @@ describe("team-mode integration", () => {
     } as ExecutorContext["client"] & LiveDeliveryClient
     const ctx = { client: recordingClient, manager, directory: baseDir }
 
-    const runtime = await createTeamRun(createSpec("msg-team", "lead", [
-      { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-      { kind: "category", name: "worker", category: "quick", prompt: "work the queue", backendType: "in-process", isActive: true },
-    ]), "ses_lead", ctx, config, manager)
+    const runtime = await createTeamRun(
+      createSpec("msg-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
+        {
+          kind: "category",
+          name: "worker",
+          category: "quick",
+          prompt: "work the queue",
+          backendType: "in-process",
+          isActive: true,
+        },
+      ]),
+      "ses_lead",
+      ctx,
+      config,
+      manager,
+    )
 
     const leadMember = runtime.members.find((member) => member.name === "lead")
     const workerMember = runtime.members.find((member) => member.name === "worker")
     if (!leadMember?.sessionId || !workerMember?.sessionId) {
       throw new Error("expected both team members to hold sessionIds")
     }
-    await saveRuntimeState({
-      ...runtime,
-      members: runtime.members.map((member) => (
-        member.name === "worker" ? { ...member, status: "idle" } : member
-      )),
-    }, config)
+    await saveRuntimeState(
+      {
+        ...runtime,
+        members: runtime.members.map((member) => (member.name === "worker" ? { ...member, status: "idle" } : member)),
+      },
+      config,
+    )
 
     const { createTeamSendMessageTool } = await import("./tools/messaging")
     const tool = createTeamSendMessageTool(config, recordingClient)
@@ -255,11 +353,14 @@ describe("team-mode integration", () => {
       ask: async () => undefined,
     } as Parameters<ReturnType<typeof createTeamSendMessageTool>["execute"]>[1]
 
-    await tool.execute({
-      teamRunId: runtime.teamRunId,
-      to: "worker",
-      body: "integration-ping",
-    }, toolContext)
+    await tool.execute(
+      {
+        teamRunId: runtime.teamRunId,
+        to: "worker",
+        body: "integration-ping",
+      },
+      toolContext,
+    )
 
     // then - runtime state carries the resolved identity end-to-end, and promptAsync receives it
     const persistedRuntime = await loadRuntimeState(runtime.teamRunId, config)
@@ -307,11 +408,17 @@ describe("team-mode integration", () => {
     const manager = createManager(async (input) => launchProbe.launch(input))
 
     // when
-    const run = createTeamRun(createSpec("parallel-team", "lead", [
-      { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
-      { kind: "subagent_type", name: "worker-a", subagent_type: "atlas", backendType: "in-process", isActive: true },
-      { kind: "subagent_type", name: "worker-b", subagent_type: "atlas", backendType: "in-process", isActive: true },
-    ]), "ses_lead", createContext(baseDir, manager, new Set(["ses_lead"])), createConfig(baseDir, { max_parallel_members: launchLimit }), manager)
+    const run = createTeamRun(
+      createSpec("parallel-team", "lead", [
+        { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true },
+        { kind: "subagent_type", name: "worker-a", subagent_type: "atlas", backendType: "in-process", isActive: true },
+        { kind: "subagent_type", name: "worker-b", subagent_type: "atlas", backendType: "in-process", isActive: true },
+      ]),
+      "ses_lead",
+      createContext(baseDir, manager, new Set(["ses_lead"])),
+      createConfig(baseDir, { max_parallel_members: launchLimit }),
+      manager,
+    )
     try {
       const firstBatch = await launchProbe.waitForFirstBatch()
       await launchProbe.releaseAndWaitForCompletion(run)

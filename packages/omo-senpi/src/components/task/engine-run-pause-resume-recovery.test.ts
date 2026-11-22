@@ -9,8 +9,16 @@ afterEach(cleanupProjects)
 
 const PARENT = "parent"
 const nodeB: PauseParticipant = {
-  key: "st_b", kind: "dag_node", taskId: "st_b", nodeId: "b", runEpoch: 0,
-  runRef: { kind: "dag", id: "run-1" }, state: "held", ackSeq: 7, observedChildSeq: 8, at: "2026-01-01T00:00:00.000Z",
+  key: "st_b",
+  kind: "dag_node",
+  taskId: "st_b",
+  nodeId: "b",
+  runEpoch: 0,
+  runRef: { kind: "dag", id: "run-1" },
+  state: "held",
+  ackSeq: 7,
+  observedChildSeq: 8,
+  at: "2026-01-01T00:00:00.000Z",
 }
 
 type ChildState = { readonly status: "running" | "paused"; readonly runPause?: true }
@@ -18,12 +26,16 @@ type ChildState = { readonly status: "running" | "paused"; readonly runPause?: t
 function graphOver(child: ChildState, answer: () => ResumeTaskResult) {
   const resumeCalls: string[] = []
   const record = {
-    task_id: "st_b", status: child.status, notification: { run_epoch: 0 },
-    ...(child.runPause === true ? { run_pause: { parent_session_id: PARENT, parent_pause_seq: 7, run_ref: nodeB.runRef } } : {}),
+    task_id: "st_b",
+    status: child.status,
+    notification: { run_epoch: 0 },
+    ...(child.runPause === true
+      ? { run_pause: { parent_session_id: PARENT, parent_pause_seq: 7, run_ref: nodeB.runRef } }
+      : {}),
   }
   const manager = {
     list: () => [],
-    get: (taskId: string) => taskId === "st_b" ? record : undefined,
+    get: (taskId: string) => (taskId === "st_b" ? record : undefined),
     resumePausedTask: async (taskId: string) => {
       resumeCalls.push(taskId)
       if (record.status !== "paused") throw new Error(`cannot resume ${record.status} task`)
@@ -31,7 +43,9 @@ function graphOver(child: ChildState, answer: () => ResumeTaskResult) {
     },
   } as unknown as Parameters<typeof createEngineRunPause>[0]["manager"]
   const graph = createEngineRunPause({
-    stateDir: tempProject(), barrier: new AdmissionBarrier(), manager,
+    stateDir: tempProject(),
+    barrier: new AdmissionBarrier(),
+    manager,
     runtime: { getPauseState: () => undefined, fenceRun: () => undefined },
   })
   graph.registry.begin(PARENT, 7, [nodeB])
@@ -62,7 +76,10 @@ for (const [name, answer, expected] of [
   test(`design 32: a node whose own hold outlives the run's Resume stays held by the user when the engine ${name}`, async () => {
     const { graph } = graphOver({ status: "paused", runPause: true }, () => answer)
     await expect(graph.controller.resume(PARENT, 7, "resume-1")).resolves.toEqual({ kind: "installed" })
-    expect(graph.registry.require(PARENT).participants.st_b).toMatchObject({ state: "held_by_user", observedChildSeq: expected })
+    expect(graph.registry.require(PARENT).participants.st_b).toMatchObject({
+      state: "held_by_user",
+      observedChildSeq: expected,
+    })
     expect(graph.registry.require(PARENT).resume?.childSeqCutoffs.st_b).toBe(8)
   })
 }

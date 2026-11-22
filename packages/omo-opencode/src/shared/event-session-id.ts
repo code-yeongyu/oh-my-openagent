@@ -8,16 +8,12 @@ function getStringField(record: Record<string, unknown> | undefined, key: string
 export function resolveSessionEventID(properties: unknown): string | undefined {
   const props = isRecord(properties) ? properties : undefined
   const info = isRecord(props?.info) ? props.info : undefined
-  return getStringField(props, "sessionID")
-    ?? getStringField(info, "sessionID")
-    ?? getStringField(info, "id")
+  return getStringField(props, "sessionID") ?? getStringField(info, "sessionID") ?? getStringField(info, "id")
 }
 
 export function resolveMessageEventSessionID(properties: unknown): string | undefined {
   const props = isRecord(properties) ? properties : undefined
   const info = isRecord(props?.info) ? props.info : undefined
   const part = isRecord(props?.part) ? props.part : undefined
-  return getStringField(props, "sessionID")
-    ?? getStringField(info, "sessionID")
-    ?? getStringField(part, "sessionID")
+  return getStringField(props, "sessionID") ?? getStringField(info, "sessionID") ?? getStringField(part, "sessionID")
 }

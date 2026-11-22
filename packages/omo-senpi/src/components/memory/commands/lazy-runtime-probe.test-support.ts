@@ -30,7 +30,9 @@ const { registerSleeptimeCommand } = await import("./sleeptime")
 
 const { root, identity } = await tempIdentity(mkdtempSync(join(tmpdir(), "memory-commands-lazy-probe-")))
 try {
-  await seededRepo(identity, [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nlazy probe\n" }])
+  await seededRepo(identity, [
+    { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nlazy probe\n" },
+  ])
   const deps = fakeDeps(identity)
 
   const lazyPi = new MemoryFakeExtensionAPI()
@@ -56,21 +58,23 @@ try {
     return { description: options?.description, argumentHint: options?.argumentHint }
   }
 
-  console.log(`PROBE_RESULT ${JSON.stringify({
-    loadsAfterRegistration,
-    loadsAfterFirstUse,
-    loadsTotal: runtimeLoads.length,
-    lazy: [
-      { result: lazyMemory, notifications: lazyMemoryCtx.ui.notifications },
-      { result: lazySleeptime, notifications: lazySleeptimeCtx.ui.notifications },
-    ],
-    eager: [
-      { result: eagerMemory, notifications: eagerMemoryCtx.ui.notifications },
-      { result: eagerSleeptime, notifications: eagerSleeptimeCtx.ui.notifications },
-    ],
-    lazyMetadata: [metadata(lazyPi, "memory"), metadata(lazyPi, "sleeptime")],
-    eagerMetadata: [metadata(eagerPi, "memory"), metadata(eagerPi, "sleeptime")],
-  })}`)
+  console.log(
+    `PROBE_RESULT ${JSON.stringify({
+      loadsAfterRegistration,
+      loadsAfterFirstUse,
+      loadsTotal: runtimeLoads.length,
+      lazy: [
+        { result: lazyMemory, notifications: lazyMemoryCtx.ui.notifications },
+        { result: lazySleeptime, notifications: lazySleeptimeCtx.ui.notifications },
+      ],
+      eager: [
+        { result: eagerMemory, notifications: eagerMemoryCtx.ui.notifications },
+        { result: eagerSleeptime, notifications: eagerSleeptimeCtx.ui.notifications },
+      ],
+      lazyMetadata: [metadata(lazyPi, "memory"), metadata(lazyPi, "sleeptime")],
+      eagerMetadata: [metadata(eagerPi, "memory"), metadata(eagerPi, "sleeptime")],
+    })}`,
+  )
 } finally {
   await removeTree(root, { maxRetries: 10, retryDelay: 200 })
 }

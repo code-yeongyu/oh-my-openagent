@@ -29,8 +29,7 @@ const { dirname, join } = process.getBuiltinModule<PathModule>("path")
 const { fileURLToPath, pathToFileURL } = process.getBuiltinModule<UrlModule>("url")
 
 export type MockStep =
-  | { type: "text"; text: string }
-  | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
+  { type: "text"; text: string } | { type: "tool_call"; name: string; arguments: Record<string, unknown>; id?: string }
 
 interface MockScript {
   steps: MockStep[]
@@ -67,8 +66,7 @@ interface SimpleStreamOptions {
 }
 
 type AssistantContent =
-  | { type: "text"; text: string }
-  | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
+  { type: "text"; text: string } | { type: "toolCall"; id: string; name: string; arguments: Record<string, unknown> }
 
 interface AssistantMessage {
   role: "assistant"
@@ -95,7 +93,11 @@ interface MockProvider {
     contextWindow: number
     maxTokens: number
   }>
-  streamSimple(model: Model<Api>, context: Context, options?: SimpleStreamOptions): AsyncIterable<LocalStreamEvent> & {
+  streamSimple(
+    model: Model<Api>,
+    context: Context,
+    options?: SimpleStreamOptions,
+  ): AsyncIterable<LocalStreamEvent> & {
     result(): Promise<AssistantMessage>
   }
 }
@@ -111,9 +113,16 @@ interface LocalAssistantMessageEventStream extends AsyncIterable<LocalStreamEven
   result(): Promise<AssistantMessage>
 }
 
-// A second id that the Astra detectors recognize (`omo-mock/gpt-6-astra`), so a live driver can
-// prove which ultrawork directive a GPT-6 Astra receiver gets without a real OpenAI route.
-const ASTRA_MOCK_MODEL_ID = "gpt-6-astra"
+// Ids the receiver detectors recognize (`omo-mock/gpt-6.2-astra`, ...), so a live driver can prove
+// which ultrawork directive each kind of receiver gets without a real provider route.
+const RECEIVER_MOCK_MODEL_IDS = [
+  "gpt-6.2-astra",
+  "gpt-6.2-astra-ultrafast",
+  "gpt-6.2-sol",
+  "gpt-6-astra",
+  "gpt-5.6-sol",
+  "claude-fable-5-2",
+]
 
 const model = {
   id: "mock-1",
@@ -134,7 +143,7 @@ export default function registerMockProvider(pi: ExtensionAPI): void {
     baseUrl: "file://mock-provider",
     apiKey: "mock",
     api: "openai-completions",
-    models: [model, { ...model, id: ASTRA_MOCK_MODEL_ID, name: "Mock GPT-6 Astra" }],
+    models: [model, ...RECEIVER_MOCK_MODEL_IDS.map((id) => ({ ...model, id, name: `Mock ${id}` }))],
     streamSimple(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
       return streamMockResponse(streamModel, context, options)
     },
@@ -187,8 +196,11 @@ let callCount = 0
  * `getCurrentTools`. `null` means the request carried no declaration source at all, which is not "no tools".
  */
 export function declaredToolNames(context: Context): string[] | null {
-  if (Array.isArray(context.tools)) return context.tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string")
-  const systemMessages = (Array.isArray(context.messages) ? (context.messages as TranscriptMessage[]) : []).filter((message) => message?.role === "system")
+  if (Array.isArray(context.tools))
+    return context.tools.map((tool) => tool.name).filter((name): name is string => typeof name === "string")
+  const systemMessages = (Array.isArray(context.messages) ? (context.messages as TranscriptMessage[]) : []).filter(
+    (message) => message?.role === "system",
+  )
   if (systemMessages.length === 0) return null
   const current = new Set<string>()
   for (const message of systemMessages) {
@@ -204,9 +216,19 @@ function recordDeclaredTools(cwd: string, context: Context): void {
   appendFileSync(join(cwd, "mock-tools.jsonl"), `${JSON.stringify(declaredToolNames(context))}\n`)
 }
 
+/** A driver that drops `mock-record-context` in the cwd gets one line per request: the receiving model and the messages it was sent. */
+function recordContext(cwd: string, modelId: string, context: Context): void {
+  if (!existsSync(join(cwd, "mock-record-context"))) return
+  appendFileSync(
+    join(cwd, "mock-context.jsonl"),
+    `${JSON.stringify({ model: modelId, messages: context.messages ?? null })}\n`,
+  )
+}
+
 function streamMockResponse(streamModel: Model<Api>, context: Context, options?: SimpleStreamOptions) {
   const cwd = context.cwd ?? process.cwd()
   recordDeclaredTools(cwd, context)
+  recordContext(cwd, streamModel.id, context)
   const script = loadMockScript(cwd)
   const step = script.steps[Math.min(callCount, script.steps.length - 1)]
   callCount += 1
@@ -312,7 +334,9 @@ function isTerminalAssistantMessageEvent(
   return false
 }
 
-function extractAssistantMessageResult(event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage }) {
+function extractAssistantMessageResult(
+  event: { type: "done"; message: AssistantMessage } | { type: "error"; error: AssistantMessage },
+) {
   return event.type === "done" ? event.message : event.error
 }
 

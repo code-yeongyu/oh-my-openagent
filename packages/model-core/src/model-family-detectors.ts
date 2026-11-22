@@ -10,11 +10,20 @@ export function isGptModel(model: string): boolean {
   return modelName.includes("gpt")
 }
 
+/**
+ * DeepSeek V4.1 Flash under every published id shape (deepseek-flash, v4.1 / v4p1 / v4-1, with a
+ * provider prefix or a tier, snapshot or mode suffix). V4 Flash, its 0731 snapshot and V4 Pro are
+ * other weights and do not match.
+ */
+export function isDeepseekV41FlashModel(model: string): boolean {
+  return /^deepseek-(?:v4(?:[.-]1|p1)-)?flash(?:$|[-:@])/.test(extractModelName(model).toLowerCase())
+}
+
 export function isGpt6AstraModel(model: string | undefined): boolean {
   if (!model) return false
   const { modelID, variant } = parseVariantFromModelID(model.toLowerCase(), { allowMaxSuffix: true })
   if (variant !== undefined && !isReasoningLevelOrAuto(variant)) return false
-  return /^(?:gpt-6-astra|gpt-6-astra-fast)$/.test(extractModelName(modelID))
+  return /^gpt-6(?:\.2)?-astra(?:-(?:fast|ultrafast))?$/.test(extractModelName(modelID))
 }
 
 export function isClaudeOpus46Model(model: string): boolean {
@@ -151,7 +160,12 @@ export function isUnservedDevinSWE2Selector(selector: string): boolean {
   const separator = selector.indexOf("/")
   if (separator <= 0 || selector.slice(0, separator).toLowerCase() !== "devin") return false
   // A reasoning suffix (`:high`, ` (high)`) rides on the selector, never on the uid Cascade sees.
-  const modelId = selector.slice(separator + 1).trim().toLowerCase().split(/[:\s(]/u)[0] ?? ""
+  const modelId =
+    selector
+      .slice(separator + 1)
+      .trim()
+      .toLowerCase()
+      .split(/[:\s(]/u)[0] ?? ""
   if (!isSWE2Model(modelId)) return false
   return !(DEVIN_SWE2_SERVED_LANES as readonly string[]).includes(modelId)
 }
@@ -190,11 +204,7 @@ const GEMINI_PROVIDERS = ["google/", "google-vertex/"] as const
 export function isGeminiModel(model: string): boolean {
   if (GEMINI_PROVIDERS.some((prefix) => model.startsWith(prefix))) return true
 
-  if (
-    model.startsWith("github-copilot/") &&
-    extractModelName(model).toLowerCase().startsWith("gemini")
-  )
-    return true
+  if (model.startsWith("github-copilot/") && extractModelName(model).toLowerCase().startsWith("gemini")) return true
 
   const modelName = extractModelName(model).toLowerCase()
   return modelName.startsWith("gemini-")

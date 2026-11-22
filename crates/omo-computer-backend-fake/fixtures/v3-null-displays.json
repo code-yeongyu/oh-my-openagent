@@ -1,0 +1,17 @@
+{
+  "windows": [
+    {
+      "id": "101",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": true,
+      "elevated": null
+    }
+  ],
+  "legacy_capture": true
+}

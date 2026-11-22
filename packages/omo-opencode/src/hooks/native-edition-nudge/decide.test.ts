@@ -55,18 +55,42 @@ describe("the nudge shows for a user who can act on it", () => {
 describe("every suppression condition, each beside its control", () => {
   // Each row is a pair: the condition set must suppress, and the SAME input with only that
   // condition cleared must show. Without the control a blanket refusal would pass every row.
-  const conditions: readonly { readonly name: string; readonly patch: Partial<NudgeDecisionInput>; readonly reason: string }[] = [
-    { name: "the native edition is already installed", patch: { nativeEditionInstalled: true }, reason: "already-migrated" },
+  const conditions: readonly {
+    readonly name: string
+    readonly patch: Partial<NudgeDecisionInput>
+    readonly reason: string
+  }[] = [
+    {
+      name: "the native edition is already installed",
+      patch: { nativeEditionInstalled: true },
+      reason: "already-migrated",
+    },
     { name: "the hook is listed in disabled_hooks", patch: { hookDisabled: true }, reason: "opted-out" },
     { name: "the session is non-interactive", patch: { interactive: false }, reason: "non-interactive" },
     { name: "the session is a child session", patch: { childSession: true }, reason: "child-session" },
-    { name: "it already fired in this process", patch: { shownThisProcess: true }, reason: "already-shown-this-process" },
+    {
+      name: "it already fired in this process",
+      patch: { shownThisProcess: true },
+      reason: "already-shown-this-process",
+    },
     { name: "the toast API is unavailable", patch: { toastAvailable: false }, reason: "toast-unavailable" },
     { name: "the state directory is unwritable", patch: { stateWritable: false }, reason: "state-unwritable" },
     { name: "the user said never", patch: { state: state({ decision: "never" }) }, reason: "opted-out" },
-    { name: "the user already migrated", patch: { state: state({ decision: "migrated" }) }, reason: "already-migrated" },
-    { name: "the lifetime cap is reached", patch: { state: state({ autoShows: NUDGE_AUTO_SHOW_CAP }) }, reason: "lifetime-cap-reached" },
-    { name: "the next window has not opened", patch: { state: state({ nextEligibleAt: NOW + 1 }) }, reason: "not-yet-eligible" },
+    {
+      name: "the user already migrated",
+      patch: { state: state({ decision: "migrated" }) },
+      reason: "already-migrated",
+    },
+    {
+      name: "the lifetime cap is reached",
+      patch: { state: state({ autoShows: NUDGE_AUTO_SHOW_CAP }) },
+      reason: "lifetime-cap-reached",
+    },
+    {
+      name: "the next window has not opened",
+      patch: { state: state({ nextEligibleAt: NOW + 1 }) },
+      reason: "not-yet-eligible",
+    },
   ]
 
   for (const condition of conditions) {

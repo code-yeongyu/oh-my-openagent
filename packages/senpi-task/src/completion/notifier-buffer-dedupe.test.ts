@@ -5,7 +5,6 @@ import type { ParentNotifier, ParentNotifierMessage, ParentState } from "./types
 import type { TaskRecord } from "../state"
 import type { PersistedTaskEvent } from "../store"
 
-
 function bufferedRecord(): TaskRecord {
   return {
     task_id: "st_dedupe",

@@ -1,15 +1,11 @@
 import { describe, it, expect } from "bun:test"
-import {
-  parseMemoryFile,
-  renderMemoryFile,
-  FrontmatterError,
-} from "./frontmatter"
+import { parseMemoryFile, renderMemoryFile, FrontmatterError } from "./frontmatter"
 
 describe("frontmatter kind + aliases (IC-13)", () => {
   describe("#given a file with kind and aliases", () => {
     const content = [
       "---",
-      'description: Person - Yeongyu',
+      "description: Person - Yeongyu",
       "kind: person",
       'aliases: ["Yeongyu","YG"]',
       "---",
@@ -50,13 +46,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given a file with kind but no aliases", () => {
-    const content = [
-      "---",
-      "description: Person - Solo",
-      "kind: person",
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Person - Solo", "kind: person", "---", "Body."].join("\n")
 
     it("#then parseMemoryFile extracts kind and leaves aliases undefined", () => {
       const parsed = parseMemoryFile(content)
@@ -74,13 +64,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given a file with aliases but no kind", () => {
-    const content = [
-      "---",
-      "description: Person - Aliased",
-      'aliases: ["A","B"]',
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Person - Aliased", 'aliases: ["A","B"]', "---", "Body."].join("\n")
 
     it("#then parseMemoryFile extracts aliases and leaves kind undefined", () => {
       const parsed = parseMemoryFile(content)
@@ -127,13 +111,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given aliases that is not a JSON array", () => {
-    const content = [
-      "---",
-      "description: Bad aliases",
-      "aliases: Yeongyu",
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Bad aliases", "aliases: Yeongyu", "---", "Body."].join("\n")
 
     it("#then parseMemoryFile throws FrontmatterError", () => {
       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
@@ -141,13 +119,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given aliases that is a JSON array with empty strings", () => {
-    const content = [
-      "---",
-      "description: Bad aliases",
-      'aliases: ["A",""]',
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Bad aliases", 'aliases: ["A",""]', "---", "Body."].join("\n")
 
     it("#then parseMemoryFile throws FrontmatterError", () => {
       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
@@ -155,13 +127,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given aliases that is a JSON array of non-strings", () => {
-    const content = [
-      "---",
-      "description: Bad aliases",
-      'aliases: [1,2,3]',
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Bad aliases", "aliases: [1,2,3]", "---", "Body."].join("\n")
 
     it("#then parseMemoryFile throws FrontmatterError", () => {
       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
@@ -169,13 +135,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given aliases that is a JSON object (not array)", () => {
-    const content = [
-      "---",
-      "description: Bad aliases",
-      'aliases: {"key":"val"}',
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Bad aliases", 'aliases: {"key":"val"}', "---", "Body."].join("\n")
 
     it("#then parseMemoryFile throws FrontmatterError", () => {
       expect(() => parseMemoryFile(content)).toThrow(FrontmatterError)
@@ -185,7 +145,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   describe("#given a card edit via str_replace keeps kind+aliases (IC-13 round-trip through memory tool)", () => {
     const content = [
       "---",
-      'description: Person - Yeongyu',
+      "description: Person - Yeongyu",
       "kind: person",
       'aliases: ["Yeongyu","YG"]',
       "---",
@@ -208,7 +168,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   describe("#given a card edit via apply_patch keeps kind+aliases (IC-13 round-trip)", () => {
     const content = [
       "---",
-      'description: Person - Yeongyu',
+      "description: Person - Yeongyu",
       "kind: person",
       'aliases: ["Yeongyu","YG"]',
       "---",
@@ -227,13 +187,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given an empty aliases array", () => {
-    const content = [
-      "---",
-      "description: Empty aliases",
-      'aliases: []',
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Empty aliases", "aliases: []", "---", "Body."].join("\n")
 
     it("#then parseMemoryFile accepts it as an empty array", () => {
       const parsed = parseMemoryFile(content)
@@ -251,13 +205,7 @@ describe("frontmatter kind + aliases (IC-13)", () => {
   })
 
   describe("#given kind as a multi-word value", () => {
-    const content = [
-      "---",
-      "description: Typed",
-      "kind: something complex",
-      "---",
-      "Body.",
-    ].join("\n")
+    const content = ["---", "description: Typed", "kind: something complex", "---", "Body."].join("\n")
 
     it("#then parseMemoryFile preserves kind verbatim", () => {
       const parsed = parseMemoryFile(content)

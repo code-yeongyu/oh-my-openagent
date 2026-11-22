@@ -18,6 +18,7 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "session-parent"
@@ -61,7 +62,11 @@ function pausedRecord(input: DagDefinition, states: Readonly<Record<string, Part
     parentSessionId,
     rootSessionId,
     definitionFingerprint: "definition-fingerprint",
-    definition: { key: input.key, name: input.name, nodes: input.nodes.map((entry) => ({ ...entry, effectivePrompt: entry.prompt })) },
+    definition: {
+      key: input.key,
+      name: input.name,
+      nodes: input.nodes.map((entry) => ({ ...entry, effectivePrompt: entry.prompt })),
+    },
     status: "paused",
     generation: 4,
     createdAt,
@@ -175,16 +180,27 @@ class HoldingTaskManager implements TaskManager {
       this.#handles.set(record.task_id, makeHandle(record.task_id).handle)
       queueMicrotask(() => this.complete(record.task_id))
     }
-    return { kind: "started", reused: false, task_id: record.task_id, status: "pending", name: record.name ?? record.task_id }
+    return {
+      kind: "started",
+      reused: false,
+      task_id: record.task_id,
+      status: "pending",
+      name: record.name ?? record.task_id,
+    }
   }
 
   findOwnedTask(ownerKey: Pick<DagTaskOwner, "kind" | "runId" | "nodeId">): TaskRecord | undefined {
-    return [...this.#tasks.values()].find(({ record }) =>
-      record.owner?.kind === ownerKey.kind && record.owner.runId === ownerKey.runId && record.owner.nodeId === ownerKey.nodeId,
+    return [...this.#tasks.values()].find(
+      ({ record }) =>
+        record.owner?.kind === ownerKey.kind &&
+        record.owner.runId === ownerKey.runId &&
+        record.owner.nodeId === ownerKey.nodeId,
     )?.record
   }
 
-  get(taskId: string): TaskRecord | undefined { return this.#tasks.get(taskId)?.record }
+  get(taskId: string): TaskRecord | undefined {
+    return this.#tasks.get(taskId)?.record
+  }
 
   waitFor(taskId: string): Promise<TaskRecord> {
     this.waitForCalls.push(taskId)
@@ -194,20 +210,44 @@ class HoldingTaskManager implements TaskManager {
     return task.completion.promise
   }
 
-  getResidentHandle(taskId: string): ManagedChildHandle | undefined { return this.#handles.get(taskId) }
+  getResidentHandle(taskId: string): ManagedChildHandle | undefined {
+    return this.#handles.get(taskId)
+  }
 
-  start(): Promise<never> { throw new Error("not implemented") }
-  continueTask(): Promise<never> { throw new Error("not implemented") }
-  sendToTask(): Promise<never> { throw new Error("not implemented") }
-  interruptTask(): Promise<never> { throw new Error("not implemented") }
-  cancelTask(): Promise<never> { throw new Error("not implemented") }
-  list(): readonly [] { return [] }
+  start(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  continueTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  sendToTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  interruptTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  cancelTask(): Promise<never> {
+    throw new Error("not implemented")
+  }
+  list(): readonly [] {
+    return []
+  }
   forget(_taskId: string, _options: Parameters<TaskManager["forget"]>[1]): void {}
-  subscribeChild(): () => void { return () => undefined }
-  residentTaskIds(): readonly string[] { return [...this.#handles.keys()] }
-  residencyChanged(): Promise<void> { return new Promise<void>(() => undefined) }
-  promoteToBackground(): boolean { return false }
-  wasBackground(): boolean { return true }
+  subscribeChild(): () => void {
+    return () => undefined
+  }
+  residentTaskIds(): readonly string[] {
+    return [...this.#handles.keys()]
+  }
+  residencyChanged(): Promise<void> {
+    return new Promise<void>(() => undefined)
+  }
+  promoteToBackground(): boolean {
+    return false
+  }
+  wasBackground(): boolean {
+    return true
+  }
 }
 
 describe("DAG resume liveness gate on running nodes", () => {
@@ -215,18 +255,21 @@ describe("DAG resume liveness gate on running nodes", () => {
     // given - the dag_5cf0bec7 checkpoint: two running nodes, one parked daemon child, one
     // foreign-resident child, and a dependent gate behind them
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = {
       key: "orphaned-resume",
       name: "orphaned resume",
       nodes: [node("parked"), node("foreign"), node("gate", ["parked", "foreign"])],
     }
-    store.writeCheckpoint(runId, pausedRecord(input, {
-      parked: { state: "running", taskId: "task-parked", attempt: 1 },
-      foreign: { state: "running", taskId: "task-foreign", attempt: 1 },
-      gate: { state: "pending" },
-    }))
+    store.writeCheckpoint(
+      runId,
+      pausedRecord(input, {
+        parked: { state: "running", taskId: "task-parked", attempt: 1 },
+        foreign: { state: "running", taskId: "task-foreign", attempt: 1 },
+        gate: { state: "pending" },
+      }),
+    )
     manager.add(parkedHostSessionRecord("parked"))
     manager.add(foreignResidentRecord("foreign"))
     const reattached: string[] = []
@@ -265,16 +308,17 @@ describe("DAG resume liveness gate on running nodes", () => {
     // and - nothing was handed to the scheduler to wait on forever
     expect(reattached).toEqual([])
     expect(manager.waitForCalls).toEqual([])
-    const transitions = store.readEvents(runId, 0, { limit: 200 }).events
-      .filter((event) => event.type === "dag.node.transitioned" && event.to === "failed")
-      .map((event) => event.type === "dag.node.transitioned" ? `${event.nodeId}:${event.from}->${event.to}` : "")
+    const transitions = store
+      .readEvents(runId, 0, { limit: 200 })
+      .events.filter((event) => event.type === "dag.node.transitioned" && event.to === "failed")
+      .map((event) => (event.type === "dag.node.transitioned" ? `${event.nodeId}:${event.from}->${event.to}` : ""))
     expect(transitions).toEqual(["parked:running->failed", "foreign:running->failed"])
   }, 30_000)
 
   test("#given a running node whose child this host holds #when the session resumes #then it is reattached and folds when the child settles", async () => {
     // given - control: the same record shape as the foreign case, but this host holds the handle
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = { key: "held-resume", name: "held resume", nodes: [node("held")] }
     store.writeCheckpoint(runId, pausedRecord(input, { held: { state: "running", taskId: "task-held", attempt: 1 } }))
@@ -304,7 +348,7 @@ describe("DAG resume liveness gate on running nodes", () => {
     // given - a scheduled node with no task: recovery starts it, and admission queues it (pending,
     // no resident handle yet) until a lease frees
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = { key: "queued-resume", name: "queued resume", nodes: [node("fresh")] }
     store.writeCheckpoint(runId, pausedRecord(input, { fresh: { state: "scheduled" } }))

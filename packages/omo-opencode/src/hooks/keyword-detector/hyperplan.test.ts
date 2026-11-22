@@ -131,12 +131,9 @@ describe("keyword-detector hyperplan keyword", () => {
     const sessionID = "hyperplan-disabled-session"
     getMainSessionSpy = spyOn(sessionState, "getMainSessionID").mockReturnValue(sessionID)
     const toastCalls: string[] = []
-    const hook = createKeywordDetectorHook(
-      createMockPluginInput({ toastCalls }),
-      undefined,
-      undefined,
-      { disabled_keywords: ["hyperplan"] },
-    )
+    const hook = createKeywordDetectorHook(createMockPluginInput({ toastCalls }), undefined, undefined, {
+      disabled_keywords: ["hyperplan"],
+    })
     const output = {
       message: {} as Record<string, unknown>,
       parts: [{ type: "text", text: "hyperplan refactor this" }],

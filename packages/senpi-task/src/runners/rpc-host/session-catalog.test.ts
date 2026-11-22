@@ -13,5 +13,5 @@ test("host catalog uses the existing get_available_models wire command", async (
   const catalog = await client.getAvailableModels()
   // then
   expect(catalog).toEqual([])
-  expect(host.commands.filter(command => command.type === "get_available_models")).toHaveLength(1)
+  expect(host.commands.filter((command) => command.type === "get_available_models")).toHaveLength(1)
 })

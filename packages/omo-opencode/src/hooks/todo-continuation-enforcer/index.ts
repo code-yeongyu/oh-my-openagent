@@ -11,13 +11,9 @@ export type { TodoContinuationEnforcer, TodoContinuationEnforcerOptions } from "
 
 export function createTodoContinuationEnforcer(
   ctx: PluginInput,
-  options: TodoContinuationEnforcerOptions = {}
+  options: TodoContinuationEnforcerOptions = {},
 ): TodoContinuationEnforcer {
-  const {
-    backgroundManager,
-    skipAgents = DEFAULT_SKIP_AGENTS,
-    isContinuationStopped,
-  } = options
+  const { backgroundManager, skipAgents = DEFAULT_SKIP_AGENTS, isContinuationStopped } = options
 
   const sessionStateStore = createSessionStateStore()
 

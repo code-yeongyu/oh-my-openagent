@@ -11,11 +11,13 @@ type FakeStdin = EventEmitter & {
   pause: ReturnType<typeof mock<() => void>>
 }
 
-function createFakeStdin(options: {
-  isTTY?: boolean
-  isRaw?: boolean
-  paused?: boolean
-} = {}): FakeStdin {
+function createFakeStdin(
+  options: {
+    isTTY?: boolean
+    isRaw?: boolean
+    paused?: boolean
+  } = {},
+): FakeStdin {
   const emitter = new EventEmitter() as FakeStdin
   emitter.isTTY = options.isTTY ?? true
   emitter.isRaw = options.isRaw ?? false

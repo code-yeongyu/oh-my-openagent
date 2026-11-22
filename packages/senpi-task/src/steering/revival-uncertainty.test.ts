@@ -10,6 +10,7 @@ import type { SteeringPort } from "./types"
 import { readFileSync } from "node:fs"
 import { buildRevived } from "./engine-policy"
 import { roots, cleanupRoots, detachedTerminal, fakeHandle } from "./__fixtures__/residency"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupRoots)
 
@@ -17,7 +18,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child that exits before acknowledging followUp #when task_send rejects #then delivery is uncertain and the message is not automatically re-sent", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-followup-exit-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let followUpCalls = 0
@@ -35,7 +36,13 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => undefined }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => undefined,
+      }),
       reviveDetached: async () => {
         live = true
         store.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -46,7 +53,11 @@ describe("task_send lazy terminal RPC revival", () => {
         return "rolled_back"
       },
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }
@@ -88,7 +99,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a record carrying an unacknowledged-delivery marker #when a new run is built #then building an epoch cannot resolve the prior delivery", () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-marker-clear-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const marked: TaskRecord = {
       ...record,
@@ -104,7 +115,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child that exits before acknowledging followUp #when a cancel already terminalized that epoch #then no uncertainty marker is written and the cancel is preserved", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-uncertain-fence-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let destroys = 0
@@ -122,7 +133,15 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => { releases += 1 } }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => {
+          releases += 1
+        },
+      }),
       reviveDetached: async () => {
         live = true
         store.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -130,7 +149,11 @@ describe("task_send lazy terminal RPC revival", () => {
       },
       rollbackDetachedRevival: () => "not_owner",
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }
@@ -143,14 +166,18 @@ describe("task_send lazy terminal RPC revival", () => {
     expect(commits).toBe(0)
     expect(releases).toBe(1)
     const current = store.load(record.task_id)
-    expect(current).toMatchObject({ status: "cancelled", error_message: "cancelled by user", notification: { run_epoch: 1 } })
+    expect(current).toMatchObject({
+      status: "cancelled",
+      error_message: "cancelled by user",
+      notification: { run_epoch: 1 },
+    })
     expect(current?.revive_delivery_uncertain).toBeUndefined()
   })
 
   test("#given a revived child that exits before acknowledging followUp #when the fenced marker write throws #then the reservation is released exactly once and no marker is written", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-uncertain-mutate-throws-"))
     roots.push(project)
-    const baseStore = createTaskRecordStore({ project_dir: project })
+    const baseStore = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(baseStore)
     let live = false
     let destroys = 0
@@ -176,7 +203,15 @@ describe("task_send lazy terminal RPC revival", () => {
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
-      reserveForRevive: () => ({ ok: true, commit: () => { commits += 1 }, release: () => { releases += 1 } }),
+      reserveForRevive: () => ({
+        ok: true,
+        commit: () => {
+          commits += 1
+        },
+        release: () => {
+          releases += 1
+        },
+      }),
       reviveDetached: async () => {
         live = true
         baseStore.mutate(record.task_id, (fresh) => ({ ...fresh, residency_state: "resident", host_pid: 6000 }))
@@ -184,7 +219,11 @@ describe("task_send lazy terminal RPC revival", () => {
       },
       rollbackDetachedRevival: () => "not_owner",
       dequeuePending: () => false,
-      destruction: { destroyResidentTask: async () => { destroys += 1 } },
+      destruction: {
+        destroyResidentTask: async () => {
+          destroys += 1
+        },
+      },
       runStatsSnapshot: () => undefined,
       now: () => Date.parse("2026-09-02T00:00:00.000Z"),
     }

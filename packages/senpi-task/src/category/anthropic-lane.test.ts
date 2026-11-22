@@ -3,7 +3,6 @@ import { describe, expect, test } from "bun:test"
 import { BUILTIN_AGENTS } from "../agents/builtin"
 import { resolveAgent } from "../agents/resolve-agent"
 import { resolveCategory } from "./index"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 // Regression coverage for code-yeongyu/oh-my-openagent#8051: senpi's Claude subscription lane
 // (`anthropic-subscription`, Claude Pro/Max) serves the same model ids as `anthropic`. A machine that is
@@ -39,7 +38,9 @@ function expectResolvedCategory(
   return result
 }
 
-function expectResolvedAgent(result: ReturnType<typeof resolveAgent>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolvedAgent(
+  result: ReturnType<typeof resolveAgent>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") throw new Error(`Expected resolved agent, got ${result.kind}`)
   return result
 }
@@ -59,7 +60,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
     // then
     expect(resolved.spec.provider).toBe("anthropic-subscription")
     expect(resolved.spec.modelId).toBe("claude-fable-5-1")
-    expect(resolved.spec.variant).toBe("max")
+    expect(resolved.spec.variant).toBe("xhigh")
     expect(resolved.modelSelection.fallbackEntry?.providers[0]).toBe("anthropic-subscription")
   })
 
@@ -75,7 +76,9 @@ describe("builtin Claude rungs under the senpi harness", () => {
 
   test("#given anthropic-subscription and opencode both serve Fable 5.1 #when plan-consultant resolves #then the subscription lane wins", () => {
     // when
-    const resolved = expectResolvedAgent(resolveAgent("plan-consultant", BUILTIN_AGENTS, subscriptionAndMeteredRegistry()))
+    const resolved = expectResolvedAgent(
+      resolveAgent("plan-consultant", BUILTIN_AGENTS, subscriptionAndMeteredRegistry()),
+    )
 
     // then
     expect(resolved.model).toBe("anthropic-subscription/claude-fable-5-1")
@@ -99,23 +102,32 @@ describe("builtin Claude rungs under the senpi harness", () => {
     const meteredHigh = expectResolvedCategory(resolveCategory("unspecified-high", {}, meteredOnlyRegistry))
     const planConsultant = expectResolvedAgent(resolveAgent("plan-consultant", BUILTIN_AGENTS, apiKeyRegistry))
 
-    // then: absent 5.5 falls back to 5.1 (while unreleased, 5.1 is requested directly); the provider
-    // order and requested-model record survive
+    // then: an unlisted 5.2 falls back to 5.1 at the same effort; the provider order and the
+    // requested-model record survive
     expect([architect.spec.provider, architect.spec.modelId, architect.spec.variant]).toEqual([
-      "anthropic", "claude-fable-5-1", "max",
+      "anthropic",
+      "claude-fable-5-1",
+      "xhigh",
     ])
-    expect(architect.spec.requested_model?.display).toBe(FABLE_55_RELEASED ? "anthropic/claude-fable-5-5" : "anthropic/claude-fable-5-1")
-    expect(architect.modelSelection).toMatchObject({ selectedModel: "anthropic/claude-fable-5-1", matchedFallback: FABLE_55_RELEASED })
+    expect(architect.spec.requested_model?.display).toBe("anthropic/claude-fable-5-2")
+    expect(architect.modelSelection).toMatchObject({
+      selectedModel: "anthropic/claude-fable-5-1",
+      matchedFallback: true,
+    })
     expect([meteredArchitect.spec.provider, meteredArchitect.spec.modelId, meteredArchitect.spec.variant]).toEqual([
-      "opencode", "claude-fable-5-1", "max",
+      "opencode",
+      "claude-fable-5-1",
+      "xhigh",
     ])
     expect(meteredArchitect.modelSelection).toMatchObject({
       selectedModel: "opencode/claude-fable-5-1",
       matchedFallback: true,
-      fallbackEntry: { model: "claude-fable-5-1", variant: "max" },
+      fallbackEntry: { model: "claude-fable-5-1", variant: "xhigh" },
     })
     expect([meteredHigh.spec.provider, meteredHigh.spec.modelId, meteredHigh.spec.variant]).toEqual([
-      "opencode", "claude-opus-5-5", "medium",
+      "opencode",
+      "claude-opus-5-5",
+      "medium",
     ])
     expect(meteredHigh.spec.requested_model?.display).toBe("anthropic/claude-opus-5-5")
     expect(planConsultant.model).toBe("anthropic/claude-fable-5-1")

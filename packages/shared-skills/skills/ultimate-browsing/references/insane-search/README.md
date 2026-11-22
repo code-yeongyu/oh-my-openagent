@@ -17,7 +17,7 @@
 2. 즉시 다음을 실행:
    ```bash
    python3 -B -m engine "<URL>" [--selector "<CSS>"] [--device auto|desktop|mobile] [--trace] \
-                              [--no-retry] [--no-extract]
+                              [--timeout 25] [--max-attempts 12] [--no-playwright] [--allow-proxy] [--json]
    ```
 3. 종료코드 0(ok) 또는 1(fail) 받은 뒤 판단. trace를 먼저 읽고 재시도 결정.
 4. 실패 시에만 `--trace --json`으로 재호출해서 원인 진단 후 `--device` 또는 `user_hint` 조정.
@@ -46,7 +46,7 @@
 - Claude는 그 사이 foreground에서 MCP Playwright 정찰 루트를 진행
 - engine이 먼저 성공해도 좋고, MCP 정찰로 얻은 API가 먼저 성공해도 좋음. 빠른 쪽 결과 채택
 
-**MCP 정찰 루트**:
+**MCP 정찰 루트** (Playwright MCP가 로드된 세션 전용. 없으면 the `browser` skill's `references/owned-engine/network.md` 로 같은 XHR/fetch 목록을 모은다):
 1. `mcp__playwright__browser_navigate` → 대상 페이지 로드 (브라우저 렌더링)
 2. `mcp__playwright__browser_network_requests` → XHR/fetch 호출 목록 수집, `/api/`·`/graphql`·`\.json` 필터로 내부 엔드포인트 식별
 3. 식별된 JSON API URL을 `python3 -B -m engine <API_URL>`로 재호출 (백그라운드 engine과는 별개 호출). 대부분 API 레이어는 페이지 HTML보다 WAF 보호가 얕아 curl_cffi로 바로 수집됨
@@ -124,7 +124,7 @@
 ### 단일 진입점
 
 ```python
-from insane_search.engine import fetch
+from engine import fetch      # 스킬 디렉터리에서 실행 (패키지는 engine/)
 
 result = fetch(
     "https://example.com/path",
@@ -136,15 +136,13 @@ result = fetch(
 
 if result.ok:
     print(result.verdict)     # strong_ok | weak_ok
-    html = result.content     # raw body — 단, content-rescue가 발동한 경우 구조 텍스트
-    # v0.10.0 content-rescue: PDF 응답은 pypdf 추출 텍스트, visible text가 얇은
-    # SPA 셸은 JSON-LD articleBody / 렌더된 innerText로 대체될 수 있다.
-    # result.extraction_source로 판별: "raw"(원문 그대로) | pdf | json_ld | *+inner_text.
-    # 일반 HTML 성공은 항상 raw. 끄기: enable_extraction=False / --no-extract.
-    # 429/502/503/504는 probe에서 백오프 재시도(Retry-After 반영, 총 10초 캡);
-    # 끄기: enable_retry=False / --no-retry.
+    html = result.content     # raw body (내장 추출/변환 없음)
+    # 필드: ok, content, final_url, verdict, profile_used, trace, summary,
+    #       provenance, snapshot_timestamp, trust (engine/result_schema.py FetchResult).
+    # 업스트림 신버전의 content-rescue(PDF/JSON-LD 추출)와 Retry-After 백오프는
+    # 이 스냅샷에 없다 — engine/AGENTS.md의 WANT 목록. grid 시도 사이에는 짧은 jitter만 둔다.
 else:
-    # Phase 3 수동 개입 (Playwright MCP) 필요 — result.trace로 원인 진단
+    # result.trace로 원인 진단. 브라우저가 필요하면 아래 "needs_js_exec only 폴백 규칙"을 따른다
     pass
 ```
 
@@ -191,16 +189,17 @@ report     — FetchResult(ok, verdict, profile_used, trace, summary)
 | 태그 | 실행기 | 언제 |
 |------|--------|------|
 | `needs_real_tls_stack` + `needs_js_exec` | `playwright_real_chrome.js` (로컬 Node) | Akamai Bot Manager 등 — Chromium 번들 TLS는 탐지됨 |
-| `needs_js_exec` only | Playwright MCP (`mcp__playwright__*`) | Cloudflare 기본 방어 등 |
+| `needs_js_exec` only | 에이전트가 직접 띄우는 브라우저 (엔진은 stub만 반환, 아래 규칙) | Cloudflare 기본 방어 등 |
 | `needs_mobile_context` (+ real_tls) | `playwright_mobile_chrome.js` | 모바일 디바이스 에뮬레이션 필요 |
 
 자세한 선택 기준: [playwright.md](playwright.md).
 
-### Playwright MCP 호출 규칙
+### `needs_js_exec only` 폴백 규칙
 
-`fetch_chain`의 `needs_js_exec only` 케이스는 **Claude 세션에서 MCP 도구를 직접 호출**해야 한다. subprocess 경로 없음. 즉:
+`fetch_chain`의 `needs_js_exec only` 케이스는 subprocess 경로가 없어 **에이전트가 직접 브라우저를 다뤄야** 한다. 즉:
 1. `result.summary`에 "Playwright MCP must be invoked from the Claude session"이 포함되면
-2. `mcp__playwright__browser_navigate` → `browser_wait_for` → `browser_snapshot` 흐름으로 Claude가 직접 처리
+2. 엔진 문구가 MCP를 가리켜도 기본 경로는 Tier 2a owned engine이다: js eval에서 omowright `connectPipe`, 스텔스는 `connectCloakProfile` (`../../SKILL.md` Tier 2, the `browser` skill's `references/owned-engine/`)
+3. `mcp__playwright__*` 도구는 그 MCP가 이미 세션에 연결된 경우에만 쓴다. 없으면 새로 설치하지 않는다 ([playwright.md](playwright.md))
 
 ## Phase 2 — 수동 개입 (옵션)
 
@@ -233,7 +232,7 @@ Tier 1 추출 폴백 전용이며 에이전트가 직접 브라우저를 다루�
 
 ```bash
 # 범용 웹 (Jina Reader — 일반 HTML만, WAF 사이트엔 무효)
-curl -s "https://r.jina.ai/{URL}"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/{URL}"
 
 # yt-dlp — 1,858 사이트 미디어 메타데이터
 yt-dlp --dump-json "URL"
@@ -290,7 +289,7 @@ yt-dlp --write-sub --write-auto-sub --sub-lang "en,ko" --skip-download -o "/tmp/
 | 파일 | 언제 읽는가 | 무엇을 다루는가 |
 |------|-------------|-----------------|
 | [`tls-impersonate.md`](tls-impersonate.md) | curl_cffi 격자가 전부 `challenge`/`blocked`로 끝날 때, 새 impersonate 타겟을 `waf_profiles.yaml`에 추가할 때 | curl_cffi로 Safari/Chrome/Firefox TLS(JA3/JA4) 지문 복제하는 방법, WAF(Akamai/Cloudflare/F5 등)별 최적 타겟 조합, 임퍼소네이션 타겟 버전 목록, `tls_impersonate_avoid`의 실증 근거 |
-| [`playwright.md`](playwright.md) | engine이 Playwright fallback으로 넘어가는데 MCP/Local Chrome 중 어디로 갈지 확인 필요할 때 | Approach 1 (`mcp__playwright__*` — Cloudflare급 챌린지), Approach 2 (Local Node + `channel:'chrome'` + stealth — Akamai Bot Manager급), 템플릿 파라미터 규격 |
+| [`playwright.md`](playwright.md) | engine이 Playwright fallback으로 넘어가는데 MCP/Local Chrome 중 어디로 갈지 확인 필요할 때 | Approach 1 (이미 연결된 경우의 `mcp__playwright__*`, 없으면 omowright owned engine — Cloudflare급 챌린지), Approach 2 (Local Node + `channel:'chrome'` + stealth — Akamai Bot Manager급), 템플릿 파라미터 규격 |
 | [`fallback.md`](fallback.md) | `verdict`가 애매하거나 Phase 전환 타이밍 결정 필요할 때 | engine의 Phase 0→1→2→3 에스컬레이션 원칙, 응답 성공/실패 판정 기준 세부, 각 Phase 종료 조건 |
 | [`metadata.md`](metadata.md) | 본문 전체를 못 가져왔지만 제목·요약·가격·저자 같은 핵심만이라도 필요할 때 | OGP 메타 태그, JSON-LD (Schema.org), Twitter Card 파싱, 구조화 데이터 추출 패턴 |
 
@@ -298,7 +297,7 @@ yt-dlp --write-sub --write-auto-sub --sub-lang "en,ko" --skip-download -o "/tmp/
 
 | 파일 | 언제 읽는가 | 무엇을 다루는가 |
 |------|-------------|-----------------|
-| [`jina.md`](jina.md) | WAF 없는 일반 웹(블로그·뉴스·Wiki)의 깨끗한 마크다운 추출 필요할 때 | `r.jina.ai/URL` 한 줄로 Puppeteer 기반 JS SPA 렌더링, 마크다운 변환, 무료 500 RPM, API 키 불필요 |
+| [`jina.md`](jina.md) | WAF 없는 일반 웹(블로그·뉴스·Wiki)의 깨끗한 마크다운 추출 필요할 때 | `r.jina.ai/URL` + `JINA_API_KEY` Bearer 헤더(익명 호출은 401)로 Puppeteer 기반 JS SPA 렌더링, 마크다운 변환 |
 | [`cache-archive.md`](cache-archive.md) | 원본 사이트가 차단됐지만 과거 스냅샷으로라도 접근 필요할 때 | Wayback Machine CDX API, archive.today, AMP Cache (Google Cache는 2024-07 종료됨) |
 | [`rss.md`](rss.md) | 뉴스·블로그·커뮤니티의 시계열 업데이트를 구조화해 받고 싶을 때 | RSS/Atom 자동 발견, 피드 파싱, 인증 불필요 — 가장 깔끔한 시계열 데이터 소스 |
 

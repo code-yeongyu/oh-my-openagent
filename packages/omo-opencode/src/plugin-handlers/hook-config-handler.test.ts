@@ -71,10 +71,7 @@ describe("applyHookConfig", () => {
 
     // then
     expect(mockSetPluginHooksConfigs).toHaveBeenCalledTimes(1)
-    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(
-      process.cwd(),
-      pluginComponents.hooksConfigs,
-    )
+    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(process.cwd(), pluginComponents.hooksConfigs)
   })
 
   test("#given empty hooksConfigs #when applyHookConfig called #then setPluginHooksConfigs still called with empty array under process.cwd()", () => {
@@ -127,10 +124,7 @@ describe("applyHookConfig", () => {
 
     // then
     expect(mockSetPluginHooksConfigs).toHaveBeenCalledTimes(1)
-    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(
-      expectedCwd,
-      pluginComponents.hooksConfigs,
-    )
+    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(expectedCwd, pluginComponents.hooksConfigs)
   })
 })
 

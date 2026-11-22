@@ -35,7 +35,10 @@ export function unmanagedAgentOverrideWarnings(
 ): readonly string[] {
   return [...agentOverrides.keys()]
     .filter((name) => !managedAgentNames.has(name))
-    .map((name) => `[codex].agents.${name} does not name a LazyCodex-managed agent role; its model override was not applied`)
+    .map(
+      (name) =>
+        `[codex].agents.${name} does not name a LazyCodex-managed agent role; its model override was not applied`,
+    )
 }
 
 // Only the [codex] block may steer Codex roles: shared base `agents` carry OpenCode model ids
@@ -58,7 +61,9 @@ function readAgentOverrides(result: LoadOmoConfigResult): {
     if (name === "default") continue
     const parsed = OmoAgentDefSchema.safeParse(value)
     if (!parsed.success) {
-      warnings.push(`[codex].agents.${name} is invalid and was ignored: ${parsed.error.issues[0]?.message ?? "unknown error"}`)
+      warnings.push(
+        `[codex].agents.${name} is invalid and was ignored: ${parsed.error.issues[0]?.message ?? "unknown error"}`,
+      )
       continue
     }
     const override = toCodexAgentOverride(parsed.data.model, parsed.data.reasoning)

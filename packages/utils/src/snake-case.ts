@@ -11,7 +11,7 @@ export function snakeToCamel(str: string): string {
 export function transformObjectKeys(
   obj: Record<string, unknown>,
   transformer: (key: string) => string,
-  deep: boolean = true
+  deep: boolean = true,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(obj)) {
@@ -20,7 +20,7 @@ export function transformObjectKeys(
       result[transformedKey] = transformObjectKeys(value, transformer, true)
     } else if (deep && Array.isArray(value)) {
       result[transformedKey] = value.map((item) =>
-        isPlainObject(item) ? transformObjectKeys(item, transformer, true) : item
+        isPlainObject(item) ? transformObjectKeys(item, transformer, true) : item,
       )
     } else {
       result[transformedKey] = value
@@ -29,16 +29,10 @@ export function transformObjectKeys(
   return result
 }
 
-export function objectToSnakeCase(
-  obj: Record<string, unknown>,
-  deep: boolean = true
-): Record<string, unknown> {
+export function objectToSnakeCase(obj: Record<string, unknown>, deep: boolean = true): Record<string, unknown> {
   return transformObjectKeys(obj, camelToSnake, deep)
 }
 
-export function objectToCamelCase(
-  obj: Record<string, unknown>,
-  deep: boolean = true
-): Record<string, unknown> {
+export function objectToCamelCase(obj: Record<string, unknown>, deep: boolean = true): Record<string, unknown> {
   return transformObjectKeys(obj, snakeToCamel, deep)
 }

@@ -63,7 +63,7 @@ describe("createBackgroundOutput metadata", () => {
       status: "running",
     }
     const manager: BackgroundOutputManager = {
-      getTask: id => (id === task.id ? task : undefined),
+      getTask: (id) => (id === task.id ? task : undefined),
     }
     const client: BackgroundOutputClient = {
       session: {
@@ -113,7 +113,7 @@ describe("createBackgroundOutput metadata", () => {
       status: "completed",
     }
     const manager: BackgroundOutputManager = {
-      getTask: id => (id === task.id ? task : undefined),
+      getTask: (id) => (id === task.id ? task : undefined),
     }
     const client: BackgroundOutputClient = {
       session: {

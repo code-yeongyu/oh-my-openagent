@@ -25,4 +25,6 @@ export function createTaskRuntimeLoader<T>(importer: () => Promise<T>): () => Pr
   }
 }
 
-export const loadKibitzerTaskRuntime: () => Promise<KibitzerTaskRuntime> = createTaskRuntimeLoader(() => import("#omo-task-runtime"))
+export const loadKibitzerTaskRuntime: () => Promise<KibitzerTaskRuntime> = createTaskRuntimeLoader(
+  () => import("#omo-task-runtime"),
+)

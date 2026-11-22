@@ -3,7 +3,14 @@ import { log } from "@oh-my-opencode/utils"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import { getLifecycleDetachedRevival } from "../lifecycle/port"
 import type { TaskRecord } from "../state"
-import { buildRevived, deliveryUncertain, evictionRefusal, lazyRevivalFailure, messageSha256, uncertainDeliveryDenial } from "./engine-policy"
+import {
+  buildRevived,
+  deliveryUncertain,
+  evictionRefusal,
+  lazyRevivalFailure,
+  messageSha256,
+  uncertainDeliveryDenial,
+} from "./engine-policy"
 import { bestEffortRollback } from "./revival-rollback"
 import { reviveRunningOnSend } from "./revive-running"
 import type { ReviveReservation, SendOutcome, SteeringPort } from "./types"
@@ -21,7 +28,15 @@ export async function reviveTerminal(
 ): Promise<SendOutcome> {
   if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
   try {
-    return await deliverRevivedTerminal(port, record, handle, message, nowIso, granted ?? port.reserveForRevive(record.task_id), false)
+    return await deliverRevivedTerminal(
+      port,
+      record,
+      handle,
+      message,
+      nowIso,
+      granted ?? port.reserveForRevive(record.task_id),
+      false,
+    )
   } finally {
     endSend(record.task_id)
   }
@@ -60,7 +75,9 @@ export async function reviveDetachedTerminalOnSend(
     }
     if (!revived.ok) {
       reservation.release()
-      return revived.code === undefined ? lazyRevivalFailure(record, revived.reason) : { kind: revived.code, task_id: record.task_id, reason: revived.reason }
+      return revived.code === undefined
+        ? lazyRevivalFailure(record, revived.reason)
+        : { kind: revived.code, task_id: record.task_id, reason: revived.reason }
     }
     const fresh = port.store.load(record.task_id)
     const handle = port.liveHandle(record.task_id)
@@ -93,7 +110,13 @@ async function deliverRevivedTerminal(
   let poolDeliveryStarted = false
   try {
     const fresh = port.store.load(record.task_id)
-    if (fresh === null || fresh.status !== record.status || fresh.killed === true || fresh.host_pid !== record.host_pid || fresh.notification.run_epoch !== record.notification.run_epoch) {
+    if (
+      fresh === null ||
+      fresh.status !== record.status ||
+      fresh.killed === true ||
+      fresh.host_pid !== record.host_pid ||
+      fresh.notification.run_epoch !== record.notification.run_epoch
+    ) {
       reservation.release()
       return lazyRevivalFailure(record, "task ownership or status changed before delivery")
     }
@@ -102,7 +125,14 @@ async function deliverRevivedTerminal(
     let applied = false
     let uncertain: SendOutcome | undefined
     const updated = port.store.mutate(record.task_id, (current) => {
-      if (current.status !== fresh.status || current.host_pid !== fresh.host_pid || current.residency_state !== "resident" || current.killed === true || current.notification.run_epoch !== fresh.notification.run_epoch) return current
+      if (
+        current.status !== fresh.status ||
+        current.host_pid !== fresh.host_pid ||
+        current.residency_state !== "resident" ||
+        current.killed === true ||
+        current.notification.run_epoch !== fresh.notification.run_epoch
+      )
+        return current
       uncertain = uncertainDeliveryDenial(current, message)
       if (uncertain !== undefined) return current
       applied = true
@@ -115,11 +145,16 @@ async function deliverRevivedTerminal(
     revived = updated
     port.store.appendEvent(record.task_id, { type: "revived", payload: { run_epoch: revived.notification.run_epoch } })
     const pending = revived.pending_steering ?? []
-    poolDeliveryStarted = pending.some(entry => entry.workpool !== undefined)
+    poolDeliveryStarted = pending.some((entry) => entry.workpool !== undefined)
     await handle.followUp([...pending.map((entry) => entry.message), message].join("\n\n"))
     deliveryAcknowledged = true
     const acknowledged = port.store.load(record.task_id)
-    if (acknowledged?.status !== "running" || acknowledged.host_pid !== revived.host_pid || acknowledged.notification.run_epoch !== revived.notification.run_epoch || port.liveHandle(record.task_id) !== handle) {
+    if (
+      acknowledged?.status !== "running" ||
+      acknowledged.host_pid !== revived.host_pid ||
+      acknowledged.notification.run_epoch !== revived.notification.run_epoch ||
+      port.liveHandle(record.task_id) !== handle
+    ) {
       reservation.release()
       return lazyRevivalFailure(record, "revived run ended or changed ownership before delivery acknowledged")
     }
@@ -127,7 +162,10 @@ async function deliverRevivedTerminal(
       const deliveredIds = new Set(pending.map((entry) => entry.id))
       port.store.mutate(record.task_id, (current) => {
         const { revive_delivery_uncertain: _uncertainty, ...rest } = current
-        return { ...rest, pending_steering: (current.pending_steering ?? []).filter((entry) => !deliveredIds.has(entry.id)) }
+        return {
+          ...rest,
+          pending_steering: (current.pending_steering ?? []).filter((entry) => !deliveredIds.has(entry.id)),
+        }
       })
     }
     reservation.commit()
@@ -139,20 +177,33 @@ async function deliverRevivedTerminal(
     }
     if (error instanceof InputConflictError) {
       reservation.release()
-      return { kind: "failed", task_id: record.task_id, effect_id: error.effectId,
-        reason: error.reason, detail: error.detail, action: error.action }
+      return {
+        kind: "failed",
+        task_id: record.task_id,
+        effect_id: error.effectId,
+        reason: error.reason,
+        detail: error.detail,
+        action: error.action,
+      }
     }
     if (poolDeliveryStarted && revived?.revive_delivery_uncertain !== undefined) {
       // A transport exception is not proof of rejection. Keep O9's pre-dispatch marker and
       // captured queue intact; pool recovery will never automatically replay this turn.
-      log("senpi-task workpool delivery uncertain", { taskId: record.task_id, runEpoch: revived.notification.run_epoch, error: error instanceof Error ? error.message : String(error) })
+      log("senpi-task workpool delivery uncertain", {
+        taskId: record.task_id,
+        runEpoch: revived.notification.run_epoch,
+        error: error instanceof Error ? error.message : String(error),
+      })
       reservation.commit()
       return deliveryUncertain(record, revived.notification.run_epoch)
     }
     if (deliveryAcknowledged && revived?.revive_delivery_uncertain !== undefined) {
       // The batch was accepted. Its pre-dispatch marker survives failed ack bookkeeping, so
       // neither rollback nor a later send can replay the still-persisted queue.
-      log("senpi-task pending delivery acknowledgment persistence failed", { taskId: record.task_id, error: error instanceof Error ? error.message : String(error) })
+      log("senpi-task pending delivery acknowledgment persistence failed", {
+        taskId: record.task_id,
+        error: error instanceof Error ? error.message : String(error),
+      })
       reservation.commit()
       return deliveryUncertain(record, revived.notification.run_epoch)
     }
@@ -160,7 +211,12 @@ async function deliverRevivedTerminal(
     // explicit retry safe. An exited child may have accepted it before the response was lost; keep
     // the revived epoch intact and let outcome tracking terminalize it instead of sending twice.
     const revivedForUncertainty = revived
-    if (rollbackOnFailure && priorRecord !== undefined && revivedForUncertainty !== undefined && handle.hasExited?.() === true) {
+    if (
+      rollbackOnFailure &&
+      priorRecord !== undefined &&
+      revivedForUncertainty !== undefined &&
+      handle.hasExited?.() === true
+    ) {
       const epoch = revivedForUncertainty.notification.run_epoch
       // Fence the marker on the exact generation this revival wrote. A concurrent cancel/interrupt
       // that already won the terminal transition on this epoch owns the record; leave it untouched.
@@ -174,7 +230,8 @@ async function deliverRevivedTerminal(
             fresh.residency_state !== "resident" ||
             fresh.host_pid !== revivedForUncertainty.host_pid ||
             fresh.notification.run_epoch !== epoch
-          ) return fresh
+          )
+            return fresh
           marked = true
           return { ...fresh, revive_delivery_uncertain: { run_epoch: epoch, message_sha256: messageSha256(message) } }
         })
@@ -204,8 +261,13 @@ async function deliverRevivedTerminal(
 
 function buildDeliveryRecord(record: TaskRecord, timestamp: string, message: string): TaskRecord {
   const revived = buildRevived(record, timestamp)
-  return record.revive_delivery_uncertain !== undefined || (record.pending_steering?.length ?? 0) === 0 ? revived : {
-    ...revived,
-    revive_delivery_uncertain: { run_epoch: revived.notification.run_epoch, message_sha256: messageSha256(message) },
-  }
+  return record.revive_delivery_uncertain !== undefined || (record.pending_steering?.length ?? 0) === 0
+    ? revived
+    : {
+        ...revived,
+        revive_delivery_uncertain: {
+          run_epoch: revived.notification.run_epoch,
+          message_sha256: messageSha256(message),
+        },
+      }
 }

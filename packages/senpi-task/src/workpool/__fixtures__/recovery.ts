@@ -8,7 +8,10 @@ import { reconcileWorkpool } from "../reconcile"
 import { evidence } from "./admission"
 
 const observations: unknown[] = []
-export function failureReceipt(name: string, value: unknown): void { observations.push({ name, value }); evidence("failure", observations) }
+export function failureReceipt(name: string, value: unknown): void {
+  observations.push({ name, value })
+  evidence("failure", observations)
+}
 export function runRecoveryCases(): void {
   test("#given assignment persisted before queue append #when restart repairs twice #then item IDs appear once in the durable worker queue", async () => {
     // given
@@ -19,9 +22,19 @@ export function runRecoveryCases(): void {
     f.push("repair", 2)
     const pools = createWorkpoolStore(f.store.stateDir)
     const turn = { pool_id: f.pool.pool_id, task_id: worker.taskId, generation: 1, run_epoch: 1 }
-    pools.mutate(f.pool.pool_id, pool => ({ ...pool, items: pool.items.map(item => item.key === "repair" ? {
-      ...item, status: "assigned", binding: { task_id: worker.taskId, generation: 1, run_epoch: 1 }, delivery: { phase: "queued" },
-    } : item) }))
+    pools.mutate(f.pool.pool_id, (pool) => ({
+      ...pool,
+      items: pool.items.map((item) =>
+        item.key === "repair"
+          ? {
+              ...item,
+              status: "assigned",
+              binding: { task_id: worker.taskId, generation: 1, run_epoch: 1 },
+              delivery: { phase: "queued" },
+            }
+          : item,
+      ),
+    }))
     // when
     reconcileWorkpool({ pools, tasks: f.store }, f.pool.pool_id, () => false)
     appendAssignedMessages({ pools, tasks: f.store }, turn)
@@ -29,7 +42,10 @@ export function runRecoveryCases(): void {
     // then
     const queued = f.store.load(worker.taskId)?.pending_steering
     expect(queued).toHaveLength(1)
-    expect(queued?.[0]).toMatchObject({ id: pools.load(f.pool.pool_id).items[1]?.item_id, workpool: { pool_id: f.pool.pool_id, generation: 1, key: "repair", run_epoch: 1 } })
+    expect(queued?.[0]).toMatchObject({
+      id: pools.load(f.pool.pool_id).items[1]?.item_id,
+      workpool: { pool_id: f.pool.pool_id, generation: 1, key: "repair", run_epoch: 1 },
+    })
     expect(pools.load(f.pool.pool_id).items[1]?.status).toBe("assigned")
     failureReceipt("assignment-queue-gap", { queued, pool: pools.load(f.pool.pool_id) })
   })
@@ -43,36 +59,84 @@ export function runRecoveryCases(): void {
     // when
     reconcileWorkpool({ pools, tasks: f.store }, f.pool.pool_id, () => false)
     // then
-    expect(pools.load(f.pool.pool_id).items[0]).toMatchObject({ status: "error", error: { code: "delivery_uncertain" }, binding: { task_id: worker.taskId, run_epoch: worker.epoch }, delivery: { message_sha256: expect.stringMatching(/^[0-9a-f]{64}$/) } })
-    expect((await f.manager.respawn(f.store.load(worker.taskId) ?? (() => { throw new Error("missing task") })())).ok).toBe(false)
+    expect(pools.load(f.pool.pool_id).items[0]).toMatchObject({
+      status: "error",
+      error: { code: "delivery_uncertain" },
+      binding: { task_id: worker.taskId, run_epoch: worker.epoch },
+      delivery: { message_sha256: expect.stringMatching(/^[0-9a-f]{64}$/) },
+    })
+    expect(
+      (
+        await f.manager.respawn(
+          f.store.load(worker.taskId) ??
+            (() => {
+              throw new Error("missing task")
+            })(),
+        )
+      ).ok,
+    ).toBe(false)
     expect(f.turns).toHaveLength(1)
     failureReceipt("running-reload", pools.load(f.pool.pool_id))
   })
 
-  for (const kind of ["authoritative", "stale", "redacted"] as const) test(`#given ${kind} yield event and uncertain delivery #when completion reconciles #then only authoritative same-identity data can replace uncertainty`, async () => {
-    // given
-    const f = deliveryFixture()
-    const worker = await f.start("a")
-    const pools = createWorkpoolStore(f.store.stateDir)
-    const item = pools.load(f.pool.pool_id).items[0]
-    if (item === undefined) throw new Error("missing assignment")
-    if (kind === "stale") {
-      const result = { key: "a", data: 99 }
-      f.store.appendEvent(worker.taskId, { type: "workpool_yield", payload: { pool_id: f.pool.pool_id, task_id: worker.taskId, run_epoch: worker.epoch + 1, generation: 1, item_id: item.item_id, result, sha256: createHash("sha256").update('{"data":99,"key":"a"}').digest("hex") } })
-    } else {
-      const crash = createWorkpoolYieldCapability({ ...pools, mutate: (id, update) => {
-        update(pools.load(id))
-        throw new Error("fixture crash before pool result replace")
-      } }, f.store)
-      expect(() => crash(worker.taskId, worker.epoch, { op: "yield", results: [{ key: "a", data: kind === "redacted" ? { password: "fixture-value" } : 42 }] })).toThrow()
-    }
-    pools.mutate(f.pool.pool_id, pool => ({ ...pool, items: pool.items.map(item => ({ ...item, status: "error", error: { code: "delivery_uncertain", message: "fixture uncertainty" } })) }))
-    // when
-    await f.settle(worker.taskId)
-    // then
-    expect(f.inspect().items[0]).toMatchObject(kind === "authoritative" ? { status: "completed", data: 42 } : { status: "error", error: { code: "delivery_uncertain" } })
-    failureReceipt(`event-${kind}`, f.inspect())
-  })
+  for (const kind of ["authoritative", "stale", "redacted"] as const)
+    test(`#given ${kind} yield event and uncertain delivery #when completion reconciles #then only authoritative same-identity data can replace uncertainty`, async () => {
+      // given
+      const f = deliveryFixture()
+      const worker = await f.start("a")
+      const pools = createWorkpoolStore(f.store.stateDir)
+      const item = pools.load(f.pool.pool_id).items[0]
+      if (item === undefined) throw new Error("missing assignment")
+      if (kind === "stale") {
+        const result = { key: "a", data: 99 }
+        f.store.appendEvent(worker.taskId, {
+          type: "workpool_yield",
+          payload: {
+            pool_id: f.pool.pool_id,
+            task_id: worker.taskId,
+            run_epoch: worker.epoch + 1,
+            generation: 1,
+            item_id: item.item_id,
+            result,
+            sha256: createHash("sha256").update('{"data":99,"key":"a"}').digest("hex"),
+          },
+        })
+      } else {
+        const crash = createWorkpoolYieldCapability(
+          {
+            ...pools,
+            mutate: (id, update) => {
+              update(pools.load(id))
+              throw new Error("fixture crash before pool result replace")
+            },
+          },
+          f.store,
+        )
+        expect(() =>
+          crash(worker.taskId, worker.epoch, {
+            op: "yield",
+            results: [{ key: "a", data: kind === "redacted" ? { password: "fixture-value" } : 42 }],
+          }),
+        ).toThrow()
+      }
+      pools.mutate(f.pool.pool_id, (pool) => ({
+        ...pool,
+        items: pool.items.map((item) => ({
+          ...item,
+          status: "error",
+          error: { code: "delivery_uncertain", message: "fixture uncertainty" },
+        })),
+      }))
+      // when
+      await f.settle(worker.taskId)
+      // then
+      expect(f.inspect().items[0]).toMatchObject(
+        kind === "authoritative"
+          ? { status: "completed", data: 42 }
+          : { status: "error", error: { code: "delivery_uncertain" } },
+      )
+      failureReceipt(`event-${kind}`, f.inspect())
+    })
 
   test("#given cancellation and a stale epoch #when a worker yields #then the generation fence preserves the cancelled result", async () => {
     // given
@@ -92,9 +156,20 @@ export function runRecoveryCases(): void {
     const f = deliveryFixture()
     const worker = await f.start("a")
     // when
-    const result = f.manager.workpools.yieldResults(worker.taskId, worker.epoch, { op: "yield", results: [null, { key: "bad", data: 1, error: { code: "e", message: "x" } }, { key: "a", error: { code: "analysis_failed", message: "fixture" } }] })
+    const result = f.manager.workpools.yieldResults(worker.taskId, worker.epoch, {
+      op: "yield",
+      results: [
+        null,
+        { key: "bad", data: 1, error: { code: "e", message: "x" } },
+        { key: "a", error: { code: "analysis_failed", message: "fixture" } },
+      ],
+    })
     // then
-    expect(result.results).toMatchObject([{ status: "refused", error: { code: "invalid_input" } }, { status: "refused", error: { code: "invalid_input" } }, { key: "a", status: "accepted" }])
+    expect(result.results).toMatchObject([
+      { status: "refused", error: { code: "invalid_input" } },
+      { status: "refused", error: { code: "invalid_input" } },
+      { key: "a", status: "accepted" },
+    ])
     expect(f.inspect().items[0]).toMatchObject({ status: "error", error: { code: "analysis_failed" } })
     failureReceipt("partial-bad-yield", { result, pool: f.inspect() })
   })
@@ -106,7 +181,11 @@ export function runRecoveryCases(): void {
     await f.settle(worker.taskId)
     await f.park(worker.taskId)
     f.followUp(async (_message, taskId) => {
-      f.store.transition(taskId, { type: "complete", timestamp: new Date().toISOString(), final_response: "fixture complete before ack" })
+      f.store.transition(taskId, {
+        type: "complete",
+        timestamp: new Date().toISOString(),
+        final_response: "fixture complete before ack",
+      })
     })
     const failed = f.event("admission_failed")
     // when
@@ -124,7 +203,9 @@ export function runRecoveryCases(): void {
     const worker = await f.start()
     await f.settle(worker.taskId)
     await f.park(worker.taskId)
-    f.followUp(async () => { throw new Error("fixture lost acknowledgment") })
+    f.followUp(async () => {
+      throw new Error("fixture lost acknowledgment")
+    })
     const failed = f.event("admission_failed")
     f.push("late-yield")
     await failed
@@ -150,13 +231,22 @@ export function runRecoveryCases(): void {
     const prompt = f.turns[0]?.spec.prompt
     if (prompt === undefined) throw new Error("missing launch prompt")
     f.manager.workpools.dispose()
-    f.store.mutate(worker.taskId, record => ({ ...record, spawn_spec: { version: 1, cwd: f.root, prompt } }))
+    f.store.mutate(worker.taskId, (record) => ({ ...record, spawn_spec: { version: 1, cwd: f.root, prompt } }))
     const pools = createWorkpoolStore(f.store.stateDir)
-    pools.mutate(f.pool.pool_id, pool => ({ ...pool, items: pool.items.map(item => { const { delivery: _delivery, ...legacy } = item; return legacy }) }))
+    pools.mutate(f.pool.pool_id, (pool) => ({
+      ...pool,
+      items: pool.items.map((item) => {
+        const { delivery: _delivery, ...legacy } = item
+        return legacy
+      }),
+    }))
     // when
     reconcileWorkpool({ pools, tasks: f.store }, f.pool.pool_id, () => false)
     // then
-    expect(pools.load(f.pool.pool_id).items[0]).toMatchObject({ error: { code: "delivery_uncertain" }, delivery: { message_sha256: createHash("sha256").update(prompt).digest("hex") } })
+    expect(pools.load(f.pool.pool_id).items[0]).toMatchObject({
+      error: { code: "delivery_uncertain" },
+      delivery: { message_sha256: createHash("sha256").update(prompt).digest("hex") },
+    })
     failureReceipt("legacy-message-digest", pools.load(f.pool.pool_id))
   })
 }

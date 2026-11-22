@@ -18,11 +18,7 @@ describe("readSkillsUsageLedger", () => {
   test("#given a ledger with valid entries #when read #then returns parsed entries", async () => {
     // #given
     const { paths } = await fixture()
-    await writeFile(
-      paths.ledgerPath,
-      JSON.stringify({ foo: { count: 3, lastUsedAt: "2026-01-15T10:00:00Z" } }),
-      "utf8",
-    )
+    await writeFile(paths.ledgerPath, JSON.stringify({ foo: { count: 3, lastUsedAt: "2026-01-15T10:00:00Z" } }), "utf8")
 
     // #when
     const ledger = await readSkillsUsageLedger(paths.ledgerPath)

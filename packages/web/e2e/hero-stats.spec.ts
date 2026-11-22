@@ -12,7 +12,7 @@ test.describe("Hero Stats", () => {
 
     // then
     await expect(tagline).toBeVisible()
-    await expect(tagline).toHaveText(en.landing.hero.subcopy.replace(/\s+/g, " "))
+    await expect(tagline).toHaveText(en.home.hero.sub)
   })
 
   test("serves a generated Open Graph image", async ({ request }) => {
@@ -30,7 +30,7 @@ test.describe("Hero Stats", () => {
     await page.goto("/")
 
     // when
-    const starStat = page.locator("text=/[\\d.]+k GitHub Stars/")
+    const starStat = page.locator("text=/[\\d.]+k GitHub stars/i")
 
     // then
     await expect(starStat).toBeVisible()
@@ -57,8 +57,8 @@ test.describe("Hero Stats", () => {
     await statsResponse
 
     // then
-    await expect(page.getByText("0 GitHub Stars")).toBeHidden()
-    await expect(page.locator("text=/[\\d.]+k GitHub Stars/")).toBeVisible()
+    await expect(page.getByText(/^0 GitHub stars$/i)).toBeHidden()
+    await expect(page.locator("text=/[\\d.]+k GitHub stars/i")).toBeVisible()
   })
 
   test("ignores a fallback payload from live stats", async ({ page }) => {
@@ -82,8 +82,8 @@ test.describe("Hero Stats", () => {
     await statsResponse
 
     // then
-    await expect(page.getByText("1 Total Downloads")).toBeHidden()
-    await expect(page.locator("text=/[\\d.]+[kM]\\+? Total Downloads/")).toBeVisible()
+    await expect(page.getByText(/^1 total downloads$/i)).toBeHidden()
+    await expect(page.locator("text=/[\\d.]+[kM]\\+? total downloads/i")).toBeVisible()
   })
 
   test("displays total download count", async ({ page }) => {
@@ -91,7 +91,7 @@ test.describe("Hero Stats", () => {
     await page.goto("/")
 
     // when
-    const totalDownloads = page.locator("text=/[\\d.]+[kM]\\+? Total Downloads/")
+    const totalDownloads = page.locator("text=/[\\d.]+[kM]\\+? total downloads/i")
 
     // then
     await expect(totalDownloads).toBeVisible()
@@ -102,7 +102,7 @@ test.describe("Hero Stats", () => {
     await page.goto("/")
 
     // when
-    const monthlyDownloads = page.locator("text=/[\\d.]+[kM]\\+? Monthly Downloads/")
+    const monthlyDownloads = page.locator("text=/[\\d.]+[kM]\\+? downloads in the last month/i")
 
     // then
     await expect(monthlyDownloads).toBeVisible()

@@ -4,10 +4,7 @@ import { log } from "../../shared/logger"
 import type { PluginManifest } from "./types"
 
 export function findPluginManifestPath(installPath: string): string | null {
-  const candidates = [
-    join(installPath, ".claude-plugin", "plugin.json"),
-    join(installPath, "plugin.json"),
-  ]
+  const candidates = [join(installPath, ".claude-plugin", "plugin.json"), join(installPath, "plugin.json")]
   for (const candidate of candidates) {
     if (existsSync(candidate)) {
       return candidate

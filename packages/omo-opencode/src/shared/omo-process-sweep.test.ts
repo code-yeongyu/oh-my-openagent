@@ -5,10 +5,7 @@ import { join } from "node:path"
 
 import { sweepOrphanedLspDaemonProxies } from "@oh-my-opencode/utils/process-sweep"
 
-import {
-  sweepOmoFamiliesBestEffort,
-  type OmoFamilySweeps,
-} from "./omo-process-sweep"
+import { sweepOmoFamiliesBestEffort, type OmoFamilySweeps } from "./omo-process-sweep"
 
 function tempDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix))
@@ -38,7 +35,8 @@ describe("sweepOmoFamiliesBestEffort()", () => {
     expect(calls.sort()).toEqual(["lsp-proxies", "stale-lsp-daemons"])
     // the proxy family receives the opencode plugin root as an owned root
     expect(pluginRoots).toHaveLength(1)
-    for (const root of pluginRoots) expect(root?.replace(/\\/g, "/").replace(/\/$/, "").endsWith("packages/omo-opencode")).toBe(true)
+    for (const root of pluginRoots)
+      expect(root?.replace(/\\/g, "/").replace(/\/$/, "").endsWith("packages/omo-opencode")).toBe(true)
   })
 
   it("#given one family throws #when the sweep runs #then the failure is logged and the other families still run", async () => {

@@ -11,9 +11,7 @@ export const BLOCKED_TMUX_SUBCOMMANDS = [
   "pipep",
 ]
 
-export const PROHIBITED_TMUX_SUBCOMMANDS = [
-  "kill-server",
-]
+export const PROHIBITED_TMUX_SUBCOMMANDS = ["kill-server"]
 
 export const INTERACTIVE_BASH_DESCRIPTION = `WARNING: This is TMUX ONLY. Pass tmux subcommands directly (without 'tmux' prefix).
 

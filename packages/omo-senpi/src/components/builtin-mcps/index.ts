@@ -60,6 +60,10 @@ function createContext7Declaration(env: Record<string, string | undefined>): Rec
 // the anonymous-but-working server into an authentication failure.
 function hasContext7ApiKey(value: string | undefined): boolean {
   if (value === undefined) return false
-  const normalized = value.trim().toLowerCase().replace(/[<>"'`]/g, "").replace(/[\s_-]+/g, " ")
+  const normalized = value
+    .trim()
+    .toLowerCase()
+    .replace(/[<>"'`]/g, "")
+    .replace(/[\s_-]+/g, " ")
   return normalized.length > 0 && normalized !== "your api key"
 }

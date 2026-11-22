@@ -16,11 +16,10 @@ export function claimRegularModeNotice(stateDir: string): boolean {
     return false
   }
   try {
-    writeFileSync(
-      join(stateDir, REGULAR_MODE_NOTICE_MARKER),
-      JSON.stringify({ shownAt: new Date().toISOString() }),
-      { flag: "wx", mode: 0o600 },
-    )
+    writeFileSync(join(stateDir, REGULAR_MODE_NOTICE_MARKER), JSON.stringify({ shownAt: new Date().toISOString() }), {
+      flag: "wx",
+      mode: 0o600,
+    })
     return true
   } catch {
     return false

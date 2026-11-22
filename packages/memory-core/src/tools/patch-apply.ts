@@ -24,7 +24,11 @@ export async function applyMemoryPatch(root: string, input: string, claim?: Clai
   return applyOperations(root, parseMemoryPatch(input), claim)
 }
 
-async function applyOperations(root: string, operations: readonly PatchOperation[], claim: ClaimReceipt | undefined): Promise<AppliedPatch> {
+async function applyOperations(
+  root: string,
+  operations: readonly PatchOperation[],
+  claim: ClaimReceipt | undefined,
+): Promise<AppliedPatch> {
   const pendingWrites = new Map<string, string>()
   const pendingDeletes = new Set<string>()
   const affectedPaths = new Set<string>()
@@ -65,7 +69,14 @@ async function applyOperations(root: string, operations: readonly PatchOperation
       if (await exists(target.absolute)) {
         throw new Error(`memory apply_patch: cannot add existing memory file: ${target.relative}`)
       }
-      pendingWrites.set(target.absolute, restampContent(undefined, normalizeAddedContent(target.relative.slice(0, -3), operation.contentLines.join("\n")), claim))
+      pendingWrites.set(
+        target.absolute,
+        restampContent(
+          undefined,
+          normalizeAddedContent(target.relative.slice(0, -3), operation.contentLines.join("\n")),
+          claim,
+        ),
+      )
       pendingDeletes.delete(target.absolute)
       affectedPaths.add(target.relative)
       continue
@@ -94,8 +105,11 @@ async function applyOperations(root: string, operations: readonly PatchOperation
     if (hasLegacyUserHeader(current) && !hasLegacyUserHeader(written)) strippedPaths.push(source.relative)
     // The destination's content before this move overwrites it: what this patch already wrote there, nothing when an earlier
     // op freed the path (that op handled its own note), else the file on disk read leniently (only its header is looked at).
-    const overwritten = pendingWrites.get(target.absolute)
-      ?? (pendingDeletes.has(target.absolute) || !(await exists(target.absolute)) ? undefined : await readFile(target.absolute, "utf8"))
+    const overwritten =
+      pendingWrites.get(target.absolute) ??
+      (pendingDeletes.has(target.absolute) || !(await exists(target.absolute))
+        ? undefined
+        : await readFile(target.absolute, "utf8"))
     if (source.absolute !== target.absolute && hasLegacyUserHeader(overwritten)) strippedPaths.push(target.relative)
     pendingWrites.set(target.absolute, written)
     pendingDeletes.delete(target.absolute)
@@ -125,7 +139,9 @@ function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
     return parseMemoryFile(content)
   } catch (error) {
     if (isMissingFrontmatterError(error)) {
-      throw new Error("memory apply_patch: target file is missing required frontmatter; add frontmatter with update_description")
+      throw new Error(
+        "memory apply_patch: target file is missing required frontmatter; add frontmatter with update_description",
+      )
     }
     throw new Error(`memory apply_patch: ${errorMessage(error).replace(/^frontmatter: /, "")}`)
   }
@@ -148,10 +164,10 @@ const utf8Decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })
 
 async function readUtf8TextStrict(path: string): Promise<string> {
   const bytes = await readFile(path)
-  const bom = bytes[0] === 0xff && bytes[1] === 0xfe
-    ? "UTF-16LE"
-    : bytes[0] === 0xfe && bytes[1] === 0xff ? "UTF-16BE" : null
-  if (bom !== null) throw new Error(`File is not valid UTF-8 text: ${path}. Detected ${bom} BOM; convert it to UTF-8 and retry.`)
+  const bom =
+    bytes[0] === 0xff && bytes[1] === 0xfe ? "UTF-16LE" : bytes[0] === 0xfe && bytes[1] === 0xff ? "UTF-16BE" : null
+  if (bom !== null)
+    throw new Error(`File is not valid UTF-8 text: ${path}. Detected ${bom} BOM; convert it to UTF-8 and retry.`)
   try {
     return utf8Decoder.decode(bytes)
   } catch {

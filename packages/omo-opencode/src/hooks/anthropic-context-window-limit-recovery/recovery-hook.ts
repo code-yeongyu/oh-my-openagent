@@ -33,14 +33,13 @@ function createRecoveryState(): AutoCompactState {
   }
 }
 
-
 export function createAnthropicContextWindowLimitRecoveryHook(
   ctx: PluginInput,
   options?: AnthropicContextWindowLimitRecoveryOptions,
 ) {
   const autoCompactState = createRecoveryState()
   const experimental = options?.experimental
-  const pluginConfig = options?.pluginConfig ?? {} as OhMyOpenCodeConfig
+  const pluginConfig = options?.pluginConfig ?? ({} as OhMyOpenCodeConfig)
   const dependencies = {
     executeCompact,
     getLastAssistant,
@@ -88,11 +87,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
           return
         }
 
-        const lastAssistant = await dependencies.getLastAssistant(
-          sessionID,
-          ctx.client,
-          ctx.directory,
-        )
+        const lastAssistant = await dependencies.getLastAssistant(sessionID, ctx.client, ctx.directory)
         const lastAssistantInfo = lastAssistant?.info
         const providerID = parsed.providerID ?? (lastAssistantInfo?.providerID as string | undefined)
         const modelID = parsed.modelID ?? (lastAssistantInfo?.modelID as string | undefined)
@@ -155,11 +150,7 @@ export function createAnthropicContextWindowLimitRecoveryHook(
       clearSessionTimeout(pendingCompactionTimeoutBySession, sessionID)
 
       const errorData = autoCompactState.errorDataBySession.get(sessionID)
-      const lastAssistant = await dependencies.getLastAssistant(
-        sessionID,
-        ctx.client,
-        ctx.directory,
-      )
+      const lastAssistant = await dependencies.getLastAssistant(sessionID, ctx.client, ctx.directory)
       const lastAssistantInfo = lastAssistant?.info
 
       if (lastAssistantInfo?.summary === true && lastAssistant?.hasContent) {

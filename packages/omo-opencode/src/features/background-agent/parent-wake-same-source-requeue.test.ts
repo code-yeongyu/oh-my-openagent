@@ -26,10 +26,12 @@ type SessionMessageStub = {
   parts?: Array<{ type?: string; text?: string; synthetic?: boolean; content?: unknown }>
 }
 
-function createNotifier(args: {
-  sessionMessages?: SessionMessageStub[]
-  promptAsyncImpl?: (call: PromptAsyncCall, attempt: number) => Promise<unknown>
-} = {}): {
+function createNotifier(
+  args: {
+    sessionMessages?: SessionMessageStub[]
+    promptAsyncImpl?: (call: PromptAsyncCall, attempt: number) => Promise<unknown>
+  } = {},
+): {
   notifier: ParentWakeNotifier
   promptAsyncCalls: PromptAsyncCall[]
 } {
@@ -289,5 +291,4 @@ describe("ParentWakeNotifier — same-source reservation requeue (BUG-E)", () =>
       releaseAllPromptAsyncReservationsForTesting()
     }
   })
-
 })

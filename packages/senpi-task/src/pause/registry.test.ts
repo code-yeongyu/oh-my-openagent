@@ -9,10 +9,14 @@ afterEach(cleanupProjects)
 
 function participant(key: string, sequence: number, phase: "pre_grant" | "parked"): PauseParticipant {
   return {
-    key, kind: phase === "parked" ? "task" : "held_admission",
-    taskId: key, runEpoch: 0, runRef: { kind: "task", id: key },
+    key,
+    kind: phase === "parked" ? "task" : "held_admission",
+    taskId: key,
+    runEpoch: 0,
+    runRef: { kind: "task", id: key },
     admission: { model: "test/model", laneKey: "test/model", sequence, phase },
-    state: "pending", at: new Date(0).toISOString(),
+    state: "pending",
+    at: new Date(0).toISOString(),
   }
 }
 
@@ -26,7 +30,10 @@ describe("durable parent pause participant ledger", () => {
     const saved = JSON.parse(readFileSync(join(dir, "pause", "root.json"), "utf8"))
     expect(saved).toMatchObject({ parentSessionId: "root", pauseSeq: 1, phase: "propagating" })
     expect(saved.participants["task-a"].admission).toEqual({
-      model: "test/model", laneKey: "test/model", sequence: 2, phase: "parked",
+      model: "test/model",
+      laneKey: "test/model",
+      sequence: 2,
+      phase: "parked",
     })
   })
 
@@ -42,8 +49,11 @@ describe("durable parent pause participant ledger", () => {
     const restored = new PauseRegistry(dir, barrier)
     restored.restore("root", { pauseSeq: 1 })
     expect(barrier.enter("root", { key: "late", runRef: { kind: "task", id: "late" } }).kind).toBe("held")
-    expect(restored.orderedAdmissions("root").map(entry => entry.key))
-      .toEqual(["parked-first", "parked-later", "queued-oldest"])
+    expect(restored.orderedAdmissions("root").map((entry) => entry.key)).toEqual([
+      "parked-first",
+      "parked-later",
+      "queued-oldest",
+    ])
   })
 
   test("#given an acknowledged child cutoff #when resume is requested and Stop repeats #then cutoffs are frozen and old continuations cannot mutate the ledger", () => {

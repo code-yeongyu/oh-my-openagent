@@ -55,7 +55,8 @@ export interface KibitzerUnavailableRecord {
 // though the producer already validated it.
 export const renderKibitzerNudgedEntry: EntryRenderer<unknown> = (entry, options, theme) => {
   const record = entry.data
-  if (!isRecord(record) || record.version !== 1 || !Array.isArray(record.nudges) || record.nudges.length === 0) return undefined
+  if (!isRecord(record) || record.version !== 1 || !Array.isArray(record.nudges) || record.nudges.length === 0)
+    return undefined
   const nudges: Array<{ readonly path: string; readonly hint: string }> = []
   for (const nudge of record.nudges) {
     const normalized = normalizeNudge(nudge)
@@ -66,17 +67,21 @@ export const renderKibitzerNudgedEntry: EntryRenderer<unknown> = (entry, options
   if (first === undefined) return undefined
   // Kibitzer owns the advice. Stored opener fields and delivery provenance do not
   // change its title, including when replaying older sessions.
-  return noticeComponent({
-    glyph: "✦",
-    title: "Kibitzer !",
-    tone: "accent",
-    why: `recalled memory: ${first.hint}`,
-    extra: [
-      ...rest.map((nudge) => ({ text: `recalled memory: ${nudge.hint}`, tone: "dim" as const })),
-      ...nudges.map((nudge) => ({ text: nudge.path, tone: "dim" as const })),
-    ],
-    detail: "Kibitzer surfaced this from stored memory; it is a hint, not current state.",
-  }, options, theme)
+  return noticeComponent(
+    {
+      glyph: "✦",
+      title: "Kibitzer !",
+      tone: "accent",
+      why: `recalled memory: ${first.hint}`,
+      extra: [
+        ...rest.map((nudge) => ({ text: `recalled memory: ${nudge.hint}`, tone: "dim" as const })),
+        ...nudges.map((nudge) => ({ text: nudge.path, tone: "dim" as const })),
+      ],
+      detail: "Kibitzer surfaced this from stored memory; it is a hint, not current state.",
+    },
+    options,
+    theme,
+  )
 }
 
 /**
@@ -109,23 +114,35 @@ export const renderKibitzerUnavailableEntry: EntryRenderer<unknown> = (entry, op
   if (record.cause !== "category_unavailable" && record.cause !== "beyond_category") return undefined
   const providers = unavailableProviders(record.missingProviders)
   if (providers === undefined) return undefined
-  const why = record.cause === "category_unavailable"
-    ? `No connected provider serves the "${category}" category chain, so recalled-memory judging is off; it resumes by itself once one is connected.`
-    : `The "${category}" category chain has no connected model and Kibitzer never falls back beyond the category, so recalled-memory judging is off.`
-  const fixes = providers.length > 0
-    ? [
-      { text: `connect one of: ${providers.join(", ")} (run /login <provider>)`, tone: "dim" as const },
-      { text: `or pin categories.${category}.model (or memory.recall.category) in omo.json`, tone: "dim" as const },
-    ]
-    : [{ text: `pin categories.${category}.model (or memory.recall.category) in omo.json to a connected model`, tone: "dim" as const }]
-  return noticeComponent({
-    glyph: "⚠",
-    title: joinFields(["Kibitzer unavailable", category]),
-    tone: "warning",
-    why,
-    extra: fixes,
-    detail: "Kibitzer is pinned to the memory.recall.category chain on purpose: an advisor reading the live transcript must never land on a frontier-priced model outside it.",
-  }, options, theme)
+  const why =
+    record.cause === "category_unavailable"
+      ? `No connected provider serves the "${category}" category chain, so recalled-memory judging is off; it resumes by itself once one is connected.`
+      : `The "${category}" category chain has no connected model and Kibitzer never falls back beyond the category, so recalled-memory judging is off.`
+  const fixes =
+    providers.length > 0
+      ? [
+          { text: `connect one of: ${providers.join(", ")} (run /login <provider>)`, tone: "dim" as const },
+          { text: `or pin categories.${category}.model (or memory.recall.category) in omo.json`, tone: "dim" as const },
+        ]
+      : [
+          {
+            text: `pin categories.${category}.model (or memory.recall.category) in omo.json to a connected model`,
+            tone: "dim" as const,
+          },
+        ]
+  return noticeComponent(
+    {
+      glyph: "⚠",
+      title: joinFields(["Kibitzer unavailable", category]),
+      tone: "warning",
+      why,
+      extra: fixes,
+      detail:
+        "Kibitzer is pinned to the memory.recall.category chain on purpose: an advisor reading the live transcript must never land on a frontier-priced model outside it.",
+    },
+    options,
+    theme,
+  )
 }
 
 function unavailableProviders(value: unknown): readonly string[] | undefined {
@@ -144,7 +161,8 @@ function unavailableProviders(value: unknown): readonly string[] | undefined {
 function validGateReason(value: unknown): string | undefined {
   if (typeof value !== "string") return undefined
   const normalized = normalizeRendererText(value)
-  if (normalized.length === 0 || normalized.length > GATE_REASON_MAX_CHARS || containsSecretLikeMaterial(value)) return undefined
+  if (normalized.length === 0 || normalized.length > GATE_REASON_MAX_CHARS || containsSecretLikeMaterial(value))
+    return undefined
   if (/[\r\n]/u.test(value)) return undefined
   return normalized
 }
@@ -167,9 +185,12 @@ export const renderKibitzerGateEntry: EntryRenderer<KibitzerGateRecord> = (entry
   if (typeof candidateCount !== "number" || !Number.isInteger(candidateCount) || candidateCount < 0) return undefined
   if (record.status === "dropped") return undefined
   if (record.status !== "skipped" && record.status !== "failed") return undefined
-  if (typeof record.consecutiveFailures !== "number"
-    || !Number.isInteger(record.consecutiveFailures)
-    || record.consecutiveFailures < 1) return undefined
+  if (
+    typeof record.consecutiveFailures !== "number" ||
+    !Number.isInteger(record.consecutiveFailures) ||
+    record.consecutiveFailures < 1
+  )
+    return undefined
   const cause = typeof record.cause === "string" ? normalizeRendererText(record.cause) : undefined
   const reason = validGateReason(record.reason)
   const runId = validRunId(record.runId)
@@ -178,25 +199,35 @@ export const renderKibitzerGateEntry: EntryRenderer<KibitzerGateRecord> = (entry
   const consecutiveFailures = record.consecutiveFailures
   // The fix names the exact setting when the record knows its recall category; older records and
   // one-shot records do not, and keep the generic hint.
-  const fix = category === undefined
-    ? "check Kibitzer model/provider settings"
-    : `set categories.${category}.model (or memory.recall.category) in omo.json to a model that answers`
+  const fix =
+    category === undefined
+      ? "check Kibitzer model/provider settings"
+      : `set categories.${category}.model (or memory.recall.category) in omo.json to a model that answers`
   const extra = [
     ...(reason === undefined ? [] : [{ text: reason, tone: "dim" as const }]),
     ...(runId === undefined ? [] : [{ text: `run ${runId}`, tone: "dim" as const }]),
-    ...(model === undefined ? [] : [{
-      text: `last failed model: ${model}${category === undefined ? "" : ` (memory recall category "${category}")`}`,
-      tone: "dim" as const,
-    }]),
+    ...(model === undefined
+      ? []
+      : [
+          {
+            text: `last failed model: ${model}${category === undefined ? "" : ` (memory recall category "${category}")`}`,
+            tone: "dim" as const,
+          },
+        ]),
     { text: `after ${consecutiveFailures} consecutive failures; ${fix}`, tone: "dim" as const },
   ]
-  return noticeComponent({
-    glyph: record.status === "skipped" ? "⚠" : "✗",
-    title: joinFields([`Kibitzer gate ${record.status === "skipped" ? "skipped" : "failed"}`, cause]),
-    tone: record.status === "skipped" ? "warning" : "error",
-    why: record.status === "skipped"
-      ? "Kibitzer could not judge the recalled memory candidates for the previous turn."
-      : "Kibitzer failed while judging the recalled memory candidates for the previous turn.",
-    ...(extra.length === 0 ? {} : { extra }),
-  }, options, theme)
+  return noticeComponent(
+    {
+      glyph: record.status === "skipped" ? "⚠" : "✗",
+      title: joinFields([`Kibitzer gate ${record.status === "skipped" ? "skipped" : "failed"}`, cause]),
+      tone: record.status === "skipped" ? "warning" : "error",
+      why:
+        record.status === "skipped"
+          ? "Kibitzer could not judge the recalled memory candidates for the previous turn."
+          : "Kibitzer failed while judging the recalled memory candidates for the previous turn.",
+      ...(extra.length === 0 ? {} : { extra }),
+    },
+    options,
+    theme,
+  )
 }

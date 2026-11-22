@@ -23,7 +23,11 @@ const IDENTITY = "memory-notice-agent"
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function fixture(): Promise<{ context: MemoryIdentityContext }> {
@@ -141,6 +145,9 @@ describe("createMemoryNoticeWiring direct surface", () => {
     wiringFor(context).register(pi)
 
     // then
-    expect(pi.entryRenderers.map((registration) => registration.customType)).toEqual([SOUL_UPDATED_ENTRY_TYPE, AGREEMENT_FLAGGED_ENTRY_TYPE])
+    expect(pi.entryRenderers.map((registration) => registration.customType)).toEqual([
+      SOUL_UPDATED_ENTRY_TYPE,
+      AGREEMENT_FLAGGED_ENTRY_TYPE,
+    ])
   })
 })

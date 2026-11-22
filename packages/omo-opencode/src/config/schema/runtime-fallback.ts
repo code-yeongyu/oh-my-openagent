@@ -12,6 +12,8 @@ export const RuntimeFallbackConfigSchema = z.object({
   /** Session-level timeout in seconds to advance fallback when provider hangs (default: 30). Set to 0 to disable timeout escalation and message.updated auto-retry signal detection. */
   timeout_seconds: z.number().min(0).optional(),
   /** Show toast notification when switching to fallback model (default: true) */
+  /** Seconds a subagent may stay silent before its first progress event before the first-prompt watchdog aborts it and dispatches the fallback (default: 300). Set to 0 to disable the watchdog. */
+  first_prompt_timeout_seconds: z.number().min(0).optional(),
   notify_on_fallback: z.boolean().optional(),
   restore_primary_after_cooldown: z.boolean().optional(),
 })

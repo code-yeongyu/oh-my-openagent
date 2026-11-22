@@ -39,7 +39,9 @@ export function startCollectorStub(reply: ServerReply = "ok"): CollectorStub {
     async fetch(request) {
       const raw = new Uint8Array(await request.arrayBuffer())
       const body = request.headers.get("content-encoding") === "gzip" ? new Uint8Array(gunzipSync(raw)) : raw
-      const ids = logRecordsOf(decodeLogs(body)).map((record) => String(attributeMap(record.attributes)["log.record.uid"]))
+      const ids = logRecordsOf(decodeLogs(body)).map((record) =>
+        String(attributeMap(record.attributes)["log.record.uid"]),
+      )
       count += 1
       stub.received.push(...ids)
       for (const wake of waiters.splice(0)) wake()

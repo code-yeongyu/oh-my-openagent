@@ -31,7 +31,8 @@ function resolved(
 
 const scenarios = {
   visualPrimary: resolved("visual-engineering", [model("google", "gemini-4-argon")]),
-  visualFableFallback: resolved("visual-engineering", [model("anthropic", "claude-fable-5-1")]),
+  visualFableFallback: resolved("visual-engineering", [model("anthropic", "claude-fable-5-2")]),
+  visualFable51Fallback: resolved("visual-engineering", [model("anthropic", "claude-fable-5-1")]),
   visualOpusFallback: resolved("visual-engineering", [model("anthropic", "claude-opus-5")]),
   visualKimiFallback: resolved("visual-engineering", [model("kimi-coding", "k3.1-pro")]),
   writingPrimary: resolved("writing", [model("google", "gemini-4-argon")]),

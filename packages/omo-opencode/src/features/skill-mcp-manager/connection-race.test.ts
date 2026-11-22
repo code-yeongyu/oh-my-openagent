@@ -19,10 +19,7 @@ const createdTransports: MockStdioClientTransport[] = []
 class MockClient {
   readonly close = mock(async () => {})
 
-  constructor(
-    _clientInfo: { name: string; version: string },
-    _options: { capabilities: Record<string, never> }
-  ) {
+  constructor(_clientInfo: { name: string; version: string }, _options: { capabilities: Record<string, never> }) {
     createdClients.push(this)
   }
 
@@ -51,7 +48,9 @@ class MockStdioClientTransport {
   }
 }
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { disconnectAll, disconnectSession } = await import("./cleanup")
 const { getOrCreateClient } = await import("./connection")
@@ -276,27 +275,28 @@ describe("getOrCreateClient multi-key disconnect race", () => {
     const supersedingConnection = createDeferred<Awaited<ReturnType<typeof getOrCreateClient>>>()
     pendingConnects.push(pendingConnect)
 
-    const newerClient = new MockClient(
-      { name: "newer-client", version: "1.0.0" },
-      { capabilities: {} },
-    )
+    const newerClient = new MockClient({ name: "newer-client", version: "1.0.0" }, { capabilities: {} })
     const newerTransport = new MockStdioClientTransport({ command: "mock-mcp-server" })
     let replacedEntry = false
     const originalSet = state.clients.set.bind(state.clients)
-    Reflect.set(state.clients, "set", (key: string, value: SkillMcpManagerState["clients"] extends Map<string, infer TValue> ? TValue : never) => {
-      originalSet(key, value)
-      if (!replacedEntry && key === clientKey) {
-        replacedEntry = true
-        originalSet(key, {
-          client: newerClient as never,
-          transport: newerTransport as never,
-          skillName: info.skillName,
-          lastUsedAt: Date.now(),
-          connectionType: "stdio",
-        })
-      }
-      return state.clients
-    })
+    Reflect.set(
+      state.clients,
+      "set",
+      (key: string, value: SkillMcpManagerState["clients"] extends Map<string, infer TValue> ? TValue : never) => {
+        originalSet(key, value)
+        if (!replacedEntry && key === clientKey) {
+          replacedEntry = true
+          originalSet(key, {
+            client: newerClient as never,
+            transport: newerTransport as never,
+            skillName: info.skillName,
+            lastUsedAt: Date.now(),
+            connectionType: "stdio",
+          })
+        }
+        return state.clients
+      },
+    )
 
     const clientPromise = getOrCreateClient({ state, clientKey, info, config: stdioConfig })
     state.pendingConnections.set(clientKey, supersedingConnection.promise)

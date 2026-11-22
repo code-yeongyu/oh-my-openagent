@@ -79,7 +79,7 @@ describe("GitHub workflow job summaries", () => {
       "    runs-on: ubuntu-latest",
       "    steps:",
       "      - name: Write job summary",
-      "        run: echo ok >> \"$GITHUB_STEP_SUMMARY\"",
+      '        run: echo ok >> "$GITHUB_STEP_SUMMARY"',
       "  newly-added:",
       "    runs-on: ubuntu-latest",
       "    steps:",
@@ -117,46 +117,52 @@ describe("GitHub workflow job summaries", () => {
     expect(summaryStep).not.toContain("`${{ inputs.dist_tag || 'latest' }}`")
   })
 
-  test("#given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders", () => {
-    const tempDir = mkdtempSync(join(tmpdir(), "omo-ci-summary-"))
-    const summaryPath = join(tempDir, "summary.md")
-    writeFileSync(summaryPath, "")
+  test(
+    "#given summary inputs #when the shared writer runs #then it emits the Markdown contract GitHub renders",
+    () => {
+      const tempDir = mkdtempSync(join(tmpdir(), "omo-ci-summary-"))
+      const summaryPath = join(tempDir, "summary.md")
+      writeFileSync(summaryPath, "")
 
-    const result = spawnSync("bash", [".github/scripts/write-job-summary.sh"], {
-      cwd: new URL("..", import.meta.url),
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        GITHUB_STEP_SUMMARY: summaryPath,
-        JOB_SUMMARY_TITLE: "Root CI tests",
-        JOB_SUMMARY_STATUS: "success",
-        JOB_SUMMARY_DETAILS: "- Runs the Bun test suite\n- Builds vendored MCP packages",
-        JOB_SUMMARY_NEXT: "Open failing step logs if this job is red.",
-        GITHUB_WORKFLOW: "CI",
-        GITHUB_EVENT_NAME: "pull_request",
-        GITHUB_REF_NAME: "dev",
-        GITHUB_SHA: "1234567890abcdef",
-        GITHUB_REPOSITORY: "code-yeongyu/oh-my-openagent",
-        GITHUB_RUN_ID: "42",
-        GITHUB_RUN_ATTEMPT: "2",
-      },
-    })
+      const result = spawnSync("bash", [".github/scripts/write-job-summary.sh"], {
+        cwd: new URL("..", import.meta.url),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GITHUB_STEP_SUMMARY: summaryPath,
+          JOB_SUMMARY_TITLE: "Root CI tests",
+          JOB_SUMMARY_STATUS: "success",
+          JOB_SUMMARY_DETAILS: "- Runs the Bun test suite\n- Builds vendored MCP packages",
+          JOB_SUMMARY_NEXT: "Open failing step logs if this job is red.",
+          GITHUB_WORKFLOW: "CI",
+          GITHUB_EVENT_NAME: "pull_request",
+          GITHUB_REF_NAME: "dev",
+          GITHUB_SHA: "1234567890abcdef",
+          GITHUB_REPOSITORY: "code-yeongyu/oh-my-openagent",
+          GITHUB_RUN_ID: "42",
+          GITHUB_RUN_ATTEMPT: "2",
+        },
+      })
 
-    try {
-      expect(result.status, result.stderr).toBe(0)
-      const summary = readFileSync(summaryPath, "utf8")
+      try {
+        expect(result.status, result.stderr).toBe(0)
+        const summary = readFileSync(summaryPath, "utf8")
 
-      expect(summary).toContain("## Root CI tests")
-      expect(summary).toContain("| Field | Value |")
-      expect(summary).toContain("| Result | `success` |")
-      expect(summary).toContain("| Workflow | `CI` |")
-      expect(summary).toContain("### What this job checks")
-      expect(summary).toContain("- Runs the Bun test suite")
-      expect(summary).toContain("### If this fails")
-      expect(summary).toContain("Open failing step logs if this job is red.")
-      expect(summary).toContain("[Open run](https://github.com/code-yeongyu/oh-my-openagent/actions/runs/42/attempts/2)")
-    } finally {
-      rmSync(tempDir, { recursive: true, force: true })
-    }
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+        expect(summary).toContain("## Root CI tests")
+        expect(summary).toContain("| Field | Value |")
+        expect(summary).toContain("| Result | `success` |")
+        expect(summary).toContain("| Workflow | `CI` |")
+        expect(summary).toContain("### What this job checks")
+        expect(summary).toContain("- Runs the Bun test suite")
+        expect(summary).toContain("### If this fails")
+        expect(summary).toContain("Open failing step logs if this job is red.")
+        expect(summary).toContain(
+          "[Open run](https://github.com/code-yeongyu/oh-my-openagent/actions/runs/42/attempts/2)",
+        )
+      } finally {
+        rmSync(tempDir, { recursive: true, force: true })
+      }
+    },
+    WINDOWS_INTEGRATION_TEST_TIMEOUT,
+  )
 })

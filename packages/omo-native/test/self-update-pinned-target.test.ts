@@ -29,7 +29,9 @@ describe("updateTarget", () => {
     })
 
     test("#then an npm install pins omo-ai@<version>", () => {
-      expect(updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", noLockfile, "5.1.2")).toEqual({
+      expect(
+        updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", noLockfile, "5.1.2"),
+      ).toEqual({
         manager: "npm",
         command: "npm i -g omo-ai@5.1.2",
         argv: ["npm", "i", "-g", "omo-ai@5.1.2"],
@@ -37,7 +39,14 @@ describe("updateTarget", () => {
     })
 
     test("#then a beta install pins the exact beta version instead of the beta tag", () => {
-      const target = updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.0.0-0.beta.90", "/home/u", noLockfile, "5.0.0-0.beta.91")
+      const target = updateTarget(
+        "/tmp/prefix/lib/node_modules/omo-ai",
+        "linux",
+        "5.0.0-0.beta.90",
+        "/home/u",
+        noLockfile,
+        "5.0.0-0.beta.91",
+      )
       expect(target.argv).toEqual(["npm", "i", "-g", "omo-ai@5.0.0-0.beta.91"])
     })
   })
@@ -45,7 +54,8 @@ describe("updateTarget", () => {
 
 describe("omo update against the channel dist-tag", () => {
   const bunRootPath = "/tmp/custom-bun/install/global/node_modules/omo-ai"
-  const resolveBunUpdate = (targetVersion?: string) => updateTarget(bunRootPath, "linux", "5.1.1", "/home/u", () => false, targetVersion)
+  const resolveBunUpdate = (targetVersion?: string) =>
+    updateTarget(bunRootPath, "linux", "5.1.1", "/home/u", () => false, targetVersion)
   const resolveNpmUpdate = (targetVersion?: string) =>
     updateTarget("/tmp/prefix/lib/node_modules/omo-ai", "linux", "5.1.1", "/home/u", () => false, targetVersion)
 
@@ -99,11 +109,13 @@ describe("omo update against the channel dist-tag", () => {
     const h = harness({ distTags: { latest: "5.1.2" }, versions: ["5.1.1", "5.1.2"] })
     const code = await runSelfUpdate(["update"], h.options)
     expect(code).toBe(0)
-    expect(h.spawned).toEqual([{
-      command: "bun",
-      args: ["add", "-g", "omo-ai@5.1.2"],
-      env: { PATH: "/usr/bin", BUN_INSTALL: "/tmp/custom-bun" },
-    }])
+    expect(h.spawned).toEqual([
+      {
+        command: "bun",
+        args: ["add", "-g", "omo-ai@5.1.2"],
+        env: { PATH: "/usr/bin", BUN_INSTALL: "/tmp/custom-bun" },
+      },
+    ])
     expect(h.lines).toEqual([
       "omo is updated via bun: bun add -g omo-ai@5.1.2",
       "omo 5.1.1 -> 5.1.2 (engine: senpi 2026.9.29)",

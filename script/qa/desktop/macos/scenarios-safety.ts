@@ -3,14 +3,16 @@ import { join } from "node:path"
 import { isRecord, type Json, type ToolOutcome } from "./agent"
 import { countCanaryDialogs, openTextEdit, quitTextEdit, settle, textEditText, workDir } from "./fixtures"
 import { command, launcherPermissions } from "./observer"
-import {
-  clickCode, onWindow, type RunOptions, type ScenarioResult, toolError, warmUp, withSession,
-} from "./scenario"
+import { clickCode, onWindow, type RunOptions, type ScenarioResult, toolError, warmUp, withSession } from "./scenario"
 
-const recordOf = (value: unknown): Json => isRecord(value) ? value : {}
+const recordOf = (value: unknown): Json => (isRecord(value) ? value : {})
 const EXPECTED = {
-  capturePermission: "granted", inputPermission: "granted", axPermission: "granted",
-  stopPath: "global", backgroundWindowInput: true, cursorOverlay: true,
+  capturePermission: "granted",
+  inputPermission: "granted",
+  axPermission: "granted",
+  stopPath: "global",
+  backgroundWindowInput: true,
+  cursorOverlay: true,
 } as const
 
 export async function preflight(options: RunOptions): Promise<ScenarioResult> {
@@ -22,7 +24,8 @@ export async function preflight(options: RunOptions): Promise<ScenarioResult> {
   }
   const probe = join(workDir, "probe.png")
   const screencapture = await command("/usr/sbin/screencapture", ["-x", probe])
-    .then(() => statSync(probe).size > 0).catch(() => false)
+    .then(() => statSync(probe).size > 0)
+    .catch(() => false)
   const launcher = await launcherPermissions()
   // Even preflight drives the packaged OmO component in an isolated real Senpi process.
   return withSession(options, {}, async (session) => {
@@ -31,8 +34,13 @@ export async function preflight(options: RunOptions): Promise<ScenarioResult> {
     const matches = Object.entries(EXPECTED).every(([key, value]) => capabilities[key] === value)
     return {
       scenario: "preflight",
-      pass: !result.isError && matches && launcher.accessibilityTrusted &&
-        launcher.screenCaptureAccess && !launcher.screenLocked && screencapture,
+      pass:
+        !result.isError &&
+        matches &&
+        launcher.accessibilityTrusted &&
+        launcher.screenCaptureAccess &&
+        !launcher.screenLocked &&
+        screencapture,
       facts: { host, capabilities, expected: EXPECTED, launcher, screencapture },
     }
   })
@@ -61,9 +69,14 @@ export async function killswitchRealHid(options: RunOptions): Promise<ScenarioRe
   await openTextEdit(doc, "")
   try {
     return await withSession(options, {}, async (session) => {
-      const typing = session.call(onWindow(doc,
-        `await w.type(${JSON.stringify(longText)}, { delivery: "background" });`))
-      await settle("typing started", () => textEditText(doc), (text) => text.length > 20)
+      const typing = session.call(
+        onWindow(doc, `await w.type(${JSON.stringify(longText)}, { delivery: "background" });`),
+      )
+      await settle(
+        "typing started",
+        () => textEditText(doc),
+        (text) => text.length > 20,
+      )
       const before = await kvmShot(options, jetkvm, "killswitch-before.png")
       await command(jetkvm, ["key", "chord", STOP_CHORD])
       const typed = await typing
@@ -78,28 +91,42 @@ export async function killswitchRealHid(options: RunOptions): Promise<ScenarioRe
       const resume = await session.command("resume")
       const statusAfterResume = await session.command("status")
       const resumed = await session.call(clickCode(doc, "background"))
-      const resumeOk = !resumed.isError && /suspended=false/.test(resume) &&
-        statusSuspended(statusAfterResume) === false
+      const resumeOk =
+        !resumed.isError && /suspended=false/.test(resume) && statusSuspended(statusAfterResume) === false
       return {
         scenario: "killswitch-real-hid",
-        pass: typedLength < longText.length && typeSuspended && clickSuspended &&
-          statusSuspended(status) === true && resumeOk,
+        pass:
+          typedLength < longText.length &&
+          typeSuspended &&
+          clickSuspended &&
+          statusSuspended(status) === true &&
+          resumeOk,
         facts: {
-          chord: STOP_CHORD, typeError: toolError(typed), typedLength, audit: session.auditLog(),
-          auditTypeSuspended: typeSuspended, clickWhileSuspended: toolError(blocked),
-          auditClickSuspended: clickSuspended, status, resume, statusAfterResume, resumeOk,
-          resumedClickError: toolError(resumed), kvmScreenshots: [before, after],
+          chord: STOP_CHORD,
+          typeError: toolError(typed),
+          typedLength,
+          audit: session.auditLog(),
+          auditTypeSuspended: typeSuspended,
+          clickWhileSuspended: toolError(blocked),
+          auditClickSuspended: clickSuspended,
+          status,
+          resume,
+          statusAfterResume,
+          resumeOk,
+          resumedClickError: toolError(resumed),
+          kvmScreenshots: [before, after],
         },
       }
     })
-  } finally { await quitTextEdit() }
+  } finally {
+    await quitTextEdit()
+  }
 }
 
 async function imageFacts(path: string): Promise<{ readonly format: string | null; readonly width: number | null }> {
   const text = await command("/usr/bin/sips", ["-g", "format", "-g", "pixelWidth", path])
   const width = /pixelWidth: (\d+)/.exec(text)?.[1]
-  return { format: /format: (\w+)/.exec(text)?.[1] ?? null,
-    width: width === undefined ? null : Number(width) }
+  return { format: /format: (\w+)/.exec(text)?.[1] ?? null, width: width === undefined ? null : Number(width) }
 }
 
 async function budgetCapture(options: RunOptions, computer: Json, label: string) {
@@ -111,12 +138,15 @@ async function budgetCapture(options: RunOptions, computer: Json, label: string)
     if (inline !== undefined) writeFileSync(inlineFile, Buffer.from(inline.data, "base64"))
     const artifact = typeof frame.path === "string" ? frame.path : null
     return {
-      settings: computer, error: toolError(result), inlineMimeType: inline?.mimeType ?? null,
+      settings: computer,
+      error: toolError(result),
+      inlineMimeType: inline?.mimeType ?? null,
       inlineBytes: inline === undefined ? null : Buffer.byteLength(inline.data, "base64"),
       inlineImage: inline === undefined ? null : await imageFacts(inlineFile),
-      displayedWidth: frame.width ?? null, sourceWidth: frame.sourceWidth ?? null,
+      displayedWidth: frame.width ?? null,
+      sourceWidth: frame.sourceWidth ?? null,
       artifactPath: artifact,
-      artifactBytes: artifact === null ? null : statSync(artifact, { throwIfNoEntry: false })?.size ?? null,
+      artifactBytes: artifact === null ? null : (statSync(artifact, { throwIfNoEntry: false })?.size ?? null),
       artifactImage: artifact === null ? null : await imageFacts(artifact),
     }
   })
@@ -124,17 +154,27 @@ async function budgetCapture(options: RunOptions, computer: Json, label: string)
 
 export async function screenshotBudget(options: RunOptions): Promise<ScenarioResult> {
   const budget = 200_000
-  const jpeg = await budgetCapture(options, {
-    screenshot_max_bytes: budget, max_width: 1280, max_height: 720,
-  }, "jpeg")
+  const jpeg = await budgetCapture(
+    options,
+    {
+      screenshot_max_bytes: budget,
+      max_width: 1280,
+      max_height: 720,
+    },
+    "jpeg",
+  )
   const artifact = await budgetCapture(options, { screenshot_max_bytes: budget }, "artifact")
-  const jpegOk = jpeg.inlineMimeType === "image/jpeg" && jpeg.inlineImage?.format === "jpeg" &&
-    (jpeg.inlineBytes ?? Infinity) <= budget && typeof jpeg.sourceWidth === "number" &&
+  const jpegOk =
+    jpeg.inlineMimeType === "image/jpeg" &&
+    jpeg.inlineImage?.format === "jpeg" &&
+    (jpeg.inlineBytes ?? Infinity) <= budget &&
+    typeof jpeg.sourceWidth === "number" &&
     jpeg.sourceWidth > (jpeg.inlineImage?.width ?? Infinity)
-  const artifactOk = artifact.inlineMimeType === null && artifact.artifactBytes !== null &&
+  const artifactOk =
+    artifact.inlineMimeType === null &&
+    artifact.artifactBytes !== null &&
     artifact.artifactImage?.width === artifact.sourceWidth
-  return { scenario: "screenshot-budget", pass: jpegOk && artifactOk,
-    facts: { jpeg, artifact, jpegOk, artifactOk } }
+  return { scenario: "screenshot-budget", pass: jpegOk && artifactOk, facts: { jpeg, artifact, jpegOk, artifactOk } }
 }
 
 export async function capabilitiesTruth(options: RunOptions): Promise<ScenarioResult> {
@@ -149,13 +189,16 @@ export async function capabilitiesTruth(options: RunOptions): Promise<ScenarioRe
       const expected = launcher.skylightSpi && launcher.accessibilityTrusted && !warm.isError
       return {
         scenario: "capabilities-truth",
-        pass: capabilities.backgroundWindowInput === expected &&
-          capabilities.screenLocked === false && !launcher.screenLocked,
-        facts: { launcher, canaryWarmUpError: toolError(warm),
-          expectedBackgroundWindowInput: expected, capabilities },
+        pass:
+          capabilities.backgroundWindowInput === expected &&
+          capabilities.screenLocked === false &&
+          !launcher.screenLocked,
+        facts: { launcher, canaryWarmUpError: toolError(warm), expectedBackgroundWindowInput: expected, capabilities },
       }
     })
-  } finally { await quitTextEdit() }
+  } finally {
+    await quitTextEdit()
+  }
 }
 
 // `computer.macos_canary`: "session" shows the canary dialog exactly once per session, "off" never
@@ -178,9 +221,19 @@ export async function canary(options: RunOptions, mode: "session" | "off"): Prom
       } finally {
         dialogs = await counter.stop()
       }
-      return { scenario: mode === "session" ? "canary" : "canary-off",
+      return {
+        scenario: mode === "session" ? "canary" : "canary-off",
         pass: !first.isError && !second.isError && dialogs.length === expectedDialogs,
-        facts: { mode, expectedDialogs, firstError: toolError(first), secondError: toolError(second), canaryDialogPids: dialogs } }
+        facts: {
+          mode,
+          expectedDialogs,
+          firstError: toolError(first),
+          secondError: toolError(second),
+          canaryDialogPids: dialogs,
+        },
+      }
     })
-  } finally { await quitTextEdit() }
+  } finally {
+    await quitTextEdit()
+  }
 }

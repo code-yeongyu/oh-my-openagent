@@ -47,7 +47,13 @@ export function primeMemoryPersonaAssets(input: {
   for (const target of input.targets ?? MEMORY_PRIME_TARGETS) {
     try {
       const loaded = target.load()
-      if (loaded instanceof Promise) pending.push(loaded.then(() => undefined, (error: unknown) => report(target, error)))
+      if (loaded instanceof Promise)
+        pending.push(
+          loaded.then(
+            () => undefined,
+            (error: unknown) => report(target, error),
+          ),
+        )
     } catch (error: unknown) {
       report(target, error)
     }

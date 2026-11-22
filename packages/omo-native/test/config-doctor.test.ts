@@ -25,7 +25,9 @@ function captureDoctor(options: Record<string, unknown>): string {
   const originalLog = console.log
   const originalExitCode = process.exitCode
   const output: string[] = []
-  console.log = (value?: unknown) => { output.push(String(value)) }
+  console.log = (value?: unknown) => {
+    output.push(String(value))
+  }
   try {
     runDoctor({ harnesses: [] }, [], { list: () => [], fetchDistTags: () => null, daemonReport: () => [], ...options })
     return output.join("\n")
@@ -53,7 +55,9 @@ describe("omo doctor config lines", () => {
   })
 
   test("#given a user category named after a builtin agent #when the config report runs #then one WARN line names the ignored category key and the agents key to use", () => {
-    const home = homeWithUserConfig(`{ "categories": { "plan-consultant": { "models": [{ "model": "provider/sonnet" }] }, "quick": { "model": "provider/quick" } } }`)
+    const home = homeWithUserConfig(
+      `{ "categories": { "plan-consultant": { "models": [{ "model": "provider/sonnet" }] }, "quick": { "model": "provider/quick" } } }`,
+    )
 
     expect(configDoctorLines({ cwd: home, env: { HOME: home } })).toEqual([
       'WARN config: categories."plan-consultant" is not read for subagent_type "plan-consultant" spawns (categories only route task(category: ...)), so that agent runs its default model chain. Move the chain to the agent: "agents": { "plan-consultant": { "models": [{"model":"provider/sonnet"}] } }. If you also use task(category: "plan-consultant") on purpose, the key keeps working there; giving the agent its own models silences this warning',
@@ -63,20 +67,32 @@ describe("omo doctor config lines", () => {
   test("#given the launcher loads the staged runtime #when it resolves #then the launcher returns the runtime's lines unchanged", async () => {
     const home = homeWithUserConfig(`{ "agents": { "oracle": { "model": "openai/gpt-6", "temperature": "hot" } } }`)
 
-    const lines = await doctorConfigLines({ cwd: home, env: { HOME: home }, loadRuntime: async () => ({ configDoctorLines }) })
+    const lines = await doctorConfigLines({
+      cwd: home,
+      env: { HOME: home },
+      loadRuntime: async () => ({ configDoctorLines }),
+    })
 
     expect(lines).toEqual(["WARN config: ~/.omo/omo.jsonc: agents.oracle.temperature ignored (invalid value)"])
   })
 
   test("#given the staged runtime cannot be loaded #when the launcher asks for config lines #then doctor says the check was unavailable instead of staying silent", async () => {
-    const lines = await doctorConfigLines({ loadRuntime: async () => { throw new Error("missing bundle") } })
+    const lines = await doctorConfigLines({
+      loadRuntime: async () => {
+        throw new Error("missing bundle")
+      },
+    })
 
     expect(lines).toEqual(["WARN config: diagnostics unavailable: missing bundle"])
   })
 
   test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", () => {
-    const stdout = captureDoctor({ configDiagnostics: ["WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"] })
+    const stdout = captureDoctor({
+      configDiagnostics: ["WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"],
+    })
 
-    expect(stdout.split("\n")).toContain("WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)")
+    expect(stdout.split("\n")).toContain(
+      "WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)",
+    )
   })
 })

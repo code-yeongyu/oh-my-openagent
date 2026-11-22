@@ -38,9 +38,7 @@ export async function refreshModelCapabilities(
     if (options.json) {
       stdout.write(`${JSON.stringify(summary, null, 2)}\n`)
     } else {
-      stdout.write(
-        `Refreshed model capabilities cache (${summary.modelCount} models) from ${summary.sourceUrl}\n`,
-      )
+      stdout.write(`Refreshed model capabilities cache (${summary.modelCount} models) from ${summary.sourceUrl}\n`)
     }
 
     return 0

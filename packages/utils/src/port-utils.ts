@@ -52,7 +52,7 @@ export async function isPortAvailable(port: number, hostname: string = "127.0.0.
 
 export async function findAvailablePort(
   startPort: number = DEFAULT_SERVER_PORT,
-  hostname: string = "127.0.0.1"
+  hostname: string = "127.0.0.1",
 ): Promise<number> {
   for (let attempt = 0; attempt < MAX_PORT_ATTEMPTS; attempt++) {
     const port = startPort + attempt
@@ -70,7 +70,7 @@ export interface AutoPortResult {
 
 export async function getAvailableServerPort(
   preferredPort: number = DEFAULT_SERVER_PORT,
-  hostname: string = "127.0.0.1"
+  hostname: string = "127.0.0.1",
 ): Promise<AutoPortResult> {
   if (await isPortAvailable(preferredPort, hostname)) {
     return { port: preferredPort, wasAutoSelected: false }

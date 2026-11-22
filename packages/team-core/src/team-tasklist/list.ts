@@ -13,11 +13,7 @@ type TaskListFilter = {
   owner?: string
 }
 
-export async function listTasks(
-  teamRunId: string,
-  config: TeamModeConfig,
-  filter?: TaskListFilter,
-): Promise<Task[]> {
+export async function listTasks(teamRunId: string, config: TeamModeConfig, filter?: TaskListFilter): Promise<Task[]> {
   const tasksDirectory = getTasksDir(resolveBaseDir(config), teamRunId)
 
   let entries: Dirent[]
