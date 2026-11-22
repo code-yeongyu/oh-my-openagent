@@ -63,7 +63,7 @@ export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOpti
         segments.dirty ? "dirty" : "clean",
         segments.backlogSteps,
         segments.streak,
-        segments.integrationFailure,
+        JSON.stringify(segments.integrationFailure ?? null),
         options.isActive(identity),
         segments.syncBlocked === true ? "sync-blocked" : segments.syncHeld === true ? "sync-held" : "sync-ok",
       ].join("|")

@@ -6,12 +6,16 @@ import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
 import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
+import { rendererVisibleWidth } from "@oh-my-opencode/senpi-task/renderer-text"
+
 import { createMemoryIdentityContext } from "./context"
 import {
   MEMORY_STATUS_KEY,
   SYNC_BLOCKED_SEGMENT,
   SYNC_HELD_SEGMENT,
+  MEMORY_STATUS_MAX_WIDTH,
   estimateSystemTokens,
+  formatMemoryStatusLine,
   estimateSystemTokensCached,
   refreshMemoryStatus,
   type GitRepoForStatus,
@@ -964,5 +968,37 @@ describe("estimateSystemTokensCached", () => {
 
     // then
     expect(estimate).toBe(Math.floor(9 / 4))
+  })
+})
+
+// #12330 review: the failure line is measured in terminal cells and keeps what the person can act on (the cause).
+describe("formatMemoryStatusLine integration failure width", () => {
+  const segments = { dirty: false, backlogSteps: 0, streak: 0, parked: false } as const
+  const line = (integrationFailure: { outcome: string; reason?: string; cause?: string }, sync = {}) =>
+    formatMemoryStatusLine("agent", "2h ago", { ...segments, ...sync, integrationFailure })
+
+  test("#given a short ASCII failure #when formatted #then the full outcome, reason and cause are shown", () => {
+    expect(line({ outcome: "merge conflict", cause: "git: notes.md" })).toBe(
+      "reflection not integrated: merge conflict (git: notes.md)",
+    )
+  })
+
+  test("#given a long internal reason and a Korean cause #when formatted #then the cause survives whole within the cell budget", () => {
+    const text = line({ outcome: "parent dirty", reason: "merge_apply_fail", cause: "충돌 파일: notes.md" })
+    expect(rendererVisibleWidth(text)).toBeLessThanOrEqual(MEMORY_STATUS_MAX_WIDTH)
+    expect(text).toContain("충돌 파일: notes.md")
+    expect(text).not.toContain("merge_apply_fail")
+  })
+
+  test("#given a wide cause that cannot fit #when formatted #then it is cut by cells, never past the budget", () => {
+    const text = line({ outcome: "parent dirty", cause: "충돌".repeat(40) })
+    expect(rendererVisibleWidth(text)).toBeLessThanOrEqual(MEMORY_STATUS_MAX_WIDTH)
+    expect(text.startsWith("reflection not integrated: 충돌")).toBe(true)
+  })
+
+  test("#given a failure and a blocked sync #when formatted #then the sync segment is kept and the whole line fits", () => {
+    const text = line({ outcome: "parent dirty", reason: "merge_apply_fail", cause: "충돌 파일: notes.md" }, { syncBlocked: true })
+    expect(text.endsWith(SYNC_BLOCKED_SEGMENT)).toBe(true)
+    expect(rendererVisibleWidth(text)).toBeLessThanOrEqual(MEMORY_STATUS_MAX_WIDTH)
   })
 })
