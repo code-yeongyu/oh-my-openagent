@@ -1,12 +1,13 @@
 import { spawn } from "node:child_process"
 import { createInterface } from "node:readline"
-import { type DesktopCapabilities, ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-opencode/senpi-desktop-protocol"
-import { isDesktopCapabilities, isRecord, parseHello } from "./parse"
+import { ENGINE_ABI, PROTOCOL_VERSION } from "@oh-my-opencode/senpi-desktop-protocol"
+import { isDesktopCapabilities, isRecord, parseHello, type ShapedCapabilities } from "./parse"
 
 /** Bounds the fresh engine's `engine.hello` + `capabilities`, the budget `computer-use-doctor` gives its probe. */
 const PERMISSION_PROBE_TIMEOUT_MS = 5_000
 
-type Capabilities = Omit<DesktopCapabilities, "cursorOverlay"> & { readonly cursorOverlay?: boolean }
+// The preflight rewrites raw engine lines, so it works on the shape-checked wire form, not the narrowed one.
+type Capabilities = ShapedCapabilities
 
 /** Resolves the capabilities a new engine process reports, or `undefined` when it gave no usable answer. */
 export type PermissionProbe = () => Promise<Capabilities | undefined>

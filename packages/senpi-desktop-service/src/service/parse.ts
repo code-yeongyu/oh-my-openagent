@@ -87,14 +87,37 @@ export function isStopPathStatus(value: unknown): value is StopPathStatus {
   return matches(value, STOP_PATH_STATUS) && isMember(value.stopPath, STOP_PATH_KINDS)
 }
 
-export function isDesktopCapabilities(
-  value: unknown,
-): value is Omit<DesktopCapabilities, "cursorOverlay"> & { readonly cursorOverlay?: boolean } {
+/** Capabilities as they pass the shape check: `cursorOverlay` may be absent and `interventionWatch` is any string. */
+export type ShapedCapabilities = Omit<DesktopCapabilities, "cursorOverlay" | "interventionWatch"> & {
+  readonly cursorOverlay?: boolean
+  readonly interventionWatch?: string | null
+}
+
+export function isDesktopCapabilities(value: unknown): value is ShapedCapabilities {
   return (
     matches(value, CAPABILITIES) &&
     isStringArray(value.deliveryModes) &&
     (value.cursorOverlay === undefined || typeof value.cursorOverlay === "boolean")
   )
+}
+
+const INTERVENTION_WATCH_STATES = ["on", "off", "not_started"] as const
+
+/**
+ * The capabilities the service hands out. The shape check tolerates any `interventionWatch` string so a newer
+ * engine still opens; a state this host does not know reads as `"unknown"` (as `parseAuditEvent` does for an
+ * unknown action), so the type never claims a state the engine did not send (#11731).
+ */
+export function toCapabilities(value: ShapedCapabilities): DesktopCapabilities {
+  const { interventionWatch } = value
+  return {
+    ...value,
+    cursorOverlay: value.cursorOverlay ?? false,
+    interventionWatch:
+      interventionWatch === undefined || interventionWatch === null
+        ? interventionWatch
+        : (INTERVENTION_WATCH_STATES.find((state) => state === interventionWatch) ?? UNKNOWN_AUDIT_VALUE),
+  }
 }
 
 type AuditEventShape = Omit<AuditEvent, "action" | "code"> & {
@@ -143,7 +166,7 @@ export function parseSessionOpened(value: unknown): SessionOpened | undefined {
     return undefined
   }
   return {
-    capabilities: { ...value.capabilities, cursorOverlay: value.capabilities.cursorOverlay ?? false },
+    capabilities: toCapabilities(value.capabilities),
     resumeToken: value.resumeToken,
   }
 }
