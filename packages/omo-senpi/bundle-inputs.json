@@ -586,6 +586,7 @@
     "packages/omo-codex/plugin/components/ulw-loop/src/domain-types.ts",
     "packages/omo-codex/plugin/components/ulw-loop/src/driver-objective-ack.ts",
     "packages/omo-codex/plugin/components/ulw-loop/src/evidence-artifacts.ts",
+    "packages/omo-codex/plugin/components/ulw-loop/src/evidence-ignore.ts",
     "packages/omo-codex/plugin/components/ulw-loop/src/evidence.ts",
     "packages/omo-codex/plugin/components/ulw-loop/src/goal-status.ts",
     "packages/omo-codex/plugin/components/ulw-loop/src/ledger.ts",

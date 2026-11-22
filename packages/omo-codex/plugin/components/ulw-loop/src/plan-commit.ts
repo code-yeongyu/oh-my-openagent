@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { linkSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { ensureEvidenceIgnored } from "./evidence-ignore.js";
 import { readLedgerAt } from "./ledger.js";
 import { type UlwLoopScope, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
 import { assertStateLockOwned, migrationEntries } from "./plan-io.js";
@@ -92,6 +93,7 @@ export async function commit(
 		Object.assign(entry, entries[index + entries.length - mutation.entries.length]);
 	await hooks.getStore()?.afterCommit?.();
 	await materialize(dir);
+	ensureEvidenceIgnored(repoRoot);
 }
 
 function viewContents(dir: string): [string, string][] {

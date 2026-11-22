@@ -1,9 +1,21 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { appendFile, copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
+import {
+	appendFile,
+	copyFile,
+	mkdir,
+	mkdtemp,
+	readdir,
+	readFile,
+	readlink,
+	rm,
+	symlink,
+	writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
-import { ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
+import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
 import {
 	appendLedger,
 	findAcceptedSteeringLedgerEntry,
@@ -542,5 +554,90 @@ describe("withUlwLoopMutationLock", () => {
 
 		// then
 		expect(events).toEqual(["scoped-1:start", "root-scope", "scoped-1:end", "scoped-2"]);
+	});
+});
+
+describe("evidence in the user's repository (#10799)", () => {
+	function git(repoRoot: string, ...args: string[]): string {
+		return execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", windowsHide: true });
+	}
+
+	it("keeps evidence written after the first plan write out of git status, and leaves tracked .omo files tracked", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		git(repoRoot, "init", "-q");
+		await mkdir(join(repoRoot, ".omo", "rules"), { recursive: true });
+		await writeFile(join(repoRoot, ".omo", "rules", "team.md"), "rule\n", "utf8");
+		git(repoRoot, "add", ".omo/rules/team.md");
+
+		// when
+		await withUlwLoopMutationLock(repoRoot, { sessionId: "s1" }, () =>
+			writePlan(repoRoot, makePlan(), { sessionId: "s1" }),
+		);
+		const attemptDir = join(repoRoot, ulwLoopAttemptEvidenceDir("G001", 1, { sessionId: "s1" }));
+		await mkdir(attemptDir, { recursive: true });
+		await writeFile(join(attemptDir, "screenshot.png"), "png", "utf8");
+
+		// then
+		const status = git(repoRoot, "status", "--porcelain", "--untracked-files=all").split("\n");
+		expect(status.filter((line) => line.includes(".omo/evidence"))).toEqual([]);
+		expect(git(repoRoot, "ls-files", ".omo/rules")).toBe(".omo/rules/team.md\n");
+	});
+
+	it.each(["file", "symlink"] as const)(
+		"saves the plan and warns without changing a %s at the evidence path",
+		async (kind) => {
+			// given
+			const fixture = await makeRepo();
+			onTestFinished(() => rm(fixture, { recursive: true, force: true }));
+			const repoRoot = join(fixture, "repo");
+			const outside = join(fixture, "outside");
+			const evidence = join(repoRoot, ".omo", "evidence");
+			await mkdir(join(repoRoot, ".omo"), { recursive: true });
+			if (kind === "file") {
+				await writeFile(evidence, "user data\n");
+			} else {
+				await mkdir(outside);
+				await symlink(outside, evidence, "junction");
+			}
+			const stderr = vi.spyOn(process.stderr, "write").mockReturnValue(true);
+
+			// when
+			let diagnostic = "";
+			try {
+				await withUlwLoopMutationLock(repoRoot, () => writePlan(repoRoot, makePlan()));
+			} finally {
+				diagnostic = stderr.mock.calls.map(([chunk]) => String(chunk)).join("");
+				stderr.mockRestore();
+			}
+
+			// then
+			const record = await readFile(join(ulwLoopDir(repoRoot), "revisions", "00000001.json"), "utf8");
+			expect(JSON.parse(record)).toMatchObject({ revision: 1, plan: { goals: [{ id: "G001" }] } });
+			if (kind === "file") {
+				expect(await readFile(evidence, "utf8")).toBe("user data\n");
+			} else {
+				expect(await readlink(evidence)).toBe(outside);
+				expect(await readdir(outside)).toEqual([]);
+			}
+			expect(diagnostic).toMatch(/\[ulw-loop\].*\.omo\/evidence\/\.gitignore/);
+		},
+	);
+
+	it("preserves a custom evidence gitignore byte-for-byte", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		onTestFinished(() => rm(repoRoot, { recursive: true, force: true }));
+		const evidence = join(repoRoot, ".omo", "evidence");
+		const ignorePath = join(evidence, ".gitignore");
+		const custom = Buffer.from("# user rules\r\n*.log\r\n!important.log");
+		await mkdir(evidence, { recursive: true });
+		await writeFile(ignorePath, custom);
+
+		// when
+		await withUlwLoopMutationLock(repoRoot, () => writePlan(repoRoot, makePlan()));
+
+		// then
+		expect(await readFile(ignorePath)).toEqual(custom);
 	});
 });
