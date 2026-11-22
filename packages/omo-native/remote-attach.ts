@@ -64,16 +64,22 @@ function serveLines(socket: Socket, onLine: (line: string) => void): void {
   socket.setEncoding("utf8")
   socket.on("data", (chunk: string) => {
     buffer += chunk
-    if (buffer.length > MAX_LINE_CHARS) {
-      socket.destroy()
-      return
-    }
+    // omo#11999: the bound is per LINE. A chunk may hold many complete small lines whose total passes it; those are
+    // served. Only a single line grown past the bound (a peer that never sends LF) ends the connection.
     let newline = buffer.indexOf("\n")
     while (newline !== -1) {
       const line = buffer.slice(0, newline).replace(/\r$/, "")
       buffer = buffer.slice(newline + 1)
+      if (line.length > MAX_LINE_CHARS) {
+        socket.destroy()
+        return
+      }
       if (line) onLine(line)
       newline = buffer.indexOf("\n")
+    }
+    if (buffer.length > MAX_LINE_CHARS) {
+      socket.destroy()
+      return
     }
   })
 }
