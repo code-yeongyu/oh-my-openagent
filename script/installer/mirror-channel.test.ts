@@ -218,5 +218,5 @@ describe("mirrorChannel", () => {
     expect(result).toBe("5.1.50")
     expect(attempts).toBe(1)
     expect(sleeps).toEqual([5_000])
-  }, 20_000)
+  })
 })
