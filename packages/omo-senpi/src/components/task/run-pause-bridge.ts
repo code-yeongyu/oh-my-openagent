@@ -1,5 +1,6 @@
 import { log } from "@oh-my-opencode/utils"
 import type { EnginePauseState } from "../../../../senpi-task/src/pause/ports"
+import type { PauseRegistryRecord } from "../../../../senpi-task/src/pause/registry"
 import type { ResumeFailure, RunPauseController } from "../../../../senpi-task/src/pause/run-controller"
 import { readEngineRunHold } from "./engine-hold-reader"
 
@@ -22,7 +23,7 @@ export class EngineRunPauseBridge {
     readonly controller: RunPauseController,
     readonly native: {
       getPauseState(): EnginePauseState | undefined
-      notifyResumeFailure?(parentSessionId: string, text: string): void
+      notifyResumeFailure?(parentSessionId: string, text: string): boolean
     },
     readonly afterReleased?: (parentSessionId: string) => void | Promise<void>,
     readonly lostRecovery?: LostParticipantRecovery,
@@ -45,6 +46,7 @@ export class EngineRunPauseBridge {
     const registry = this.controller.registry
     const record = registry.load(parentSessionId)
     if (record === undefined) return
+    this.#deliverFailureNotice(parentSessionId, record.pendingResumeFailureNotice)
     const state = this.native.getPauseState()
     if (state === undefined) return
     const live = readEngineRunHold(state)
@@ -75,6 +77,7 @@ export class EngineRunPauseBridge {
   // ordinary Stop-then-message path) or a `resuming` ledger is left to the path that owns it.
   releaseStale(parentSessionId: string): Promise<void> {
     const record = this.controller.registry.load(parentSessionId)
+    this.#deliverFailureNotice(parentSessionId, record?.pendingResumeFailureNotice)
     if (record === undefined || record.phase !== "applied") return Promise.resolve()
     const inFlight = this.#resumes.get(parentSessionId)
     if (inFlight?.seq === record.pauseSeq && !inFlight.settled) return Promise.resolve()
@@ -196,20 +199,42 @@ export class EngineRunPauseBridge {
     failures: readonly ResumeFailure[],
   ): void {
     if (this.native.notifyResumeFailure === undefined) return
-    const state = this.native.getPauseState()
-    if (state !== undefined && readEngineRunHold(state).stopped) return
     try {
-      if (!this.controller.registry.claimResumeFailureNotice(parentSessionId, pauseSeq, resumeId)) return
+      const registry = this.controller.registry
+      const pending = registry.load(parentSessionId)?.pendingResumeFailureNotice
+      if (pending !== undefined) {
+        this.#deliverFailureNotice(parentSessionId, pending)
+        if (pending.pauseSeq === pauseSeq && pending.resumeId === resumeId) return
+      }
       const reasons = [...new Set(failures.map(({ code }) => code))].sort().join(", ")
       const count = failures.length
-      this.native.notifyResumeFailure(
+      const notice = {
+        pauseSeq,
+        resumeId,
+        text: `Resume could not restore ${count} participant${count === 1 ? "" : "s"} (${reasons}). Check /tasks for their status.`,
+      }
+      if (registry.queueResumeFailureNotice(parentSessionId, notice))
+        this.#deliverFailureNotice(parentSessionId, notice)
+    } catch (error) {
+      log("[omo-senpi] run resume failure notice could not be queued", {
         parentSessionId,
-        `Resume could not restore ${count} participant${count === 1 ? "" : "s"} (${reasons}). Check /tasks for their status.`,
-      )
+        pauseSeq,
+        error: String(error),
+      })
+    }
+  }
+
+  #deliverFailureNotice(parentSessionId: string, notice: PauseRegistryRecord["pendingResumeFailureNotice"]): void {
+    if (notice === undefined || this.native.notifyResumeFailure === undefined) return
+    try {
+      const state = this.native.getPauseState()
+      if (state !== undefined && readEngineRunHold(state).stopped) return
+      if (this.native.notifyResumeFailure(parentSessionId, notice.text)) {
+        this.controller.registry.markResumeFailureNoticed(parentSessionId, notice)
+      }
     } catch (error) {
       log("[omo-senpi] run resume failure notice could not be delivered", {
         parentSessionId,
-        pauseSeq,
         error: String(error),
       })
     }

@@ -26,12 +26,19 @@ export type PauseParticipant = {
   readonly at: string
 }
 
+type ResumeFailureNotice = {
+  readonly pauseSeq: number
+  readonly resumeId: string
+  readonly text: string
+}
+
 export type PauseRegistryRecord = {
   readonly parentSessionId: string
   readonly pauseSeq: number
   readonly phase: "propagating" | "applied" | "resuming" | "resumed"
   readonly barrier: AdmissionState
   readonly participants: Readonly<Record<string, PauseParticipant>>
+  readonly pendingResumeFailureNotice?: ResumeFailureNotice
   readonly resume?: {
     readonly resumeId: string
     readonly childSeqCutoffs: Readonly<Record<string, number>>
@@ -92,6 +99,9 @@ export class PauseRegistry {
       phase: "propagating",
       barrier: { kind: "closed", pauseSeq },
       participants: Object.fromEntries(participants.map((participant) => [participant.key, participant])),
+      ...(prior?.pendingResumeFailureNotice === undefined
+        ? {}
+        : { pendingResumeFailureNotice: prior.pendingResumeFailureNotice }),
     }
     this.#write(record)
     return record
@@ -181,17 +191,29 @@ export class PauseRegistry {
     return true
   }
 
-  claimResumeFailureNotice(parentSessionId: string, pauseSeq: number, resumeId: string): boolean {
+  queueResumeFailureNotice(parentSessionId: string, notice: ResumeFailureNotice): boolean {
     const record = this.require(parentSessionId)
     if (
-      record.pauseSeq !== pauseSeq ||
+      record.pauseSeq !== notice.pauseSeq ||
       record.phase !== "resumed" ||
-      record.resume?.resumeId !== resumeId ||
-      record.resume.failureNoticed
+      record.resume?.resumeId !== notice.resumeId ||
+      record.resume.failureNoticed ||
+      record.pendingResumeFailureNotice !== undefined
     )
       return false
-    this.#write({ ...record, resume: { ...record.resume, failureNoticed: true } })
+    this.#write({ ...record, pendingResumeFailureNotice: notice })
     return true
+  }
+
+  markResumeFailureNoticed(parentSessionId: string, notice: ResumeFailureNotice): void {
+    const { pendingResumeFailureNotice: pending, ...record } = this.require(parentSessionId)
+    if (pending?.pauseSeq !== notice.pauseSeq || pending.resumeId !== notice.resumeId) return
+    const resume = record.resume
+    this.#write(
+      record.pauseSeq === notice.pauseSeq && resume?.resumeId === notice.resumeId
+        ? { ...record, resume: { ...resume, failureNoticed: true } }
+        : record,
+    )
   }
 
   authorizeResume(parentSessionId: string, pauseSeq: number, resumeId: string) {

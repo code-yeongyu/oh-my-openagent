@@ -125,14 +125,10 @@
     "packages/senpi-task/src/manager/index.ts": ["TaskConcurrency", "decideDepthPolicy", "NameRegistry", "AUTO_HOST_CAPABILITIES", "adaptInProcessHandle", "adaptRpcHandle", "TASK_AWAITING_INPUT_EVENT", "TRANSCRIPT_ASSISTANT_EVENT", "TRANSCRIPT_TOOL_EVENT", "logTranscriptEvent", "subscribeTranscriptLog"],
     // pre-existing at origin dev 4686e425b5: unused export(s) readObservedModel, observeChildEffectiveModel
     "packages/senpi-task/src/manager/observed-model.ts": ["readObservedModel", "observeChildEffectiveModel"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) PausedChildLostError, PausedChildOwnedElsewhereError
-    "packages/senpi-task/src/manager/paused-restore.ts": ["PausedChildLostError", "PausedChildOwnedElsewhereError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) UNEXPECTED_EXIT_CONFIRMATION_MS
     "packages/senpi-task/src/manager/provisional-exit.ts": ["UNEXPECTED_EXIT_CONFIRMATION_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) spillCandidates
     "packages/senpi-task/src/manager/spill-admission.ts": ["spillCandidates"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) NativeResumeRefusedError
-    "packages/senpi-task/src/pause/native-child-pause.ts": ["NativeResumeRefusedError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) tokensPerSecond
     "packages/senpi-task/src/run-stats.ts": ["tokensPerSecond"],
     // pre-existing at origin dev 4686e425b5: unused export(s) makeSessionDir

@@ -96,12 +96,17 @@ export class TaskRuntimeContext {
     if ("effectiveServiceTier" in ctx || "serviceTier" in ctx) {
       this.#parentServiceTier = asParentServiceTier(ctx.effectiveServiceTier) ?? asParentServiceTier(ctx.serviceTier)
     }
-    if (ctx.ui !== undefined) this.#ui = ctx.ui
-    if (typeof ctx.mode === "string") this.#mode = ctx.mode
     if (ctx.sessionManager !== undefined) {
-      this.#sessionId = ctx.sessionManager.getSessionId()
+      const sessionId = ctx.sessionManager.getSessionId()
+      if (sessionId !== this.#sessionId) {
+        this.#ui = undefined
+        this.#mode = undefined
+      }
+      this.#sessionId = sessionId
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
     }
+    if (ctx.ui !== undefined) this.#ui = ctx.ui
+    if (typeof ctx.mode === "string") this.#mode = ctx.mode
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
     if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
   }
@@ -163,8 +168,16 @@ export class TaskRuntimeContext {
     return this.#ui
   }
 
-  notifyResumeFailure(parentSessionId: string, text: string): void {
-    if (this.#sessionId === parentSessionId) notifyTaskUser({ mode: this.#mode, ui: this.#ui }, text, "warning")
+  notifyResumeFailure(parentSessionId: string, text: string): boolean {
+    if (
+      this.#sessionId !== parentSessionId ||
+      this.#transition === "session_switching" ||
+      this.#transition === "session_shutdown"
+    )
+      return false
+    if (this.#mode !== "print" && this.#mode !== "json" && this.#ui === undefined) return false
+    notifyTaskUser({ mode: this.#mode, ui: this.#ui }, text, "warning")
+    return true
   }
 
   sessionId(): string | undefined {

@@ -10,6 +10,7 @@ import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { createEngineRunPause } from "./engine-run-pause"
 import { EngineRunPauseBridge } from "./run-pause-bridge"
+import { TaskRuntimeContext, type CapturedUi } from "./runtime-context"
 
 const roots: string[] = []
 afterEach(() => {
@@ -41,7 +42,11 @@ const queued: PauseParticipant = {
   at: "2026-01-01T00:00:00.000Z",
 }
 
-function hostOver(participants: readonly PauseParticipant[], overrides: Partial<RunPauseEffects>) {
+function hostOver(
+  participants: readonly PauseParticipant[],
+  overrides: Partial<RunPauseEffects>,
+  runtime?: TaskRuntimeContext,
+) {
   const root = mkdtempSync(join(tmpdir(), "run-pause-resume-failure-"))
   roots.push(root)
   const barrier = new AdmissionBarrier()
@@ -64,10 +69,16 @@ function hostOver(participants: readonly PauseParticipant[], overrides: Partial<
   }
   let live: EnginePauseState = stopped(7)
   const notices: { parent: string; text: string }[] = []
-  const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), {
-    getPauseState: () => live,
-    notifyResumeFailure: (parent: string, text: string) => notices.push({ parent, text }),
-  })
+  const bridge = new EngineRunPauseBridge(
+    new RunPauseController(registry, effects),
+    runtime ?? {
+      getPauseState: () => live,
+      notifyResumeFailure: (parent: string, text: string) => {
+        notices.push({ parent, text })
+        return true
+      },
+    },
+  )
   return {
     barrier,
     registry,
@@ -123,6 +134,59 @@ test("Resume reports multiple failures once, reopens admission, and retries only
   expect(h.notices).toHaveLength(1)
   expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+})
+
+test("a partial Resume warns only the original parent on return, even after the child recovers", async () => {
+  const runtime = new TaskRuntimeContext(tempProject())
+  const parentNotices: { text: string; level: string | undefined }[] = []
+  const unrelatedNotices: typeof parentNotices = []
+  const capture = (sessionId: string, state: EnginePauseState, notices: typeof parentNotices) => {
+    const ui: CapturedUi = {
+      notify: (text, level) => notices.push({ text, level }),
+      select: async () => undefined,
+      confirm: async () => false,
+      setStatus: () => undefined,
+      setWidget: () => undefined,
+    }
+    runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId }, getPauseState: () => state, ui })
+  }
+  let resumeFails = true
+  const h = hostOver(
+    [child],
+    {
+      resume: async () => {
+        if (resumeFails) throw new NativeResumeRefusedError(child.key, "stale")
+        return { kind: "resumed" }
+      },
+    },
+    runtime,
+  )
+  const resume = { ...released(7), change: "resumed" } as const
+  capture(PARENT, stopped(7), parentNotices)
+  await h.bridge.changed(PARENT, { ...stopped(7), change: "paused" })
+
+  capture("unrelated", released(1), unrelatedNotices)
+  await h.bridge.changed(PARENT, resume)
+  await h.bridge.changed(PARENT, resume)
+  resumeFails = false
+  await h.bridge.changed(PARENT, resume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+  expect(parentNotices).toEqual([])
+  expect(unrelatedNotices).toEqual([])
+
+  const returned = new EngineRunPauseBridge(h.bridge.controller, runtime)
+  capture(PARENT, released(7), parentNotices)
+  await returned.restore(PARENT)
+  await returned.reconciled(PARENT)
+  expect(parentNotices).toEqual([{ text: expect.stringContaining("native_resume_refused"), level: "warning" }])
+
+  capture("unrelated", released(1), unrelatedNotices)
+  await returned.reconciled("unrelated")
+  capture(PARENT, released(7), parentNotices)
+  await returned.reconciled(PARENT)
+  await returned.changed(PARENT, resume)
+  expect(parentNotices).toHaveLength(1)
+  expect(unrelatedNotices).toEqual([])
 })
 
 test("delta-2 HIGH: the Resume caller's result names each participant whose resume failed", async () => {

@@ -87,7 +87,10 @@ function hostProcess(
   let live = options.state
   const controller = new RunPauseController(registry, effects)
   const notices: string[] = []
-  const notice = (_parent: string, text: string) => notices.push(text)
+  const notice = (_parent: string, text: string) => {
+    notices.push(text)
+    return true
+  }
   const bridge = new EngineRunPauseBridge(controller, {
     getPauseState: () => live,
     ...(options.legacyWithoutNotice ? {} : { notifyResumeFailure: notice }),
