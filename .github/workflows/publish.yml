@@ -300,6 +300,26 @@ jobs:
               ' <<< "$RUNS")"
               if [ -n "$SUCCESS_ID" ]; then
                 echo "CI workflow run ${SUCCESS_ID} succeeded for ${sha}."
+                if [ "$#" -eq 0 ]; then
+                  # An unpinned release can reuse platform CI only for a verified stamp over a green base.
+                  LEGS="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${SUCCESS_ID}/jobs?filter=latest&per_page=100" \
+                    --jq "$(cat .github/scripts/platform-jobs.jq)" | cut -f2)"
+                  if [ -n "$LEGS" ] && ! grep -qvx success <<< "$LEGS"; then
+                    echo "Its macOS/Windows legs ran and passed."
+                    return 0
+                  fi
+                  git fetch --no-tags --depth=2 origin "$sha"
+                  PLATFORM_BASE="$(git rev-parse "${sha}^")"
+                  if ! node script/release-state-paths.mjs --check-stamp "$PLATFORM_BASE" "$sha"; then
+                    echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and ${sha} changes more than the release stamp over ${PLATFORM_BASE}; run the full matrix on it."
+                    return 1
+                  fi
+                  if [ "$(GH_REPO="$REPOSITORY" BASE_SHA="$PLATFORM_BASE" bash .github/scripts/base-platform-green.sh)" != "true" ]; then
+                    echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and the base ${PLATFORM_BASE} has no dev push run whose macOS/Windows legs ran green."
+                    return 1
+                  fi
+                  echo "Its macOS/Windows legs did not run; base ${PLATFORM_BASE} proved them and the delta is the release stamp only."
+                fi
                 return 0
               fi
 
@@ -349,7 +369,7 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - A pinned source requires successful push CI before stamping. Only a verified release stamp can reuse it.
-            - Otherwise checks CI at the exact prepared SHA, skipping the wait on unpinned preparation.
+            - Otherwise checks CI at the exact prepared SHA, skipping the wait on unpinned preparation. When macOS/Windows did not run, requires a verified stamp over a base that proved them.
             - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.

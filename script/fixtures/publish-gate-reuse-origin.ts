@@ -12,6 +12,8 @@ function file(path: string, body: string): string {
 /**
  * A: base. B: workflow-only on A. C: source change on B. D: workflow-only sibling of B.
  * E: a non-workflow .github/ change on B. R: A with a source file renamed into .github/workflows/. T: version stamp on B.
+ * P: a release stamp on A (manifest + changelog). Q: a release stamp on A that also changes source.
+ * S: a release stamp on A that also renames a source file into the changelog fragments.
  * Built by one fast-import stream: two git processes, so the fixture stays cheap on a loaded runner.
  */
 const COMMITS = [
@@ -20,13 +22,13 @@ const COMMITS = [
     [
       file("src/a.ts", "a\n"),
       file(".github/workflows/publish.yml", "on: workflow_dispatch\n"),
-      file("package.json", '{"version":"1"}\n'),
-      file("packages/omo-native/package.json", '{"version":"1"}\n'),
+      file("package.json", '{"version":"1.0.0"}\n'),
+      file("packages/omo-native/package.json", '{"version":"1.0.0-0"}\n'),
     ].join(""),
   ],
   ["O", "historical", "H", file("script/release-state-paths.mjs", 'process.exit(process.argv[2] === "--check" ? 0 : 1)\n')],
-  ["HT", "historical-stamp", "H", file("package.json", '{"version":"2"}\n')],
-  ["OT", "older-stamp", "O", file("package.json", '{"version":"2"}\n')],
+  ["HT", "historical-stamp", "H", file("package.json", '{"version":"1.0.1"}\n')],
+  ["OT", "older-stamp", "O", file("package.json", '{"version":"1.0.1"}\n')],
   ["HX", "unsafe-stamp", "H", file("src/a.ts", "changed\n") + file("script/release-state-paths.mjs", "process.exit(0)\n")],
   [
     "A", "main", "O",
@@ -37,7 +39,17 @@ const COMMITS = [
   ["D", "sibling", "A", file(".github/workflows/ci.yml", "on: push\n")],
   ["E", "scripts", "B", file(".github/scripts/summary.sh", "echo\n")],
   ["R", "rename", "A", `D src/a.ts\n${file(".github/workflows/a.yml", "a\n")}`],
-  ["T", "dev", "B", file("package.json", '{"version":"2"}\n')],
+  ["T", "dev", "B", file("package.json", '{"version":"1.0.1"}\n')],
+  ["P", "stamp", "A", file("package.json", '{"version":"1.0.1"}\n') + file("CHANGELOG.md", "## 1.0.1\n") + file("packages/omo-native/package.json", '{"version":"1.0.1-0"}\n')],
+  ["Q", "stamp-and-source", "A", file("package.json", '{"version":"1.0.1"}\n') + file("packages/omo-native/package.json", '{"version":"1.0.1-0"}\n') + file("src/a.ts", "q\n")],
+  [
+    "S",
+    "stamp-and-rename",
+    "A",
+    `D src/a.ts\n${file("changes/a.md", "a\n")}` +
+      file("package.json", '{"version":"1.0.1"}\n') +
+      file("packages/omo-native/package.json", '{"version":"1.0.1-0"}\n'),
+  ],
 ] as const
 
 export type CommitName = (typeof COMMITS)[number][0]
@@ -91,7 +103,9 @@ function importOrigin(
   const marks = join(root, "marks")
   git(origin, ["fast-import", "--quiet", `--export-marks=${marks}`], stream)
 
-  const sha: Record<CommitName, string> = { H: "", O: "", HT: "", OT: "", HX: "", A: "", B: "", C: "", D: "", E: "", R: "", T: "" }
+  const sha: Record<CommitName, string> = {
+    H: "", O: "", HT: "", OT: "", HX: "", A: "", B: "", C: "", D: "", E: "", R: "", T: "", P: "", Q: "", S: "",
+  }
   for (const line of readFileSync(marks, "utf8").trim().split("\n")) {
     const [mark, id] = line.split(" ")
     const entry = COMMITS[Number(mark?.slice(1)) - 1]

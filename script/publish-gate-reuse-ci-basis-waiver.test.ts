@@ -2,9 +2,9 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
 
 /**
@@ -32,10 +32,23 @@ function stepRun(): string {
   return run.replaceAll("${{ github.repository }}", REPOSITORY)
 }
 
+// RUN_LEGS / BASE_LEGS: the Windows leg of hosted run 42 and of the base's dev push run 7 (success, failure, or
+// skipped = passed with its test step skipped). The jobs and dev-run answers go through the caller's --jq filter, so the
+// shipped platform-jobs.jq is what classifies them; the stub is exported so base-platform-green.sh sees it too.
 const GH_STUB = [
+  "leg_jobs() {",
+  '  local test_step="$1" conclusion="$1"',
+  '  [ "$1" = skipped ] && conclusion=success',
+  '  printf \'{"jobs":[{"name":"test (windows-latest, 1/2)","conclusion":"%s","html_url":"u","labels":["windows-latest"],"steps":[{"name":"Set up job","conclusion":"success"},{"name":"Run tests","conclusion":"%s"}]}]}\' "$conclusion" "$test_step"',
+  "}",
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
+  '  local filter="" previous="" argument',
+  '  for argument in "$@"; do [ "$previous" = --jq ] && filter="$argument"; previous="$argument"; done',
   '  case "$*" in',
+  '    *"/actions/runs/42/jobs"*) leg_jobs "$RUN_LEGS" | jq -r "$filter" ;;',
+  '    *"/actions/runs/7/jobs"*) leg_jobs "$BASE_LEGS" | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs?branch=dev"*) printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z"}]}\' | jq -r "$filter" ;;',
   '    *"/collaborators/"*"/permission"*)',
   '      local login="${2#*/collaborators/}"; login="${login%/permission}"',
   '      [ -n "$PERMISSION_API_DOWN" ] && return 1',
@@ -46,9 +59,17 @@ const GH_STUB = [
   '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$sha" "$conclusion" ;;',
   "  esac",
   "}",
+  "export -f gh leg_jobs",
   "sleep() { :; }",
   "",
 ].join("\n")
+
+// The step reads these from its checkout (the dispatch ref); the test checkout is empty, so they are copied in.
+const STEP_FILES = [
+  ".github/scripts/platform-jobs.jq",
+  ".github/scripts/base-platform-green.sh",
+  "script/release-state-paths.mjs",
+]
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), "publish-gate-reuse-origin-"))
 let fixture: GitOrigin
@@ -69,6 +90,8 @@ interface Dispatch {
   readonly triggeringActor?: string
   readonly permissionApiDown?: boolean
   readonly ciConclusion?: string
+  readonly runLegs?: "success" | "failure" | "skipped"
+  readonly baseLegs?: "success" | "failure" | "skipped"
   // Replaces the step's own LC_ALL=C. Git Bash on windows-latest keeps classifying UTF-8 characters under LC_ALL=C, so
   // its [[:print:]] matches "\u00e9" (#13955); a UTF-8 locale reproduces that on any host.
   readonly classLocale?: string
@@ -99,6 +122,10 @@ function dispatch(input: Dispatch): Outcome {
     }
     git(["fetch", "origin"])
     git(["checkout", "--detach", prepared || "origin/dev"])
+  }
+  for (const path of STEP_FILES) {
+    mkdirSync(join(checkout, dirname(path)), { recursive: true })
+    copyFileSync(new URL(`../${path}`, import.meta.url), join(checkout, path))
   }
   const script = join(root, "step.sh")
   const summary = join(root, "summary.md")
@@ -133,6 +160,8 @@ function dispatch(input: Dispatch): Outcome {
       ROLES: "maint=maintain owner=admin dev=write",
       PERMISSION_API_DOWN: input.permissionApiDown ? "1" : "",
       CI_CONCLUSION: input.ciConclusion ?? "success",
+      RUN_LEGS: input.runLegs ?? "success",
+      BASE_LEGS: input.baseLegs ?? "success",
     },
   })
   if (result.error) throw result.error
@@ -322,6 +351,51 @@ describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
       expect(outcome.summary).toBe("")
     },
     TEST_TIMEOUT_MS,
+  )
+
+  // #14438: a release-state run kept on Linux, or a release merge push that skipped macOS/Windows, proves them only
+  // through its base; the same rule ci-fast-path.mjs used to keep it on Linux.
+  test.each([
+    ["its legs ran green", { runLegs: "success" }, 0, "Its macOS/Windows legs ran and passed."],
+    [
+      "its legs were skipped on a stamp over a base whose legs ran green",
+      { runLegs: "skipped", prepared: "P", baseLegs: "success" },
+      0,
+      "the delta is the release stamp only",
+    ],
+    [
+      "its legs were skipped and the base's legs were red",
+      { runLegs: "skipped", prepared: "P", baseLegs: "failure" },
+      1,
+      "has no dev push run whose macOS/Windows legs ran green",
+    ],
+    [
+      "its legs were skipped and the base's legs were skipped too",
+      { runLegs: "skipped", prepared: "P", baseLegs: "skipped" },
+      1,
+      "has no dev push run whose macOS/Windows legs ran green",
+    ],
+    [
+      "its legs were skipped on a stamp that also changes source",
+      { runLegs: "skipped", prepared: "Q", baseLegs: "success" },
+      1,
+      "changes more than the release stamp",
+    ],
+    [
+      "its legs were skipped on a stamp that renames a source file into the changelog fragments",
+      { runLegs: "skipped", prepared: "S", baseLegs: "success" },
+      1,
+      "changes more than the release stamp",
+    ],
+  ] as const)(
+    "#given an empty receipt and a successful hosted run #when %s #then gate-reuse decides on the platform proof",
+    (_label, input, status, line) => {
+      const prepared = "prepared" in input ? fixture.sha[input.prepared] : undefined
+      const legs = { runLegs: input.runLegs, ...("baseLegs" in input ? { baseLegs: input.baseLegs } : {}) }
+      const outcome = dispatch({ ...legs, ...(prepared === undefined ? {} : { prepared }) })
+      expect(outcome.status === 0 ? 0 : 1).toBe(status)
+      expect(outcome.output).toContain(line)
+    },
   )
 
   test(
