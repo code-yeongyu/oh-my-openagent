@@ -190,11 +190,25 @@ export function notificationMessages(
   else if (migration.journalResumed)
     messages.push({ message: "OmO Native: recovered an interrupted configuration migration", type: "info" })
   const migrationDiagnostics = migration.results.flatMap((result) => result.diagnostics)
-  if (migrationDiagnostics.length > 0)
+  if (migrationDiagnostics.length > 0) {
+    // The keys the transform dropped still live in the migrated sources' backups; name that place
+    // once so a dropped setting has an address to recover from (#10974).
+    const droppedKeys = migrationDiagnostics.some((diagnostic) => diagnostic.startsWith("not imported: "))
+    const backups = droppedKeys
+      ? [
+          ...new Set(
+            migration.results.flatMap((result) =>
+              result.status === "migrated" ? (result.preview?.backupMoves.map((move) => move.to) ?? []) : [],
+            ),
+          ),
+        ].sort()
+      : []
+    const backupSuffix = backups.length > 0 ? `; backup: ${backups.join(", ")}` : ""
     messages.push({
-      message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}`,
+      message: `OmO Native: configuration migration: ${migrationDiagnostics.join("; ")}${backupSuffix}`,
       type: "warning",
     })
+  }
   if (config.diagnostics.length > 0)
     messages.push({
       message: `OmO Native: configuration diagnostics: ${config.diagnostics.map((diagnostic) => diagnostic.message).join("; ")}`,

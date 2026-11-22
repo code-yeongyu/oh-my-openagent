@@ -134,7 +134,9 @@ function showStartupToast(
 function startupToastBody(input: {
   readonly diagnostics: readonly string[]
   readonly error?: string
+  readonly legacyBackupPaths: readonly string[]
   readonly migratedFrom: readonly string[]
+  readonly notImportedKeys: readonly string[]
   readonly skippedConflictCount: number
   readonly targetBackupPaths: readonly string[]
 }): Record<string, unknown> | undefined {
@@ -146,9 +148,11 @@ function startupToastBody(input: {
     input.skippedConflictCount === 0
       ? ""
       : ` Kept ${input.skippedConflictCount} existing value${input.skippedConflictCount === 1 ? "" : "s"}.`
+  const notImported =
+    input.notImportedKeys.length === 0 ? "" : ` Keys not imported: ${input.notImportedKeys.join(", ")}.`
   const diagnostics = input.diagnostics.length === 0 ? "" : ` ${input.diagnostics.join(" ")}`
-  const backups =
-    input.targetBackupPaths.length === 0 ? "" : ` Previous config saved as ${input.targetBackupPaths.join(", ")}.`
+  const backupPaths = [...new Set([...input.targetBackupPaths, ...input.legacyBackupPaths])]
+  const backups = backupPaths.length === 0 ? "" : ` Previous config saved as ${backupPaths.join(", ")}.`
   if (input.error !== undefined) {
     return {
       title: "Configuration migration failed",
@@ -159,7 +163,13 @@ function startupToastBody(input: {
   if (summary.length > 0 || backups.length > 0)
     return {
       title: "Configuration migrated",
-      message: `${summary}${conflicts}${backups}${diagnostics}`.trim(),
+      message: `${summary}${conflicts}${notImported}${backups}${diagnostics}`.trim(),
+      variant: "success",
+    }
+  if (notImported.length > 0)
+    return {
+      title: "Configuration migrated",
+      message: `${notImported}${backups}${diagnostics}`.trim(),
       variant: "success",
     }
   if (diagnostics.length > 0)
@@ -194,7 +204,9 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
     const toast = startupToastBody({
       diagnostics: startupDiagnostics,
       ...(startupMigration.error === undefined ? {} : { error: startupMigration.error }),
+      legacyBackupPaths: startupMigration.legacyBackupPaths,
       migratedFrom: startupMigration.migratedFrom,
+      notImportedKeys: startupMigration.notImportedKeys,
       skippedConflictCount: startupMigration.skippedConflictCount,
       targetBackupPaths: startupMigration.targetBackupPaths,
     })

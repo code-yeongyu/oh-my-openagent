@@ -27,6 +27,8 @@ const mockRunOpenCodeStartupMigration = mock(() => ({
   reloadRequired: false,
   results: [],
   skippedConflictCount: 0,
+  legacyBackupPaths: [] as string[],
+  notImportedKeys: [],
   targetBackupPaths: [] as string[],
 }))
 const mockLoadPluginConfig = mock(() => ({}))
@@ -140,6 +142,8 @@ describe("createPluginModule()", () => {
       reloadRequired: false,
       results: [],
       skippedConflictCount: 0,
+      legacyBackupPaths: [] as string[],
+      notImportedKeys: [],
       targetBackupPaths: [] as string[],
     })
     mockDetectDuplicateOmoPlugin.mockReturnValue({
@@ -403,6 +407,8 @@ describe("createPluginModule()", () => {
         reloadRequired: true,
         results: [],
         skippedConflictCount: 2,
+        legacyBackupPaths: [] as string[],
+        notImportedKeys: [],
         targetBackupPaths: [] as string[],
       }))
       const showToast = mock(async () => ({}))
@@ -428,6 +434,40 @@ describe("createPluginModule()", () => {
       expect(mockLoadPluginConfig).toHaveBeenCalledTimes(1)
     })
 
+    it("#then a migration that dropped legacy keys toasts them once with the backup location (#10974)", async () => {
+      // given
+      const legacyBackupPath =
+        "/home/alice/.omo/migration-backup-2026-11-22T00-00-00-000Z-opencode-config/.config/opencode/oh-my-openagent.json"
+      const runOpenCodeStartupMigration = mock(() => ({
+        journalResumed: false,
+        legacyBackupPaths: [legacyBackupPath],
+        migratedFrom: ["/home/alice/.config/opencode/oh-my-openagent.json"],
+        notImportedKeys: ["agents", "categories"],
+        reloadRequired: true,
+        results: [],
+        skippedConflictCount: 0,
+        targetBackupPaths: [] as string[],
+      }))
+      const showToast = mock(async () => ({}))
+      const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
+      mockLoadPluginConfig.mockReturnValue({})
+
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: { tui: { showToast } },
+      } as Parameters<typeof pluginModule.server>[0])
+
+      // then: read the recorded toast before any asymmetric matcher can touch it
+      const toastBody = showToast.mock.calls[0]?.[0]?.body as { readonly message: string } | undefined
+      const message = toastBody?.message ?? ""
+      expect(toastBody?.title).toBe("Configuration migrated")
+      expect(message).toContain("not imported: agents, categories")
+      expect(message).toContain(legacyBackupPath)
+      expect(message).not.toContain("anthropic/legacy")
+      expect(message.match(/not imported/g)?.length ?? 0).toBe(1)
+    })
+
     it("#then a failed migration's toast still names the backup it kept (#8187)", async () => {
       // given
       const runOpenCodeStartupMigration = mock(() => ({
@@ -437,6 +477,8 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        legacyBackupPaths: [] as string[],
+        notImportedKeys: [],
         targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.kept"],
       }))
       const showToast = mock(async () => ({}))
@@ -466,6 +508,8 @@ describe("createPluginModule()", () => {
         reloadRequired: true,
         results: [],
         skippedConflictCount: 0,
+        legacyBackupPaths: [] as string[],
+        notImportedKeys: [],
         targetBackupPaths: ["/home/alice/.omo/omo.jsonc.bak.2026-10-15T09-00-00-000Z"],
       }))
       const showToast = mock(async () => ({}))
@@ -494,6 +538,8 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        legacyBackupPaths: [] as string[],
+        notImportedKeys: [],
         targetBackupPaths: [] as string[],
       }))
       const pluginModule = createTestPluginModule({ runOpenCodeStartupMigration })
@@ -518,6 +564,8 @@ describe("createPluginModule()", () => {
         reloadRequired: false,
         results: [],
         skippedConflictCount: 0,
+        legacyBackupPaths: [] as string[],
+        notImportedKeys: [],
         targetBackupPaths: [] as string[],
       }))
       const loadConfigChain = mock(() => ({ config: {}, messages: ["invalid config"], path: null, valid: false }))

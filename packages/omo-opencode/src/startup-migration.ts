@@ -36,7 +36,11 @@ export type OpenCodeStartupMigrationOptions = {
 export type OpenCodeStartupMigrationResult = {
   readonly error?: string
   readonly journalResumed: boolean
+  /** Where each migrated legacy source was backed up, so dropped keys can point somewhere. */
+  readonly legacyBackupPaths: readonly string[]
   readonly migratedFrom: readonly string[]
+  /** Legacy top-level keys the transform could not map into the unified config (#10957). */
+  readonly notImportedKeys: readonly string[]
   readonly reloadRequired: boolean
   readonly results: readonly MigrationRunResult[]
   readonly skippedConflictCount: number
@@ -60,6 +64,28 @@ function uniqueSources(results: readonly MigrationRunResult[]): readonly string[
   ].sort()
 }
 
+const NOT_IMPORTED_PREFIX = "not imported: "
+
+function notImportedKeys(results: readonly MigrationRunResult[]): readonly string[] {
+  const keys = new Set(
+    results
+      .flatMap((result) => result.diagnostics)
+      .filter((diagnostic) => diagnostic.startsWith(NOT_IMPORTED_PREFIX))
+      .map((diagnostic) => diagnostic.slice(NOT_IMPORTED_PREFIX.length)),
+  )
+  return [...keys].sort()
+}
+
+function legacyBackupPaths(results: readonly MigrationRunResult[]): readonly string[] {
+  return [
+    ...new Set(
+      results.flatMap((result) =>
+        result.status === "migrated" ? (result.preview?.backupMoves.map((move) => move.to) ?? []) : [],
+      ),
+    ),
+  ].sort()
+}
+
 function skippedConflictCount(results: readonly MigrationRunResult[]): number {
   return results.flatMap((result) => result.diagnostics).filter((diagnostic) => diagnostic.startsWith("skipped:"))
     .length
@@ -71,7 +97,9 @@ export function runOpenCodeStartupMigration(options: OpenCodeStartupMigrationOpt
     return {
       error: "Cannot migrate configuration because no home directory is available",
       journalResumed: false,
+      legacyBackupPaths: [],
       migratedFrom: [],
+      notImportedKeys: [],
       reloadRequired: false,
       results: [],
       skippedConflictCount: 0,
@@ -107,7 +135,9 @@ export function runOpenCodeStartupMigration(options: OpenCodeStartupMigrationOpt
     ]
     return {
       journalResumed: batch.journalResumed,
+      legacyBackupPaths: legacyBackupPaths(batch.results),
       migratedFrom,
+      notImportedKeys: notImportedKeys(batch.results),
       reloadRequired: batch.journalResumed || migratedFrom.length > 0,
       results: batch.results,
       skippedConflictCount: skippedConflictCount(batch.results),
@@ -121,7 +151,9 @@ export function runOpenCodeStartupMigration(options: OpenCodeStartupMigrationOpt
     return {
       error: error instanceof Error ? error.message : String(error),
       journalResumed: false,
+      legacyBackupPaths: [],
       migratedFrom: [],
+      notImportedKeys: [],
       reloadRequired: false,
       results: [],
       skippedConflictCount: 0,

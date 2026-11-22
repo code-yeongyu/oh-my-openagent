@@ -19,7 +19,13 @@ function existingOpenCodeConfig(path: string): Record<string, unknown> {
   return record(document["[opencode]"])
 }
 
-export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult {
+export type WriteOmoConfigOptions = {
+  /** Line sink for the migration report; defaults to console.log. Tests inject a collector. */
+  readonly output?: (line: string) => void
+}
+
+export function writeOmoConfig(installConfig: InstallConfig, options: WriteOmoConfigOptions = {}): ConfigMergeResult {
+  const output = options.output ?? console.log
   const targetPath = resolveUserOmoConfigPath()
   let writtenPath = targetPath
   try {
@@ -38,6 +44,12 @@ export function writeOmoConfig(installConfig: InstallConfig): ConfigMergeResult 
     if (migration.error !== undefined) {
       return { success: false, configPath: targetPath, error: migration.error }
     }
+    if (migration.notImportedKeys.length > 0)
+      output(
+        `Legacy configuration keys not imported: ${migration.notImportedKeys.join(
+          ", ",
+        )}. Backup: ${migration.legacyBackupPaths.join(", ")}`,
+      )
     return { success: true, configPath: writtenPath }
   } catch (error) {
     return {
