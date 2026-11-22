@@ -184,7 +184,7 @@ export function registerMemoryStatic(input: {
         return undefined
       }
       // Read host getters while this event context is live, before journal or queue I/O.
-      const selection = input.hasUserActivity(sessionId)
+      const selection = !identity.oneShot && input.hasUserActivity(sessionId)
         ? {
             registry: resolveMemoryModelRegistry(eventCtx),
             sessionModel: resolveMemorySessionModel(eventCtx),
@@ -196,7 +196,10 @@ export function registerMemoryStatic(input: {
       if (resolveContext(sessionId) !== identity) return result
       if (input.hasUserActivity(sessionId)) {
         observer?.phase("onSettled.facts.enqueue")
-        await factsWiringFor(identity).onSettled(sessionId, selection, observer?.signal)
+        const facts = factsWiringFor(identity)
+        // A one-shot shutdown would cancel the extractor. Keep its journal delta for a later run.
+        if (identity.oneShot) await facts.enqueueSettled(sessionId, observer?.signal)
+        else await facts.onSettled(sessionId, selection, observer?.signal)
       }
       observer?.signal.throwIfAborted()
       if (resolveContext(sessionId) !== identity) return result

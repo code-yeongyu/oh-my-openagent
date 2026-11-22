@@ -407,11 +407,11 @@ for (const assertion of ["bounded", "attributed"] as const) {
       identityPaths: buildIdentityPaths(root, "settle-agent"),
       binding: { identity: "settle-agent", repoPathHash: "hash", boundAt: 1 },
     })
-    const entered = Promise.withResolvers<void>()
-    const release = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<undefined>()
+    const release = Promise.withResolvers<undefined>()
     const runtime = {
       reconcile: () => {
-        entered.resolve()
+        entered.resolve(undefined)
         return release.promise
       },
     } as unknown as MemoryIdentityRuntime
@@ -461,7 +461,7 @@ for (const assertion of ["bounded", "attributed"] as const) {
           }),
         )
     } finally {
-      release.resolve()
+      release.resolve(undefined)
       await settled
       await pi.dispatch("session_shutdown", {})
     }
@@ -644,6 +644,42 @@ async function liveFooterHarness(): Promise<{
 }
 
 describe("facts shutdown wiring", () => {
+  for (const oneShot of [true, false]) {
+    test(`#given oneShot=${oneShot} #when a user turn settles #then the facts extractor launches ${oneShot ? "zero times" : "once"}`, async () => {
+      const fixture = await createFixture()
+      const context = createMemoryIdentityContext({ ...fixture.context, oneShot })
+      let launches = 0
+      const pi = new MemoryFakeExtensionAPI()
+      const wiring = createMemoryWiring({
+        sessions: new Map([[fixture.sessionId, { context }]]),
+        loadConfig: () => loadedMemoryConfig(memorySettings({ facts: { enabled: true, debounce_settles: 1 } })),
+        cwd: () => fixture.cwd,
+        env: fixture.env,
+        createFactsExtractor: () => ({
+          launchPending: async () => {
+            launches++
+          },
+          reconcilePending: async () => {},
+        }),
+      })
+      wiring.registerStatic(pi, componentContext())
+      const entry = { type: "message", message: { role: "user", content: "Remember this turn." } }
+      const eventCtx = sessionContext(fixture.sessionId, undefined, [entry])
+      await pi.dispatch(
+        "input",
+        { type: "input", source: "rpc", inputId: "turn", text: "Remember this turn." },
+        eventCtx,
+      )
+      await pi.dispatch(
+        "input_disposition",
+        { type: "input_disposition", inputId: "turn", disposition: "started" },
+        eventCtx,
+      )
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      expect(launches).toBe(oneShot ? 0 : 1)
+    })
+  }
+
   const FIXED_NOW = 10_000
   const fixedClock = () => FIXED_NOW
 
@@ -799,12 +835,12 @@ describe("session shutdown pre-drain bounds", () => {
   test("#given a Kibitzer whose shutdown never resolves #when the session shuts down #then the handler returns at the drain deadline and the drain still runs", async () => {
     // given: the resident child start never returns, so the sidecar's shutdown is stuck behind the
     // per-session mutex exactly as a stalled startChild strands it in production.
-    const started = Promise.withResolvers<void>()
+    const started = Promise.withResolvers<undefined>()
     const f = await boundedShutdownFixture({
       kibitzerChildStarter: {
         createRunner: () => ({
           start: async () => {
-            started.resolve()
+          started.resolve(undefined)
             return await new Promise<never>(() => {})
           },
         }),
@@ -846,13 +882,13 @@ describe("session shutdown pre-drain bounds", () => {
 
   test("#given facts cancellation that never resolves #when the session shuts down #then the handler returns at the drain deadline and the drain still runs", async () => {
     // given
-    const entered = Promise.withResolvers<void>()
+    const entered = Promise.withResolvers<undefined>()
     const f = await boundedShutdownFixture({
       createFactsExtractor: () => ({
         launchPending: async () => undefined,
         reconcilePending: async () => undefined,
         cancelActive: async () => {
-          entered.resolve()
+          entered.resolve(undefined)
           await new Promise<void>(() => {})
         },
       }),
