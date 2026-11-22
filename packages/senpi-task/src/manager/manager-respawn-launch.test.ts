@@ -5,6 +5,7 @@ import { createTaskRecord, type TaskRecord } from "../state"
 import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import { categoryPlanner, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const startedAt = "2026-09-08T01:00:00.000Z"
 const priorStartedAt = "2026-09-07T01:00:00.000Z"
@@ -14,7 +15,7 @@ afterEach(cleanupProjects)
 
 function harness(mode: "in-process" | "process", priorStamp?: string) {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const record: TaskRecord = {
     ...createTaskRecord(
       {
@@ -34,7 +35,7 @@ function harness(mode: "in-process" | "process", priorStamp?: string) {
   store.save(record)
   const observations: Array<TaskRecord | null> = []
   const handle = makeHandle(record.task_id).handle
-  const observe = () => observations.push(createTaskRecordStore({ project_dir: project }).load(record.task_id))
+  const observe = () => observations.push(createTaskRecordStore(ownedTaskState(project)).load(record.task_id))
   const runner = {
     start: async () => {
       observe()
@@ -91,7 +92,7 @@ describe.each(["in-process", "process"] as const)("%s respawn durable launch bou
         expect(result.ok).toBe(true)
         expect(fixture.observations).toHaveLength(1)
         expect(fixture.observations[0]).toMatchObject({ started_at: expectedStamp, status: "pending" })
-        expect(createTaskRecordStore({ project_dir: fixture.project }).load(fixture.record.task_id)?.started_at).toBe(
+        expect(createTaskRecordStore(ownedTaskState(fixture.project)).load(fixture.record.task_id)?.started_at).toBe(
           expectedStamp,
         )
       },
@@ -138,7 +139,7 @@ describe("reattach durable launch boundary", () => {
 
       // then
       expect(result).toEqual({ ok: true })
-      expect(createTaskRecordStore({ project_dir: fixture.project }).load(fixture.record.task_id)).toMatchObject({
+      expect(createTaskRecordStore(ownedTaskState(fixture.project)).load(fixture.record.task_id)).toMatchObject({
         status: "running",
         started_at: priorStamp ?? startedAt,
         updated_at: startedAt,

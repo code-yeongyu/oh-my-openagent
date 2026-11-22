@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 type PostToolUseMockResult = {
   block?: boolean
@@ -19,14 +20,6 @@ const appendTranscriptEntry = mock((sessionId: string, entry: unknown) => {
 })
 let postToolUseResult: PostToolUseMockResult = { warnings: [] }
 
-mock.module("../config", () => ({
-  loadClaudeHooksConfig: async () => ({}),
-}))
-
-mock.module("../config-loader", () => ({
-  loadPluginExtendedConfig: async () => ({}),
-}))
-
 mock.module("../post-tool-use", () => ({
   executePostToolUseHooks: async () => postToolUseResult,
 }))
@@ -45,6 +38,8 @@ afterAll(() => {
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after-handler")
 
 describe("createToolExecuteAfterHandler", () => {
+  useEmptyHookConfig()
+
   beforeEach(() => {
     appendTranscriptEntry.mockClear()
     transcriptCalls.length = 0

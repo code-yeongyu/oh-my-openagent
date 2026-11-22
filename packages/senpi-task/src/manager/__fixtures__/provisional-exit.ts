@@ -10,6 +10,7 @@ import { resolveChildSessionDir } from "../../runners/rpc/spawn"
 import { createTaskRecordStore, type TaskRecordStore } from "../../store"
 import { createTaskManager } from "../manager"
 import { baseSpec, categoryPlanner, FakeRunner, makeHandle, settings, tempProject } from "./manager-fakes"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export function exitClock() {
   let time = Date.parse("2026-10-10T00:00:00.000Z")
@@ -46,7 +47,7 @@ export async function exitedTask(
   clock = exitClock(),
 ) {
   const project = tempProject()
-  const backing = createTaskRecordStore({ project_dir: project })
+  const backing = createTaskRecordStore(ownedTaskState(project))
   const observed = Promise.withResolvers<void>()
   const store = wrap({
     ...backing,
