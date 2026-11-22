@@ -45,7 +45,6 @@ describe("ensureNotepadScaffold", () => {
     const issues = readFileSync(join(notepadDir, "issues.md"), "utf8")
     const problems = readFileSync(join(notepadDir, "problems.md"), "utf8")
 
-
     expect(learnings).toContain("Auto-scaffolded by /ulw-execute")
     expect(decisions).toContain("Auto-scaffolded by /ulw-execute")
     expect(issues).toContain("Auto-scaffolded by /ulw-execute")
@@ -125,7 +124,6 @@ describe("ensureNotepadScaffold", () => {
 
     const issues = readFileSync(join(notepadDir, "issues.md"), "utf8")
     const problems = readFileSync(join(notepadDir, "problems.md"), "utf8")
-
 
     expect(result.created).toEqual(["issues.md", "problems.md"])
     expect(result.skipped).toEqual(["learnings.md", "decisions.md"])

@@ -22,7 +22,13 @@ const exhausted = { exhausted: () => true }
 describe("decideWake", () => {
   test("#given a batch with one path never offered #when decided #then it wakes with only the fresh eligible candidates", () => {
     const decision = decideWake({
-      candidates: [candidate("reference/a.md"), candidate("reference/b.md"), candidate("reference/c.md"), candidate("system/hidden.md"), candidate("reference/b.md", 2)],
+      candidates: [
+        candidate("reference/a.md"),
+        candidate("reference/b.md"),
+        candidate("reference/c.md"),
+        candidate("system/hidden.md"),
+        candidate("reference/b.md", 2),
+      ],
       offered: new Set(["reference/a.md"]),
       surfaced: new Set(["reference/c.md"]),
       maxItems: 2,
@@ -38,24 +44,48 @@ describe("decideWake", () => {
   })
 
   test("#given no candidates, a zero cap, or only already-offered paths #when decided #then each stays silent with its own reason", () => {
-    expect(decideWake({ candidates: [], offered: new Set(), surfaced: new Set(), maxItems: 2, cooldown: quiet }))
-      .toEqual({ wake: false, reason: "no_candidates" })
-    expect(decideWake({ candidates: [candidate("reference/a.md")], offered: new Set(), surfaced: new Set(), maxItems: 0, cooldown: quiet }))
-      .toEqual({ wake: false, reason: "max_items_zero" })
-    expect(decideWake({
-      candidates: [candidate("reference/a.md"), candidate("reference/b.md")],
-      offered: new Set(["reference/a.md"]),
-      surfaced: new Set(["reference/b.md"]),
-      maxItems: 2,
-      cooldown: quiet,
-    })).toEqual({ wake: false, reason: "no_new_candidate" })
+    expect(
+      decideWake({ candidates: [], offered: new Set(), surfaced: new Set(), maxItems: 2, cooldown: quiet }),
+    ).toEqual({ wake: false, reason: "no_candidates" })
+    expect(
+      decideWake({
+        candidates: [candidate("reference/a.md")],
+        offered: new Set(),
+        surfaced: new Set(),
+        maxItems: 0,
+        cooldown: quiet,
+      }),
+    ).toEqual({ wake: false, reason: "max_items_zero" })
+    expect(
+      decideWake({
+        candidates: [candidate("reference/a.md"), candidate("reference/b.md")],
+        offered: new Set(["reference/a.md"]),
+        surfaced: new Set(["reference/b.md"]),
+        maxItems: 2,
+        cooldown: quiet,
+      }),
+    ).toEqual({ wake: false, reason: "no_new_candidate" })
   })
 
   test("#given an exhausted cooldown #when decided #then a fresh candidate buffers as cooldown but nothing-new still reports nothing-new", () => {
-    expect(decideWake({ candidates: [candidate("reference/a.md")], offered: new Set(), surfaced: new Set(), maxItems: 2, cooldown: exhausted }))
-      .toEqual({ wake: false, reason: "cooldown" })
-    expect(decideWake({ candidates: [candidate("reference/a.md")], offered: new Set(["reference/a.md"]), surfaced: new Set(), maxItems: 2, cooldown: exhausted }))
-      .toEqual({ wake: false, reason: "no_new_candidate" })
+    expect(
+      decideWake({
+        candidates: [candidate("reference/a.md")],
+        offered: new Set(),
+        surfaced: new Set(),
+        maxItems: 2,
+        cooldown: exhausted,
+      }),
+    ).toEqual({ wake: false, reason: "cooldown" })
+    expect(
+      decideWake({
+        candidates: [candidate("reference/a.md")],
+        offered: new Set(["reference/a.md"]),
+        surfaced: new Set(),
+        maxItems: 2,
+        cooldown: exhausted,
+      }),
+    ).toEqual({ wake: false, reason: "no_new_candidate" })
   })
 })
 
@@ -102,7 +132,9 @@ describe("backoffDelayMs", () => {
   test("#given a streak of consecutive failures #when each retry delay is computed #then the ladder climbs 1s, 2s, 4s ... and settles on the five-minute cap, every draw inside the band", () => {
     // Full-jitter draw: the ladder itself, capped at five minutes from the ninth retry on.
     const ladder = Array.from({ length: 12 }, (_, attempt) => backoffDelayMs(attempt, () => 1))
-    expect(ladder).toEqual([1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000])
+    expect(ladder).toEqual([
+      1_000, 2_000, 4_000, 8_000, 16_000, 32_000, 64_000, 128_000, 256_000, 300_000, 300_000, 300_000,
+    ])
 
     // Whatever the draw, a delay never leaves [1s, 5min] and never drops below half its rung.
     for (const attempt of [0, 1, 4, 8, 9, 30]) {
@@ -110,7 +142,9 @@ describe("backoffDelayMs", () => {
         const delay = backoffDelayMs(attempt, () => draw)
         expect(delay).toBeGreaterThanOrEqual(KIBITZER_BACKOFF_MIN_MS)
         expect(delay).toBeLessThanOrEqual(KIBITZER_BACKOFF_MAX_MS)
-        expect(delay).toBeGreaterThanOrEqual(Math.min(KIBITZER_BACKOFF_MAX_MS, KIBITZER_BACKOFF_MIN_MS * 2 ** attempt) / 2)
+        expect(delay).toBeGreaterThanOrEqual(
+          Math.min(KIBITZER_BACKOFF_MAX_MS, KIBITZER_BACKOFF_MIN_MS * 2 ** attempt) / 2,
+        )
       }
     }
   })

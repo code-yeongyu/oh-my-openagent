@@ -40,10 +40,7 @@ interface CommitMetadata {
   readonly body: string
 }
 
-export async function collectHistory(
-  repo: GitMemoryRepo,
-  exec: GitExec = createNodeGitExec(),
-): Promise<PalaceHistory> {
+export async function collectHistory(repo: GitMemoryRepo, exec: GitExec = createNodeGitExec()): Promise<PalaceHistory> {
   const caps: PalaceHistoryCaps = {
     maxCommits: HISTORY_MAX_COMMITS,
     perDiffBytes: HISTORY_PER_DIFF_CAP,

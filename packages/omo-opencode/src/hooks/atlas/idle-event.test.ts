@@ -6,10 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { createBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import { _resetForTesting, registerAgentName } from "../../features/claude-code-session-state"
-import {
-  releaseAllPromptAsyncReservationsForTesting,
-  releasePromptAsyncReservation,
-} from "../shared/prompt-async-gate"
+import { releaseAllPromptAsyncReservationsForTesting, releasePromptAsyncReservation } from "../shared/prompt-async-gate"
 import { handleCompletedBoulderIdle } from "./idle-completion-nudge"
 import { scheduleRetryWithTimer } from "./idle-continuation"
 import { handleAtlasSessionIdle } from "./idle-event"
@@ -88,19 +85,21 @@ describe("handleAtlasSessionIdle completion nudge", () => {
         }>
       }
     }> = []
-    const promptAsyncMock = mock(async (request: {
-      body?: {
-        noReply?: boolean
-        parts?: Array<{
-          text?: string
-          synthetic?: boolean
-          metadata?: Record<string, unknown>
-        }>
-      }
-    }) => {
-      promptRequests.push(request)
-      return { data: {} }
-    })
+    const promptAsyncMock = mock(
+      async (request: {
+        body?: {
+          noReply?: boolean
+          parts?: Array<{
+            text?: string
+            synthetic?: boolean
+            metadata?: Record<string, unknown>
+          }>
+        }
+      }) => {
+        promptRequests.push(request)
+        return { data: {} }
+      },
+    )
 
     const ctx = unsafeTestValue<PluginInput>({
       directory: testDirectory,
@@ -471,7 +470,9 @@ describe("handleAtlasSessionIdle completion nudge", () => {
       getState,
       options: {
         directory: testDirectory,
-        backgroundManager: unsafeTestValue<NonNullable<Parameters<typeof handleAtlasSessionIdle>[0]["options"]>["backgroundManager"]>({
+        backgroundManager: unsafeTestValue<
+          NonNullable<Parameters<typeof handleAtlasSessionIdle>[0]["options"]>["backgroundManager"]
+        >({
           getTasksByParentSession: () => [{ status: "pending" }],
         }),
       },

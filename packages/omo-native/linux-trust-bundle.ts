@@ -48,21 +48,28 @@ export function selectLinuxBundle(
   const lines: string[] = []
   for (const raw of text.split(/\r?\n/)) {
     const previous = lines.at(-1)
-    if (previous !== undefined && /(?:^|[^\\])(?:\\\\)*\\$/.test(previous)) lines[lines.length - 1] = previous.slice(0, -1) + raw
+    if (previous !== undefined && /(?:^|[^\\])(?:\\\\)*\\$/.test(previous))
+      lines[lines.length - 1] = previous.slice(0, -1) + raw
     else lines.push(raw)
   }
   for (const line of lines) {
     const assignment = /^(ID|ID_LIKE)=(?:'([^']*)'|"((?:\\.|[^"\\])*)"|((?:\\.|[^\s"'\\])*))[ \t]*$/.exec(line)
     if (!assignment) continue
-    const value = assignment[2] ?? (assignment[3] !== undefined
-      ? assignment[3].replace(/\\([$`"\\])/g, "$1")
-      : (assignment[4] ?? "").replace(/\\(.)/g, "$1"))
+    const value =
+      assignment[2] ??
+      (assignment[3] !== undefined
+        ? assignment[3].replace(/\\([$`"\\])/g, "$1")
+        : (assignment[4] ?? "").replace(/\\(.)/g, "$1"))
     if (assignment[1] === "ID") id = value
     else idLike = value
   }
-  const family = familyOf(id, true)
-    ?? idLike.split(/\s+/).map((token) => familyOf(token, false)).find((candidate) => candidate !== null)
-    ?? null
+  const family =
+    familyOf(id, true) ??
+    idLike
+      .split(/\s+/)
+      .map((token) => familyOf(token, false))
+      .find((candidate) => candidate !== null) ??
+    null
   if (family !== null) {
     const paths = {
       debian: "/etc/ssl/certs/ca-certificates.crt",
@@ -88,7 +95,10 @@ export interface LinuxBundleStat {
 
 export interface LinuxBundleFs {
   stat(path: string): Promise<LinuxBundleStat>
-  open(path: string, flags: "r"): Promise<{
+  open(
+    path: string,
+    flags: "r",
+  ): Promise<{
     read(buffer: Uint8Array): Promise<{ readonly bytesRead: number }>
     /** The opened object's own metadata, so a swap between the path stats and the open is detected. */
     stat(): Promise<LinuxBundleStat>
@@ -99,9 +109,9 @@ export interface LinuxBundleFs {
 export type LinuxBundleRead =
   | { readonly kind: "success"; readonly path: string; readonly bytes: Uint8Array }
   | {
-    readonly kind: "linux-bundle-unreadable" | "linux-bundle-too-large" | "linux-bundle-replaced"
-    readonly path: string
-  }
+      readonly kind: "linux-bundle-unreadable" | "linux-bundle-too-large" | "linux-bundle-replaced"
+      readonly path: string
+    }
 
 export async function readLinuxBundle(path: string, fs: LinuxBundleFs): Promise<LinuxBundleRead> {
   const cap = 8 * 1024 * 1024

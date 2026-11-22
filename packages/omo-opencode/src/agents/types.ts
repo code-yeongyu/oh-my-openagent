@@ -1,4 +1,4 @@
-import type { AgentConfig } from "@opencode-ai/sdk";
+import type { AgentConfig } from "@opencode-ai/sdk"
 
 import {
   isClaudeFableOrMythosModel,
@@ -15,7 +15,7 @@ import {
   isKimiK28Model,
   isKimiK3Model,
   isMiniMaxModel,
-} from "@oh-my-opencode/model-core";
+} from "@oh-my-opencode/model-core"
 
 export {
   isClaudeFableOrMythosModel,
@@ -32,9 +32,9 @@ export {
   isKimiK28Model,
   isKimiK3Model,
   isMiniMaxModel,
-};
+}
 
-const CLAUDE_THINKING_BUDGET_TOKENS = 32000;
+const CLAUDE_THINKING_BUDGET_TOKENS = 32000
 
 /**
  * Anthropic Opus 4.7+, Fable, and Mythos models reject thinking.type "enabled";
@@ -47,9 +47,9 @@ export function buildClaudeThinkingConfig(
   model: string,
 ): { thinking: { type: "enabled"; budgetTokens: number } } | Record<string, never> {
   if (isClaudeOpus47OrLaterModel(model) || isClaudeFableOrMythosModel(model)) {
-    return {};
+    return {}
   }
-  return { thinking: { type: "enabled", budgetTokens: CLAUDE_THINKING_BUDGET_TOKENS } };
+  return { thinking: { type: "enabled", budgetTokens: CLAUDE_THINKING_BUDGET_TOKENS } }
 }
 
 /**
@@ -58,38 +58,34 @@ export function buildClaudeThinkingConfig(
  * - "subagent": Uses own fallback chain, ignores UI selection (oracle, explore, etc.)
  * - "all": Available in both contexts (OpenCode compatibility)
  */
-export type AgentMode = "primary" | "subagent" | "all";
+export type AgentMode = "primary" | "subagent" | "all"
 
 /**
  * Agent factory function with static mode property.
  * Mode is exposed as static property for pre-instantiation access.
  */
 export type AgentFactory = ((model: string) => AgentConfig) & {
-  mode: AgentMode;
-};
+  mode: AgentMode
+}
 
 /**
  * Agent category for grouping in Sisyphus prompt sections
  */
-export type AgentCategory =
-  | "exploration"
-  | "specialist"
-  | "advisor"
-  | "utility";
+export type AgentCategory = "exploration" | "specialist" | "advisor" | "utility"
 
 /**
  * Cost classification for Tool Selection table
  */
-export type AgentCost = "FREE" | "CHEAP" | "EXPENSIVE";
+export type AgentCost = "FREE" | "CHEAP" | "EXPENSIVE"
 
 /**
  * Delegation trigger for Sisyphus prompt's Delegation Table
  */
 export interface DelegationTrigger {
   /** Domain of work (e.g., "Frontend UI/UX") */
-  domain: string;
+  domain: string
   /** When to delegate (e.g., "Visual changes only...") */
-  trigger: string;
+  trigger: string
 }
 
 /**
@@ -98,56 +94,56 @@ export interface DelegationTrigger {
  */
 export interface AgentPromptMetadata {
   /** Category for grouping in prompt sections */
-  category: AgentCategory;
+  category: AgentCategory
 
   /** Cost classification for Tool Selection table */
-  cost: AgentCost;
+  cost: AgentCost
 
   /** Domain triggers for Delegation Table */
-  triggers: DelegationTrigger[];
+  triggers: DelegationTrigger[]
 
   /** When to use this agent (for detailed sections) */
-  useWhen?: string[];
+  useWhen?: string[]
 
   /** When NOT to use this agent */
-  avoidWhen?: string[];
+  avoidWhen?: string[]
 
   /** Optional dedicated prompt section (markdown) - for agents like Oracle that have special sections */
-  dedicatedSection?: string;
+  dedicatedSection?: string
 
   /** Nickname/alias used in prompt (e.g., "Oracle" instead of "oracle") */
-  promptAlias?: string;
+  promptAlias?: string
 
   /** Key triggers that should appear in Phase 0 (e.g., "External library mentioned → fire librarian") */
-  keyTrigger?: string;
+  keyTrigger?: string
 }
 
 function extractModelName(model: string): string {
-  return model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  return model.includes("/") ? (model.split("/").pop() ?? model) : model
 }
 
-const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i;
+const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i
 
 export function isGptNativeSisyphusModel(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return GPT_NATIVE_SISYPHUS_RE.test(modelName);
+  const modelName = extractModelName(model).toLowerCase()
+  return GPT_NATIVE_SISYPHUS_RE.test(modelName)
 }
 
 export function isGpt5_5Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5");
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("gpt-5.5") || modelName.includes("gpt-5-5")
 }
 
 /** Matches the GPT-5.6 family: gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna. */
 export function isGpt5_6Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-5.6") || modelName.includes("gpt-5-6");
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("gpt-5.6") || modelName.includes("gpt-5-6")
 }
 
 /** Matches GPT-6 models, including provider-prefixed and fast-tier IDs. */
 export function isGpt6Model(model: string): boolean {
-  const modelName = extractModelName(model).toLowerCase();
-  return modelName.includes("gpt-6");
+  const modelName = extractModelName(model).toLowerCase()
+  return modelName.includes("gpt-6")
 }
 
 export type BuiltinAgentName =
@@ -160,21 +156,19 @@ export type BuiltinAgentName =
   | "metis"
   | "momus"
   | "atlas"
-  | "sisyphus-junior";
+  | "sisyphus-junior"
 
-export type OverridableAgentName = "build" | BuiltinAgentName;
+export type OverridableAgentName = "build" | BuiltinAgentName
 
-export type AgentName = BuiltinAgentName;
+export type AgentName = BuiltinAgentName
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
-  category?: string;
-  prompt_append?: string;
-  skills?: string[];
-  tools?: Record<string, boolean>;
-  variant?: string;
-  fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[];
-};
+  category?: string
+  prompt_append?: string
+  skills?: string[]
+  tools?: Record<string, boolean>
+  variant?: string
+  fallback_models?: string | (string | import("../config/schema/fallback-models").FallbackModelObject)[]
+}
 
-export type AgentOverrides = Partial<
-  Record<OverridableAgentName, AgentOverrideConfig>
->;
+export type AgentOverrides = Partial<Record<OverridableAgentName, AgentOverrideConfig>>

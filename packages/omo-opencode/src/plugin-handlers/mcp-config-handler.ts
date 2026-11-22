@@ -1,48 +1,45 @@
-import type { OhMyOpenCodeConfig } from "../config";
-import { loadMcpConfigs } from "../features/claude-code-mcp-loader";
-import { createBuiltinMcps } from "../mcp";
-import type { PluginComponents } from "./plugin-components-loader";
-import { log } from "../shared";
+import type { OhMyOpenCodeConfig } from "../config"
+import { loadMcpConfigs } from "../features/claude-code-mcp-loader"
+import { createBuiltinMcps } from "../mcp"
+import type { PluginComponents } from "./plugin-components-loader"
+import { log } from "../shared"
 
-type McpEntry = Record<string, unknown>;
+type McpEntry = Record<string, unknown>
 
 function isDisabledMcpEntry(value: unknown): value is McpEntry & { enabled: false } {
-  return typeof value === "object" && value !== null && (value as McpEntry).enabled === false;
+  return typeof value === "object" && value !== null && (value as McpEntry).enabled === false
 }
 
-function captureUserDisabledMcps(
-  userMcp: Record<string, unknown> | undefined
-): Set<string> {
-  const disabled = new Set<string>();
-  if (!userMcp) return disabled;
+function captureUserDisabledMcps(userMcp: Record<string, unknown> | undefined): Set<string> {
+  const disabled = new Set<string>()
+  if (!userMcp) return disabled
 
   for (const [name, value] of Object.entries(userMcp)) {
     if (isDisabledMcpEntry(value)) {
-      disabled.add(name);
+      disabled.add(name)
     }
   }
 
-  return disabled;
+  return disabled
 }
 
 export async function applyMcpConfig(params: {
-  config: Record<string, unknown>;
-  ctx: { directory: string };
-  pluginConfig: OhMyOpenCodeConfig;
-  pluginComponents: PluginComponents;
+  config: Record<string, unknown>
+  ctx: { directory: string }
+  pluginConfig: OhMyOpenCodeConfig
+  pluginComponents: PluginComponents
 }): Promise<void> {
-  const disabledMcps = params.pluginConfig.disabled_mcps ?? [];
-  const userMcp = params.config.mcp as Record<string, unknown> | undefined;
-  const userDisabledMcps = captureUserDisabledMcps(userMcp);
+  const disabledMcps = params.pluginConfig.disabled_mcps ?? []
+  const userMcp = params.config.mcp as Record<string, unknown> | undefined
+  const userDisabledMcps = captureUserDisabledMcps(userMcp)
 
-  const mcpResult = params.pluginConfig.claude_code?.mcp ?? true
-    ? await loadMcpConfigs(disabledMcps)
-    : { servers: {} };
+  const mcpResult =
+    (params.pluginConfig.claude_code?.mcp ?? true) ? await loadMcpConfigs(disabledMcps) : { servers: {} }
 
   if (userMcp) {
     for (const name of Object.keys(userMcp)) {
       if (name in mcpResult.servers) {
-        log(`warning: MCP server "${name}" from user config overrides Claude Code .mcp.json`);
+        log(`warning: MCP server "${name}" from user config overrides Claude Code .mcp.json`)
       }
     }
   }
@@ -52,18 +49,18 @@ export async function applyMcpConfig(params: {
     ...mcpResult.servers,
     ...(userMcp ?? {}),
     ...params.pluginComponents.mcpServers,
-  } as Record<string, McpEntry>;
+  } as Record<string, McpEntry>
 
   for (const name of userDisabledMcps) {
     if (merged[name]) {
-      merged[name] = { ...merged[name], enabled: false };
+      merged[name] = { ...merged[name], enabled: false }
     }
   }
 
-  const disabledSet = new Set(disabledMcps);
+  const disabledSet = new Set(disabledMcps)
   for (const name of disabledSet) {
-    delete merged[name];
+    delete merged[name]
   }
 
-  params.config.mcp = merged;
+  params.config.mcp = merged
 }

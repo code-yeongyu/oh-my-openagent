@@ -12,11 +12,7 @@ type ThinkModeHookOutput = {
   parts: Array<{ type: string; text?: string; [key: string]: unknown }>
 }
 
-function createHookInput(args: {
-  sessionID?: string
-  providerID?: string
-  modelID?: string
-}): ThinkModeHookInput {
+function createHookInput(args: { sessionID?: string; providerID?: string; modelID?: string }): ThinkModeHookInput {
   const { sessionID = "test-session-id", providerID, modelID } = args
 
   if (!providerID || !modelID) {

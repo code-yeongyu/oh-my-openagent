@@ -40,7 +40,10 @@ function stubOpenCodeInstall(): void {
   })
   spyOn(configManager, "isOpenCodeInstalled").mockResolvedValue(true)
   spyOn(configManager, "getOpenCodeVersion").mockResolvedValue("1.4.0")
-  spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({ success: true, configPath: "/tmp/opencode.jsonc" })
+  spyOn(configManager, "addPluginToOpenCodeConfig").mockResolvedValue({
+    success: true,
+    configPath: "/tmp/opencode.jsonc",
+  })
   spyOn(configManager, "writeOmoConfig").mockReturnValue({ success: true, configPath: "/tmp/omo.jsonc" })
 }
 

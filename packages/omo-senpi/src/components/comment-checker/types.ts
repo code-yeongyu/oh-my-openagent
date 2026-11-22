@@ -1,4 +1,8 @@
-import type { CheckResult, CommentCheckerReleaseAsset, RunCommentCheckerInput } from "@oh-my-opencode/comment-checker-core"
+import type {
+  CheckResult,
+  CommentCheckerReleaseAsset,
+  RunCommentCheckerInput,
+} from "@oh-my-opencode/comment-checker-core"
 
 import type { ComponentContext } from "../../extension/types"
 

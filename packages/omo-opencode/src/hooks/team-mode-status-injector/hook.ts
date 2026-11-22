@@ -37,12 +37,9 @@ export type TeamModeStatusInjectorHook = {
   ) => Promise<void>
 }
 
-const TEAM_MODE_STATUS_MARKER = "<team_mode_status enabled=\"true\">"
+const TEAM_MODE_STATUS_MARKER = '<team_mode_status enabled="true">'
 
-function resolveSessionID(
-  input: TeamModeStatusInjectorInput,
-  messages: MessageWithParts[],
-): string | undefined {
+function resolveSessionID(input: TeamModeStatusInjectorInput, messages: MessageWithParts[]): string | undefined {
   if (typeof input.sessionID === "string" && input.sessionID.length > 0) {
     return input.sessionID
   }
@@ -90,12 +87,9 @@ function latestUserMessageRequestsTeamMode(
   }
 
   const promptText = extractPromptText(message.parts)
-  return detectKeywordsWithType(
-    promptText,
-    undefined,
-    undefined,
-    keywordDetectorConfig?.disabled_keywords,
-  ).some((keyword) => keyword.type === "team")
+  return detectKeywordsWithType(promptText, undefined, undefined, keywordDetectorConfig?.disabled_keywords).some(
+    (keyword) => keyword.type === "team",
+  )
 }
 
 function buildTeamModeStatusContent(): string {
@@ -121,10 +115,7 @@ export function createTeamModeStatusInjector(
   keywordDetectorConfig?: KeywordDetectorConfig,
 ): TeamModeStatusInjectorHook {
   return {
-    "experimental.chat.messages.transform": async (
-      input,
-      output,
-    ): Promise<void> => {
+    "experimental.chat.messages.transform": async (input, output): Promise<void> => {
       if (!config.enabled || output.messages.length === 0) {
         return
       }

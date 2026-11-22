@@ -4,9 +4,19 @@ import { createLateSendOutcomeDeliverer, SEND_OUTCOME_MESSAGE_TYPE } from "./lat
 
 type Sent = { readonly message: Record<string, unknown>; readonly options: Record<string, unknown> | undefined }
 
-function recordingPi(): { pi: { sendMessage: (message: Record<string, unknown>, options?: Record<string, unknown>) => void }; sent: Sent[] } {
+function recordingPi(): {
+  pi: { sendMessage: (message: Record<string, unknown>, options?: Record<string, unknown>) => void }
+  sent: Sent[]
+} {
   const sent: Sent[] = []
-  return { pi: { sendMessage: (message, options) => { sent.push({ message, options }) } }, sent }
+  return {
+    pi: {
+      sendMessage: (message, options) => {
+        sent.push({ message, options })
+      },
+    },
+    sent,
+  }
 }
 
 const revived = {

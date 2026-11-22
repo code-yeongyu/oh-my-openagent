@@ -72,7 +72,12 @@ describe("runTaskSend", () => {
   })
 
   test("#given a caller session id #when sending #then callerSessionId is injected into the steering call", async () => {
-    const { manager, sendCalls } = spyManager({ kind: "steered", task_id: "st_00000001", status: "running", delivered: "steer" })
+    const { manager, sendCalls } = spyManager({
+      kind: "steered",
+      task_id: "st_00000001",
+      status: "running",
+      delivered: "steer",
+    })
 
     await runTaskSend(manager, { to: "st_00000001", message: "hi" }, "session-42")
 
@@ -81,7 +86,12 @@ describe("runTaskSend", () => {
   })
 
   test("#given all_scope true #when sending #then allScope is forwarded to the engine", async () => {
-    const { manager, sendCalls } = spyManager({ kind: "steered", task_id: "st_00000001", status: "running", delivered: "steer" })
+    const { manager, sendCalls } = spyManager({
+      kind: "steered",
+      task_id: "st_00000001",
+      status: "running",
+      delivered: "steer",
+    })
 
     await runTaskSend(manager, { to: "st_00000001", message: "hi", all_scope: true }, "session-42")
 
@@ -123,11 +133,18 @@ describe("runTaskSend", () => {
     const { manager, store, inProcess } = makeManager({})
     const started = await manager.start(baseSpec({ parent_session_id: "owner-session" }))
     if (started.kind !== "started") throw new Error("expected started")
-    store.mutate(started.task_id, (record) => ({ ...record, awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() } }))
+    store.mutate(started.task_id, (record) => ({
+      ...record,
+      awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
+    }))
 
     // when
     const denied = await runTaskSend(manager, { to: started.task_id, redispatch: true }, "other-session")
-    const crossed = await runTaskSend(manager, { to: started.task_id, redispatch: true, all_scope: true }, "other-session")
+    const crossed = await runTaskSend(
+      manager,
+      { to: started.task_id, redispatch: true, all_scope: true },
+      "other-session",
+    )
 
     // then
     expect(denied.details.kind).toBe("scope_denied")
@@ -154,7 +171,11 @@ describe("runTaskSend", () => {
     const { manager } = spyManager({ kind: "not_found", reason: "unused", suggestion: "unused" })
 
     // when
-    const result = await runTaskSend(manager, { to: "st_00000009", redispatch: true, message: "different instructions" }, "lead-session")
+    const result = await runTaskSend(
+      manager,
+      { to: "st_00000009", redispatch: true, message: "different instructions" },
+      "lead-session",
+    )
 
     // then
     expect(result.details.kind).toBe("invalid_arguments")
@@ -189,7 +210,7 @@ describe("runTaskSend", () => {
   })
 
   test("#given a string recipient that is not a child and no team routing #when sent #then the child not_found result is preserved", async () => {
-    const { manager } = spyManager({ kind: "not_found", reason: "No task found for \"ghost\".", suggestion: "unused" })
+    const { manager } = spyManager({ kind: "not_found", reason: 'No task found for "ghost".', suggestion: "unused" })
 
     const result = await runTaskSend(manager, { to: "ghost", message: "hi" }, "p1")
 

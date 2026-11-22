@@ -6,10 +6,12 @@ use senpi_desktop_core::protocol_params::ObserveParams;
 use senpi_desktop_core::types::{ObserveResult, Target};
 
 use crate::budget::plan_screenshot;
+use crate::display_awake::is_activity;
+use crate::screen_notes::op_display;
 use crate::request::{Op, Response};
 use crate::session::guarded;
 use crate::worker::Worker;
-use crate::worker_capture::capture_response;
+use crate::worker_capture::{capture_response, with_identity};
 
 impl Worker {
     pub(crate) fn observe(
@@ -33,9 +35,11 @@ impl Worker {
         let snapshot = ax::snapshot(backend, &mut registry, &window, &options)?;
         check_cancel(cancelled)?;
         let legacy_capture = geometry.is_legacy_capture();
+        let identity = self.object_identity(&geometry);
         let mut frames = self.frames.clone();
         let frame_id = frames.record(&target, geometry);
-        let Response::Capture(capture) = capture_response(screenshot, &target, frame_id, None, window.is_on_screen, legacy_capture) else {
+        let captured = capture_response(screenshot, &target, frame_id, None, window.is_on_screen, legacy_capture);
+        let Response::Capture(capture) = with_identity(captured, identity) else {
             return Err(DesktopError::internal("capture response has no frame"));
         };
         self.refresh_capabilities();
@@ -57,16 +61,25 @@ impl Worker {
     ) {
         let checkpoint = matches!(op, Op::Observe(_))
             .then(|| (self.frames.clone(), self.registry.clone()));
+        let activity = self.options.is_some() && is_activity(&op);
+        if activity {
+            self.begin_activity();
+        }
+        let display = op_display(&op);
         // A read of a window that began now shows the user's input there only
         // once its result reaches the caller (plan todo 17): the record is told
         // after a successful delivery, never for a reply the waiter gave up on.
         let read = crate::intervention::window_read(&op).map(|target| (target.to_owned(), self.safety.supervisor.now_ms()));
-        let result = guarded(|| self.process(op, cancelled));
+        let result = guarded(|| self.process(op, cancelled))
+            .map_err(|error| self.notes.explain(error, display.as_ref()));
         let success = result.is_ok();
         let delivered = deliver(result);
         if let Some((frames, registry)) = checkpoint.filter(|_| !success || !delivered) {
             self.frames.restore(frames);
             self.registry.restore(registry);
+        }
+        if activity {
+            self.awake.finish(std::time::Instant::now());
         }
         if let Some((target, started_ms)) = read.filter(|_| success && delivered) {
             self.note_read(&target, started_ms);

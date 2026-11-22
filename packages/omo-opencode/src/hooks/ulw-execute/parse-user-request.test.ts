@@ -52,7 +52,7 @@ describe("parseUserRequest", () => {
 
   describe("when plan name is wrapped in quotes", () => {
     test("#given quoted plan name #when parsing #then strips wrapping quotes", () => {
-      const result = parseUserRequest("<user-request>\"my feature plan\"</user-request>")
+      const result = parseUserRequest('<user-request>"my feature plan"</user-request>')
       expect(result.planName).toBe("my feature plan")
       expect(result.explicitWorktreePath).toBeNull()
     })
@@ -98,6 +98,21 @@ describe("parseUserRequest", () => {
       const result = parseUserRequest("<user-request>my-plan</user-request>")
       expect(result.makePr).toBe(false)
       expect(result.ship).toBe(false)
+    })
+  })
+
+  // #14388: an opt-in light profile keeps the plan but drops per-step ceremony
+  describe("when the light profile flag is present", () => {
+    test("#given --light with plan name and delivery flags #when parsing #then light is true and the flag leaves the plan name", () => {
+      const result = parseUserRequest("<user-request>my-plan --light --ship</user-request>")
+      expect(result.planName).toBe("my-plan")
+      expect(result.light).toBe(true)
+      expect(result.ship).toBe(true)
+    })
+
+    test("#given no --light #when parsing #then light defaults false", () => {
+      expect(parseUserRequest("<user-request>my-plan --ship</user-request>").light).toBe(false)
+      expect(parseUserRequest("<user-request>my-plan --lightweight</user-request>").light).toBe(false)
     })
   })
 

@@ -41,12 +41,14 @@ export interface FakeCommandContext extends MemoryCommandContext {
   readonly sessionId: string
 }
 
-export function fakeCommandContext(options: {
-  readonly sessionId?: string
-  readonly hasUI?: boolean
-  readonly agentDir?: string
-  readonly withWaitForIdle?: boolean
-} = {}): FakeCommandContext {
+export function fakeCommandContext(
+  options: {
+    readonly sessionId?: string
+    readonly hasUI?: boolean
+    readonly agentDir?: string
+    readonly withWaitForIdle?: boolean
+  } = {},
+): FakeCommandContext {
   const order: string[] = []
   const ui: FakeCommandUi = {
     notifications: [],
@@ -173,28 +175,28 @@ export function fakeDeps(
  * Every timestamp derives from the caller's argument, never from the wall clock, which is what lets
  * reflection-health severity assertions stay a pure function of their fixtures.
  */
-export async function seedReflectionFailureStreak(
-  reflectionDir: string,
-  newestFinishedAtMs: number,
-): Promise<void> {
+export async function seedReflectionFailureStreak(reflectionDir: string, newestFinishedAtMs: number): Promise<void> {
   const completions = join(reflectionDir, "completions")
   await mkdir(completions, { recursive: true })
   for (let index = 0; index < 3; index += 1) {
     const finishedAtMs = newestFinishedAtMs - (2 - index) * 60_000
-    await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
-      schemaVersion: 1,
-      runId: `run-${index}`,
-      identity: TEST_IDENTITY,
-      category: "quick",
-      conversationIds: ["past-session"],
-      trigger: "manual",
-      outcome: "failed",
-      reason: "model-not-found",
-      detail: "configured model unavailable",
-      startedAt: new Date(finishedAtMs - 60_000).toISOString(),
-      finishedAt: new Date(finishedAtMs).toISOString(),
-      delivery: { status: "consumed" },
-    })}\n`)
+    await writeFile(
+      join(completions, `run-${index}.json`),
+      `${JSON.stringify({
+        schemaVersion: 1,
+        runId: `run-${index}`,
+        identity: TEST_IDENTITY,
+        category: "quick",
+        conversationIds: ["past-session"],
+        trigger: "manual",
+        outcome: "failed",
+        reason: "model-not-found",
+        detail: "configured model unavailable",
+        startedAt: new Date(finishedAtMs - 60_000).toISOString(),
+        finishedAt: new Date(finishedAtMs).toISOString(),
+        delivery: { status: "consumed" },
+      })}\n`,
+    )
   }
 }
 

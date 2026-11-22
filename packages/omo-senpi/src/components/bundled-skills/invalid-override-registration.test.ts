@@ -31,7 +31,16 @@ afterEach(() => {
 
 function recorder(): { readonly errors: string[]; readonly logger: ComponentLogger } {
   const errors: string[] = []
-  return { errors, logger: { info() {}, warn() {}, error: (message) => { errors.push(message) } } }
+  return {
+    errors,
+    logger: {
+      info() {},
+      warn() {},
+      error: (message) => {
+        errors.push(message)
+      },
+    },
+  }
 }
 
 function ctxFor(pi: FakeExtensionAPI, logger: ComponentLogger): ComponentContext {
@@ -75,9 +84,15 @@ describe("invalid bundled skills override at registration", () => {
       try {
         // when
         const first = new FakeExtensionAPI()
-        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(first, ctxFor(first, logger))
+        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(
+          first,
+          ctxFor(first, logger),
+        )
         const second = new FakeExtensionAPI()
-        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(second, ctxFor(second, logger))
+        await createTaskComponent({ loadJobWidgetHost: noJobWidgetHost, resolveCwd: () => root }).register(
+          second,
+          ctxFor(second, logger),
+        )
 
         // then
         for (const pi of [first, second]) {

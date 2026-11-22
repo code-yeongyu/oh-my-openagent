@@ -130,7 +130,9 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
     depositSessionHandoff(sessionId, {
       invoked: [...(invokedBySession.get(sessionId) ?? [])],
       requested: [...(requestedBySession.get(sessionId) ?? [])],
-      planTouches: [...(planTouchesBySession.get(sessionId) ?? [])].map(([path, touch]) => [path, { ...touch }] as const),
+      planTouches: [...(planTouchesBySession.get(sessionId) ?? [])].map(
+        ([path, touch]) => [path, { ...touch }] as const,
+      ),
       planTouchSequence,
     })
   }
@@ -158,7 +160,9 @@ export function createSkillInvocationTracker(pi: SenpiExtensionAPI): SkillInvoca
       // Mirror senpi's parse (see the ultrawork component): the skill name runs to the first space.
       const spaceIndex = text.indexOf(" ")
       const skill = (
-        spaceIndex === -1 ? text.slice(SKILL_COMMAND_PREFIX.length) : text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
+        spaceIndex === -1
+          ? text.slice(SKILL_COMMAND_PREFIX.length)
+          : text.slice(SKILL_COMMAND_PREFIX.length, spaceIndex)
       ).trim()
       record(invokedBySession, sessionId, skill)
       record(requestedBySession, sessionId, skill)
@@ -324,14 +328,21 @@ function userText(content: unknown): string {
   if (typeof content === "string") return content
   if (!Array.isArray(content)) return ""
   return content
-    .flatMap((block: unknown) => (isRecord(block) && block["type"] === "text" && typeof block["text"] === "string" ? [block["text"]] : []))
+    .flatMap((block: unknown) =>
+      isRecord(block) && block["type"] === "text" && typeof block["text"] === "string" ? [block["text"]] : [],
+    )
     .join("\n")
 }
 
-function toolCalls(content: unknown): readonly { readonly id: string; readonly name: string; readonly args: unknown }[] {
+function toolCalls(
+  content: unknown,
+): readonly { readonly id: string; readonly name: string; readonly args: unknown }[] {
   if (!Array.isArray(content)) return []
   return content.flatMap((block: unknown) =>
-    isRecord(block) && block["type"] === "toolCall" && typeof block["id"] === "string" && typeof block["name"] === "string"
+    isRecord(block) &&
+    block["type"] === "toolCall" &&
+    typeof block["id"] === "string" &&
+    typeof block["name"] === "string"
       ? [{ id: block["id"], name: block["name"], args: block["arguments"] }]
       : [],
   )

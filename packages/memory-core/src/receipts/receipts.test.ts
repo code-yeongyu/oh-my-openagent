@@ -31,11 +31,17 @@ async function runtimeDir(): Promise<string> {
 
 function runWorker(dir: string, mode: "append" | "once", count: number, runId: string): Promise<number | null> {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [worker, dir, mode, String(count), runId], { stdio: ["ignore", "ignore", "pipe"] })
+    const child = spawn(process.execPath, [worker, dir, mode, String(count), runId], {
+      stdio: ["ignore", "ignore", "pipe"],
+    })
     let stderr = ""
-    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString("utf8") })
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr += chunk.toString("utf8")
+    })
     child.once("error", reject)
-    child.once("exit", (code) => code === 0 ? resolve(code) : reject(new Error(`worker exited ${String(code)}: ${stderr}`)))
+    child.once("exit", (code) =>
+      code === 0 ? resolve(code) : reject(new Error(`worker exited ${String(code)}: ${stderr}`)),
+    )
   })
 }
 
@@ -49,13 +55,26 @@ describe("memory receipts", () => {
     const dir = await runtimeDir()
 
     // when
-    await appendMemoryReceipt(dir, { kind: "dream", runId: "run-1", trigger: "idle", event: "launched", generation: "2026-01-01T00:00:00.000Z" })
+    await appendMemoryReceipt(dir, {
+      kind: "dream",
+      runId: "run-1",
+      trigger: "idle",
+      event: "launched",
+      generation: "2026-01-01T00:00:00.000Z",
+    })
 
     // then
     const written = await lines(dir)
     expect(written).toHaveLength(1)
     const receipt = JSON.parse(written[0] ?? "{}")
-    expect(receipt).toMatchObject({ v: 1, kind: "dream", runId: "run-1", trigger: "idle", event: "launched", pid: process.pid })
+    expect(receipt).toMatchObject({
+      v: 1,
+      kind: "dream",
+      runId: "run-1",
+      trigger: "idle",
+      event: "launched",
+      pid: process.pid,
+    })
     expect(typeof receipt.host).toBe("string")
     expect(Number.isNaN(Date.parse(receipt.at))).toBe(false)
     if (process.platform !== "win32") expect((await stat(receiptsPath(dir))).mode & 0o777).toBe(0o600)
@@ -67,7 +86,15 @@ describe("memory receipts", () => {
 
     // when
     await Promise.all([
-      ...Array.from({ length: 20 }, (_, index) => appendMemoryReceipt(dir, { kind: "dream", runId: `local-${index}`, trigger: "idle", event: "launched", generation: "g1" })),
+      ...Array.from({ length: 20 }, (_, index) =>
+        appendMemoryReceipt(dir, {
+          kind: "dream",
+          runId: `local-${index}`,
+          trigger: "idle",
+          event: "launched",
+          generation: "g1",
+        }),
+      ),
       runWorker(dir, "append", 10, "child-a"),
       runWorker(dir, "append", 10, "child-b"),
       runWorker(dir, "append", 10, "child-c"),
@@ -85,7 +112,13 @@ describe("memory receipts", () => {
     const dir = await runtimeDir()
 
     // when
-    await appendMemoryReceipt(dir, { kind: "facts", batchId: "b-1", trigger: "settle", event: "failed", detail: `push token=abc123456 ${"x".repeat(600)}` })
+    await appendMemoryReceipt(dir, {
+      kind: "facts",
+      batchId: "b-1",
+      trigger: "settle",
+      event: "failed",
+      detail: `push token=abc123456 ${"x".repeat(600)}`,
+    })
 
     // then
     const receipt = JSON.parse((await lines(dir))[0] ?? "{}")
@@ -99,16 +132,34 @@ describe("memory receipts", () => {
     // given
     const dir = await runtimeDir()
     for (let index = 0; index < 7; index++) {
-      await appendMemoryReceipt(dir, { kind: "dream", runId: `d-${index}`, trigger: "idle", event: "merged", generation: `g${index}` })
-      await appendMemoryReceipt(dir, { kind: "reflection", runId: `r-${index}`, trigger: "step", event: "no_changes", generation: `g${index}` })
+      await appendMemoryReceipt(dir, {
+        kind: "dream",
+        runId: `d-${index}`,
+        trigger: "idle",
+        event: "merged",
+        generation: `g${index}`,
+      })
+      await appendMemoryReceipt(dir, {
+        kind: "reflection",
+        runId: `r-${index}`,
+        trigger: "step",
+        event: "no_changes",
+        generation: `g${index}`,
+      })
     }
-    await appendFile(receiptsPath(dir), "{\"v\":1,\"kind\":\"dream\",\"runId\":\"cut")
+    await appendFile(receiptsPath(dir), '{"v":1,"kind":"dream","runId":"cut')
 
     // when
     const read = await readMemoryReceipts(dir, { kind: "dream", limit: 5 })
 
     // then
-    expect(read.receipts.map((receipt) => receipt.kind === "facts" ? receipt.batchId : receipt.runId)).toEqual(["d-6", "d-5", "d-4", "d-3", "d-2"])
+    expect(read.receipts.map((receipt) => (receipt.kind === "facts" ? receipt.batchId : receipt.runId))).toEqual([
+      "d-6",
+      "d-5",
+      "d-4",
+      "d-3",
+      "d-2",
+    ])
     expect(read.skippedPartialLines).toBe(1)
   })
 
@@ -126,7 +177,13 @@ describe("memory receipts", () => {
   test("#given the same merge reported from four processes #when appended once #then exactly one line exists, and a different event still lands", async () => {
     // given
     const dir = await runtimeDir()
-    const merged = { kind: "dream" as const, runId: "same", trigger: "idle", event: "merged" as const, generation: "g1" }
+    const merged = {
+      kind: "dream" as const,
+      runId: "same",
+      trigger: "idle",
+      event: "merged" as const,
+      generation: "g1",
+    }
 
     // when
     await Promise.all([
@@ -153,8 +210,18 @@ describe("memory receipts", () => {
 
     // when
     const live = receiptIdentity({ kind: "dream", runId: ledger.runId, event: "merged", generation: ledger.startedAt })
-    const backfilled = receiptIdentity({ kind: "dream", runId: reread.runId, event: "merged", generation: reread.startedAt })
-    const retired = receiptIdentity({ kind: "dream", runId: ledger.runId, event: "merged", generation: "2025-12-31T00:00:00.000Z" })
+    const backfilled = receiptIdentity({
+      kind: "dream",
+      runId: reread.runId,
+      event: "merged",
+      generation: reread.startedAt,
+    })
+    const retired = receiptIdentity({
+      kind: "dream",
+      runId: ledger.runId,
+      event: "merged",
+      generation: "2025-12-31T00:00:00.000Z",
+    })
     const facts = receiptIdentity({ kind: "facts", batchId: "batch-1", event: "committed" })
 
     // then
@@ -166,7 +233,9 @@ describe("memory receipts", () => {
   test("#given kill points #when the variable is unset, different, or matching #then only a match kills this process with the platform's signal", () => {
     // given
     const kills: Array<{ readonly pid: number; readonly signal: string | undefined }> = []
-    const kill = (pid: number, signal?: NodeJS.Signals) => { kills.push({ pid, signal }) }
+    const kill = (pid: number, signal?: NodeJS.Signals) => {
+      kills.push({ pid, signal })
+    }
     const previous = process.env.OMO_MEMORY_KILL_POINT
 
     // when
@@ -183,8 +252,19 @@ describe("memory receipts", () => {
       expect([unset, other]).toEqual([undefined, undefined])
       expect(hit).toBe("signal")
       expect(hitWindows).toBe("terminate")
-      expect(kills).toEqual([{ pid: process.pid, signal: "SIGKILL" }, { pid: process.pid, signal: undefined }])
-      expect(MEMORY_KILL_POINTS).toEqual(["after-reserve", "after-prelaunch", "after-worktree", "after-child-exit", "after-validate", "after-merge", "before-receipt"])
+      expect(kills).toEqual([
+        { pid: process.pid, signal: "SIGKILL" },
+        { pid: process.pid, signal: undefined },
+      ])
+      expect(MEMORY_KILL_POINTS).toEqual([
+        "after-reserve",
+        "after-prelaunch",
+        "after-worktree",
+        "after-child-exit",
+        "after-validate",
+        "after-merge",
+        "before-receipt",
+      ])
     } finally {
       if (previous === undefined) delete process.env.OMO_MEMORY_KILL_POINT
       else process.env.OMO_MEMORY_KILL_POINT = previous
@@ -196,7 +276,13 @@ describe("memory receipts", () => {
     const dir = await runtimeDir()
 
     // when
-    await appendMemoryReceipt(dir, { kind: "reflection", runId: "r", trigger: "manual", event: "launched", generation: "g" })
+    await appendMemoryReceipt(dir, {
+      kind: "reflection",
+      runId: "r",
+      trigger: "manual",
+      event: "launched",
+      generation: "g",
+    })
 
     // then
     expect((await stat(join(dir, "locks"))).isDirectory()).toBe(true)

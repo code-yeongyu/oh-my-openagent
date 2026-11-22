@@ -21,9 +21,11 @@ export function describeAgreementsToolViolation(
     if (before !== undefined && parseAgreementsLedger(parseMemoryFile(before).body).receipts.length > 0) {
       return "agreement event receipts cannot be removed by memory tools"
     }
-    if (humanBefore.length > 0) return "system/agreements.md holds agreements your person wrote; only they can remove them (/agreements drop)"
+    if (humanBefore.length > 0)
+      return "system/agreements.md holds agreements your person wrote; only they can remove them (/agreements drop)"
     const flagged = itemsBefore.find((item) => item.status === "needs-human")
-    if (flagged !== undefined) return `agreement ${flagged.id} is flagged as needing your person; only they can drop it (/agreements drop)`
+    if (flagged !== undefined)
+      return `agreement ${flagged.id} is flagged as needing your person; only they can drop it (/agreements drop)`
     const counted = itemsBefore.find((item) => item.n > 0)
     return counted === undefined ? undefined : countedRemoval(counted)
   }
@@ -50,7 +52,9 @@ export function describeAgreementsToolViolation(
     humanAfter.delete(item.id)
   }
   const forged = [...humanAfter.keys()][0]
-  return forged === undefined ? undefined : `agreement ${forged} is marked by: human, which only /agreements add may write`
+  return forged === undefined
+    ? undefined
+    : `agreement ${forged} is marked by: human, which only /agreements add may write`
 }
 
 function describeCountTampering(before: readonly AgreementItem[], after: readonly AgreementItem[]): string | undefined {
@@ -58,11 +62,13 @@ function describeCountTampering(before: readonly AgreementItem[], after: readonl
   for (const item of before) {
     const kept = byId.get(item.id)
     if (kept === undefined) {
-      if (item.status === "needs-human") return `agreement ${item.id} is flagged as needing your person; only they can drop it (/agreements drop)`
+      if (item.status === "needs-human")
+        return `agreement ${item.id} is flagged as needing your person; only they can drop it (/agreements drop)`
       if (item.n > 0) return countedRemoval(item)
       continue
     }
-    if (kept.n < item.n) return `agreement ${item.id} was broken ${item.n} times; automation cannot lower that count (/agreements ack)`
+    if (kept.n < item.n)
+      return `agreement ${item.id} was broken ${item.n} times; automation cannot lower that count (/agreements ack)`
     if (item.status === "needs-human" && kept.status !== "needs-human") {
       return `agreement ${item.id} is flagged as needing your person; only they can clear it (/agreements ack)`
     }

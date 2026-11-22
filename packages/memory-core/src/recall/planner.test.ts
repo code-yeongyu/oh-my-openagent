@@ -27,12 +27,7 @@ describe("planRecallQueries", () => {
     const queries = planRecallQueries(texts)
 
     // then (single terms are bare, bigrams are quoted phrases of adjacent kept terms)
-    expect(queries).toEqual([
-      "kubernetes",
-      "controller",
-      '"kubernetes ingress"',
-      '"ingress controller"',
-    ])
+    expect(queries).toEqual(["kubernetes", "controller", '"kubernetes ingress"', '"ingress controller"'])
   })
 
   it("#given a term repeated across every text #when queries are planned #then rarer terms outrank the repeated one", () => {
@@ -47,31 +42,18 @@ describe("planRecallQueries", () => {
     const queries = planRecallQueries(texts)
 
     // then ("memory" and "cache" appear in all three texts, so unique terms win the slots)
-    expect(queries).toEqual([
-      "eviction",
-      "policy",
-      '"memory cache"',
-      '"cache eviction"',
-    ])
+    expect(queries).toEqual(["eviction", "policy", '"memory cache"', '"cache eviction"'])
   })
 
   it("#given a newest text without kept terms #when queries are planned #then the next text tops up", () => {
     // given
-    const texts = [
-      "Yes, do it.",
-      "Please summarize the kubernetes rollout status",
-    ]
+    const texts = ["Yes, do it.", "Please summarize the kubernetes rollout status"]
 
     // when
     const queries = planRecallQueries(texts)
 
     // then
-    expect(queries).toEqual([
-      "kubernetes",
-      "summarize",
-      '"kubernetes rollout"',
-      '"rollout status"',
-    ])
+    expect(queries).toEqual(["kubernetes", "summarize", '"kubernetes rollout"', '"rollout status"'])
   })
 
   it("#given a text rich in distinctive terms #when queries are planned #then at most four queries are emitted", () => {
@@ -93,29 +75,23 @@ describe("planRecallQueries", () => {
 
   it("#given characterization pin distinctive newest text #when queries are planned with no options #then today's kubernetes ingress output is reproduced", () => {
     // given / when / then — pin the no-options output before tool-slot work
-    expect(planRecallQueries([
-      "Can you check the Kubernetes ingress controller setup?",
-      "Sure, I will look at the database schema next.",
-    ])).toEqual([
-      "kubernetes",
-      "controller",
-      '"kubernetes ingress"',
-      '"ingress controller"',
-    ])
+    expect(
+      planRecallQueries([
+        "Can you check the Kubernetes ingress controller setup?",
+        "Sure, I will look at the database schema next.",
+      ]),
+    ).toEqual(["kubernetes", "controller", '"kubernetes ingress"', '"ingress controller"'])
   })
 
   it("#given characterization pin repeated terms #when queries are planned with no options #then today's rarer-term output is reproduced", () => {
     // given / when / then — pin the no-options output before tool-slot work
-    expect(planRecallQueries([
-      "The memory cache eviction policy still feels wrong",
-      "We tuned the memory cache again yesterday",
-      "The memory cache keeps evicting hot entries",
-    ])).toEqual([
-      "eviction",
-      "policy",
-      '"memory cache"',
-      '"cache eviction"',
-    ])
+    expect(
+      planRecallQueries([
+        "The memory cache eviction policy still feels wrong",
+        "We tuned the memory cache again yesterday",
+        "The memory cache keeps evicting hot entries",
+      ]),
+    ).toEqual(["eviction", "policy", '"memory cache"', '"cache eviction"'])
   })
 
   it("#given characterization pin short stopword tokens #when queries are planned with no options #then today's api-repo output is reproduced", () => {
@@ -179,9 +155,7 @@ describe("planRecallQueries", () => {
     const queries = planRecallQueries(userTexts, {
       toolTexts: ["cargo", "console", "rollout", "rollout.md"],
     })
-    const toolSingles = queries
-      .filter((query) => !query.startsWith('"'))
-      .filter((term) => !userSingles.includes(term))
+    const toolSingles = queries.filter((query) => !query.startsWith('"')).filter((term) => !userSingles.includes(term))
     // then
     expect(userSingles).toContain("cargo")
     expect(toolSingles[0]).toBe("rollout")
@@ -221,12 +195,7 @@ describe("planRecallQueries", () => {
       const queries = planRecallQueries(texts)
 
       // then (Hangul survives tokenization; ranking stays deterministic)
-      expect(queries).toEqual([
-        "플래너를",
-        "점검해줘",
-        '"메모리 시스템"',
-        '"시스템 리콜"',
-      ])
+      expect(queries).toEqual(["플래너를", "점검해줘", '"메모리 시스템"', '"시스템 리콜"'])
     })
 
     it("#given a Korean-only complaint #when queries are planned #then at least one query carries Hangul", () => {
@@ -246,12 +215,7 @@ describe("planRecallQueries", () => {
       const queries = planRecallQueries(texts)
 
       // then
-      expect(queries).toEqual([
-        "kubernetes",
-        "메모리",
-        '"내일 kubernetes"',
-        '"kubernetes 배포"',
-      ])
+      expect(queries).toEqual(["kubernetes", "메모리", '"내일 kubernetes"', '"kubernetes 배포"'])
     })
 
     it("#given Korean stopword chatter #when queries are planned #then no query is emitted", () => {

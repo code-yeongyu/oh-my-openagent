@@ -9,7 +9,13 @@ import { loadSkillsFromDir } from "./skill-directory-loader"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
 import type { LoadedSkill } from "./types"
 import { detectWorktreePath } from "../../shared/project-discovery-dirs"
-import { skillProvenance, checkSkillPath, reportSkillLoadError, type SkillProvenance, type SkillDiagnosticSink } from "./skill-provenance"
+import {
+  skillProvenance,
+  checkSkillPath,
+  reportSkillLoadError,
+  type SkillProvenance,
+  type SkillDiagnosticSink,
+} from "./skill-provenance"
 
 const sourceOrigins = new WeakMap<object, SkillProvenance>()
 export function setSkillSourceProvenance(config: SkillsConfig, provenance: SkillProvenance): void {
@@ -73,7 +79,9 @@ async function loadSourcePath(options: {
   const absolutePath = toAbsolutePath(options.sourcePath, options.configDir)
   const provenance = skillProvenance(absolutePath, "config", { ...options.provenance, selectedRoot: absolutePath })
   if (provenance.kind === "project-auto") {
-    try { checkSkillPath(absolutePath, provenance, true) } catch (error) {
+    try {
+      checkSkillPath(absolutePath, provenance, true)
+    } catch (error) {
       reportSkillLoadError(error, absolutePath, options.onDiagnostic)
       return []
     }
@@ -121,20 +129,27 @@ export async function discoverConfigSourceSkills(options: {
 }): Promise<LoadedSkill[]> {
   const normalized = normalizeSkillsConfig(options.config)
   if (normalized.sources.length === 0) return []
-  const provenance = options.provenance ?? (options.config && sourceOrigins.get(options.config)) ?? {
-    kind: "project-auto", selectedRoot: options.configDir, projectRoot: detectWorktreePath(options.configDir) ?? options.configDir,
-  }
+  const provenance = options.provenance ??
+    (options.config && sourceOrigins.get(options.config)) ?? {
+      kind: "project-auto",
+      selectedRoot: options.configDir,
+      projectRoot: detectWorktreePath(options.configDir) ?? options.configDir,
+    }
 
   const loadedBySource = await Promise.all(
     normalized.sources.map((source) => {
       const sourcePath = typeof source === "string" ? source : source.path
-      const userSelected = options.userSources?.some((path) =>
-        toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir))
-      const projectSelected = options.projectSources?.some((path) =>
-        toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir))
+      const userSelected = options.userSources?.some(
+        (path) => toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir),
+      )
+      const projectSelected = options.projectSources?.some(
+        (path) => toAbsolutePath(path, options.configDir) === toAbsolutePath(sourcePath, options.configDir),
+      )
       const sourceProvenance: SkillProvenance = userSelected
         ? { ...provenance, kind: "user" }
-        : projectSelected ? { ...provenance, kind: "project-auto" } : provenance
+        : projectSelected
+          ? { ...provenance, kind: "project-auto" }
+          : provenance
       if (typeof source === "string") {
         return loadSourcePath({
           sourcePath: source,

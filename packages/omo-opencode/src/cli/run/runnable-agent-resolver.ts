@@ -51,9 +51,7 @@ export async function resolveRunnableRunAgent(
       )
     }
     if (registered.length > 0) {
-      throw new UnknownRunAgentError(
-        `Unknown agent "${resolvedAgent}". Runnable agents: ${registered.join(", ")}.`,
-      )
+      throw new UnknownRunAgentError(`Unknown agent "${resolvedAgent}". Runnable agents: ${registered.join(", ")}.`)
     }
     return resolvedAgent
   } catch (error) {

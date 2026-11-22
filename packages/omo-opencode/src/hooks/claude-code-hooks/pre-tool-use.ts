@@ -1,9 +1,4 @@
-import type {
-  PreToolUseInput,
-  PreToolUseOutput,
-  PermissionDecision,
-  ClaudeHooksConfig,
-} from "./types"
+import type { PreToolUseInput, PreToolUseOutput, PermissionDecision, ClaudeHooksConfig } from "./types"
 import { findMatchingHooks, objectToSnakeCase, transformToolName, log } from "../../shared"
 import { dispatchHook, getHookIdentifier } from "./dispatch-hook"
 import { isHookCommandDisabled, type PluginExtendedConfig } from "./config-loader"
@@ -47,7 +42,7 @@ function buildInputLines(toolInput: Record<string, unknown>): string {
 export async function executePreToolUseHooks(
   ctx: PreToolUseContext,
   config: ClaudeHooksConfig | null,
-  extendedConfig?: PluginExtendedConfig | null
+  extendedConfig?: PluginExtendedConfig | null,
 ): Promise<PreToolUseResult> {
   if (!config) {
     return { decision: "allow" }
@@ -82,10 +77,10 @@ export async function executePreToolUseHooks(
     systemMessage?: string
   } = {}
 
-   for (const matcher of matchers) {
-     if (!matcher.hooks || matcher.hooks.length === 0) continue
-     for (const hook of matcher.hooks) {
-       if (hook.type !== "command" && hook.type !== "http") continue
+  for (const matcher of matchers) {
+    if (!matcher.hooks || matcher.hooks.length === 0) continue
+    for (const hook of matcher.hooks) {
+      if (hook.type !== "command" && hook.type !== "http") continue
 
       const hookName = getHookIdentifier(hook)
       if (isHookCommandDisabled("PreToolUse", hookName, extendedConfig ?? null)) {
@@ -173,7 +168,8 @@ export async function executePreToolUseHooks(
           if (output.continue !== undefined) accumulatedCommonFields.continue = output.continue
           if (output.stopReason !== undefined) accumulatedCommonFields.stopReason = normalizeHookText(output.stopReason)
           if (output.suppressOutput !== undefined) accumulatedCommonFields.suppressOutput = output.suppressOutput
-          if (output.systemMessage !== undefined) accumulatedCommonFields.systemMessage = normalizeHookText(output.systemMessage)
+          if (output.systemMessage !== undefined)
+            accumulatedCommonFields.systemMessage = normalizeHookText(output.systemMessage)
         } catch (error) {
           if (!(error instanceof SyntaxError)) {
             throw error

@@ -67,6 +67,7 @@ fn text_is_inserted_into_a_native_text_field_and_audited_as_delivered() {
     assert_eq!(
         reply.expect("typed"),
         Response::AxInput(AxInputResult {
+            report: None,
             method: AxInputMethod::Inserted
         })
     );
@@ -94,6 +95,7 @@ fn text_for_an_element_that_takes_no_insertion_goes_as_keys_once_it_is_focused()
     assert_eq!(
         reply.expect("typed"),
         Response::AxInput(AxInputResult {
+            report: None,
             method: AxInputMethod::Keys
         })
     );

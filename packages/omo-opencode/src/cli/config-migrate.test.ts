@@ -7,17 +7,25 @@ import { runConfigMigrate } from "./config-migrate"
 
 const fixtures: string[] = []
 
-function createFixture(): { readonly homeDir: string; readonly root: string; readonly sourcePath: string; readonly targetPath: string } {
+function createFixture(): {
+  readonly homeDir: string
+  readonly root: string
+  readonly sourcePath: string
+  readonly targetPath: string
+} {
   const root = mkdtempSync(join(tmpdir(), "omo-config-migrate-"))
   fixtures.push(root)
   const homeDir = join(root, "home")
   const sourcePath = join(homeDir, ".config", "opencode", "oh-my-openagent.json")
   const targetPath = join(homeDir, ".omo", "omo.jsonc")
   mkdirSync(join(homeDir, ".config", "opencode"), { recursive: true })
-  writeFileSync(sourcePath, JSON.stringify({
-    agents: { oracle: { model: "anthropic/legacy" } },
-    model_fallback: true,
-  }))
+  writeFileSync(
+    sourcePath,
+    JSON.stringify({
+      agents: { oracle: { model: "anthropic/legacy" } },
+      model_fallback: true,
+    }),
+  )
   return { homeDir, root, sourcePath, targetPath }
 }
 
@@ -64,7 +72,9 @@ describe("runConfigMigrate", () => {
 
     // then
     expect(exitCode).toBe(0)
-    const report = JSON.parse(lines.join("\n")) as { migrations: Array<{ readonly movePlan: unknown[]; readonly transform?: unknown }> }
+    const report = JSON.parse(lines.join("\n")) as {
+      migrations: Array<{ readonly movePlan: unknown[]; readonly transform?: unknown }>
+    }
     const legacy = report.migrations.find((migration) => migration.movePlan.length > 0)
     expect(legacy?.transform).toBeDefined()
     expect(legacy?.movePlan).toHaveLength(1)
@@ -106,15 +116,18 @@ describe("runConfigMigrate", () => {
     const fixture = createFixture()
     const journalPath = join(fixture.homeDir, ".omo", ".migration-journal.json")
     mkdirSync(join(fixture.homeDir, ".omo"), { recursive: true })
-    writeFileSync(journalPath, JSON.stringify({
-      backupMoves: [{ from: fixture.sourcePath, to: join(fixture.homeDir, ".omo", "backup.json") }],
-      completedMoves: [],
-      migrationId: "recovery",
-      targetPath: fixture.targetPath,
-      targetWrite: { additions: { task: { default_concurrency: 3 } } },
-      targetWritten: false,
-      version: 1,
-    }))
+    writeFileSync(
+      journalPath,
+      JSON.stringify({
+        backupMoves: [{ from: fixture.sourcePath, to: join(fixture.homeDir, ".omo", "backup.json") }],
+        completedMoves: [],
+        migrationId: "recovery",
+        targetPath: fixture.targetPath,
+        targetWrite: { additions: { task: { default_concurrency: 3 } } },
+        targetWritten: false,
+        version: 1,
+      }),
+    )
     const lines: string[] = []
 
     // when
@@ -147,7 +160,7 @@ describe("runConfigMigrate", () => {
     const migrated = readFileSync(fixture.targetPath, "utf8")
     expect(migrated).toContain("anthropic/MINE")
     expect(migrated).toContain("// my notes")
-    const named = lines.flatMap((line) => line.startsWith("backup: ") ? [line.slice("backup: ".length)] : [])
+    const named = lines.flatMap((line) => (line.startsWith("backup: ") ? [line.slice("backup: ".length)] : []))
     expect(named.length).toBeGreaterThan(0)
     const onDisk = readdirSync(join(fixture.homeDir, ".omo")).filter((name) => name.startsWith("omo.jsonc.bak."))
     expect(onDisk.map((name) => join(fixture.homeDir, ".omo", name)).sort()).toEqual([...named].sort())
@@ -177,18 +190,24 @@ describe("runConfigMigrate", () => {
       const backupPath = join(omoDir, "omo.jsonc.bak.planned")
       if (crashedAfterWrite) {
         writeFileSync(backupPath, original)
-        writeFileSync(fixture.targetPath, '{"agents":{"oracle":{"model":"anthropic/MINE"}},"_migrations":["recovery"]}\n')
+        writeFileSync(
+          fixture.targetPath,
+          '{"agents":{"oracle":{"model":"anthropic/MINE"}},"_migrations":["recovery"]}\n',
+        )
       }
-      writeFileSync(join(omoDir, ".migration-journal.json"), JSON.stringify({
-        backupMoves: [{ from: fixture.sourcePath, to: join(omoDir, "backup.json") }],
-        completedMoves: [],
-        migrationId: "recovery",
-        targetBackupPath: backupPath,
-        targetPath: fixture.targetPath,
-        targetWrite: { additions: { task: { default_concurrency: 3 } } },
-        targetWritten: false,
-        version: 1,
-      }))
+      writeFileSync(
+        join(omoDir, ".migration-journal.json"),
+        JSON.stringify({
+          backupMoves: [{ from: fixture.sourcePath, to: join(omoDir, "backup.json") }],
+          completedMoves: [],
+          migrationId: "recovery",
+          targetBackupPath: backupPath,
+          targetPath: fixture.targetPath,
+          targetWrite: { additions: { task: { default_concurrency: 3 } } },
+          targetWritten: false,
+          version: 1,
+        }),
+      )
       const lines: string[] = []
 
       // when
@@ -216,16 +235,19 @@ describe("runConfigMigrate", () => {
       const backupPath = join(omoDir, "omo.jsonc.bak.planned")
       writeFileSync(backupPath, leftover === "same" ? original : '{"unrelated":true}\n')
       const journalPath = join(omoDir, ".migration-journal.json")
-      writeFileSync(journalPath, JSON.stringify({
-        backupMoves: [{ from: fixture.sourcePath, to: join(omoDir, "backup.json") }],
-        completedMoves: [],
-        migrationId: "recovery",
-        targetBackupPath: backupPath,
-        targetPath: fixture.targetPath,
-        targetWrite: { additions: { task: { default_concurrency: 3 } } },
-        targetWritten: false,
-        version: 1,
-      }))
+      writeFileSync(
+        journalPath,
+        JSON.stringify({
+          backupMoves: [{ from: fixture.sourcePath, to: join(omoDir, "backup.json") }],
+          completedMoves: [],
+          migrationId: "recovery",
+          targetBackupPath: backupPath,
+          targetPath: fixture.targetPath,
+          targetWrite: { additions: { task: { default_concurrency: 3 } } },
+          targetWritten: false,
+          version: 1,
+        }),
+      )
       const environment = { HOME: fixture.homeDir, XDG_CONFIG_HOME: join(fixture.homeDir, ".config") }
 
       // when
@@ -238,7 +260,7 @@ describe("runConfigMigrate", () => {
       expect(second).toBe(0)
       expect(existsSync(journalPath)).toBe(false)
       expect(readFileSync(fixture.targetPath, "utf8")).toContain("_migrations")
-      const named = lines.flatMap((line) => line.startsWith("backup: ") ? [line.slice("backup: ".length)] : [])
+      const named = lines.flatMap((line) => (line.startsWith("backup: ") ? [line.slice("backup: ".length)] : []))
       expect(named.length).toBeGreaterThan(0)
       expect(named.some((path) => readFileSync(path, "utf8") === original)).toBe(true)
       if (leftover === "different") expect(readFileSync(backupPath, "utf8")).toBe('{"unrelated":true}\n')

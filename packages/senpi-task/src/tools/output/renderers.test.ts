@@ -145,10 +145,7 @@ describe("task_output renderers", () => {
 
   test("#given a width smaller than the fixed call tokens #when rendering task_output #then the complete ANSI row is clamped", () => {
     // given / when
-    const line = firstLine(
-      renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME),
-      20,
-    )
+    const line = firstLine(renderTaskOutputCall({ name: "abcdef", mode: "status" }, ANSI_THEME), 20)
 
     // then
     expect(line).toContain("...")
@@ -172,7 +169,9 @@ describe("task_output renderers", () => {
     ]
 
     // when
-    const lines = details.map((detail) => firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120))
+    const lines = details.map((detail) =>
+      firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 120),
+    )
 
     // then
     expect(lines).toHaveLength(details.length)
@@ -208,7 +207,10 @@ describe("task_output renderers", () => {
     // given / when
     const line = firstLine(
       renderTaskOutputResult(
-        toolResult("ignored", { kind: "status", snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }) }),
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({ name: "task-1", description: "Audit the waiting line" }),
+        }),
         RESULT_OPTIONS,
         TEST_THEME,
       ),
@@ -394,13 +396,31 @@ describe("task_output run stats rendering", () => {
   test("#given a snapshot without run stats #when the status row renders #then no runtime tokens appear", () => {
     // when
     const line = firstLine(
-      renderTaskOutputResult(toolResult("ignored", { kind: "status", snapshot: snapshot() }), RESULT_OPTIONS, TEST_THEME),
+      renderTaskOutputResult(
+        toolResult("ignored", { kind: "status", snapshot: snapshot() }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
       200,
     )
 
     // then
     expect(line).not.toContain("ran ")
     expect(line).not.toContain("tok/s")
+  })
+
+  test("#given no-progress output without a pending notification #when the row renders #then it shows the factual reason", () => {
+    const detail: TaskOutputDetails = {
+      kind: "no_progress",
+      task_id: "st_done",
+      status: "completed",
+      reason: "Task st_done is completed. It will not send a completion notification.",
+    }
+
+    const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
+
+    expect(line).toContain("It will not send a completion notification.")
+    expect(line).not.toContain("await notification")
   })
 })
 
@@ -409,7 +429,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "persisted_only", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "persisted_only",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when
@@ -424,7 +448,11 @@ describe("task_output suspended residency rendering", () => {
     // given
     const detail: TaskOutputDetails = {
       kind: "status",
-      snapshot: snapshot({ status: "running", residency_state: "rpc_detached", suspended: { explanation: "suspended (resumes with session)" } }),
+      snapshot: snapshot({
+        status: "running",
+        residency_state: "rpc_detached",
+        suspended: { explanation: "suspended (resumes with session)" },
+      }),
     }
 
     // when

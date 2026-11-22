@@ -37,7 +37,7 @@ afterEach(async () => {
   }
 })
 
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 15_000)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 
 describe("GitMemoryRepo secret screening", () => {
   it("#given a file carrying an aws key #when commitWrite runs #then it refuses with path and class, HEAD stays and the file survives", async () => {

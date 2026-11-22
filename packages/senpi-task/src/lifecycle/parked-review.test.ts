@@ -32,10 +32,13 @@ test("queued steers are cleared and accounted for in the single terminal result"
   const record = f.store.load(id)
   expect(record?.status).toBe("error")
   expect(record?.pending_steering).toBeUndefined()
-  expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload)
-    .toMatchObject({ undelivered_messages: 2 })
-  expect(f.recordedEvents.find((event) => event.type === "steer_dropped")?.payload)
-    .toMatchObject({ count: 2, reason: "target_gone" })
+  expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+    undelivered_messages: 2,
+  })
+  expect(f.recordedEvents.find((event) => event.type === "steer_dropped")?.payload).toMatchObject({
+    count: 2,
+    reason: "target_gone",
+  })
   expect(f.messages).toHaveLength(1)
   expect(f.messages[0]?.content).toContain(record?.error_message ?? "missing terminal result")
   f.advance(300_000)
@@ -47,7 +50,9 @@ test("an attached live handle survives stale expired recovery markers", async ()
   const id = await f.start()
   const handle = f.manager.getResidentHandle(id)
   f.store.mutate(id, (record) => ({
-    ...record, recovery_deadline_at: 0, suspension_reason: "host_draining",
+    ...record,
+    recovery_deadline_at: 0,
+    suspension_reason: "host_draining",
   }))
   await f.lifecycle.reconcileOnSessionStart("parent-1")
   expect(f.store.load(id)?.status).toBe("running")
@@ -132,7 +137,14 @@ test("recoverable daemon refusal detaches without aborting or closing its sessio
   const getResident = f.registry.get.bind(f.registry)
   spyOn(f.registry, "get").mockImplementation((taskId) => {
     const resident = getResident(taskId)
-    return resident === undefined ? undefined : { ...resident, terminate: async () => { terminated += 1 } }
+    return resident === undefined
+      ? undefined
+      : {
+          ...resident,
+          terminate: async () => {
+            terminated += 1
+          },
+        }
   })
   f.store.mutate(id, (record) => ({ ...record, residency_state: "rpc_detached" }))
   await f.lifecycle.destroyResidentTask(id, "recovery_detach")
@@ -196,10 +208,13 @@ test("recovery detach forgets a handle even when its disposal rejects", async ()
 test("explicit end reports a forgotten target's dropped queue to its parent", async () => {
   const f = fixture()
   const id = await f.start()
-  f.store.mutate(id, record => ({ ...record, pending_steering: [
-    { id: "forgotten-1", message: "Q1", deliver_as: "steer" },
-    { id: "forgotten-2", message: "Q2", deliver_as: "steer" },
-  ] }))
+  f.store.mutate(id, (record) => ({
+    ...record,
+    pending_steering: [
+      { id: "forgotten-1", message: "Q1", deliver_as: "steer" },
+      { id: "forgotten-2", message: "Q2", deliver_as: "steer" },
+    ],
+  }))
   const notified = Promise.withResolvers<void>()
   const push = f.messages.push.bind(f.messages)
   const notification = spyOn(f.messages, "push").mockImplementation((...messages) => {
@@ -215,8 +230,9 @@ test("explicit end reports a forgotten target's dropped queue to its parent", as
     expect(record?.pending_steering).toBeUndefined()
     expect(f.messages).toHaveLength(1)
     expect(f.messages[0]?.content).toContain(record?.error_message ?? "missing drop notice")
-    expect(f.recordedEvents.filter(event => event.type === "steer_dropped").map(event => event.payload))
-      .toEqual([{ count: 2, reason: "task_forgotten" }])
+    expect(f.recordedEvents.filter((event) => event.type === "steer_dropped").map((event) => event.payload)).toEqual([
+      { count: 2, reason: "task_forgotten" },
+    ])
   } finally {
     notification.mockRestore()
   }

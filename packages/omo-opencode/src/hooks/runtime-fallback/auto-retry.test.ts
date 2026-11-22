@@ -95,12 +95,7 @@ describe("createAutoRetryHelpers", () => {
     deps.sessionAwaitingFallbackResult.add(sessionID)
 
     // when
-    const outcome = await helpers.autoRetryWithFallback(
-      sessionID,
-      "google/gemini-2.5-pro",
-      undefined,
-      "session.status",
-    )
+    const outcome = await helpers.autoRetryWithFallback(sessionID, "google/gemini-2.5-pro", undefined, "session.status")
 
     // then
     expect(outcome).toEqual({ accepted: true, status: "queued" })
@@ -230,6 +225,22 @@ describe("createAutoRetryHelpers", () => {
     // then
     expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
     expect(deps.sessionLastAccess.get(sessionID)).toBeGreaterThan(staleLastAccess)
+  })
+
+  test("#given the first-prompt watchdog aborts to swap in a fallback #when its abort echo arrives #then the abort is marked internal so stop/idle echoes preserve fallback position (issue #6751)", async () => {
+    // given - the watchdog aborts a silent subagent and immediately dispatches
+    // a fallback. Its abort source must be treated like every other
+    // fallback-following abort, otherwise the echo wipes the prepared state.
+    const promptCalls = { count: 0 }
+    const deps = createDeps(promptCalls)
+    const helpers = createAutoRetryHelpers(deps)
+    const sessionID = "session-watchdog-abort-marked"
+
+    // when
+    await helpers.abortSessionRequest(sessionID, "first-prompt-watchdog")
+
+    // then
+    expect(deps.internallyAbortedSessions.has(sessionID)).toBe(true)
   })
 
   test("#given stale internal abort marker #when stale session cleanup runs #then the marker is cleared", () => {

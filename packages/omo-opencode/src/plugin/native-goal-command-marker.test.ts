@@ -1,9 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  consumeNativeGoalCommandMarker,
-  markNativeGoalCommand,
-} from "./command-execute-before"
+import { consumeNativeGoalCommandMarker, markNativeGoalCommand } from "./command-execute-before"
 
 describe("native goal command marker", () => {
   test("#given an interleaved same-session prompt #when markers are consumed #then only the native goal turn matches", () => {

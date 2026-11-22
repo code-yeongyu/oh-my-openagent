@@ -9,7 +9,8 @@ import { createMomusReviewPersistenceHook } from "./hook"
 import { extractSinglePlanPath } from "./review-resolution"
 
 const OKAY_OUTPUT = "**[OKAY]**\n\n**Summary**: All references check out."
-const REJECT_OUTPUT = "**[REJECT]**\n\n**Summary**: One reference is missing.\n\n**Blocking Issues**:\n1. `.omo/plans/demo.md:12` cites a file that does not exist."
+const REJECT_OUTPUT =
+  "**[REJECT]**\n\n**Summary**: One reference is missing.\n\n**Blocking Issues**:\n1. `.omo/plans/demo.md:12` cites a file that does not exist."
 
 function createProject(): string {
   const directory = mkdtempSync(join(tmpdir(), "momus-review-persistence-"))
@@ -105,11 +106,21 @@ describe("createMomusReviewPersistenceHook", () => {
     try {
       // when
       await hook["tool.execute.after"](
-        { tool: "task", sessionID: "ses_parent", callID: "call_1", args: { subagent_type: "momus", prompt: ".omo/plans/demo.md" } },
+        {
+          tool: "task",
+          sessionID: "ses_parent",
+          callID: "call_1",
+          args: { subagent_type: "momus", prompt: ".omo/plans/demo.md" },
+        },
         { title: "Review plan", output: OKAY_OUTPUT, metadata: {} },
       )
       await hook["tool.execute.after"](
-        { tool: "task", sessionID: "ses_parent", callID: "call_2", args: { subagent_type: "momus", prompt: ".omo/plans/demo.md" } },
+        {
+          tool: "task",
+          sessionID: "ses_parent",
+          callID: "call_2",
+          args: { subagent_type: "momus", prompt: ".omo/plans/demo.md" },
+        },
         { title: "Review plan again", output: REJECT_OUTPUT, metadata: {} },
       )
 
@@ -150,7 +161,11 @@ describe("createMomusReviewPersistenceHook", () => {
       // when
       await hook["tool.execute.after"](
         { tool: "task", sessionID: "ses_parent", callID: "call_1" },
-        { title: "Review plan", output: "Still reviewing, no verdict yet.", metadata: { agent: "momus", prompt: ".omo/plans/demo.md" } },
+        {
+          title: "Review plan",
+          output: "Still reviewing, no verdict yet.",
+          metadata: { agent: "momus", prompt: ".omo/plans/demo.md" },
+        },
       )
 
       // then
@@ -192,7 +207,12 @@ describe("createMomusReviewPersistenceHook", () => {
         parts: [{ type: "text", text: ".omo/plans/demo.md" }],
       },
       {
-        info: { role: "assistant", providerID: "openai", modelID: "gpt-5.5", time: { created: 2_000, completed: 61_000 } },
+        info: {
+          role: "assistant",
+          providerID: "openai",
+          modelID: "gpt-5.5",
+          time: { created: 2_000, completed: 61_000 },
+        },
         parts: [{ type: "text", text: OKAY_OUTPUT }],
       },
     ]
@@ -202,7 +222,11 @@ describe("createMomusReviewPersistenceHook", () => {
       // when
       await hook["tool.execute.after"](
         { tool: "background_output", sessionID: "ses_parent", callID: "call_9", args: { task_id: "bg_1" } },
-        { title: "Background task result", output: OKAY_OUTPUT, metadata: { agent: "momus", sessionId: "ses_bg_child" } },
+        {
+          title: "Background task result",
+          output: OKAY_OUTPUT,
+          metadata: { agent: "momus", sessionId: "ses_bg_child" },
+        },
       )
 
       // then
@@ -283,7 +307,11 @@ describe("createMomusReviewPersistenceHook", () => {
     // given
     const directory = createProject()
     const hook = createMomusReviewPersistenceHook(createCtx(directory))
-    const output = { title: "Review plan", output: OKAY_OUTPUT, metadata: { agent: "momus", prompt: ".omo/plans/demo.md" } }
+    const output = {
+      title: "Review plan",
+      output: OKAY_OUTPUT,
+      metadata: { agent: "momus", prompt: ".omo/plans/demo.md" },
+    }
 
     try {
       // when

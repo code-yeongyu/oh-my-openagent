@@ -75,7 +75,11 @@ describe("message.part.delta handling", () => {
 
     //#when
     const { handleMessagePartUpdated } = require("./event-handlers") as {
-      handleMessagePartUpdated: (ctx: RunContext, payload: EventPayload, state: ReturnType<typeof createEventState>) => void
+      handleMessagePartUpdated: (
+        ctx: RunContext,
+        payload: EventPayload,
+        state: ReturnType<typeof createEventState>,
+      ) => void
     }
     handleMessagePartUpdated(ctx, payload, state)
 
@@ -128,7 +132,12 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -187,7 +196,12 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -242,7 +256,13 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_assistant",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -304,12 +324,19 @@ describe("message.part.delta handling", () => {
     const ctx = createMockContext("ses_main")
     const state = createEventState()
     const stdoutSpy = spyOn(process.stdout, "write").mockImplementation(() => true)
-    const longThinking = "This is a very long thinking stream that should never be truncated and must include final tail marker END-OF-THINKING-MARKER"
+    const longThinking =
+      "This is a very long thinking stream that should never be truncated and must include final tail marker END-OF-THINKING-MARKER"
     const events: EventPayload[] = [
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_assistant",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -353,7 +380,14 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7", variant: "max" },
+          info: {
+            id: "msg_assistant",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+            variant: "max",
+          },
         },
       },
       {
@@ -388,13 +422,25 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_user", sessionID: "ses_main", role: "user", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_user",
+            sessionID: "ses_main",
+            role: "user",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
         type: "message.part.updated",
         properties: {
-          part: { id: "part_user_text", messageID: "msg_user", sessionID: "ses_main", type: "text", text: "[search-mode] should not print" },
+          part: {
+            id: "part_user_text",
+            messageID: "msg_user",
+            sessionID: "ses_main",
+            type: "text",
+            text: "[search-mode] should not print",
+          },
         },
       },
       {
@@ -410,7 +456,13 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_assistant", sessionID: "ses_main", role: "assistant", agent: "Sisyphus - Ultraworker", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_assistant",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus - Ultraworker",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -619,7 +671,13 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_1",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {
@@ -634,7 +692,13 @@ describe("message.part.delta handling", () => {
       {
         type: "message.updated",
         properties: {
-          info: { id: "msg_1", sessionID: "ses_main", role: "assistant", agent: "Sisyphus", modelID: "claude-opus-4-7" },
+          info: {
+            id: "msg_1",
+            sessionID: "ses_main",
+            role: "assistant",
+            agent: "Sisyphus",
+            modelID: "claude-opus-4-7",
+          },
         },
       },
       {

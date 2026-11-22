@@ -96,7 +96,13 @@ export interface SessionDigest {
 }
 
 export type RecentSessionOutcome =
-  | { readonly _tag: "Importable"; readonly thread: AgentSessionThread; readonly source: TranscriptSource; readonly cwd: string; readonly digest: SessionDigest }
+  | {
+      readonly _tag: "Importable"
+      readonly thread: AgentSessionThread
+      readonly source: TranscriptSource
+      readonly cwd: string
+      readonly digest: SessionDigest
+    }
   | { readonly _tag: "AlreadyImported"; readonly source: TranscriptSource }
   | { readonly _tag: "Duplicate"; readonly source: TranscriptSource }
   | { readonly _tag: "Skipped" }

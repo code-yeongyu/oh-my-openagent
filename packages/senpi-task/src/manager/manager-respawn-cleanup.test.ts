@@ -6,11 +6,19 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
-import { FakeRunner, categoryPlanner, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import type { ManagedStartSpec } from "./types"
 import { createTaskManager } from "./manager"
 import { createParentRegistrySessionContext } from "./parent-registry-context"
 import { createInProcessManagedRunner } from "./runner"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -55,17 +63,18 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
         disposeCalls += 1
         return cleanupStage === "dispose" ? Promise.reject(cleanupFailure) : Promise.resolve()
       },
-      terminate: () => cleanupStage === "terminate" ? Promise.reject(cleanupFailure) : Promise.resolve(),
+      terminate: () => (cleanupStage === "terminate" ? Promise.reject(cleanupFailure) : Promise.resolve()),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: true }),
     } satisfies RpcChildHandle
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -117,17 +126,18 @@ describe("TaskManager respawn launch trust boundary", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
     let extensions: readonly string[] | undefined
     let memberEnv: Readonly<Record<string, string>> | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -189,16 +199,17 @@ describe("TaskManager team-member respawn", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
     let startedSpec: RpcRunnerSpec | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const options = {
       store,
@@ -253,16 +264,17 @@ describe("TaskManager respawn variant", () => {
       dispose: () => Promise.resolve(),
       terminate: () => Promise.resolve(),
       exitOutcome: () => undefined,
-      waitForExit: () => Promise.resolve({
-        kind: "clean" as const,
-        facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
-      }),
+      waitForExit: () =>
+        Promise.resolve({
+          kind: "clean" as const,
+          facts: { pid: 4321, code: 0, signal: null, stderrTail: "" },
+        }),
       lastSeen: () => undefined,
       switchSession: () => Promise.resolve({ cancelled: false }),
     } satisfies RpcChildHandle
     let startedSpec: RpcRunnerSpec | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -293,7 +305,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given a claimed in-process record #when respawned #then resume receives the rebuilt persisted spec", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -356,7 +368,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given resolveResumeContext cannot find the persisted model #when respawned #then failure is retryable and no child is spawned", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record: TaskRecord = {
       ...respawnRecord(),
       execution_mode: "in-process",
@@ -369,15 +381,18 @@ describe("TaskManager in-process respawn", () => {
       spawn_spec: { version: 1, cwd: project, prompt: "continue safely" },
     }
     let childResumeCalls = 0
-    const managedRunner = createInProcessManagedRunner({
-      start: () => {
-        throw new Error("start must not be called during respawn")
+    const managedRunner = createInProcessManagedRunner(
+      {
+        start: () => {
+          throw new Error("start must not be called during respawn")
+        },
+        resume: () => {
+          childResumeCalls += 1
+          throw new Error("resume must be guarded before child spawn")
+        },
       },
-      resume: () => {
-        childResumeCalls += 1
-        throw new Error("resume must be guarded before child spawn")
-      },
-    }, createParentRegistrySessionContext(() => undefined))
+      createParentRegistrySessionContext(() => undefined),
+    )
     const manager = createTaskManager({
       store,
       runners: { "in-process": managedRunner, process: new FakeRunner() },
@@ -404,7 +419,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given an in-process record without v1 rebuild facts #when respawned #then it fails unrecoverably without spawning", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record: TaskRecord = { ...respawnRecord(), execution_mode: "in-process" }
     let resumeCalls = 0
     const runner = {
@@ -440,7 +455,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given no prior host ownership claim #when reattached #then the handle is rejected", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const { host_pid: _hostPid, ...record } = respawnRecord()
     store.replace(record)
@@ -463,7 +478,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given a claimed non-terminal record with stale output #when reattached #then output clears and run_epoch bumps exactly once", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -500,7 +515,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given a pid-less record revived onto a daemon session #when reattached #then the record names that session", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const { pid: _pid, ...withoutPid } = respawnRecord()
     const record: TaskRecord = { ...withoutPid, host_pid: 7001 }
@@ -513,7 +528,12 @@ describe("TaskManager guarded reattach", () => {
       cwd: project,
       hostPid: 7001,
     })
-    const hostSession = { socket: "/tmp/dh-fake/rpc.sock", routingId: "routing-revived", sessionPath: "/tmp/dh-fake/sessions/revived.jsonl", instanceId: "instance-2" }
+    const hostSession = {
+      socket: "/tmp/dh-fake/rpc.sock",
+      routingId: "routing-revived",
+      sessionPath: "/tmp/dh-fake/sessions/revived.jsonl",
+      instanceId: "instance-2",
+    }
     const handle = Object.assign(makeHandle(record.task_id).handle, { kind: "host-session" as const, hostSession })
 
     // when
@@ -523,14 +543,19 @@ describe("TaskManager guarded reattach", () => {
     expect(result).toEqual({ ok: true })
     expect(store.load(record.task_id)).toMatchObject({
       runner_kind: "host-session",
-      host_session: { socket: hostSession.socket, routing_id: "routing-revived", session_path: hostSession.sessionPath, instance_id: "instance-2" },
+      host_session: {
+        socket: hostSession.socket,
+        routing_id: "routing-revived",
+        session_path: hostSession.sessionPath,
+        instance_id: "instance-2",
+      },
     })
   })
 
   test("#given a claimed terminal record #when reattached #then run_epoch is unchanged", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -590,7 +615,7 @@ describe("TaskManager respawn continuation", () => {
       switchSession: () => Promise.resolve({ cancelled: switchCancelled }),
     } satisfies RpcChildHandle
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -674,7 +699,10 @@ describe("TaskManager respawn continuation", () => {
     const { manager, followUpCalls } = continuationHarness()
 
     // when
-    const result = await manager.respawn({ ...respawnRecord(), status: "completed", final_response: "done" }, sessionPath)
+    const result = await manager.respawn(
+      { ...respawnRecord(), status: "completed", final_response: "done" },
+      sessionPath,
+    )
 
     // then
     expect(result.ok).toBe(true)

@@ -6,10 +6,10 @@ This skill's uv lane (kernel-less harnesses, isolated one-shots) runs through `u
 
 | Platform | Command |
 |---|---|
-| macOS / Linux / WSL / Git Bash | `bash scripts/setup-uv.sh` |
-| Windows (PowerShell) | `powershell -ExecutionPolicy Bypass -File scripts/setup-uv.ps1` |
+| macOS / Linux / WSL | `bash scripts/setup-uv.sh` |
+| Windows (PowerShell; also from Git Bash, where `setup-uv.sh` exits) | `powershell -ExecutionPolicy Bypass -File scripts/setup-uv.ps1` |
 
-Both scripts: detect OS + architecture → install uv to the latest release when missing → upgrade it when present (`uv self update`) → make it resolvable for the current shell → verify with `uv --version`. They are idempotent — safe to re-run any time.
+Both scripts: detect OS + architecture → install uv to the latest release when missing → upgrade it when present (`uv self update`) → make it resolvable for the script's own `uv --version` check (an already-open shell still needs the PATH line below) → verify with `uv --version`. They are idempotent — safe to re-run any time.
 
 ## Manual install per platform
 

@@ -3,10 +3,12 @@ import * as z from "zod"
 import { OmoModelRefObjectSchema, OmoReasoningSchema, type OmoModelRefObject } from "./model-ref"
 import { normalizeReasoning, splitReasoningSuffix } from "./reasoning-vocabulary"
 
-export const OmoThinkingConfigSchema = z.object({
-  type: z.enum(["enabled", "disabled"]),
-  budgetTokens: z.number().optional(),
-}).strict()
+export const OmoThinkingConfigSchema = z
+  .object({
+    type: z.enum(["enabled", "disabled"]),
+    budgetTokens: z.number().optional(),
+  })
+  .strict()
 
 /** @deprecated Use OmoReasoningSchema. */
 export const OmoReasoningEffortSchema = OmoReasoningSchema
@@ -49,10 +51,8 @@ export function normalizeLegacyModelFields(entry: Readonly<Record<string, unknow
   const variant = canonicalReasoning(entry["variant"])
   const reasoningEffort = canonicalReasoning(entry["reasoningEffort"])
   const thinking = isRecord(entry["thinking"]) ? entry["thinking"] : undefined
-  const reasoning = explicitReasoning
-    ?? reasoningEffort
-    ?? variant
-    ?? (thinking?.["type"] === "disabled" ? "off" : undefined)
+  const reasoning =
+    explicitReasoning ?? reasoningEffort ?? variant ?? (thinking?.["type"] === "disabled" ? "off" : undefined)
   if (reasoning !== undefined) normalized["reasoning"] = reasoning
 
   const providerOptions = isRecord(entry["provider_options"])
@@ -81,29 +81,31 @@ export function normalizeLegacyModelEntry(entry: Readonly<Record<string, unknown
   return OmoModelRefObjectSchema.parse(normalizeLegacyModelFields(entry))
 }
 
-const OmoLegacyFallbackModelObjectInputSchema = z.object({
-  model: z.string(),
-  reasoning: OmoReasoningSchema.optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  top_p: z.number().min(0).max(1).optional(),
-  max_tokens: z.number().int().positive().optional(),
-  provider_options: z.record(z.string(), z.unknown()).optional(),
-  /** @deprecated Use reasoning. */
-  variant: z.string().optional(),
-  /** @deprecated Use reasoning. */
-  reasoningEffort: OmoReasoningEffortSchema.optional(),
-  /** @deprecated Use provider_options.thinking or reasoning: "off". */
-  thinking: OmoThinkingConfigSchema.optional(),
-  /** @deprecated Use provider_options.textVerbosity. */
-  textVerbosity: z.enum(["low", "medium", "high"]).optional(),
-  /** @deprecated Use max_tokens. */
-  maxTokens: z.number().optional(),
-  /** @deprecated Use provider_options. */
-  providerOptions: z.record(z.string(), z.unknown()).optional(),
-}).strict()
+const OmoLegacyFallbackModelObjectInputSchema = z
+  .object({
+    model: z.string(),
+    reasoning: OmoReasoningSchema.optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    top_p: z.number().min(0).max(1).optional(),
+    max_tokens: z.number().int().positive().optional(),
+    provider_options: z.record(z.string(), z.unknown()).optional(),
+    /** @deprecated Use reasoning. */
+    variant: z.string().optional(),
+    /** @deprecated Use reasoning. */
+    reasoningEffort: OmoReasoningEffortSchema.optional(),
+    /** @deprecated Use provider_options.thinking or reasoning: "off". */
+    thinking: OmoThinkingConfigSchema.optional(),
+    /** @deprecated Use provider_options.textVerbosity. */
+    textVerbosity: z.enum(["low", "medium", "high"]).optional(),
+    /** @deprecated Use max_tokens. */
+    maxTokens: z.number().optional(),
+    /** @deprecated Use provider_options. */
+    providerOptions: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict()
 
 export const OmoFallbackModelObjectSchema = z.preprocess(
-  (value) => isRecord(value) ? normalizeLegacyModelFields(value) : value,
+  (value) => (isRecord(value) ? normalizeLegacyModelFields(value) : value),
   OmoLegacyFallbackModelObjectInputSchema,
 )
 

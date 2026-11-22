@@ -24,7 +24,11 @@ import { reviveRunningOnSend } from "./revive-running"
 import { createSteeringControls } from "./controls"
 import { createPendingSteering } from "./pending-steering"
 import { endDroppedSteering } from "../state/queued-steering"
-import { HostSessionDetachedError, HostSessionUnresponsiveError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import {
+  HostSessionDetachedError,
+  HostSessionUnresponsiveError,
+  SessionHeldElsewhereError,
+} from "../runners/rpc-host/session-wire"
 import { InputUncertainError, InputConflictError } from "../runners/input-effects"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -74,8 +78,12 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     const oneShot = oneShotPolicyDenial(record)
     if (oneShot !== undefined) return oneShot
     if (record.failure_kind === "suspended_unresumable" && record.status === "error") {
-      return { kind: "not_continuable", task_id: record.task_id,
-        reason: [record.error_message, record.final_response].filter(Boolean).join("\n\n"), suggestion: TASK_OUTPUT_SUGGESTION }
+      return {
+        kind: "not_continuable",
+        task_id: record.task_id,
+        reason: [record.error_message, record.final_response].filter(Boolean).join("\n\n"),
+        suggestion: TASK_OUTPUT_SUGGESTION,
+      }
     }
     const held = port.sendWhileRunHeld?.(record, input.message)
     if (held !== undefined) return held
@@ -84,8 +92,13 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (record.status === "pending") return enqueuePending(record, input.message, deliverAs)
     // A first launch the host has not admitted yet (#10042): no session has ever existed for this
     // task, so there is nothing to revive. Queue the message; the launch drains it once the child starts.
-    if (record.status === "running" && record.host_session === undefined && record.child_session_id === undefined
-      && port.isLaunching?.(record.task_id) === true && port.liveHandle(record.task_id) === undefined) {
+    if (
+      record.status === "running" &&
+      record.host_session === undefined &&
+      record.child_session_id === undefined &&
+      port.isLaunching?.(record.task_id) === true &&
+      port.liveHandle(record.task_id) === undefined
+    ) {
       return enqueuePending(record, input.message, deliverAs)
     }
     if (port.isEvicting?.(record.task_id) === true) return evictionRefusal(record.task_id)
@@ -98,16 +111,25 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         suggestion: TASK_OUTPUT_SUGGESTION,
       }
     }
-    if (record.status === "running" && record.killed !== true
-      && (record.residency_state !== "resident" || record.suspension_reason !== undefined)) {
-      if (record.runner_kind === "host-session" && record.host_session !== undefined && record.residency_state === "rpc_detached") {
-        return reviveRunningOnSend(port, record, input.message, beginSend, endSend,
-          () => enqueuePending(record, input.message, deliverAs))
+    if (
+      record.status === "running" &&
+      record.killed !== true &&
+      (record.residency_state !== "resident" || record.suspension_reason !== undefined)
+    ) {
+      if (
+        record.runner_kind === "host-session" &&
+        record.host_session !== undefined &&
+        record.residency_state === "rpc_detached"
+      ) {
+        return reviveRunningOnSend(port, record, input.message, beginSend, endSend, () =>
+          enqueuePending(record, input.message, deliverAs),
+        )
       }
       return enqueuePending(record, input.message, deliverAs)
     }
 
-    if (coldRevivals.has(record.task_id)) return { kind: "admission_refused", task_id: record.task_id, reason: "revival_in_progress" }
+    if (coldRevivals.has(record.task_id))
+      return { kind: "admission_refused", task_id: record.task_id, reason: "revival_in_progress" }
     const cold = isColdRevivalCandidate(record)
     // Daemon-hosted children are read with their host identity: a PARKED session whose daemon still
     // answers is reachable (reopened from its transcript, then delivered to), never `not_continuable`.
@@ -121,14 +143,22 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
       port.isDaemonReachable,
     )
     if (!cold && mode === "not-continuable") {
-      return { kind: "not_continuable", task_id: record.task_id, reason: notContinuableReason(record), suggestion: TASK_OUTPUT_SUGGESTION }
+      return {
+        kind: "not_continuable",
+        task_id: record.task_id,
+        reason: notContinuableReason(record),
+        suggestion: TASK_OUTPUT_SUGGESTION,
+      }
     }
     const uncertain = uncertainDeliveryDenial(record, input.message)
     if (uncertain !== undefined) return uncertain
     if (cold) {
       coldRevivals.add(record.task_id)
-      try { return await reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend, reservation) }
-      finally { coldRevivals.delete(record.task_id) }
+      try {
+        return await reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend, reservation)
+      } finally {
+        coldRevivals.delete(record.task_id)
+      }
     }
     const handle = port.liveHandle(record.task_id)
     if (handle === undefined) {
@@ -152,7 +182,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
         reason: lost
           ? `Task ${record.task_id} ended: ${record.error_message}. Its transcript and worktree are kept.`
           : `Task ${record.task_id} exited before its last message was acknowledged.`,
-        suggestion: lost ? "Read its work with task_output and start a new task to continue it." : "Inspect task_output before resending.",
+        suggestion: lost
+          ? "Read its work with task_output and start a new task to continue it."
+          : "Inspect task_output before resending.",
       }
     }
 
@@ -160,7 +192,9 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     if (liveness !== undefined && liveness.state !== "running") {
       if (record.status === "running") return enqueuePending(record, input.message, deliverAs)
       return {
-        kind: "unresponsive", task_id: record.task_id, retryable: true,
+        kind: "unresponsive",
+        task_id: record.task_id,
+        retryable: true,
         reason: `Task ${record.task_id}'s session is unresponsive; nothing was sent. Retry when its host status returns to running.`,
       }
     }
@@ -174,27 +208,50 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     return reviveTerminal(port, record, handle, input.message, nowIso, beginSend, endSend, reservation)
   }
 
-  async function steerRunning(record: TaskRecord, handle: ManagedChildHandle, message: string, deliverAs: SendDelivery): Promise<SendOutcome> {
+  async function steerRunning(
+    record: TaskRecord,
+    handle: ManagedChildHandle,
+    message: string,
+    deliverAs: SendDelivery,
+  ): Promise<SendOutcome> {
     if (!beginSend(record.task_id)) return evictionRefusal(record.task_id)
     try {
       if (deliverAs === "steer") await handle.steer(message)
       else await handle.followUp(message)
     } catch (error) {
       if (error instanceof HostSessionUnresponsiveError) return enqueuePending(record, message, deliverAs)
-      if (error instanceof InputUncertainError) return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
-      if (error instanceof InputConflictError) return { kind: "failed", task_id: record.task_id,
-        effect_id: error.effectId, reason: error.reason, detail: error.detail, action: error.action }
+      if (error instanceof InputUncertainError)
+        return { kind: "uncertain", task_id: record.task_id, effect_id: error.effectId, reason: error.message }
+      if (error instanceof InputConflictError)
+        return {
+          kind: "failed",
+          task_id: record.task_id,
+          effect_id: error.effectId,
+          reason: error.reason,
+          detail: error.detail,
+          action: error.action,
+        }
       // These typed refusals happen before delivery. Never replay an ambiguous transport failure.
       if (!(error instanceof HostSessionDetachedError) && !(error instanceof SessionHeldElsewhereError)) throw error
       const fresh = tryLoad(record.task_id)
       if (fresh === undefined || fresh.status !== "running" || fresh.killed === true) {
-        return { kind: "not_continuable", task_id: record.task_id,
-          reason: fresh?.error_message ?? `Task ${record.task_id} ended.`, suggestion: TASK_OUTPUT_SUGGESTION }
+        return {
+          kind: "not_continuable",
+          task_id: record.task_id,
+          reason: fresh?.error_message ?? `Task ${record.task_id} ended.`,
+          suggestion: TASK_OUTPUT_SUGGESTION,
+        }
       }
       if (fresh.notification.run_epoch !== record.notification.run_epoch) return staleSend(fresh)
-      port.store.mutate(record.task_id, (current) => current.status === "running" && current.killed !== true
-        ? { ...current, residency_state: "rpc_detached", suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable" }
-        : current)
+      port.store.mutate(record.task_id, (current) =>
+        current.status === "running" && current.killed !== true
+          ? {
+              ...current,
+              residency_state: "rpc_detached",
+              suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable",
+            }
+          : current,
+      )
       const queued = enqueuePending(fresh, message, deliverAs)
       await port.destruction.destroyResidentTask(record.task_id, "recovery_detach")
       return queued
@@ -233,8 +290,17 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
 
   function dropPending(taskId: string, reason: Parameters<SteeringEngine["dropPending"]>[1]): void {
     const dropped = clearPersistedQueue(taskId, undefined, reason)
-    if (dropped > 0) port.store.mutate(taskId, fresh => endDroppedSteering(fresh, nowIso(), dropped))
+    if (dropped > 0) port.store.mutate(taskId, (fresh) => endDroppedSteering(fresh, nowIso(), dropped))
   }
 
-  return { sendToTask, ...createSteeringControls(port, resolve, (taskId) => { clearPersistedQueue(taskId, undefined, "cancelled") }), notifyStarted, hasPendingSends, hasInFlightSends, dropPending }
+  return {
+    sendToTask,
+    ...createSteeringControls(port, resolve, (taskId) => {
+      clearPersistedQueue(taskId, undefined, "cancelled")
+    }),
+    notifyStarted,
+    hasPendingSends,
+    hasInFlightSends,
+    dropPending,
+  }
 }

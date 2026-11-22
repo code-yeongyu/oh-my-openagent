@@ -7,7 +7,13 @@ import { z } from "zod"
 
 export const SUBPROCESS_TEST_TIMEOUT_MS = 30_000
 export const SUBPROCESS_SPAWN_TIMEOUT_MS = 20_000
-export const MATERIAL = ["CSC_LINK", "CSC_KEY_PASSWORD", "APPLE_API_KEY", "APPLE_API_KEY_ID", "APPLE_API_ISSUER"] as const
+export const MATERIAL = [
+  "CSC_LINK",
+  "CSC_KEY_PASSWORD",
+  "APPLE_API_KEY",
+  "APPLE_API_KEY_ID",
+  "APPLE_API_ISSUER",
+] as const
 export const HELPER_BYTES = "synthetic universal keychain helper\n"
 
 export const readWorkflow = (name: string): string =>
@@ -25,12 +31,15 @@ const stepSchema = z.object({
 })
 export type Step = z.infer<typeof stepSchema>
 export const workflowSchema = z.object({
-  jobs: z.record(z.string(), z.object({
-    needs: z.union([z.string(), z.array(z.string())]).optional(),
-    "runs-on": z.string().optional(),
-    if: z.string().optional(),
-    steps: z.array(stepSchema).optional(),
-  })),
+  jobs: z.record(
+    z.string(),
+    z.object({
+      needs: z.union([z.string(), z.array(z.string())]).optional(),
+      "runs-on": z.string().optional(),
+      if: z.string().optional(),
+      steps: z.array(stepSchema).optional(),
+    }),
+  ),
 })
 
 export function jobSteps(source: string, job: string): Step[] {
@@ -48,7 +57,10 @@ export function stepAt(steps: readonly Step[], name: string): { readonly index: 
 
 export function bash(script: string, cwd: string, env: Record<string, string>): ReturnType<typeof spawnSync> {
   return spawnSync("bash", ["-e", "-c", `umask 077\n${script}`], {
-    cwd, env: { ...process.env, ...env }, encoding: "utf8", timeout: SUBPROCESS_SPAWN_TIMEOUT_MS,
+    cwd,
+    env: { ...process.env, ...env },
+    encoding: "utf8",
+    timeout: SUBPROCESS_SPAWN_TIMEOUT_MS,
   })
 }
 
@@ -58,7 +70,11 @@ export function helperTarball(root: string): string {
   writeFileSync(join(source, "omo-keychain"), HELPER_BYTES)
   chmodSync(join(source, "omo-keychain"), 0o755)
   mkdirSync(join(root, ".omo", "keychain-helper"), { recursive: true })
-  const tar = spawnSync("tar", ["-czf", join(root, ".omo", "keychain-helper", "omo-keychain.tar.gz"), "-C", source, "omo-keychain"], { timeout: SUBPROCESS_SPAWN_TIMEOUT_MS })
+  const tar = spawnSync(
+    "tar",
+    ["-czf", join(root, ".omo", "keychain-helper", "omo-keychain.tar.gz"), "-C", source, "omo-keychain"],
+    { timeout: SUBPROCESS_SPAWN_TIMEOUT_MS },
+  )
   if (tar.status !== 0) throw new Error("tar failed")
   return root
 }

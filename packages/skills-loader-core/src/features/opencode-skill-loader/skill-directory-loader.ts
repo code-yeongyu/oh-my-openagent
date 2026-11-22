@@ -4,8 +4,11 @@ import type { DiscoveredProjectDirectory } from "../../shared/project-discovery-
 import type { LoadedSkill, SkillScope } from "./types"
 import { inferSkillNameFromFileName, loadSkillFromPath } from "./loaded-skill-from-path"
 import {
-  checkSkillPath, reportSkillLoadError, skillProvenance,
-  type SkillProvenance, type SkillDiagnosticSink,
+  checkSkillPath,
+  reportSkillLoadError,
+  skillProvenance,
+  type SkillProvenance,
+  type SkillDiagnosticSink,
 } from "./skill-provenance"
 
 export async function loadSkillsFromDir(options: {
@@ -21,9 +24,14 @@ export async function loadSkillsFromDir(options: {
 }): Promise<LoadedSkill[]> {
   const directory = typeof options.skillsDir === "string" ? undefined : options.skillsDir
   const discovered = typeof options.skillsDir === "string" ? options.skillsDir : options.skillsDir.discovered
-  const provenance = skillProvenance(discovered, options.scope, options.provenance ?? (
-    directory ? { kind: "project-auto", selectedRoot: directory.discovered, projectRoot: directory.projectRoot } : undefined
-  ))
+  const provenance = skillProvenance(
+    discovered,
+    options.scope,
+    options.provenance ??
+      (directory
+        ? { kind: "project-auto", selectedRoot: directory.discovered, projectRoot: directory.projectRoot }
+        : undefined),
+  )
   const namePrefix = options.namePrefix ?? ""
   const depth = options.depth ?? 0
   const maxDepth = options.maxDepth ?? 2
@@ -45,7 +53,9 @@ export async function loadSkillsFromDir(options: {
           const candidates = [join(path, "SKILL.md"), join(path, `${entry.name}.md`)]
           let found = false
           for (const skillPath of candidates) {
-            try { await fs.lstat(skillPath) } catch (error) {
+            try {
+              await fs.lstat(skillPath)
+            } catch (error) {
               if (error instanceof Error && "code" in error && error.code === "ENOENT") continue
               reportSkillLoadError(error, skillPath, options.onDiagnostic)
               found = true
@@ -53,8 +63,13 @@ export async function loadSkillsFromDir(options: {
             }
             found = true
             const skill = await loadSkillFromPath({
-              skillPath, resolvedPath: resolved, defaultName: entry.name, scope: options.scope,
-              namePrefix, provenance: entryProvenance, onDiagnostic: options.onDiagnostic,
+              skillPath,
+              resolvedPath: resolved,
+              defaultName: entry.name,
+              scope: options.scope,
+              namePrefix,
+              provenance: entryProvenance,
+              onDiagnostic: options.onDiagnostic,
               skipMalformedFrontmatter: options.skipMalformedFrontmatter,
             })
             if (skill && !skillMap.has(skill.name)) skillMap.set(skill.name, skill)
@@ -62,15 +77,24 @@ export async function loadSkillsFromDir(options: {
           }
           if (!found && depth < maxDepth) {
             const nested = await loadSkillsFromDir({
-              ...options, skillsDir: path, provenance: entryProvenance, ancestry,
-              namePrefix: namePrefix ? `${namePrefix}/${entry.name}` : entry.name, depth: depth + 1,
+              ...options,
+              skillsDir: path,
+              provenance: entryProvenance,
+              ancestry,
+              namePrefix: namePrefix ? `${namePrefix}/${entry.name}` : entry.name,
+              depth: depth + 1,
             })
             for (const skill of nested) if (!skillMap.has(skill.name)) skillMap.set(skill.name, skill)
           }
         } else if (stat.isFile() && path.toLowerCase().endsWith(".md")) {
           const skill = await loadSkillFromPath({
-            skillPath: path, resolvedPath: canonical, defaultName: inferSkillNameFromFileName(path),
-            scope: options.scope, namePrefix, provenance: entryProvenance, onDiagnostic: options.onDiagnostic,
+            skillPath: path,
+            resolvedPath: canonical,
+            defaultName: inferSkillNameFromFileName(path),
+            scope: options.scope,
+            namePrefix,
+            provenance: entryProvenance,
+            onDiagnostic: options.onDiagnostic,
             skipMalformedFrontmatter: options.skipMalformedFrontmatter,
           })
           if (skill && !skillMap.has(skill.name)) skillMap.set(skill.name, skill)

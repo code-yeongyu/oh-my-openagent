@@ -9,9 +9,15 @@ test("#given a held selected-account boundary #when the transport gate retires w
   const entered = Promise.withResolvers<void>()
   const release = Promise.withResolvers<void>()
   let effects = 0
-  f.account.boundary = async (dispatch) => { entered.resolve(); await release.promise; return dispatch() }
+  f.account.boundary = async (dispatch) => {
+    entered.resolve()
+    await release.promise
+    return dispatch()
+  }
   f.runtime.enableSync = async (input) => {
-    await input.authority.boundary(() => { effects += 1 })
+    await input.authority.boundary(() => {
+      effects += 1
+    })
     return { kind: "joined" }
   }
   const result = f.call("enable", a.context)

@@ -37,8 +37,17 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  platform:
+    permissions:
+      contents: read
+      pull-requests: read
+    uses: ./.github/workflows/pr-platform-decision.yml
+
   windows-desktop-qa:
     name: Windows interactive-desktop QA
+    needs: platform
+    # macOS/Windows only when the shared platform decision allows it (pr-platform-decision.yml, #13859).
+    if: needs.platform.outputs.full_matrix == 'true'
     runs-on: windows-latest
     timeout-minutes: 60
     env:

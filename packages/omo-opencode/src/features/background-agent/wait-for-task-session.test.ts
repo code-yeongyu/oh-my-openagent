@@ -90,6 +90,6 @@ describe("waitForTaskSessionID", () => {
 
       // then
       expect(sessionID).toBeUndefined()
-    }
+    },
   )
 })

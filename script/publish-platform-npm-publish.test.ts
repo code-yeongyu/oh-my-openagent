@@ -27,7 +27,8 @@ function publishSteps(): WorkflowStep[] {
 
 function stepRun(name: string): string {
   const step = publishSteps().find((candidate) => candidate.name === name)
-  if (step === undefined || typeof step.run !== "string") throw new Error(`publish job has no runnable step named ${name}`)
+  if (step === undefined || typeof step.run !== "string")
+    throw new Error(`publish job has no runnable step named ${name}`)
   return step.run
 }
 
@@ -49,7 +50,10 @@ function setup(outcomes: readonly ("tlog" | "other" | "ok")[], registryHasVersio
   const bin = join(root, "bin")
   const pkg = join(root, "pkg")
   spawnSync("mkdir", ["-p", bin, pkg])
-  writeFileSync(join(pkg, "package.json"), JSON.stringify({ name: "oh-my-opencode-linux-x64-musl-baseline", version: "9.9.9" }))
+  writeFileSync(
+    join(pkg, "package.json"),
+    JSON.stringify({ name: "oh-my-opencode-linux-x64-musl-baseline", version: "9.9.9" }),
+  )
   writeFileSync(join(root, "outcomes"), `${outcomes.join("\n")}\n`)
   const npm = join(bin, "npm")
   writeFileSync(
@@ -133,7 +137,10 @@ describe("platform publish helper", () => {
   })
 
   test("#given the two publish steps #when the workflow is read #then neither may continue on error and both use the helper", () => {
-    for (const name of ["Publish oh-my-opencode-${{ matrix.platform }}", "Publish oh-my-openagent-${{ matrix.platform }}"]) {
+    for (const name of [
+      "Publish oh-my-opencode-${{ matrix.platform }}",
+      "Publish oh-my-openagent-${{ matrix.platform }}",
+    ]) {
       const step = publishSteps().find((candidate) => candidate.name === name)
       expect(step?.["continue-on-error"]).toBeUndefined()
       expect(step?.run).toContain('bash "$RUNNER_TEMP/npm-publish.sh" "$DIST_TAG"')

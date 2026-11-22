@@ -13,7 +13,11 @@ const EFFECTIVE_WITHOUT_WRITE = ["read", "bash", "edit", "grep", "x_search"]
 
 async function grant(
   capability: KernelToolsCapability,
-  policy: { readonly toolAllowlist?: readonly string[]; readonly toolDenylist?: readonly string[]; readonly agentType?: string } = {},
+  policy: {
+    readonly toolAllowlist?: readonly string[]
+    readonly toolDenylist?: readonly string[]
+    readonly agentType?: string
+  } = {},
 ): Promise<ReturnType<typeof resolveKernelToolGrant>> {
   return resolveKernelToolGrant({
     requestedNames: ["fixture_write"],
@@ -133,7 +137,9 @@ describe("a capability that advertises invokeScope", () => {
 })
 
 describe("a nested host call refused inside the scoped invocation", () => {
-  async function callWithNested(tool: string): Promise<{ readonly isError?: boolean; readonly details: unknown; readonly text: string }> {
+  async function callWithNested(
+    tool: string,
+  ): Promise<{ readonly isError?: boolean; readonly details: unknown; readonly text: string }> {
     const capability = fakeKernelTools({ invokeScope: true })
     capability.define({ name: "fixture_write", run: (_args, host) => host(tool) })
     const wrappers = createKernelToolWrappers(granted(await grant(capability, { toolDenylist: ["write"] })))

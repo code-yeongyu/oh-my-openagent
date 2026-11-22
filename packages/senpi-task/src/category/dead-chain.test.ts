@@ -98,7 +98,7 @@ describe("dead-chain category disabling", () => {
   })
 
   describe("#given a Copilot-only registry whose Claude ids use the engine's dotted spelling", () => {
-    test("#when the quick chain's copilot rung is claude-haiku-5-5 high #then the transformed id keeps the category alive", () => {
+    test("#when the quick chain's copilot rung is claude-haiku-5-5 medium #then the transformed id keeps the category alive", () => {
       // given
       const copilotOnly = registry([model("github-copilot", "claude-haiku-5.5")])
 
@@ -110,7 +110,7 @@ describe("dead-chain category disabling", () => {
       if (result.kind !== "resolved") throw new Error("Expected resolved")
       expect(result.spec.provider).toBe("github-copilot")
       expect(result.spec.modelId).toBe("claude-haiku-5.5")
-      expect(result.spec.variant).toBe("high")
+      expect(result.spec.variant).toBe("medium")
       expect(result.availableCategories).toContain("quick")
     })
   })
@@ -172,11 +172,7 @@ describe("dead-chain category disabling", () => {
       const models = registry([model("omo-mock", "mock-parent")])
 
       // when
-      const result = resolveCategory(
-        "quick",
-        { categories: { quick: { model: "omo-mock/mock-parent" } } },
-        models,
-      )
+      const result = resolveCategory("quick", { categories: { quick: { model: "omo-mock/mock-parent" } } }, models)
 
       // then
       expect(result.kind).toBe("resolved")
@@ -188,11 +184,7 @@ describe("dead-chain category disabling", () => {
       const models = registry([model("omo-mock", "mock-parent")])
 
       // when
-      const result = resolveCategory(
-        "quick",
-        { categories: { quick: { model: "omo-mock/absent" } } },
-        models,
-      )
+      const result = resolveCategory("quick", { categories: { quick: { model: "omo-mock/absent" } } }, models)
 
       // then
       expect(result.kind).toBe("model_unavailable")

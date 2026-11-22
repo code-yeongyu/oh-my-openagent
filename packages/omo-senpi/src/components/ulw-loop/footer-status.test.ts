@@ -148,7 +148,11 @@ describe("omo-senpi ulw-loop footer status", () => {
       expect(scenario.ui.calls.some((call) => call.key === "ulw-loop" && call.text !== undefined)).toBe(true)
 
       writeGoal(scenario.goalPath, "complete")
-      await dispatchRunEnd(scenario.pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, scenario.context)
+      await dispatchRunEnd(
+        scenario.pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        scenario.context,
+      )
 
       expect(scenario.ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: undefined })
       expect(scenario.timers.activeCount()).toBe(0)
@@ -196,10 +200,18 @@ describe("omo-senpi ulw-loop footer status", () => {
     expect(ui.calls).toHaveLength(0)
 
     goalActive = true
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo", { ui }))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo", { ui }),
+    )
     expect(timers.activeCount()).toBe(1)
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo", { ui }))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo", { ui }),
+    )
     expect(ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: undefined })
     expect(timers.activeCount()).toBe(0)
 
@@ -219,7 +231,11 @@ describe("omo-senpi ulw-loop footer status", () => {
       logger,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo", { ui }))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo", { ui }),
+    )
     expect(timers.activeCount()).toBe(1)
 
     // Esc right after the last goal completed: no continuation, and no tool_result will arrive to
@@ -236,7 +252,13 @@ describe("omo-senpi ulw-loop footer status", () => {
     expect(logger.entries).toContainEqual({
       level: "info",
       message: "omo-senpi ulw-loop continuation skipped",
-      details: { reason: "terminal-outcome", blockedBy: "aborted", stopReason: "stop", aborted: true, willRetry: false },
+      details: {
+        reason: "terminal-outcome",
+        blockedBy: "aborted",
+        stopReason: "stop",
+        aborted: true,
+        willRetry: false,
+      },
     })
   })
 
@@ -249,7 +271,11 @@ describe("omo-senpi ulw-loop footer status", () => {
       timers,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo", { ui }))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      sessionEventCtx("/repo", { ui }),
+    )
     expect(pi.messages).toHaveLength(1)
     expect(pi.messages[0]?.message["customType"]).toBe("omo-senpi:ulw-continuation")
     expect(ui.calls.some((call) => call.key === "ulw-loop" && visibleFrame(call.text) === "⚡ ultraworking")).toBe(true)
@@ -260,7 +286,13 @@ describe("omo-senpi ulw-loop footer status", () => {
       outputs: [activeStatus()],
       timers: headlessTimers,
     })
-    await expect(dispatchRunEnd(headlessPi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, sessionEventCtx("/repo"))).resolves.toHaveLength(1)
+    await expect(
+      dispatchRunEnd(
+        headlessPi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        sessionEventCtx("/repo"),
+      ),
+    ).resolves.toHaveLength(1)
     expect(headlessPi.messages).toHaveLength(1)
     expect(headlessTimers.activeCount()).toBe(0)
   })

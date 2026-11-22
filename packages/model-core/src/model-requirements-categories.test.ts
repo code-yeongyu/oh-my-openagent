@@ -1,84 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import { CATEGORY_MODEL_REQUIREMENTS } from "./model-requirements"
-import { FABLE_55_RELEASED } from "./fable-55-launch"
 
 describe("CATEGORY_MODEL_REQUIREMENTS", () => {
   test("writing only activates when one of its own chain models is available", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["writing"].requiresAnyModel).toBe(true)
   })
 
-  test("ultrabrain routes GPT-6 Astra max before the existing Sol max fallbacks", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" },
-    ])
-  })
+  // #14155: each GPT deep lane is one exact-model rung with no older, Fast or other-family fallback, and
+  // stays unavailable (requiresAnyModel) when no listed provider serves it.
+  test.each([
+    ["ultrabrain", ["openai", "chatgpt-subscription", "opencode"], "gpt-6.2-astra", "max"],
+    ["deep-high", ["openai", "chatgpt-subscription", "opencode"], "gpt-6.2-astra", "high"],
+    ["deep-low", ["openai", "chatgpt-subscription"], "gpt-6.2-sol", "medium"],
+  ])("%s runs exactly one rung and requires it", (category, providers, model, variant) => {
+    const requirement = CATEGORY_MODEL_REQUIREMENTS[category]
 
-  test("ultrabrain keeps gpt-5.6-sol max on every fallback rung", () => {
-    // given
-    const requirement = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
-
-    // when
-    const chain = requirement.fallbackChain.filter(({ model }) => model === "gpt-5.6-sol")
-
-    // then
-    expect(chain).toEqual([
-      {
-        providers: ["openai", "chatgpt-subscription"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      },
-      {
-        providers: ["github-copilot"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      },
-      {
-        providers: ["openai", "chatgpt-subscription", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      }
-    ])
-  })
-
-  test("deep-high routes GPT-6 Astra high only", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "high" },
-    ])
-  })
-
-  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast high on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
-    // given
-    const requirement = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
-
-    // when
-    const chain = requirement.fallbackChain
-
-    // then
-    expect(chain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "high" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "high" },
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "high",
-      },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "high" }
-    ])
-  })
-
-  test("neither deep lane carries the other lane's model, so they never substitute each other", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol", "gpt-5.6-sol-fast"])
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-astra"])
+    expect(requirement.fallbackChain).toEqual([{ providers, model, variant }])
+    expect(requirement.requiresAnyModel).toBe(true)
   })
 
   test("visual-engineering starts with Argon low (#10187)", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["visual-engineering"].fallbackChain.at(0)).toEqual({
-      providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low",
+      providers: ["google", "google-vertex", "opencode"],
+      model: "gemini-4-argon",
+      variant: "low",
     })
   })
 
@@ -96,11 +41,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "gemini-4-argon",
         variant: "low",
       },
-      ...(FABLE_55_RELEASED ? [{
+      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-5",
+        model: "claude-fable-5-2",
         variant: "max",
-      }] : []),
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -120,11 +65,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
   })
 
-  test("quick follows the approved 9-rung chain with Haiku 5.5 high after Luna Fast", () => {
+  test("quick follows the approved 9-rung chain with Haiku 5.5 medium after Luna Fast", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["quick"]
 
@@ -141,7 +86,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot"],
         model: "claude-haiku-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["deepseek"],
@@ -168,11 +113,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         model: "grok-4.20-0309-non-reasoning",
       },
       { providers: ["zai-coding-plan"], model: "glm-5.3-flash", variant: "low" },
-      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+      { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
     ])
   })
 
-  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 high", () => {
+  test("unspecified-low follows the approved chain headed by claude-sonnet-5-5 medium", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["unspecified-low"]
 
@@ -184,7 +129,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-sonnet-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["xiaomi", "opencode-go"],
@@ -194,7 +139,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["xai", "github-copilot", "opencode-go"],
         model: "grok-4.7",
-        variant: "high",
+        variant: "xhigh",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],
@@ -203,13 +148,18 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       },
       {
         providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.2-sol",
+        variant: "medium",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription"],
         model: "gpt-6.1-sol",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
         model: "gpt-5.6-sol",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
@@ -230,7 +180,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["xiaomi", "opencode-go"],
         model: "mimo-v2.5-pro",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -246,7 +196,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-5-5",
-        variant: "high",
+        variant: "medium",
       },
       {
         providers: ["zai-coding-plan", "opencode-go"],
@@ -262,7 +212,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -275,11 +225,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
-      ...(FABLE_55_RELEASED ? [{
+      {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-5",
+        model: "claude-fable-5-2",
         variant: "max",
-      }] : []),
+      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -299,7 +249,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["opencode"],
         model: "kimi-k3",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -327,7 +277,7 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-opus-4-6",
         variant: "max",
-      }
+      },
     ])
   })
 
@@ -342,5 +292,4 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(deepHigh.requiresModel).toBeUndefined()
     expect(artistry.requiresModel).toBeUndefined()
   })
-
 })

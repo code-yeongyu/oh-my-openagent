@@ -6,6 +6,7 @@
 use senpi_desktop_core::error::CoreResult;
 use x11rb::protocol::xproto::Window;
 
+use super::client_process::ClientProcess;
 use super::keys::Keymap;
 
 /// A root-coordinate point and the same point in the target window.
@@ -72,5 +73,8 @@ pub trait InputServer {
     fn parent(&self, window: Window) -> CoreResult<Option<Window>>;
     /// Raw `WM_CLASS` bytes (`instance\0class\0`); `None` when absent.
     fn wm_class(&self, window: Window) -> Option<Vec<u8>>;
+    /// The local process of the client that owns `window`; `Err` says why
+    /// it is unknown.
+    fn client_process(&self, window: Window) -> Result<ClientProcess, String>;
     fn flush(&self) -> CoreResult<()>;
 }

@@ -38,15 +38,16 @@ afterAll(() => {
   restoreModuleMocksForTestFile(import.meta.url)
 })
 
-const createPluginInput = (): PluginInput => ({
-  client: {} as PluginInput["client"],
-  directory: "/tmp/project",
-  project: {} as PluginInput["project"],
-  worktree: "/tmp/project",
-  experimental_workspace: { register: () => undefined },
-  serverUrl: new URL("https://example.com"),
-  $: {} as PluginInput["$"],
-} satisfies PluginInput)
+const createPluginInput = (): PluginInput =>
+  ({
+    client: {} as PluginInput["client"],
+    directory: "/tmp/project",
+    project: {} as PluginInput["project"],
+    worktree: "/tmp/project",
+    experimental_workspace: { register: () => undefined },
+    serverUrl: new URL("https://example.com"),
+    $: {} as PluginInput["$"],
+  }) satisfies PluginInput
 
 const createDeps = (overrides: Partial<HookDeps> = {}) => {
   const showConfigErrorsIfAny = mock(async () => undefined)
@@ -88,10 +89,7 @@ const createDeps = (overrides: Partial<HookDeps> = {}) => {
   }
 }
 
-const createHook = async (
-  options: HookOptions = {},
-  overrides: Partial<HookDeps> = {},
-) => {
+const createHook = async (options: HookOptions = {}, overrides: Partial<HookDeps> = {}) => {
   const module = await import("./hook")
   const { deps, mocks } = createDeps(overrides)
 
@@ -250,9 +248,12 @@ describe("auto-update-checker hook", () => {
   test("shows localDevToast when local dev version exists", async () => {
     // given
     resetDeferredState()
-    const { hook, mocks } = await createHook({}, {
-      getLocalDevVersion: () => "3.0.0-dev",
-    })
+    const { hook, mocks } = await createHook(
+      {},
+      {
+        getLocalDevVersion: () => "3.0.0-dev",
+      },
+    )
 
     // when
     triggerSessionCreated(hook)
@@ -279,11 +280,7 @@ describe("auto-update-checker hook", () => {
 
     // then
     expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
-    expect(mocks.showVersionToast).toHaveBeenCalledWith(
-      expect.anything(),
-      "3.0.0",
-      expect.stringContaining("Sisyphus"),
-    )
+    expect(mocks.showVersionToast).toHaveBeenCalledWith(expect.anything(), "3.0.0", expect.stringContaining("Sisyphus"))
   })
 
   // regression: issue #4211 - banner must show bundled (build-time) version, not the
@@ -292,11 +289,14 @@ describe("auto-update-checker hook", () => {
     // given: cached install reports an old version (simulating a stale plugin cache),
     //         bundled (build-time) reports the actually-loaded build's version
     resetDeferredState()
-    const { hook, mocks } = await createHook({}, {
-      getCachedVersion: () => "4.0.0",
-      getBundledVersion: () => "4.3.0",
-      getLocalDevVersion: () => null,
-    })
+    const { hook, mocks } = await createHook(
+      {},
+      {
+        getCachedVersion: () => "4.0.0",
+        getBundledVersion: () => "4.3.0",
+        getLocalDevVersion: () => null,
+      },
+    )
 
     // when
     triggerSessionCreated(hook)
@@ -304,20 +304,19 @@ describe("auto-update-checker hook", () => {
 
     // then: banner displays the bundled version, never the stale cached one
     expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
-    expect(mocks.showVersionToast).toHaveBeenCalledWith(
-      expect.anything(),
-      "4.3.0",
-      expect.any(String),
-    )
+    expect(mocks.showVersionToast).toHaveBeenCalledWith(expect.anything(), "4.3.0", expect.any(String))
   })
 
   test("local dev version still wins over bundled version on the banner", async () => {
     // given
     resetDeferredState()
-    const { hook, mocks } = await createHook({}, {
-      getBundledVersion: () => "4.3.0",
-      getLocalDevVersion: () => "5.0.0-dev",
-    })
+    const { hook, mocks } = await createHook(
+      {},
+      {
+        getBundledVersion: () => "4.3.0",
+        getLocalDevVersion: () => "5.0.0-dev",
+      },
+    )
 
     // when
     triggerSessionCreated(hook)
@@ -325,22 +324,21 @@ describe("auto-update-checker hook", () => {
 
     // then: localDev takes precedence so contributors see their working build
     expect(mocks.showLocalDevToast).toHaveBeenCalledTimes(1)
-    expect(mocks.showLocalDevToast).toHaveBeenCalledWith(
-      expect.anything(),
-      "5.0.0-dev",
-      expect.any(Boolean),
-    )
+    expect(mocks.showLocalDevToast).toHaveBeenCalledWith(expect.anything(), "5.0.0-dev", expect.any(Boolean))
     expect(mocks.showVersionToast).not.toHaveBeenCalled()
   })
 
   test("banner falls back to cached version when the bundled version dep is absent", async () => {
     // given: an injected-deps caller predating getBundledVersion keeps the legacy banner
     resetDeferredState()
-    const { hook, mocks } = await createHook({}, {
-      getBundledVersion: undefined,
-      getCachedVersion: () => "3.9.9",
-      getLocalDevVersion: () => null,
-    })
+    const { hook, mocks } = await createHook(
+      {},
+      {
+        getBundledVersion: undefined,
+        getCachedVersion: () => "3.9.9",
+        getLocalDevVersion: () => null,
+      },
+    )
 
     // when
     triggerSessionCreated(hook)
@@ -348,10 +346,6 @@ describe("auto-update-checker hook", () => {
 
     // then: the cached-version banner still renders instead of crashing the deferred check
     expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
-    expect(mocks.showVersionToast).toHaveBeenCalledWith(
-      expect.anything(),
-      "3.9.9",
-      expect.any(String),
-    )
+    expect(mocks.showVersionToast).toHaveBeenCalledWith(expect.anything(), "3.9.9", expect.any(String))
   })
 })

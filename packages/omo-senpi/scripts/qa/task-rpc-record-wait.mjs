@@ -25,10 +25,12 @@ export function waitForRecord(stateDir, predicate, timeoutMs, signal) {
   if (existing !== undefined) return Promise.resolve(existing)
   return new Promise((resolve, reject) => {
     let settled = false
-    const watchers = [tasksDir, logsDir].map((dir) => watch(dir, { persistent: false }, () => {
-      const match = find()
-      if (match !== undefined) finish(match)
-    }))
+    const watchers = [tasksDir, logsDir].map((dir) =>
+      watch(dir, { persistent: false }, () => {
+        const match = find()
+        if (match !== undefined) finish(match)
+      }),
+    )
     // File watchers drop events under load (macOS FSEvents, Windows runners), and a dropped create
     // event would read as a missing child. A short re-read backs the watchers up until the wait ends.
     const recheck = setInterval(() => {

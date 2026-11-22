@@ -6,14 +6,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { GitMemoryRepo } from "../git"
 import * as sync from "./index"
-import {
-  CONFIG_KEY,
-  LOG_NAME,
-  MirrorSync,
-  SYNC_PUSH_ENV,
-  getPostCommitHookScript,
-  mirrorLogPath,
-} from "./mirror"
+import { CONFIG_KEY, LOG_NAME, MirrorSync, SYNC_PUSH_ENV, getPostCommitHookScript, mirrorLogPath } from "./mirror"
 import { removeTree } from "../../../../test-support/remove-tree"
 import { createMirrorRepo, initBareMirror } from "./mirror.test-support"
 

@@ -1,9 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  createSisyphusJuniorAgentWithOverrides,
-  SISYPHUS_JUNIOR_DEFAULTS,
-  buildSisyphusJuniorPrompt,
-} from "./index"
+import { createSisyphusJuniorAgentWithOverrides, SISYPHUS_JUNIOR_DEFAULTS, buildSisyphusJuniorPrompt } from "./index"
 
 describe("createSisyphusJuniorAgentWithOverrides", () => {
   describe("honored fields", () => {
@@ -150,21 +146,21 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.reasoningEffort).toBe("high")
+      expect(result.reasoningEffort).toBe("medium")
       expect(result.thinking).toBeUndefined()
     })
 
     test("#given GPT model with variant override #when agent is created #then respects user variant", () => {
       const override = {
         model: "openai/gpt-5.6-sol",
-        variant: "high",
-        reasoningEffort: "high" as const,
+        variant: "xhigh",
+        reasoningEffort: "xhigh" as const,
       }
 
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
-      expect(result.variant).toBe("high")
-      expect(result.reasoningEffort).toBe("high")
+      expect(result.variant).toBe("xhigh")
+      expect(result.reasoningEffort).toBe("xhigh")
     })
 
     test("#given GPT model with reasoningEffort override only #when agent is created #then honors reasoningEffort without injecting variant", () => {
@@ -181,25 +177,25 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
 
     test("#given GPT model with variant override only #when agent is created #then keeps default reasoningEffort", () => {
       // given
-      const override = { model: "openai/gpt-5.6-sol", variant: "high" }
+      const override = { model: "openai/gpt-5.6-sol", variant: "xhigh" }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.variant).toBe("high")
-      expect(result.reasoningEffort).toBe("high")
+      expect(result.variant).toBe("xhigh")
+      expect(result.reasoningEffort).toBe("medium")
     })
 
     test("#given GPT model with distinct variant and reasoningEffort #when agent is created #then applies each independently", () => {
       // given
-      const override = { model: "openai/gpt-5.6-sol", variant: "high", reasoningEffort: "low" as const }
+      const override = { model: "openai/gpt-5.6-sol", variant: "xhigh", reasoningEffort: "low" as const }
 
       // when
       const result = createSisyphusJuniorAgentWithOverrides(override)
 
       // then
-      expect(result.variant).toBe("high")
+      expect(result.variant).toBe("xhigh")
       expect(result.reasoningEffort).toBe("low")
     })
 
@@ -282,7 +278,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
       } as { permission: Record<string, string> }
 
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
 
       // then - task blocked, but call_omo_agent allowed for explore/librarian spawning
       const tools = result.tools as Record<string, boolean> | undefined
@@ -303,7 +301,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         tools: { grep: false, write: false, read: true } as Record<string, boolean>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission.grep).toBe("deny")
@@ -320,7 +320,9 @@ describe("createSisyphusJuniorAgentWithOverrides", () => {
         } as Record<string, string>,
       }
       // when
-      const result = createSisyphusJuniorAgentWithOverrides(override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0])
+      const result = createSisyphusJuniorAgentWithOverrides(
+        override as Parameters<typeof createSisyphusJuniorAgentWithOverrides>[0],
+      )
       // then
       const permission = result.permission as Record<string, string>
       expect(permission["mcp__context7__resolve-library-id"]).toBe("allow")
@@ -453,5 +455,4 @@ describe("buildSisyphusJuniorPrompt", () => {
     expect(prompt).toContain("todowrite")
     expect(prompt).not.toContain("task_create")
   })
-
 })

@@ -24,7 +24,8 @@ export interface AutomountTriggerOptions {
 export function isDarwinAutomountTriggerPath(path: string, options: AutomountTriggerOptions = {}): boolean {
   if ((options.platform ?? process.platform) !== "darwin") return false
   const lexical = posix.resolve(path).toLowerCase()
-  if (!DARWIN_AUTOMOUNT_TRIGGERS.some((trigger) => lexical === trigger || lexical.startsWith(`${trigger}/`))) return false
+  if (!DARWIN_AUTOMOUNT_TRIGGERS.some((trigger) => lexical === trigger || lexical.startsWith(`${trigger}/`)))
+    return false
   const home = posix.resolve(options.homeDir ?? homedir()).toLowerCase()
   return home === "/" || !(lexical === home || lexical.startsWith(`${home}/`))
 }
@@ -50,7 +51,11 @@ export function isPathInside(child: string, parent: string, options: PathContain
 }
 
 /** The canonical child's path relative to the canonical parent ("" for the parent itself), or undefined when outside. */
-export function containedRelativePath(child: string, parent: string, options: PathContainmentOptions = {}): string | undefined {
+export function containedRelativePath(
+  child: string,
+  parent: string,
+  options: PathContainmentOptions = {},
+): string | undefined {
   const paths = (options.platform ?? process.platform) === "win32" ? win32 : posix
   const realpath = options.realpath ?? realpathSync.native
   const canonicalChild = paths.normalize(realpath(child))

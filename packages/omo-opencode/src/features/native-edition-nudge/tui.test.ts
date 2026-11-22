@@ -3,7 +3,12 @@ import { describe, expect, test } from "bun:test"
 import { applyNativeEditionNudgeAction, NATIVE_NUDGE_OPTIONS } from "./tui"
 import { formatNativeInstallEntryCommand, resolveNativeInstallPlan } from "../../cli/install-native"
 import type { NudgeStateStore } from "../../hooks/native-edition-nudge"
-import { NUDGE_SNOOZE_MS, NUDGE_STATE_VERSION, type NudgeState, type NudgeStateRead } from "../../hooks/native-edition-nudge/types"
+import {
+  NUDGE_SNOOZE_MS,
+  NUDGE_STATE_VERSION,
+  type NudgeState,
+  type NudgeStateRead,
+} from "../../hooks/native-edition-nudge/types"
 
 const NOW = 1_700_000_000_000
 // The advertised installer follows the plugin's own channel (`@beta` only on a prerelease build).

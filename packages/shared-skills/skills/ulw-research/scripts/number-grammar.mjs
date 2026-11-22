@@ -9,15 +9,17 @@
 /** Separators a thousands group may use: comma, period, space, NBSP, narrow NBSP, thin space, figure space. */
 export const GROUP_SEPARATORS = Object.freeze([",", ".", " ", "\u00A0", "\u202F", "\u2009", "\u2007"])
 
-const literal = (sep) => (sep === "." ? "\\." : sep === " " ? " " : sep === "," ? "," : `\\u${sep.charCodeAt(0).toString(16).padStart(4, "0")}`)
+const literal = (sep) =>
+  sep === "." ? "\\." : sep === " " ? " " : sep === "," ? "," : `\\u${sep.charCodeAt(0).toString(16).padStart(4, "0")}`
 const decimalAfter = (sep) => (sep === "," ? "\\." : sep === "." ? "," : "[.,]")
 
 /** Regex source of one grouped number using any of `separators` (one type per number); no flags needed. */
 export function groupedNumberSource(separators = GROUP_SEPARATORS) {
-	const one = (sep) => sep === "."
-		? "\\d{1,3}(?:(?:\\.\\d{3}(?!\\d)){2,}(?:,\\d+)?|\\.\\d{3}(?!\\d),\\d+)"
-		: `\\d{1,3}(?:${literal(sep)}\\d{3}(?!\\d))+(?:${decimalAfter(sep)}\\d+)?`
-	return `(?<!\\d)(?:${separators.map(one).join("|")})`
+  const one = (sep) =>
+    sep === "."
+      ? "\\d{1,3}(?:(?:\\.\\d{3}(?!\\d)){2,}(?:,\\d+)?|\\.\\d{3}(?!\\d),\\d+)"
+      : `\\d{1,3}(?:${literal(sep)}\\d{3}(?!\\d))+(?:${decimalAfter(sep)}\\d+)?`
+  return `(?<!\\d)(?:${separators.map(one).join("|")})`
 }
 
 /** A grouped number or a plain one ("4.22", "12,3451" read as 12.3451), as regex source. */
@@ -27,7 +29,7 @@ const WHOLE = new Map(GROUP_SEPARATORS.map((sep) => [sep, new RegExp(`^${grouped
 
 /** The plain decimal a number token spells: group separators dropped, a decimal comma read as a point. */
 export function plainDecimal(token) {
-	const sep = GROUP_SEPARATORS.find((candidate) => WHOLE.get(candidate).test(token))
-	const ungrouped = sep === undefined ? token : token.split(sep).join("")
-	return ungrouped.replace(",", ".")
+  const sep = GROUP_SEPARATORS.find((candidate) => WHOLE.get(candidate).test(token))
+  const ungrouped = sep === undefined ? token : token.split(sep).join("")
+  return ungrouped.replace(",", ".")
 }

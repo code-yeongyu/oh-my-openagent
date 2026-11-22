@@ -28,6 +28,8 @@ const REQUIRED_ARTIFACTS = [
   "plugin/runtime/ast-grep-mcp/cli.js",
   "plugin/runtime/dag/sdk.js",
   "plugin/runtime/agent-toolkit-sdk/sdk.js",
+  // Eval cells import the fleet SDK from OMO_BUNSHIN_TS_SDK_ROOT; the installer requires it too.
+  "plugin/runtime/bunshin-ts/sdk.js",
   // omo thread and omo daemon adopt import it (bin/lib/thread.js).
   "plugin/runtime/thread-sdk/sdk.js",
   // omo doctor / omo setup classify task-category coverage through it (bin/lib/category-coverage.js).
@@ -124,9 +126,7 @@ for (const path of paths.filter((p) => BUNDLE_PATH_RE.test(p))) {
 
 const skillCount = paths.filter((p) => SKILL_PATH_RE.test(p)).length
 if (skillCount < MIN_SKILL_COUNT) {
-  errors.push(
-    `missing: expected >= ${MIN_SKILL_COUNT} skill files (plugin/skills/*/SKILL.md), found ${skillCount}`,
-  )
+  errors.push(`missing: expected >= ${MIN_SKILL_COUNT} skill files (plugin/skills/*/SKILL.md), found ${skillCount}`)
 }
 
 if (paths.length > 0) {
@@ -146,9 +146,7 @@ if (paths.length > 0) {
   }
 
   if (unpackedSize >= MAX_UNPACKED_SIZE) {
-    errors.push(
-      `unpacked size ${unpackedSize} bytes exceeds limit ${MAX_UNPACKED_SIZE} bytes (30 MB)`,
-    )
+    errors.push(`unpacked size ${unpackedSize} bytes exceeds limit ${MAX_UNPACKED_SIZE} bytes (30 MB)`)
   }
 }
 
@@ -160,6 +158,4 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-console.log(
-  `omo-ai payload verification OK (${paths.length} packed paths, 0 offenders, ${unpackedSize} bytes)`,
-)
+console.log(`omo-ai payload verification OK (${paths.length} packed paths, 0 offenders, ${unpackedSize} bytes)`)

@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
-const workflow = readFileSync(
-  new URL("../.github/workflows/publish-platform.yml", import.meta.url),
-  "utf8",
-)
+const workflow = readFileSync(new URL("../.github/workflows/publish-platform.yml", import.meta.url), "utf8")
 
 describe("standalone binary eval release gate", () => {
   test("#given the platform release workflow #when darwin-arm64 is freshly built #then the compiled binary runs the eval smoke before upload", () => {

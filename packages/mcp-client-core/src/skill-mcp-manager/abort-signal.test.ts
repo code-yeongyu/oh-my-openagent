@@ -17,18 +17,28 @@ function withinMs<T>(promise: Promise<T>, ms: number, waitingFor: string): Promi
 function startHangingServer(mode: HangMode) {
   let callReceived!: () => void
   let disconnected!: () => void
-  const received = new Promise<void>((resolve) => { callReceived = resolve })
-  const closed = new Promise<void>((resolve) => { disconnected = resolve })
+  const received = new Promise<void>((resolve) => {
+    callReceived = resolve
+  })
+  const closed = new Promise<void>((resolve) => {
+    disconnected = resolve
+  })
   const server = Bun.serve({
     port: 0,
     idleTimeout: 0,
     async fetch(request) {
       if (request.method === "GET") return new Response(null, { status: 405 })
-      const message = await request.json() as { id?: number | string; method: string }
+      const message = (await request.json()) as { id?: number | string; method: string }
       if (message.method === "server/discover") {
-        return Response.json({ jsonrpc: "2.0", id: message.id, result: {
-          resultType: "complete", supportedVersions: ["2026-07-28"], capabilities: { tools: {} },
-        } })
+        return Response.json({
+          jsonrpc: "2.0",
+          id: message.id,
+          result: {
+            resultType: "complete",
+            supportedVersions: ["2026-07-28"],
+            capabilities: { tools: {} },
+          },
+        })
       }
       if (message.method !== "tools/call") return new Response(null, { status: 202 })
       callReceived()
@@ -36,10 +46,17 @@ function startHangingServer(mode: HangMode) {
         request.signal.addEventListener("abort", () => disconnected(), { once: true })
         return new Promise<Response>(() => {})
       }
-      return new Response(new ReadableStream({
-        start(controller) { controller.enqueue(new TextEncoder().encode(": open\n\n")) },
-        cancel() { disconnected() },
-      }), { headers: { "content-type": "text/event-stream" } })
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(": open\n\n"))
+          },
+          cancel() {
+            disconnected()
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      )
     },
   })
   return { server, received, closed }
@@ -50,13 +67,18 @@ async function startHangingCall(mode: HangMode, sessionID: string) {
   const manager = new SkillMcpManager()
   const controller = new AbortController()
   const options: SkillMcpClientOptions = { signal: controller.signal }
-  const settled = manager.callTool(
-    { serverName: "hanging", skillName: "test", sessionID },
-    { skillName: "test", config: { url: server.url.href } },
-    "never_answers",
-    {},
-    options,
-  ).then(() => new Error("the hanging call resolved"), (error: unknown) => error)
+  const settled = manager
+    .callTool(
+      { serverName: "hanging", skillName: "test", sessionID },
+      { skillName: "test", config: { url: server.url.href } },
+      "never_answers",
+      {},
+      options,
+    )
+    .then(
+      () => new Error("the hanging call resolved"),
+      (error: unknown) => error,
+    )
   await withinMs(received, 5_000, "the server to receive tools/call")
   return {
     controller,

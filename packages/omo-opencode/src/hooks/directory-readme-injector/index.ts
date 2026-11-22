@@ -1,1 +1,1 @@
-export { createDirectoryReadmeInjectorHook } from "./hook";
+export { createDirectoryReadmeInjectorHook } from "./hook"

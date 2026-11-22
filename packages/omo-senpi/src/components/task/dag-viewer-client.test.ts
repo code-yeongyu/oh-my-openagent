@@ -6,19 +6,11 @@ import { join } from "node:path"
 
 import { dagRunStartedEvent } from "../../../../senpi-task/src/dag/events"
 import { createDagJournal } from "../../../../senpi-task/src/dag/journal"
-import {
-  createDagManager,
-  type DagHistoryParams,
-  type DagRunRecordV1,
-} from "../../../../senpi-task/src/dag/manager"
+import { createDagManager, type DagHistoryParams, type DagRunRecordV1 } from "../../../../senpi-task/src/dag/manager"
 import { createDagFileStore } from "../../../../senpi-task/src/dag/store"
 import type { DagRunEvent, DagRunId } from "../../../../senpi-task/src/dag/types"
 import type { SenpiExtensionAPI } from "../../extension/types"
-import {
-  createDagRpcBridge,
-  DAG_ACTIVITY_COALESCE_MS,
-  type DagBridgeActivityEvent,
-} from "./dag-rpc-bridge"
+import { createDagRpcBridge, DAG_ACTIVITY_COALESCE_MS, type DagBridgeActivityEvent } from "./dag-rpc-bridge"
 import {
   registerDagRpcHandlers,
   type DagRpcEnvelope,
@@ -192,12 +184,14 @@ class ReferenceDagViewer {
 
   private async history(sinceSeq: number, throughSeq: number): Promise<DagRpcHistoryPage> {
     this.historyRequests += 1
-    return expectOk<DagRpcHistoryPage>(await this.rpc.call("omo.dag.history", {
-      runId: this.runId,
-      sinceSeq,
-      throughSeq,
-      limit: this.pageLimit,
-    }))
+    return expectOk<DagRpcHistoryPage>(
+      await this.rpc.call("omo.dag.history", {
+        runId: this.runId,
+        sinceSeq,
+        throughSeq,
+        limit: this.pageLimit,
+      }),
+    )
   }
 
   private applyPage(events: readonly DagRpcEvent[]): void {
@@ -296,9 +290,7 @@ describe("dag viewer reference consumer", () => {
     expect(handshake.highWaterSeq).toBe(150)
     expect(viewer.recoveryQueries).toEqual([{ sinceSeq: 175, throughSeq: 176 }])
     expect(viewer.gaps).toEqual([])
-    expect(viewer.applied.map((event) => event.seq)).toEqual(
-      Array.from({ length: 200 }, (_, index) => index + 1),
-    )
+    expect(viewer.applied.map((event) => event.seq)).toEqual(Array.from({ length: 200 }, (_, index) => index + 1))
     expect(viewer.seen.size).toBe(viewer.applied.length)
     expect(viewer.lastAppliedSeq).toBe(manager.snapshot(runId, parentSessionId).lastSeq)
 

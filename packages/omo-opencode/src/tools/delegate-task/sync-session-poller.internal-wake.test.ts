@@ -58,12 +58,17 @@ describe("pollSyncSession internal all-complete wakes", () => {
     ])
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_test",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_test",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
     expect(result).toBeNull()
@@ -94,12 +99,17 @@ describe("pollSyncSession internal all-complete wakes", () => {
     ])
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_test",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_test",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
     expect(result).toBe("child failed after stale output")
@@ -124,15 +134,22 @@ describe("pollSyncSession internal all-complete wakes", () => {
     ])
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_test",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_test",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
-    expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test")
+    expect(result).toBe(
+      "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test",
+    )
   })
 
   test("#given user task text collides with internal markers before terminal assistant turn #when polling #then the sync task completes", async () => {
@@ -153,12 +170,17 @@ describe("pollSyncSession internal all-complete wakes", () => {
     ])
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_test",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_test",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
     expect(result).toBeNull()
@@ -183,14 +205,21 @@ describe("pollSyncSession internal all-complete wakes", () => {
     ])
 
     // when
-    const result = await pollSyncSession(toolContext, client, {
-      sessionID: "ses_test",
-      agentToUse: "sisyphus",
-      toastManager: null,
-      taskId: undefined,
-    }, 50)
+    const result = await pollSyncSession(
+      toolContext,
+      client,
+      {
+        sessionID: "ses_test",
+        agentToUse: "sisyphus",
+        toastManager: null,
+        taskId: undefined,
+      },
+      50,
+    )
 
     // then
-    expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test")
+    expect(result).toBe(
+      "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test",
+    )
   })
 })

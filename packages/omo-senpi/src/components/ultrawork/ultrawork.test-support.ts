@@ -99,7 +99,11 @@ export function expectReminderMessage(pi: FakeExtensionAPI, index: number): void
 }
 
 /** The directive must ride in as ONE hidden custom message, never as rewritten user text. */
-export function expectHiddenInjection(pi: FakeExtensionAPI, result: unknown, expectedDeliverAs?: "steer" | "followUp"): void {
+export function expectHiddenInjection(
+  pi: FakeExtensionAPI,
+  result: unknown,
+  expectedDeliverAs?: "steer" | "followUp",
+): void {
   expect(result).toEqual({ action: "continue" })
   expect(pi.messages).toHaveLength(1)
 

@@ -32,13 +32,16 @@ function summaryText(value: unknown): string | undefined {
   return clampTaskSummary(typeof value === "string" ? value : undefined)
 }
 
-function isolationArguments(value: Record<PropertyKey, unknown>): Pick<TaskToolParamsStatic, "isolated" | "apply" | "merge"> {
+function isolationArguments(
+  value: Record<PropertyKey, unknown>,
+): Pick<TaskToolParamsStatic, "isolated" | "apply" | "merge"> {
   const isolated = value.isolated
   const apply = value.apply
   const merge = value.merge
   if (isolated !== undefined && typeof isolated !== "boolean") throw new TypeError("isolated must be a boolean")
   if (apply !== undefined && typeof apply !== "boolean") throw new TypeError("apply must be a boolean")
-  if (merge !== undefined && merge !== "patch" && merge !== "branch") throw new TypeError("merge must be patch or branch")
+  if (merge !== undefined && merge !== "patch" && merge !== "branch")
+    throw new TypeError("merge must be patch or branch")
   return {
     ...(isolated === undefined ? {} : { isolated }),
     ...(apply === undefined ? {} : { apply }),

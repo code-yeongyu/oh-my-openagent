@@ -24,9 +24,7 @@ function isDisabledSkillConfigEntry(entry: unknown): boolean {
 }
 
 export function collectDisabledSkillAliases(config: SkillDisableConfig): Set<string> {
-  const disabledSkills = new Set<string>(
-    (config.disabled_skills ?? []).map(normalizeSkillAliasName),
-  )
+  const disabledSkills = new Set<string>((config.disabled_skills ?? []).map(normalizeSkillAliasName))
   const skillsConfig = config.skills
   if (!isSkillsConfigRecord(skillsConfig)) return disabledSkills
 
@@ -59,9 +57,6 @@ function isDisabledAlias(name: string, disabledSkills: ReadonlySet<string>): boo
   return false
 }
 
-export function isDisabledSkillName(
-  name: string,
-  disabledSkills: ReadonlySet<string>,
-): boolean {
+export function isDisabledSkillName(name: string, disabledSkills: ReadonlySet<string>): boolean {
   return isDisabledAlias(normalizeSkillAliasName(name), disabledSkills)
 }

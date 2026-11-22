@@ -38,27 +38,50 @@ function row(label, parts) {
 }
 
 function loginParts({ credentials, agentDir, home }) {
-  if (credentials.malformed) return credentials.found > 0 ? [`${count(credentials.found, "login")} found - not imported: omo's auth.json is malformed (see notes)`] : []
+  if (credentials.malformed)
+    return credentials.found > 0
+      ? [`${count(credentials.found, "login")} found - not imported: omo's auth.json is malformed (see notes)`]
+      : []
   const { result, guidance } = credentials
   const parts = []
   const keyName = (item) => (item.source === "opencode" ? item.provider : `${item.provider} from ${item.source}`)
-  if (result.additions.length > 0) parts.push(`${count(result.additions.length, "API key")} (${result.additions.map(keyName).join(", ")}) - will be imported`)
-  if (result.skippedExisting.length > 0) parts.push(`${count(result.skippedExisting.length, "API key")} omo already has (${result.skippedExisting.join(", ")}) - kept as is`)
+  if (result.additions.length > 0)
+    parts.push(
+      `${count(result.additions.length, "API key")} (${result.additions.map(keyName).join(", ")}) - will be imported`,
+    )
+  if (result.skippedExisting.length > 0)
+    parts.push(
+      `${count(result.skippedExisting.length, "API key")} omo already has (${result.skippedExisting.join(", ")}) - kept as is`,
+    )
   const byState = (state) => guidance.logins.filter((login) => login.state === state)
   const login = byState("login")
   if (login.length > 0) {
     // One command per omo provider, naming the logins it replaces when their id differs.
     const targets = new Map()
     for (const item of login) targets.set(item.target, [...(targets.get(item.target) ?? []), item.provider])
-    const commands = [...targets].map(([target, providers]) => (providers.every((provider) => provider === target) ? `/login ${target}` : `/login ${target} (for ${providers.join(", ")})`))
-    parts.push(`${count(login.length, "OAuth login")} (${login.map((item) => item.provider).join(", ")}) - sign in again inside omo: ${commands.join(", ")}`)
+    const commands = [...targets].map(([target, providers]) =>
+      providers.every((provider) => provider === target)
+        ? `/login ${target}`
+        : `/login ${target} (for ${providers.join(", ")})`,
+    )
+    parts.push(
+      `${count(login.length, "OAuth login")} (${login.map((item) => item.provider).join(", ")}) - sign in again inside omo: ${commands.join(", ")}`,
+    )
   }
   const signedIn = byState("signed-in")
-  if (signedIn.length > 0) parts.push(`${count(signedIn.length, "OAuth login")} (${signedIn.map((item) => item.provider).join(", ")}) - already signed in inside omo`)
+  if (signedIn.length > 0)
+    parts.push(
+      `${count(signedIn.length, "OAuth login")} (${signedIn.map((item) => item.provider).join(", ")}) - already signed in inside omo`,
+    )
   const unsupported = byState("unsupported")
-  if (unsupported.length > 0) parts.push(`${count(unsupported.length, "OAuth login")} (${unsupported.map((item) => item.provider).join(", ")}) - omo has no provider for it; keep using the other agent for it`)
+  if (unsupported.length > 0)
+    parts.push(
+      `${count(unsupported.length, "OAuth login")} (${unsupported.map((item) => item.provider).join(", ")}) - omo has no provider for it; keep using the other agent for it`,
+    )
   if (guidance.unmapped.length > 0) {
-    parts.push(`${count(guidance.unmapped.length, "API key")} for providers omo does not serve (${guidance.unmapped.join(", ")}) - define the provider and its baseUrl in ${displayPath(join(agentDir, "models.json"), home)}, then /login <provider> inside omo`)
+    parts.push(
+      `${count(guidance.unmapped.length, "API key")} for providers omo does not serve (${guidance.unmapped.join(", ")}) - define the provider and its baseUrl in ${displayPath(join(agentDir, "models.json"), home)}, then /login <provider> inside omo`,
+    )
   }
   return parts
 }
@@ -101,7 +124,10 @@ function providerParts({ providers }) {
   return [
     ...added,
     ...segments([
-      [result.skippedExisting, (items) => `${items.length} already in omo's models.json (${items.join(", ")}) - kept as is`],
+      [
+        result.skippedExisting,
+        (items) => `${items.length} already in omo's models.json (${items.join(", ")}) - kept as is`,
+      ],
       [result.blocked, (items) => `${items.length} not imported: omo's models.json is malformed (${items.join(", ")})`],
       [providers.skipped, (items) => `${items.length} not carried (${items.join(", ")}) - see notes`],
     ]),
@@ -120,7 +146,10 @@ function modelChoiceParts({ modelChoices }) {
   return [
     ...(chosen.length > 0 ? [`${chosen.join("; ")} - will be written`] : []),
     ...segments([
-      [labels("kept"), (items) => `${items.length} you already set differently in omo (${items.join(", ")}) - kept as is`],
+      [
+        labels("kept"),
+        (items) => `${items.length} you already set differently in omo (${items.join(", ")}) - kept as is`,
+      ],
       [labels("carried"), (items) => `${items.length} already carried (${items.join(", ")})`],
       [labels("blocked"), (items) => `${items.length} not written (${items.join(", ")}) - see notes`],
       [modelChoices.dropped, (items) => `${items.length} not carried - see notes`],
@@ -131,13 +160,24 @@ function modelChoiceParts({ modelChoices }) {
 // The harnesses setup reads from, only the installed ones. OpenCode also counts as found when only
 // its config (MCP servers, skills, providers, model choices) exists and it never stored a login.
 function sourceNames(context) {
-  const installed = new Set(context.inventory.harnesses.filter((harness) => harness.installed).map((harness) => harness.id))
+  const installed = new Set(
+    context.inventory.harnesses.filter((harness) => harness.installed).map((harness) => harness.id),
+  )
   const { assets, providers, modelChoices } = context
-  const configFound = assets.present || assets.refusedServers.length > 0 || assets.skippedSkills.length > 0
-    || providers.present || providers.skipped.length > 0 || modelChoices.present
+  const configFound =
+    assets.present ||
+    assets.refusedServers.length > 0 ||
+    assets.skippedSkills.length > 0 ||
+    providers.present ||
+    providers.skipped.length > 0 ||
+    modelChoices.present
   if (configFound) installed.add("opencode")
-  const names = Object.keys(SOURCE_HARNESSES).filter((id) => installed.has(id)).map((id) => SOURCE_HARNESSES[id])
-  return providers.result.added.some((provider) => provider.origin === "commandcode") ? [...names, "Command Code"] : names
+  const names = Object.keys(SOURCE_HARNESSES)
+    .filter((id) => installed.has(id))
+    .map((id) => SOURCE_HARNESSES[id])
+  return providers.result.added.some((provider) => provider.origin === "commandcode")
+    ? [...names, "Command Code"]
+    : names
 }
 
 // Every stage notice once. Of the detect notices only omo's own store is added: the credential
@@ -145,7 +185,9 @@ function sourceNames(context) {
 function notes(context) {
   const detect = context.inventory.harnesses
     .filter((harness) => harness.installed && !Object.hasOwn(SOURCE_HARNESSES, harness.id))
-    .flatMap((harness) => harness.notices.map((notice) => `${notice.startsWith("could not") ? "WARN" : "NOTICE"} ${harness.id}: ${notice}`))
+    .flatMap((harness) =>
+      harness.notices.map((notice) => `${notice.startsWith("could not") ? "WARN" : "NOTICE"} ${harness.id}: ${notice}`),
+    )
   const stages = [context.credentials, context.assets, context.providers, context.modelChoices]
   return [...new Set([...detect, ...stages.flatMap((stage) => stage.notices)])]
 }
@@ -176,8 +218,9 @@ export function formatSetupSummary(context) {
   // The Command Code guidance speaks to a user the plan already has a Command Code stake for: the
   // key env var is set (the preset is on its way into models.json) or an entry the plan carries or
   // refused is already there. A user with neither sees no Command Code guidance at all.
-  const commandCodePlanned = context.providers.result.added.some((item) => item.id === COMMANDCODE_PROVIDER_ID)
-    || context.providers.skipped.includes(COMMANDCODE_PROVIDER_ID)
+  const commandCodePlanned =
+    context.providers.result.added.some((item) => item.id === COMMANDCODE_PROVIDER_ID) ||
+    context.providers.skipped.includes(COMMANDCODE_PROVIDER_ID)
   lines.push(...(commandCodePlanned ? commandCodeGuidance() : []))
   lines.push(MODEL_GUIDE_LINE)
   if (rows.length === 0) lines.push(...formatModelTemplate())

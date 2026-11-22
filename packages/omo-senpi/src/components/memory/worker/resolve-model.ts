@@ -53,9 +53,7 @@ export type ReflectionModelResolution =
       readonly missingProviders?: readonly string[]
     }
 
-const THINKING_LEVELS: readonly ReflectionThinkingLevel[] = [
-  "off", "minimal", "low", "medium", "high", "xhigh", "max",
-]
+const THINKING_LEVELS: readonly ReflectionThinkingLevel[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
 export function resolveReflectionModel(
   category: string,
@@ -72,8 +70,13 @@ export function resolveReflectionModel(
     return resolveReflectionModel(category, config, liveRegistry, rest)
   }
   if (!registry) {
-    return resolveBeyondCategory(category, undefined, options)
-      ?? { kind: "category_unavailable", category, cause: "no_registry" }
+    return (
+      resolveBeyondCategory(category, undefined, options) ?? {
+        kind: "category_unavailable",
+        category,
+        cause: "no_registry",
+      }
+    )
   }
   const resolution = resolveCategory(category, config, registry)
   if (resolution.kind !== "resolved") {
@@ -86,7 +89,12 @@ export function resolveReflectionModel(
         // An explicitly pinned user model is authoritative over the availability snapshot, which
         // is refreshed asynchronously and is routinely stale when a first-turn (step_count=1)
         // reflection triggers before extension-provider registration finishes refreshing.
-        return { kind: "resolved", category, model: pinnedSelector, fallbacks: builtinChainFallbacks(category, registry, pinnedSelector) }
+        return {
+          kind: "resolved",
+          category,
+          model: pinnedSelector,
+          fallbacks: builtinChainFallbacks(category, registry, pinnedSelector),
+        }
       }
     }
     // An explicit categories.<name>.disable=true keeps its meaning: no silent fallback model.
@@ -112,9 +120,7 @@ export function resolveReflectionModel(
     }
   }
 
-  const rawThinking = resolution.spec.reasoning
-    ?? resolution.spec.reasoningEffort
-    ?? resolution.spec.variant
+  const rawThinking = resolution.spec.reasoning ?? resolution.spec.reasoningEffort ?? resolution.spec.variant
   const thinking = normalizeThinking(rawThinking)
   const resolvedFallbacks = (resolution.spec.fallback_models ?? []).map((fallback): ReflectionModelCandidate => {
     const fallbackThinking = normalizeThinking(fallback.reasoning_effort ?? fallback.variant)
@@ -200,11 +206,13 @@ function builtinChainFallbacks(
   registry: SenpiModelRegistryPort<SenpiModelPort>,
   selectedModel: string,
 ): readonly ReflectionModelCandidate[] {
-  return builtinCategoryChainCandidates(category, registry).flatMap((candidate): readonly ReflectionModelCandidate[] => {
-    if (candidate.model === selectedModel) return []
-    const thinking = normalizeThinking(candidate.variant)
-    return [{ model: candidate.model, ...(thinking === undefined ? {} : { thinking }) }]
-  })
+  return builtinCategoryChainCandidates(category, registry).flatMap(
+    (candidate): readonly ReflectionModelCandidate[] => {
+      if (candidate.model === selectedModel) return []
+      const thinking = normalizeThinking(candidate.variant)
+      return [{ model: candidate.model, ...(thinking === undefined ? {} : { thinking }) }]
+    },
+  )
 }
 
 function configuredFallbackModels(
@@ -217,14 +225,15 @@ function configuredFallbackModels(
   if (categoryConfig === undefined) return []
   const canonical = categoryConfig.models
   const legacy = categoryConfig.fallback_models
-  const configured = canonical !== undefined && canonical.length > 0
-    ? canonical
-    : legacy === undefined
-      ? []
-      : [selectedModel, ...(Array.isArray(legacy) ? legacy : [legacy])]
+  const configured =
+    canonical !== undefined && canonical.length > 0
+      ? canonical
+      : legacy === undefined
+        ? []
+        : [selectedModel, ...(Array.isArray(legacy) ? legacy : [legacy])]
   if (configured.length === 0) return []
-  const selectedIndex = configured.findIndex((entry) =>
-    (typeof entry === "string" ? entry : entry.model) === selectedModel
+  const selectedIndex = configured.findIndex(
+    (entry) => (typeof entry === "string" ? entry : entry.model) === selectedModel,
   )
   if (selectedIndex === -1) return []
 
@@ -244,20 +253,19 @@ function configuredFallbackModels(
     const provider = selector.slice(0, separatorIndex)
     const modelId = selector.slice(separatorIndex + 1)
     if (registry.find(provider, modelId) === undefined) return []
-    const rawThinking = typeof entry === "string"
-      ? undefined
-      : entry.reasoning ?? entry.reasoningEffort ?? entry.variant
+    const rawThinking =
+      typeof entry === "string" ? undefined : (entry.reasoning ?? entry.reasoningEffort ?? entry.variant)
     const thinking = normalizeThinking(rawThinking)
-    return [{
-      model: selector,
-      ...(thinking === undefined ? {} : { thinking }),
-    }]
+    return [
+      {
+        model: selector,
+        ...(thinking === undefined ? {} : { thinking }),
+      },
+    ]
   })
 }
 
-function deduplicateCandidates(
-  candidates: readonly ReflectionModelCandidate[],
-): readonly ReflectionModelCandidate[] {
+function deduplicateCandidates(candidates: readonly ReflectionModelCandidate[]): readonly ReflectionModelCandidate[] {
   const seen = new Set<string>()
   return candidates.filter((candidate) => {
     if (seen.has(candidate.model)) return false
@@ -268,15 +276,15 @@ function deduplicateCandidates(
 
 export function shouldWarnCategoryUnavailable(config: OmoConfig, category: string): boolean {
   if (config.categories?.[category]?.model !== undefined) return false
-  return (config.categories?.[category]?.warn_unavailable
-    ?? config.task?.warnings.unavailable_categories
-    ?? true) !== false
+  return (
+    (config.categories?.[category]?.warn_unavailable ?? config.task?.warnings.unavailable_categories ?? true) !== false
+  )
 }
 
 function normalizeThinking(value: string | undefined): ReflectionThinkingLevel | undefined {
   if (value === undefined || value === "auto") return undefined
   const normalized = value === "none" ? "off" : value
   return THINKING_LEVELS.includes(normalized as ReflectionThinkingLevel)
-    ? normalized as ReflectionThinkingLevel
+    ? (normalized as ReflectionThinkingLevel)
     : undefined
 }

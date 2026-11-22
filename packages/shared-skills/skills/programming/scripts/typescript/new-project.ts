@@ -20,9 +20,9 @@
  *     .gitignore
  */
 
-import { cpSync, mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { parseArgs } from "node:util";
+import { cpSync, mkdirSync, writeFileSync, existsSync } from "node:fs"
+import { join, resolve } from "node:path"
+import { parseArgs } from "node:util"
 
 const { values, positionals } = parseArgs({
   args: Bun.argv.slice(2),
@@ -32,7 +32,7 @@ const { values, positionals } = parseArgs({
   },
   allowPositionals: true,
   strict: true,
-});
+})
 
 if (values.help || positionals.length === 0) {
   console.log(`Usage: bun run new-project.ts <name> [--path <dir>]
@@ -42,21 +42,21 @@ Arguments:
 
 Options:
   --path      Parent directory (default: current dir)
-  -h, --help  Show this help`);
-  process.exit(positionals.length === 0 ? 2 : 0);
+  -h, --help  Show this help`)
+  process.exit(positionals.length === 0 ? 2 : 0)
 }
 
-const name = positionals[0];
-if (!name) throw new Error("Project name is required");
-const root = resolve(values.path ?? ".", name);
+const name = positionals[0]
+if (!name) throw new Error("Project name is required")
+const root = resolve(values.path ?? ".", name)
 
 if (existsSync(root)) {
-  console.error(`Error: ${root} already exists`);
-  process.exit(1);
+  console.error(`Error: ${root} already exists`)
+  process.exit(1)
 }
 
 // ── Directory structure ──
-mkdirSync(join(root, "src"), { recursive: true });
+mkdirSync(join(root, "src"), { recursive: true })
 
 // ── package.json ──
 const pkg = {
@@ -77,7 +77,7 @@ const pkg = {
   },
   dependencies: {
     hono: "^4.12.5",
-    zod: "^3.24.0",
+    zod: "^4.0.0",
   },
   devDependencies: {
     "@types/bun": "latest",
@@ -86,11 +86,11 @@ const pkg = {
     "oxlint-tsgolint": "7.0.2005",
     typescript: "^5.8.0",
   },
-};
-writeFileSync(join(root, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
+}
+writeFileSync(join(root, "package.json"), JSON.stringify(pkg, null, 2) + "\n")
 
 // Copy the formatted strict configs and plugin documented in oxc-lint.md.
-cpSync(join(import.meta.dir, "oxc"), root, { recursive: true });
+cpSync(join(import.meta.dir, "oxc"), root, { recursive: true })
 
 // ── src/index.ts ──
 const indexTs = `import { Hono } from "hono";
@@ -100,8 +100,8 @@ const app = new Hono();
 app.get("/", (c) => c.json({ status: "ok" }));
 
 export default app;
-`;
-writeFileSync(join(root, "src/index.ts"), indexTs);
+`
+writeFileSync(join(root, "src/index.ts"), indexTs)
 
 // ── .gitignore ──
 const gitignore = `node_modules/
@@ -109,8 +109,8 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
-`;
-writeFileSync(join(root, ".gitignore"), gitignore);
+`
+writeFileSync(join(root, ".gitignore"), gitignore)
 
-console.log(`✓ Created: ${root}`);
-console.log(`  cd ${name} && bun install && bun run check`);
+console.log(`✓ Created: ${root}`)
+console.log(`  cd ${name} && bun install && bun run check`)

@@ -9,6 +9,7 @@ import { createDagFileStore, type DagRunId } from "@oh-my-opencode/senpi-task/da
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime } from "./dag-runtime"
 import { composeTaskEngine } from "./engine"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -94,7 +95,7 @@ function buildRuntime(cwd: string, retentionSweep?: { readonly schedule?: (sweep
 }
 
 /** Awaits a durable state change (the artifact disappearing) under a bounded deadline. */
-async function waitUntilGone(path: string, budgetMs = 2000): Promise<void> {
+async function waitUntilGone(path: string, budgetMs = remainingTestTime()): Promise<void> {
   const deadline = Date.now() + budgetMs
   while (fs.existsSync(path)) {
     if (Date.now() > deadline) throw new Error(`still present after ${budgetMs}ms: ${path}`)

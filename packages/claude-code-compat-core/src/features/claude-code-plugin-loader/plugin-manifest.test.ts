@@ -27,11 +27,7 @@ describe("loadPluginManifest", () => {
       JSON.stringify({ name: "claude-layout", version: "2.0.0" }),
       "utf-8",
     )
-    writeFileSync(
-      join(installPath, "plugin.json"),
-      JSON.stringify({ name: "root-layout", version: "1.0.0" }),
-      "utf-8",
-    )
+    writeFileSync(join(installPath, "plugin.json"), JSON.stringify({ name: "root-layout", version: "1.0.0" }), "utf-8")
 
     //#when
     const { loadPluginManifest } = await import(`./discovery?t=${Date.now()}-manifest-layout`)

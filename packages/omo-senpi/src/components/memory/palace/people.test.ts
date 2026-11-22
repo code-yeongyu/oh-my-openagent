@@ -15,9 +15,7 @@ afterAll(cleanupPalaceFixtures)
 const LIMITS = { maxEntries: 40, maxEntryChars: 200 } as const
 
 function inlineJson(html: string): Record<string, unknown> {
-  const match = html.match(
-    /<script type="application\/json" id="omo-palace-data">([\s\S]*?)<\/script>/,
-  )
+  const match = html.match(/<script type="application\/json" id="omo-palace-data">([\s\S]*?)<\/script>/)
   if (match?.[1] === undefined) throw new Error("palace html has no inline data script")
   const decoded = match[1]
     .replace(/\\u003c/g, "<")
