@@ -155,9 +155,19 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
     }
-    // No builtin left a store under this HOME that could still be written after it is removed.
-    const homeEntries = readdirSync(root, { recursive: true }).map(String)
+    // No builtin left a store under this HOME: only the engine-seeded agent layout and the settled
+    // fallback log may remain, so a future builtin store fails this allowlist (#10933). Windows
+    // listings use backslashes; normalize so the guard is platform-stable.
+    const homeEntries = readdirSync(root, { recursive: true })
+      .map((entry) => String(entry).replaceAll("\\", "/"))
+      .sort()
     rmSync(root, { recursive: true, force: true })
-    expect(homeEntries.filter((entry) => entry.includes("goal"))).toEqual([])
+    expect(homeEntries).toEqual([
+      "agent",
+      "agent/auth.json",
+      "agent/extensions",
+      "agent/logs",
+      "agent/logs/.fallback-log-v2",
+    ])
   }
 }, 30_000)
