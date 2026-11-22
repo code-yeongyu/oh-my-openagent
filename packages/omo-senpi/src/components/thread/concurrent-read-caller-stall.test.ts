@@ -86,4 +86,4 @@ test("concurrent terminal reads all answer when another call blocks the caller p
       messages: [{ role: "user", content: `transcript of session-${index}` }],
     })),
   )
-}, 20_000)
+})
