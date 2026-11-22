@@ -2625,6 +2625,7 @@
     "packages/utils/src/index.ts",
     "packages/utils/src/internal-initiator-marker.ts",
     "packages/utils/src/jsonc-parser.ts",
+    "packages/utils/src/loading-spinner.ts",
     "packages/utils/src/logger.ts",
     "packages/utils/src/logging/index.ts",
     "packages/utils/src/logging/logger.ts",
