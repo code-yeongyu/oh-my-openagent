@@ -1,4 +1,6 @@
 import { expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { isSharedAgentDir } from "./dev-build-runtime"
@@ -28,4 +30,27 @@ test("#given the process env #when USERPROFILE differs from HOME #then the USERP
       else process.env[key] = value
     }
   }
+})
+
+test("#given an existing shared store #when the agent dir spells it with different case on a case-insensitive volume #then it is shared", () => {
+  const home = mkdtempSync(join(tmpdir(), "agent-home-case-"))
+  try {
+    mkdirSync(join(home, ".omo", "agent"), { recursive: true })
+    const upper = join(home, ".OMO", "AGENT")
+    let caseInsensitive = true
+    try {
+      mkdirSync(join(home, ".omo", "Probe"))
+      mkdirSync(join(home, ".omo", "probe"))
+      caseInsensitive = false
+    } catch {}
+    expect(isSharedAgentDir(upper, [home])).toBe(caseInsensitive)
+  } finally {
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test("#given a shared store not created yet #when the agent dir spells it with different case #then it is shared where the platform's volumes ignore case", () => {
+  const home = join(tmpdir(), "agent-home-absent-case")
+  const caseInsensitivePlatform = process.platform === "win32" || process.platform === "darwin"
+  expect(isSharedAgentDir(join(home, ".OMO", "Agent"), [home])).toBe(caseInsensitivePlatform)
 })

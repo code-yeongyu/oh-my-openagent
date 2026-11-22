@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync } from "node:fs"
+import { readFileSync, realpathSync, statSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -47,10 +47,32 @@ function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
  * isolated dir is never shared.
  */
 export function isSharedAgentDir(agentDir: string, homes: readonly string[] = accountHomes(process.env)): boolean {
-  const target = canonical(agentDir)
   return homes.some((home) =>
-    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
-      (candidate) => canonical(candidate) === target,
+    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some((candidate) =>
+      sameLocation(candidate, agentDir),
     ),
   )
+}
+
+/**
+ * Two spellings name one store when the filesystem says so (#14622 review M3): an existing path is compared by its
+ * device and inode, so a case-insensitive volume's `.OMO\agent` and `.omo\agent` match. A path that does not
+ * exist yet falls back to its canonical spelling, case-folded where the platform's default volumes ignore case.
+ */
+function sameLocation(left: string, right: string): boolean {
+  const a = identity(left)
+  const b = identity(right)
+  if (a !== undefined && b !== undefined) return a === b
+  const fold = (path: string) =>
+    process.platform === "win32" || process.platform === "darwin" ? path.toLowerCase() : path
+  return fold(canonical(left)) === fold(canonical(right))
+}
+
+function identity(path: string): string | undefined {
+  try {
+    const stat = statSync(path, { bigint: true })
+    return `${stat.dev}:${stat.ino}`
+  } catch {
+    return undefined
+  }
 }
