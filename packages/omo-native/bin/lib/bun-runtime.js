@@ -3,6 +3,7 @@ import { existsSync, realpathSync } from "node:fs"
 import { homedir as osHomedir } from "node:os"
 import { posix, win32 } from "node:path"
 import { propagateResult, runChild } from "./child-process.js"
+import { privateFdHandoff } from "./private-fds.js"
 
 // A bun global install lives under <BUN_ROOT>/install/global/, and `bun add -g` links the launcher
 // into <BUN_ROOT>/bin. The link TARGET is what identifies the install, so every comparison below
@@ -267,7 +268,8 @@ export async function maybeReexecUnderBun(input) {
   const target = decision.nodePath ?? decision.bunPath
   // A hand-off to node is pinned there so the node launch never re-execs the old bun again.
   const childEnv = decision.nodePath ? { ...process.env, OMO_RUNTIME: "node" } : process.env
-  if ((input.platform ?? process.platform) !== "win32" && typeof execve === "function") {
+  const handoff = privateFdHandoff(childEnv)
+  if (handoff === undefined && (input.platform ?? process.platform) !== "win32" && typeof execve === "function") {
     try {
       execve(target, [target, input.scriptPath, ...argv.slice(2)], childEnv)
       return true
@@ -278,7 +280,7 @@ export async function maybeReexecUnderBun(input) {
   const result = await run(target, [input.scriptPath, ...argv.slice(2)], {
     stdio: "inherit",
     windowsHide: true,
-    ...(decision.nodePath ? { env: childEnv } : {}),
+    ...(handoff ?? (decision.nodePath ? { env: childEnv } : {})),
   })
   propagate(result)
   return true

@@ -1,0 +1,118 @@
+/* 4.6 Everywhere */
+.grid-3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  margin-top: var(--space-8);
+}
+
+/* 4.7 Commands */
+.commands {
+  margin-top: var(--space-8);
+}
+
+/* 4.8 Closing CTA */
+.closing {
+  margin-top: var(--space-10);
+  padding-block: var(--space-9);
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.closing .h2 {
+  margin-inline: auto;
+}
+
+.closing .section__lede {
+  margin-inline: auto;
+}
+
+.closing .hero__cta {
+  justify-content: center;
+}
+
+/* Loops run only while their scene is on screen and the tab is visible: main.js sets .is-running. */
+
+/* ---------- 5. Reveal on scroll ---------- */
+
+.rise {
+  opacity: 0;
+  transform: translateY(var(--reveal-shift));
+  transition:
+    opacity var(--dur-enter) var(--ease-reverb),
+    transform var(--dur-enter) var(--ease-reverb);
+  transition-delay: var(--delay, 0ms);
+}
+
+.rise.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* no JavaScript: show everything */
+html:not(.js) .rise {
+  opacity: 1;
+  transform: none;
+}
+
+/* ---------- 6. Breakpoints ---------- */
+
+@media (min-width: 640px) {
+  .index .d {
+    display: inline;
+    margin-left: auto;
+    font-size: var(--text-sm);
+    color: var(--ink-soft);
+  }
+}
+
+@media (min-width: 900px) {
+  .grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1080px) {
+  .hero {
+    padding-top: var(--space-9);
+  }
+}
+
+@media (max-width: 760px) {
+  .index ol {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .section {
+    padding-top: var(--space-9);
+  }
+
+  .card {
+    padding: var(--space-5);
+  }
+}
+
+/* ---------- 7. Reduced motion: every loop stops, every figure stays readable ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .rise {
+    opacity: 1;
+    transform: none;
+  }
+
+  .caret {
+    animation: none;
+  }
+}

@@ -1,0 +1,27 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/senpi-desktop-sdk": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), the manifest generator run by path from
+      // package.json scripts, and the test, config and helper files plugins report with exports unchecked: listing them
+      // export-checks them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/generate-facade-manifest.ts",
+        "test/fake-port.ts",
+        "vitest.config.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // computer-use v2 row 15: the SDK's public delivery-mode constants (consumed by name from rows 24/26 and by SDK users)
+    "packages/senpi-desktop-sdk/src/index.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+    "packages/senpi-desktop-sdk/src/types.ts": ["BACKGROUND", "FOREGROUND", "SEMANTIC"],
+    // same shape as the sibling desktop packages: vitest config default export
+    "packages/senpi-desktop-sdk/vitest.config.ts": ["default"]
+  }
+}

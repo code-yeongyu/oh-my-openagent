@@ -6,15 +6,17 @@ import { registerProcessCleanup, startCleanupTimer } from "./cleanup"
 import { redactSensitiveData } from "./error-redaction"
 import type { ManagedClient, McpClient, McpTransport, SkillMcpClientConnectionParams } from "./types"
 import { log } from "../logger"
+import { createProtocolTransport } from "./protocol-transport"
 import { connectWithPolicySignal, McpEnvironmentPolicyChangedError } from "./policy-connection"
 
 type StdioClientFactory = (
   clientInfo: { name: string; version: string },
-  options: { capabilities: Record<string, never> }
+  options: { capabilities: Record<string, never> },
 ) => McpClient
 
 type StdioTransportFactory = (
-  options: ConstructorParameters<typeof StdioClientTransport>[0]
+  options: ConstructorParameters<typeof StdioClientTransport>[0],
+  client: McpClient,
 ) => McpTransport
 
 interface StdioClientDependencies {
@@ -24,14 +26,17 @@ interface StdioClientDependencies {
 
 const defaultStdioClientDependencies: StdioClientDependencies = {
   createClient: (clientInfo, options) => new Client(clientInfo, options),
-  createTransport: (options) => new StdioClientTransport(options),
+  createTransport: (options, client) =>
+    createProtocolTransport(
+      new StdioClientTransport(options),
+      client instanceof Client ? client : undefined,
+      `stdio:${JSON.stringify([options.command, options.args ?? [], options.cwd ?? ""])}`,
+    ),
 }
 
 let stdioClientDependencies: StdioClientDependencies = defaultStdioClientDependencies
 
-export function setStdioClientDependenciesForTesting(
-  dependencies?: Partial<StdioClientDependencies>
-): void {
+export function setStdioClientDependenciesForTesting(dependencies?: Partial<StdioClientDependencies>): void {
   stdioClientDependencies = dependencies
     ? {
         ...defaultStdioClientDependencies,
@@ -49,7 +54,7 @@ function getStdioCommand(config: ClaudeCodeMcpServer, serverName: string): strin
 
 async function closeStdioResourceIgnoringFailure(
   close: () => Promise<void>,
-  context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" }
+  context: { resource: "client" | "transport"; serverName: string; phase: "connect-failure" | "post-shutdown" },
 ): Promise<void> {
   try {
     await close()
@@ -72,17 +77,19 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
 
   registerProcessCleanup(state)
 
-  const transport: McpTransport = stdioClientDependencies.createTransport({
-    command,
-    args,
-    env: mergedEnv,
-    stderr: "ignore",
-    ...(info.directory ? { cwd: info.directory } : {}),
-  })
-
   const client: McpClient = stdioClientDependencies.createClient(
     { name: `skill-mcp-${info.skillName}-${info.serverName}`, version: "1.0.0" },
-    { capabilities: {} }
+    { capabilities: {} },
+  )
+  const transport: McpTransport = stdioClientDependencies.createTransport(
+    {
+      command,
+      args,
+      env: mergedEnv,
+      stderr: "ignore",
+      ...(info.directory ? { cwd: info.directory } : {}),
+    },
+    client,
   )
 
   try {
@@ -101,12 +108,12 @@ export async function createStdioClient(params: SkillMcpClientConnectionParams):
     const safeErrorMessage = redactSensitiveData(errorMessage)
     throw new Error(
       `Failed to connect to MCP server "${info.serverName}".\n\n` +
-      `Command: ${safeCommand}\n` +
-      `Reason: ${safeErrorMessage}\n\n` +
-      `Hints:\n` +
-      `  - Ensure the command is installed and available in PATH\n` +
-      `  - Check if the MCP server package exists\n` +
-      `  - Verify the args are correct for this server`
+        `Command: ${safeCommand}\n` +
+        `Reason: ${safeErrorMessage}\n\n` +
+        `Hints:\n` +
+        `  - Ensure the command is installed and available in PATH\n` +
+        `  - Check if the MCP server package exists\n` +
+        `  - Verify the args are correct for this server`,
     )
   }
 

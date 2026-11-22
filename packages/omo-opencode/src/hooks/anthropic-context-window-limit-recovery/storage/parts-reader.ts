@@ -34,7 +34,7 @@ export function readParts(messageID: string): StoredPart[] {
 export async function readPartsFromSDK(
   client: OpencodeClient,
   sessionID: string,
-  messageID: string
+  messageID: string,
 ): Promise<StoredPart[]> {
   try {
     const response = await client.session.message({

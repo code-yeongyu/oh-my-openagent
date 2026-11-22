@@ -1,0 +1,23 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/git-bash": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) parsePreToolUsePayload, parsePostCompactPayload
+    "packages/omo-codex/plugin/components/git-bash/src/codex-hook.ts": ["parsePreToolUsePayload", "parsePostCompactPayload"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) applyGitBashPostCompactReset, applyGitBashPreToolUseReminder, parsePostCompactPayload, parsePreToolUsePayload, runGitBashHookCli
+    "packages/omo-codex/plugin/components/git-bash/src/index.ts": ["applyGitBashPostCompactReset", "applyGitBashPreToolUseReminder", "parsePostCompactPayload", "parsePreToolUsePayload", "runGitBashHookCli"]
+  }
+}

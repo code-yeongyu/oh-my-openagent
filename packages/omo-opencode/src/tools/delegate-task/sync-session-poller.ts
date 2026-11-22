@@ -4,6 +4,8 @@ import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
+import { MIN_SESSION_GONE_POLLS } from "../../features/background-agent/session-existence"
+import { formatDeletedSyncSessionError, isSyncSessionDeleted } from "./sync-session-existence"
 
 export { isSessionComplete } from "./sync-session-turns"
 
@@ -20,11 +22,13 @@ function wait(milliseconds: number): Promise<void> {
 
 function abortSyncSession(client: OpencodeClient, sessionID: string, reason: string): void {
   log("[task] Aborting sync session", { sessionID, reason })
-  void client.session.abort({
-    path: { id: sessionID },
-  }).catch((error: unknown) => {
-    log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
-  })
+  void client.session
+    .abort({
+      path: { id: sessionID },
+    })
+    .catch((error: unknown) => {
+      log("[task] Failed to abort sync session", { sessionID, reason, error: String(error) })
+    })
 }
 
 function isActiveSessionStatus(status: { type: string } | undefined): boolean {
@@ -43,10 +47,7 @@ function hasMessagesAfterAnchor(
   return anchorMessageCount === undefined || messages.length > anchorMessageCount
 }
 
-async function fetchSessionMessages(
-  client: OpencodeClient,
-  sessionID: string
-): Promise<SessionMessage[]> {
+async function fetchSessionMessages(client: OpencodeClient, sessionID: string): Promise<SessionMessage[]> {
   const messagesResult = await client.session.messages({ path: { id: sessionID }, query: { limit: 100 } })
   const rawData = (messagesResult as { data?: unknown })?.data ?? messagesResult
   return Array.isArray(rawData) ? (rawData as SessionMessage[]) : []
@@ -69,7 +70,7 @@ export async function pollSyncSession(
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
   },
-  timeoutMs?: number
+  timeoutMs?: number,
 ): Promise<string | null> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
@@ -81,6 +82,7 @@ export async function pollSyncSession(
   let lastStatusRevision: string | undefined
   let hasFetchedNonActiveMessages = false
   let timedOut = false
+  let consecutiveDeletedChecks = 0
   let assistantTurnCount = 0
   let lastSeenAssistantId: string | undefined
   let lastObservedAssistantId: string | undefined
@@ -146,11 +148,7 @@ export async function pollSyncSession(
       }
 
       if (finalMessages) {
-        const hasNewMessages = hasMessagesAfterAnchor(
-          finalMessages,
-          input.anchorMessageID,
-          input.anchorMessageCount,
-        )
+        const hasNewMessages = hasMessagesAfterAnchor(finalMessages, input.anchorMessageID, input.anchorMessageCount)
         if (hasNewMessages && isSessionComplete(finalMessages)) {
           log("[task] Abort detected after session already completed", { sessionID: input.sessionID })
           return null
@@ -166,12 +164,18 @@ export async function pollSyncSession(
     await wait(syncTiming.POLL_INTERVAL_MS)
     pollCount++
 
-    let sessionStatus: ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<string, unknown>) | undefined
+    let sessionStatus:
+      | ({ type: string; updatedAt?: string | number; revision?: string | number; messageCount?: number } & Record<
+          string,
+          unknown
+        >)
+      | undefined
+    let statusFetched = false
     try {
       const statusResult = await client.session.status()
       const allStatuses = normalizeSDKResponse(statusResult, {} as Record<string, { type: string }>)
       sessionStatus = allStatuses[input.sessionID] as typeof sessionStatus
-
+      statusFetched = true
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error)
       log("[task] Poll status fetch failed, checking messages", { sessionID: input.sessionID, error: errorMessage })
@@ -187,8 +191,25 @@ export async function pollSyncSession(
       })
     }
 
+    // Idle sessions are also absent from the status map, so absence alone is not terminal;
+    // a session that the server repeatedly reports as not found is gone and can never finish.
+    if (statusFetched && sessionStatus === undefined) {
+      consecutiveDeletedChecks = (await isSyncSessionDeleted(client, input.sessionID))
+        ? consecutiveDeletedChecks + 1
+        : 0
+      if (consecutiveDeletedChecks >= MIN_SESSION_GONE_POLLS) {
+        log("[task] Poll stopped - session no longer exists", { sessionID: input.sessionID, pollCount })
+        if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
+        return formatDeletedSyncSessionError(input.sessionID)
+      }
+    } else {
+      consecutiveDeletedChecks = 0
+    }
+
     const isActive = isActiveSessionStatus(sessionStatus)
-    const statusRevision = sessionStatus && (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount ?? sessionStatus.type)
+    const statusRevision =
+      sessionStatus &&
+      (sessionStatus.updatedAt ?? sessionStatus.revision ?? sessionStatus.messageCount ?? sessionStatus.type)
     const statusChanged = statusRevision !== undefined && String(statusRevision) !== lastStatusRevision
     if (statusChanged) inactiveStart = Date.now()
 
@@ -197,7 +218,11 @@ export async function pollSyncSession(
     // Keep inspecting messages on the same staleness cadence so the error surfaces and the
     // inactivity timer only resets on observable change.
     nonActivePollsSinceMessageFetch++
-    if (hasFetchedNonActiveMessages && !statusChanged && nonActivePollsSinceMessageFetch < MAX_NON_ACTIVE_STATUS_STALENESS_POLLS) {
+    if (
+      hasFetchedNonActiveMessages &&
+      !statusChanged &&
+      nonActivePollsSinceMessageFetch < MAX_NON_ACTIVE_STATUS_STALENESS_POLLS
+    ) {
       continue
     }
     lastStatusRevision = statusRevision === undefined ? lastStatusRevision : String(statusRevision)

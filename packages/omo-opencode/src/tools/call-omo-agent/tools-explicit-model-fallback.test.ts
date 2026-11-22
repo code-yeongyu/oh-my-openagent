@@ -24,17 +24,16 @@ function createCtx(): PluginInput {
   } as unknown as PluginInput
 }
 
-async function launchExplore(
-  agentOverrides?: AgentOverrides,
-  userCategories?: CategoriesConfig,
-): Promise<LaunchInput> {
-  const launch = mock((_input: LaunchInput) => Promise.resolve({
-    id: "task-explicit-model",
-    sessionId: "sub-session",
-    description: "Test task",
-    agent: "explore",
-    status: "pending",
-  }))
+async function launchExplore(agentOverrides?: AgentOverrides, userCategories?: CategoriesConfig): Promise<LaunchInput> {
+  const launch = mock((_input: LaunchInput) =>
+    Promise.resolve({
+      id: "task-explicit-model",
+      sessionId: "sub-session",
+      description: "Test task",
+      agent: "explore",
+      status: "pending",
+    }),
+  )
   const manager = { launch, getTask: mock(() => undefined) } as unknown as BackgroundManager
   const toolDef = createCallOmoAgent(createCtx(), manager, [], agentOverrides, userCategories)
 

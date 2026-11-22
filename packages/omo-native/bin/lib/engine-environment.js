@@ -1,8 +1,16 @@
 import { existsSync, realpathSync } from "node:fs"
 import { delimiter, isAbsolute, join, relative, sep } from "node:path"
-import { canonicalAgentDir } from "./agent-dir.js"
+import { canonicalAgentDir, ensureAgentDir } from "./agent-dir.js"
+import { OMO_BRAND_LOGO } from "./brand-logo.generated.js"
 import { HERDR_AGENT_MARKER } from "./herdr-agent-hint.js"
-import { nearestNodeBin, packageManifest, packageRoot, readJson, releaseChannel, updateTarget } from "./package-paths.js"
+import {
+  nearestNodeBin,
+  packageManifest,
+  packageRoot,
+  readJson,
+  releaseChannel,
+  updateTarget,
+} from "./package-paths.js"
 
 // Identity the engine adopts for this install: what the user sees, where state lives, which
 // environment prefix is read first, what goes on the wire, and which channel to check for
@@ -27,6 +35,7 @@ function brandProfile() {
   const changelog = pluginChangelogSource()
   return {
     name: "OmO",
+    logo: OMO_BRAND_LOGO,
     command: "omo",
     displayVersion: packageManifest().version,
     configDir: ".omo",
@@ -37,6 +46,9 @@ function brandProfile() {
     userAgent: "omo",
     originator: "omo",
     ...(changelog ? { changelog } : {}),
+    // The plugin spawnSenpi prepends with --extension: the engine's own, never a user flag an attaching start
+    // could not apply to a host-held session (#14465).
+    extensions: [join(packageRoot, "plugin")],
     update: {
       packageName: "omo-ai",
       distTag: releaseChannel(),
@@ -83,6 +95,7 @@ export function senpiEnvironment(senpiRoot, overrides = {}) {
   // One directory for every surface. The legacy name travels too, so a bare senpi spawned by a
   // tool inherits the same state instead of falling back to its own home.
   const agentDir = canonicalAgentDir(env)
+  ensureAgentDir(agentDir)
   env.OMO_CODING_AGENT_DIR = agentDir
   env.SENPI_CODING_AGENT_DIR = agentDir
   // senpi's footer reads this marker to show the OmO Native badge for omo-ai installs, which load
@@ -103,6 +116,9 @@ export function senpiEnvironment(senpiRoot, overrides = {}) {
   // Anything resolving the product by name must re-enter through this launcher, otherwise it
   // would reach the engine directly and lose the brand.
   env.OMO_BIN = join(packageRoot, "bin", "omo.js")
+  // The plugin names this command when part of the install is missing (#11379). SENPI_BRAND carries it
+  // too, but the engine scrubs that at startup, before any plugin file can fail to load.
+  env.OMO_REINSTALL_COMMAND = updateTarget().command
   const merged = { ...env, ...overrides }
   // Only the interactive launch writes this record of the herdr hint it set (herdr-agent-hint.js),
   // after this function returns. No engine started here may carry one from the parent environment

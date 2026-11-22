@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { join } from "node:path"
 
 import { createOnboardingHarness, hermeticScanEnvironment } from "./test-harness"
 import { claimOnboarding, isOnboardingComplete, releaseOnboarding } from "./state"
 import { createOnboardingComponent, type TuiScanResult } from "./component"
+import { BUILTIN_SKILL_NAMES } from "../telemetry/event-schemas"
+import { getBuiltinSkillsRoot } from "../telemetry/product-identity"
 import { registrySnapshot } from "../memory/facts-runner.test-support"
 import { fakeModel } from "./understand.test-support"
 
@@ -57,9 +59,11 @@ describe("onboarding entry", () => {
     const dir = freshDir()
     const h = createOnboardingHarness(dir, "first", "tui")
     await h.start()
-    expect(await h.prompt()).toEqual([{
-      message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
-    }])
+    expect(await h.prompt()).toEqual([
+      {
+        message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
+      },
+    ])
     expect(isOnboardingComplete(dir)).toBe(true)
     expect(h.pi.messages).toEqual([])
     expect(h.widgets.has("omo-onboarding")).toBe(false)
@@ -118,9 +122,11 @@ describe("onboarding entry", () => {
     const dir = freshDir()
     const h = createOnboardingHarness(dir)
     const preview = await h.prompt({ preview: true })
-    expect(preview).toEqual([{
-      message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
-    }])
+    expect(preview).toEqual([
+      {
+        message: { customType: "omo-onboarding:context", content: expect.any(String), display: false },
+      },
+    ])
     expect(isOnboardingComplete(dir)).toBe(false)
     expect(h.pi.handlers.find((entry) => entry.event === "before_agent_start")?.options?.previewSafe).toBe(true)
     expect(await h.prompt()).toEqual(preview)
@@ -147,10 +153,12 @@ describe("onboarding entry", () => {
     h.pi.setFlag("onboard", true)
     await h.start()
     await h.start()
-    expect(h.pi.messages).toEqual([{
-      message: { customType: "omo-onboarding:bootstrap", content: expect.any(String), display: false },
-      options: { triggerTurn: true, deliverAs: "followUp" },
-    }])
+    expect(h.pi.messages).toEqual([
+      {
+        message: { customType: "omo-onboarding:bootstrap", content: expect.any(String), display: false },
+        options: { triggerTurn: true, deliverAs: "followUp" },
+      },
+    ])
     expect(await h.prompt()).toEqual([undefined])
     await h.agentStart()
     await h.end()
@@ -206,7 +214,8 @@ describe("onboarding entry", () => {
       sessionHistory: async () => undefined,
     })
     const h = createOnboardingHarness(dir, "retry", "rpc", component)
-    const contentOf = (results: unknown[]) => String((results.find(Boolean) as { message: { content: unknown } }).message.content)
+    const contentOf = (results: unknown[]) =>
+      String((results.find(Boolean) as { message: { content: unknown } }).message.content)
 
     expect(contentOf(await h.prompt())).not.toContain("SCAN-RETRY-OK")
     await h.pi.dispatch("input_disposition", { disposition: "rejected" }, h.ctx)
@@ -217,7 +226,12 @@ describe("onboarding entry", () => {
   test("#given the first understanding scan fails #when onboarding_understand runs again, twice at once #then one retried scan serves both", async () => {
     const dir = freshDir()
     let open = (): void => undefined
-    const flaky = flakyScan("unused", new Promise<void>((resolve) => { open = resolve }))
+    const flaky = flakyScan(
+      "unused",
+      new Promise<void>((resolve) => {
+        open = resolve
+      }),
+    )
     const component = createOnboardingComponent({
       claimOnboarding: () => claimOnboarding(dir),
       isOnboardingComplete: () => isOnboardingComplete(dir),
@@ -228,10 +242,17 @@ describe("onboarding entry", () => {
     })
     const h = createOnboardingHarness(dir, "understand", "tui", component)
     const understand = h.pi.tools.find((tool) => tool["name"] === "onboarding_understand") as unknown as {
-      execute(id: string, params: unknown, signal?: AbortSignal, onUpdate?: unknown, ctx?: unknown): Promise<{ content: Array<{ text?: string }>; isError?: boolean }>
+      execute(
+        id: string,
+        params: unknown,
+        signal?: AbortSignal,
+        onUpdate?: unknown,
+        ctx?: unknown,
+      ): Promise<{ content: Array<{ text?: string }>; isError?: boolean }>
     }
     const toolCtx = { model: { provider: "omo-mock", id: "mock-1" }, modelRegistry: registrySnapshot() }
-    const text = (result: { content: Array<{ text?: string }> }) => result.content.map((part) => part.text ?? "").join("")
+    const text = (result: { content: Array<{ text?: string }> }) =>
+      result.content.map((part) => part.text ?? "").join("")
 
     const failed = await understand.execute("u1", { consent: true }, undefined, undefined, toolCtx)
     expect(text(failed)).toContain("scan did not run")
@@ -245,17 +266,111 @@ describe("onboarding entry", () => {
   })
 
   for (const entry of ["context", "forced-rpc", "bootstrap"]) {
-    test(`#given ${entry} onboarding #when its skill pointer is resolved #then the actual skill file exists`, async () => {
+    test(`#given ${entry} onboarding #when its skill pointer is resolved #then it names a listed built-in skill, not an install path`, async () => {
       const h = createOnboardingHarness(freshDir(), entry, entry === "bootstrap" ? "tui" : "rpc")
       h.pi.setFlag("onboard", entry !== "context")
       await h.start()
       const results = await h.prompt()
-      const message = entry === "bootstrap" ? h.pi.messages[0]?.message
-        : (results[0] as { message: { content: unknown } }).message
+      const message =
+        entry === "bootstrap" ? h.pi.messages[0]?.message : (results[0] as { message: { content: unknown } }).message
       expect(typeof message?.content).toBe("string")
-      const path = String(message?.content).match(/\S+\/onboarding\/SKILL\.md/)?.[0]
-      expect(path).toBeDefined()
-      expect(existsSync(resolve(path!))).toBe(true)
+      const content = String(message?.content)
+      // #12150: the context carries no absolute install path; the tour names the skill, which
+      // the skills listing resolves by name, and that skill file exists under the skills root.
+      expect(content).not.toContain("/onboarding/SKILL.md")
+      expect(content).toContain("built-in `onboarding` skill")
+      expect(BUILTIN_SKILL_NAMES).toContain("onboarding")
+      expect(existsSync(join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md"))).toBe(true)
     })
   }
+
+  describe("onboarding skill provenance (#12544 review)", () => {
+    test("#given a user skill named onboarding wins the listing #when prompting #then the context falls back to the built-in path", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "shadowed", "rpc")
+      h.pi.getCommands = () => [
+        {
+          name: "skill:onboarding",
+          source: "skill",
+          sourceInfo: { path: join(dir, "user-skills", "onboarding", "SKILL.md") },
+        },
+      ]
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      expect(content).toContain(`Follow ${join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")}.`)
+      expect(content).not.toContain("built-in `onboarding` skill")
+    })
+
+    test("#given the listing resolves onboarding to the built-in file #when prompting #then the context names the skill, not its path", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "listed", "rpc")
+      h.pi.getCommands = () => [
+        {
+          name: "skill:onboarding",
+          source: "skill",
+          sourceInfo: { path: join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md") },
+        },
+      ]
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      expect(content).toContain("built-in `onboarding` skill")
+      expect(content).not.toContain("/onboarding/SKILL.md")
+    })
+
+    test("#given the skills listing is empty #when prompting #then the context still names the built-in skill", async () => {
+      const dir = freshDir()
+      const h = createOnboardingHarness(dir, "hidden", "rpc")
+      h.pi.getCommands = () => []
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      // An empty listing with no config disabling the skill reads as unshadowed (fail-open):
+      // the host may predate `getCommands` or discovery may not have run yet.
+      expect(content).toContain("built-in `onboarding` skill")
+      expect(content).not.toContain("/onboarding/SKILL.md")
+    })
+
+    test("#given onboarding is in disabled_skills #when prompting #then the context falls back to the built-in path", async () => {
+      const dir = freshDir()
+      mkdirSync(join(dir, ".omo"), { recursive: true })
+      writeFileSync(join(dir, ".omo", "omo.jsonc"), JSON.stringify({ disabled_skills: ["onboarding"] }))
+      const h = createOnboardingHarness(dir, "disabled", "rpc")
+      h.pi.cwd = dir
+      h.pi.getCommands = () => []
+      await h.start()
+      const results = await h.prompt()
+      const content = String((results[0] as { message: { content: unknown } }).message.content)
+      // #12544 review follow-up: with `onboarding` in `disabled_skills` the name form points
+      // at nothing on the `/skill:` surface, so the tour falls back to the built-in path.
+      expect(content).toContain(`Follow ${join(getBuiltinSkillsRoot(), "onboarding", "SKILL.md")}.`)
+      expect(content).not.toContain("built-in `onboarding` skill")
+    })
+  })
+
+  test("#given two installs at different paths #when each prompts #then the onboarding context is byte-identical (#12150)", async () => {
+    const variable = "OMO_BUNDLED_SKILLS_DIR"
+    const previous = process.env[variable]
+    const contents: string[] = []
+    const roots: string[] = []
+    try {
+      for (const leaf of ["short", "a-much-longer-install-path"]) {
+        const root = mkdtempSync(join(tmpdir(), `omo-skills-${leaf}-`))
+        roots.push(root)
+        process.env[variable] = root
+        const h = createOnboardingHarness(freshDir(), `install-${leaf}`, "rpc")
+        await h.start()
+        const results = await h.prompt()
+        const content = String((results[0] as { message: { content: unknown } }).message.content)
+        expect(content).not.toContain(root)
+        contents.push(content)
+      }
+      expect(contents[0]).toBe(contents[1])
+    } finally {
+      if (previous === undefined) delete process.env[variable]
+      else process.env[variable] = previous
+      for (const root of roots) rmSync(root, { recursive: true, force: true })
+    }
+  })
 })

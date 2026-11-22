@@ -38,6 +38,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeOpus,
       variant: "max",
     },
@@ -45,43 +50,40 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
+    },
   ],
   architect: [
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeFable,
-      variant: "max",
-    }
+      variant: "xhigh",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "xhigh",
+    },
   ],
+  // The three GPT deep lanes run one exact model each (#14155): no older GPT, no Fast tier and no other
+  // family behind it. The single rung lists every provider serving that exact id, in preference order
+  // (subscription, then API key, then OpenCode Zen); Copilot does not serve GPT-6.2 and GPT-6.2 Sol is
+  // served only on the two OpenAI lanes. A registry without the model leaves the lane gated off.
   ultrabrain: [
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-    { providers: ["github-copilot"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "max" },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-    { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-5.6-sol", variant: "max" }
+    {
+      providers: ["chatgpt-subscription", "openai", "opencode"],
+      model: LATEST_MODEL_BY_FAMILY.gptAstra,
+      variant: "max",
+    },
   ],
   "deep-low": [
-    // GPT-6.1 Sol leads at the same medium effort: it matches GPT-6 Sol's price with near-Astra
-    // quality, but only the ChatGPT subscription and OpenAI lanes serve it (plain, then the Fast
-    // tier). GPT-5.6 Sol stays behind it so Copilot, OpenCode Zen and a registry without 6.1 still
-    // resolve the lane.
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
-    { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptSolFast, variant: "medium" },
-    {
-      providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
-      model: "gpt-5.6-sol",
-      variant: "medium",
-    },
-    { providers: ["chatgpt-subscription", "openai"], model: "gpt-5.6-sol-fast", variant: "medium" }
   ],
   "deep-high": [
     {
-      providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+      providers: ["chatgpt-subscription", "openai", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.gptAstra,
       variant: "high",
-    }
+    },
   ],
   artistry: [
     {
@@ -91,6 +93,11 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     },
     {
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-1",
+      variant: "max",
+    },
+    {
+      providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: LATEST_MODEL_BY_FAMILY.claudeOpus,
       variant: "max",
     },
@@ -98,7 +105,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
+    },
   ],
   quick: [
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptLunaFast, variant: "low" },
@@ -121,7 +128,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     // thinking off (glm-5.3-flash maps `off` to null, mimo-v2.6-flash refuses disabled thinking), so
     // both run at the lowest effort they accept, like qwen3.6-flash.
     { providers: ["zai", "zai-coding-cn"], model: LATEST_MODEL_BY_FAMILY.glmFlash, variant: "low" },
-    { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" }
+    { providers: ["xiaomi"], model: "mimo-v2.6-flash", variant: "low" },
   ],
   "unspecified-low": [
     {
@@ -133,9 +140,10 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
     { providers: ["xai", "github-copilot", "opencode-go"], model: "grok-4.7", variant: "xhigh" },
     // GLM 5.3 sits ahead of the GPT rungs so a Claude + Z.ai user does not fall from Sonnet to GPT (#10306).
     { providers: ["zai", "zai-coding-cn", "opencode-go"], model: LATEST_MODEL_BY_FAMILY.glm, variant: "high" },
-    // GPT-6.1 Sol is the current GPT default, served only by the OpenAI lanes; GPT-5.6 Sol stays
-    // behind it so Copilot, OpenCode Zen and a registry without 6.1 still resolve the lane (#9844).
+    // GPT-6.2 Sol is the current GPT default, served only by the OpenAI lanes; GPT-6.1 Sol and then
+    // GPT-5.6 Sol stay behind it so Copilot, OpenCode Zen and an older registry still resolve the lane (#9844).
     { providers: ["chatgpt-subscription", "openai"], model: LATEST_MODEL_BY_FAMILY.gptSol, variant: "medium" },
+    { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
     {
       providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
       model: "gpt-5.6-sol",
@@ -152,7 +160,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       variant: "high",
     },
     { providers: ["deepseek", "opencode-go"], model: "deepseek-v4-pro", variant: "max" },
-    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" }
+    { providers: ["xiaomi", "opencode-go"], model: "mimo-v2.5-pro", variant: "high" },
   ],
   "unspecified-high": [
     {
@@ -165,7 +173,7 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"],
       model: LATEST_MODEL_BY_FAMILY.kimi,
       variant: "max",
-    }
+    },
   ],
   writing: [
     // Argon at its lowest accepted thinking level leads (#10187, owner decision 2026-10-15):
@@ -182,6 +190,6 @@ export const CATEGORY_FALLBACK_CHAINS: Readonly<Record<string, readonly Delegate
       providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
       model: "claude-opus-4-6",
       variant: "max",
-    }
+    },
   ],
 }

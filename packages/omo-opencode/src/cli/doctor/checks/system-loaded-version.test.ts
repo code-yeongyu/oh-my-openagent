@@ -9,8 +9,9 @@ import { resolveSymlink } from "../../../shared/file-utils"
 
 const systemLoadedVersionModulePath = "./system-loaded-version?system-loaded-version-test"
 
-const { getLoadedPluginVersion, getSuggestedInstallTag }: typeof import("./system-loaded-version") =
-  await import(systemLoadedVersionModulePath)
+const { getLoadedPluginVersion, getSuggestedInstallTag }: typeof import("./system-loaded-version") = await import(
+  systemLoadedVersionModulePath
+)
 
 const originalOpencodeConfigDir = process.env.OPENCODE_CONFIG_DIR
 const originalXdgCacheHome = process.env.XDG_CACHE_HOME
@@ -79,7 +80,9 @@ describe("system loaded version", () => {
       //#then
       expect(loadedVersion.cacheDir).toBe(expectedPath(configDir))
       expect(loadedVersion.cachePackagePath).toBe(expectedPath(join(configDir, "package.json")))
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(configDir, "node_modules", PACKAGE_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(configDir, "node_modules", PACKAGE_NAME, "package.json")),
+      )
       expect(loadedVersion.expectedVersion).toBe("1.2.3")
       expect(loadedVersion.loadedVersion).toBe("1.2.3")
     })
@@ -106,7 +109,9 @@ describe("system loaded version", () => {
       //#then
       expect(loadedVersion.cacheDir).toBe(expectedPath(cacheDir))
       expect(loadedVersion.cachePackagePath).toBe(expectedPath(join(cacheDir, "package.json")))
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")),
+      )
       expect(loadedVersion.expectedVersion).toBe("2.3.4")
       expect(loadedVersion.loadedVersion).toBe("2.3.4")
     })
@@ -128,7 +133,9 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(configDir, "node_modules", PLUGIN_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(configDir, "node_modules", PLUGIN_NAME, "package.json")),
+      )
       expect(loadedVersion.expectedVersion).toBe("5.6.7")
       expect(loadedVersion.loadedVersion).toBe("5.6.7")
     })
@@ -154,7 +161,9 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(taggedInstallDir, "node_modules", PLUGIN_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(taggedInstallDir, "node_modules", PLUGIN_NAME, "package.json")),
+      )
       expect(loadedVersion.cachePackagePath).toBe(expectedPath(join(taggedInstallDir, "package.json")))
       expect(loadedVersion.expectedVersion).toBe("8.8.8")
       expect(loadedVersion.loadedVersion).toBe("8.8.8")
@@ -184,7 +193,9 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(cacheDir, "node_modules", PACKAGE_NAME, "package.json")),
+      )
       expect(loadedVersion.loadedVersion).toBe("3.3.3")
     })
 
@@ -224,7 +235,9 @@ describe("system loaded version", () => {
       const loadedVersion = getLoadedPluginVersion()
 
       //#then
-      expect(loadedVersion.installedPackagePath).toBe(expectedPath(join(configDir, "node_modules", PACKAGE_NAME, "package.json")))
+      expect(loadedVersion.installedPackagePath).toBe(
+        expectedPath(join(configDir, "node_modules", PACKAGE_NAME, "package.json")),
+      )
       expect(loadedVersion.loadedVersion).toBe("7.7.7")
     })
 

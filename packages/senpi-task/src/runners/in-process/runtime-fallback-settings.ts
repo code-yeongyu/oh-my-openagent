@@ -2,6 +2,7 @@ import type { SettingsManager } from "@code-yeongyu/senpi"
 
 import { senpiBarrel } from "../../lazy/senpi-barrel"
 import type { ResolvedModelRecord } from "../../state"
+import { designatedFallbackProfile } from "../designated-fallback-profile"
 
 /** Same-model retry budget merged over the engine defaults for one child. */
 export type ChildRetryOverride = {
@@ -40,16 +41,25 @@ export function createRuntimeFallbackSettings(
     ...(retry?.maxRetries === undefined ? {} : { maxRetries: retry.maxRetries }),
     ...(retry?.baseDelayMs === undefined ? {} : { baseDelayMs: retry.baseDelayMs }),
   }
-  const chained = selectedModel !== undefined && fallbackModels !== undefined && fallbackModels.length > 0
   const global = withoutChildOwnedRetry(source.getGlobalSettings(), retryOverride)
   const project = withoutChildOwnedRetry(source.getProjectSettings(), retryOverride)
+  const policy =
+    selectedModel === undefined
+      ? { modelFallback: false }
+      : designatedFallbackProfile(selectedModel, (fallbackModels ?? []).map(modelSelector))
   const childGlobal: SettingsSnapshot = {
     ...global,
     retry: {
       ...global.retry,
-      modelFallback: chained,
       ...retryOverride,
-      ...(chained ? { fallbackChains: { [selectedModel]: fallbackModels.map(modelSelector) } } : {}),
+      modelFallback: policy.modelFallback,
+      ...("fallbackChains" in policy
+        ? {
+            fallbackChains: Object.fromEntries(
+              Object.entries(policy.fallbackChains).map(([key, chain]) => [key, [...chain]]),
+            ),
+          }
+        : {}),
     },
   }
   return manager.fromStorage(new SnapshotSettingsStorage(childGlobal, project))
@@ -58,7 +68,12 @@ export function createRuntimeFallbackSettings(
 // A project layer merges over global, so a child-owned key left there would beat the child's value.
 function withoutChildOwnedRetry(settings: SettingsSnapshot, retryOverride: ChildRetryOverride): SettingsSnapshot {
   if (settings.retry === undefined) return settings
-  const { modelFallback: _modelFallback, fallbackChains: _fallbackChains, fallbackRevertPolicy: _revertPolicy, ...rest } = settings.retry
+  const {
+    modelFallback: _modelFallback,
+    fallbackChains: _fallbackChains,
+    fallbackRevertPolicy: _revertPolicy,
+    ...rest
+  } = settings.retry
   const kept = Object.fromEntries(Object.entries(rest).filter(([key]) => !(key in retryOverride)))
   return { ...settings, retry: kept }
 }

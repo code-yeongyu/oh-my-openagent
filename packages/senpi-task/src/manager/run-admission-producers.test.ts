@@ -3,7 +3,16 @@ import { AdmissionBarrier } from "../pause/admission-barrier"
 import type { ChildPausePort, RunPauseOwner } from "../pause/ports"
 import { createTaskRecordStore } from "../store"
 import { createTaskManager } from "./manager"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  launchSettled,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -11,7 +20,7 @@ const ROOT = "parent-1"
 
 function harness() {
   const cwd = tempProject()
-  const store = createTaskRecordStore({ project_dir: cwd })
+  const store = createTaskRecordStore(ownedTaskState(cwd))
   const runner = new FakeRunner()
   const barrier = new AdmissionBarrier()
   const paused: RunPauseOwner[] = []
@@ -23,16 +32,25 @@ function harness() {
       runner.handles.get(child.task_id)?.settle({ status: "cancelled" })
       return { childSeq: 5 }
     },
-    resumeTurn: async () => { throw new Error("no Resume in this test") },
+    resumeTurn: async () => {
+      throw new Error("no Resume in this test")
+    },
     holdInput: async (child, input) => {
       held.push({ taskId: child.task_id, text: input.text })
       return { kind: "held", entryId: `entry-${held.length}`, duplicate: false }
     },
   }
   const manager = createTaskManager({
-    cwd, store, config: settings({ default_concurrency: 5 }), planner: categoryPlanner(), admissionBarrier: barrier,
-    runners: { "in-process": runner, process: runner }, childPausePort,
-    onPausedChild: record => { noted.push(record.task_id) },
+    cwd,
+    store,
+    config: settings({ default_concurrency: 5 }),
+    planner: categoryPlanner(),
+    admissionBarrier: barrier,
+    runners: { "in-process": runner, process: runner },
+    childPausePort,
+    onPausedChild: (record) => {
+      noted.push(record.task_id)
+    },
   })
   const start = async () => {
     const started = await manager.start(baseSpec({ run_in_background: true }))

@@ -1,0 +1,9 @@
+{
+  "repository": "sisyphuslabs/omo-service",
+  "revision": "b7096241611d2630aa2930393a872378fe904c08",
+  "files": {
+    "reports.ts": "2411b5c169623d1e978744d70ecd83f587b5d50a581c44b4c2189e7e317cf2e2",
+    "schema.ts": "754d753ecd9f6fec9c9ecf60f3ee92859d1668c1263da1161ddaf5bb82c1a20a",
+    "errors.ts": "68615c10678af3c697f6175d2ab2fb07c9a803e99736785723a7a9cf86ab954b"
+  }
+}

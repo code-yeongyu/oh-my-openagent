@@ -7,14 +7,8 @@ import {
   BTW_PARENT_CONTEXT_MAX_MESSAGES,
   createBtwSideContextInjectorHook,
 } from "./context-injector"
-import {
-  BTW_SIDE_METADATA_KEY,
-  createBtwSideMetadata,
-} from "./metadata"
-import {
-  isTrackedBtwSideSession,
-  resetBtwSideSessionRegistryForTesting,
-} from "./server-session-registry"
+import { BTW_SIDE_METADATA_KEY, createBtwSideMetadata } from "./metadata"
+import { isTrackedBtwSideSession, resetBtwSideSessionRegistryForTesting } from "./server-session-registry"
 
 type TestPart = {
   id: string
@@ -206,9 +200,7 @@ describe("createBtwSideContextInjectorHook", () => {
       "msg_parent_2",
       "msg_side_1",
     ])
-    const allText = output.messages.flatMap((message: TestMessage) =>
-      message.parts.map((part) => part.text),
-    )
+    const allText = output.messages.flatMap((message: TestMessage) => message.parts.map((part) => part.text))
     expect(allText.filter((text: string) => text.includes(BTW_BOUNDARY_SENTINEL))).toHaveLength(1)
     expect(allText).not.toContain("newer partial output")
     const sidePartIDs = output.messages
@@ -370,9 +362,7 @@ describe("createBtwSideContextInjectorHook", () => {
         session: {
           get: async () => {
             attempts += 1
-            return attempts === 1
-              ? { error: { name: "TemporaryError" } }
-              : { data: { id: sessionID } }
+            return attempts === 1 ? { error: { name: "TemporaryError" } } : { data: { id: sessionID } }
           },
         },
       }),
@@ -423,13 +413,10 @@ describe("createBtwSideContextInjectorHook", () => {
     })
 
     // when
-    const transform =
-      hook["experimental.chat.messages.transform"]!({}, output)
+    const transform = hook["experimental.chat.messages.transform"]!({}, output)
 
     // then
-    await expect(transform).rejects.toThrow(
-      "Unable to classify session for BTW isolation.",
-    )
+    await expect(transform).rejects.toThrow("Unable to classify session for BTW isolation.")
     expect(isTrackedBtwSideSession(sessionID)).toBe(false)
   })
 
@@ -498,12 +485,8 @@ describe("createBtwSideContextInjectorHook", () => {
 
     // then
     expect(output.messages).toEqual(sideMessages)
-    expect(output.messages[0].parts[0].text).toContain(
-      BTW_BOUNDARY_SENTINEL,
-    )
-    expect(output.messages[0].parts[1].text).toBe(
-      "answer without inherited context",
-    )
+    expect(output.messages[0].parts[0].text).toContain(BTW_BOUNDARY_SENTINEL)
+    expect(output.messages[0].parts[1].text).toBe("answer without inherited context")
   })
 
   it("#given an oversized parent prefix #when a side request transforms #then inherited context stays within byte and message budgets", async () => {
@@ -546,18 +529,10 @@ describe("createBtwSideContextInjectorHook", () => {
     await hook["experimental.chat.messages.transform"]!({}, output)
 
     // then
-    const inherited = output.messages.filter(
-      (message: TestMessage) => message.info.sessionID === parentSessionID,
-    )
-    const inheritedBytes = new TextEncoder().encode(
-      JSON.stringify(inherited),
-    ).byteLength
-    expect(inherited.length).toBeLessThanOrEqual(
-      BTW_PARENT_CONTEXT_MAX_MESSAGES,
-    )
-    expect(inheritedBytes).toBeLessThanOrEqual(
-      BTW_PARENT_CONTEXT_MAX_BYTES,
-    )
+    const inherited = output.messages.filter((message: TestMessage) => message.info.sessionID === parentSessionID)
+    const inheritedBytes = new TextEncoder().encode(JSON.stringify(inherited)).byteLength
+    expect(inherited.length).toBeLessThanOrEqual(BTW_PARENT_CONTEXT_MAX_MESSAGES)
+    expect(inheritedBytes).toBeLessThanOrEqual(BTW_PARENT_CONTEXT_MAX_BYTES)
     expect(inherited.at(-1)?.info.id).toBe(boundaryMessageID)
   })
 })

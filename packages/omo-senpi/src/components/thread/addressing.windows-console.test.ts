@@ -36,7 +36,11 @@ describe("thread addressing win32 console suppression", () => {
     describe("#when git is invoked", () => {
       test("#then node:child_process receives windowsHide: true", () => {
         const captured: CapturedExecFileSync[] = []
-        spyOn(childProcess, "execFileSync").mockImplementation(((command: string, args: readonly string[], options: Record<string, unknown>) => {
+        spyOn(childProcess, "execFileSync").mockImplementation(((
+          command: string,
+          args: readonly string[],
+          options: Record<string, unknown>,
+        ) => {
           captured.push({ command, args, options })
           return "/workspace/repo\n"
         }) as unknown as typeof childProcess.execFileSync)

@@ -8,6 +8,7 @@ export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
   /** Ordered model chain; the first entry is primary and the rest are fallbacks. */
   models: z.array(z.union([z.string(), FallbackModelObjectSchema])).optional(),
+  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
   fallback_models: FallbackModelsSchema.optional(),
   reasoning: OmoReasoningSchema.optional(),
   /** @deprecated Use `reasoning` instead. */
@@ -66,24 +67,26 @@ export const AgentOverrideConfigSchema = z.object({
     .optional(),
 })
 
-export const AgentOverridesSchema = z.object({
-  build: AgentOverrideConfigSchema.optional(),
-  plan: AgentOverrideConfigSchema.optional(),
-  sisyphus: AgentOverrideConfigSchema.optional(),
-  hephaestus: AgentOverrideConfigSchema.extend({
-    allow_non_gpt_model: z.boolean().optional(),
-  }).optional(),
-  "sisyphus-junior": AgentOverrideConfigSchema.optional(),
-  "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
-  prometheus: AgentOverrideConfigSchema.optional(),
-  metis: AgentOverrideConfigSchema.optional(),
-  momus: AgentOverrideConfigSchema.optional(),
-  oracle: AgentOverrideConfigSchema.optional(),
-  librarian: AgentOverrideConfigSchema.optional(),
-  explore: AgentOverrideConfigSchema.optional(),
-  "multimodal-looker": AgentOverrideConfigSchema.optional(),
-  atlas: AgentOverrideConfigSchema.optional(),
-}).catchall(AgentOverrideConfigSchema.optional())
+export const AgentOverridesSchema = z
+  .object({
+    build: AgentOverrideConfigSchema.optional(),
+    plan: AgentOverrideConfigSchema.optional(),
+    sisyphus: AgentOverrideConfigSchema.optional(),
+    hephaestus: AgentOverrideConfigSchema.extend({
+      allow_non_gpt_model: z.boolean().optional(),
+    }).optional(),
+    "sisyphus-junior": AgentOverrideConfigSchema.optional(),
+    "OpenCode-Builder": AgentOverrideConfigSchema.optional(),
+    prometheus: AgentOverrideConfigSchema.optional(),
+    metis: AgentOverrideConfigSchema.optional(),
+    momus: AgentOverrideConfigSchema.optional(),
+    oracle: AgentOverrideConfigSchema.optional(),
+    librarian: AgentOverrideConfigSchema.optional(),
+    explore: AgentOverrideConfigSchema.optional(),
+    "multimodal-looker": AgentOverrideConfigSchema.optional(),
+    atlas: AgentOverrideConfigSchema.optional(),
+  })
+  .catchall(AgentOverrideConfigSchema.optional())
 
 export type AgentOverrideConfig = z.infer<typeof AgentOverrideConfigSchema>
 export type AgentOverrides = z.infer<typeof AgentOverridesSchema>

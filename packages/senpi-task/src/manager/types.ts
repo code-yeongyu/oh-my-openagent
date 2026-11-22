@@ -24,6 +24,7 @@ import type { ExitConfirmationSchedule } from "./provisional-exit"
 import type { ChildCreationPort, ChildPausePort, ResumedChildTurn, RunPauseOwner } from "../pause/ports"
 import type { AdmissionBarrier, ResumeCredential } from "../pause/admission-barrier"
 import type { HeldStart, StartAdmission } from "./start-admission"
+import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
 
 export type { ExecutionMode, ExecutionModeGate } from "./execution-mode"
 
@@ -99,8 +100,6 @@ export type ManagerStartSpec = {
   readonly subagent_type?: string
   readonly execution_mode?: ExecutionMode
   readonly model?: string
-  // `provider/model` the parent session runs at spawn; appended as a category child's last rung (#10750).
-  readonly parent_model?: string
   readonly name?: string
   readonly description?: string
   readonly team_run_id?: string
@@ -229,20 +228,24 @@ export type ResidencyDenied =
 export type ContinueDelivery = "steer" | "followUp" | "revive"
 
 export type ContinueResult =
-  | Extract<SendOutcome, { kind: "uncertain" }>
+  | Extract<SendOutcome, { kind: "uncertain" | "unresponsive" }>
   | {
       readonly kind: "continued"
       readonly task_id: string
       readonly status: TaskStatus
       readonly delivered: ContinueDelivery
     }
-  | { readonly kind: "not_continuable"; readonly task_id?: string; readonly reason: string; readonly suggestion: string }
+  | {
+      readonly kind: "not_continuable"
+      readonly task_id?: string
+      readonly reason: string
+      readonly suggestion: string
+    }
 
-export type ForgetOptions = { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
+export type ForgetOptions =
+  { readonly path: "park" | "evict" } | { readonly path: "end"; readonly reason?: "target_gone" }
 
-export type ListScope =
-  | { readonly scope: "parent-session"; readonly session_id: string }
-  | { readonly scope: "all" }
+export type ListScope = { readonly scope: "parent-session"; readonly session_id: string } | { readonly scope: "all" }
 
 export type ListedTask = {
   readonly record: TaskRecord
@@ -274,6 +277,7 @@ export type TrustedRespawnLaunch = {
 export type TrustedRespawnLaunchResolver = (record: TaskRecord) => Promise<TrustedRespawnLaunch | undefined>
 
 export type TaskManagerOptions = {
+  readonly onChildLiveness?: (record: TaskRecord, status: HostLivenessStatus) => void
   readonly onPausedChild?: (record: TaskRecord, owner: RunPauseOwner, childSeq: number) => void
   readonly childCreationPort?: ChildCreationPort
   readonly admissionBarrier?: AdmissionBarrier

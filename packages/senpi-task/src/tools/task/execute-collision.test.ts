@@ -1,17 +1,24 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { collisionStore } from "../../manager/__fixtures__/collision-store"
-import { FakeRunner, categoryPlanner, cleanupProjects, settings, tempProject } from "../../manager/__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  categoryPlanner,
+  cleanupProjects,
+  settings,
+  tempProject,
+} from "../../manager/__fixtures__/manager-fakes"
 import { createTaskManager } from "../../manager"
 import { createTaskRecordStore } from "../../store"
 import { CTX, makeDeps } from "./__fixtures__/task-tool-fakes"
 import { buildTaskExecute } from "./execute"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
 function buildCollisionExecute() {
   const project = tempProject()
-  const inner = createTaskRecordStore({ project_dir: project })
+  const inner = createTaskRecordStore(ownedTaskState(project))
   const manager = createTaskManager({
     store: collisionStore(inner).store,
     runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
@@ -28,7 +35,13 @@ describe("buildTaskExecute collision handling", () => {
     const execute = buildCollisionExecute()
 
     // when
-    const result = await execute("collision-single", { prompt: "work", category: "quick", run_in_background: true }, undefined, undefined, CTX)
+    const result = await execute(
+      "collision-single",
+      { prompt: "work", category: "quick", run_in_background: true },
+      undefined,
+      undefined,
+      CTX,
+    )
 
     // then
     expect(result.details.status).toBe("running")

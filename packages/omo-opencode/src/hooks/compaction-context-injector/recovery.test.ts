@@ -55,8 +55,7 @@ function createMockContext(
     client: {
       session: {
         messages: async () => {
-          const response =
-            messageResponses[Math.min(callIndex, messageResponses.length - 1)] ?? []
+          const response = messageResponses[Math.min(callIndex, messageResponses.length - 1)] ?? []
           callIndex += 1
           return { data: response }
         },
@@ -82,11 +81,7 @@ function createAssistantMessageUpdatedEvent(sessionID: string, messageID: string
   } as const
 }
 
-function createMeaningfulPartUpdatedEvent(
-  sessionID: string,
-  messageID: string,
-  type: "reasoning" | "tool_use",
-) {
+function createMeaningfulPartUpdatedEvent(sessionID: string, messageID: string, type: "reasoning" | "tool_use") {
   return {
     event: {
       type: "message.part.updated",
@@ -130,12 +125,7 @@ describe("createCompactionContextInjector recovery", () => {
       },
     ]
     const ctx = createMockContext(
-      [
-        checkpointedPromptConfig,
-        incompletePromptConfig,
-        incompletePromptConfig,
-        checkpointedPromptConfig,
-      ],
+      [checkpointedPromptConfig, incompletePromptConfig, incompletePromptConfig, checkpointedPromptConfig],
       promptAsyncRecorder.promptAsync,
     )
     const injector = createCompactionContextInjector({ ctx })
@@ -174,10 +164,7 @@ describe("createCompactionContextInjector recovery", () => {
         },
       },
     ]
-    const ctx = createMockContext(
-      [incompletePromptConfig],
-      promptAsyncRecorder.promptAsync,
-    )
+    const ctx = createMockContext([incompletePromptConfig], promptAsyncRecorder.promptAsync)
     const hook = createCompactionContextInjector({ ctx })
     const peerHold = await dispatchInternalPrompt({
       mode: "async",
@@ -238,12 +225,7 @@ describe("createCompactionContextInjector recovery", () => {
       },
     ]
     const ctx = createMockContext(
-      [
-        recoveredPromptConfig,
-        incompletePromptConfig,
-        incompletePromptConfig,
-        recoveredPromptConfig,
-      ],
+      [recoveredPromptConfig, incompletePromptConfig, incompletePromptConfig, recoveredPromptConfig],
       promptAsyncRecorder.promptAsync,
     )
     const injector = createCompactionContextInjector({ ctx })
@@ -463,9 +445,7 @@ describe("createCompactionContextInjector recovery", () => {
     for (let index = 1; index <= 5; index++) {
       const messageID = `msg_reasoning_${index}`
       await injector.event(createAssistantMessageUpdatedEvent(sessionID, messageID))
-      await injector.event(
-        createMeaningfulPartUpdatedEvent(sessionID, messageID, "reasoning"),
-      )
+      await injector.event(createMeaningfulPartUpdatedEvent(sessionID, messageID, "reasoning"))
       await injector.event({
         event: { type: "session.idle", properties: { sessionID } },
       })
@@ -504,9 +484,7 @@ describe("createCompactionContextInjector recovery", () => {
     for (let index = 1; index <= 5; index++) {
       const messageID = `msg_tool_use_${index}`
       await injector.event(createAssistantMessageUpdatedEvent(sessionID, messageID))
-      await injector.event(
-        createMeaningfulPartUpdatedEvent(sessionID, messageID, "tool_use"),
-      )
+      await injector.event(createMeaningfulPartUpdatedEvent(sessionID, messageID, "tool_use"))
       await injector.event({
         event: { type: "session.idle", properties: { sessionID } },
       })

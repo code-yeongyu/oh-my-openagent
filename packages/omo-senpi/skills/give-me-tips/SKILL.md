@@ -9,9 +9,10 @@ metadata:
 
 ## Purpose
 
-Senpi shows the user tips: startup tips, working tips, and `Tip:` lines injected by omo
-components. When the user asks about any of them - "what was that Tip: line", "what does this tip
-mean", "how does that feature work" - this skill produces a DEEP explanation of that exact tip, in
+Senpi shows the user tips: startup tips and working tips, each drawn as a `Tip:` line by senpi
+itself. omo components add notices of their own beside them, such as the fallback-architect
+`⚡ Fallback upgrade engaged` card and the `✦ Kibitzer` line. When the user asks about any of them -
+"what was that Tip: line", "what does this tip mean", "how does that feature work" - this skill produces a DEEP explanation of that exact tip, in
 the USER'S language (match the language they asked in, always).
 
 Specific over generic, every time. "It retries on failure" is a failure of this skill. "It detects
@@ -27,15 +28,17 @@ Never explain from memory. Get the ground truth of what tips exist:
 1. Run the tip-listing flag of the command this product is installed as: `omo --list-tips`
    under OmO Native (omo-ai installs; the session environment carries `OMO_NATIVE=1` and
    `OMO_BIN`), or `senpi --list-tips` under a plain senpi install. Never spell it `senpi` on an
-   OmO Native machine: package managers link only the top-level `omo` bin, so `senpi` is not on
-   PATH there. If the brand command is not on PATH either (bunx/npx launches), invoke the
+   OmO Native machine: package managers link only the top-level `omo` bin into the user's shell, so
+   `senpi` is not on their PATH (inside a session the bundled engine's `.bin` is on PATH, so `senpi`
+   can resolve there — spell it `omo` anyway). If the brand command is not on PATH either (bunx/npx launches), invoke the
    launcher the `OMO_BIN` variable points at: `"$OMO_BIN" --list-tips`. The command prints JSON:
    `[{id, text, requiresCommand?}]`. Match the user's tip against this list by id or by text
    fragment.
-2. If the flag is unavailable on this senpi version, fall back to reading the catalog sources
-   directly at `packages/coding-agent/src/modes/interactive/tips/catalog/` inside the installed
-   `@code-yeongyu/senpi` package (find it via the senpi install path or node_modules) or in a
-   local clone of code-yeongyu/senpi.
+2. If the flag is unavailable on this senpi version, fall back to reading the catalog directly:
+   the compiled modules at `dist/modes/interactive/tips/catalog/` inside the installed
+   `@code-yeongyu/senpi` package (find it via the senpi install path or node_modules; the package
+   ships `dist/`, not `src/`), or the sources at
+   `packages/coding-agent/src/modes/interactive/tips/catalog/` in a local clone of code-yeongyu/senpi.
 
 Then - and this is the part most explanations get wrong - **available tips DIFFER per user**. The
 catalog is the superset; what THIS user can actually see is gated by:
@@ -72,10 +75,10 @@ should finish the explanation feeling like they got a tour of the engine room, n
 reading. Concrete mechanics over adjectives: name the events, the gates, the file paths, the exact
 order of operations.
 
-## The Fable-5-refusal tip specifically
+## The Fable-5-refusal fallback notice specifically
 
-When the user asks about the tip that appears after a Fable 5 refusal ("Fable 5 refused, but its
-refusals should not wear you down..."), explain the full fallback-architect pipeline, citing
+When the user asks about the notice that appears after a Fable 5 refusal (the `⚡ Fallback upgrade
+engaged` card), explain the full fallback-architect pipeline, citing
 `packages/omo-senpi/src/components/fallback-architect/`:
 
 1. **Refusal detection** (`detection.ts`): the component watches `message_end` events and applies
@@ -92,13 +95,13 @@ refusals should not wear you down..."), explain the full fallback-architect pipe
    consult `task(category: "architect")` with one self-contained query per part (the architect
    consultant IS Fable 5, reached through a lane its refusal cannot block), run independent
    consultations in parallel, and split refused queries into smaller benign sub-questions instead
-   of resending. The directive also tells the model the user was shown the visible tip, so the
-   two never contradict each other.
-4. **Visible tip** (`tip-message.ts`, customType `omo-fallback-architect:tip`, display:true):
-   rendered as a dim `Tip:` block via a registered message renderer. It names the ACTUAL fallback
-   model the session landed on, reassures the user that the refused question is still being
-   reasoned through in essence, and notes Fable-5-grade depth stays reachable through the
-   architect category.
+   of resending. The directive also tells the model what the user was shown, so the two never
+   contradict each other.
+4. **Visible notice** (`notice.ts`, customType `omo-fallback-architect:notice`, display:true,
+   structured `details` `{from, to}`): rendered by a registered message renderer as an accent-tone
+   notice box titled `⚡ Fallback upgrade engaged`. It names the model that declined and the ACTUAL
+   fallback model the session landed on, and notes that Fable 5 at xhigh stays on call through
+   `task(category: "architect")`.
 
 The engineering worth bragging about: the refusal never deletes the user's question. Detection
 arms on the exact assistant message that preceded the switch (a later successful answer disarms

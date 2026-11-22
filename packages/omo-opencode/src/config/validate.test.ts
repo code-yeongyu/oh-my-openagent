@@ -121,8 +121,16 @@ describe("validatePluginConfig", () => {
 
       const result = validatePluginConfig(fixture.project)
 
-      expect(result.config.agents?.sisyphus).toMatchObject({ model: "project/model", prompt: "user prompt", temperature: 0.7 })
-      expect(result.config.categories?.["deep-low"]).toMatchObject({ model: "user/deep", temperature: 0.2, prompt_append: "project appendix" })
+      expect(result.config.agents?.sisyphus).toMatchObject({
+        model: "project/model",
+        prompt: "user prompt",
+        temperature: 0.7,
+      })
+      expect(result.config.categories?.["deep-low"]).toMatchObject({
+        model: "user/deep",
+        temperature: 0.2,
+        prompt_append: "project appendix",
+      })
       expect(result.config.claude_code).toMatchObject({ mcp: true, commands: true })
       expect(result.config.disabled_agents).toEqual(["user-agent", "project-agent"])
       expect(result.config.tui?.sidebar.enabled).toBe(false)
@@ -212,7 +220,9 @@ describe("validatePluginConfig", () => {
 
       expect(result.valid).toBe(false)
       expect(result.messages.some((message) => message.includes("Unknown config key: unknown_switch"))).toBe(true)
-      expect(result.messages.some((message) => message.includes("Unknown config key: tui.sidebar.unknown_sidebar_switch"))).toBe(true)
+      expect(
+        result.messages.some((message) => message.includes("Unknown config key: tui.sidebar.unknown_sidebar_switch")),
+      ).toBe(true)
       expect(Object.hasOwn(result.config, "unknown_switch")).toBe(false)
       expect(Object.hasOwn(result.config.tui?.sidebar ?? {}, "unknown_sidebar_switch")).toBe(false)
       expect(result.config.tui?.sidebar.enabled).toBe(false)

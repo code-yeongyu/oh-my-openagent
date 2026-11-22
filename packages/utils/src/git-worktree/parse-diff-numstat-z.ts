@@ -10,10 +10,7 @@ function toCount(value: string): number {
  * the source and destination (`1\t2\t\0old\0new\0`) and is reported once, under
  * the destination.
  */
-export function parseGitDiffNumstatZ(
-  output: string,
-  statusMap: Map<string, GitFileStatus>,
-): GitFileStat[] {
+export function parseGitDiffNumstatZ(output: string, statusMap: Map<string, GitFileStatus>): GitFileStat[] {
   if (!output) return []
 
   const stats: GitFileStat[] = []

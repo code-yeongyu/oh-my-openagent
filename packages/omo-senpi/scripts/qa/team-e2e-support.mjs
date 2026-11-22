@@ -106,9 +106,9 @@ export function memberSessionDir(sandbox, taskId) {
 
 export function sessionEnvelopeCount(sandbox, taskId, messageId) {
   const marker = `messageId=\"${messageId}\"`
-  return sessionStringValues(sandbox, taskId)
-    .filter((value) => value.includes("<peer_message ") && value.includes(marker))
-    .length
+  return sessionStringValues(sandbox, taskId).filter(
+    (value) => value.includes("<peer_message ") && value.includes(marker),
+  ).length
 }
 
 export function sessionContainsText(sandbox, taskId, needle) {

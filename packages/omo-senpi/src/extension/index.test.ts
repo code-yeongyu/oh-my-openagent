@@ -1,12 +1,14 @@
 import { describe, expect, it } from "bun:test"
 
 import { createConfigWatchComponent } from "../components/config-watch"
-import { FakeExtensionAPI } from "../../test-support/fake-extension-api"
+import { FakeExtensionAPI, withInertSenpiSeams } from "../../test-support/fake-extension-api"
 import { composeOmoSenpiExtension } from "./compose"
 import type { ComponentLogger } from "./types"
 import extension from "./index"
 
-function createRecordingLogger(): ComponentLogger & { entries: Array<{ level: string; message: string; details?: unknown }> } {
+function createRecordingLogger(): ComponentLogger & {
+  entries: Array<{ level: string; message: string; details?: unknown }>
+} {
   const entries: Array<{ level: string; message: string; details?: unknown }> = []
   return {
     entries,
@@ -93,7 +95,7 @@ describe("omo-senpi extension entry", () => {
   })
 
   it("#given config-watch disabled by flag #when composed #then it emits no registration and no warning", async () => {
-    const pi = new FakeExtensionAPI()
+    const pi = withInertSenpiSeams(new FakeExtensionAPI())
     const emitted: Array<{ name: string; payload: unknown }> = []
     const logger = createRecordingLogger()
     pi.setFlag("omo-senpi-config-watch-disabled", true)
@@ -108,10 +110,7 @@ describe("omo-senpi extension entry", () => {
 
     await composeOmoSenpiExtension([createConfigWatchComponent()], { logger })(pi)
 
-    expect(pi.flags.map((flag) => flag.name)).toEqual([
-      "omo-senpi-disabled",
-      "omo-senpi-config-watch-disabled",
-    ])
+    expect(pi.flags.map((flag) => flag.name)).toEqual(["omo-senpi-disabled", "omo-senpi-config-watch-disabled"])
     expect(emitted).toEqual([])
     expect(logger.entries).toEqual([
       {

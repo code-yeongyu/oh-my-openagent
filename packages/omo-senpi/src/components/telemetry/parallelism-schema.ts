@@ -2,7 +2,9 @@ const BOOLEAN_PROPERTY = Object.freeze({ type: "boolean" } as const)
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
 
-function enumProperty<const Values extends readonly string[]>(values: Values): Readonly<{
+function enumProperty<const Values extends readonly string[]>(
+  values: Values,
+): Readonly<{
   type: "string"
   values: Values
 }> {
@@ -10,7 +12,7 @@ function enumProperty<const Values extends readonly string[]>(values: Values): R
 }
 
 export const PARALLELISM_SUMMARY_SCHEMA = Object.freeze({
-  "$session_id": STRING_PROPERTY,
+  $session_id: STRING_PROPERTY,
   clock_anomalies: NUMBER_PROPERTY,
   dropped_calls: NUMBER_PROPERTY,
   eval_execution_detached_count: NUMBER_PROPERTY,

@@ -5,24 +5,32 @@ import { InProcessRunner, RunnerError } from "./in-process"
 import { baseSpec, createFakeSession, makeTool, tmpSessionDirs } from "./in-process-child-spec.test-support"
 import type { CreateAgentSessionOptions } from "./in-process-child-spec.test-support"
 import type { ChildSession } from "./in-process"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 const unhandled: unknown[] = []
-const onUnhandled = (reason: unknown): void => { unhandled.push(reason) }
-afterEach(() => { unhandled.length = 0; while (tmpSessionDirs.length > 0) rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true }) })
+const onUnhandled = (reason: unknown): void => {
+  unhandled.push(reason)
+}
+afterEach(() => {
+  unhandled.length = 0
+  while (tmpSessionDirs.length > 0) rmSync(tmpSessionDirs.pop() ?? "", { recursive: true, force: true })
+})
 
-  test("#given handle construction touches a broken subscription #when start is called #then the created session is disposed before start rejects", async () => {
-    const fake = createFakeSession()
-    const broken: ChildSession = {
-      ...fake.session,
-      subscribe: () => { throw new Error("subscribe failed") },
-    }
-    const runner = new InProcessRunner({ createSession: async () => broken })
+test("#given handle construction touches a broken subscription #when start is called #then the created session is disposed before start rejects", async () => {
+  const fake = createFakeSession()
+  const broken: ChildSession = {
+    ...fake.session,
+    subscribe: () => {
+      throw new Error("subscribe failed")
+    },
+  }
+  const runner = new InProcessRunner({ createSession: async () => broken })
 
-    await expect(runner.start(baseSpec())).rejects.toThrow("subscribe failed")
-    expect(fake.disposeCount).toBe(1)
-  })
-
-
+  await expect(runner.start(baseSpec())).rejects.toThrow("subscribe failed")
+  expect(fake.disposeCount).toBe(1)
+})
 
 describe("InProcessRunner completion policy", () => {
   test('#given a spec with completion "turn" #when the child settles with no assistant output #then start passes the policy through and the handle completes', async () => {
@@ -40,7 +48,10 @@ describe("InProcessRunner completion policy", () => {
     const runner = new InProcessRunner({ createSession: async () => fake.session })
     const spec = baseSpec({ completion: "turn" })
     const sessionPath = join(spec.sessionDir, "child.jsonl")
-    writeFileSync(sessionPath, JSON.stringify({ type: "session", version: 3, id: fake.session.sessionId, cwd: spec.cwd }) + "\n")
+    writeFileSync(
+      sessionPath,
+      JSON.stringify({ type: "session", version: 3, id: fake.session.sessionId, cwd: spec.cwd }) + "\n",
+    )
 
     const handle = await runner.resume(spec, sessionPath)
 

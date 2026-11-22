@@ -1,8 +1,5 @@
 import { readSessionRole } from "@oh-my-opencode/senpi-task"
-import {
-  sweepOrphanedLspDaemonProxies,
-  sweepStaleLspDaemonVersions,
-} from "@oh-my-opencode/utils/process-sweep"
+import { sweepOrphanedLspDaemonProxies, sweepStaleLspDaemonVersions } from "@oh-my-opencode/utils/process-sweep"
 
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import { resolveSenpiDaemonRuntime } from "../lsp/daemon-runtime"
@@ -44,9 +41,11 @@ export function wireSessionStartProcessSweep(
   const env = options.env ?? process.env
   const resolveDaemonVersion =
     options.resolveDaemonVersion ?? ((runtimeEnv) => resolveSenpiDaemonRuntime(runtimeEnv).version)
-  const sweep = options.sweep ?? (() => {
-    return sweepOmoFamiliesBestEffort(ctx, () => resolveDaemonVersion(env), options.familySweeps)
-  })
+  const sweep =
+    options.sweep ??
+    (() => {
+      return sweepOmoFamiliesBestEffort(ctx, () => resolveDaemonVersion(env), options.familySweeps)
+    })
 
   pi.on("session_start", () => {
     // Machine hygiene belongs to the process the USER launched. A task child - its own process, or

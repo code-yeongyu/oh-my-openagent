@@ -2,7 +2,7 @@ import {
   createTelemetryClient,
   getDefaultTelemetryOsProvider,
   getDailyActiveCaptureState,
-  getTelemetryDistinctId,
+  getTelemetryInstallDistinctId,
 } from "@oh-my-opencode/telemetry-core"
 import type {
   PostHogActivityCaptureState,
@@ -10,14 +10,10 @@ import type {
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core"
 
+import { getActivityStateDir } from "./data-path"
 import { writeTelemetryDiagnostic } from "./diagnostics"
 import { getPostHogActivityCaptureState } from "./posthog-activity-state"
-import {
-  DEFAULT_POSTHOG_API_KEY,
-  DEFAULT_POSTHOG_HOST,
-  MACHINE_ID_PREFIX,
-  createCodexTelemetryProductConfig,
-} from "./product-identity"
+import { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST, createCodexTelemetryProductConfig } from "./product-identity"
 
 export { DEFAULT_POSTHOG_API_KEY, DEFAULT_POSTHOG_HOST }
 
@@ -25,7 +21,7 @@ export type PostHogSource = "cli" | "plugin" | "install"
 export type PostHogActivityReason = "install_started" | "install_completed" | "cli_run" | "session_start"
 
 export type PostHogClient = {
-  readonly trackActive: (distinctId: string, reason: PostHogActivityReason) => void
+  readonly trackActive: (reason: PostHogActivityReason) => void
   readonly shutdown: () => Promise<void>
 }
 
@@ -69,10 +65,7 @@ function resolveActivityStateProvider(options: CreatePostHogClientOptions): Acti
   return () => getPostHogActivityCaptureState(options.now ?? new Date())
 }
 
-function createPostHogClient(
-  source: PostHogSource,
-  options: CreatePostHogClientOptions = {},
-): PostHogClient {
+function createPostHogClient(source: PostHogSource, options: CreatePostHogClientOptions = {}): PostHogClient {
   const client = createTelemetryClient({
     diagnostics: writeTelemetryDiagnostic,
     env: options.env ?? process.env,
@@ -89,21 +82,22 @@ function createPostHogClient(
   const activityStateProvider = resolveActivityStateProvider(options)
 
   return {
-    trackActive: (distinctId, reason) => {
-      const activityState = options.stateDir === undefined
-        ? activityStateProvider()
-        : getDailyActiveCaptureState({
-            diagnostics: writeTelemetryDiagnostic,
-            now: options.now,
-            stateDir: options.stateDir,
-          })
+    trackActive: (reason) => {
+      const activityState =
+        options.stateDir === undefined
+          ? activityStateProvider()
+          : getDailyActiveCaptureState({
+              diagnostics: writeTelemetryDiagnostic,
+              now: options.now,
+              stateDir: options.stateDir,
+            })
       if (!activityState.captureDaily) {
         return
       }
 
       client.trackActive({
         dayUTC: activityState.dayUTC,
-        distinctId,
+        distinctId: getTelemetryInstallDistinctId(options.stateDir ?? getActivityStateDir()),
         reason,
       })
     },
@@ -111,10 +105,6 @@ function createPostHogClient(
       await client.shutdown()
     },
   }
-}
-
-export function getPostHogDistinctId(): string {
-  return getTelemetryDistinctId(MACHINE_ID_PREFIX, resolveOsProvider())
 }
 
 export function createCliPostHog(): PostHogClient {
@@ -129,10 +119,7 @@ export function createPluginPostHog(): PostHogClient {
   return createPostHogClient("plugin")
 }
 
-export function __createPostHogForTesting(
-  source: PostHogSource,
-  options: CreatePostHogClientOptions,
-): PostHogClient {
+export function __createPostHogForTesting(source: PostHogSource, options: CreatePostHogClientOptions): PostHogClient {
   return createPostHogClient(source, options)
 }
 

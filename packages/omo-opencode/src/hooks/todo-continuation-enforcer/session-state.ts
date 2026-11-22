@@ -28,11 +28,7 @@ export interface SessionStateStore {
   getState: (sessionID: string) => SessionState
   getExistingState: (sessionID: string) => SessionState | undefined
   startPruneInterval: () => void
-  trackContinuationProgress: (
-    sessionID: string,
-    incompleteCount: number,
-    todos?: Todo[],
-  ) => ContinuationProgressUpdate
+  trackContinuationProgress: (sessionID: string, incompleteCount: number, todos?: Todo[]) => ContinuationProgressUpdate
   resetContinuationProgress: (sessionID: string) => void
   cancelCountdown: (sessionID: string) => void
   cleanup: (sessionID: string) => void
@@ -125,13 +121,13 @@ export function createSessionStateStore(): SessionStateStore {
     const currentCompletedCount = todos?.filter((todo) => todo.status === "completed").length
     const currentTodoSnapshot = todos ? getTodoSnapshot(todos) : undefined
     const hasCompletedMoreTodos =
-      currentCompletedCount !== undefined
-      && trackedSession.lastCompletedCount !== undefined
-      && currentCompletedCount > trackedSession.lastCompletedCount
+      currentCompletedCount !== undefined &&
+      trackedSession.lastCompletedCount !== undefined &&
+      currentCompletedCount > trackedSession.lastCompletedCount
     const hasTodoSnapshotChanged =
-      currentTodoSnapshot !== undefined
-      && trackedSession.lastTodoSnapshot !== undefined
-      && currentTodoSnapshot !== trackedSession.lastTodoSnapshot
+      currentTodoSnapshot !== undefined &&
+      trackedSession.lastTodoSnapshot !== undefined &&
+      currentTodoSnapshot !== trackedSession.lastTodoSnapshot
     const hadSuccessfulInjectionAwaitingProgressCheck = state.awaitingPostInjectionProgressCheck === true
 
     state.lastIncompleteCount = incompleteCount
@@ -181,10 +177,7 @@ export function createSessionStateStore(): SessionStateStore {
     }
 
     state.awaitingPostInjectionProgressCheck = false
-    if (
-      state.continuationResponseObserved === true
-      && state.continuationBlockReason !== "user-interruption"
-    ) {
+    if (state.continuationResponseObserved === true && state.continuationBlockReason !== "user-interruption") {
       state.continuationBlockReason = "directive-response"
     }
     state.continuationResponseObserved = false

@@ -21,6 +21,8 @@ export interface FallbackArchitectNoticeDetails {
 // Display flavor only: unknown selectors fall through to their bare model id, so the copy never
 // blocks on this list being complete.
 const FRIENDLY_MODEL_NAMES: readonly (readonly [RegExp, string])[] = [
+  // Checked before the K3 label, which would also match `kimi-k3.1-pro`. Kimi Code spells it `k3.1-pro`.
+  [/k3[.-]1(?!\d)/i, "Kimi K3.1 Pro (max)"],
   [/kimi-k3/i, "Kimi K3 (max)"],
   [/claude-fable-5/i, "Fable 5"],
   [/claude-opus-5[-.]5/i, "Opus 5.5"],
@@ -46,7 +48,11 @@ export function buildFallbackArchitectNotice(input: FallbackArchitectNoticeDetai
   ].join("\n")
 }
 
-export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNoticeDetails> = (message, options, theme) => {
+export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNoticeDetails> = (
+  message,
+  options,
+  theme,
+) => {
   const details = message.details
   if (details === undefined) {
     return buildNoticeBox(
@@ -66,7 +72,9 @@ export const renderFallbackArchitectNotice: MessageRenderer<FallbackArchitectNot
       title: "⚡ Fallback upgrade engaged",
       tone: "accent",
       why: `${from} declined that one: ${to} takes the wheel, zero downtime.`,
-      extra: [{ text: `Top-tier reasoning stays on call: task(category: "architect") still consults Fable 5 at xhigh.` }],
+      extra: [
+        { text: `Top-tier reasoning stays on call: task(category: "architect") still consults Fable 5 at xhigh.` },
+      ],
       expandedLine: `${to} on execution + Fable 5 xhigh on hard thinking: two frontier brains, one session.`,
     },
     options,

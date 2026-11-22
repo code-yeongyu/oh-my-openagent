@@ -30,8 +30,11 @@ export async function tccDiagnostic(options: RunOptions): Promise<ScenarioResult
     const result = await session.call({ action: "call", chain: [{ method: "screenshot" }] })
     const message = toolError(result) ?? ""
     const { pass, identity } = tccIdentityPasses(message, engine)
-    return { scenario: "tcc-diagnostic", pass: result.isError && pass,
-      facts: { launcher: "engine spawned with TCC responsibility disclaimed", engine, message, identity } }
+    return {
+      scenario: "tcc-diagnostic",
+      pass: result.isError && pass,
+      facts: { launcher: "engine spawned with TCC responsibility disclaimed", engine, message, identity },
+    }
   })
 }
 

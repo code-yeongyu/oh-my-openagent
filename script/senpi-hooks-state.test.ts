@@ -1,23 +1,12 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import {
-  mkdirSync,
-  mkdtempSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { CONFIG_DIR_NAME } from "../node_modules/@code-yeongyu/senpi/dist/config.js"
 import { FileHookStateStorage } from "../node_modules/@code-yeongyu/senpi/dist/core/extensions/builtin/hooks/trust-storage.js"
 
-function withStorage(run: (fixture: {
-  root: string
-  statePath: string
-  storage: FileHookStateStorage
-}) => void): void {
+function withStorage(run: (fixture: { root: string; statePath: string; storage: FileHookStateStorage }) => void): void {
   const root = mkdtempSync(join(tmpdir(), "omo-hooks-state-"))
   const cwd = join(root, "project")
   const agentDir = join(root, "agent")
@@ -92,25 +81,32 @@ describe("patched Senpi hooks state snapshots", () => {
     })
   })
 
-  test.skipIf(process.platform === "win32")("preserves an existing POSIX snapshot mode under a restrictive umask", () => {
-    const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-mode-runner.ts")
-    const child = spawnSync(process.execPath, [runner], { encoding: "utf8" })
+  test.skipIf(process.platform === "win32")(
+    "preserves an existing POSIX snapshot mode under a restrictive umask",
+    () => {
+      const runner = join(import.meta.dir, "fixtures", "senpi-hooks-state-mode-runner.ts")
+      const child = spawnSync(process.execPath, [runner], { encoding: "utf8" })
 
-    expect(child.status, child.stderr).toBe(0)
-    expect(JSON.parse(child.stdout)).toEqual({ mode: 0o640 })
-  }, 60_000)
+      expect(child.status, child.stderr).toBe(0)
+      expect(JSON.parse(child.stdout)).toEqual({ mode: 0o640 })
+    },
+    60_000,
+  )
 
-  test.skipIf(process.platform === "win32")("creates a new POSIX snapshot with mode 0600 under a permissive umask", () => {
-    withStorage(({ statePath, storage }) => {
-      rmSync(statePath, { force: true })
-      const previousUmask = process.umask(0)
-      try {
-        storage.update("project", (current) => current)
-      } finally {
-        process.umask(previousUmask)
-      }
+  test.skipIf(process.platform === "win32")(
+    "creates a new POSIX snapshot with mode 0600 under a permissive umask",
+    () => {
+      withStorage(({ statePath, storage }) => {
+        rmSync(statePath, { force: true })
+        const previousUmask = process.umask(0)
+        try {
+          storage.update("project", (current) => current)
+        } finally {
+          process.umask(previousUmask)
+        }
 
-      expect(statSync(statePath).mode & 0o777).toBe(0o600)
-    })
-  })
+        expect(statSync(statePath).mode & 0o777).toBe(0o600)
+      })
+    },
+  )
 })

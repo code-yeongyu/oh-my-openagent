@@ -34,11 +34,21 @@ const localLatches = (() => {
 function permissionClaim(): typeof localLatches.claim {
   try {
     const retained: unknown = Object.getOwnPropertyDescriptor(globalThis, PERMISSION_LATCHES)?.value
-    const facade = typeof retained === "object" && retained !== null && Object.isFrozen(retained)
-      && "version" in retained && retained.version === 1 && "claim" in retained && typeof retained.claim === "function"
-      ? retained : localLatches
+    const facade =
+      typeof retained === "object" &&
+      retained !== null &&
+      Object.isFrozen(retained) &&
+      "version" in retained &&
+      retained.version === 1 &&
+      "claim" in retained &&
+      typeof retained.claim === "function"
+        ? retained
+        : localLatches
     Object.defineProperty(globalThis, PERMISSION_LATCHES, {
-      value: facade, writable: false, configurable: false, enumerable: false,
+      value: facade,
+      writable: false,
+      configurable: false,
+      enumerable: false,
     })
     const claim = facade.claim
     if (typeof claim !== "function") return localLatches.claim
@@ -57,8 +67,40 @@ function permissionClaim(): typeof localLatches.claim {
   }
 }
 
+/**
+ * The execution scope a hand (brain/hand split) runs this component in. Both values come from the loop side as
+ * opaque routing keys: the hand reports with them and never interprets them.
+ */
+export interface ComputerPermissionScope {
+  readonly scopeId: string
+  readonly rootOwner: string
+}
+
+/**
+ * On a hand there is no session_start, no transcript and no caller ancestry: the scope's root owner is the
+ * report's identity, deduped per (root owner, permission) by the same process-global latch.
+ */
+function handReporter(pi: SenpiExtensionAPI, scope: ComputerPermissionScope) {
+  const claim = permissionClaim()
+  return (permission: Omit<ChildExtensionEvent, "type">): void => {
+    if (pi.rpc === undefined || !claim(scope.rootOwner, permission.permission)) return
+    pi.rpc.emit(ROOT_PERMISSION_EVENT, {
+      session_id: scope.rootOwner,
+      scope_id: scope.scopeId,
+      permission: permission.permission,
+      ...(permission.app === undefined ? {} : { app: permission.app }),
+    })
+  }
+}
+
 /** Root identity belongs to session_start, never to a shared tool's in-process child context. */
-export function wireComputerPermissionEvents(pi: SenpiExtensionAPI, env: NodeJS.ProcessEnv, logger: ComponentLogger) {
+export function wireComputerPermissionEvents(
+  pi: SenpiExtensionAPI,
+  env: NodeJS.ProcessEnv,
+  logger: ComponentLogger,
+  scope?: ComputerPermissionScope,
+) {
+  if (scope !== undefined) return handReporter(pi, scope)
   const claim = permissionClaim()
   let sessionId: string | undefined
   let unsubscribe: (() => void) | undefined
@@ -70,7 +112,11 @@ export function wireComputerPermissionEvents(pi: SenpiExtensionAPI, env: NodeJS.
       return
     }
     if (!claim(sessionId, event.permission)) return
-    const data = { session_id: sessionId, permission: event.permission, ...(event.app === undefined ? {} : { app: event.app }) }
+    const data = {
+      session_id: sessionId,
+      permission: event.permission,
+      ...(event.app === undefined ? {} : { app: event.app }),
+    }
     pi.rpc.emit(ROOT_PERMISSION_EVENT, data)
     try {
       pi.appendEntry?.(ROOT_PERMISSION_EVENT, { session_id: sessionId, permission: event.permission })

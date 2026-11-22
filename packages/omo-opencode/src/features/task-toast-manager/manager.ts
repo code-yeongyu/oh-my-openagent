@@ -7,7 +7,9 @@ type OpencodeClient = PluginInput["client"]
 
 type ClientWithTui = {
   tui?: {
-    showToast: (opts: { body: { title: string; message: string; variant: string; duration: number } }) => Promise<unknown>
+    showToast: (opts: {
+      body: { title: string; message: string; variant: string; duration: number }
+    }) => Promise<unknown>
   }
 }
 
@@ -119,11 +121,11 @@ export class TaskToastManager {
     }
     const lines: string[] = []
 
-    const isFallback = newTask.modelInfo && (
-      newTask.modelInfo.type === "inherited" ||
-      newTask.modelInfo.type === "system-default" ||
-      newTask.modelInfo.type === "runtime-fallback"
-    )
+    const isFallback =
+      newTask.modelInfo &&
+      (newTask.modelInfo.type === "inherited" ||
+        newTask.modelInfo.type === "system-default" ||
+        newTask.modelInfo.type === "runtime-fallback")
     if (isFallback) {
       const suffixMap: Record<"inherited" | "system-default" | "runtime-fallback", string> = {
         inherited: t("toast.fallback_inherited"),
@@ -170,18 +172,18 @@ export class TaskToastManager {
     const running = this.getRunningTasks()
     const queued = this.getQueuedTasks()
 
-    const title = newTask.isBackground
-      ? t("toast.new_background_task")
-      : t("toast.new_task_executed")
+    const title = newTask.isBackground ? t("toast.new_background_task") : t("toast.new_task_executed")
 
-    tuiClient.tui.showToast({
-      body: {
-        title,
-        message: message || `${newTask.description} (${newTask.agent})`,
-        variant: "info",
-        duration: running.length + queued.length > 2 ? 5000 : 3000,
-      },
-    }).catch(() => {})
+    tuiClient.tui
+      .showToast({
+        body: {
+          title,
+          message: message || `${newTask.description} (${newTask.agent})`,
+          variant: "info",
+          duration: running.length + queued.length > 2 ? 5000 : 3000,
+        },
+      })
+      .catch(() => {})
   }
 
   showCompletionToast(task: { id: string; description: string; duration: string }): void {
@@ -198,14 +200,16 @@ export class TaskToastManager {
       message += `\n\n${t("toast.task_completion_remaining", { running: remaining.length, queued: queued.length })}`
     }
 
-    tuiClient.tui.showToast({
-      body: {
-        title: t("toast.task_completed"),
-        message,
-        variant: "success",
-        duration: 5000,
-      },
-    }).catch(() => {})
+    tuiClient.tui
+      .showToast({
+        body: {
+          title: t("toast.task_completed"),
+          message,
+          variant: "success",
+          duration: 5000,
+        },
+      })
+      .catch(() => {})
   }
 }
 
@@ -217,7 +221,7 @@ export function getTaskToastManager(): TaskToastManager | null {
 
 export function initTaskToastManager(
   client: OpencodeClient,
-  concurrencyManager?: ConcurrencyManager
+  concurrencyManager?: ConcurrencyManager,
 ): TaskToastManager {
   instance = new TaskToastManager(client, concurrencyManager)
   return instance

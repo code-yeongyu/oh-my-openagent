@@ -152,19 +152,23 @@ describe("oh-my-openagent plugin module", () => {
     expect(mockInitializeOpenClaw).toHaveBeenCalledWith(openclawConfig)
   })
 
-  it("does not start openclaw when openclaw config is absent", async () => {
-    // given
-    mockLoadPluginConfig.mockReturnValue({})
+  it(
+    "does not start openclaw when openclaw config is absent",
+    async () => {
+      // given
+      mockLoadPluginConfig.mockReturnValue({})
 
-    // when
-    await pluginModule.server({
-      directory: "/tmp/project",
-      client: {},
-    } as Parameters<typeof pluginModule.server>[0])
+      // when
+      await pluginModule.server({
+        directory: "/tmp/project",
+        client: {},
+      } as Parameters<typeof pluginModule.server>[0])
 
-    // then
-    expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
-  }, { timeout: 15000 })
+      // then
+      expect(mockInitializeOpenClaw).not.toHaveBeenCalled()
+    },
+    { timeout: 15000 },
+  )
 
   it("migrates legacy workspace state during plugin bootstrap", async () => {
     // given

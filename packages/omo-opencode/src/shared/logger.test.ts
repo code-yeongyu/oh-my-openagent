@@ -112,9 +112,7 @@ describe("#given the shared logger", () => {
       expect(fs.readFileSync(`${logFilePath}.1`, "utf8")).toContain("entry-C")
 
       // Total worst-case files on disk: primary + 2 backups
-      const survivors = fs
-        .readdirSync(tempDir)
-        .filter((name) => name.startsWith(path.basename(logFilePath)))
+      const survivors = fs.readdirSync(tempDir).filter((name) => name.startsWith(path.basename(logFilePath)))
       expect(survivors.length).toBeLessThanOrEqual(3)
     })
 

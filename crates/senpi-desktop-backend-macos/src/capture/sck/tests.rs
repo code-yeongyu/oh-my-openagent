@@ -239,37 +239,5 @@ pixels(1, 1, [0, 0, 0, 255])
     }
 }
 
-#[test]
-fn ping_waits_for_the_ready_reply() {
-    // Given: a helper that answers the warm-up ping
-    let dir = tempfile::tempdir().unwrap();
-    let helper = fake_helper(&dir, &format!(
-        "{PY_PREAMBLE}
-assert json.loads(sys.stdin.buffer.readline().decode()) == {{'kind': 'ping'}}
-header({{'kind':'ready'}})
-"
-    ));
-    let mut client = HelperClient::start(&helper).unwrap();
-    // When / Then: the ping returns once the ready header arrives
-    client.ping(std::time::Duration::from_secs(5)).unwrap();
-}
-
-#[test]
-fn a_silent_helper_fails_the_ping_within_its_budget() {
-    // Given: a helper that reads the ping and never answers
-    let dir = tempfile::tempdir().unwrap();
-    let helper = fake_helper(&dir, &format!(
-        "{PY_PREAMBLE}
-import time
-sys.stdin.buffer.readline()
-time.sleep(30)
-"
-    ));
-    let mut client = HelperClient::start(&helper).unwrap();
-    // When: the warm-up budget is short
-    let started = std::time::Instant::now();
-    let error = client.ping(std::time::Duration::from_millis(300)).unwrap_err();
-    // Then: it is a transport (start) failure that honors the budget
-    assert!(matches!(error, ClientError::Transport(_)), "{error:?}");
-    assert!(started.elapsed() < std::time::Duration::from_secs(2));
-}
+#[path = "handshake_tests.rs"]
+mod handshake;

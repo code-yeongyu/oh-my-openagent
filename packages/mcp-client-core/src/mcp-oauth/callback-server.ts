@@ -85,9 +85,7 @@ function probeServerAcceptingHttpRequests(port: number): Promise<boolean> {
     }
 
     const socket = createConnection({ host: "127.0.0.1", port }, () => {
-      socket.write(
-        `GET ${READINESS_PROBE_PATH} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`,
-      )
+      socket.write(`GET ${READINESS_PROBE_PATH} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\nConnection: close\r\n\r\n`)
     })
     socket.once("data", () => {
       receivedResponse = true

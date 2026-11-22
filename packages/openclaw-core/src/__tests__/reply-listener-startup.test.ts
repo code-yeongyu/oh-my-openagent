@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -79,10 +78,8 @@ function resetStateDir(): void {
   daemonPids.clear()
 }
 
-beforeAll(async () => {
-  process.env.HOME = tempHome
-  process.env.USERPROFILE = tempHome
-
+// The test setup restores module mocks after every test, so each test installs its own.
+function mockReplyListenerDependencies(): void {
   mock.module("../reply-listener-spawn", () => ({
     spawnReplyListenerDaemon: (...args: unknown[]) => spawnImplementation(...args),
   }))
@@ -98,12 +95,20 @@ beforeAll(async () => {
     analyzePaneContent: () => ({ confidence: 1 }),
     sendToPane: async () => true,
   }))
+}
+
+beforeAll(async () => {
+  process.env.HOME = tempHome
+  process.env.USERPROFILE = tempHome
+
+  mockReplyListenerDependencies()
 
   replyListenerModule = await import("../reply-listener")
   replyListenerStartModule = await import("../reply-listener-start")
 })
 
 beforeEach(() => {
+  mockReplyListenerDependencies()
   resetStateDir()
 })
 
@@ -170,8 +175,7 @@ describe("startReplyListener", () => {
 
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -200,8 +204,7 @@ describe("startReplyListener", () => {
   test("does not report success or leave stale running state when detached child never becomes ready", async () => {
     spawnImplementation = () => ({
       pid: 9876,
-      unref() {
-      },
+      unref() {},
     })
 
     const result = await replyListenerModule.startReplyListener(createConfig())
@@ -226,15 +229,21 @@ describe("startReplyListener", () => {
       stateFilePath,
       JSON.stringify({ isRunning: true, pid: existingPid, startupToken: "existing", errors: 0 }, null, 2),
     )
-    writeFileSync(configFilePath, JSON.stringify({ ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } }, null, 2))
+    writeFileSync(
+      configFilePath,
+      JSON.stringify(
+        { ...createConfig(), replyListener: { ...createConfig().replyListener, pollIntervalMs: 500 } },
+        null,
+        2,
+      ),
+    )
 
     let spawnCalls = 0
     spawnImplementation = () => {
       spawnCalls += 1
       return {
         pid: 9999,
-        unref() {
-        },
+        unref() {},
       }
     }
 
@@ -251,5 +260,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

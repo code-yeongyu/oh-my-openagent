@@ -68,13 +68,21 @@ describe("senpi LSP config paths follow the branded .omo dir (#8370)", () => {
     const cwd = tempDir("omo-lsp-project-")
 
     // when / then
-    expect(projectLspConfigPaths(cwd)).toEqual([join(cwd, ".omo", "lsp-client.json"), join(cwd, ".pi", "lsp-client.json")])
+    expect(projectLspConfigPaths(cwd)).toEqual([
+      join(cwd, ".omo", "lsp-client.json"),
+      join(cwd, ".pi", "lsp-client.json"),
+    ])
   })
 
   it("#given a migrated project config with a custom command #when config notices are read #then the notice points at the .omo file", () => {
     // given
     const cwd = tempDir("omo-lsp-project-")
-    const projectConfig = writeConfig(cwd, ".omo", "lsp-client.json", JSON.stringify({ lsp: { custom: { command: ["custom-lsp"], extensions: [".zz"] } } }))
+    const projectConfig = writeConfig(
+      cwd,
+      ".omo",
+      "lsp-client.json",
+      JSON.stringify({ lsp: { custom: { command: ["custom-lsp"], extensions: [".zz"] } } }),
+    )
     const originalCwd = process.cwd()
     process.chdir(cwd)
     try {

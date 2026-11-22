@@ -57,13 +57,13 @@ describe("resolveAgent category stage", () => {
   test("#given categories deep then unspecified-high #when both resolve #then the deep model wins and the later category extends the runtime chain", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
-    const models = registry([model("openai", "gpt-5.6-sol"), model("anthropic", "claude-opus-5-5")])
+    const models = registry([model("openai", "gpt-6.2-sol"), model("anthropic", "claude-opus-5-5")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
 
     // then
-    expect(result.model).toBe("openai/gpt-5.6-sol")
+    expect(result.model).toBe("openai/gpt-6.2-sol")
     expect(result.resolved_model?.reasoning).toBe("medium")
     expect(result.fallback_models?.map((record) => record.display)).toContain("anthropic/claude-opus-5-5")
     for (const record of result.fallback_models ?? []) {
@@ -127,7 +127,7 @@ describe("resolveAgent category stage", () => {
   test("#given a category that carries a prompt append and tools #when the agent resolves through it #then the agent keeps its own prompt and allowlist", () => {
     // given
     const agents = categorizedAgent(["deep", "unspecified-high"])
-    const models = registry([model("openai", "gpt-5.6-sol")])
+    const models = registry([model("openai", "gpt-6.2-sol")])
 
     // when
     const result = expectResolved(resolveAgent("categorized", agents, models))
@@ -169,7 +169,7 @@ describe("resolveAgent category stage", () => {
     const result = expectUnavailable(resolveAgent("categorized", agents, undefined))
 
     // then
-    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6-astra")
+    expect(result.attemptedModel).toBe("chatgpt-subscription/gpt-6.2-astra")
   })
 
   test("#given the ulw reviewer builtins #when reading their definitions #then each declares its ordered model-policy categories", () => {
@@ -230,7 +230,7 @@ describe("resolveAgent category stage", () => {
   test("#given a user category model override that is unavailable #when resolution fails #then the attempted model names the user model, not the builtin", () => {
     // given: the user pointed deep at their own model; neither it nor the builtin is in the registry.
     const definition: AgentDefinition = { name: "probe", categories: ["deep"] }
-    const omoConfig = { categories: { deep: { model: "openai/my-custom-model" } } } as OmoConfig
+    const omoConfig = { categories: { deep: { model: "openai/my-custom-model" } } } satisfies OmoConfig
     const unrelatedRegistry = registry([model("google", "gemini-3.1-pro")])
 
     // when

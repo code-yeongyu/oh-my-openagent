@@ -23,11 +23,11 @@ ulw-research/
     ├── report-tools-commands.mjs    # one function per subcommand
     ├── cli-support.mjs / entry-guard.mjs   # flags, CliError, exit codes, atomic JSON, symlink-safe entry check
     ├── contracts.mjs                # frozen vocabulary: DEFECT_CODES (severity lives only here), FIDELITY_CODES, enums, manifest + repair-state validators
-    ├── outcome.mjs                  # outcome.json manifest, deliverable state, verify, closing briefing
+    ├── outcome.mjs / outcome-start.mjs # manifest lifecycle + the run clock outcome init records (--started-at, metadata, dir-name fallback)
     ├── repair-tracker.mjs           # bounded repair decisions (attempts, plateau, oscillation, wall clock, integrity codes)
     ├── html-lite.mjs / entities.mjs # HTML tokenizer, selector paths, prose text
     ├── css-lite.mjs / design-spec.mjs      # CSS scanning, palette + lineage parsing, design-spec rendering
-    ├── gates-static.mjs + gates-text.mjs / gates-figures.mjs / gates-structure.mjs   # static gates G1-G17
+    ├── gates-static.mjs + gates-text.mjs / gates-figures.mjs / gates-structure.mjs   # static gates G1-G17; sources-citation.mjs is the one Sources predicate (claim segments vs citation fields)
     ├── layout-probe.mjs / gates-layout.mjs # in-page probe source + layout gates L1-L5 over its output
     ├── format-extract.mjs / format-extract-css.mjs   # design-spec draft from a pointed-at HTML or Markdown document
     ├── fact-ledger.mjs              # fact ledger IO and writers (addRow, retractRow, supersedeRow, --view table)
@@ -43,14 +43,18 @@ ulw-research/
     ├── fact-commands.mjs            # `fact add|quote|retract|export|fill|derive` (lazy-loaded by report-tools)
     ├── fact-commands-verify.mjs     # `fact verify` and the Markdown projection it checks
     ├── fidelity-records.mjs         # FIDELITY_RECORDS table + the delivery barrier of outcome verify/finish (fidelity_unresolved, edition_unverified)
-    ├── source-commands.mjs          # `source snapshot`, `claims index`, snapshot readers
+    ├── source-commands.mjs          # `source snapshot`, `claims index`, snapshot readers; `source refresh` is source-refresh.mjs
+    ├── source-view.mjs / raw-decode.mjs / html-text-map.mjs   # the one snapshot reading: locator text, charset decode, byte map, visible-text extraction
+    ├── css-hiding.mjs               # whether inline styles and the page's <style> rules hide an element from every reader (cascade, conditional at-rules)
+    ├── conversion-probe.mjs / number-grammar.mjs   # `source probe-conversion` (numeric diff of a conversion); the one grouped-number grammar (shared with numerals.mjs)
+    ├── markdown-closers.mjs         # CommonMark closer runs (titled/parenthesised link and image targets, references, escapes) for the probe's sign reading and link spans
     ├── *.test.ts                    # co-located bun tests, one per module (unshipped)
     └── tests/fixtures/              # good/bad reports, boxes.json, reference docs (unshipped)
 ```
 
 ## SURFACE
 
-`node "$SKILL_DIR/scripts/report-tools.mjs" <command>`: `check`, `layout-probe`, `repair decide`, `outcome init`, `outcome set`, `outcome gate`, `outcome render`, `outcome state`, `outcome verify`, `outcome finish`, `outcome briefing`, `format-extract`, `fact add`, `fact quote`, `fact retract`, `fact export`, `fact fill`, `fact verify`, `fact derive`, `source snapshot`, `claims index`, `--help --json`. Gates recorded by `outcome gate`, in order: `static`, `fidelity`, `layout`, `visual`, `proofread` (`fidelity` is `fact verify` on every reader-facing edition; HTML only in this stage). Exit codes: `0` pass, `1` semantic failure (blockers, a failed verify, a blocked repair), `2` usage or IO. JSON on stdout, one summary line on stderr. Flags per command: `references/deliverable-phase.md` section 10.
+`node "$SKILL_DIR/scripts/report-tools.mjs" <command>`: `check`, `layout-probe`, `repair decide`, `outcome init`, `outcome set`, `outcome gate`, `outcome render`, `outcome state`, `outcome verify`, `outcome finish`, `outcome briefing`, `format-extract`, `fact add`, `fact quote`, `fact retract`, `fact export`, `fact fill`, `fact verify`, `fact derive`, `source snapshot`, `source refresh`, `claims index`, `--help --json`. Gates recorded by `outcome gate`, in order: `static`, `fidelity`, `layout`, `visual`, `proofread` (`fidelity` is `fact verify` on every reader-facing edition; HTML, or Markdown with its fill map). Exit codes: `0` pass, `1` semantic failure (blockers, a failed verify, a blocked repair), `2` usage or IO. JSON on stdout, one summary line on stderr. Flags per command: `references/deliverable-phase.md` section 10.
 
 ## CONVENTIONS
 

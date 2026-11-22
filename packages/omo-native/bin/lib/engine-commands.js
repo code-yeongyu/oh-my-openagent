@@ -3,11 +3,19 @@
 // The list is checked against the installed engine's own dispatch by test/engine-commands.test.ts.
 import { join } from "node:path"
 
-const ENGINE_COMMANDS = new Set(["install", "remove", "uninstall", "update", "list", "config", "auth", "host", "schedule"])
-
-// The two host subcommands that START a host. Without `--launch-spec` the engine starts a bare host
-// that never loads the omo plugin, and every client that later reuses it inherits that (#10643).
-const HOST_STARTING_SUBCOMMANDS = new Set(["ensure", "handoff"])
+const ENGINE_COMMANDS = new Set([
+  "install",
+  "remove",
+  "uninstall",
+  "update",
+  "list",
+  "config",
+  "auth",
+  "host",
+  "schedule",
+  // omo#14253: senpi answers `session-of-pid <pid> --json` itself (one JSON line, its own usage errors).
+  "session-of-pid",
+])
 
 export function isEngineCommand(args) {
   const command = args[0]
@@ -16,12 +24,17 @@ export function isEngineCommand(args) {
   return command === "models" && args[1] === "discover"
 }
 
-/**
- * The engine argv for a one-shot command: unchanged, except that `host ensure` / `host handoff`
- * without an explicit `--launch-spec` get this package's own plugin spec, so an omo host always
- * carries the omo plugin, as `omo daemon run` and `omo --mode rpc` do.
- */
+// The host subcommands that START a host. Without `--launch-spec` the engine starts a bare host that never
+// loads the omo plugin, and every client that later reuses it inherits that (#10643). compile-args.ts applies
+// the same rule to the compiled entry.
+function startsHost(args) {
+  if (args[0] !== "host") return false
+  return args[1] === "ensure" || args[1] === "handoff" || (args[1] === "session" && args[2] === "open")
+}
+
+/** The engine argv for a one-shot command: unchanged, except that a host start without a spec gets this package's own. */
 export function engineCommandArgs(args, pluginRoot) {
-  if (args[0] !== "host" || !HOST_STARTING_SUBCOMMANDS.has(args[1]) || args.includes("--launch-spec")) return args
+  if (!startsHost(args)) return args
+  if (args.some((arg) => arg === "--launch-spec" || arg.startsWith("--launch-spec="))) return args
   return [...args, "--launch-spec", join(pluginRoot, "daemon-launch-spec.json")]
 }

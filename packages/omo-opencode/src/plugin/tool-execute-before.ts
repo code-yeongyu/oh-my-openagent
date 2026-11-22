@@ -1,4 +1,7 @@
+import { isDeepStrictEqual } from "node:util"
+
 import type { PluginContext } from "./types"
+import type { PrometheusExecutionArguments } from "../hooks/prometheus-md-only/hook"
 
 import { isTrackedBtwSideSession } from "../features/btw-side"
 import { getMainSessionID } from "../features/claude-code-session-state"
@@ -34,8 +37,7 @@ function isPureSleepCommand(command: string): boolean {
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && !line.startsWith("#"))
 
-  return commandLines.length > 0
-    && commandLines.every((line) => /^sleep\s+\d+(?:\.\d+)?[smhd]?\s*$/i.test(line))
+  return commandLines.length > 0 && commandLines.every((line) => /^sleep\s+\d+(?:\.\d+)?[smhd]?\s*$/i.test(line))
 }
 
 export function createToolExecuteBeforeHandler(args: {
@@ -49,6 +51,7 @@ export function createToolExecuteBeforeHandler(args: {
   const { ctx, hooks, backgroundManager } = args
 
   return async (input, output): Promise<void> => {
+    const execution: PrometheusExecutionArguments = { original: output.args }
     // Strip mcp_ prefix from tool names — the model may emit mcp_background_output
     // but the runtime registry has it as background_output (fixes #2697)
     if (/^mcp_/i.test(input.tool)) {
@@ -63,10 +66,7 @@ export function createToolExecuteBeforeHandler(args: {
     }
 
     const normalizedToolName = input.tool.toLowerCase()
-    if (
-      BTW_DELEGATION_TOOLS.has(normalizedToolName) &&
-      isTrackedBtwSideSession(input.sessionID)
-    ) {
+    if (BTW_DELEGATION_TOOLS.has(normalizedToolName) && isTrackedBtwSideSession(input.sessionID)) {
       throw new Error("BTW side conversations cannot delegate work.")
     }
 
@@ -80,11 +80,9 @@ export function createToolExecuteBeforeHandler(args: {
       }
 
       if (
-        isPureSleepCommand(output.args.command)
-        && (
-          backgroundManager?.hasActiveChildTasks(input.sessionID) === true
-          || backgroundManager?.hasPendingParentWake(input.sessionID) === true
-        )
+        isPureSleepCommand(output.args.command) &&
+        (backgroundManager?.hasActiveChildTasks(input.sessionID) === true ||
+          backgroundManager?.hasPendingParentWake(input.sessionID) === true)
       ) {
         throw new Error(BACKGROUND_WAIT_BLOCK_MESSAGE)
       }
@@ -101,18 +99,19 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.directoryReadmeInjector?.["tool.execute.before"]?.(input, output)
     await hooks.rulesInjector?.["tool.execute.before"]?.(input, output)
     await hooks.tasksTodowriteDisabler?.["tool.execute.before"]?.(input, output)
-      await hooks.webfetchRedirectGuard?.["tool.execute.before"]?.(input, output)
-      await hooks.fsyncSkipWarning?.["tool.execute.before"]?.(input, output)
-      await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
+    await hooks.webfetchRedirectGuard?.["tool.execute.before"]?.(input, output)
+    await hooks.fsyncSkipWarning?.["tool.execute.before"]?.(input, output)
+    await hooks.momusReviewPersistence?.["tool.execute.before"]?.(input, output)
+    await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output, execution)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
     await hooks.compactionTodoPreserver?.["tool.execute.before"]?.(input, output)
     await hooks.teamToolGating?.["tool.execute.before"]?.(input, output)
 
     if (
-      normalizedToolName === "question"
-      || normalizedToolName === "ask_user_question"
-      || normalizedToolName === "askuserquestion"
+      normalizedToolName === "question" ||
+      normalizedToolName === "ask_user_question" ||
+      normalizedToolName === "askuserquestion"
     ) {
       const sessionID = input.sessionID || getMainSessionID()
       await hooks.sessionNotification?.({
@@ -150,11 +149,12 @@ export function createToolExecuteBeforeHandler(args: {
       }
 
       if (command === "goal" && sessionID && hooks.goal) {
-        const rawArgs = typeof output.args.user_message === "string"
-          ? output.args.user_message.trim()
-          : typeof output.args.arguments === "string"
-            ? output.args.arguments.trim()
-            : ""
+        const rawArgs =
+          typeof output.args.user_message === "string"
+            ? output.args.user_message.trim()
+            : typeof output.args.arguments === "string"
+              ? output.args.arguments.trim()
+              : ""
         if (rawArgs.length > 0) {
           hooks.goal.setGoal(sessionID, rawArgs)
         }
@@ -172,6 +172,19 @@ export function createToolExecuteBeforeHandler(args: {
           })
         }
       }
+    }
+    if (
+      execution.approved &&
+      (output.args !== execution.original ||
+        Object.entries(execution.approved).some(
+          ([field, value]) => !isDeepStrictEqual(execution.original[field], value),
+        ))
+    ) {
+      log("[prometheus-md-only] Blocked: approved arguments changed after authorization", {
+        sessionID: input.sessionID,
+        tool: input.tool,
+      })
+      throw new Error("Prometheus approved arguments no longer match the host execution reference")
     }
   }
 }

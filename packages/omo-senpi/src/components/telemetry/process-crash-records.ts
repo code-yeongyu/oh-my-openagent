@@ -126,7 +126,12 @@ function crashRecordSources(agentDir: string): readonly CrashRecordSource[] {
   for (const endpoint of endpoints.sort()) {
     const endpointDir = join(agentDir, "rpc-host-daemon", endpoint)
     // The id carries the endpoint directory's hash, so two hosts' byte-identical lines never share a claim.
-    sources.push({ id: `rpc-host-daemon/${endpoint}`, file: join(endpointDir, "crashes.jsonl"), kind: "rpc-host", endpointDir })
+    sources.push({
+      id: `rpc-host-daemon/${endpoint}`,
+      file: join(endpointDir, "crashes.jsonl"),
+      kind: "rpc-host",
+      endpointDir,
+    })
   }
   return sources
 }
@@ -138,8 +143,9 @@ function crashRecordSources(agentDir: string): readonly CrashRecordSource[] {
  * does, so a copied or foreign file never lends its kind to another endpoint.
  */
 function endpointShardKind(agentDir: string, endpointDir: string): CrashShardKind {
-  const socket = socketNamedBy(join(endpointDir, "endpoint.json"), agentDir, endpointDir)
-    ?? socketNamedBy(join(endpointDir, "settings.json"), agentDir, endpointDir)
+  const socket =
+    socketNamedBy(join(endpointDir, "endpoint.json"), agentDir, endpointDir) ??
+    socketNamedBy(join(endpointDir, "settings.json"), agentDir, endpointDir)
   if (socket === undefined) return "unknown"
   return parseShardBasename(socket)?.kind ?? "none"
 }
@@ -157,7 +163,10 @@ function socketNamedBy(file: string, agentDir: string, endpointDir: string): str
 
 function readLines(file: string): readonly string[] {
   try {
-    return readFileSync(file, "utf8").split("\n").map((line) => line.trim()).filter((line) => line.length > 0)
+    return readFileSync(file, "utf8")
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
   } catch {
     return []
   }

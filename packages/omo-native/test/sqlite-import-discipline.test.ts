@@ -24,7 +24,10 @@ describe("node:sqlite import discipline", () => {
     describe("#when its module is scanned", () => {
       test("#then it reaches node:sqlite only through a lazy import", () => {
         const source = readFileSync(THREAD_CLI, "utf8")
-        expect({ static: STATIC_SQLITE_IMPORT.test(source), lazy: source.includes('import("node:sqlite")') }).toEqual({ static: false, lazy: true })
+        expect({ static: STATIC_SQLITE_IMPORT.test(source), lazy: source.includes('import("node:sqlite")') }).toEqual({
+          static: false,
+          lazy: true,
+        })
       })
     })
   })
@@ -32,9 +35,15 @@ describe("node:sqlite import discipline", () => {
   describe("#given the thread gateway store", () => {
     describe("#when every gateway module is scanned", () => {
       test("#then only the store worker reaches node:sqlite, through a lazy import", () => {
-        const modules = readdirSync(GATEWAY_DIR, { recursive: true, encoding: "utf8" }).filter((name) => name.endsWith(".ts"))
-        const offenders = modules.filter((name) => STATIC_SQLITE_IMPORT.test(readFileSync(join(GATEWAY_DIR, name), "utf8")))
-        const lazy = modules.filter((name) => readFileSync(join(GATEWAY_DIR, name), "utf8").includes('import("node:sqlite")'))
+        const modules = readdirSync(GATEWAY_DIR, { recursive: true, encoding: "utf8" }).filter((name) =>
+          name.endsWith(".ts"),
+        )
+        const offenders = modules.filter((name) =>
+          STATIC_SQLITE_IMPORT.test(readFileSync(join(GATEWAY_DIR, name), "utf8")),
+        )
+        const lazy = modules.filter((name) =>
+          readFileSync(join(GATEWAY_DIR, name), "utf8").includes('import("node:sqlite")'),
+        )
         expect({ offenders, lazy }).toEqual({ offenders: [], lazy: ["store-worker.ts"] })
       })
     })

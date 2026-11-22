@@ -78,11 +78,19 @@ try {
       binaryPath,
       cwd: scratch.cwd,
       socketPath,
-      env: { ...isolatedChildEnv(scratch.env, scratch.agentDir), SENPI_CODING_AGENT_DIR: scratch.agentDir, OMO_CODING_AGENT_DIR: scratch.agentDir },
+      env: {
+        ...isolatedChildEnv(scratch.env, scratch.agentDir),
+        SENPI_CODING_AGENT_DIR: scratch.agentDir,
+        OMO_CODING_AGENT_DIR: scratch.agentDir,
+      },
       onHostEnsured: (host) => Effect.sync(() => managedHost.observe(host)),
     })
     yield* shared.request({ type: "get_protocol_info" })
-    report.assert("engine-reported-host-pid", typeof managedHost.pid() === "number", `pid=${managedHost.pid()} socket=${socketPath}`)
+    report.assert(
+      "engine-reported-host-pid",
+      typeof managedHost.pid() === "number",
+      `pid=${managedHost.pid()} socket=${socketPath}`,
+    )
 
     const opened = yield* shared.request({
       type: "open_session",
@@ -143,10 +151,7 @@ try {
     const byId = resolveTarget(addressEntries, durableId, { all_scope: true })
     report.assert(
       "cli-resolves-desktop-session",
-      byName.kind === "ok" &&
-        byName.entry.thread_id === durableId &&
-        byId.kind === "ok" &&
-        byId.resolution === "id",
+      byName.kind === "ok" && byName.entry.thread_id === durableId && byId.kind === "ok" && byId.resolution === "id",
       `by_name=${byName.kind === "ok" ? byName.resolution : JSON.stringify(byName)} by_id=${byId.kind === "ok" ? byId.resolution : JSON.stringify(byId)}`,
     )
 
@@ -169,9 +174,7 @@ try {
 
     // ---- typed error path: unknown target ----
     const unknownResolution = resolveTarget(addressEntries, "no-such-thread-t13d", { all_scope: true })
-    const wireFailure = yield* Effect.promise(() =>
-      cli.raw({ type: "get_state", sessionId: "rpc-unknown-t13d" }),
-    )
+    const wireFailure = yield* Effect.promise(() => cli.raw({ type: "get_state", sessionId: "rpc-unknown-t13d" }))
     const afterUnknown = (yield* shared.request({ type: "get_messages", sessionId: routingId })).data.messages
     report.assert(
       "unknown-target-typed-error",

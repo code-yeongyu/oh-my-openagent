@@ -164,7 +164,12 @@ describe("createFirstPaintScheduler", () => {
       on: (event, handler) => handlers.set(event, [...(handlers.get(event) ?? []), handler]),
       backstopMs: 60_000,
     })
-    return { schedule, fire: (event) => { for (const handler of handlers.get(event) ?? []) handler() } }
+    return {
+      schedule,
+      fire: (event) => {
+        for (const handler of handlers.get(event) ?? []) handler()
+      },
+    }
   }
 
   it("#given queued work #when no post-paint edge has fired #then nothing runs before the gate opens", () => {
@@ -173,7 +178,9 @@ describe("createFirstPaintScheduler", () => {
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
 
     // then
     expect(ran).toBe(0)
@@ -192,7 +199,9 @@ describe("createFirstPaintScheduler", () => {
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
 
     // then
     expect(ran).toBe(0)
@@ -208,7 +217,9 @@ describe("createFirstPaintScheduler", () => {
     // given
     const { schedule, fire } = gate()
     let ran = 0
-    const cancel = schedule(() => { ran += 1 })
+    const cancel = schedule(() => {
+      ran += 1
+    })
 
     // when
     cancel()
@@ -218,13 +229,58 @@ describe("createFirstPaintScheduler", () => {
     expect(ran).toBe(0)
   })
 
+  it("#given the first-paint gate #when it subscribes to its post-paint edges #then each edge is declared for the loop side", () => {
+    // given
+    const subscriptions: Array<{ event: string; options: unknown }> = []
+
+    // when
+    createFirstPaintScheduler({
+      on: (event, _handler, options) => subscriptions.push({ event, options }),
+      backstopMs: 60_000,
+    })
+
+    // then
+    expect(subscriptions).toEqual([
+      { event: "input", options: { runs: "brain" } },
+      { event: "before_agent_start", options: { previewSafe: true, runs: "brain" } },
+    ])
+  })
+
+  it("#given a hand placement #when work is queued #then it runs on the next tick without waiting for a paint edge or the backstop", async () => {
+    // given
+    const subscriptions: string[] = []
+    const schedule = createFirstPaintScheduler({
+      on: (event) => subscriptions.push(event),
+      backstopMs: 60_000,
+      placement: "hand",
+    })
+    let ran = 0
+
+    // when
+    schedule(() => {
+      ran += 1
+    })
+
+    // then
+    expect(subscriptions).toEqual([])
+    expect(ran).toBe(0)
+
+    // when
+    await new Promise((resolve) => setTimeout(resolve, 1))
+
+    // then
+    expect(ran).toBe(1)
+  })
+
   it("#given a session that never paints an edge #when the backstop elapses #then the work still runs once", async () => {
     // given
     const schedule = createFirstPaintScheduler({ on: () => undefined, backstopMs: 1 })
     let ran = 0
 
     // when
-    schedule(() => { ran += 1 })
+    schedule(() => {
+      ran += 1
+    })
     await new Promise((resolve) => setTimeout(resolve, 20))
 
     // then

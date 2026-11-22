@@ -19,7 +19,8 @@ async function runProbe(): Promise<Record<string, unknown>> {
     child.exited,
   ])
   const line = stdout.split("\n").find((entry) => entry.startsWith("PROBE_RESULT "))
-  if (exitCode !== 0 || line === undefined) throw new Error(`probe exited ${exitCode}\nstdout:\n${stdout}\nstderr:\n${stderr}`)
+  if (exitCode !== 0 || line === undefined)
+    throw new Error(`probe exited ${exitCode}\nstdout:\n${stdout}\nstderr:\n${stderr}`)
   return JSON.parse(line.slice("PROBE_RESULT ".length)) as Record<string, unknown>
 }
 
@@ -37,7 +38,9 @@ describe("lazy memory commands sidecar", () => {
   })
 
   test("#given a sidecar that fails to load #when a lazy command runs #then the actionable error is the reply and its error notification", async () => {
-    const loader = createMemoryCommandsRuntimeLoader(() => Promise.reject(new Error("Cannot find module '#omo-memory-commands-runtime'")))
+    const loader = createMemoryCommandsRuntimeLoader(() =>
+      Promise.reject(new Error("Cannot find module '#omo-memory-commands-runtime'")),
+    )
     const pi = new MemoryFakeExtensionAPI()
     registerMemoryCommands(pi, fakeDeps(undefined), loader)
     const ctx = fakeCommandContext()
@@ -48,7 +51,7 @@ describe("lazy memory commands sidecar", () => {
     expect(reply).toContain("/sleeptime")
     expect(reply).toContain(MEMORY_COMMANDS_RUNTIME_ARTIFACT)
     expect(reply).toContain("Cannot find module '#omo-memory-commands-runtime'")
-    expect(reply).toContain("reinstall omo, then start a new session")
+    expect(reply).toContain("reinstall omo")
   })
 
   test("#given one load failure #when the sidecar is requested again #then the loader retries and later calls share one load", async () => {

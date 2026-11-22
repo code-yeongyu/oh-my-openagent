@@ -1,0 +1,61 @@
+{
+  "request": "devices.list",
+  "cases": [
+    {
+      "name": "answers every device with its label, kind and presence",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "devices.list"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "devices": [
+                {
+                  "device": "dev-peer-1",
+                  "label": "Studio",
+                  "online": true
+                },
+                {
+                  "device": "dev-peer-2",
+                  "label": "Laptop",
+                  "online": false
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "devices.list"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

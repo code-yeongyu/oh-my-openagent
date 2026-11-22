@@ -25,5 +25,5 @@ mcporter call 'linkedin-scraper.search_jobs(keyword: "software engineer", limit:
 如果 MCP 不可用，可以用 Jina Reader：
 
 ```bash
-curl -s "https://r.jina.ai/https://linkedin.com/in/username"
+curl -s -H "Authorization: Bearer ${JINA_API_KEY}" "https://r.jina.ai/https://linkedin.com/in/username"
 ```

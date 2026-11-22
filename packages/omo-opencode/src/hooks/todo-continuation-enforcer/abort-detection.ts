@@ -1,8 +1,6 @@
 import type { MessageInfo } from "./types"
 
-export function isLastAssistantMessageAborted(
-  messages: Array<{ info?: MessageInfo }>
-): boolean {
+export function isLastAssistantMessageAborted(messages: Array<{ info?: MessageInfo }>): boolean {
   if (!messages || messages.length === 0) return false
 
   const assistantMessages = messages.filter((message) => message.info?.role === "assistant")

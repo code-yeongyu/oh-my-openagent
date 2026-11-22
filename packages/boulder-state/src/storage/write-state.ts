@@ -62,12 +62,23 @@ export function clearBoulderState(directory: string): boolean {
 }
 
 export function generateWorkId(planName: string): string {
-  const slug = planName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
-  const randomHex = Math.floor(Math.random() * 0xffffffff).toString(16).padStart(8, "0")
+  const slug = planName
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  const randomHex = Math.floor(Math.random() * 0xffffffff)
+    .toString(16)
+    .padStart(8, "0")
   return `${slug.length > 0 ? slug : "work"}-${randomHex}`
 }
 
-export function createBoulderState(planPath: string, sessionId: string, agent?: string, worktreePath?: string): BoulderState {
+export function createBoulderState(
+  planPath: string,
+  sessionId: string,
+  agent?: string,
+  worktreePath?: string,
+): BoulderState {
   const startedAt = nowIsoString()
   const normalizedSessionId = normalizeSessionId(sessionId)
   const workId = generateWorkId(getPlanName(planPath))
@@ -172,7 +183,8 @@ export function completeBoulder(directory: string, workId?: string, endedAt?: st
     return null
   }
 
-  const work = state.works?.[targetWorkId] ?? getBoulderWorks(state).find((candidate) => candidate.work_id === targetWorkId)
+  const work =
+    state.works?.[targetWorkId] ?? getBoulderWorks(state).find((candidate) => candidate.work_id === targetWorkId)
   if (!work) {
     return null
   }

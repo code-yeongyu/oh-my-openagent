@@ -25,7 +25,9 @@ describe("checkAndInterruptStaleTasks persisted session activity", () => {
       get: mock(() => Promise.resolve({ data: { id: "ses-1" } })),
     },
   })
-  const mockConcurrencyManager = unsafeTestValue<Parameters<typeof checkAndInterruptStaleTasks>[0]["concurrencyManager"]>({
+  const mockConcurrencyManager = unsafeTestValue<
+    Parameters<typeof checkAndInterruptStaleTasks>[0]["concurrencyManager"]
+  >({
     release: mock(() => {}),
   })
   const mockNotify = mock(() => Promise.resolve())

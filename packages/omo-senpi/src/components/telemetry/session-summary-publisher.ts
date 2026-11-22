@@ -3,12 +3,22 @@ import type { EventTelemetryProperties, TelemetryDiagnosticInput } from "@oh-my-
 import type { sendSummaryRecord, SummaryPublish } from "./session-summary-delivery"
 
 import type { TelemetrySessionRole } from "./session-role"
-import { isRecordSendable, type ConsentScope, type PendingRecord, type RecordConsent, type SummaryStorage } from "./session-summary-storage"
+import {
+  isRecordSendable,
+  type ConsentScope,
+  type PendingRecord,
+  type RecordConsent,
+  type SummaryStorage,
+} from "./session-summary-storage"
 import { summaryProperties, type EndedBy, type SummaryWindow } from "./session-summary-window"
 import { isSessionSampled } from "./session-summary-sampling"
 
 /** `timestamp` is the window's close time (the pending record's createdAt), the same on every re-send. */
-export type SummaryPublication = { readonly uuid: string; readonly properties: EventTelemetryProperties; readonly timestamp: number }
+export type SummaryPublication = {
+  readonly uuid: string
+  readonly properties: EventTelemetryProperties
+  readonly timestamp: number
+}
 
 /**
  * Resolves true only when the transport acknowledged the event (a 2xx answer). A rejection keeps the pending

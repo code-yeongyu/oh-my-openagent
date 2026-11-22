@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { TaskConcurrency } from "./concurrency"
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // senpi#3266 review: re-dispatch must work with the REAL destruction port, wired exactly as
 // omo-senpi's engine wires it (components/task/engine.ts). A mock that skips teardown hid that the
@@ -45,7 +46,7 @@ type LaneOptions = {
 
 function productionLane(options: LaneOptions = {}) {
   const runner = new CountingRunner()
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const config = settings({ default_concurrency: 1, global_concurrency: 1, max_depth: 1 })
   const concurrency = new TaskConcurrency(config)
   const hook = options.duringRedispatchTeardown
@@ -57,21 +58,29 @@ function productionLane(options: LaneOptions = {}) {
     hostPid: OWNER_PID,
     runners: { "in-process": runner, process: runner },
     planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
-    ...(options.withDestructionPort === false ? {} : {
-      destruction: {
-        destroyResidentTask: async (taskId: string, cause: DestroyCause) => {
-          const during = hook?.current
-          if (cause === "redispatch" && hook !== undefined && during !== undefined) {
-            hook.current = undefined
-            await during()
-          }
-          await lifecycle.destroyResidentTask(taskId, cause)
-        },
-        parkTerminalResident: (taskId: string) => lifecycle.parkTerminalResident(taskId),
-      },
-    }),
+    ...(options.withDestructionPort === false
+      ? {}
+      : {
+          destruction: {
+            destroyResidentTask: async (taskId: string, cause: DestroyCause) => {
+              const during = hook?.current
+              if (cause === "redispatch" && hook !== undefined && during !== undefined) {
+                hook.current = undefined
+                await during()
+              }
+              await lifecycle.destroyResidentTask(taskId, cause)
+            },
+            parkTerminalResident: (taskId: string) => lifecycle.parkTerminalResident(taskId),
+          },
+        }),
   })
-  const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: OWNER_PID, registry: createManagerResidencyRegistry(() => manager) })
+  const lifecycle = createTaskLifecycle({
+    hostEndpoint: NO_HOST_ENDPOINT,
+    store,
+    config,
+    hostPid: OWNER_PID,
+    registry: createManagerResidencyRegistry(() => manager),
+  })
   const dispose = (): void => {
     lifecycle.dispose?.()
     manager.workpools.dispose()
@@ -83,7 +92,10 @@ function productionLane(options: LaneOptions = {}) {
 async function flaggedOn(lane: ReturnType<typeof productionLane>) {
   const started = await lane.manager.start(baseSpec({ prompt: "build the report" }))
   if (started.kind !== "started") throw new Error(`expected started, got ${started.kind}`)
-  lane.store.mutate(started.task_id, (record) => ({ ...record, awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() } }))
+  lane.store.mutate(started.task_id, (record) => ({
+    ...record,
+    awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
+  }))
   const oldHandle = lane.manager.getResidentHandle(started.task_id)
   if (oldHandle === undefined) throw new Error("expected a live handle")
   return { taskId: started.task_id, oldHandle }
@@ -97,7 +109,10 @@ describe("TaskManager.redispatchTask with the real destruction port (senpi#3266)
       const started = await lane.manager.start(baseSpec({ prompt: "build the report" }))
       if (started.kind !== "started") throw new Error(`expected started, got ${started.kind}`)
       const taskId = started.task_id
-      lane.store.mutate(taskId, (record) => ({ ...record, awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() } }))
+      lane.store.mutate(taskId, (record) => ({
+        ...record,
+        awaiting_input: { reason: "resumed_turn_aborted", since: new Date().toISOString() },
+      }))
       const oldHandle = lane.manager.getResidentHandle(taskId)
       if (oldHandle === undefined) throw new Error("expected a live handle")
       const before = lane.store.load(taskId)?.notification.run_epoch ?? -1

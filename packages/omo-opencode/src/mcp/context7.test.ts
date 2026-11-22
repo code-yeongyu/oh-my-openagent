@@ -8,7 +8,7 @@ async function importFreshContext7Module(): Promise<typeof import("./context7")>
   return import(`./context7?test=${Date.now()}-${Math.random()}`)
 }
 
-async function loadContext7WithApiKey(value: string | undefined): Promise<typeof import("./context7")["context7"]> {
+async function loadContext7WithApiKey(value: string | undefined): Promise<(typeof import("./context7"))["context7"]> {
   originalContext7ApiKey = process.env.CONTEXT7_API_KEY
   if (value === undefined) {
     delete process.env.CONTEXT7_API_KEY
@@ -27,7 +27,7 @@ afterEach(() => {
 })
 
 describe("context7 MCP config", () => {
-  test('#given placeholder CONTEXT7_API_KEY #when config is loaded #then auth headers are omitted', async () => {
+  test("#given placeholder CONTEXT7_API_KEY #when config is loaded #then auth headers are omitted", async () => {
     // given / when
     const config = await loadContext7WithApiKey("your api key")
 

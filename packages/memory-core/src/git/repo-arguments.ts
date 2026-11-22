@@ -22,5 +22,5 @@ export function normalizeSeedPath(path: string): string {
 }
 
 export function commandError(argv: readonly string[], result: GitExecResult): GitCommandError {
-  return new GitCommandError(argv, result.code, result.stdout, result.stderr)
+  return new GitCommandError(argv, result.code, result.stdout, result.stderr, result.termination)
 }

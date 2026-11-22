@@ -14,7 +14,12 @@ export function createIdleReclaimerScheduler<Timer extends IdleReclaimerTimer>(t
       let active = true
       let unreferenced = false
       let current: Timer | undefined
-      const interval: IdleReclaimerTimer = { unref: () => { unreferenced = true; current?.unref?.() } }
+      const interval: IdleReclaimerTimer = {
+        unref: () => {
+          unreferenced = true
+          current?.unref?.()
+        },
+      }
       const schedule = () => {
         const chunk = Math.min(remaining, MAX_TIMER_DELAY_MS)
         current = timers.setTimeout(() => {
@@ -35,7 +40,9 @@ export function createIdleReclaimerScheduler<Timer extends IdleReclaimerTimer>(t
       schedule()
       return interval
     },
-    clearInterval(interval) { cancellations.get(interval)?.() },
+    clearInterval(interval) {
+      cancellations.get(interval)?.()
+    },
   }
 }
 

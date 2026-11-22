@@ -1,15 +1,13 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from "bun:test"
 import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import { fileURLToPath } from "node:url"
 import type { HookHttp } from "./types"
 import * as sharedModule from "../../shared"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const mockFetch = mock(() =>
-  Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-)
+const mockFetch = mock(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
 const originalFetch = globalThis.fetch
 const originalEnv = { ...process.env }
 
@@ -18,16 +16,12 @@ async function importFreshExecuteHttpHook() {
   return import(modulePath)
 }
 
+// A spy on the shared namespace, which mock.restore() undoes after each test. A module mock of the whole shared barrel
+// rebound every function it re-exports for the rest of the process and broke later test files (#13331).
 function installSharedLogMock(logCalls: Array<{ message: string; data?: unknown }>): void {
-  const sharedMockFactory = () => ({
-    ...sharedModule,
-    log: (message: string, data?: unknown) => {
-      logCalls.push({ message, data })
-    },
+  spyOn(sharedModule, "log").mockImplementation((message: string, data?: unknown) => {
+    logCalls.push({ message, data })
   })
-
-  mock.module("../../shared", sharedMockFactory)
-  mock.module("../../shared/index.ts", sharedMockFactory)
 }
 
 describe("executeHttpHook TLS security", () => {
@@ -36,9 +30,7 @@ describe("executeHttpHook TLS security", () => {
   beforeEach(() => {
     globalThis.fetch = unsafeTestValue<typeof fetch>(mockFetch)
     mockFetch.mockReset()
-    mockFetch.mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
-    )
+    mockFetch.mockImplementation(() => Promise.resolve(new Response(JSON.stringify({}), { status: 200 })))
     logCalls = []
   })
 
@@ -112,8 +104,10 @@ describe("executeHttpHook TLS security", () => {
 
       // then
       const matchingCalls = logCalls.filter(({ message, data }) => {
-        return message === "HTTP hook URL uses insecure protocol"
-          && JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        return (
+          message === "HTTP hook URL uses insecure protocol" &&
+          JSON.stringify(data) === JSON.stringify({ url: hook.url })
+        )
       })
 
       expect(result.exitCode).toBe(0)
@@ -228,7 +222,7 @@ describe("executeHttpHook TLS security", () => {
 
     it("#when hook uses https:// URL #then fetch rejects redirects manually", async () => {
       mockFetch.mockImplementation(() =>
-        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" }))
+        Promise.resolve(new Response("redirect", { status: 302, statusText: "Found" })),
       )
       const { executeHttpHook } = await import("./execute-http-hook")
       const hook: HookHttp = { type: "http", url: "https://example.com/hooks" }
@@ -241,7 +235,7 @@ describe("executeHttpHook TLS security", () => {
         "https://example.com/hooks",
         expect.objectContaining({
           redirect: "manual",
-        })
+        }),
       )
     })
   })

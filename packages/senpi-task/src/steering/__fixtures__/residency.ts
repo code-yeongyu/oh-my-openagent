@@ -32,7 +32,7 @@ export function detachedTerminal(store: ReturnType<typeof createTaskRecordStore>
   store.save(terminal)
   const sessionDir = join(store.stateDir, "children", terminal.task_id, "sessions", terminal.task_id)
   mkdirSync(sessionDir, { recursive: true })
-  writeFileSync(join(sessionDir, "resume.jsonl"), "{\"role\":\"assistant\"}\n")
+  writeFileSync(join(sessionDir, "resume.jsonl"), '{"role":"assistant"}\n')
   return terminal
 }
 
@@ -42,7 +42,9 @@ export function fakeHandle(taskId: string, followUps: string[]): ManagedChildHan
     sessionId: `session:${taskId}`,
     pid: 7000,
     steer: async () => undefined,
-    followUp: async (message) => { followUps.push(message) },
+    followUp: async (message) => {
+      followUps.push(message)
+    },
     abort: async () => undefined,
     subscribe: () => () => undefined,
     waitForOutcome: () => new Promise(() => undefined),
@@ -57,7 +59,9 @@ export function rpcHandle(taskId: string, followUps: string[]): RpcChildHandle {
     sessionId: `session:${taskId}`,
     pid: 7000,
     steer: async () => undefined,
-    followUp: async (message) => { followUps.push(message) },
+    followUp: async (message) => {
+      followUps.push(message)
+    },
     abort: async () => undefined,
     subscribe: () => () => undefined,
     waitForIdle: () => new Promise(() => undefined),
@@ -80,7 +84,7 @@ export function portFor(
   let live = startLive
   return {
     store,
-    liveHandle: () => live ? revived : undefined,
+    liveHandle: () => (live ? revived : undefined),
     reserveForRevive: () => ({
       ok: true,
       commit: () => undefined,

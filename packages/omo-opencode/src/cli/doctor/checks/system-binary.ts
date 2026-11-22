@@ -100,7 +100,7 @@ export function buildVersionCommand(binaryPath: string, platform: NodeJS.Platfor
 
 export function findDesktopBinary(
   platform: NodeJS.Platform = process.platform,
-  checkExists: (path: string) => boolean = existsSync
+  checkExists: (path: string) => boolean = existsSync,
 ): OpenCodeBinaryInfo | null {
   for (const desktopPath of getDesktopAppPaths(platform)) {
     if (checkExists(desktopPath)) {
@@ -144,14 +144,12 @@ function getCommandCandidates(platform: NodeJS.Platform): string[] {
   if (platform !== "win32") return [...OPENCODE_BINARIES]
 
   const WINDOWS_SUFFIXES = ["", ...WINDOWS_EXECUTABLE_EXTS] as const
-  return OPENCODE_BINARIES.flatMap((command) =>
-    WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`),
-  )
+  return OPENCODE_BINARIES.flatMap((command) => WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`))
 }
 
 export async function getOpenCodeVersion(
   binaryPath: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = process.platform,
 ): Promise<string | null> {
   try {
     const command = buildVersionCommand(binaryPath, platform)

@@ -42,6 +42,7 @@ pub(super) fn setup() -> (Worker, Arc<Mutex<State>>) {
         captures: vec![],
         displays: vec![display("1", 0), display("2", 64)],
         window: DesktopWindow {
+            identity: None,
             id: "101".into(),
             title: "test".into(),
             app: "test".into(),

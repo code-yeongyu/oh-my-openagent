@@ -43,7 +43,9 @@ export type NestedHostScopeRequest = {
 }
 
 function reachableHostTools(request: NestedHostScopeRequest): readonly string[] {
-  return childStructuralToolNames(request.childToolNames ?? []).filter((name) => !isChildOrchestrationExcluded(name, request.includeTaskTools === true))
+  return childStructuralToolNames(request.childToolNames ?? []).filter(
+    (name) => !isChildOrchestrationExcluded(name, request.includeTaskTools === true),
+  )
 }
 
 /**
@@ -54,8 +56,9 @@ function reachableHostTools(request: NestedHostScopeRequest): readonly string[] 
 export function childEffectiveToolNames(request: NestedHostScopeRequest): readonly string[] {
   const allowlist = request.toolAllowlist === undefined ? undefined : new Set(request.toolAllowlist)
   const denylist = new Set(request.toolDenylist ?? [])
-  return reachableHostTools(request)
-    .filter((name) => !denylist.has(name) && (allowlist === undefined || allowlist.has(name)))
+  return reachableHostTools(request).filter(
+    (name) => !denylist.has(name) && (allowlist === undefined || allowlist.has(name)),
+  )
 }
 
 /**

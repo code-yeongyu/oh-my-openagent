@@ -31,7 +31,8 @@ export async function salvageCrashedIsolation(ports: SalvagePorts, record: TaskR
     reason: "host_crashed",
   })
   ports.mutate(record.task_id, (fresh) =>
-    fresh.isolation === undefined ? fresh : { ...fresh, isolation: { ...fresh.isolation, merge_result } })
+    fresh.isolation === undefined ? fresh : { ...fresh, isolation: { ...fresh.isolation, merge_result } },
+  )
 }
 
 export function sweepRootsFor(runtime: IsolationRuntime, records: readonly TaskRecord[]): readonly string[] {

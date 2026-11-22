@@ -5,13 +5,7 @@ import { provenDeadTakeoverFor } from "../locks/proven-dead-takeovers"
 import { traceTakeover } from "./takeover-trace.test-support"
 
 import { GitMemoryRepo } from "../git"
-import {
-  LockContentionError,
-  acquireLock,
-  createLockRecord,
-  memoryWriterLockPath,
-  releaseLock,
-} from "../locks"
+import { LockContentionError, acquireLock, createLockRecord, memoryWriterLockPath, releaseLock } from "../locks"
 import { runMemoryTool } from "../tools/memory"
 
 type WriterMode = "normal" | "kill-holder" | "recovery"
@@ -140,10 +134,17 @@ async function commit(task: WriterTask): Promise<void> {
   try {
     await createNote(task, relativePath)
   } catch (error) {
-    traceTakeover(writerId, "commit-error", { task: `${task.writerId}-${task.index}`, ms: Math.round(performance.now() - commitStart), error: String(error).slice(0, 300) })
+    traceTakeover(writerId, "commit-error", {
+      task: `${task.writerId}-${task.index}`,
+      ms: Math.round(performance.now() - commitStart),
+      error: String(error).slice(0, 300),
+    })
     throw error
   }
-  traceTakeover(writerId, "commit-end", { task: `${task.writerId}-${task.index}`, ms: Math.round(performance.now() - commitStart) })
+  traceTakeover(writerId, "commit-end", {
+    task: `${task.writerId}-${task.index}`,
+    ms: Math.round(performance.now() - commitStart),
+  })
 }
 
 async function createNote(task: WriterTask, relativePath: string): Promise<void> {

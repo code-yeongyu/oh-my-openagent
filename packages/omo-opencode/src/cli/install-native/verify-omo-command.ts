@@ -35,7 +35,9 @@ export async function verifyOmoCommand(options: {
     return {
       ok: false,
       notes: [],
-      warnings: ["Could not find an omo command owned by omo-ai after the install. Run omo --version yourself to check."],
+      warnings: [
+        "Could not find an omo command owned by omo-ai after the install. Run omo --version yourself to check.",
+      ],
     }
   }
 

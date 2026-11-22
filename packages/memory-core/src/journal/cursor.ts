@@ -25,6 +25,8 @@ export type ReflectionTranscriptState = {
   readonly unreflected_bytes?: number
   readonly consecutive_failures?: number
   readonly next_eligible_at?: string
+  /** Set when retention removed `transcript.jsonl` and kept this state; cleared by the next rebuild. */
+  readonly transcript_pruned_at?: string
 }
 
 export type ReflectionSnapshot = {
@@ -49,10 +51,7 @@ function entryBytes(entry: TranscriptEntry): number {
  * Index of the last row belonging to the reflected message, so a resumed capture starts after the
  * WHOLE message group (its trailing tool rows included) rather than replaying them.
  */
-function anchorRowIndex(
-  entries: readonly TranscriptEntry[],
-  reflectedThroughMessageId: string | undefined,
-): number {
+function anchorRowIndex(entries: readonly TranscriptEntry[], reflectedThroughMessageId: string | undefined): number {
   if (reflectedThroughMessageId === undefined) return -1
   let anchor = -1
   for (const [index, entry] of entries.entries()) {
@@ -73,10 +72,7 @@ export function isCanonicalEntry(
 
 export function countCompletedSteps(entries: readonly TranscriptEntry[]): number {
   return entries.filter(
-    (entry) =>
-      entry.kind === "assistant" &&
-      entry.source_message_id.length > 0 &&
-      entry.text.trim().length > 0,
+    (entry) => entry.kind === "assistant" && entry.source_message_id.length > 0 && entry.text.trim().length > 0,
   ).length
 }
 
@@ -95,13 +91,8 @@ export function deriveState(
     schema_version: REFLECTION_STATE_SCHEMA_VERSION,
     total_completed_steps: totalCompletedSteps,
     reflected_completed_steps: reflectedCompletedSteps,
-    steps_since_last_successful_reflection: Math.max(
-      0,
-      totalCompletedSteps - reflectedCompletedSteps,
-    ),
-    unreflected_bytes: entries
-      .slice(anchorIndex + 1)
-      .reduce((total, entry) => total + entryBytes(entry), 0),
+    steps_since_last_successful_reflection: Math.max(0, totalCompletedSteps - reflectedCompletedSteps),
+    unreflected_bytes: entries.slice(anchorIndex + 1).reduce((total, entry) => total + entryBytes(entry), 0),
   }
 }
 
@@ -111,9 +102,7 @@ export function captureCursorSnapshot(
   options: CaptureCursorOptions = {},
 ): ReflectionSnapshot | null {
   const anchorIndex = anchorRowIndex(entries, state.reflected_through_message_id)
-  const startIndex = entries.findIndex(
-    (entry, index) => index > anchorIndex && isCanonicalEntry(entry),
-  )
+  const startIndex = entries.findIndex((entry, index) => index > anchorIndex && isCanonicalEntry(entry))
   if (startIndex < 0) return null
   const start = entries[startIndex]
   if (!start || !isCanonicalEntry(start)) return null

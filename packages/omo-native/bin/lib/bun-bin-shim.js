@@ -1,4 +1,13 @@
-import { chmodSync, lstatSync, readFileSync, realpathSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  lstatSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir as osHomedir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { bunRoot, findBunBinary, isUnderBunGlobalTree } from "./bun-runtime.js"
@@ -90,7 +99,8 @@ export function ensureBunBinShim(input) {
     warn: input.warn ?? ((message) => console.error(message)),
   }
 
-  if (platform !== "darwin" && platform !== "linux") return { action: "skipped-platform", error: undefined, entries: [] }
+  if (platform !== "darwin" && platform !== "linux")
+    return { action: "skipped-platform", error: undefined, entries: [] }
   if (!isUnderBunGlobalTree(input.scriptPath, { env, homedir, platform, realpath: io.realpath })) {
     return { action: "skipped-install", error: undefined, entries: [] }
   }

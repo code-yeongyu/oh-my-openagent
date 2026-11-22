@@ -23,7 +23,10 @@ describe("telemetry.rawTurnSampleRate", () => {
     [-0.1, false],
     [1.5, false],
     ["0.5", false],
-  ])("#given rawTurnSampleRate %p #when a config layer is parsed #then it is accepted: %p", (rawTurnSampleRate, accepted) => {
-    expect(OmoTelemetrySettingsLayerSchema.safeParse({ rawTurnSampleRate }).success).toBe(accepted)
-  })
+  ])(
+    "#given rawTurnSampleRate %p #when a config layer is parsed #then it is accepted: %p",
+    (rawTurnSampleRate, accepted) => {
+      expect(OmoTelemetrySettingsLayerSchema.safeParse({ rawTurnSampleRate }).success).toBe(accepted)
+    },
+  )
 })

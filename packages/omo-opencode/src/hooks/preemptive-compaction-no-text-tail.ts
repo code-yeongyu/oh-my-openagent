@@ -37,10 +37,7 @@ function findMessageByID(messages: SessionMessage[], messageID?: string): Sessio
 export async function resolveNoTextTailFromSession(args: {
   client: {
     session: {
-      messages: (input: {
-        path: { id: string }
-        query?: { directory: string }
-      }) => Promise<unknown>
+      messages: (input: { path: { id: string }; query?: { directory: string } }) => Promise<unknown>
     }
   }
   sessionID: string

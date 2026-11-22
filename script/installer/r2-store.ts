@@ -27,7 +27,11 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
     const keys: string[] = []
     let token: string | undefined
     do {
-      const page = await client.list({ prefix: full(under), maxKeys: 1000, ...(token ? { continuationToken: token } : {}) })
+      const page = await client.list({
+        prefix: full(under),
+        maxKeys: 1000,
+        ...(token ? { continuationToken: token } : {}),
+      })
       for (const entry of page.contents ?? []) keys.push(entry.key)
       token = page.isTruncated ? page.nextContinuationToken : undefined
     } while (token)
@@ -43,7 +47,9 @@ export function createR2Store(credentials: R2Credentials, prefix: string): R2Sto
     async write(key, body, contentType) {
       const file = new Blob([body], { type: contentType })
       const hash = new Bun.CryptoHasher("sha256").update(body).digest("hex")
-      await withRetry(`write ${full(key)}`, () => putVerified(credentials, full(key), file, hash, { "content-type": contentType }))
+      await withRetry(`write ${full(key)}`, () =>
+        putVerified(credentials, full(key), file, hash, { "content-type": contentType }),
+      )
     },
     async listReleaseVersions() {
       const versions = new Set<string>()

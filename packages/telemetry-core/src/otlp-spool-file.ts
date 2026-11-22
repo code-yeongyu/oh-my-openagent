@@ -28,15 +28,22 @@ export function frame(payload: Uint8Array): Uint8Array {
 }
 
 export function encodeHeader(signal: Signal, resource: ResourceAttributes, scope: InstrumentationScope): Uint8Array {
-  const body = signal === "logs"
-    ? toBinary(ResourceLogsSchema, create(ResourceLogsSchema, {
-      resource: encodeResource(resource),
-      scopeLogs: [{ scope: encodeScope(scope) }],
-    }))
-    : toBinary(ResourceSpansSchema, create(ResourceSpansSchema, {
-      resource: encodeResource(resource),
-      scopeSpans: [{ scope: encodeScope(scope) }],
-    }))
+  const body =
+    signal === "logs"
+      ? toBinary(
+          ResourceLogsSchema,
+          create(ResourceLogsSchema, {
+            resource: encodeResource(resource),
+            scopeLogs: [{ scope: encodeScope(scope) }],
+          }),
+        )
+      : toBinary(
+          ResourceSpansSchema,
+          create(ResourceSpansSchema, {
+            resource: encodeResource(resource),
+            scopeSpans: [{ scope: encodeScope(scope) }],
+          }),
+        )
   const out = new Uint8Array(2 + body.byteLength)
   out[0] = SPOOL_FORMAT
   out[1] = SIGNAL_BYTE[signal]
@@ -70,7 +77,9 @@ function headerSignal(header: Uint8Array | undefined): Signal | undefined {
 }
 
 function looksLikeHeader(first: Uint8Array | undefined): boolean {
-  return first !== undefined && first.byteLength >= 2 && (first[1] === SIGNAL_BYTE.logs || first[1] === SIGNAL_BYTE.traces)
+  return (
+    first !== undefined && first.byteLength >= 2 && (first[1] === SIGNAL_BYTE.logs || first[1] === SIGNAL_BYTE.traces)
+  )
 }
 
 function buildBody(signal: Signal, header: Uint8Array, records: readonly Uint8Array[]): Uint8Array {
@@ -79,20 +88,29 @@ function buildBody(signal: Signal, header: Uint8Array, records: readonly Uint8Ar
     const scopeLogs = resourceLogs.scopeLogs[0]
     if (scopeLogs === undefined) throw new Error("spool header without scope")
     scopeLogs.logRecords = records.map((record) => fromBinary(LogRecordSchema, record))
-    return toBinary(ExportLogsServiceRequestSchema, create(ExportLogsServiceRequestSchema, { resourceLogs: [resourceLogs] }))
+    return toBinary(
+      ExportLogsServiceRequestSchema,
+      create(ExportLogsServiceRequestSchema, { resourceLogs: [resourceLogs] }),
+    )
   }
   const resourceSpans = fromBinary(ResourceSpansSchema, header)
   const scopeSpans = resourceSpans.scopeSpans[0]
   if (scopeSpans === undefined) throw new Error("spool header without scope")
   scopeSpans.spans = records.map((record) => fromBinary(SpanSchema, record))
-  return toBinary(ExportTraceServiceRequestSchema, create(ExportTraceServiceRequestSchema, { resourceSpans: [resourceSpans] }))
+  return toBinary(
+    ExportTraceServiceRequestSchema,
+    create(ExportTraceServiceRequestSchema, { resourceSpans: [resourceSpans] }),
+  )
 }
 
 export function spoolRequest(bytes: Uint8Array): SpoolRequest {
   const [first, ...rest] = readFrames(bytes)
   const signal = headerSignal(first)
   if (first === undefined || signal === undefined) {
-    return { kind: "corrupt", records: looksLikeHeader(first) ? rest.length : rest.length + (first === undefined ? 0 : 1) }
+    return {
+      kind: "corrupt",
+      records: looksLikeHeader(first) ? rest.length : rest.length + (first === undefined ? 0 : 1),
+    }
   }
   try {
     return { kind: "ok", signal, records: rest.length, body: buildBody(signal, first.subarray(2), rest) }

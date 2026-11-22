@@ -5,7 +5,7 @@ import { FAKE_SESSION, fakeSessionPort } from "./handle.test-support"
 
 test("#given close in flight #when terminate overlaps it #then the later terminated intent classifies the exit as killed", async () => {
   // given
-  const closeGate = Promise.withResolvers<void>()
+  const closeGate = Promise.withResolvers<boolean>()
   const port = {
     ...fakeSessionPort(),
     close: () => closeGate.promise,
@@ -23,7 +23,7 @@ test("#given close in flight #when terminate overlaps it #then the later termina
   // when
   const closing = handle.close()
   const terminating = handle.terminate()
-  closeGate.resolve()
+  closeGate.resolve(true)
   await Promise.all([closing, terminating])
 
   // then

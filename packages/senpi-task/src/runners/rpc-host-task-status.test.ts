@@ -23,7 +23,9 @@ function taskStatusOf(context: unknown): unknown {
 /** Resolves once the host has received a patch publishing `status`; checking and arming happen in one tick. */
 async function patchSeen(host: FakeHost, status: string): Promise<void> {
   const seen = (): boolean =>
-    host.commands.some((command) => command.type === "set_session_context" && taskStatusOf(command.payload.patch) === status)
+    host.commands.some(
+      (command) => command.type === "set_session_context" && taskStatusOf(command.payload.patch) === status,
+    )
   while (!seen()) await host.waitForCommand("set_session_context")
 }
 
@@ -37,7 +39,12 @@ function within<T>(work: Promise<T>, what: string): Promise<T> {
   ])
 }
 
-async function finishedChild(): Promise<{ readonly world: HostWorld; readonly parent: ParentSession; readonly taskId: string; readonly sessionPath: string }> {
+async function finishedChild(): Promise<{
+  readonly world: HostWorld
+  readonly parent: ParentSession
+  readonly taskId: string
+  readonly sessionPath: string
+}> {
   const world = await startHostWorld({ transcripts: true })
   worlds.push(world)
   const parent = world.connect("parent-a", { reattachDelaysMs: [0, 0] })
@@ -111,7 +118,11 @@ describe("a daemon-hosted task publishes its status to the host", () => {
     if (session === undefined) throw new Error("the child did not start on the host")
     const running = (async () => {
       await patchSeen(world.host, "completed")
-      while (taskStatusOf(world.host.commands.filter((command) => command.type === "set_session_context").at(-1)?.payload.patch) !== "running") {
+      while (
+        taskStatusOf(
+          world.host.commands.filter((command) => command.type === "set_session_context").at(-1)?.payload.patch,
+        ) !== "running"
+      ) {
         await world.host.waitForCommand("set_session_context")
       }
     })()

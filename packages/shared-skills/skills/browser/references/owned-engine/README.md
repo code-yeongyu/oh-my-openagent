@@ -24,8 +24,10 @@ try {
 ```
 
 `connectPipe` launches over `--remote-debugging-pipe`: no listening port, stdio drained, the
-process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to a browser something
-else launched. `connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
+process reaped on `close()`. `connect("http://127.0.0.1:<port>")` attaches to the DevTools endpoint
+of a browser something else launched; attaches to the same browser in one process share one
+connection, and `close()` releases only your handle (the last release disconnects).
+`connectCloakProfile({ profileDir })` launches CloakBrowser with a pinned
 fingerprint seed — the stealth path for WAF and bot-scored targets, where the attached engine's
 console capture would be a signal.
 
@@ -58,5 +60,5 @@ or text), not a timer; `goto(url, { waitUntil: "commit" })` is the escape hatch 
 - [network.md](network.md) — `createNetworkSnoop`, `collectWhileScrolling`, `createTrace`, `createRoutes`
 - [frames-and-humans.md](frames-and-humans.md) — `snapshotWithFrames`, `describeLayers`, dialog policy, `emulate`, `requestHuman`
 
-The library's own skill (`skills/omowright/SKILL.md` and `presets/*` in the omowright repository)
+The omowright repository's own agent guide and its `presets/*`
 is the authoritative, longer treatment of each; these pages are the routing summary.

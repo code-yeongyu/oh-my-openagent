@@ -7,9 +7,17 @@ import { hostRunnerHarness } from "../runners/rpc-host.test-support"
 import type { ResolvedModelRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { adaptRpcHandle, type ManagedChildHandle } from "./child-handle"
-import { baseSpec, cleanupProjects, FakeRunner, launchSettled, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  cleanupProjects,
+  FakeRunner,
+  launchSettled,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The parent dies after the handoff is committed but before the failed rung's daemon session closed.
 // Revival must close that retained session before it opens the next rung, on the real daemon wire.
@@ -28,14 +36,22 @@ function rung(id: string): ResolvedModelRecord {
 test("#given the parent dies before the failed rung's session closes #when another session revives the handoff #then the retained session is closed and only the next rung stays open", async () => {
   // given
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const host = await harness.fakeHost({ transcripts: true })
   const rpc = harness.runnerOver(host)
   const closing = Promise.withResolvers<void>()
   let failedRung: ManagedChildHandle | undefined
   const runner: ManagedRunner = {
     start: async (spec) => {
-      failedRung = adaptRpcHandle(await rpc.start({ task_id: spec.taskId, cwd: project, state_dir: spec.stateDir, prompt: spec.prompt, model: spec.model }))
+      failedRung = adaptRpcHandle(
+        await rpc.start({
+          task_id: spec.taskId,
+          cwd: project,
+          state_dir: spec.stateDir,
+          prompt: spec.prompt,
+          model: spec.model,
+        }),
+      )
       return failedRung
     },
   }
@@ -45,8 +61,16 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     cwd: project,
     hostPid: 11_001,
     runners: { process: runner, "in-process": runner },
-    planner: () => ({ kind: "resolved", plan: { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] } }),
-    destruction: { destroyResidentTask: () => { closing.resolve(); return new Promise<void>(() => undefined) } },
+    planner: () => ({
+      kind: "resolved",
+      plan: { model: "test/first", resolved_model: rung("first"), fallback_models: [rung("next")] },
+    }),
+    destruction: {
+      destroyResidentTask: () => {
+        closing.resolve()
+        return new Promise<void>(() => undefined)
+      },
+    },
   })
   const task = await owner.start(baseSpec({ execution_mode: "process" }))
   if (task.kind !== "started") throw new Error("expected the task to start")
@@ -72,7 +96,11 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     planner: () => ({ kind: "resolved", plan: { model: "test/next" } }),
     rpcRespawnRunner: rpc,
   })
-  const { hostSessionProbe: _fakeProbe, hostSessionClose: _fakeClose, ...deps } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
+  const {
+    hostSessionProbe: _fakeProbe,
+    hostSessionClose: _fakeClose,
+    ...deps
+  } = hostLifecycleDeps({ store, hostPid: 22_002, isAlive: (pid) => pid === 22_002 }).deps
   const lifecycle = createTaskLifecycle({
     ...deps,
     registry: createManagerResidencyRegistry(() => sweeper),
@@ -85,7 +113,11 @@ test("#given the parent dies before the failed rung's session closes #when anoth
     const result = await lifecycle.reconcileOnSessionStart("another-session")
 
     // then
-    expect(result.outcomes).toContainEqual({ task_id: task.task_id, kind: "resumed", reason: "respawned and reattached" })
+    expect(result.outcomes).toContainEqual({
+      task_id: task.task_id,
+      kind: "resumed",
+      reason: "respawned and reattached",
+    })
     expect(host.sessions().map((session) => session.sessionPath)).not.toContain(original.sessionPath)
     expect(host.sessions()).toHaveLength(1)
     expect(store.load(task.task_id)?.fallback_closing_child).toBeUndefined()

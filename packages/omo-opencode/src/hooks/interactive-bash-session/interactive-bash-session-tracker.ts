@@ -2,11 +2,11 @@ import {
   loadInteractiveBashSessionState,
   saveInteractiveBashSessionState,
   clearInteractiveBashSessionState,
-} from "./storage";
-import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants";
-import type { InteractiveBashSessionState } from "./types";
-import { subagentSessions } from "../../features/claude-code-session-state";
-import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide";
+} from "./storage"
+import { OMO_SESSION_PREFIX, buildSessionReminderMessage } from "./constants"
+import type { InteractiveBashSessionState } from "./types"
+import { subagentSessions } from "../../features/claude-code-session-state"
+import { spawnWithWindowsHide } from "../../shared/spawn-with-windows-hide"
 
 type AbortSession = (args: { path: { id: string } }) => Promise<unknown>
 
@@ -14,10 +14,7 @@ function isOmoSession(sessionName: string | null): sessionName is string {
   return sessionName !== null && sessionName.startsWith(OMO_SESSION_PREFIX)
 }
 
-async function killAllTrackedSessions(
-  abortSession: AbortSession,
-  state: InteractiveBashSessionState,
-): Promise<void> {
+async function killAllTrackedSessions(abortSession: AbortSession, state: InteractiveBashSessionState): Promise<void> {
   for (const sessionName of state.tmuxSessions) {
     try {
       const proc = spawnWithWindowsHide(["tmux", "kill-session", "-t", sessionName], {
@@ -37,9 +34,7 @@ async function killAllTrackedSessions(
   }
 }
 
-export function createInteractiveBashSessionTracker(options: {
-  abortSession: AbortSession
-}): {
+export function createInteractiveBashSessionTracker(options: { abortSession: AbortSession }): {
   getOrCreateState: (sessionID: string) => InteractiveBashSessionState
   handleSessionDeleted: (sessionID: string) => Promise<void>
   handleTmuxCommand: (input: {

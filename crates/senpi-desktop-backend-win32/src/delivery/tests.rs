@@ -1,6 +1,10 @@
 use senpi_desktop_core::error::ErrorCode;
+use senpi_desktop_core::report::Disposition;
 
 use super::*;
+use crate::input::keys::{VK_CONTROL, VK_F1, VK_SHIFT};
+
+const VK_K: u16 = 0x4B;
 
 #[test]
 fn recognizes_real_classes_and_rejects_lookalikes() {
@@ -107,6 +111,36 @@ fn background_text_into_chromium_is_refused_naming_the_class() {
         error.message
     );
     assert!(error.message.contains("text_input"), "{}", error.message);
+}
+
+#[test]
+fn a_posted_chord_holding_a_modifier_is_refused_with_nothing_sent() {
+    // Given: ctrl+k as posted virtual keys; the target reads Ctrl from
+    // GetKeyState, which a posted WM_KEYDOWN never sets (omo#13297)
+    // When
+    let refusal = posted_chord_refusal("4242", &[VK_CONTROL, VK_K]);
+    // Then: refused before anything is posted, naming the modifier
+    let error = refusal.expect("a posted ctrl+k arrives as a bare k");
+    assert_eq!(error.code, ErrorCode::BackgroundUnavailable);
+    assert!(error.message.contains("ctrl"), "{}", error.message);
+    let report = error.report.expect("the refusal carries its report");
+    assert_eq!(report.reason.as_deref(), Some("key_route_unproven"));
+    assert_eq!(report.disposition, Some(Disposition::NOT_DELIVERED_SAFE));
+}
+
+#[test]
+fn a_layout_shifted_key_is_a_held_modifier_too() {
+    // Given: `K` on a layout that needs Shift held for it
+    let refusal = posted_chord_refusal("4242", &[VK_SHIFT, VK_K]);
+    // Then
+    assert_eq!(refusal.map(|error| error.code), Some(ErrorCode::BackgroundUnavailable));
+}
+
+#[test]
+fn plain_keys_and_modifier_only_chords_still_post() {
+    for vks in [&[VK_K][..], &[VK_F1 + 4], &[VK_CONTROL], &[VK_CONTROL, VK_SHIFT], &[VK_F1, VK_K]] {
+        assert!(posted_chord_refusal("4242", vks).is_none(), "{vks:?}");
+    }
 }
 
 #[test]

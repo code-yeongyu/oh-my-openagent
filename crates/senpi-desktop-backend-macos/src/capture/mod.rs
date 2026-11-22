@@ -4,6 +4,7 @@
 //! Known cursor-helper windows are excluded from every frame by window ID.
 //! Never prompts for permission.
 
+mod consent_probe;
 mod displays;
 pub(crate) mod fallback;
 mod filtered;
@@ -11,6 +12,8 @@ mod minimized;
 mod route;
 mod sck;
 pub(crate) mod screencapture;
+mod skylight_capture;
+mod spaces;
 mod windows;
 
 use image::RgbaImage;

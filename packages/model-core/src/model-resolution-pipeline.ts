@@ -20,9 +20,7 @@ function log(message: string, data?: unknown): void {
   logImplementation(message, data)
 }
 
-export function _setModelResolutionLogImplementationForTesting(
-  logImplementation: LogImplementation | undefined,
-): void {
+export function _setModelResolutionLogImplementationForTesting(logImplementation: LogImplementation | undefined): void {
   logImplementationForTesting = logImplementation
 }
 
@@ -43,11 +41,7 @@ export type ModelResolutionRequest = {
   }
 }
 
-export type ModelResolutionProvenance =
-  | "override"
-  | "category-default"
-  | "provider-fallback"
-  | "system-default"
+export type ModelResolutionProvenance = "override" | "category-default" | "provider-fallback" | "system-default"
 
 export type ModelResolutionResult = {
   model: string
@@ -58,11 +52,7 @@ export type ModelResolutionResult = {
 }
 
 export type ModelResolutionDeps = {
-  fuzzyMatchModel: (
-    target: string,
-    available: Set<string>,
-    providers?: string[],
-  ) => string | null
+  fuzzyMatchModel: (target: string, available: Set<string>, providers?: string[]) => string | null
   transformModelForProvider: (provider: string, model: string) => string
 }
 
@@ -94,7 +84,6 @@ function findFallbackVariantForModel(
       entry.variant,
   )?.variant
 }
-
 
 export function resolveModelPipeline(
   request: ModelResolutionRequest,
@@ -186,7 +175,10 @@ export function resolveModelPipeline(
             if (connectedSet.has(provider)) {
               const modelName = parts.slice(1).join("/")
               const transformedModel = `${provider}/${deps.transformModelForProvider(provider, modelName)}`
-              log("Model resolved via user fallback_models (connected provider)", { model: transformedModel, original: model })
+              log("Model resolved via user fallback_models (connected provider)", {
+                model: transformedModel,
+                original: model,
+              })
               return { model: transformedModel, provenance: "provider-fallback", attempted }
             }
           }
@@ -243,9 +235,8 @@ export function resolveModelPipeline(
         for (const provider of entry.providers) {
           const entryModelID = modelIDForProvider(provider, entry.model)
           const transformedModelId = deps.transformModelForProvider(provider, entryModelID)
-          const candidateModelIds = transformedModelId === entryModelID
-            ? [entryModelID]
-            : [entryModelID, transformedModelId]
+          const candidateModelIds =
+            transformedModelId === entryModelID ? [entryModelID] : [entryModelID, transformedModelId]
           for (const modelID of candidateModelIds) {
             const fullModel = `${provider}/${modelID}`
             const match = deps.fuzzyMatchModel(fullModel, availableModels, [provider])
@@ -265,7 +256,6 @@ export function resolveModelPipeline(
             }
           }
         }
-
       }
       log("No available model found in fallback chain, falling through to system default")
     }

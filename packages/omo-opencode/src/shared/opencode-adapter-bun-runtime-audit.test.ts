@@ -3,8 +3,7 @@ import { existsSync } from "node:fs"
 import { readdir, readFile } from "node:fs/promises"
 import path from "node:path"
 
-const RAW_BUN_RUNTIME_API_RE =
-  /(?<![.$\w])Bun\.(spawn|spawnSync|file|write|which|hash|serve|readableStreamToText)\b/g
+const RAW_BUN_RUNTIME_API_RE = /(?<![.$\w])Bun\.(spawn|spawnSync|file|write|which|hash|serve|readableStreamToText)\b/g
 const RAW_BUN_MODULE_RE =
   /\b(?:from\s*["']bun:[^"']+["']|import\s*\(\s*["']bun:[^"']+["']\s*\)|require\s*\(\s*["']bun:[^"']+["']\s*\))/g
 const APPROVED_BUN_SHIM_RE = /^bun-[a-z0-9-]+-shim\.ts$/
@@ -35,16 +34,18 @@ async function listAdapterSourceFiles(directory: string): Promise<string[]> {
     return []
   }
 
-  const nestedFiles = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      return listAdapterSourceFiles(entryPath)
-    }
-    if (entry.isFile() && isAuditedProductionSource(entryPath)) {
-      return [entryPath]
-    }
-    return []
-  }))
+  const nestedFiles = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        return listAdapterSourceFiles(entryPath)
+      }
+      if (entry.isFile() && isAuditedProductionSource(entryPath)) {
+        return [entryPath]
+      }
+      return []
+    }),
+  )
 
   return nestedFiles.flat()
 }
@@ -54,18 +55,18 @@ function isAuditedProductionSource(filePath: string): boolean {
   const relativePath = relativeAdapterPath(filePath)
 
   return (
-    basename.endsWith(".ts")
-    && !basename.endsWith(".d.ts")
-    && !basename.endsWith(".test.ts")
-    && !basename.endsWith(".smoke.ts")
-    && !basename.endsWith("test-support.ts")
-    && !basename.endsWith("-test-fixture.ts")
-    && !basename.endsWith(".fixture.ts")
-    && !basename.endsWith(".fixtures.ts")
-    && !APPROVED_BUN_SHIM_RE.test(basename)
-    && !relativePath.includes("/__tests__/")
-    && !relativePath.includes("/fixtures/")
-    && !relativePath.includes("/test-fixtures/")
+    basename.endsWith(".ts") &&
+    !basename.endsWith(".d.ts") &&
+    !basename.endsWith(".test.ts") &&
+    !basename.endsWith(".smoke.ts") &&
+    !basename.endsWith("test-support.ts") &&
+    !basename.endsWith("-test-fixture.ts") &&
+    !basename.endsWith(".fixture.ts") &&
+    !basename.endsWith(".fixtures.ts") &&
+    !APPROVED_BUN_SHIM_RE.test(basename) &&
+    !relativePath.includes("/__tests__/") &&
+    !relativePath.includes("/fixtures/") &&
+    !relativePath.includes("/test-fixtures/")
   )
 }
 
@@ -143,10 +144,10 @@ describe("OpenCode adapter Bun runtime audit", () => {
         RAW_BUN_RUNTIME_API_RE.lastIndex = 0
         for (const match of line.matchAll(RAW_BUN_RUNTIME_API_RE)) {
           if (
-            match.index === undefined
-            || isInsideStringLiteral(line, match.index)
-            || isLineComment(line, match.index)
-            || isTypeOnlyBunReference(line, match.index)
+            match.index === undefined ||
+            isInsideStringLiteral(line, match.index) ||
+            isLineComment(line, match.index) ||
+            isTypeOnlyBunReference(line, match.index)
           ) {
             continue
           }
@@ -157,10 +158,10 @@ describe("OpenCode adapter Bun runtime audit", () => {
         RAW_BUN_MODULE_RE.lastIndex = 0
         for (const match of line.matchAll(RAW_BUN_MODULE_RE)) {
           if (
-            match.index === undefined
-            || isLineComment(line, match.index)
-            || isInsideStringLiteral(line, match.index)
-            || isTypeOnlyBunModuleReference(line, match.index)
+            match.index === undefined ||
+            isLineComment(line, match.index) ||
+            isInsideStringLiteral(line, match.index) ||
+            isTypeOnlyBunModuleReference(line, match.index)
           ) {
             continue
           }

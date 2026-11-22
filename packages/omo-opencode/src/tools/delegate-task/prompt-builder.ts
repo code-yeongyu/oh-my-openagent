@@ -44,10 +44,7 @@ function usesFreeOrLocalModel(model: { providerID: string; modelID: string; vari
 
   const provider = model.providerID.toLowerCase()
   const modelId = model.modelID.toLowerCase()
-  return provider.includes("local")
-    || provider === "ollama"
-    || provider === "lmstudio"
-    || modelId.includes("free")
+  return provider.includes("local") || provider === "ollama" || provider === "lmstudio" || modelId.includes("free")
 }
 
 /**
@@ -71,14 +68,12 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   const effectiveAvailableSkills = mergeNativeIntoAvailable(availableSkills ?? [], nativeSkillInfos)
 
   const isPlan = isPlanAgent(agentName)
-  const planAgentPrepend = isPlan
-    ? buildPlanAgentSystemPrepend(availableCategories, effectiveAvailableSkills)
-    : ""
+  const planAgentPrepend = isPlan ? buildPlanAgentSystemPrepend(availableCategories, effectiveAvailableSkills) : ""
 
   const effectiveAgentsContext = agentsContext ?? planAgentPrepend
 
-  const effectiveMaxPromptTokens = maxPromptTokens
-    ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
+  const effectiveMaxPromptTokens =
+    maxPromptTokens ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
   return buildSystemContentWithTokenLimit(
     {
@@ -88,7 +83,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
       agentsContext: effectiveAgentsContext,
       planAgentPrepend,
     },
-    effectiveMaxPromptTokens
+    effectiveMaxPromptTokens,
   )
 }
 

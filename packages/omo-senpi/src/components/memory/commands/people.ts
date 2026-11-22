@@ -15,7 +15,9 @@ export function registerPeopleCommand(
     description: "Show the people roster and relationship graph, one person's record, or ask about them.",
     argumentHint: '[<name>] [--all] [--ask "<question>"]',
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
-      const runtime = await loadRuntime().catch((error: unknown) => error instanceof Error ? error : new Error(String(error)))
+      const runtime = await loadRuntime().catch((error: unknown) =>
+        error instanceof Error ? error : new Error(String(error)),
+      )
       if (runtime instanceof Error) return respond(ctx, palaceRuntimeLoadFailure("people", runtime), "error")
       return runtime.runPeopleCommand(deps, args, ctx)
     },

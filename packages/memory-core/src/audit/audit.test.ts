@@ -19,19 +19,36 @@ test("#given clean memory #when audited #then no structural defects", async () =
 
 test("#given root wikilinks and relative markdown links #when audited #then only missing targets reported", async () => {
   const { dir } = await repoWith([
-    { relativePath: "reference/a.md", content: memory("A", "[[reference/missing.md]] [[notes/gone]] [see](../people/nobody/card.md) [[exists.md]] [peer](exists.md#h)") },
+    {
+      relativePath: "reference/a.md",
+      content: memory(
+        "A",
+        "[[reference/missing.md]] [[notes/gone]] [see](../people/nobody/card.md) [[exists.md]] [peer](exists.md#h)",
+      ),
+    },
     { relativePath: "reference/exists.md", content: memory("Exists", "Target") },
-    { relativePath: "notes/n.md", content: "[[reference/exists.md]] [[reference/exists|label]] [[reference/exists#h]]" },
+    {
+      relativePath: "notes/n.md",
+      content: "[[reference/exists.md]] [[reference/exists|label]] [[reference/exists#h]]",
+    },
   ])
   const issues = (await auditMemoryRepo(dir)).issues.filter((issue) => issue.code === "link_dangling")
-  expect(issues.map((issue) => issue.detail).sort()).toEqual([
-    "reference/missing.md", "notes/gone", "../people/nobody/card.md", "exists.md",
-  ].sort())
+  expect(issues.map((issue) => issue.detail).sort()).toEqual(
+    ["reference/missing.md", "notes/gone", "../people/nobody/card.md", "exists.md"].sort(),
+  )
   expect(issues.every((issue) => issue.path === "reference/a.md")).toBe(true)
 })
 
 test("#given fenced examples and external links #when audited #then examples are not dangling", async () => {
-  const { dir } = await repoWith([{ relativePath: "reference/a.md", content: memory("A", "```md\n[[missing]]\n```\n~~~\n[x](missing.md)\n~~~\n[x](https://example.com) [mail](mailto:x@example.com)") }])
+  const { dir } = await repoWith([
+    {
+      relativePath: "reference/a.md",
+      content: memory(
+        "A",
+        "```md\n[[missing]]\n```\n~~~\n[x](missing.md)\n~~~\n[x](https://example.com) [mail](mailto:x@example.com)",
+      ),
+    },
+  ])
   expect((await auditMemoryRepo(dir)).counts.link_dangling).toBe(0)
 })
 
@@ -80,8 +97,12 @@ test("#given invalid UTF8 #when audited #then unreadable file is reported withou
 
 test("#given pressure threshold #when audited #then caller budget controls warning", async () => {
   const { dir } = await repoWith([])
-  expect((await auditMemoryRepo(dir, { systemTokens: { totalTokens: 800 }, budgetTokens: 1000 })).counts.system_pressure).toBe(1)
-  expect((await auditMemoryRepo(dir, { systemTokens: { totalTokens: 799 }, budgetTokens: 1000 })).counts.system_pressure).toBe(0)
+  expect(
+    (await auditMemoryRepo(dir, { systemTokens: { totalTokens: 800 }, budgetTokens: 1000 })).counts.system_pressure,
+  ).toBe(1)
+  expect(
+    (await auditMemoryRepo(dir, { systemTokens: { totalTokens: 799 }, budgetTokens: 1000 })).counts.system_pressure,
+  ).toBe(0)
   expect((await auditMemoryRepo(dir)).counts.system_pressure).toBe(0)
 })
 
@@ -112,7 +133,13 @@ test("#given symlinked files and excluded directories #when audited #then they a
 test("#given links that do resolve in markdown syntax variants #when audited #then none is reported dangling", async () => {
   // a link title, a link to a directory, and link syntax quoted in inline code all point nowhere wrong
   const { dir } = await repoWith([
-    { relativePath: "reference/a.md", content: memory("A", "[t](exists.md \"Title\") [dir](../people/) see `[[reference/missing.md]]` and `[x](gone.md)`") },
+    {
+      relativePath: "reference/a.md",
+      content: memory(
+        "A",
+        '[t](exists.md "Title") [dir](../people/) see `[[reference/missing.md]]` and `[x](gone.md)`',
+      ),
+    },
     { relativePath: "reference/exists.md", content: memory("Exists", "Target") },
     { relativePath: "people/sam/card.md", content: memory("Sam", "Card") },
   ])
@@ -134,7 +161,9 @@ test("#given the legacy memory/ layout #when audited #then its homes are not orp
 })
 
 test("#given escaping markdown target #when audited #then confinement failure is explicit", async () => {
-  const { dir } = await repoWith([{ relativePath: "reference/a.md", content: memory("A", "[outside](../../outside.md)") }])
+  const { dir } = await repoWith([
+    { relativePath: "reference/a.md", content: memory("A", "[outside](../../outside.md)") },
+  ])
   expect((await auditMemoryRepo(dir)).issues).toEqual([
     { code: "link_dangling", path: "reference/a.md", detail: "../../outside.md (escapes repository)" },
   ])

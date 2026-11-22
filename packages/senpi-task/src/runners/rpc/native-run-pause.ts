@@ -20,16 +20,17 @@ export function createRpcRunPause(input: {
     try {
       return await run(input.control())
     } catch (error) {
-      if (error instanceof TaskParentControlError && error.code === "unsupported") throw new NativePauseUnavailableError(input.taskId)
+      if (error instanceof TaskParentControlError && error.code === "unsupported")
+        throw new NativePauseUnavailableError(input.taskId)
       throw error
     }
   }
   return {
-    pauseForRun: owner => unsupported(control => control.pauseForRun(owner)),
+    pauseForRun: (owner) => unsupported((control) => control.pauseForRun(owner)),
     async resumeForRun(request) {
       const releaseClaim = input.claimNextTurn()
       try {
-        const receipt = await unsupported(control => control.resumeForRun(request))
+        const receipt = await unsupported((control) => control.resumeForRun(request))
         if (!receipt.released) {
           releaseClaim()
           return receipt
@@ -45,7 +46,7 @@ export function createRpcRunPause(input: {
         throw error
       }
     },
-    holdInput: (parentSessionId, held) => unsupported(control => control.holdInput(parentSessionId, held)),
-    observeHold: parentSessionId => unsupported(control => control.observeHold(parentSessionId)),
+    holdInput: (parentSessionId, held) => unsupported((control) => control.holdInput(parentSessionId, held)),
+    observeHold: (parentSessionId) => unsupported((control) => control.observeHold(parentSessionId)),
   }
 }
