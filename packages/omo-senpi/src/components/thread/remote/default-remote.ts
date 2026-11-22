@@ -1,6 +1,7 @@
 import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 import type { RemoteSender } from "../../remote/types"
 import type { SessionEntry } from "@code-yeongyu/senpi"
+import { loadServiceAliasRegistry } from "./account-surface"
 import type { RemoteThreadSurface } from "./ports"
 
 /**
@@ -18,19 +19,12 @@ export function createDefaultRemoteSurface(options: {
     version: options.version,
     sender: options.sender,
     loadRuntime: () => import("#omo-thread-client-runtime"),
-    loadAliasRegistry: async () => {
-      const [{ createServiceAliasRegistry }, { cliServiceAccess }] = await Promise.all([
-        import("#omo-thread-client-runtime"),
-        import("#omo-device-account-runtime"),
-      ])
-      return createServiceAliasRegistry(
-        cliServiceAccess({
-          env: process.env,
-          cwd: process.cwd(),
-          ...(options.log === undefined ? {} : { log: options.log }),
-        }),
-      )
-    },
+    loadAliasRegistry: () =>
+      loadServiceAliasRegistry({
+        env: process.env,
+        cwd: process.cwd(),
+        ...(options.log === undefined ? {} : { log: options.log }),
+      }),
     ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }),
     // The engine this extension runs in projects the entries a paged thread_read fetched from another device the way that
     // device's engine answers get_messages; entries are senpi's own session records, as get_entries hands them over.
