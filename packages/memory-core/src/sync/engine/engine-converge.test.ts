@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 
+import { awaitWithinTestBudget } from "../../../../../test-support/test-deadline"
 import { createNodeGitExec } from "../../git/exec"
 import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import type { CycleReport } from "./engine"
@@ -8,14 +9,18 @@ import { FakeSyncServer } from "./fake-server.test-support"
 const devices: Device[] = []
 let active: { readonly controller: AbortController; readonly settled: Promise<void> } | undefined
 
-afterEach(async () => {
-  // Bun can time out the test without cancelling its async body. Stop it from scheduling
-  // another cycle, and join it (including fixture setup) before taking the list to dispose.
+async function disposePair(): Promise<void> {
+  // Bun can time out the test without cancelling its async body. Block new cycles and release
+  // fake backoff waits so the in-flight cycle can actually finish before we dispose its fixture.
   active?.controller.abort()
+  for (const d of devices) d.clock.releaseWaits()
+  // A device still being set up will be registered before it checks the abort signal.
   await active?.settled
   active = undefined
   for (const d of devices.splice(0)) await d.dispose()
-}, GIT_TEST_TIMEOUT)
+}
+
+afterEach(disposePair, GIT_TEST_TIMEOUT)
 
 interface Pair {
   readonly a: Device
@@ -24,46 +29,44 @@ interface Pair {
   readonly cycle: (device: Device) => Promise<CycleReport>
 }
 
-function testPair(name: string, scenario: (pair: Pair) => Promise<void>): void {
-  test(
-    name,
-    () => {
-      const controller = new AbortController()
-      const { signal } = controller
-      const run = async () => {
-        const server = new FakeSyncServer()
-        const a = await makeDevice(server, "a")
-        devices.push(a)
+function runPair(scenario: (pair: Pair) => Promise<void>): Promise<void> {
+  const controller = new AbortController()
+  const { signal } = controller
+  const run = async () => {
+    const server = new FakeSyncServer()
+    const a = await makeDevice(server, "a")
+    devices.push(a)
+    signal.throwIfAborted()
+    // Copy the pristine repo instead of running the same Git setup commands a second time.
+    // makeDevice creates a separate store and journal for b.
+    const b = await makeDevice(server, "b", undefined, { memoryFrom: a.repo.root })
+    devices.push(b)
+    signal.throwIfAborted()
+    await scenario({
+      a,
+      b,
+      server,
+      cycle: (device) => {
         signal.throwIfAborted()
-        // Copy the pristine repo instead of running the same Git setup commands a second time.
-        // makeDevice creates a separate store and journal for b.
-        const b = await makeDevice(server, "b", undefined, { memoryFrom: a.repo.root })
-        devices.push(b)
-        signal.throwIfAborted()
-        await scenario({
-          a,
-          b,
-          server,
-          cycle: (device) => {
-            signal.throwIfAborted()
-            // This promise covers the cycle's Git commit and checkpoint, unlike a head notification.
-            return device.engine.runCycle()
-          },
-        })
-      }
-      const result = run().then(
-        () => ({ ok: true }) as const,
-        (error: unknown) => ({ ok: false, error }) as const,
-      )
-      active = { controller, settled: result.then(() => undefined) }
-      return result.then((outcome) => {
-        // Bun can kill an in-flight child when the test expires. The timeout has
-        // already failed the test; do not reject its abandoned promise as well.
-        if (!outcome.ok && !signal.aborted) throw outcome.error
-      })
-    },
-    GIT_TEST_TIMEOUT,
+        // This promise covers the cycle's Git commit and checkpoint, unlike a head notification.
+        return device.engine.runCycle()
+      },
+    })
+  }
+  const result = run().then(
+    () => ({ ok: true }) as const,
+    (error: unknown) => ({ ok: false, error }) as const,
   )
+  active = { controller, settled: result.then(() => undefined) }
+  return result.then((outcome) => {
+    // Bun can kill an in-flight child when the test expires. The timeout has
+    // already failed the test; do not reject its abandoned promise as well.
+    if (!outcome.ok && !signal.aborted) throw outcome.error
+  })
+}
+
+function testPair(name: string, scenario: (pair: Pair) => Promise<void>): void {
+  test(name, () => runPair(scenario), GIT_TEST_TIMEOUT)
 }
 
 async function syncHistory(device: Device): Promise<string[]> {
@@ -132,4 +135,35 @@ testPair("a device's own pushed batch is not applied back to it", async ({ a, cy
   expect(await cycle(a)).toMatchObject({ pushed: true })
   expect(await cycle(a)).toMatchObject({ applied: 0, pushed: false })
   expect((await a.engine.state()).applied).toBe(1)
+})
+
+test("pair teardown joins a cycle already waiting on stale-base backoff", async () => {
+  const waiting = Promise.withResolvers<Pair>()
+  const pair = runPair(async (fixture) => {
+    const { a, b, server, cycle } = fixture
+    await a.write("a.md", "a\n")
+    await b.write("b.md", "b\n")
+    server.beforeNextAppend = async () => {
+      await cycle(a)
+    }
+    const pending = b.clock.untilPending()
+    const running = cycle(b)
+    const backedOff = await Promise.race([pending.then(() => true), running.then(() => false)])
+    if (!backedOff) throw new Error("cycle finished without scheduling stale-base backoff")
+    waiting.resolve(fixture)
+    await running
+  })
+  const { b, server } = await awaitWithinTestBudget(
+    Promise.race([waiting.promise, pair.then(() => waiting.promise)]),
+    "the stale-base backoff",
+  )
+  const teardown = disposePair()
+  try {
+    await awaitWithinTestBudget(teardown, "pair teardown with a pending stale-base backoff")
+    expect(server.appends.map(({ ok }) => ok)).toEqual([true, false, true])
+  } finally {
+    // Release the injected wait even if teardown regresses, so the regression can fail cleanly.
+    b.clock.advance(8_000)
+    await teardown
+  }
 })
