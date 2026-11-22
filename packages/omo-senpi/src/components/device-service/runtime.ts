@@ -5,11 +5,11 @@
 import { isAbsolute } from "node:path"
 
 import { isOmoDeviceServiceEnabled, type OmoDeviceServiceConfigView } from "@oh-my-opencode/omo-config-core"
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import type { ComponentLogger } from "../../extension/types"
 import { loadSenpiOmoConfig } from "../config-resolution"
-import { isCi, type RegistrantStartOptions, startRegistrantAtStart } from "./registrant-start"
+import { type RegistrantStartOptions, startRegistrantAtStart } from "./registrant-start"
+import { skipsDeviceService } from "./start-eligibility"
 import { type BootstrapReport, runBootstrapWorker } from "./runner"
 
 export interface ProcessLatch {
@@ -72,8 +72,7 @@ export async function bootstrapAtStart(
     latch.claimed ||
     omoBin === undefined ||
     !isAbsolute(omoBin) ||
-    isCi(env) ||
-    env[OMO_SENPI_TASK_RPC_CHILD] === "1" ||
+    skipsDeviceService(env) ||
     notify === undefined
   )
     return

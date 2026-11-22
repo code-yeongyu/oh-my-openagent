@@ -6,10 +6,11 @@ import {
   startAgentDirRegistrant,
 } from "@oh-my-opencode/device-service-core"
 import { isOmoDeviceServiceEnabled, type OmoDeviceServiceConfigView } from "@oh-my-opencode/omo-config-core"
-import { OMO_SENPI_TASK_RPC_CHILD } from "@oh-my-opencode/senpi-task/rpc-spawn"
 
 import type { ComponentLogger } from "../../extension/types"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
+import { skipsDeviceService } from "./start-eligibility"
+export { isCi } from "./start-eligibility"
 
 // The agent dir registrant's start (#12379): one per engine process for every tui or rpc engine, except task
 // children, CI and `device_service.enabled: false`. It registers the agent dir the engine itself resolved, and it is
@@ -49,11 +50,6 @@ function processRegistrantLatch(): RegistrantLatch {
   return latch
 }
 
-export const isCi = (env: Readonly<Record<string, string | undefined>>): boolean => {
-  const ci = env.CI?.trim().toLowerCase()
-  return ci !== undefined && ci !== "" && ci !== "0" && ci !== "false"
-}
-
 const startDefault =
   (logger: ComponentLogger): StartRegistrant =>
   ({ agentDir }) =>
@@ -80,7 +76,7 @@ export function startRegistrantAtStart(
   if (!isRecord(eventCtx) || (eventCtx.mode !== "tui" && eventCtx.mode !== "rpc")) return
   const agentDir = eventCtx.agentDir
   if (typeof agentDir !== "string" || !isAbsolute(agentDir)) return
-  if (isCi(options.env) || options.env[OMO_SENPI_TASK_RPC_CHILD] === "1") return
+  if (skipsDeviceService(options.env)) return
   const latch = options.registrantLatch ?? processRegistrantLatch()
   if (latch.claimed) return
   const cwd = typeof eventCtx.cwd === "string" ? eventCtx.cwd : process.cwd()
