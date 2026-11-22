@@ -6,6 +6,7 @@ import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager
 import type { RunnerOutcome } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { createTaskRunPause } from "./run-pause"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -25,7 +26,7 @@ test.each([
 ])(
   "cold Resume keeps saved allocation ahead of newer work ($model)",
   async (allocation) => {
-    const store = createTaskRecordStore({ project_dir: tempProject() })
+    const store = createTaskRecordStore(ownedTaskState(tempProject()))
     const record = seedRecord(store, { task_id: "st_0a675202", status: "paused", run_epoch: 7 })
     const concurrency = new TaskConcurrency({ provider_concurrency: { anthropic: 1, test: 1 }, global_concurrency: 1 })
     const barrier = new AdmissionBarrier()

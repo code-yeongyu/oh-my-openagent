@@ -1,19 +1,10 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string; transcriptPath?: string }) => ({
   block: false,
   observedParentSessionId: context.parentSessionId,
-}))
-
-mock.module("../config", () => ({
-  clearClaudeHooksConfigCache: () => {},
-  loadClaudeHooksConfig: async () => null,
-}))
-
-mock.module("../config-loader", () => ({
-  clearPluginExtendedConfigCache: () => {},
-  loadPluginExtendedConfig: async () => ({}),
 }))
 
 mock.module("../stop", () => ({
@@ -29,6 +20,8 @@ afterAll(() => {
 const { createSessionEventHandler } = await import("./session-event-handler")
 
 describe("createSessionEventHandler retry behavior", () => {
+  useEmptyHookConfig()
+
   beforeEach(() => {
     executeStopHooks.mockClear()
   })
@@ -66,7 +59,7 @@ describe("createSessionEventHandler retry behavior", () => {
         parentSessionId: "ses_parent",
       }),
       null,
-      {},
+      { disabledHooks: {} },
     )
   })
 
@@ -104,7 +97,7 @@ describe("createSessionEventHandler retry behavior", () => {
         parentSessionId: "ses_parent",
       }),
       null,
-      {},
+      { disabledHooks: {} },
     )
   })
 

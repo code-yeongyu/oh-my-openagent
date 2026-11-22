@@ -7,6 +7,7 @@ import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import { makeManager, tempProject } from "./__fixtures__/manager-fakes"
 import { respawnManagedTask } from "./manager-respawn"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 export const reconciliationHarness = hostRunnerHarness()
 
@@ -54,7 +55,7 @@ export async function stoppedChild(receipt: InputEffectStatus) {
       instance_id: session.instanceId,
     },
   }
-  const baseStore = createTaskRecordStore({ project_dir: project })
+  const baseStore = createTaskRecordStore(ownedTaskState(project))
   const resumed = Promise.withResolvers<void>()
   const events: string[] = []
   const store = {
