@@ -6,11 +6,17 @@ import { summaryFileName } from "./optout-purge.test-support"
 // listing joins with "\\", and a name that keeps it hides the owner entry from the filters (#11171).
 describe("summary file names", () => {
   test("#given a Windows-shaped path under the summary dir #when named #then it uses / like every assertion", () => {
-    expect(summaryFileName("C:\\state\\session-summary", "C:\\state\\session-summary\\owners\\6872.json", "\\")).toBe("owners/6872.json")
-    expect(summaryFileName("C:\\state\\session-summary", "C:\\state\\session-summary\\pending\\0395eae0.json", "\\")).toBe("pending/0395eae0.json")
+    expect(summaryFileName("C:\\state\\session-summary", "C:\\state\\session-summary\\owners\\6872.json", "\\")).toBe(
+      "owners/6872.json",
+    )
+    expect(
+      summaryFileName("C:\\state\\session-summary", "C:\\state\\session-summary\\pending\\0395eae0.json", "\\"),
+    ).toBe("pending/0395eae0.json")
   })
 
   test("#given a POSIX path under the summary dir #when named #then it is unchanged", () => {
-    expect(summaryFileName("/state/session-summary", "/state/session-summary/owners/6872.json", "/")).toBe("owners/6872.json")
+    expect(summaryFileName("/state/session-summary", "/state/session-summary/owners/6872.json", "/")).toBe(
+      "owners/6872.json",
+    )
   })
 })

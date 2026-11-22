@@ -25,14 +25,17 @@ function createBackgroundManager(
   Reflect.set(client.session, "prompt", async () => ({ data: { info: {}, parts: [] } }))
   Reflect.set(client.session, "promptAsync", async () => ({ data: undefined }))
 
-  const manager = new BackgroundManager({ pluginContext: {
-    $: {} as PluginInput["$"],
-    client,
-    directory,
-    project: {} as PluginInput["project"],
-    serverUrl: new URL("http://localhost"),
-    worktree: directory,
-  }, config: config })
+  const manager = new BackgroundManager({
+    pluginContext: {
+      $: {} as PluginInput["$"],
+      client,
+      directory,
+      project: {} as PluginInput["project"],
+      serverUrl: new URL("http://localhost"),
+      worktree: directory,
+    },
+    config: config,
+  })
   managersToShutdown.push(manager)
   return manager
 }
@@ -58,15 +61,25 @@ function createMockTask(overrides: Partial<BackgroundTask> & { id: string; paren
   }
 }
 
-function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> { return Reflect.get(manager, "tasks") as Map<string, BackgroundTask> }
+function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
+  return Reflect.get(manager, "tasks") as Map<string, BackgroundTask>
+}
 
-function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>> { return Reflect.get(manager, "pendingByParent") as Map<string, Set<string>> }
+function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>> {
+  return Reflect.get(manager, "pendingByParent") as Map<string, Set<string>>
+}
 
-function getQueuesByKey(manager: BackgroundManager): Map<string, Array<{ task: BackgroundTask; input: LaunchInput }>> { return Reflect.get(manager, "queuesByKey") as Map<string, Array<{ task: BackgroundTask; input: LaunchInput }>> }
+function getQueuesByKey(manager: BackgroundManager): Map<string, Array<{ task: BackgroundTask; input: LaunchInput }>> {
+  return Reflect.get(manager, "queuesByKey") as Map<string, Array<{ task: BackgroundTask; input: LaunchInput }>>
+}
 
-function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager { return Reflect.get(manager, "concurrencyManager") as ConcurrencyManager }
+function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
+  return Reflect.get(manager, "concurrencyManager") as ConcurrencyManager
+}
 
-function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> { return Reflect.get(manager, "completionTimers") as Map<string, ReturnType<typeof setTimeout>> }
+function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
+  return Reflect.get(manager, "completionTimers") as Map<string, ReturnType<typeof setTimeout>>
+}
 
 async function processKeyForTest(manager: BackgroundManager, key: string): Promise<void> {
   const processKey = Reflect.get(manager, "processKey") as (key: string) => Promise<void>

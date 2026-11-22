@@ -26,7 +26,11 @@ import { rmEfaultTolerant } from "./teardown.test-support"
 const roots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function identityWithHistory(commits: number) {
@@ -99,13 +103,18 @@ describe("createMemoryMaintenance", () => {
     // when
     maintenance.schedule(context)
     await writeFile(join(repo.dir, "concurrent.md"), "written during maintenance\n")
-    const concurrent = repo.commitWrite(["concurrent.md"], "concurrent note", { agentId: context.identity, authorName: context.identity })
+    const concurrent = repo.commitWrite(["concurrent.md"], "concurrent note", {
+      agentId: context.identity,
+      authorName: context.identity,
+    })
     await Promise.all([concurrent, maintenance.settled()])
 
     // then
     const subjects = (await repo.log()).map((commit) => commit.subject)
     expect(subjects).toContain("concurrent note")
-    expect(execFileSync("git", ["fsck", "--connectivity-only"], { cwd: repo.dir, encoding: "utf8" })).not.toContain("missing")
+    expect(execFileSync("git", ["fsck", "--connectivity-only"], { cwd: repo.dir, encoding: "utf8" })).not.toContain(
+      "missing",
+    )
   }, 60_000)
 
   test("#given a pass ran recently for this identity #when a second process schedules one #then it does not run again within the interval", async () => {
@@ -116,7 +125,10 @@ describe("createMemoryMaintenance", () => {
     await first.settled()
     for (let index = 20; index < 40; index += 1) {
       await writeFile(join(repo.dir, `note-${index}.md`), `note ${index}\n`)
-      await repo.commitWrite([`note-${index}.md`], `note ${index}`, { agentId: context.identity, authorName: context.identity })
+      await repo.commitWrite([`note-${index}.md`], `note ${index}`, {
+        agentId: context.identity,
+        authorName: context.identity,
+      })
     }
     const looseAfterNewCommits = looseObjects(repo.dir)
     const log = recorder()
@@ -157,7 +169,9 @@ describe("createMemoryMaintenance", () => {
     // given
     const { context, repo } = await identityWithHistory(20)
     const log = recorder()
-    const runners = Array.from({ length: 10 }, () => createMemoryMaintenance({ logger: log.logger, delayMs: 0, minLooseObjects: 10 }))
+    const runners = Array.from({ length: 10 }, () =>
+      createMemoryMaintenance({ logger: log.logger, delayMs: 0, minLooseObjects: 10 }),
+    )
 
     // when
     for (const runner of runners) runner.schedule(context)
@@ -210,7 +224,11 @@ describe("createMemoryMaintenance", () => {
   test("#given a loose object no commit references yet (a writer mid-commit) #when a pass packs the repo #then that object is kept", async () => {
     // given
     const { context, repo } = await identityWithHistory(20)
-    const pending = execFileSync("git", ["hash-object", "-w", "--stdin"], { cwd: repo.dir, input: "staged by a writer\n", encoding: "utf8" }).trim()
+    const pending = execFileSync("git", ["hash-object", "-w", "--stdin"], {
+      cwd: repo.dir,
+      input: "staged by a writer\n",
+      encoding: "utf8",
+    }).trim()
     const maintenance = createMemoryMaintenance({ delayMs: 0, minLooseObjects: 10 })
 
     // when
@@ -218,7 +236,9 @@ describe("createMemoryMaintenance", () => {
     await maintenance.settled()
 
     // then
-    expect(execFileSync("git", ["cat-file", "-p", pending], { cwd: repo.dir, encoding: "utf8" })).toBe("staged by a writer\n")
+    expect(execFileSync("git", ["cat-file", "-p", pending], { cwd: repo.dir, encoding: "utf8" })).toBe(
+      "staged by a writer\n",
+    )
   }, 60_000)
 
   test("#given a shared host where one session exits before its pass #when another session binds later #then that session's pass runs", async () => {
@@ -255,7 +275,10 @@ describe("createMemoryMaintenance", () => {
       const dir = join(identityPaths.transcripts, sessionId)
       await mkdir(dir, { recursive: true })
       await writeFile(join(dir, "transcript.jsonl"), "")
-      await writeFile(join(dir, "state.json"), JSON.stringify({ schema_version: "v3_assistant_steps", total_completed_steps: 0 }))
+      await writeFile(
+        join(dir, "state.json"),
+        JSON.stringify({ schema_version: "v3_assistant_steps", total_completed_steps: 0 }),
+      )
       for (const file of ["transcript.jsonl", "state.json"]) await utimes(join(dir, file), old, old)
       await utimes(dir, old, old)
     }
@@ -344,12 +367,22 @@ describe("runtime retention inside the maintenance pass (A23)", () => {
     const { context, repo } = await identityWithHistory(0)
     const runDir = join(context.identityPaths.reflection, "runs", "reflection-run-1")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "final.json"), JSON.stringify({ runId: "reflection-run-1", outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }))
+    await writeFile(
+      join(runDir, "final.json"),
+      JSON.stringify({
+        runId: "reflection-run-1",
+        outcome: "merged",
+        finishedAt: new Date(NOW - 8 * DAY).toISOString(),
+      }),
+    )
     await utimes(join(runDir, "final.json"), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
     await utimes(runDir, new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
     const newest = join(context.identityPaths.reflection, "runs", "reflection-run-2")
     await mkdir(newest, { recursive: true })
-    await writeFile(join(newest, "final.json"), JSON.stringify({ runId: "reflection-run-2", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }))
+    await writeFile(
+      join(newest, "final.json"),
+      JSON.stringify({ runId: "reflection-run-2", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }),
+    )
     return { context, repo, runDir }
   }
 
@@ -393,14 +426,23 @@ describe("retention stamp and resume (A33 maintenance half)", () => {
     const runs = join(context.identityPaths.reflection, "runs")
     for (const runId of ["reflection-run-1", "reflection-run-2"]) {
       await mkdir(join(runs, runId), { recursive: true })
-      await writeFile(join(runs, runId, "final.json"), JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }))
+      await writeFile(
+        join(runs, runId, "final.json"),
+        JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - 8 * DAY).toISOString() }),
+      )
       await utimes(join(runs, runId, "final.json"), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
       await utimes(join(runs, runId), new Date(NOW - 8 * DAY), new Date(NOW - 8 * DAY))
     }
     await mkdir(join(runs, "reflection-run-3"), { recursive: true })
-    await writeFile(join(runs, "reflection-run-3", "final.json"), JSON.stringify({ runId: "reflection-run-3", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }))
+    await writeFile(
+      join(runs, "reflection-run-3", "final.json"),
+      JSON.stringify({ runId: "reflection-run-3", outcome: "merged", finishedAt: new Date(NOW - DAY).toISOString() }),
+    )
     await repo.configSet("omo.maintenanceAt", String(NOW - 60_000))
-    await writeFile(join(context.identityPaths.runtime, "retention.json"), JSON.stringify({ version: 1, cursor: { store: "runs", lastName: "reflection-run-1" } }))
+    await writeFile(
+      join(context.identityPaths.runtime, "retention.json"),
+      JSON.stringify({ version: 1, cursor: { store: "runs", lastName: "reflection-run-1" } }),
+    )
 
     const first = createMemoryMaintenance({ delayMs: 0, now: () => NOW })
     first.schedule(context)
@@ -429,7 +471,10 @@ describe("a cap that cannot measure inside the budget is throttled to the interv
   const resume = { store: "cap", tier: "folded-run", clock: 0, lastName: "reflection-run-0" }
   // A pass budget of 0 ms: the stores are empty, so the store walk finishes, and the cap's size walk
   // always overruns what is left, so the cap can never measure runtime/.
-  const zeroBudget = { resolveRetention: () => ({ ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 0 }), resolveMaxBytes: () => 1 }
+  const zeroBudget = {
+    resolveRetention: () => ({ ...DEFAULT_RUNTIME_RETENTION, passBudgetMs: 0 }),
+    resolveMaxBytes: () => 1,
+  }
 
   test("#given a stored cap resume point and a size walk that always overruns #when the pass runs #then it stamps omo.retentionAt and the next bind inside the interval does not run retention", async () => {
     const { context, repo } = await identityWithHistory(0)
@@ -479,9 +524,15 @@ describe("host sweep driver 2 (6b, A34 in-session half)", () => {
 
   async function foreignWithOldRun(memoryRoot: string): Promise<string> {
     const runs = join(memoryRoot, "agents", "foreign-agent", "runtime", "reflection", "runs")
-    for (const [runId, age] of [["reflection-run-1", 8], ["reflection-run-9", 1]] as const) {
+    for (const [runId, age] of [
+      ["reflection-run-1", 8],
+      ["reflection-run-9", 1],
+    ] as const) {
       await mkdir(join(runs, runId), { recursive: true })
-      await writeFile(join(runs, runId, "final.json"), JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - age * DAY).toISOString() }))
+      await writeFile(
+        join(runs, runId, "final.json"),
+        JSON.stringify({ runId, outcome: "merged", finishedAt: new Date(NOW - age * DAY).toISOString() }),
+      )
       await utimes(join(runs, runId, "final.json"), new Date(NOW - age * DAY), new Date(NOW - age * DAY))
       await utimes(join(runs, runId), new Date(NOW - age * DAY), new Date(NOW - age * DAY))
     }
@@ -512,9 +563,15 @@ describe("host sweep driver 2 (6b, A34 in-session half)", () => {
     const snapshot = await journal.captureReflectionSnapshot()
     if (snapshot === null) throw new Error("expected a snapshot")
     await journal.finalizeReflection(snapshot, true)
-    for (const name of ["state.json", "transcript.jsonl"]) await utimes(join(journalDir, name), new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
+    for (const name of ["state.json", "transcript.jsonl"])
+      await utimes(join(journalDir, name), new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
     await utimes(journalDir, new Date(NOW - 20 * DAY), new Date(NOW - 20 * DAY))
-    const maintenance = createMemoryMaintenance({ delayMs: 0, now: () => NOW, isLiveSession: (id) => id === "live-session", hostSweep: () => ({}) })
+    const maintenance = createMemoryMaintenance({
+      delayMs: 0,
+      now: () => NOW,
+      isLiveSession: (id) => id === "live-session",
+      hostSweep: () => ({}),
+    })
 
     maintenance.schedule(context)
     await maintenance.settled()
@@ -543,10 +600,21 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
   async function identityWithYoungRuns() {
     const { context } = await identityWithHistory(0)
     const runDirs: string[] = []
-    for (const [index, days] of [[3, 3], [4, 2], [5, 1]] as const) {
+    for (const [index, days] of [
+      [3, 3],
+      [4, 2],
+      [5, 1],
+    ] as const) {
       const runDir = join(context.identityPaths.reflection, "runs", `reflection-run-${index}`)
       await mkdir(runDir, { recursive: true })
-      await writeFile(join(runDir, "final.json"), JSON.stringify({ runId: `reflection-run-${index}`, outcome: "merged", finishedAt: new Date(NOW - days * DAY).toISOString() }))
+      await writeFile(
+        join(runDir, "final.json"),
+        JSON.stringify({
+          runId: `reflection-run-${index}`,
+          outcome: "merged",
+          finishedAt: new Date(NOW - days * DAY).toISOString(),
+        }),
+      )
       await writeFile(join(runDir, "child-1.log"), Buffer.alloc(64 * 1024, 1))
       runDirs.push(runDir)
     }
@@ -556,7 +624,12 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
   test("#given an identity over its cap #when the pass runs #then the cap evicts the oldest folded runs and logs the figures", async () => {
     const { context, runDirs } = await identityWithYoungRuns()
     const log = recorder()
-    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      now: () => NOW,
+      resolveMaxBytes: () => 1,
+    })
 
     maintenance.schedule(context)
     await maintenance.settled()
@@ -572,7 +645,12 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
     const { context, runDirs } = await identityWithYoungRuns()
     const log = recorder()
     const settings = OmoMemorySettingsSchema.parse({ agents: { [context.identity]: { runtime: { max_bytes: 1 } } } })
-    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, memorySettings: () => settings })
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      now: () => NOW,
+      memorySettings: () => settings,
+    })
 
     maintenance.schedule(context)
     await maintenance.settled()
@@ -586,7 +664,12 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
     const { context, runDirs } = await identityWithYoungRuns()
     const log = recorder()
     const settings = OmoMemorySettingsSchema.parse({ agents: { "other-agent": { runtime: { max_bytes: 1 } } } })
-    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, memorySettings: () => settings })
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      now: () => NOW,
+      memorySettings: () => settings,
+    })
 
     maintenance.schedule(context)
     await maintenance.settled()
@@ -598,14 +681,24 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
   test("#given the reflection-scheduler lock is busy so the journal tiers are skipped #when the over-cap pass runs #then it does not log nothing-evictable (#12538 review L4)", async () => {
     const { context, runDirs } = await identityWithYoungRuns()
     const log = recorder()
-    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      now: () => NOW,
+      resolveMaxBytes: () => 1,
+    })
     const holder = await createLockRecord("reflection-scheduler", { runId: "other-process" })
     await mkdir(context.identityPaths.locks, { recursive: true })
 
-    await withLock(reflectionSchedulerLockPath(context.identityPaths.locks), holder, async () => {
-      maintenance.schedule(context)
-      await maintenance.settled()
-    }, { waitTimeoutMs: 0 })
+    await withLock(
+      reflectionSchedulerLockPath(context.identityPaths.locks),
+      holder,
+      async () => {
+        maintenance.schedule(context)
+        await maintenance.settled()
+      },
+      { waitTimeoutMs: 0 },
+    )
 
     expect(runDirs.map((dir) => existsSync(dir))).toEqual([false, false, true])
     expect(log.warn).not.toContain("omo-senpi memory runtime cap exceeded, nothing evictable")
@@ -615,13 +708,23 @@ describe("runtime size cap inside the maintenance pass (B08)", () => {
   test("#given another process holds the maintenance lock #when the pass comes due #then the cap skips without waiting or evicting", async () => {
     const { context, runDirs } = await identityWithYoungRuns()
     const log = recorder()
-    const maintenance = createMemoryMaintenance({ logger: log.logger, delayMs: 0, now: () => NOW, resolveMaxBytes: () => 1 })
+    const maintenance = createMemoryMaintenance({
+      logger: log.logger,
+      delayMs: 0,
+      now: () => NOW,
+      resolveMaxBytes: () => 1,
+    })
     const holder = await createLockRecord("memory-maintenance", { runId: "other-process" })
 
-    await withLock(memoryMaintenanceLockPath(context.identityPaths.locks), holder, async () => {
-      maintenance.schedule(context)
-      await maintenance.settled()
-    }, { waitTimeoutMs: 0 })
+    await withLock(
+      memoryMaintenanceLockPath(context.identityPaths.locks),
+      holder,
+      async () => {
+        maintenance.schedule(context)
+        await maintenance.settled()
+      },
+      { waitTimeoutMs: 0 },
+    )
 
     expect(runDirs.every((dir) => existsSync(dir))).toBe(true)
     expect(log.info).toEqual([])

@@ -9,13 +9,7 @@ import {
 export type ReflectionTrigger = "step-count" | "compaction" | "manual" | "dream"
 export type DreamOrigin = "manual" | "idle" | "shutdown" | "pressure"
 export type ReflectionOutcome =
-  | "merged"
-  | "no_changes"
-  | "parent_dirty"
-  | "merge_conflict"
-  | "dirty_uncommitted"
-  | "failed"
-  | "timed_out"
+  "merged" | "no_changes" | "parent_dirty" | "merge_conflict" | "dirty_uncommitted" | "failed" | "timed_out"
 
 export interface TriggerConfig {
   readonly stepCount?: number
@@ -77,8 +71,7 @@ export type ReflectionEvent =
     }
 
 export type EvaluationAction =
-  | { readonly kind: "none" }
-  | { readonly kind: "reserve"; readonly request: ReflectionRequest }
+  { readonly kind: "none" } | { readonly kind: "reserve"; readonly request: ReflectionRequest }
 
 export interface EvaluationResult {
   readonly state: MachineState
@@ -126,7 +119,8 @@ export function evaluateTransitions(state: MachineState, event: ReflectionEvent)
     return { state, action: { kind: "reserve", request: makeRequest(state.journal, "manual", ids, event) } }
   }
   if (!event.success) return { state, action: { kind: "none" } }
-  const eligible = state.journal.state.next_eligible_at === undefined ||
+  const eligible =
+    state.journal.state.next_eligible_at === undefined ||
     (state.now !== undefined && state.now >= state.journal.state.next_eligible_at)
   if (!eligible) return { state, action: { kind: "none" } }
 
@@ -152,8 +146,7 @@ export function evaluateTransitions(state: MachineState, event: ReflectionEvent)
   // Byte pressure is its own trigger: a few very large steps overflow the payload budget long
   // before the step threshold fires, and each capture only drains one budget's worth.
   const budget = state.config.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES
-  const backlogReady =
-    budget > 0 && (state.journal.state.unreflected_bytes ?? 0) >= budget && stepCountFree
+  const backlogReady = budget > 0 && (state.journal.state.unreflected_bytes ?? 0) >= budget && stepCountFree
   return backlogReady
     ? { state, action: { kind: "reserve", request: makeRequest(state.journal, "step-count") } }
     : { state, action: { kind: "none" } }
@@ -167,7 +160,11 @@ export function reserveTransition(
   runId: string,
 ): { readonly state: ReservationState; readonly result: "active" | "pending" } {
   // A lone pending (left by a release without promotion) stays queued behind the new active run.
-  if (!state.active) return { state: { active: { runId, request }, ...(state.pending === undefined ? {} : { pending: state.pending }) }, result: "active" }
+  if (!state.active)
+    return {
+      state: { active: { runId, request }, ...(state.pending === undefined ? {} : { pending: state.pending }) },
+      result: "active",
+    }
   const pending = state.pending
     ? { runId: state.pending.runId, request: mergeRequests(state.pending.request, request) }
     : { runId, request }
@@ -330,7 +327,10 @@ function isStillTriggered(
 ): boolean {
   if (request.trigger === "manual" || request.trigger === "dream") return true
   if (request.trigger === "compaction") {
-    return config.onCompaction === true && request.conversationIds.some((id) => journals.get(id)?.state.pending_compaction === true)
+    return (
+      config.onCompaction === true &&
+      request.conversationIds.some((id) => journals.get(id)?.state.pending_compaction === true)
+    )
   }
   const threshold = config.stepCount
   const budget = config.snapshotMaxBytes ?? REFLECTION_SNAPSHOT_MAX_BYTES

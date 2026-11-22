@@ -222,14 +222,19 @@ impl FakeBackend {
     /// The frontmost app's pid: scripted, else the focused window's.
     pub fn frontmost_pid(&mut self) -> CoreResult<Option<u32>> {
         self.begin(FakeMethod::FrontmostPid)?;
-        let pid = self.scripted.frontmost_pid.or_else(|| {
+        let pid = self.front_pid();
+        self.record(SinkOp::FrontmostRead { pid });
+        Ok(pid)
+    }
+
+    /// [`Self::frontmost_pid`]'s answer, with no call recorded.
+    pub(crate) fn front_pid(&self) -> Option<u32> {
+        self.scripted.frontmost_pid.or_else(|| {
             self.windows
                 .iter()
                 .find(|window| window.focused)
                 .and_then(|window| window.pid)
-        });
-        self.record(SinkOp::FrontmostRead { pid });
-        Ok(pid)
+        })
     }
 
     /// Moves the coordinate epoch, as a host event would.

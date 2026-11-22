@@ -10,7 +10,18 @@ export const KEYCHAIN_HELPER_REQUIREMENT =
 /** Q5, decided 2026-10-28 (fewest prompts): the helper serves root. The refuse-root branch stays buildable behind this switch. */
 const KEYCHAIN_HELPER_REFUSE_ROOT_DEFAULT = false
 
-const SOURCES = ["main.c", "buffer.c", "request.c", "store.c", "partition.c", "session.c", "verbs.c"] as const
+const SOURCES = [
+  "main.c",
+  "buffer.c",
+  "request.c",
+  "store.c",
+  "dedicated.c",
+  "dedicated-lifecycle.c",
+  "store-select.c",
+  "partition.c",
+  "session.c",
+  "verbs.c",
+] as const
 
 export type KeychainHelperArchitecture = "arm64" | "x86_64"
 
@@ -34,16 +45,18 @@ function keychainHelperCompileArgs(build: KeychainHelperBuild): string[] {
     "-Wextra",
     "-Werror",
     "-mmacosx-version-min=12.0",
-    ...architectures.flatMap(arch => ["-arch", arch]),
+    ...architectures.flatMap((arch) => ["-arch", arch]),
     ...(build.flavor === "test" ? ["-DOMO_KEYCHAIN_TEST_BUILD=1"] : []),
     `-DOMO_KEYCHAIN_REFUSE_ROOT=${(build.refuseRoot ?? KEYCHAIN_HELPER_REFUSE_ROOT_DEFAULT) ? 1 : 0}`,
     "-framework",
     "Security",
     "-framework",
     "CoreFoundation",
+    "-framework",
+    "CoreServices",
     "-o",
     build.output,
-    ...SOURCES.map(source => join(sourceDir, source)),
+    ...SOURCES.map((source) => join(sourceDir, source)),
   ]
 }
 

@@ -73,7 +73,17 @@ export class GitRevisionReads {
     // The flags keep diff-tree's answer: no paths for a root or merge commit, renames as delete plus add,
     // and every path of a commit a pathspec selected.
     const argv = includePaths
-      ? [...STABLE_LOG_OUTPUT, "-c", "log.showRoot=false", "log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI", "--name-only", "-z", "--no-renames", "--full-diff"]
+      ? [
+          ...STABLE_LOG_OUTPUT,
+          "-c",
+          "log.showRoot=false",
+          "log",
+          "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI",
+          "--name-only",
+          "-z",
+          "--no-renames",
+          "--full-diff",
+        ]
       : [...STABLE_LOG_OUTPUT, "log", "--format=%x1e%H%x1f%s%x1f%b%x1f%an%x1f%ae%x1f%cI"]
     // `--fixed-strings` because callers pass trailer literals, `--all-match` because every one of them
     // must appear in the same commit. Filtering inside git means a caller after one trailer combination

@@ -71,6 +71,7 @@ impl Failure {
                         disposition: report.disposition,
                         delivered: report.delivered,
                         focus_restoration: report.focus_restoration,
+                        next_call: report.next_call.map(Box::new),
                     })),
                 }
             }

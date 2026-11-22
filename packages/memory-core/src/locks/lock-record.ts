@@ -55,10 +55,7 @@ export function parseLockRecord(content: string): LockRecord | null {
   }
 }
 
-export async function createLockRecord(
-  purpose: string,
-  options: CreateLockRecordOptions = {},
-): Promise<LockRecord> {
+export async function createLockRecord(purpose: string, options: CreateLockRecordOptions = {}): Promise<LockRecord> {
   if (purpose.length === 0) throw new Error("lock purpose must not be empty")
   const processStart = await getProcessStartIdentity(process.pid)
   return {

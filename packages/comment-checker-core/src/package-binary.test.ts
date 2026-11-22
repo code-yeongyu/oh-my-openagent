@@ -30,7 +30,10 @@ function writeFile(path: string): string {
 function writePlatformPackage(root: string, platformKey: string, binaryName: string): string {
   const packageDir = join(root, "node_modules", "@code-yeongyu", `comment-checker-${platformKey}`)
   mkdirSync(packageDir, { recursive: true })
-  writeFileSync(join(packageDir, "package.json"), JSON.stringify({ name: `@code-yeongyu/comment-checker-${platformKey}` }))
+  writeFileSync(
+    join(packageDir, "package.json"),
+    JSON.stringify({ name: `@code-yeongyu/comment-checker-${platformKey}` }),
+  )
   return writeFile(join(packageDir, "bin", binaryName))
 }
 
@@ -43,7 +46,11 @@ describe("findCommentCheckerPackageBinary", () => {
 
     // when
     const resolved = findCommentCheckerPackageBinary({
-      packageJsonPath, binaryName: "comment-checker", existsSync, platform: "linux", arch: "arm64",
+      packageJsonPath,
+      binaryName: "comment-checker",
+      existsSync,
+      platform: "linux",
+      arch: "arm64",
     })
 
     // then
@@ -57,7 +64,11 @@ describe("findCommentCheckerPackageBinary", () => {
 
     // when
     const resolved = findCommentCheckerPackageBinary({
-      packageJsonPath, binaryName: "comment-checker.exe", existsSync, platform: "win32", arch: "x64",
+      packageJsonPath,
+      binaryName: "comment-checker.exe",
+      existsSync,
+      platform: "win32",
+      arch: "x64",
     })
 
     // then
@@ -72,7 +83,11 @@ describe("findCommentCheckerPackageBinary", () => {
 
     // when
     const resolved = findCommentCheckerPackageBinary({
-      packageJsonPath, binaryName: "comment-checker", existsSync, platform: "darwin", arch: "arm64",
+      packageJsonPath,
+      binaryName: "comment-checker",
+      existsSync,
+      platform: "darwin",
+      arch: "arm64",
     })
 
     // then
@@ -85,7 +100,11 @@ describe("findCommentCheckerPackageBinary", () => {
 
     // when
     const resolved = findCommentCheckerPackageBinary({
-      packageJsonPath, binaryName: "comment-checker", existsSync, platform: "linux", arch: "x64",
+      packageJsonPath,
+      binaryName: "comment-checker",
+      existsSync,
+      platform: "linux",
+      arch: "x64",
     })
 
     // then

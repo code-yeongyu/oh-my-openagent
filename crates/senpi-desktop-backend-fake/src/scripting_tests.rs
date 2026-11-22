@@ -55,7 +55,8 @@ fn every_existing_fixture_parses_with_todays_defaults() {
         let path = entry.expect("entry").path();
         if path
             .file_name()
-            .is_some_and(|name| name == "v2-scripting.json")
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.starts_with("v2-"))
         {
             continue;
         }

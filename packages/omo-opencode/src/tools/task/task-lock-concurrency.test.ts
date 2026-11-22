@@ -94,7 +94,9 @@ describe("task tool lock contention", () => {
     ])
 
     //#then
-    const errors = results.map((result) => JSON.parse(result) as { error?: string }).filter((r) => r.error !== undefined)
+    const errors = results
+      .map((result) => JSON.parse(result) as { error?: string })
+      .filter((r) => r.error !== undefined)
     expect(errors).toEqual([])
     expect(listTaskIds(testDir).length).toBe(5)
   })

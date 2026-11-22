@@ -37,10 +37,7 @@ function formatMonitor(record: MonitorRecord) {
   }
 }
 
-export function createMonitorList(
-  manager: MonitorManager,
-  ctx: MonitorListContext
-): ToolDefinition {
+export function createMonitorList(manager: MonitorManager, ctx: MonitorListContext): ToolDefinition {
   return tool({
     description: `List monitors owned by the current session.
 

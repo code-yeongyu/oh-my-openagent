@@ -53,9 +53,14 @@ describe("root session admission barrier", () => {
 
   test("#given restored resuming state #when transaction is superseded #then ordinary admission stays closed", () => {
     const barrier = new AdmissionBarrier()
-    barrier.restore("root", { kind: "resuming", pauseSeq: 1, resumeId: "stale" }, {
-      newestSeq: 2, superseded: true,
-    })
+    barrier.restore(
+      "root",
+      { kind: "resuming", pauseSeq: 1, resumeId: "stale" },
+      {
+        newestSeq: 2,
+        superseded: true,
+      },
+    )
     expect(barrier.state("root")).toEqual({ kind: "closed", pauseSeq: 2 })
     expect(barrier.enter("root", participant).kind).toBe("held")
   })

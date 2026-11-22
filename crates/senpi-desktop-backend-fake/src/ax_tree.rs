@@ -1,16 +1,47 @@
 //! Flattened scripted accessibility trees addressed by numeric node id.
 
+use std::cell::Cell;
 use std::collections::BTreeMap;
+use std::time::{Duration, Instant};
 
 use senpi_desktop_core::ax::{AxBounds, AxHandle, AxProps};
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 
+use crate::clock::FakeClock;
 use crate::scenario::FakeAxNode;
+
+/// The clock `ready_after_ms` is measured on: the host's by default, or a
+/// [`FakeClock`] that only a test moves.
+#[derive(Debug, Clone)]
+pub(crate) enum AxTime {
+    Host(Instant),
+    Fake(FakeClock),
+}
+
+impl Default for AxTime {
+    fn default() -> Self {
+        Self::Host(Instant::now())
+    }
+}
+
+impl AxTime {
+    fn now(&self) -> Duration {
+        match self {
+            Self::Host(origin) => origin.elapsed(),
+            Self::Fake(clock) => Duration::from_millis(clock.now_ms()),
+        }
+    }
+}
 
 struct AxEntry {
     props: AxProps,
+    identifier: Option<String>,
+    secure: bool,
     parent: Option<u64>,
     children: Vec<u64>,
+    ready_after: Option<Duration>,
+    first_read: Cell<Option<Duration>>,
+    moving_reads: Cell<u32>,
 }
 
 #[derive(Default)]
@@ -18,6 +49,7 @@ pub(crate) struct AxTree {
     nodes: BTreeMap<u64, AxEntry>,
     roots: BTreeMap<String, u64>,
     next_id: u64,
+    pub(crate) time: AxTime,
 }
 
 impl AxTree {
@@ -62,8 +94,13 @@ impl AxTree {
             id,
             AxEntry {
                 props,
+                identifier: node.identifier.clone(),
+                secure: node.secure,
                 parent,
                 children,
+                ready_after: node.ready_after_ms.map(Duration::from_millis),
+                first_read: Cell::new(None),
+                moving_reads: Cell::new(node.moving_reads),
             },
         );
         id
@@ -86,11 +123,15 @@ impl AxTree {
                 title: Some(format!("filler {index}")),
                 value: None,
                 description: None,
+                identifier: None,
                 enabled: true,
                 focused: false,
+                secure: false,
                 bounds: None,
                 actions: Vec::new(),
                 children: Vec::new(),
+                ready_after_ms: None,
+                moving_reads: 0,
             };
             let id = self.insert(&leaf, Some(root));
             if let Some(entry) = self.nodes.get_mut(&root) {
@@ -112,8 +153,38 @@ impl AxTree {
             .ok_or_else(|| DesktopError::ax_failed(format!("unknown fake AX node {id}")))
     }
 
+    /// The node's props as read now: hidden and disabled before its
+    /// `ready_after_ms`, shifted while it has `moving_reads` left.
     pub(crate) fn props(&self, id: u64) -> CoreResult<AxProps> {
-        self.entry(id).map(|entry| entry.props.clone())
+        let entry = self.entry(id)?;
+        let mut props = entry.props.clone();
+        if let Some(ready_after) = entry.ready_after {
+            let now = self.time.now();
+            let first = *entry.first_read.get().get_or_insert(now);
+            entry.first_read.set(Some(first));
+            if now.saturating_sub(first) < ready_after {
+                props.bounds = None;
+                props.enabled = false;
+            }
+        }
+        let moving = entry.moving_reads.get();
+        if moving > 0 {
+            entry.moving_reads.set(moving - 1);
+            if let Some(bounds) = props.bounds.as_mut() {
+                bounds.x += f64::from(moving);
+            }
+        }
+        Ok(props)
+    }
+
+    /// Adds `node` as the accessibility tree of a window that opened later.
+    pub(crate) fn add_window(&mut self, window_id: &str, node: &FakeAxNode) {
+        let id = self.insert(node, None);
+        self.roots.insert(window_id.to_owned(), id);
+    }
+
+    pub(crate) fn identifier(&self, id: u64) -> CoreResult<Option<String>> {
+        self.entry(id).map(|entry| entry.identifier.clone())
     }
 
     pub(crate) fn children(&self, id: u64) -> CoreResult<Vec<u64>> {
@@ -169,6 +240,25 @@ impl AxTree {
             .iter()
             .find(|(_, entry)| entry.props.focused)
             .map(|(id, _)| *id)
+    }
+
+    /// The first focused node inside the trees of `windows`: one app's own
+    /// focus, which stays put while another app is frontmost.
+    pub(crate) fn focused_in(&self, windows: &[&str]) -> Option<u64> {
+        self.nodes
+            .iter()
+            .filter(|(_, entry)| entry.props.focused)
+            .map(|(id, _)| *id)
+            .find(|id| {
+                self.window_of(*id)
+                    .ok()
+                    .flatten()
+                    .is_some_and(|window| windows.contains(&window.as_str()))
+            })
+    }
+
+    pub(crate) fn secure(&self, id: u64) -> CoreResult<bool> {
+        self.entry(id).map(|entry| entry.secure)
     }
 
     /// Deepest node whose bounds contain the global logical point.

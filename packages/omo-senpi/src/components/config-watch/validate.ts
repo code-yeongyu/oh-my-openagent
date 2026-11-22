@@ -1,10 +1,7 @@
 import { createHash } from "node:crypto"
 import { basename, dirname, isAbsolute, relative, resolve } from "node:path"
 
-import {
-  resolveUserOmoConfigDirectory,
-  type OmoConfigEnv,
-} from "@oh-my-opencode/omo-config-core"
+import { resolveUserOmoConfigDirectory, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
 
 import { loadSenpiOmoConfig, type SenpiConfigDiagnostic } from "../config-resolution"
 
@@ -97,9 +94,10 @@ export function createOmoConfigValidator(options: CreateOmoConfigValidatorOption
   return {
     validate(changedPaths: readonly string[]): ConfigWatchValidation {
       const diagnostics = loadRejectableDiagnostics()
-      const fingerprintedDiagnostics = diagnostics.map(
-        (diagnostic): FingerprintedDiagnostic => ({ diagnostic, fingerprint: fingerprintDiagnostic(diagnostic) }),
-      )
+      const fingerprintedDiagnostics = diagnostics.map((diagnostic): FingerprintedDiagnostic => ({
+        diagnostic,
+        fingerprint: fingerprintDiagnostic(diagnostic),
+      }))
       const diagnosticsByFingerprint = new Map(
         fingerprintedDiagnostics.map((entry) => [entry.fingerprint, entry.diagnostic]),
       )

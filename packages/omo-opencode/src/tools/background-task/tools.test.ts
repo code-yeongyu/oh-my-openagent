@@ -137,12 +137,15 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      include_thinking: true,
-      include_tool_results: true,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        include_thinking: true,
+        include_tool_results: true,
+      },
+      mockContext,
+    )
 
     // #then
     expect(output).toContain("thinking text")
@@ -171,11 +174,14 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      since_message_id: "m1",
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        since_message_id: "m1",
+      },
+      mockContext,
+    )
 
     // #then
     expect(output.includes("hello")).toBe(false)
@@ -198,11 +204,14 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      since_message_id: "missing",
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        since_message_id: "missing",
+      },
+      mockContext,
+    )
 
     // #then
     expect(output).toContain("since_message_id not found")
@@ -224,11 +233,14 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      message_limit: 300,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        message_limit: 300,
+      },
+      mockContext,
+    )
 
     // #then
     expect(output).toContain("Returned: 200")
@@ -299,12 +311,15 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      include_thinking: true,
-      thinking_max_chars: 100,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        include_thinking: true,
+        thinking_max_chars: 100,
+      },
+      mockContext,
+    )
 
     // #then
     expect(output).toContain("[thinking] " + "x".repeat(100) + "...")
@@ -331,18 +346,20 @@ describe("background_output full_session", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when
-    const output = await tool.execute({
-      task_id: "task-1",
-      full_session: true,
-      include_thinking: true,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        full_session: true,
+        include_thinking: true,
+      },
+      mockContext,
+    )
 
     // #then
     expect(output).toContain("[thinking] " + "y".repeat(2000) + "...")
     expect(output).not.toContain("y".repeat(2100))
   })
 })
-
 
 describe("background_output blocking", () => {
   test("block=true keeps legacy task result output when full_session is not provided", async () => {
@@ -371,11 +388,14 @@ describe("background_output blocking", () => {
     const tool = createBackgroundOutput(manager, client)
 
     // #when block=true, full_session not specified
-    const output = await tool.execute({
-      task_id: "task-1",
-      block: true,
-      timeout: 10000,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: "task-1",
+        block: true,
+        timeout: 10000,
+      },
+      mockContext,
+    )
 
     // #then should have waited and returned task result output
     expect(task.status).toBe("completed")
@@ -499,9 +519,7 @@ describe("background_cancel", () => {
 
     // #then - skipNotification should be true to prevent self-deadlock
     expect(cancelOptions).toHaveLength(1)
-    expect(cancelOptions[0].options).toEqual(
-      expect.objectContaining({ skipNotification: true })
-    )
+    expect(cancelOptions[0].options).toEqual(expect.objectContaining({ skipNotification: true }))
   })
 
   test("passes skipNotification: true when cancelling single task", async () => {
@@ -525,9 +543,7 @@ describe("background_cancel", () => {
 
     // #then - skipNotification should be true
     expect(cancelOptions).toHaveLength(1)
-    expect(cancelOptions[0].options).toEqual(
-      expect.objectContaining({ skipNotification: true })
-    )
+    expect(cancelOptions[0].options).toEqual(expect.objectContaining({ skipNotification: true }))
   })
 })
 type BackgroundOutputMessage = {

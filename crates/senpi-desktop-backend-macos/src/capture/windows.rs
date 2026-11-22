@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use senpi_desktop_core::error::{CoreResult, DesktopError};
-use senpi_desktop_core::types::DesktopWindow;
+use senpi_desktop_core::types::{DesktopWindow, WindowIdentity};
 use xcap::Window;
 
 const MIN_WINDOW_EDGE: u32 = 16;
@@ -37,12 +37,19 @@ pub(crate) fn enumerate() -> CoreResult<Vec<DesktopWindow>> {
         if (title.is_empty() && app.is_empty()) || app == WINDOW_SERVER_OWNER {
             continue;
         }
+        let pid = window.pid().ok();
         result.push(DesktopWindow {
-            identity: None,
+            // The owning process and its start time tell this window from a
+            // later process reusing its number (object-mode frames).
+            identity: pid.map(|pid| WindowIdentity {
+                window_number: id.to_string(),
+                pid,
+                process_start: crate::input::process_started(pid),
+            }),
             id: id.to_string(),
             title,
             app,
-            pid: window.pid().ok(),
+            pid,
             x,
             y,
             width,

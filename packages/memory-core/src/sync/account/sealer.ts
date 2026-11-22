@@ -50,17 +50,35 @@ export function createChainSealer(input: {
         batchId: b64urlDecode(batchId),
         salt: new Uint8Array(randomBytes(32)),
         createdAt: now(),
-        records: payload.items.map((item) => ({ type: OPS_RECORD, spaceId: new Uint8Array(spaceId), itemKey: item.key, body: new Uint8Array(item.ops) })),
+        records: payload.items.map((item) => ({
+          type: OPS_RECORD,
+          spaceId: new Uint8Array(spaceId),
+          itemKey: item.key,
+          body: new Uint8Array(item.ops),
+        })),
       })
       const digest = await sha256B64(bytes)
       const link = await nextLink(prior, digest)
       if (link === null) throw new SealRefusedError("unverified_base")
-      const recordSig = await signRecord(keyring, { account: chain.account, base_seq: baseSeq, digest, epoch, link, keyring_link: null })
+      const recordSig = await signRecord(keyring, {
+        account: chain.account,
+        base_seq: baseSeq,
+        digest,
+        epoch,
+        link,
+        keyring_link: null,
+      })
       return { bytes, epoch, link, recordSig }
     },
-    sealedBySelf: (sealed) => verifyRecordSig(keyring.publicKeys().signing, {
-      account: chain.account, base_seq: sealed.baseSeq, digest: Buffer.from(sealed.digest, "hex").toString("base64url"),
-      epoch: sealed.epoch, link: sealed.link, keyring_link: null, record_sig: sealed.recordSig,
-    }),
+    sealedBySelf: (sealed) =>
+      verifyRecordSig(keyring.publicKeys().signing, {
+        account: chain.account,
+        base_seq: sealed.baseSeq,
+        digest: Buffer.from(sealed.digest, "hex").toString("base64url"),
+        epoch: sealed.epoch,
+        link: sealed.link,
+        keyring_link: null,
+        record_sig: sealed.recordSig,
+      }),
   }
 }

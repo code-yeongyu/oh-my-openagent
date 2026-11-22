@@ -5,7 +5,7 @@ description: "Applies strict, modern language practice (typed errors, exhaustive
 
 # Programming
 
-You are a lazy senior engineer — lazy meaning efficient, never careless. **The best code is the code never written; the code you do write is type-strict, stack-first, async-correct, and architecturally honest about size.**
+**You own this code.** What it is for and how it is built are your call, so change it the way its owner would: fit new behavior into the structure that is there and leave no duplicate or dead code behind. **A defect in the code you are changing is yours to fix now, at its root cause; never excuse it as pre-existing, someone else's, or the tool's fault.** One elsewhere goes in your summary as a follow-up.
 
 This skill is an index. The hard per-language rules live under `references/`. Load the language-specific reference **before** writing a single line of code.
 
@@ -25,6 +25,7 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
    | `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, `.cjs`, "TypeScript" / "JavaScript" | `references/typescript/README.md` + every file under `references/typescript/` that the README tells you to load on demand |
    | `.go`, `go.mod`, `go.sum`, `.golangci.yml`, `*.proto` next to a Go module, "Go" / "Golang" | `references/go/README.md` + every file under `references/go/` that the README tells you to load on demand |
    | any test file (`*.test.*`, `*.spec.*`, `*_test.go`, `test_*.py`, `*_test.py`, under `test/`, `tests/` or `__tests__/`), or a change that adds, reshapes, or deletes a test | the language row above PLUS `references/testing/README.md` (the authoring gate) and `references/testing/junk-classes.md` (the table the gate reviewer applies) |
+   | a rendered web surface: `.html`, `.css`, `.jsx`, `.tsx`, `.vue`, `.svelte`, `.astro`, or any task that ships a UI | the matching language row above, if any, PLUS the `frontend` skill, before the first line of UI code. With no design direction (no named brand, reference image or site, `DESIGN.md`, or existing styled UI to match), take the look from its references; never improvise one. The UI is done only after the `visual-qa` skill passes on the real rendered surface. |
 
 3. Only after the references are loaded, apply the **shared philosophy** below plus the per-language iron list from the reference.
 
@@ -36,7 +37,7 @@ This skill is an index. The hard per-language rules live under `references/`. Lo
 
 These are not style preferences. They are the seven axioms every recipe in `references/` derives from.
 
-0. **The best code is the code never written.** Before writing, stop at the first rung that holds: (1) does this need to exist at all? (YAGNI) (2) does this codebase already have it? — reuse the helper or pattern, do not re-implement. (3) does the standard library do it? (4) does a native platform feature cover it? (5) does an installed dependency solve it? (6) can it be one line? (7) only then, write the minimum that works. Climb the ladder *after* you understand the problem and trace the real flow end to end — the smallest diff in the wrong place is a second bug, not laziness. The ladder is a fast decision, not a written essay: pick the rung and move. **Bug fix = root cause, not symptom.** A ticket names a symptom; grep every caller of the function you touch and fix the shared seam once — one guard at the source is a smaller, more correct diff than one guard per caller, and patching only the path the ticket names leaves a sibling caller broken.
+0. **The best code is the code never written.** Before writing, stop at the first rung that holds: (1) does this need to exist at all? (YAGNI) (2) does this codebase already have it? — reuse the helper or pattern, do not re-implement. (3) does the standard library do it? (4) does a native platform feature cover it? (5) does an installed dependency solve it? (6) can it be one line? (7) only then, write the minimum that works. Climb the ladder *after* you understand the problem and trace the real flow end to end — the smallest diff in the wrong place is a second bug. The ladder is a fast decision, not a written essay: pick the rung and move. A ticket names a symptom; grep every caller of the function you touch and fix the shared seam once — one guard at the source is a smaller, more correct diff than one guard per caller, and patching only the path the ticket names leaves a sibling caller broken.
 
 1. **The type system is your proof system.** Make illegal states unrepresentable. The compiler / type checker is the cheapest test you will ever run. If a bug can be expressed as a type error, it is *required* to be expressed as a type error.
 

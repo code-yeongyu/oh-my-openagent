@@ -111,7 +111,7 @@ The rest of the surface (CUA coordinates, captcha solving, routes, traces, frame
 
 ### Tier 2b — attached engine (the user's account on a blocked host)
 
-When the blocked flow needs the user's account, drive the browser they are already signed into instead of cloning their profile: `connectBrowserSkill()` → `session.navigate` → `bskSnapshot(session)` / `session.observe()` → `session.click` → `session.stop()`. NEVER launch against or clear cookies/cache/site data from the user's live profile, and never fall back to the owned engine for an authenticated criterion: if no extension is connected, run the `browser` skill's onboarding script and relay its one human step. The full loop is the `browser` skill.
+When the blocked flow needs the user's account, drive the browser they are already signed into instead of cloning their profile: `connectBrowserSkill()` → `session.navigate` → `bskSnapshot(session)` / `session.observe()` → `session.click` → `session.stop()`, each page action carrying `{ context }` from a fresh `session.cooperate("sync")` (BrowserSkill 0.4 refuses it otherwise). NEVER launch against or clear cookies/cache/site data from the user's live profile, and never fall back to the owned engine for an authenticated criterion: if no extension is connected, run the `browser` skill's onboarding script and relay its one human step. The full loop is the `browser` skill.
 
 ### Cookie login (cross-platform)
 

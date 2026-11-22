@@ -28,19 +28,27 @@ async function loadSecurity(): Promise<SecurityFunctions | null> {
     const { dlopen, FFIType, ptr } = await loadBunFfi()
     const cf = dlopen("/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation", {
       CFStringCreateWithCString: { args: [FFIType.u64, FFIType.ptr, FFIType.u32], returns: FFIType.u64 },
-      CFURLCreateFromFileSystemRepresentation: { args: [FFIType.u64, FFIType.ptr, FFIType.i64, FFIType.bool], returns: FFIType.u64 },
+      CFURLCreateFromFileSystemRepresentation: {
+        args: [FFIType.u64, FFIType.ptr, FFIType.i64, FFIType.bool],
+        returns: FFIType.u64,
+      },
       CFRelease: { args: [FFIType.u64], returns: FFIType.void },
     })
     const sec = dlopen("/System/Library/Frameworks/Security.framework/Security", {
       SecStaticCodeCreateWithPath: { args: [FFIType.u64, FFIType.u32, FFIType.ptr], returns: FFIType.i32 },
       SecRequirementCreateWithString: { args: [FFIType.u64, FFIType.u32, FFIType.ptr], returns: FFIType.i32 },
-      SecStaticCodeCheckValidityWithErrors: { args: [FFIType.u64, FFIType.u32, FFIType.u64, FFIType.u64], returns: FFIType.i32 },
+      SecStaticCodeCheckValidityWithErrors: {
+        args: [FFIType.u64, FFIType.u32, FFIType.u64, FFIType.u64],
+        returns: FFIType.i32,
+      },
     })
     const cString = (text: string) => Buffer.from(`${text}\0`, "utf8")
     security = {
       check(path, requirement) {
         const pathBytes = Buffer.from(path, "utf8")
-        const url = BigInt(cf.symbols.CFURLCreateFromFileSystemRepresentation(0n, ptr(pathBytes), pathBytes.length, false))
+        const url = BigInt(
+          cf.symbols.CFURLCreateFromFileSystemRepresentation(0n, ptr(pathBytes), pathBytes.length, false),
+        )
         const text = BigInt(cf.symbols.CFStringCreateWithCString(0n, ptr(cString(requirement)), UTF8))
         const codeOut = new BigUint64Array(1)
         const requirementOut = new BigUint64Array(1)
@@ -52,7 +60,8 @@ async function loadSecurity(): Promise<SecurityFunctions | null> {
           const designated = requirementOut[0] ?? 0n
           return sec.symbols.SecStaticCodeCheckValidityWithErrors(code, STRICT_ALL_ARCHITECTURES, designated, 0n) === 0
         } finally {
-          for (const ref of [url, text, codeOut[0] ?? 0n, requirementOut[0] ?? 0n]) if (ref !== 0n) cf.symbols.CFRelease(ref)
+          for (const ref of [url, text, codeOut[0] ?? 0n, requirementOut[0] ?? 0n])
+            if (ref !== 0n) cf.symbols.CFRelease(ref)
         }
       },
     }
@@ -99,7 +108,10 @@ async function fileIdentity(path: string): Promise<string | null> {
  */
 export type SignatureChecker = (path: string) => Promise<SignatureVerdict>
 
-export function createSignatureChecker(check: RequirementCheck = verifyWithSecurityFramework, requirement = KEYCHAIN_HELPER_REQUIREMENT): SignatureChecker {
+export function createSignatureChecker(
+  check: RequirementCheck = verifyWithSecurityFramework,
+  requirement = KEYCHAIN_HELPER_REQUIREMENT,
+): SignatureChecker {
   const verdicts = new Map<string, SignatureVerdict>()
   const checker = async (path: string): Promise<SignatureVerdict> => {
     const before = await fileIdentity(path)

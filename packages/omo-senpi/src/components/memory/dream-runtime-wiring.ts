@@ -20,10 +20,10 @@ export function buildDreamTriggerWiring(
       return sessionId !== undefined && hasUserActivity(sessionId) ? runtimeWiring.dreamSessionFor(eventCtx) : undefined
     },
     // A manual /dream is an explicit user action and needs no prior prompt.
-    resolveActiveSession: () => activeSession.current === undefined
-      ? undefined
-      : runtimeWiring.dreamSessionById(activeSession.current),
-    resolveSessionById: (sessionId) => hasUserActivity(sessionId) ? runtimeWiring.dreamSessionById(sessionId) : undefined,
+    resolveActiveSession: () =>
+      activeSession.current === undefined ? undefined : runtimeWiring.dreamSessionById(activeSession.current),
+    resolveSessionById: (sessionId) =>
+      hasUserActivity(sessionId) ? runtimeWiring.dreamSessionById(sessionId) : undefined,
     resolveSettings: (identity) => {
       const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
       return resolveDreamTriggerSettings(settings, identity)

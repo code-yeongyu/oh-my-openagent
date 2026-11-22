@@ -1,10 +1,4 @@
-import type {
-  ResidencyState,
-  TaskRecord,
-  TaskStatus,
-  TaskTransition,
-  TaskTransitionResult,
-} from "./types"
+import type { ResidencyState, TaskRecord, TaskStatus, TaskTransition, TaskTransitionResult } from "./types"
 import { fenceRun } from "./run-fence"
 
 const terminalStatuses = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -83,11 +77,7 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
     case "complete":
       return { ...record, final_response: transition.final_response, ...runStatsField(transition.run_stats) }
     case "fail": {
-      const {
-        failure_kind: _failureKind,
-        failure_reason: _failureReason,
-        ...withoutFailureFacts
-      } = record
+      const { failure_kind: _failureKind, failure_reason: _failureReason, ...withoutFailureFacts } = record
       return {
         ...withoutFailureFacts,
         error_message: transition.error_message,
@@ -139,11 +129,19 @@ function applyTransitionFields(record: TaskRecord, transition: TaskTransition): 
 }
 
 export function transitionTaskRecord(record: TaskRecord, transition: TaskTransition): TaskTransitionResult {
-  if (transition.type === "cancel" && transition.expected_run_epoch !== undefined && fenceRun(record, transition.expected_run_epoch) !== "live") {
+  if (
+    transition.type === "cancel" &&
+    transition.expected_run_epoch !== undefined &&
+    fenceRun(record, transition.expected_run_epoch) !== "live"
+  ) {
     return {
       applied: false,
       record,
-      audit: { type: "epoch_mismatch_ignored", expected_run_epoch: transition.expected_run_epoch, run_epoch: record.notification.run_epoch },
+      audit: {
+        type: "epoch_mismatch_ignored",
+        expected_run_epoch: transition.expected_run_epoch,
+        run_epoch: record.notification.run_epoch,
+      },
     }
   }
   const nextStatus = transitionStatus(transition, record.status)
@@ -258,9 +256,12 @@ function isStatusTransitionAllowed(current: TaskStatus, transition: TaskTransiti
     case "interrupt":
       return current === "running"
     case "fail":
-      return current === "running" || (current === "pending" && transition.failure_kind === "suspended_unresumable")
+      return (
+        current === "running" ||
+        (current === "pending" && transition.failure_kind === "suspended_unresumable") ||
         // A paused child its run's Resume could not restore ends here instead of staying paused (#12249).
-        || (current === "paused" && transition.failure_kind === "session_unavailable")
+        (current === "paused" && transition.failure_kind === "session_unavailable")
+      )
     case "lose":
       return false
     case "evict":

@@ -119,7 +119,7 @@ describe.skipIf(process.platform === "win32")("probeBwrapUsability", () => {
     const executable = join(binDir, "bwrap")
     writeFileSync(
       executable,
-      "#!/bin/sh\nprintf 'spawn\\n' >> \"$0.spawns\"\nif [ ! -e \"$0.hung\" ]; then : > \"$0.hung\"; exec sleep 30; fi\nexit 0\n",
+      '#!/bin/sh\nprintf \'spawn\\n\' >> "$0.spawns"\nif [ ! -e "$0.hung" ]; then : > "$0.hung"; exec sleep 30; fi\nexit 0\n',
     )
     chmodSync(executable, 0o755)
 

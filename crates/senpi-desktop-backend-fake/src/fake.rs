@@ -37,6 +37,7 @@ pub struct FakeBackend {
     pub(crate) user_input: std::sync::Arc<crate::user_input_impl::FakeUserInput>,
     pub(crate) user_input_feed: bool,
     faults: Faults,
+    openings: std::collections::VecDeque<crate::scenario::FakeOpening>,
     pub(crate) scripted: crate::scripting_impl::Scripted,
 }
 
@@ -86,12 +87,19 @@ impl FakeBackend {
             remote_screens: scenario.remote_screens,
             sink: RecordingSink::default(),
             faults,
+            openings: scenario.opens_on_write.into(),
         }
     }
 
     /// A handle on the op log that stays valid after the backend is boxed.
     pub fn sink(&self) -> RecordingSink {
         self.sink.clone()
+    }
+
+    /// Measures every node's `ready_after_ms` on `clock` instead of the
+    /// host's time; set it before the first read.
+    pub fn set_ax_clock(&mut self, clock: crate::clock::FakeClock) {
+        self.ax_tree.time = crate::ax_tree::AxTime::Fake(clock);
     }
 
     /// A handle on the failure queues that stays valid after the backend is boxed.
@@ -185,6 +193,16 @@ impl FakeBackend {
     pub(crate) fn focus_window(&mut self, id: &str) {
         for window in &mut self.windows {
             window.focused = window.id == id;
+        }
+    }
+
+    /// Opens the next scripted window, if any, after an action landed.
+    pub(crate) fn open_next_surface(&mut self) {
+        if let Some(opening) = self.openings.pop_front() {
+            if let Some(ax) = &opening.ax {
+                self.ax_tree.add_window(&opening.window.id, ax);
+            }
+            self.windows.push(opening.window);
         }
     }
 

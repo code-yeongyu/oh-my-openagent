@@ -4,6 +4,7 @@
 // on a platform or of a kind this client does not know never stops a rotation. A row whose three
 // fields do not parse vouches for nothing; it does not fail the view.
 
+import { syncRequestHeaders } from "../contract-version.ts"
 import { AccountHttpError } from "./http.ts"
 
 export type RevocationView =
@@ -17,7 +18,8 @@ export type RevocationView =
       readonly listed: ReadonlySet<string>
     }
 
-const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 
 export function parseRevocationView(body: unknown): RevocationView {
   const rows = isRecord(body) ? body["devices"] : undefined
@@ -29,12 +31,15 @@ export function parseRevocationView(body: unknown): RevocationView {
     if (!isRecord(row)) continue
     const principal = row["syncPrincipal"]
     const revokedAt = row["revokedAt"]
-    if (typeof principal !== "string" || principal === "" || (revokedAt !== null && typeof revokedAt !== "string")) continue
+    if (typeof principal !== "string" || principal === "" || (revokedAt !== null && typeof revokedAt !== "string"))
+      continue
     listed.add(principal)
     if (revokedAt !== null) revoked.add(principal)
     if (row["current"] === true && self === null) self = { principal, revoked: revokedAt !== null }
   }
-  return self === null ? { kind: "unusable" } : { kind: "usable", self: self.principal, selfRevoked: self.revoked, revoked, listed }
+  return self === null
+    ? { kind: "unusable" }
+    : { kind: "usable", self: self.principal, selfRevoked: self.revoked, revoked, listed }
 }
 
 /** The view over `GET /v1/devices` for a device holding its own bearer token (the CLI credential). */
@@ -45,7 +50,9 @@ export function createRevocationView(options: {
 }): () => Promise<RevocationView> {
   const doFetch = options.fetch ?? fetch
   return async () => {
-    const response = await doFetch(`${options.baseUrl}/v1/devices`, { headers: { authorization: `Bearer ${await options.token()}` } })
+    const response = await doFetch(`${options.baseUrl}/v1/devices`, {
+      headers: syncRequestHeaders(await options.token()),
+    })
     if (!response.ok) throw new AccountHttpError(response.status >= 500 ? "unavailable" : "refused", response.status)
     return parseRevocationView(await response.json())
   }

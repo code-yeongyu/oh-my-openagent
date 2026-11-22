@@ -9,7 +9,6 @@ import {
   RETIRED_MODEL_PROFILE_IDS,
 } from "./builtin-profiles"
 import { KNOWN_MODELS } from "../telemetry/model-vocabulary"
-import { FABLE_55_RELEASED } from "@oh-my-opencode/model-core"
 
 const LANE_IDS = ["daily-normal", "daily-heavy", "geeky-normal", "geeky-heavy"] as const
 const EXPECTED_IDS = LANE_IDS
@@ -18,7 +17,11 @@ const BANNED_VENDOR_TOKENS: readonly string[] = [["mini", "max"].join(""), ["gem
 
 const PROVIDER_VOCABULARY: Readonly<Record<string, readonly string[]>> = KNOWN_MODELS
 
-function rungs(): readonly { readonly profile: string; readonly providers: readonly string[]; readonly model: string }[] {
+function rungs(): readonly {
+  readonly profile: string
+  readonly providers: readonly string[]
+  readonly model: string
+}[] {
   return Object.entries(BUILTIN_MODEL_PROFILES).flatMap(([profile, definition]) =>
     definition.models.map((rung) => ({ profile, providers: rung.providers, model: rung.model })),
   )
@@ -67,7 +70,9 @@ describe("BUILTIN_MODEL_PROFILES", () => {
   it("never lists a gateway aggregator on a builtin rung", () => {
     const gateways = ["opengateway", "openrouter", "vercel-ai-gateway", "cloudflare-ai-gateway"]
     const offenders = rungs().flatMap((rung) =>
-      rung.providers.filter((provider) => gateways.includes(provider)).map((provider) => `${rung.profile}: ${provider}`),
+      rung.providers
+        .filter((provider) => gateways.includes(provider))
+        .map((provider) => `${rung.profile}: ${provider}`),
     )
     expect(offenders).toEqual([])
   })
@@ -105,32 +110,30 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     expect(misordered).toEqual([])
   })
 
-  it("heads every GLM rung with engine zai then zai-coding-cn", () => {
-    const glmRungs = rungs().filter((rung) => rung.model.startsWith("glm-"))
-    expect(glmRungs.length).toBeGreaterThan(0)
-    const misordered = glmRungs
-      .filter((rung) => rung.providers[0] !== "zai" || rung.providers[1] !== "zai-coding-cn")
-      .map((rung) => `${rung.profile}: ${rung.providers.join("|")}/${rung.model}`)
-    expect(misordered).toEqual([])
-  })
-
   it("heads every Claude rung with the anthropic-subscription lane", () => {
     const claudeRungs = rungs().filter((rung) => rung.model.startsWith("claude-"))
     expect(claudeRungs.length).toBeGreaterThan(0)
-    expect(claudeRungs.filter((rung) => rung.providers[0] !== "anthropic-subscription").map((rung) => `${rung.profile}: ${rung.model}`)).toEqual([])
+    expect(
+      claudeRungs
+        .filter((rung) => rung.providers[0] !== "anthropic-subscription")
+        .map((rung) => `${rung.profile}: ${rung.model}`),
+    ).toEqual([])
   })
 
-  it("orders daily-normal opus medium then kimi max then glm max", () => {
-    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "kimi-k3.1-pro max", "glm-5.3 max"])
+  // Owner's order, Slack C0C50M2NFU5 ts 1794719178.424289 / 1794719397.623049 (#13547): the start walk matches
+  // senpi's shipped Opus 5.5 fallback chain (senpi#6699), with no other rung.
+  it("orders daily-normal opus medium then fable 5.2 medium then kimi max, and nothing else", () => {
+    expect(chainOf("daily-normal")).toEqual(["claude-opus-5-5 medium", "claude-fable-5-2 medium", "kimi-k3.1-pro max"])
   })
 
-  it("runs daily-heavy as Fable 5.5 then 5.1 at xhigh", () => {
+  // Owner's order, Slack C0C54MMK806 ts 1794722854.910489: Fable 5.2 runs at high in Daily · Heavy.
+  it("runs daily-heavy as Fable 5.2 at high, then Fable 5.1 at xhigh", () => {
     expect(BUILTIN_MODEL_PROFILES["daily-heavy"]?.models).toEqual([
-      ...(FABLE_55_RELEASED ? [{
+      {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
-        model: "claude-fable-5-5",
-        variant: "xhigh",
-      }] : []),
+        model: "claude-fable-5-2",
+        variant: "high",
+      },
       {
         providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-1",
@@ -139,17 +142,29 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     ])
   })
 
-  it("runs geeky-normal as gpt-6-astra medium on every GPT lane, then gpt-6.1-sol-fast and gpt-6.1-sol medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
+  it("runs geeky-normal as gpt-6.2-astra then gpt-6-astra medium, then the GPT-6.2 and GPT-6.1 Sol tiers medium on the OpenAI lanes, then gpt-5.6-sol medium on every GPT lane", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-normal"]?.models).toEqual([
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-6-astra", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6.2-astra", variant: "medium" },
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-6-astra",
+        variant: "medium",
+      },
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.2-sol-fast", variant: "medium" },
+      { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.2-sol", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol-fast", variant: "medium" },
       { providers: ["chatgpt-subscription", "openai"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"], model: "gpt-5.6-sol", variant: "medium" },
+      {
+        providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
+        model: "gpt-5.6-sol",
+        variant: "medium",
+      },
     ])
   })
 
-  it("runs geeky-heavy as astra high with the same provider ranking as deep-high", () => {
+  it("runs geeky-heavy as gpt-6.2-astra then gpt-6-astra high with the same provider ranking as deep-high", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.models).toEqual([
+      { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6.2-astra", variant: "high" },
       {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
         model: "gpt-6-astra",

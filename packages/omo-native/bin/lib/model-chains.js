@@ -36,16 +36,20 @@ function rungLines(rungs) {
 }
 
 function entryLines(entry) {
-  const head = entry.status === "resolved"
-    ? `  ${entry.name}: ${entry.runtime.join(" -> ")}`
-    : `  ${entry.name}: ${entry.status}${entry.reason === undefined ? "" : ` (${entry.reason})`}`
+  const head =
+    entry.status === "resolved"
+      ? `  ${entry.name}: ${entry.runtime.join(" -> ")}`
+      : `  ${entry.name}: ${entry.status}${entry.reason === undefined ? "" : ` (${entry.reason})`}`
   return [head, ...rungLines(entry.rungs)]
 }
 
 /** The human report. @param {any} view the runtime's `modelChains` result */
 export function formatModelChainLines(view) {
   const profile = view.modelProfile
-  const lane = profile.selection === "set" ? `model_profile ${profile.profile}` : `model_profile unset, default lane ${profile.profile}`
+  const lane =
+    profile.selection === "set"
+      ? `model_profile ${profile.profile}`
+      : `model_profile unset, default lane ${profile.profile}`
   return [
     "Models a spawn resolves right now (logins read offline; credentials are not probed).",
     `exclude_models: ${view.excludeModels.length === 0 ? "none" : view.excludeModels.join(", ")}`,
@@ -85,7 +89,10 @@ export async function doctorModelChains(options) {
     const cwd = options.cwd ?? process.cwd()
     const models = await engineAvailableModels({ agentDir: options.agentDir, cwd, loadEngine: options.loadEngine })
     const view = runtime.modelChains({ models, cwd, env: options.env ?? process.env })
-    return { output: options.json ? JSON.stringify(view, null, 2) : formatModelChainLines(view).join("\n"), failed: false }
+    return {
+      output: options.json ? JSON.stringify(view, null, 2) : formatModelChainLines(view).join("\n"),
+      failed: false,
+    }
   } catch (error) {
     return { output: `FAIL models: ${error instanceof Error ? error.message : String(error)}`, failed: true }
   }

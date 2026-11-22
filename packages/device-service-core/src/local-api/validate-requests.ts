@@ -1,11 +1,19 @@
+// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/validate-requests.ts
+import { toHex } from "./bytes-encoding.ts";
 import { SESSION_PROJECT_MAX_CHARS, SESSION_READ_TAIL_MAX } from "./spec-proto.ts";
-import type { EnvironmentReport, LocalRequest, RequestType, SessionFilter } from "./protocol.ts";
+import type {
+  AttachFrom,
+  AttachResume,
+  EnvironmentReport,
+  LocalRequest,
+  RequestType,
+  SessionFilter,
+} from "./protocol.ts";
 import {
   COMMAND_REQUEST_VALIDATORS,
   requestFields,
   type RequestValidators,
 } from "./validate-command.ts";
-import { DELEGATED_REQUEST_VALIDATORS } from "./validate-delegated.ts";
 import {
   absolutePath,
   base64Bytes,
@@ -20,7 +28,14 @@ import {
   text,
   uint,
 } from "./validate-fields.ts";
-import { deviceId, deviceRef, sessionId } from "./validate-shapes.ts";
+import { MACHINE_REQUEST_VALIDATORS } from "./validate-machine.ts";
+import { DELEGATED_REQUEST_VALIDATORS, endpointRequests } from "./validate-delegated.ts";
+import { isStreamSessionKey } from "./session-ref.ts";
+import { attachId, deviceId, deviceRef } from "./validate-shapes.ts";
+import { PRESENTER_REQUEST_VALIDATORS } from "./validate-presenter.ts";
+import { DELIVERIES_REQUEST_VALIDATORS } from "./validate-deliveries.ts";
+import { SESSION_WAKE_VALIDATORS } from "./validate-session-wake.ts";
+import { updateCommittedOf } from "./validate-update.ts";
 import { FILTER_KEYS, SESSION_ROW_STATES } from "./vocabulary.ts";
 
 const ENVIRONMENTS_MAX = 1024;
@@ -34,7 +49,7 @@ const PKCS8_PREFIX = {
 
 const pkcs8 = (v: unknown, algorithm: "ed25519" | "x25519", what: string): string => {
   const bytes = base64Bytes(v, PKCS8_KEY_BYTES, what);
-  const prefix = Buffer.from(bytes.subarray(0, 16)).toString("hex");
+  const prefix = toHex(bytes.subarray(0, 16));
   const exact = bytes.length === PKCS8_KEY_BYTES && prefix === PKCS8_PREFIX[algorithm];
   return exact && typeof v === "string" ? v : fail(what);
 };
@@ -67,22 +82,41 @@ const environmentsOf = (v: unknown): readonly EnvironmentReport[] => {
     : fail("duplicate environment_id");
 };
 
+// #774: the last record a reattaching client applied, by its attach_id and that record's seq.
+const resumeOf = (v: unknown): AttachResume => {
+  const m = exactly(v, ["attach_id", "seq"], [], "resume");
+  const seq = uint(m["seq"], 0, Number.MAX_SAFE_INTEGER, "resume.seq");
+  return { attach_id: attachId(m["attach_id"]), seq };
+};
+// #896: the newest entry the reattaching client holds.
+const fromOf = (v: unknown): AttachFrom => {
+  const m = exactly(v, ["last_entry_id"], [], "from");
+  return { last_entry_id: entryId(m["last_entry_id"], "from.last_entry_id") };
+};
 const bare = (v: Fields): void => {
   requestFields(v, []);
 };
-const agentDir = (v: Fields): string =>
-  absolutePath(requestFields(v, ["agent_dir"])["agent_dir"], "agent_dir");
 
 const VALIDATORS: RequestValidators<RequestType> = {
   ...COMMAND_REQUEST_VALIDATORS,
+  ...MACHINE_REQUEST_VALIDATORS,
   ...DELEGATED_REQUEST_VALIDATORS,
+  ...PRESENTER_REQUEST_VALIDATORS,
+  ...DELIVERIES_REQUEST_VALIDATORS,
   authenticate: (v, id) => {
     const m = requestFields(v, ["client_proof"]);
     return { id, type: "authenticate", client_proof: text(m["client_proof"], 64, "client_proof") };
   },
   "status.get": (v, id) => {
-    bare(v);
-    return { id, type: "status.get" };
+    const { exe, sign_in_reason: reason } = requestFields(v, [], ["exe", "sign_in_reason"]);
+    if (exe !== undefined && exe !== true) return fail("exe");
+    if (reason !== undefined && reason !== true) return fail("sign_in_reason");
+    return {
+      id,
+      type: "status.get",
+      ...(exe === true ? { exe } : {}),
+      ...(reason === true ? { sign_in_reason: reason } : {}),
+    };
   },
   "status.subscribe": (v, id) => {
     bare(v);
@@ -96,6 +130,15 @@ const VALIDATORS: RequestValidators<RequestType> = {
     const attached = bool(requestFields(v, ["attached"])["attached"], "attached");
     return { id, type: "control.attach.set", attached };
   },
+  "control.remote_commands.get": (v, id) => {
+    bare(v);
+    return { id, type: "control.remote_commands.get" };
+  },
+  "control.remote_commands.set": (v, id) => {
+    const enabled = bool(requestFields(v, ["enabled"])["enabled"], "enabled");
+    return { id, type: "control.remote_commands.set", enabled };
+  },
+  ...SESSION_WAKE_VALIDATORS,
   "service.set_enabled": (v, id) => {
     const enabled = bool(requestFields(v, ["enabled"])["enabled"], "enabled");
     return { id, type: "service.set_enabled", enabled };
@@ -111,11 +154,19 @@ const VALIDATORS: RequestValidators<RequestType> = {
     };
   },
   "device.adopt": (v, id) => {
-    const m = requestFields(v, ["device", "signing_private_key", "sealing_private_key"]);
+    const m = requestFields(
+      v,
+      ["device", "signing_private_key", "sealing_private_key"],
+      ["account", "sign_in_reason"],
+    );
+    const reason = m["sign_in_reason"];
+    if (reason !== undefined && reason !== true) return fail("sign_in_reason");
     return {
       id,
       type: "device.adopt",
       device: deviceRef(m["device"]),
+      ...(m["account"] === undefined ? {} : { account: text(m["account"], 256, "account") }),
+      ...(reason === true ? { sign_in_reason: reason } : {}),
       signing_private_key: pkcs8(m["signing_private_key"], "ed25519", "signing_private_key"),
       sealing_private_key: pkcs8(m["sealing_private_key"], "x25519", "sealing_private_key"),
     };
@@ -128,15 +179,20 @@ const VALIDATORS: RequestValidators<RequestType> = {
     bare(v);
     return { id, type: "device.info" };
   },
-  "endpoints.register": (v, id) => ({ id, type: "endpoints.register", agent_dir: agentDir(v) }),
-  "endpoints.unregister": (v, id) => ({ id, type: "endpoints.unregister", agent_dir: agentDir(v) }),
+  ...endpointRequests,
   "devices.list": (v, id) => {
+    const { managed } = requestFields(v, [], ["managed"]);
+    if (managed !== undefined && managed !== true) return fail("managed");
+    return { id, type: "devices.list", ...(managed === undefined ? {} : { managed }) };
+  },
+  "sessions.events.subscribe": (v, id) => {
     bare(v);
-    return { id, type: "devices.list" };
+    return { id, type: "sessions.events.subscribe" };
   },
   "sessions.list": (v, id) => {
     const { filter, rows } = requestFields(v, [], ["filter", "rows"]);
-    if (rows !== undefined && rows !== 2) return fail("rows");
+    if (rows !== undefined && rows !== 2 && rows !== 3 && rows !== 4 && rows !== 5)
+      return fail("rows");
     return {
       id,
       type: "sessions.list",
@@ -144,13 +200,21 @@ const VALIDATORS: RequestValidators<RequestType> = {
       ...(rows === undefined ? {} : { rows }),
     };
   },
+  // #1349: the session_id is the bare stream session key (decision 0008, what session.locate answers as `key`); a durable
+  // engine id or any other text is refused here, never handed to the relay's attach.
   "session.attach": (v, id) => {
-    const m = requestFields(v, ["device", "session_id"]);
+    const m = requestFields(v, ["device", "session_id"], ["seqs", "resume", "from"]);
+    const { seqs, resume, from, session_id } = m;
+    if (seqs !== undefined && seqs !== true) return fail("seqs");
+    if (!isStreamSessionKey(session_id)) return fail("session_id");
     return {
       id,
       type: "session.attach",
       device: deviceId(m["device"]),
-      session_id: sessionId(m["session_id"]),
+      session_id,
+      ...(seqs === undefined ? {} : { seqs }),
+      ...(resume === undefined ? {} : { resume: resumeOf(resume) }),
+      ...(from === undefined ? {} : { from: fromOf(from) }),
     };
   },
   "session.detach": (v, id) => ({
@@ -188,6 +252,7 @@ const VALIDATORS: RequestValidators<RequestType> = {
     );
     return { id, type: "owner.shutdown_for_upgrade", target_version };
   },
+  "owner.update_committed": (v, id) => updateCommittedOf(requestFields(v, ["update_id"]), id),
 };
 
 export const REQUEST_TYPES: readonly RequestType[] = keysOf(VALIDATORS);

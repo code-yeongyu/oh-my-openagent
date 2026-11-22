@@ -21,13 +21,7 @@ type ResolvedModelEventStore = {
 // The `model_changed` sources the host actually names (docs/rpc.md "model_changed"). Anything
 // else is future host vocabulary: ignored rather than persisted, because the record schema only
 // vouches for these.
-const MODEL_CHANGED_SOURCES: ReadonlySet<string> = new Set([
-  "set",
-  "cycle",
-  "restore",
-  "fallback",
-  "fallback-revert",
-])
+const MODEL_CHANGED_SOURCES: ReadonlySet<string> = new Set(["set", "cycle", "restore", "fallback", "fallback-revert"])
 
 /**
  * Apply a child's live model events to its record (F12): `retry_fallback_applied` (as before),
@@ -37,11 +31,7 @@ const MODEL_CHANGED_SOURCES: ReadonlySet<string> = new Set([
  * mint itself is marked `switched_by_operator`. Never touches the spawn plan (`model` /
  * `resolved_model` state the plan except on the two fallback events) or the parent's model.
  */
-export function applyModelEvent(
-  store: ModelEventStore,
-  taskId: string,
-  event: ManagedChildEvent,
-): void {
+export function applyModelEvent(store: ModelEventStore, taskId: string, event: ManagedChildEvent): void {
   if (store.load === undefined || store.replace === undefined) return
   const resolved: ResolvedModelEventStore = {
     load: store.load,
@@ -60,22 +50,14 @@ export function applyModelEvent(
   }
 }
 
-function applyFallbackApplied(
-  store: ResolvedModelEventStore,
-  taskId: string,
-  event: ManagedChildEvent,
-): void {
+function applyFallbackApplied(store: ResolvedModelEventStore, taskId: string, event: ManagedChildEvent): void {
   const selector = readEventString(event, "to")
   const record = store.load(taskId)
   if (selector === undefined || record == null) return
   const resolvedModel = parseModelSelector(selector, record.resolved_model?.source ?? "category")
   if (resolvedModel === undefined) return
   const fallbackModels = remainingFallbacks(record.fallback_models, resolvedModel)
-  const fallbackAttempts = appendFallbackAttempts(
-    record.fallback_attempts,
-    record.resolved_model,
-    resolvedModel,
-  )
+  const fallbackAttempts = appendFallbackAttempts(record.fallback_attempts, record.resolved_model, resolvedModel)
   store.replace({
     ...record,
     model: resolvedModel.display,
@@ -87,19 +69,15 @@ function applyFallbackApplied(
   })
 }
 
-function applyFallbackReverted(
-  store: ResolvedModelEventStore,
-  taskId: string,
-  event: ManagedChildEvent,
-): void {
+function applyFallbackReverted(store: ResolvedModelEventStore, taskId: string, event: ManagedChildEvent): void {
   const record = store.load(taskId)
   if (record == null) return
   const selector = readEventString(event, "to")
   // Host truth first (the controller emits the original selector); the record's own attempt
   // history answers when the event carries none.
-  const restored = (selector !== undefined
-    ? parseModelSelector(selector, record.resolved_model?.source ?? "category")
-    : undefined) ?? record.fallback_attempts?.[0]
+  const restored =
+    (selector !== undefined ? parseModelSelector(selector, record.resolved_model?.source ?? "category") : undefined) ??
+    record.fallback_attempts?.[0]
   if (restored === undefined) return
   store.replace({
     ...record,
@@ -110,11 +88,7 @@ function applyFallbackReverted(
   })
 }
 
-function applyModelChanged(
-  store: ResolvedModelEventStore,
-  taskId: string,
-  event: ManagedChildEvent,
-): void {
+function applyModelChanged(store: ResolvedModelEventStore, taskId: string, event: ManagedChildEvent): void {
   const record = store.load(taskId)
   if (record == null) return
   const source = readEventString(event, "source")
@@ -123,8 +97,8 @@ function applyModelChanged(
   if (model === undefined) return
   const thinkingLevel = readEventString(event, "thinkingLevel")
   const effectId = readEventString(event, "effectId")
-  const switchedByOperator = (source === "set" || source === "cycle")
-    && (effectId === undefined || store.isOwnEffect?.(effectId) !== true)
+  const switchedByOperator =
+    (source === "set" || source === "cycle") && (effectId === undefined || store.isOwnEffect?.(effectId) !== true)
   const previous = record.effective_model
   const sameRoute = previous?.provider === model.provider && previous?.model_id === model.id
   store.replace({
@@ -142,10 +116,7 @@ function applyModelChanged(
   })
 }
 
-function toEffectiveRecord(
-  model: ResolvedModelRecord,
-  source: EffectiveModelSource,
-): EffectiveModelRecord {
+function toEffectiveRecord(model: ResolvedModelRecord, source: EffectiveModelSource): EffectiveModelRecord {
   return {
     provider: model.provider,
     model_id: model.model_id,
@@ -165,10 +136,7 @@ function readModelRef(event: ManagedChildEvent): { readonly provider: string; re
   return typeof provider === "string" && typeof id === "string" ? { provider, id } : undefined
 }
 
-function parseModelSelector(
-  selector: string,
-  source: ResolvedModelRecord["source"],
-): ResolvedModelRecord | undefined {
+function parseModelSelector(selector: string, source: ResolvedModelRecord["source"]): ResolvedModelRecord | undefined {
   const slash = selector.indexOf("/")
   if (slash <= 0 || slash === selector.length - 1) return undefined
   const colon = selector.lastIndexOf(":")
@@ -179,9 +147,7 @@ function parseModelSelector(
     provider: display.slice(0, slash),
     model_id: display.slice(slash + 1),
     display,
-    ...(hasThinking
-      ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) }
-      : {}),
+    ...(hasThinking ? { reasoning: selector.slice(colon + 1), reasoning_effort: selector.slice(colon + 1) } : {}),
   }
 }
 
@@ -190,8 +156,8 @@ function remainingFallbacks(
   selected: ResolvedModelRecord,
 ): readonly ResolvedModelRecord[] | undefined {
   if (candidates === undefined) return undefined
-  const selectedIndex = candidates.findIndex((candidate) =>
-    candidate.provider === selected.provider && candidate.model_id === selected.model_id
+  const selectedIndex = candidates.findIndex(
+    (candidate) => candidate.provider === selected.provider && candidate.model_id === selected.model_id,
   )
   return selectedIndex === -1 ? candidates : candidates.slice(selectedIndex + 1)
 }
@@ -204,10 +170,8 @@ function appendFallbackAttempts(
   const next = [...(attempts ?? [])]
   for (const candidate of [previous, selected]) {
     if (
-      candidate !== undefined
-      && !next.some((attempt) =>
-        attempt.provider === candidate.provider && attempt.model_id === candidate.model_id
-      )
+      candidate !== undefined &&
+      !next.some((attempt) => attempt.provider === candidate.provider && attempt.model_id === candidate.model_id)
     ) {
       next.push(candidate)
     }

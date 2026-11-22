@@ -7,25 +7,25 @@ export const sessionErrorState = new Map<string, { hasError: boolean; errorMessa
 export const sessionInterruptState = new Map<string, { interrupted: boolean }>()
 
 export function clearSessionHookState(sessionID: string): void {
-	sessionErrorState.delete(sessionID)
-	sessionInterruptState.delete(sessionID)
-	// sessionFirstMessageProcessed must NOT be cleared on idle.
-	// It tracks whether the first message of a session has been processed,
-	// so that SessionStart hooks fire only once per session. Clearing it
-	// on idle (which fires after every model response) makes isFirstMessage
-	// always return true, causing SessionStart hooks to fire on every
-	// prompt instead of only the first one.
+  sessionErrorState.delete(sessionID)
+  sessionInterruptState.delete(sessionID)
+  // sessionFirstMessageProcessed must NOT be cleared on idle.
+  // It tracks whether the first message of a session has been processed,
+  // so that SessionStart hooks fire only once per session. Clearing it
+  // on idle (which fires after every model response) makes isFirstMessage
+  // always return true, causing SessionStart hooks to fire on every
+  // prompt instead of only the first one.
 }
 
 export function clearSessionEndHookState(sessionID: string): void {
-	clearSessionHookState(sessionID)
-	sessionFirstMessageProcessed.delete(sessionID)
-	clearStopHookActive(sessionID)
+  clearSessionHookState(sessionID)
+  sessionFirstMessageProcessed.delete(sessionID)
+  clearStopHookActive(sessionID)
 }
 
 export function clearAllSessionHookState(): void {
-	sessionErrorState.clear()
-	sessionInterruptState.clear()
-	sessionFirstMessageProcessed.clear()
-	clearAllStopHookActive()
+  sessionErrorState.clear()
+  sessionInterruptState.clear()
+  sessionFirstMessageProcessed.clear()
+  clearAllStopHookActive()
 }

@@ -78,15 +78,10 @@ export async function refreshMemoryStatus(input: RefreshMemoryStatusInput): Prom
   let footerShown = false
   if (input.showFooter !== false) {
     const committedAt = await repo.headCommitTimestamp()
-    const age = committedAt === null
-      ? null
-      : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
+    const age = committedAt === null ? null : formatRelativeAge(committedAt * SECOND_MS, (input.now ?? Date.now)())
     if (age !== null) {
       const segments = await readMemoryStatusSegments(repo, input.context, input.sessionId, input.syncStatus)
-      input.ui.setStatus(
-        MEMORY_STATUS_KEY,
-        formatMemoryStatusLine(input.context.identity, age, segments),
-      )
+      input.ui.setStatus(MEMORY_STATUS_KEY, formatMemoryStatusLine(input.context.identity, age, segments))
       footerShown = true
     }
   }
@@ -135,13 +130,10 @@ export async function readMemoryStatusSegments(
  * segments right-to-left to fit. ` sync blocked` and ` sync held` are never dropped: they are the
  * segments that ask the person to act.
  */
-export function formatMemoryStatusLine(
-  identity: string,
-  age: string,
-  segments: MemoryStatusSegments,
-): string {
+export function formatMemoryStatusLine(identity: string, age: string, segments: MemoryStatusSegments): string {
   const base = `mem:${identity} ${age}`
-  const sync = segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
+  const sync =
+    segments.syncBlocked === true ? SYNC_BLOCKED_SEGMENT : segments.syncHeld === true ? SYNC_HELD_SEGMENT : ""
   const optional: string[] = [
     segments.dirty ? "*" : "",
     segments.backlogSteps >= 1 ? ` (+${segments.backlogSteps})` : "",
@@ -156,7 +148,10 @@ export function formatMemoryStatusLine(
   return base + sync
 }
 
-async function readSyncState(context: MemoryIdentityContext, syncStatus: SyncStatusReader | undefined): Promise<{ syncBlocked: boolean; syncHeld: boolean }> {
+async function readSyncState(
+  context: MemoryIdentityContext,
+  syncStatus: SyncStatusReader | undefined,
+): Promise<{ syncBlocked: boolean; syncHeld: boolean }> {
   const none = { syncBlocked: false, syncHeld: false }
   if (syncStatus === undefined) return none
   try {
@@ -165,7 +160,9 @@ async function readSyncState(context: MemoryIdentityContext, syncStatus: SyncSta
     if (status?.kind === "frozen") return { syncBlocked: true, syncHeld: false }
     const failure = shownSyncFailure(status)
     if (failure === undefined) return none
-    return failure.kind === "oversized_item" ? { syncBlocked: false, syncHeld: true } : { syncBlocked: true, syncHeld: false }
+    return failure.kind === "oversized_item"
+      ? { syncBlocked: false, syncHeld: true }
+      : { syncBlocked: true, syncHeld: false }
   } catch {
     return none
   }
@@ -179,10 +176,7 @@ async function readDirty(repo: GitRepoForStatus): Promise<boolean> {
   }
 }
 
-async function readBacklogSteps(
-  context: MemoryIdentityContext,
-  sessionId: string | undefined,
-): Promise<number> {
+async function readBacklogSteps(context: MemoryIdentityContext, sessionId: string | undefined): Promise<number> {
   if (sessionId === undefined || sessionId.length === 0) return 0
   try {
     const raw: unknown = JSON.parse(
@@ -206,10 +200,9 @@ async function readParked(context: MemoryIdentityContext): Promise<boolean> {
 
 async function readStreak(context: MemoryIdentityContext): Promise<number> {
   try {
-    const health = await readReflectionHealth(
-      join(context.identityPaths.reflection, "completions"),
-      { limit: MEMORY_HEALTH_SCAN_LIMIT },
-    )
+    const health = await readReflectionHealth(join(context.identityPaths.reflection, "completions"), {
+      limit: MEMORY_HEALTH_SCAN_LIMIT,
+    })
     return health.streak
   } catch {
     return 0
@@ -240,9 +233,7 @@ export async function estimateSystemTokens(repo: GitRepoForStatus, head: string)
   const paths = await repo.lsTree(head)
   const systemMarkdownPaths = paths.filter(isSystemMarkdown)
   if (systemMarkdownPaths.length === 0) return 0
-  const contents = await Promise.all(
-    systemMarkdownPaths.map((path) => repo.show(head, path)),
-  )
+  const contents = await Promise.all(systemMarkdownPaths.map((path) => repo.show(head, path)))
   const totalBytes = contents.reduce((sum, content) => sum + Buffer.byteLength(content, "utf8"), 0)
   return Math.floor(totalBytes / 4)
 }

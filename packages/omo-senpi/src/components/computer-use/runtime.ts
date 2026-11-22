@@ -40,7 +40,11 @@ export function createComputerUseRuntime(options: ComputerUseRuntimeOptions) {
     ...(options.fullAccess === undefined ? {} : { fullAccess: options.fullAccess }),
   })
   const handle = new ComputerHandle({ service, settings: () => options.settings })
-  const deps: ComputerToolDeps = { handle, executeTool: options.executeTool, confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }) }
+  const deps: ComputerToolDeps = {
+    handle,
+    executeTool: options.executeTool,
+    confirmControl: (request) => confirmComputerControl(request, { fullAccess: options.fullAccess }),
+  }
   return {
     handle,
     service,

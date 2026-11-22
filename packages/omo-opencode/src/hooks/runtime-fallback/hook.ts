@@ -11,7 +11,14 @@ import {
   registerRuntimeFallbackRecoveryOwner,
   settleRuntimeFallbackRecoveryClaim,
 } from "../../shared/runtime-fallback-recovery"
-import type { HookDeps, RuntimeFallbackHook, RuntimeFallbackInterval, RuntimeFallbackOptions, RuntimeFallbackPluginInput, RuntimeFallbackTimeout } from "./types"
+import type {
+  HookDeps,
+  RuntimeFallbackHook,
+  RuntimeFallbackInterval,
+  RuntimeFallbackOptions,
+  RuntimeFallbackPluginInput,
+  RuntimeFallbackTimeout,
+} from "./types"
 
 declare function setInterval(callback: () => void, delay?: number): RuntimeFallbackInterval
 declare function clearInterval(interval: RuntimeFallbackInterval): void
@@ -48,8 +55,11 @@ export function createRuntimeFallbackHook(
     max_fallback_attempts: options?.config?.max_fallback_attempts ?? DEFAULT_CONFIG.max_fallback_attempts,
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
+    first_prompt_timeout_seconds:
+      options?.config?.first_prompt_timeout_seconds ?? DEFAULT_CONFIG.first_prompt_timeout_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
-    restore_primary_after_cooldown: options?.config?.restore_primary_after_cooldown ?? DEFAULT_CONFIG.restore_primary_after_cooldown,
+    restore_primary_after_cooldown:
+      options?.config?.restore_primary_after_cooldown ?? DEFAULT_CONFIG.restore_primary_after_cooldown,
   }
 
   const deps: HookDeps = {
@@ -72,7 +82,11 @@ export function createRuntimeFallbackHook(
   const baseEventHandler = factories.createEventHandler(deps, helpers)
   const messageUpdateHandler = factories.createMessageUpdateHandler(deps, helpers)
   const chatMessageHandler = factories.createChatMessageHandler(deps)
-  const firstPromptWatchdog = factories.createFirstPromptWatchdog(deps, helpers)
+  const firstPromptWatchdog = factories.createFirstPromptWatchdog(
+    deps,
+    helpers,
+    config.first_prompt_timeout_seconds * 1000,
+  )
 
   let cleanupInterval: RuntimeFallbackInterval | null = null
   let intervalStarted = false
@@ -96,8 +110,8 @@ export function createRuntimeFallbackHook(
   // an accepted retry and an error from a superseded generation that arrives while one is live; an error
   // from the retry itself clears both sets before it is declined.
   const ownsRecovery = (sessionID: string | undefined): boolean =>
-    sessionID !== undefined
-    && (deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID))
+    sessionID !== undefined &&
+    (deps.sessionRetryInFlight.has(sessionID) || deps.sessionAwaitingFallbackResult.has(sessionID))
 
   const deferredSessionErrors = deps.deferredSessionErrors ?? new Map<string, object[]>()
   const isDeferred = (sessionID: string | undefined, event: object): boolean =>
@@ -119,30 +133,36 @@ export function createRuntimeFallbackHook(
     ensureInterval()
     observeCompactionEvent(event)
 
-    const messageUpdatedInfo = event.type === "message.updated"
-      && typeof event.properties === "object"
-      && event.properties !== null
-      && typeof (event.properties as Record<string, unknown>).info === "object"
-      && (event.properties as Record<string, unknown>).info !== null
-      ? (event.properties as Record<string, unknown>).info as Record<string, unknown>
-      : undefined
-    const messageUpdatedEnded = messageUpdatedInfo
-      && (messageUpdatedInfo.error !== undefined
-        || (typeof messageUpdatedInfo.time === "object"
-          && messageUpdatedInfo.time !== null
-          && (messageUpdatedInfo.time as Record<string, unknown>).completed !== undefined))
+    const messageUpdatedInfo =
+      event.type === "message.updated" &&
+      typeof event.properties === "object" &&
+      event.properties !== null &&
+      typeof (event.properties as Record<string, unknown>).info === "object" &&
+      (event.properties as Record<string, unknown>).info !== null
+        ? ((event.properties as Record<string, unknown>).info as Record<string, unknown>)
+        : undefined
+    const messageUpdatedEnded =
+      messageUpdatedInfo &&
+      (messageUpdatedInfo.error !== undefined ||
+        (typeof messageUpdatedInfo.time === "object" &&
+          messageUpdatedInfo.time !== null &&
+          (messageUpdatedInfo.time as Record<string, unknown>).completed !== undefined))
     if (
-      event.type === "session.compacted"
-      || event.type === "session.compaction.ended"
-      || event.type === "session.compaction.failed"
-      || messageUpdatedEnded
+      event.type === "session.compacted" ||
+      event.type === "session.compaction.ended" ||
+      event.type === "session.compaction.failed" ||
+      messageUpdatedEnded
     ) {
       const props = event.properties as Record<string, unknown> | undefined
       const sessionID = resolveSessionEventID(props)
       const compaction = sessionID ? getCompaction(sessionID) : undefined
       const endedAt = compaction?.endedAt
-      if (sessionID && deps.sessionAwaitingFallbackResult.has(sessionID) && endedAt !== undefined
-        && lastEndedRearm.get(sessionID) !== endedAt) {
+      if (
+        sessionID &&
+        deps.sessionAwaitingFallbackResult.has(sessionID) &&
+        endedAt !== undefined &&
+        lastEndedRearm.get(sessionID) !== endedAt
+      ) {
         lastEndedRearm.set(sessionID, endedAt)
         helpers.scheduleSessionFallbackTimeout(sessionID)
       }
@@ -154,20 +174,21 @@ export function createRuntimeFallbackHook(
 
     if (event.type === "message.part.updated" || event.type === "message.part.delta") {
       const props = event.properties as Record<string, unknown> | undefined
-      const sessionID = resolveSessionEventID(props) ?? resolveSessionEventID(
-        typeof props?.part === "object" && props.part !== null
-          ? props.part as Record<string, unknown>
-          : undefined,
-      )
+      const sessionID =
+        resolveSessionEventID(props) ??
+        resolveSessionEventID(
+          typeof props?.part === "object" && props.part !== null ? (props.part as Record<string, unknown>) : undefined,
+        )
       if (sessionID && deps.sessionAwaitingFallbackResult.has(sessionID)) {
         const lastRearm = lastFallbackProgressRearm.get(sessionID) ?? -Infinity
         if (Date.now() - lastRearm >= 5_000) {
           lastFallbackProgressRearm.set(sessionID, Date.now())
           const compaction = getCompaction(sessionID)
           const timeoutMs = options?.session_timeout_ms ?? config.timeout_seconds * 1000
-          const delayOverride = compaction && !compaction.endedAt
-            ? Math.max(0, Math.min(timeoutMs, COMPACTION_WATCHDOG_BUDGET_MS - (Date.now() - compaction.startedAt)))
-            : undefined
+          const delayOverride =
+            compaction && !compaction.endedAt
+              ? Math.max(0, Math.min(timeoutMs, COMPACTION_WATCHDOG_BUDGET_MS - (Date.now() - compaction.startedAt)))
+              : undefined
           helpers.scheduleSessionFallbackTimeout(sessionID, undefined, delayOverride)
           log(`[runtime-fallback] watchdog-part-progress-rearm`, { sessionID })
         }

@@ -28,7 +28,8 @@ function errorCode(error: unknown): string | undefined {
 async function readPendingRunId(reflectionDir: string): Promise<string | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(join(reflectionDir, "pending.json"), "utf8"))
-    const runId = typeof parsed === "object" && parsed !== null ? (parsed as { readonly runId?: unknown }).runId : undefined
+    const runId =
+      typeof parsed === "object" && parsed !== null ? (parsed as { readonly runId?: unknown }).runId : undefined
     return typeof runId === "string" ? runId : undefined
   } catch (error) {
     if (errorCode(error) === "ENOENT" || error instanceof SyntaxError) return undefined
@@ -44,23 +45,36 @@ async function readPendingRunId(reflectionDir: string): Promise<string | undefin
  * The next session promotes the pending run under its own pid (`ReflectionReservationStore.promotePending`).
  * Lock contention throws `LockContentionError` (the scheduler lock is taken with `waitTimeoutMs: 0`).
  */
-export async function releaseReservationWithoutPromotion(options: ReleaseWithoutPromotionOptions): Promise<ReleaseWithoutPromotionResult> {
+export async function releaseReservationWithoutPromotion(
+  options: ReleaseWithoutPromotionOptions,
+): Promise<ReleaseWithoutPromotionResult> {
   const now = options.now ?? (() => new Date())
   const record = await createLockRecord("reflection-scheduler", { runId: options.runId })
-  return withLock(reflectionSchedulerLockPath(options.locksDir), record, async () => {
-    const activePath = join(options.reflectionDir, "active.lock")
-    const active = await readRun(activePath)
-    if (active?.runId !== options.runId) return { released: false }
-    if (active.request.trigger !== "manual" && active.request.trigger !== "dream") {
-      for (const conversationId of active.request.conversationIds) {
-        const journalDir = join(options.transcriptsDir, conversationId)
-        if (!(await stat(journalDir).then((status) => status.isDirectory(), () => false))) continue
-        await new TranscriptJournal({ journalDir, now }).recordReflectionFailure()
+  return withLock(
+    reflectionSchedulerLockPath(options.locksDir),
+    record,
+    async () => {
+      const activePath = join(options.reflectionDir, "active.lock")
+      const active = await readRun(activePath)
+      if (active?.runId !== options.runId) return { released: false }
+      if (active.request.trigger !== "manual" && active.request.trigger !== "dream") {
+        for (const conversationId of active.request.conversationIds) {
+          const journalDir = join(options.transcriptsDir, conversationId)
+          if (
+            !(await stat(journalDir).then(
+              (status) => status.isDirectory(),
+              () => false,
+            ))
+          )
+            continue
+          await new TranscriptJournal({ journalDir, now }).recordReflectionFailure()
+        }
       }
-    }
-    await new ReflectionParkFile(options.reflectionDir, now).transition(active, options.runId, "failed", undefined)
-    const pendingRunId = await readPendingRunId(options.reflectionDir)
-    await unlink(activePath)
-    return { released: true, ...(pendingRunId === undefined ? {} : { pendingRunId }) }
-  }, { waitTimeoutMs: 0 })
+      await new ReflectionParkFile(options.reflectionDir, now).transition(active, options.runId, "failed", undefined)
+      const pendingRunId = await readPendingRunId(options.reflectionDir)
+      await unlink(activePath)
+      return { released: true, ...(pendingRunId === undefined ? {} : { pendingRunId }) }
+    },
+    { waitTimeoutMs: 0 },
+  )
 }

@@ -29,6 +29,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { ChildPlanner, ManagedRunner, SpawnAdmission, TaskManager } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const RENDERER_THEME = {
   fg: (_color: ThemeColor, text: string) => text,
@@ -52,7 +53,7 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
 
 function makeLifecycleManager(runner: ManagedRunner, config = settings({ default_concurrency: 1, max_depth: 1 })) {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   let managerRef: TaskManager | undefined
   const getManager = (): TaskManager => {
     if (managerRef === undefined) throw new Error("manager accessed before test composition finished")
@@ -398,7 +399,11 @@ describe("TaskManager.start", () => {
     })
     const runner = new FakeRunner()
     runner.childEffectiveModel = { provider: "anthropic", id: "model-b" }
-    const { manager, store } = makeManager({ planner, process: runner, config: settings({ default_execution_mode: "process" }) })
+    const { manager, store } = makeManager({
+      planner,
+      process: runner,
+      config: settings({ default_execution_mode: "process" }),
+    })
 
     // when
     const result = await manager.start(baseSpec({}))
@@ -566,7 +571,11 @@ describe("TaskManager.waitFor", () => {
 describe("TaskManager child subscriptions", () => {
   test("#given a pending task #when its concurrency slot is promoted #then the deferred child listener attaches to its managed handle", async () => {
     const runner = new FakeRunner()
-    const { manager } = makeManager({ config: settings({ default_concurrency: 1 }), inProcess: runner, process: runner })
+    const { manager } = makeManager({
+      config: settings({ default_concurrency: 1 }),
+      inProcess: runner,
+      process: runner,
+    })
     const first = await manager.start(baseSpec({ name: "running" }))
     const queued = await manager.start(baseSpec({ name: "queued" }))
     if (first.kind !== "started" || queued.kind !== "started") throw new Error("expected starts")
@@ -609,7 +618,9 @@ describe("TaskManager pending cancellation", () => {
     expect((await waiting).status).toBe("cancelled")
     expect(store.load(queued.task_id)?.status).toBe("cancelled")
     expect(store.load(queued.task_id)?.residency_state).toBe("disposed")
-    expect(manager.list({ scope: "all" }).find((entry) => entry.record.task_id === queued.task_id)?.queue_position).toBeUndefined()
+    expect(
+      manager.list({ scope: "all" }).find((entry) => entry.record.task_id === queued.task_id)?.queue_position,
+    ).toBeUndefined()
 
     const later = await manager.start(baseSpec({ name: "later" }))
     expect(later.kind).toBe("started")
@@ -621,7 +632,7 @@ describe("TaskManager pending cancellation", () => {
   test("#given a grant whose start transition loses to cancel w2pend #when the slot transfers #then the runner is skipped and the slot is released", async () => {
     // given
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     let cancelBeforeStartTaskId: string | undefined
     const store = {
       ...backing,

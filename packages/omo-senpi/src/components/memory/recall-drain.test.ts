@@ -1,11 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  PendingNudges,
-  RecallLedger,
-  renderNudgeBlock,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, PendingNudges, RecallLedger, renderNudgeBlock } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { NUDGED_ENTRY_TYPE } from "./kibitzer/notice"
@@ -119,7 +114,9 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
 
     // then
     expect(real?.message?.content).toBe(renderNudgeBlock(NUDGE))
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
+    expect(pi.entries).toEqual([
+      { customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } },
+    ])
   }, 30_000)
 
   test("#given an injected nudge #when the turn starts #then the path is ledgered and the pending file is consumed", async () => {
@@ -151,7 +148,9 @@ describe("createMemoryRecallWiring pending-nudge injection", () => {
     await dispatch(pi, eventContext([userEntry("m1", "anything at all")]))
 
     // then
-    expect(pi.entries).toEqual([{ customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } }])
+    expect(pi.entries).toEqual([
+      { customType: NUDGED_ENTRY_TYPE, data: { version: 1, nudges: [NUDGE], via: "prompt" } },
+    ])
   }, 30_000)
 
   test("#given a failing ledger #when a nudge is injected #then the injection still lands and the failure is logged", async () => {

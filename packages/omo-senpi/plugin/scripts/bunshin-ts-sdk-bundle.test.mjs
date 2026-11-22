@@ -6,7 +6,17 @@ describe("bunshin-ts SDK bundle", () => {
   test("#given the built bundle #when imported through the plugin import map #then it exposes the eval cell API", async () => {
     const sdk = await import("#bunshin-ts")
     const names = Object.keys(sdk)
-    for (const name of ["bunshin", "connect", "createRelayTransport", "relayStatus", "RelayTransportError", "pickTransport", "BunshinSessionError", "FanoutRun", "SDK_VERSION"]) {
+    for (const name of [
+      "bunshin",
+      "connect",
+      "createRelayTransport",
+      "relayStatus",
+      "RelayTransportError",
+      "pickTransport",
+      "BunshinSessionError",
+      "FanoutRun",
+      "SDK_VERSION",
+    ]) {
       expect(names).toContain(name)
     }
     expect(typeof sdk.bunshin.listMachines).toBe("function")

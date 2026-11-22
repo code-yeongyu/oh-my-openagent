@@ -9,18 +9,24 @@ const home = resolve("/home/test")
 const repo = resolve("/volume/repo")
 const volume = resolve("/volume")
 const id = "task-one"
-const segment = `t${createHash("sha1").update(repo + id).digest("hex").slice(0, 10)}`
+const segment = `t${createHash("sha1")
+  .update(repo + id)
+  .digest("hex")
+  .slice(0, 10)}`
 const onVolume = (path: string) => {
   const resolved = resolve(path)
   return resolved === volume || resolved.startsWith(volume + sep)
 }
 const sameDevice: BaseDirIO = {
   stat: async () => ({ dev: 1 }),
-  writable: async () => { throw new Error("same-device selection must not probe volume") },
+  writable: async () => {
+    throw new Error("same-device selection must not probe volume")
+  },
 }
 test("chooses the home directory on the same device", async () => {
   expect(await chooseBaseDir(repo, home, id, sameDevice)).toEqual({
-    baseDir: join(home, ".omo/wt", segment), crossDevice: false,
+    baseDir: join(home, ".omo/wt", segment),
+    crossDevice: false,
   })
 })
 test("chooses the mount root on a different writable device", async () => {
@@ -29,14 +35,17 @@ test("chooses the mount root on a different writable device", async () => {
     writable: async (path) => resolve(path) === join(volume, ".omo-wt"),
   }
   expect(await chooseBaseDir(repo, home, id, io)).toEqual({
-    baseDir: join(volume, ".omo-wt", segment), crossDevice: false,
+    baseDir: join(volume, ".omo-wt", segment),
+    crossDevice: false,
   })
 })
 test("flags cross-device home fallback when volume is not writable", async () => {
-  expect(await chooseBaseDir(repo, home, id, {
-    stat: async (path) => ({ dev: onVolume(path) ? 2 : 1 }),
-    writable: async () => false,
-  })).toEqual({ baseDir: join(home, ".omo/wt", segment), crossDevice: true })
+  expect(
+    await chooseBaseDir(repo, home, id, {
+      stat: async (path) => ({ dev: onVolume(path) ? 2 : 1 }),
+      writable: async () => false,
+    }),
+  ).toEqual({ baseDir: join(home, ".omo/wt", segment), crossDevice: true })
 })
 test("different task ids get different paths without interpolating the id", async () => {
   const first = await chooseBaseDir(repo, home, "../escape", sameDevice)

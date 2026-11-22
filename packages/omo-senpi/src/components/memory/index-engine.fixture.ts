@@ -16,6 +16,8 @@ export default function memoryEngineFixture(pi: SenpiExtensionAPI): void {
     const host: HostMemorySync | undefined = Reflect.get(globalThis, HOST_KEY)
     if (host === undefined) return { kind: "absent" }
     const selection = await host.selection
-    return selection.kind === "unavailable" ? { kind: selection.kind, reason: selection.reason } : { kind: selection.kind }
+    return selection.kind === "unavailable"
+      ? { kind: selection.kind, reason: selection.reason }
+      : { kind: selection.kind }
   })
 }

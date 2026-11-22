@@ -22,7 +22,8 @@ export const SESSION_B = "main-session-b"
 const model: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
 export const registry = {
   getAvailable: () => [model],
-  find: (provider: string, modelId: string) => (provider === model.provider && modelId === model.id ? model : undefined),
+  find: (provider: string, modelId: string) =>
+    provider === model.provider && modelId === model.id ? model : undefined,
   getProviderAuth: () => undefined,
 }
 
@@ -57,7 +58,10 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
     identityPaths,
     binding: createMemoryBinding({ identity: IDENTITY, repoPath: identityPaths.repo, boundAt: 1 }),
   })
-  const sessions = new Map<string, MemoryIdentityContext>([[SESSION_A, context], [SESSION_B, context]])
+  const sessions = new Map<string, MemoryIdentityContext>([
+    [SESSION_A, context],
+    [SESSION_B, context],
+  ])
   const scripted = new Map<string, readonly string[]>()
   const specs: ChildSpec[] = []
   const children: FakeChild[] = []
@@ -72,7 +76,10 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
   const composition = createKibitzerComposition({
     env: {},
     cwd: () => root,
-    loadConfig: () => ({ ...loadedMemoryConfig(memory), config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } } }),
+    loadConfig: () => ({
+      ...loadedMemoryConfig(memory),
+      config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } },
+    }),
     resolveContext,
     recall: {
       snapshotSession: (eventCtx) => {
@@ -82,7 +89,10 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
           return undefined
         }
       },
-      collectCandidatesFromSnapshot: async (snapshot, extraTexts = []): Promise<CollectedRecallCandidates | undefined> => {
+      collectCandidatesFromSnapshot: async (
+        snapshot,
+        extraTexts = [],
+      ): Promise<CollectedRecallCandidates | undefined> => {
         collections.push({ sessionId: snapshot.id, extraTexts })
         // A real collection awaits git: by then the host has disposed the ctx behind `snapshot`.
         await (held ?? Promise.resolve())
@@ -126,11 +136,20 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
         },
       }),
     },
-    logger: { info: () => {}, warn: (message, details) => { warnings.push({ message, details }) }, error: () => {} },
+    logger: {
+      info: () => {},
+      warn: (message, details) => {
+        warnings.push({ message, details })
+      },
+      error: () => {},
+    },
   })
   composition.registerHooks(pi)
 
-  function eventCtx(sessionId: string, branchLength: number): { readonly ctx: Record<string, unknown>; dispose(): void } {
+  function eventCtx(
+    sessionId: string,
+    branchLength: number,
+  ): { readonly ctx: Record<string, unknown>; dispose(): void } {
     let disposed = false
     const guard = <T>(value: T): T => {
       if (disposed) throw new Error("event context disposed")
@@ -142,12 +161,23 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
       message: { role: index % 2 === 0 ? "user" : "assistant", content: [{ type: "text", text: `turn ${index}` }] },
     }))
     const ctx = {
-      sessionManager: { getSessionId: () => guard(sessionId), getBranch: () => guard(branch), getEntries: () => guard(branch) },
-      get modelRegistry(): unknown { return guard(registry) },
+      sessionManager: {
+        getSessionId: () => guard(sessionId),
+        getBranch: () => guard(branch),
+        getEntries: () => guard(branch),
+      },
+      get modelRegistry(): unknown {
+        return guard(registry)
+      },
       hasPendingMessages: () => guard(false),
       isIdle: () => guard(false),
     }
-    return { ctx, dispose: () => { disposed = true } }
+    return {
+      ctx,
+      dispose: () => {
+        disposed = true
+      },
+    }
   }
 
   return {
@@ -160,13 +190,21 @@ export async function harness(overrides: Partial<OmoMemorySettings> = {}): Promi
     children,
     collections,
     warnings,
-    script: (sessionId, paths) => { scripted.set(sessionId, paths) },
+    script: (sessionId, paths) => {
+      scripted.set(sessionId, paths)
+    },
     holdNextCollection() {
       let release: () => void = () => {}
-      held = new Promise<void>((resolve) => { release = resolve })
-      return () => { held = undefined; release() }
+      held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return () => {
+        held = undefined
+        release()
+      }
     },
-    nextChild: () => withinMs(new Promise<FakeChild>((resolve) => childWaiters.push(resolve)), "the next resident child"),
+    nextChild: () =>
+      withinMs(new Promise<FakeChild>((resolve) => childWaiters.push(resolve)), "the next resident child"),
     nextFollowUp: () => withinMs(new Promise<void>((resolve) => followUpWaiters.push(resolve)), "the next followUp"),
     eventCtx,
     async dispatch(event, payload, sessionId, branchLength) {

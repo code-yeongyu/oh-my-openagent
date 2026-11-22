@@ -37,18 +37,30 @@ describe("getLastAgentFromSession JSON backend", () => {
     // given
     const sessionID = "ses_json_last_agent"
     const messageDir = createTempMessageDir(sessionID)
-    writeFileSync(join(messageDir, "msg_ffff0000_000001.json"), JSON.stringify({
-      agent: "compaction",
-      time: { created: 200 },
-    }), "utf-8")
-    writeFileSync(join(messageDir, "msg_00000000_000999.json"), JSON.stringify({
-      agent: "atlas",
-      time: { created: 100 },
-    }), "utf-8")
-    writeFileSync(join(messageDir, "msg_11111111_000002.json"), JSON.stringify({
-      agent: "sisyphus-junior",
-      time: { created: 50 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_ffff0000_000001.json"),
+      JSON.stringify({
+        agent: "compaction",
+        time: { created: 200 },
+      }),
+      "utf-8",
+    )
+    writeFileSync(
+      join(messageDir, "msg_00000000_000999.json"),
+      JSON.stringify({
+        agent: "atlas",
+        time: { created: 100 },
+      }),
+      "utf-8",
+    )
+    writeFileSync(
+      join(messageDir, "msg_11111111_000002.json"),
+      JSON.stringify({
+        agent: "sisyphus-junior",
+        time: { created: 50 },
+      }),
+      "utf-8",
+    )
 
     const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
 
@@ -77,21 +89,33 @@ describe("getLastAgentFromSession JSON backend", () => {
     const regularMessageID = `msg_${sessionID}_regular`
     const partDir = join(PART_STORAGE, compactionMessageID)
     testDirs.push(partDir)
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      id: compactionMessageID,
-      agent: "atlas",
-      time: { created: 200 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        id: compactionMessageID,
+        agent: "atlas",
+        time: { created: 200 },
+      }),
+      "utf-8",
+    )
     mkdirSync(partDir, { recursive: true })
-    writeFileSync(join(partDir, "prt_0001.json"), JSON.stringify({
-      type: "compaction",
-    }), "utf-8")
+    writeFileSync(
+      join(partDir, "prt_0001.json"),
+      JSON.stringify({
+        type: "compaction",
+      }),
+      "utf-8",
+    )
 
-    writeFileSync(join(messageDir, "msg_0002.json"), JSON.stringify({
-      id: regularMessageID,
-      agent: "sisyphus-junior",
-      time: { created: 100 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_0002.json"),
+      JSON.stringify({
+        id: regularMessageID,
+        agent: "sisyphus-junior",
+        time: { created: 100 },
+      }),
+      "utf-8",
+    )
 
     const { getLastAgentFromSession } = await importFreshSessionLastAgentModule()
 
@@ -146,16 +170,18 @@ describe("getLastAgentFromSession JSON backend", () => {
     // given
     const sessionID = "ses_json_sdk_preferred"
     const messageDir = createTempMessageDir(sessionID)
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      agent: "sisyphus",
-      time: { created: 300 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        agent: "sisyphus",
+        time: { created: 300 },
+      }),
+      "utf-8",
+    )
     const client = {
       session: {
         messages: async () => ({
-          data: [
-            { id: "msg_0001", info: { agent: "atlas", time: { created: 100 } } },
-          ],
+          data: [{ id: "msg_0001", info: { agent: "atlas", time: { created: 100 } } }],
         }),
       },
     }
@@ -176,16 +202,18 @@ describe("getLastAgentFromSession JSON backend", () => {
     // given
     const sessionID = "ses_json_sdk_top_level_agent"
     const messageDir = createTempMessageDir(sessionID)
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      agent: "sisyphus",
-      time: { created: 300 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        agent: "sisyphus",
+        time: { created: 300 },
+      }),
+      "utf-8",
+    )
     const client = {
       session: {
         messages: async () => ({
-          data: [
-            { id: "msg_0001", agent: "Atlas", info: { time: { created: 100 } } },
-          ],
+          data: [{ id: "msg_0001", agent: "Atlas", info: { time: { created: 100 } } }],
         }),
       },
     }
@@ -206,10 +234,14 @@ describe("getLastAgentFromSession JSON backend", () => {
     // given
     const sessionID = "ses_json_after_empty_sdk"
     const messageDir = createTempMessageDir(sessionID)
-    writeFileSync(join(messageDir, "msg_0001.json"), JSON.stringify({
-      agent: "sisyphus",
-      time: { created: 100 },
-    }), "utf-8")
+    writeFileSync(
+      join(messageDir, "msg_0001.json"),
+      JSON.stringify({
+        agent: "sisyphus",
+        time: { created: 100 },
+      }),
+      "utf-8",
+    )
     const client = {
       session: {
         messages: async () => ({ data: [] }),

@@ -2,10 +2,16 @@ import { keychainProcessState } from "./process-state"
 
 export type ItemAttributes = { readonly cdat: number; readonly mdat: number }
 export type ApprovalEntry = ItemAttributes & { readonly value: string; readonly readStartedAt: number }
-export type ApprovalAnswer = { readonly kind: "approved"; readonly value: string; readonly attributes: ItemAttributes } | { readonly kind: "denied" } | { readonly kind: "missing" }
+export type ApprovalAnswer =
+  | { readonly kind: "approved"; readonly value: string; readonly attributes: ItemAttributes }
+  | { readonly kind: "denied" }
+  | { readonly kind: "missing" }
 
 export type ApprovalClock = { readonly nowSeconds: () => number; readonly sleepMs: (ms: number) => Promise<void> }
-const systemClock: ApprovalClock = { nowSeconds: () => Date.now() / 1_000, sleepMs: ms => new Promise(resolve => setTimeout(resolve, ms)) }
+const systemClock: ApprovalClock = {
+  nowSeconds: () => Date.now() / 1_000,
+  sleepMs: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}
 
 /**
  * A cached `approve` answer serves a read only while `<A>` is exactly the item that answer read: equal `cdat` and `mdat`,
@@ -14,7 +20,11 @@ const systemClock: ApprovalClock = { nowSeconds: () => Date.now() / 1_000, sleep
  */
 export function isEntryValid(entry: ApprovalEntry, current: ItemAttributes, nowSeconds: number): boolean {
   if (nowSeconds < entry.readStartedAt) return false
-  return current.cdat === entry.cdat && current.mdat === entry.mdat && Math.floor(current.mdat) < Math.floor(entry.readStartedAt)
+  return (
+    current.cdat === entry.cdat &&
+    current.mdat === entry.mdat &&
+    Math.floor(current.mdat) < Math.floor(entry.readStartedAt)
+  )
 }
 
 export type ApprovalCache = ReturnType<typeof createApprovalCache>
@@ -50,7 +60,7 @@ export function createApprovalCache(clock: ApprovalClock = systemClock) {
     approve(run: () => Promise<ApprovalAnswer>): Promise<ApprovalAnswer> {
       if (pending !== null) return pending
       const readStartedAt = clock.nowSeconds()
-      const started = run().then(answer => {
+      const started = run().then((answer) => {
         if (answer.kind === "approved") {
           entry = { value: answer.value, ...answer.attributes, readStartedAt }
           deniedForBackground = false

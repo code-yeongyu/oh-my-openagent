@@ -44,11 +44,14 @@ describe("writeHandleAll", () => {
 
 describe("abort signals", () => {
   test("an already-aborted signal rejects writeFile before any mutation", async () => {
-    const file = path.join(await (async () => {
-      const directory = await mkdtemp(path.join(tmpdir(), "write-abort-"))
-      abortDirectories.push(directory)
-      return directory
-    })(), "never.txt")
+    const file = path.join(
+      await (async () => {
+        const directory = await mkdtemp(path.join(tmpdir(), "write-abort-"))
+        abortDirectories.push(directory)
+        return directory
+      })(),
+      "never.txt",
+    )
     await expect(writeFile(file, "x", { signal: AbortSignal.abort() })).rejects.toThrow()
     await expect(readFile(file, "utf8")).rejects.toThrow("ENOENT")
   })

@@ -8,8 +8,10 @@ function equalValues(left: unknown, right: unknown): boolean {
   if (!isPlainRecord(left) || !isPlainRecord(right)) return false
   const leftKeys = Object.keys(left)
   const rightKeys = Object.keys(right)
-  return leftKeys.length === rightKeys.length && leftKeys.every((key) =>
-    Object.hasOwn(right, key) && equalValues(left[key], right[key]))
+  return (
+    leftKeys.length === rightKeys.length &&
+    leftKeys.every((key) => Object.hasOwn(right, key) && equalValues(left[key], right[key]))
+  )
 }
 
 export function deepDifference(

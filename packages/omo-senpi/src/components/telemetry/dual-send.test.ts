@@ -1,20 +1,41 @@
 import { expect, spyOn, test } from "bun:test"
-import type { TelemetryCaptureMessage, TelemetryTransport, TelemetryTransportOptions } from "@oh-my-opencode/telemetry-core"
+import type {
+  TelemetryCaptureMessage,
+  TelemetryTransport,
+  TelemetryTransportOptions,
+} from "@oh-my-opencode/telemetry-core"
 import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 
 const options: TelemetryTransportOptions = {
-  host: "https://posthog.test", disableGeoip: false, enableExceptionAutocapture: false,
-  enableLocalEvaluation: false, strictLocalEvaluation: true, disableRemoteConfig: true,
-  flushAt: 20, flushInterval: 10_000,
+  host: "https://posthog.test",
+  disableGeoip: false,
+  enableExceptionAutocapture: false,
+  enableLocalEvaluation: false,
+  strictLocalEvaluation: true,
+  disableRemoteConfig: true,
+  flushAt: 20,
+  flushInterval: 10_000,
 }
-const message: TelemetryCaptureMessage = { distinctId: "test", event: "daily_active", properties: { day_utc: "2026-10-26" } }
+const message: TelemetryCaptureMessage = {
+  distinctId: "test",
+  event: "daily_active",
+  properties: { day_utc: "2026-10-26" },
+}
 
 function recorder(calls: unknown[]): TelemetryTransport {
   return {
-    capture: value => { calls.push(value) },
-    captureImmediate: async value => { calls.push(value) },
-    flush: async () => { calls.push("flush") },
-    shutdown: async () => { calls.push("shutdown") },
+    capture: (value) => {
+      calls.push(value)
+    },
+    captureImmediate: async (value) => {
+      calls.push(value)
+    },
+    flush: async () => {
+      calls.push("flush")
+    },
+    shutdown: async () => {
+      calls.push("shutdown")
+    },
   }
 }
 
@@ -25,7 +46,10 @@ test("dual-send lazily fans out buffered captures and awaits both lifecycle oper
   let loads = 0
   const transport = createLazyPostHogTransportFactory({
     load: async () => ({ createDefaultPostHogTransport: () => recorder(posthog) }),
-    loadOtlp: () => { loads++; return ready.promise },
+    loadOtlp: () => {
+      loads++
+      return ready.promise
+    },
   })("key", options)
   expect(loads).toBe(0)
   transport.capture(message)
@@ -45,8 +69,12 @@ for (const failure of ["reject", "null", "timeout"] as const) {
     const posthog: unknown[] = []
     const transport = createLazyPostHogTransportFactory({
       load: async () => ({ createDefaultPostHogTransport: () => recorder(posthog) }),
-      loadOtlp: () => failure === "reject" ? Promise.reject(new Error("OTLP unavailable"))
-        : failure === "null" ? Promise.resolve(null) : new Promise(() => undefined),
+      loadOtlp: () =>
+        failure === "reject"
+          ? Promise.reject(new Error("OTLP unavailable"))
+          : failure === "null"
+            ? Promise.resolve(null)
+            : new Promise(() => undefined),
       timeoutMs: 10,
     })("key", options)
     transport.capture(message)
@@ -58,7 +86,9 @@ for (const failure of ["reject", "null", "timeout"] as const) {
 test("dual-send preserves OTLP when PostHog initialization fails", async () => {
   const otlp: unknown[] = []
   const transport = createLazyPostHogTransportFactory({
-    load: async () => { throw new Error("PostHog unavailable") },
+    load: async () => {
+      throw new Error("PostHog unavailable")
+    },
     loadOtlp: async () => recorder(otlp),
   })("key", options)
   transport.capture(message)
@@ -69,11 +99,15 @@ test("dual-send preserves OTLP when PostHog initialization fails", async () => {
 test("dual-send forwards immediate events to OTLP even when the PostHog acknowledgement fails", async () => {
   const otlp: unknown[] = []
   const transport = createLazyPostHogTransportFactory({
-    load: async () => ({ createDefaultPostHogTransport: () => ({
-      capture: () => undefined,
-      captureImmediate: async () => { throw new Error("PostHog rejected") },
-      shutdown: async () => undefined,
-    }) }),
+    load: async () => ({
+      createDefaultPostHogTransport: () => ({
+        capture: () => undefined,
+        captureImmediate: async () => {
+          throw new Error("PostHog rejected")
+        },
+        shutdown: async () => undefined,
+      }),
+    }),
     loadOtlp: async () => recorder(otlp),
   })("key", options)
   await expect(transport.captureImmediate?.(message)).rejects.toThrow("PostHog rejected")
@@ -103,7 +137,9 @@ test("dual-send isolates capture failures and bounds a stuck OTLP shutdown", asy
   const transport = createLazyPostHogTransportFactory({
     load: async () => ({ createDefaultPostHogTransport: () => recorder(posthog) }),
     loadOtlp: async () => ({
-      capture: () => { throw new Error("OTLP capture failed") },
+      capture: () => {
+        throw new Error("OTLP capture failed")
+      },
       shutdown: () => new Promise(() => undefined),
     }),
     timeoutMs: 10,
@@ -116,11 +152,15 @@ test("dual-send isolates capture failures and bounds a stuck OTLP shutdown", asy
 test("dual-send keeps consent drains failed when PostHog flush rejects, without losing OTLP", async () => {
   const otlp: unknown[] = []
   const transport = createLazyPostHogTransportFactory({
-    load: async () => ({ createDefaultPostHogTransport: () => ({
-      capture: () => undefined,
-      flush: async () => { throw new Error("PostHog did not drain") },
-      shutdown: async () => undefined,
-    }) }),
+    load: async () => ({
+      createDefaultPostHogTransport: () => ({
+        capture: () => undefined,
+        flush: async () => {
+          throw new Error("PostHog did not drain")
+        },
+        shutdown: async () => undefined,
+      }),
+    }),
     loadOtlp: async () => recorder(otlp),
   })("key", options)
   transport.capture(message)
@@ -132,8 +172,14 @@ test("dual-send keeps consent drains failed when PostHog flush rejects, without 
 test("dual-send does not initialize either unused transport on exit", async () => {
   let loads = 0
   const transport = createLazyPostHogTransportFactory({
-    load: async () => { loads++; throw new Error("unused PostHog") },
-    loadOtlp: async () => { loads++; throw new Error("unused OTLP") },
+    load: async () => {
+      loads++
+      throw new Error("unused PostHog")
+    },
+    loadOtlp: async () => {
+      loads++
+      throw new Error("unused OTLP")
+    },
   })("key", options)
   await transport.shutdown()
   expect(loads).toBe(0)
@@ -172,7 +218,14 @@ for (const failure of ["reject", "timeout"] as const) {
       // A timed-out attempt must not replace the successful retry or leak a late sender.
       const disposed = Promise.withResolvers<undefined>()
       const stale: unknown[] = []
-      late.resolve({ capture: value => { stale.push(value) }, shutdown: async () => { disposed.resolve(undefined) } })
+      late.resolve({
+        capture: (value) => {
+          stale.push(value)
+        },
+        shutdown: async () => {
+          disposed.resolve(undefined)
+        },
+      })
       if (failure === "timeout") await disposed.promise
       expect(stale).toEqual([])
     } finally {
@@ -186,8 +239,11 @@ test("dual-send refuses OTLP once after a null load and never loads for unmapped
   let loads = 0
   const transport = createLazyPostHogTransportFactory({
     load: async () => ({ createDefaultPostHogTransport: () => recorder([]) }),
-    loadOtlp: async () => { loads++; return null },
-    isOtlpEvent: event => event === message.event,
+    loadOtlp: async () => {
+      loads++
+      return null
+    },
+    isOtlpEvent: (event) => event === message.event,
     now: () => now,
   })("key", options)
   transport.capture({ ...message, event: "omo_senpi_daily_active" })
@@ -214,9 +270,14 @@ for (const method of ["flush", "captureImmediate"] as const) {
       await acknowledged.promise
     }
     const transport = createLazyPostHogTransportFactory({
-      load: async () => ({ createDefaultPostHogTransport: () => ({
-        capture: () => undefined, flush: operation, captureImmediate: operation, shutdown: async () => undefined,
-      }) }),
+      load: async () => ({
+        createDefaultPostHogTransport: () => ({
+          capture: () => undefined,
+          flush: operation,
+          captureImmediate: operation,
+          shutdown: async () => undefined,
+        }),
+      }),
       loadOtlp: async () => recorder([]),
     })("key", options)
     transport.capture(message)
@@ -224,18 +285,23 @@ for (const method of ["flush", "captureImmediate"] as const) {
     // Drive deadlines directly, so the acknowledgement contract does not depend on wall-clock luck.
     const deadlines: (() => void)[] = []
     const schedule = globalThis.setTimeout
-    const timers = spyOn(globalThis, "setTimeout").mockImplementation(Object.assign(
-      <Args extends unknown[]>(callback: (...args: Args) => void, _ms?: number, ...args: Args) => {
-        deadlines.push(() => callback(...args))
-        return schedule(() => undefined, 60_000)
-      },
-      { __promisify__: schedule.__promisify__ },
-    ))
+    const timers = spyOn(globalThis, "setTimeout").mockImplementation(
+      Object.assign(
+        <Args extends unknown[]>(callback: (...args: Args) => void, _ms?: number, ...args: Args) => {
+          deadlines.push(() => callback(...args))
+          return schedule(() => undefined, 60_000)
+        },
+        { __promisify__: schedule.__promisify__ },
+      ),
+    )
     try {
       slow = true
       const pending = method === "flush" ? transport.flush?.() : transport.captureImmediate?.(message)
       // Attach a rejection handler before firing the deadlines.
-      const result = Promise.resolve(pending).then(() => "acknowledged", error => String(error))
+      const result = Promise.resolve(pending).then(
+        () => "acknowledged",
+        (error) => String(error),
+      )
       await started.promise
       for (const deadline of [...deadlines]) deadline()
       acknowledged.resolve(undefined)

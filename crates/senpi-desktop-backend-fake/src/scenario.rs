@@ -10,7 +10,7 @@ use serde::Deserialize;
 use serde_json::{Map, Value};
 
 use crate::method::{AxWrite, FakeMethod};
-pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode};
+pub use crate::scenario_nodes::{FakeAxNode, FakeBounds, FakeMenuNode, FakeOpening};
 use crate::scripting::{
     DisplaysChange, EpochEvent, FakeFocusRead, FakeHit, FakeWindowIdentity, FocusRecordKind, FocusRecordOutcome,
     IdentityChange, TimedUserPress,
@@ -82,6 +82,8 @@ pub struct FakeScenario {
     pub displays_change: Option<DisplaysChange>,
     /// A stop marker file present at engine start, by path.
     pub stop_marker: Option<String>,
+    /// Windows the next AX actions and pointer clicks open, in order.
+    pub opens_on_write: Vec<FakeOpening>,
 }
 
 impl Default for FakeScenario {
@@ -115,6 +117,7 @@ impl Default for FakeScenario {
             epoch_events: Vec::new(),
             displays_change: None,
             stop_marker: None,
+            opens_on_write: Vec::new(),
         }
     }
 }
@@ -274,6 +277,8 @@ struct RawScenario {
     displays_change: Option<DisplaysChange>,
     #[serde(default)]
     stop_marker: Option<String>,
+    #[serde(default)]
+    opens_on_write: Vec<FakeOpening>,
 }
 
 impl TryFrom<RawScenario> for FakeScenario {
@@ -339,6 +344,7 @@ impl TryFrom<RawScenario> for FakeScenario {
             epoch_events: raw.epoch_events,
             displays_change: raw.displays_change,
             stop_marker: raw.stop_marker,
+            opens_on_write: raw.opens_on_write,
         })
     }
 }

@@ -17,26 +17,45 @@ for (const owned of [false, true]) {
     const messages: ParentNotifierMessage[] = []
     const h = coldReviveHarness({
       now: () => now,
-      storeWrapper: backing => createCompletionObservingStore(backing, {
-        notifier: createCompletionNotifier({ store: backing, notifier: { enqueue: message => messages.push(message) } }),
-        parentState: () => ({ kind: "idle" }), wasBackground: () => true, currentSessionId: () => "parent",
-      }),
+      storeWrapper: (backing) =>
+        createCompletionObservingStore(backing, {
+          notifier: createCompletionNotifier({
+            store: backing,
+            notifier: { enqueue: (message) => messages.push(message) },
+          }),
+          parentState: () => ({ kind: "idle" }),
+          wasBackground: () => true,
+          currentSessionId: () => "parent",
+        }),
     })
     const events = spyOn(h.store, "appendEvent")
-    h.store.mutate(h.record.task_id, record => {
+    h.store.mutate(h.record.task_id, (record) => {
       const { final_response: _previousTurn, ...running } = record
       return {
-        ...running, status: "running", notify_on_terminal: true,
+        ...running,
+        status: "running",
+        notify_on_terminal: true,
         pending_steering: [{ id: "queued", message: "Q1", deliver_as: "steer" }],
       }
     })
     const host = hostLifecycleDeps({
-      store: h.store, hostPid: process.pid, now: () => now,
-      deferredRetryBackoffMs: [10, 20, 40], onWait: ms => { now += ms },
-      respawn: async () => ({ ok: false, disposition: "retryable", code: "model_unavailable", reason: "model unavailable" }),
+      store: h.store,
+      hostPid: process.pid,
+      now: () => now,
+      deferredRetryBackoffMs: [10, 20, 40],
+      onWait: (ms) => {
+        now += ms
+      },
+      respawn: async () => ({
+        ok: false,
+        disposition: "retryable",
+        code: "model_unavailable",
+        reason: "model unavailable",
+      }),
     })
     const context = resolveContext({
-      ...host.deps, registry: { ...h.registry, ownsRecord: () => owned },
+      ...host.deps,
+      registry: { ...h.registry, ownsRecord: () => owned },
     })
     try {
       // When the real deferred-revival loop spends its entire fake-clock retry ladder.
@@ -56,8 +75,9 @@ for (const owned of [false, true]) {
         expect(ended?.error_message).toContain("1 queued message was not delivered.")
         expect(messages).toHaveLength(1)
         expect(messages[0]?.content).toContain("1 queued message was not delivered.")
-        expect(events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload))
-          .toEqual([{ count: 1, reason: "target_gone" }])
+        expect(
+          events.mock.calls.filter(([, event]) => event.type === "steer_dropped").map(([, event]) => event.payload),
+        ).toEqual([{ count: 1, reason: "target_gone" }])
       }
     } finally {
       h.lifecycle.dispose?.()

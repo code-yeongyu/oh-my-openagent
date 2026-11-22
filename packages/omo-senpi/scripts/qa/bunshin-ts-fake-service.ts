@@ -44,11 +44,16 @@ const OPS = ["shell", "fs.stat"] as const
 const OP_STATES = ["queued", "transport_confirmed", "host_dispatched", "host_applied"] as const
 
 type Message = Readonly<Record<string, unknown>>
-type Reply = { readonly ok: true; readonly data: Message; readonly after?: () => void } | { readonly ok: false; readonly code: string; readonly reason: string }
-type OpRequest = Readonly<{ op_id: string; op: string; args?: Message }>
+type Reply =
+  | { readonly ok: true; readonly data: Message; readonly after?: () => void }
+  | { readonly ok: false; readonly code: string; readonly reason: string }
+export type OpRequest = Readonly<{ op_id: string; op: string; args?: Message; deadline_ms?: number }>
+// The machine.op_result `response` the service relays for one op; the default runs the fixed shell/fs.stat table.
+export type OpExecutor = (device: FakeDevice, op: OpRequest) => Message
 export type SentLine = Readonly<{ conn: number; message: Message }>
 
-const isRecord = (value: unknown): value is Message => typeof value === "object" && value !== null && !Array.isArray(value)
+const isRecord = (value: unknown): value is Message =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
 const secure: SecureFile = process.platform === "win32" ? async () => {} : posixSecureFile
 
 const describeDevice = (device: FakeDevice): Message => ({
@@ -60,13 +65,19 @@ const describeDevice = (device: FakeDevice): Message => ({
 })
 
 const execute = (device: FakeDevice, op: OpRequest): Message => {
-  if (op.op === "shell") return { state: "applied", response: { exitCode: 0, stdout: `${device.label}: ${String(op.args?.["command"] ?? "")}`, stderr: "" } }
-  if (op.op === "fs.stat") return { state: "applied", response: { path: String(op.args?.["path"] ?? ""), kind: "dir", size: 0 } }
+  if (op.op === "shell")
+    return {
+      state: "applied",
+      response: { exitCode: 0, stdout: `${device.label}: ${String(op.args?.["command"] ?? "")}`, stderr: "" },
+    }
+  if (op.op === "fs.stat")
+    return { state: "applied", response: { path: String(op.args?.["path"] ?? ""), kind: "dir", size: 0 } }
   return { state: "refused", error: { code: "op_unknown", message: `${op.op} is not an op this device runs` } }
 }
 
-export async function startFakeDeviceService(options: { devices?: readonly FakeDevice[] } = {}) {
+export async function startFakeDeviceService(options: { devices?: readonly FakeDevice[]; execute?: OpExecutor } = {}) {
   const devices = options.devices ?? FAKE_DEVICES
+  const run = options.execute ?? execute
   const stateDir = mkdtempSync(join(tmpdir(), "omo-bunshin-ts-fake-service-"))
   chmodSync(stateDir, 0o700)
   const token = await writeToken(stateDir, secure)
@@ -91,9 +102,16 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
       const device = devices.find((candidate) => candidate.device === request["device"])
       switch (request["type"]) {
         case "machine.list":
-          return { ok: true, data: { machines: devices.map(({ device: id, label }) => ({ device: id, label, state: "online" })) } }
+          return {
+            ok: true,
+            data: { machines: devices.map(({ device: id, label }) => ({ device: id, label, state: "online" })) },
+          }
         case "machine.events.subscribe":
-          return { ok: true, data: {}, after: () => devices.forEach((d) => event("machine.changed", { device: d.device, state: "online" })) }
+          return {
+            ok: true,
+            data: {},
+            after: () => devices.forEach((d) => event("machine.changed", { device: d.device, state: "online" })),
+          }
         case "machine.describe":
           if (device === undefined) return { ok: false, code: "peer_not_found", reason: "no such device" }
           if (device.describeRefusal !== undefined) return { ok: false, ...device.describeRefusal }
@@ -107,7 +125,7 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
             after: () => {
               for (const op of ops) {
                 for (const state of OP_STATES) event("machine.op_state", { op_id: op.op_id, state })
-                event("machine.op_result", { op_id: op.op_id, response: execute(device, op) })
+                event("machine.op_result", { op_id: op.op_id, response: run(device, op) })
               }
             },
           }
@@ -123,7 +141,13 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
     }
 
     const reply = (id: string, outcome: Reply): void => {
-      if (!outcome.ok) return send({ id, type: "response", ok: false, error: { code: outcome.code, reason: outcome.reason, action: null } })
+      if (!outcome.ok)
+        return send({
+          id,
+          type: "response",
+          ok: false,
+          error: { code: outcome.code, reason: outcome.reason, action: null },
+        })
       send({ id, type: "response", ok: true, data: outcome.data })
       outcome.after?.()
     }
@@ -152,7 +176,8 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
       if (typeof id !== "string" || typeof message["type"] !== "string") return transport.destroy()
       requests.push(message)
       if (!proven) {
-        if (message["type"] !== "authenticate") return reply(id, { ok: false, code: "unauthenticated", reason: "authenticate first" })
+        if (message["type"] !== "authenticate")
+          return reply(id, { ok: false, code: "unauthenticated", reason: "authenticate first" })
         const proof = message["client_proof"]
         if (typeof proof !== "string" || !proofMatches(clientProof(token, serverNonce, transport.endpoint), proof)) {
           reply(id, { ok: false, code: "client_proof_invalid", reason: "client proof does not verify" })
@@ -166,7 +191,10 @@ export async function startFakeDeviceService(options: { devices?: readonly FakeD
       reply(id, machine(message))
     }
 
-    const decoder = new LineDecoder((line) => onMessage(parseLine(line)), () => transport.destroy())
+    const decoder = new LineDecoder(
+      (line) => onMessage(parseLine(line)),
+      () => transport.destroy(),
+    )
     transport.onData((bytes) => decoder.push(bytes))
     transport.onClose(() => open.delete(transport))
   }

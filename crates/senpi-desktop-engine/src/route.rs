@@ -76,14 +76,34 @@ impl Engine {
             Method::Capture => op(Op::Capture(parse(params)?)),
             Method::CaptureRegion => op(Op::CaptureRegion(parse(params)?)),
             Method::Observe => op(Op::Observe(parse(params)?)),
-            Method::Click => op(Op::Click(parse(params)?)),
-            Method::MoveMouse => op(Op::MoveMouse(parse(params)?)),
-            Method::Drag => op(Op::Drag(parse(params)?)),
-            Method::Scroll => op(Op::Scroll(parse(params)?)),
+            Method::Click => {
+                let params: senpi_desktop_core::protocol_params::PointParams = parse(params)?;
+                framed_consume(params.opts.as_ref(), params.frame_id.as_deref())?;
+                op(Op::Click(params))
+            }
+            Method::MoveMouse => {
+                let params: senpi_desktop_core::protocol_params::PointParams = parse(params)?;
+                framed_consume(params.opts.as_ref(), params.frame_id.as_deref())?;
+                op(Op::MoveMouse(params))
+            }
+            Method::Drag => {
+                let params: senpi_desktop_core::protocol_params::DragParams = parse(params)?;
+                framed_consume(params.opts.as_ref(), params.frame_id.as_deref())?;
+                op(Op::Drag(params))
+            }
+            Method::Scroll => {
+                let params: senpi_desktop_core::protocol_params::ScrollParams = parse(params)?;
+                framed_consume(params.opts.as_ref(), params.frame_id.as_deref())?;
+                op(Op::Scroll(params))
+            }
             Method::TypeText => op(Op::TypeText(parse(params)?)),
             Method::KeyChord => op(Op::KeyChord(parse(params)?)),
             Method::HoldKeys => op(Op::HoldKeys(parse(params)?)),
-            Method::HoldMouse => op(Op::HoldMouse(parse(params)?)),
+            Method::HoldMouse => {
+                let params: senpi_desktop_core::protocol_params::HoldMouseParams = parse(params)?;
+                framed_consume(params.opts.as_ref(), params.frame_id.as_deref())?;
+                op(Op::HoldMouse(params))
+            }
             Method::RaiseWindow => op(Op::RaiseWindow(parse(params)?)),
             Method::AxSnapshot => op(Op::AxSnapshot(parse(params)?)),
             Method::AxQuery => op(Op::AxQuery(parse(params)?)),
@@ -141,6 +161,20 @@ impl Engine {
             }
         }
     }
+}
+
+/// `consume: true` names the frame it consumes: without `frameId` the
+/// request is malformed (`-32602`), whatever the session would map it to.
+fn framed_consume(
+    options: Option<&senpi_desktop_core::types::PointerOptions>,
+    frame_id: Option<&str>,
+) -> Result<(), Failure> {
+    if options.is_some_and(|options| options.consume) && frame_id.is_none() {
+        return Err(Failure::InvalidParams(
+            "invalid params: consume needs the frameId of the frame it consumes".to_owned(),
+        ));
+    }
+    Ok(())
 }
 
 /// Absent params mean `{}`.

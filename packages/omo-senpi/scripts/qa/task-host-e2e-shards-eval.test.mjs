@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { CONTROL_ID, evaluateShardFaultReport, SCENARIO_IDS, selectedScenarioIds } from "./task-host-e2e-shards-eval.mjs"
+import {
+  CONTROL_ID,
+  evaluateShardFaultReport,
+  SCENARIO_IDS,
+  selectedScenarioIds,
+} from "./task-host-e2e-shards-eval.mjs"
 
 function complete(mode = "full") {
   const ids = mode === "control" ? [CONTROL_ID] : SCENARIO_IDS
@@ -39,7 +44,18 @@ describe("evaluateShardFaultReport", () => {
   })
 
   test("selection covers the full matrix once and rejects unknown groups", () => {
-    expect(selectedScenarioIds(["crash", "nested", "handoff", "handoff-successors", "rollback", "index", "retain", "contracts"])).toEqual(SCENARIO_IDS)
+    expect(
+      selectedScenarioIds([
+        "crash",
+        "nested",
+        "handoff",
+        "handoff-successors",
+        "rollback",
+        "index",
+        "retain",
+        "contracts",
+      ]),
+    ).toEqual(SCENARIO_IDS)
     expect(selectedScenarioIds(["crash", "crash"])).toHaveLength(4)
     expect(selectedScenarioIds(["contracts"])).toEqual([])
     expect(() => selectedScenarioIds(["typo"])).toThrow("Unknown scenario group: typo")

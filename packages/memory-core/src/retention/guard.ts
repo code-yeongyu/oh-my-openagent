@@ -19,16 +19,23 @@ export interface ReflectionRetentionGuard {
  * removed (H1 Guard 2). Contention means a reservation is in progress: the reflection stores are
  * skipped for this pass rather than waited on.
  */
-export async function readReflectionRetentionGuard(context: RetentionContext): Promise<ReflectionRetentionGuard | undefined> {
+export async function readReflectionRetentionGuard(
+  context: RetentionContext,
+): Promise<ReflectionRetentionGuard | undefined> {
   await mkdir(context.paths.locks, { recursive: true, mode: 0o700 })
   const record = await createLockRecord("reflection-scheduler", { runId: "runtime-retention" })
   try {
-    return await withLock(reflectionSchedulerLockPath(context.paths.locks), record, async () => {
-      const highWater = await scanReflectionRunHighWater(context.paths)
-      if (highWater > 0) await recordReflectionRunIdMark(context.paths.reflection, highWater)
-      const reservations = await readReservations(context.paths.reflection)
-      return { highWater, reserved: reservations.runIds, reservedConversationIds: reservations.conversationIds }
-    }, { waitTimeoutMs: 0 })
+    return await withLock(
+      reflectionSchedulerLockPath(context.paths.locks),
+      record,
+      async () => {
+        const highWater = await scanReflectionRunHighWater(context.paths)
+        if (highWater > 0) await recordReflectionRunIdMark(context.paths.reflection, highWater)
+        const reservations = await readReservations(context.paths.reflection)
+        return { highWater, reserved: reservations.runIds, reservedConversationIds: reservations.conversationIds }
+      },
+      { waitTimeoutMs: 0 },
+    )
   } catch (error) {
     if (error instanceof LockContentionError) return undefined
     throw error
@@ -41,12 +48,17 @@ export async function reservedRunIds(reflectionDir: string): Promise<ReadonlySet
 }
 
 /** Run ids and conversation ids named by `active.lock` and `pending.json`, read lock-free (the doctors' estimate). */
-export async function readReservations(reflectionDir: string): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
+export async function readReservations(
+  reflectionDir: string,
+): Promise<{ readonly runIds: Set<string>; readonly conversationIds: Set<string> }> {
   const runIds = new Set<string>()
   const conversationIds = new Set<string>()
   for (const name of ["active.lock", "pending.json"]) {
     const record = await readFile(join(reflectionDir, name), "utf8")
-      .then((raw) => JSON.parse(raw) as { readonly runId?: unknown; readonly request?: { readonly conversationIds?: unknown } })
+      .then(
+        (raw) =>
+          JSON.parse(raw) as { readonly runId?: unknown; readonly request?: { readonly conversationIds?: unknown } },
+      )
       .catch(() => undefined)
     if (typeof record?.runId === "string") runIds.add(record.runId)
     const ids = record?.request?.conversationIds

@@ -5,7 +5,13 @@ import { isCallerOrchestrator } from "../../shared/session-utils"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
-import { getWorkForSession, readBoulderState, readCurrentTopLevelTask, resolveBoulderPlanPath, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
+import {
+  getWorkForSession,
+  readBoulderState,
+  readCurrentTopLevelTask,
+  resolveBoulderPlanPath,
+  resolveBoulderPlanPathForWork,
+} from "../../features/boulder-state"
 import { HOOK_NAME } from "./hook-name"
 import { ORCHESTRATOR_DELEGATION_REQUIRED, SINGLE_TASK_DIRECTIVE } from "./system-reminder-templates"
 import { isOmoPath } from "./omo-path"
@@ -66,10 +72,19 @@ export function createToolExecuteBeforeHandler(input: {
   isCallerOrchestrator?: (sessionID: string | undefined) => Promise<boolean>
 }): (
   toolInput: { tool: string; sessionID?: string; callID?: string },
-  toolOutput: { args: Record<string, unknown>; message?: string }
+  toolOutput: { args: Record<string, unknown>; message?: string },
 ) => Promise<void> {
-  const { ctx, pendingFilePaths, pendingTaskRefs, pendingPlanSnapshots, trackFileCall, trackTaskCall, trackPlanSnapshot } = input
-  const resolveIsCallerOrchestrator = input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
+  const {
+    ctx,
+    pendingFilePaths,
+    pendingTaskRefs,
+    pendingPlanSnapshots,
+    trackFileCall,
+    trackTaskCall,
+    trackPlanSnapshot,
+  } = input
+  const resolveIsCallerOrchestrator =
+    input.isCallerOrchestrator ?? ((sessionID) => isCallerOrchestrator(sessionID, ctx.client))
 
   function trackTask(callID: string, sessionID: string | undefined, task: TrackedTopLevelTaskRef): void {
     const pending = { kind: "track", task } as const
@@ -95,9 +110,7 @@ export function createToolExecuteBeforeHandler(input: {
       trackFileCall?.(toolInput.callID, toolInput.sessionID, filePath)
 
       const sessionID = toolInput.sessionID
-      const sessionWork = sessionID
-        ? getWorkForSession(ctx.directory, sessionID)
-        : null
+      const sessionWork = sessionID ? getWorkForSession(ctx.directory, sessionID) : null
       const state = sessionWork ? null : readBoulderState(ctx.directory)
       const planPath = sessionWork
         ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
@@ -149,13 +162,15 @@ export function createToolExecuteBeforeHandler(input: {
           const currentTask = boulderState
             ? readCurrentTopLevelTask(resolveBoulderPlanPath(ctx.directory, boulderState))
             : null
-          const resolvedTask = taskFromPrompt ?? (currentTask
-            ? {
-                key: currentTask.key,
-                label: currentTask.label,
-                title: currentTask.title,
-              }
-            : null)
+          const resolvedTask =
+            taskFromPrompt ??
+            (currentTask
+              ? {
+                  key: currentTask.key,
+                  label: currentTask.label,
+                  title: currentTask.title,
+                }
+              : null)
           if (resolvedTask) {
             if (!taskFromPrompt) {
               log(`[${HOOK_NAME}] TASK section parse failed; falling back to current top-level task`, {
@@ -168,9 +183,9 @@ export function createToolExecuteBeforeHandler(input: {
               label: resolvedTask.label,
               title: resolvedTask.title,
             }
-            const hasExistingClaim = [...pendingTaskRefs.values()].some((pendingTaskRef) => (
-              pendingTaskRef.kind === "track" && pendingTaskRef.task.key === trackedTask.key
-            ))
+            const hasExistingClaim = [...pendingTaskRefs.values()].some(
+              (pendingTaskRef) => pendingTaskRef.kind === "track" && pendingTaskRef.task.key === trackedTask.key,
+            )
 
             if (hasExistingClaim) {
               const pending = {
@@ -194,7 +209,9 @@ export function createToolExecuteBeforeHandler(input: {
 
       const prompt = toolOutput.args.prompt as string | undefined
       if (prompt && !prompt.includes(SYSTEM_DIRECTIVE_PREFIX)) {
-        replaceToolArgs(toolOutput, { prompt: `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt })
+        replaceToolArgs(toolOutput, {
+          prompt: `<system-reminder>${SINGLE_TASK_DIRECTIVE}</system-reminder>\n` + prompt,
+        })
         log(`[${HOOK_NAME}] Injected single-task directive to task`, {
           sessionID: toolInput.sessionID,
         })

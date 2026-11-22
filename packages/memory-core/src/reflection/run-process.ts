@@ -1,4 +1,9 @@
-import { getPidLiveness, getProcessStartIdentity, startIdentitiesComparable, type ProcessLiveness } from "../locks/process-identity"
+import {
+  getPidLiveness,
+  getProcessStartIdentity,
+  startIdentitiesComparable,
+  type ProcessLiveness,
+} from "../locks/process-identity"
 
 export type RecordedProcessVerdict = "alive" | "dead" | "unknown" | "absent"
 
@@ -13,7 +18,11 @@ export type RecordedProcessClassifier = (
   seams?: RecordedProcessSeams,
 ) => Promise<RecordedProcessVerdict>
 
-async function startVerdict(pid: number, recordedStart: string | null, seams: RecordedProcessSeams): Promise<RecordedProcessVerdict> {
+async function startVerdict(
+  pid: number,
+  recordedStart: string | null,
+  seams: RecordedProcessSeams,
+): Promise<RecordedProcessVerdict> {
   const actualStart = await (seams.getProcessStartIdentity ?? getProcessStartIdentity)(pid).catch(() => null)
   if (recordedStart === null || actualStart === null) return "unknown"
   return startIdentitiesComparable(recordedStart, actualStart) && recordedStart !== actualStart ? "dead" : "alive"

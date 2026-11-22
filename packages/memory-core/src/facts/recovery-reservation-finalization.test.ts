@@ -17,36 +17,54 @@ async function fixture() {
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: AUTHOR.agentId })
   await repo.init({ seedFiles: buildDefaultSeedFiles() })
-  await applyFactsBatch(repo, {
-    batchId: "11111111-1111-4111-8111-111111111111",
-    records: [{ scope: "project", text: "Initial August.", date: "2026-08-01" }],
-  }, AUTHOR)
+  await applyFactsBatch(
+    repo,
+    {
+      batchId: "11111111-1111-4111-8111-111111111111",
+      records: [{ scope: "project", text: "Initial August.", date: "2026-08-01" }],
+    },
+    AUTHOR,
+  )
   return { dir, repo }
 }
 
 async function deletionRecovery(repo: GitMemoryRepo): Promise<FactsApplyRecovery> {
-  const planned = await planFactsMutation(repo, {
-    batchId: "22222222-2222-4222-8222-222222222222",
-    records: [
-      { scope: "project", text: "August update.", date: "2026-08-10" },
-      { scope: "project", text: "September.", date: "2026-09-01" },
-    ],
-  }, undefined)
+  const planned = await planFactsMutation(
+    repo,
+    {
+      batchId: "22222222-2222-4222-8222-222222222222",
+      records: [
+        { scope: "project", text: "August update.", date: "2026-08-10" },
+        { scope: "project", text: "September.", date: "2026-09-01" },
+      ],
+    },
+    undefined,
+  )
   const august = "notes/facts/2026-08.md"
   const current = await repo.pathState.capture(august)
   if (current.index === null || current.worktree.kind !== "file") throw new Error("expected August")
   return {
     ...planned,
-    paths: planned.paths.map((entry) => entry.path === august ? {
-      path: august,
-      pre: { index: null, worktree: { kind: "missing" as const } },
-      post: { index: current.index!, worktree: current.worktree as Extract<typeof current.worktree, { kind: "file" }> },
-    } : entry),
+    paths: planned.paths.map((entry) =>
+      entry.path === august
+        ? {
+            path: august,
+            pre: { index: null, worktree: { kind: "missing" as const } },
+            post: {
+              index: current.index!,
+              worktree: current.worktree as Extract<typeof current.worktree, { kind: "file" }>,
+            },
+          }
+        : entry,
+    ),
   }
 }
 
 async function indexIdentity(repo: GitMemoryRepo, path: string): Promise<string> {
-  const result = await createNodeGitExec().run(["ls-files", "--stage", "--", path], { cwd: repo.dir, timeoutMs: 30_000 })
+  const result = await createNodeGitExec().run(["ls-files", "--stage", "--", path], {
+    cwd: repo.dir,
+    timeoutMs: 30_000,
+  })
   if (result.code !== 0) throw new Error(result.stderr)
   return result.stdout
 }
@@ -58,12 +76,16 @@ function expectNoReceipt(repo: GitMemoryRepo, batchId: string): Promise<void> {
 }
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, {
-    recursive: true,
-    force: true,
-    maxRetries: 10,
-    retryDelay: 200,
-  })))
+  await Promise.all(
+    tempDirs.splice(0).map((dir) =>
+      rm(dir, {
+        recursive: true,
+        force: true,
+        maxRetries: 10,
+        retryDelay: 200,
+      }),
+    ),
+  )
 })
 
 describe("facts deletion reservation finalization", () => {
@@ -128,13 +150,15 @@ describe("facts deletion reservation finalization", () => {
       repo.pathState.reserveWorktreeDeletion = originalReserve
       const reservation = await originalReserve(path, moved)
       if (reservation === undefined) return undefined
-      return { verify: async () => {
-        const finalizer = await reservation.verify()
-        if (finalizer === undefined) return undefined
-        await rm(target, { recursive: true })
-        await writeFile(target, "foreign A\n")
-        return finalizer
-      } }
+      return {
+        verify: async () => {
+          const finalizer = await reservation.verify()
+          if (finalizer === undefined) return undefined
+          await rm(target, { recursive: true })
+          await writeFile(target, "foreign A\n")
+          return finalizer
+        },
+      }
     }
     const originalRestore = repo.pathState.restoreWorktreeClaim.bind(repo.pathState)
     repo.pathState.restoreWorktreeClaim = async (path, claimed) => {
@@ -153,7 +177,9 @@ describe("facts deletion reservation finalization", () => {
     expect(await readFile(retained, "utf8")).toBe("foreign A\n")
     expect((await repo.pathState.capture(august)).index).toEqual(indexBefore.get(august)?.index ?? null)
     expect((await repo.pathState.capture(september)).index).toEqual(indexBefore.get(september)?.index ?? null)
-    expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
+    expect(await repo.pathState.capture(september)).toEqual(
+      recovery.paths.find((entry) => entry.path === september)!.pre,
+    )
     await expectNoReceipt(repo, recovery.batchId)
   })
 
@@ -178,13 +204,15 @@ describe("facts deletion reservation finalization", () => {
       repo.pathState.reserveWorktreeDeletion = originalReserve
       const reservation = await originalReserve(path, moved)
       if (reservation === undefined) return undefined
-      return { verify: async () => {
-        const finalizer = await reservation.verify()
-        if (finalizer === undefined) return undefined
-        await rm(target, { recursive: true })
-        await mkdir(target)
-        return finalizer
-      } }
+      return {
+        verify: async () => {
+          const finalizer = await reservation.verify()
+          if (finalizer === undefined) return undefined
+          await rm(target, { recursive: true })
+          await mkdir(target)
+          return finalizer
+        },
+      }
     }
     const originalRestore = repo.pathState.restoreWorktreeClaim.bind(repo.pathState)
     repo.pathState.restoreWorktreeClaim = async (path, claimed) => {
@@ -207,7 +235,9 @@ describe("facts deletion reservation finalization", () => {
     expect({ dev: remaining.dev, ino: remaining.ino }).toEqual(foreignB)
     expect(await indexIdentity(repo, august)).toBe(augustIndexBefore)
     expect(await indexIdentity(repo, september)).toBe(septemberIndexBefore)
-    expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
+    expect(await repo.pathState.capture(september)).toEqual(
+      recovery.paths.find((entry) => entry.path === september)!.pre,
+    )
     await expectNoReceipt(repo, recovery.batchId)
   })
 
@@ -234,14 +264,18 @@ describe("facts deletion reservation finalization", () => {
       }
     }
 
-    const outcome = await applyFactsRecovery(repo, recovery, 2, AUTHOR)
-      .then((result) => result.outcome, () => "failed" as const)
+    const outcome = await applyFactsRecovery(repo, recovery, 2, AUTHOR).then(
+      (result) => result.outcome,
+      () => "failed" as const,
+    )
 
     expect(outcome).toBe("parent_dirty")
     expect(await readFile(target, "utf8")).toBe("foreign finalization sentinel\n")
     expect((await repo.pathState.capture(august)).index).toEqual(indexBefore.get(august)?.index ?? null)
     expect((await repo.pathState.capture(september)).index).toEqual(indexBefore.get(september)?.index ?? null)
-    expect(await repo.pathState.capture(september)).toEqual(recovery.paths.find((entry) => entry.path === september)!.pre)
+    expect(await repo.pathState.capture(september)).toEqual(
+      recovery.paths.find((entry) => entry.path === september)!.pre,
+    )
     await expectNoReceipt(repo, recovery.batchId)
   })
 })

@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  UNCONFIGURED_POSTHOG_API_KEY,
-  hasTelemetryApiKey,
-  shouldDisableTelemetry,
-} from "./index"
+import { UNCONFIGURED_POSTHOG_API_KEY, hasTelemetryApiKey, shouldDisableTelemetry } from "./index"
 
 const OPT_OUT_CASES = [
   ["unset env enables telemetry", {}, false],
@@ -40,25 +36,25 @@ describe("telemetry API key configuration", () => {
     ["whitespace-only", "   ", false],
     ["exact unconfigured placeholder", UNCONFIGURED_POSTHOG_API_KEY, false],
     ["longer key containing the placeholder", `${UNCONFIGURED_POSTHOG_API_KEY}_configured`, true],
-  ] as const)("#given %s input #when key availability is checked #then the expected result is returned", (_name, apiKey, expected) => {
-    expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
-  })
+  ] as const)(
+    "#given %s input #when key availability is checked #then the expected result is returned",
+    (_name, apiKey, expected) => {
+      expect(hasTelemetryApiKey({ POSTHOG_API_KEY: apiKey })).toBe(expected)
+    },
+  )
 })
 
 describe("opt-out telemetry env matrix", () => {
-  test.each(OPT_OUT_CASES)(
-    "#given %s #when evaluated #then disabled=%p",
-    (_name, env, expected) => {
-      // given
-      const productPrefix = "OMO_CODEX"
+  test.each(OPT_OUT_CASES)("#given %s #when evaluated #then disabled=%p", (_name, env, expected) => {
+    // given
+    const productPrefix = "OMO_CODEX"
 
-      // when
-      const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
+    // when
+    const result = shouldDisableTelemetry({ env, productEnvPrefix: productPrefix })
 
-      // then
-      expect(result).toBe(expected)
-    },
-  )
+    // then
+    expect(result).toBe(expected)
+  })
 })
 
 describe("DO_NOT_TRACK global opt-out", () => {

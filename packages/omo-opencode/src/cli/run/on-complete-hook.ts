@@ -34,11 +34,7 @@ async function readOutput(
   }
 }
 
-function resolveHookShellCommand(
-  command: string,
-  platform: NodeJS.Platform,
-  env: NodeJS.ProcessEnv,
-): string[] {
+function resolveHookShellCommand(command: string, platform: NodeJS.Platform, env: NodeJS.ProcessEnv): string[] {
   const shellType = detectShellType(platform, env)
 
   switch (shellType) {
@@ -56,13 +52,16 @@ function resolveHookShellCommand(
   }
 }
 
-export async function executeOnCompleteHook(options: {
-  command: string
-  sessionId: string
-  exitCode: number
-  durationMs: number
-  messageCount: number
-}, deps: OnCompleteHookDeps = defaultDeps): Promise<void> {
+export async function executeOnCompleteHook(
+  options: {
+    command: string
+    sessionId: string
+    exitCode: number
+    durationMs: number
+    messageCount: number
+  },
+  deps: OnCompleteHookDeps = defaultDeps,
+): Promise<void> {
   const { command, sessionId, exitCode, durationMs, messageCount } = options
 
   const trimmedCommand = command.trim()

@@ -32,24 +32,19 @@ export function createFallbackTimeoutHelpers(
     source: string,
   ) => Promise<AutoRetryDispatchOutcome>,
 ) {
-  const {
-    config,
-    options,
-    sessionStates,
-    sessionRetryInFlight,
-    sessionFallbackTimeouts,
-    pluginConfig,
-  } = deps
+  const { config, options, sessionStates, sessionRetryInFlight, sessionFallbackTimeouts, pluginConfig } = deps
   const sessionResolvedAgents = new Map<string, string>()
 
   const showWatchdogToast = async (sessionID: string, message: string) => {
     try {
-      await deps.ctx.client.tui.showToast({ body: {
-        title: "Runtime fallback",
-        message,
-        variant: "warning",
-        duration: 3000,
-      } })
+      await deps.ctx.client.tui.showToast({
+        body: {
+          title: "Runtime fallback",
+          message,
+          variant: "warning",
+          duration: 3000,
+        },
+      })
     } catch (error) {
       log(`[${HOOK_NAME}] Session fallback watchdog toast failed`, { sessionID, error: String(error) })
     }
@@ -156,7 +151,9 @@ export function createFallbackTimeoutHelpers(
       if (compaction && !compaction.endedAt) {
         const elapsed = Date.now() - compaction.startedAt
         if (elapsed < COMPACTION_WATCHDOG_BUDGET_MS) {
-          log(`[${HOOK_NAME}] compaction in flight; deferring session timeout (compaction-aware-timeout)`, { sessionID })
+          log(`[${HOOK_NAME}] compaction in flight; deferring session timeout (compaction-aware-timeout)`, {
+            sessionID,
+          })
           scheduleSessionFallbackTimeout(
             sessionID,
             effectiveResolvedAgent,
@@ -164,11 +161,14 @@ export function createFallbackTimeoutHelpers(
           )
           return
         }
-        log(`[${HOOK_NAME}] compaction watchdog budget exhausted; returning control without fallback (compaction-aware-timeout)`, {
-          sessionID,
-          elapsed,
-          budgetMs: COMPACTION_WATCHDOG_BUDGET_MS,
-        })
+        log(
+          `[${HOOK_NAME}] compaction watchdog budget exhausted; returning control without fallback (compaction-aware-timeout)`,
+          {
+            sessionID,
+            elapsed,
+            budgetMs: COMPACTION_WATCHDOG_BUDGET_MS,
+          },
+        )
         // Control goes back to the user and nothing retries, so ownership is released before any await:
         // the abort's own session.error must not find a retry in flight, and a toast that never settles
         // must not leave the session marked as owning recovery. The abort uses the terminal source so
@@ -202,10 +202,13 @@ export function createFallbackTimeoutHelpers(
         // A timeout outside compaction is a deliberate wedge return: the stream
         // is considered stuck, so abort to return control to the user even when
         // no replacement can be prepared. This branch never dispatches.
-        log(`[${HOOK_NAME}] fallback exhausted; aborting stuck session without replacement (fallback-exhausted-wedge-return)`, {
-          sessionID,
-          fallbackModels: fallbackModels.length,
-        })
+        log(
+          `[${HOOK_NAME}] fallback exhausted; aborting stuck session without replacement (fallback-exhausted-wedge-return)`,
+          {
+            sessionID,
+            fallbackModels: fallbackModels.length,
+          },
+        )
         // An awaiting caller gets exactly one observable terminal abort (#6637);
         // without one, the stuck stream is returned with a plain timeout abort.
         const awaitingCaller = deps.sessionAwaitingFallbackResult.has(sessionID)
@@ -265,7 +268,12 @@ export function createFallbackTimeoutHelpers(
         attemptCount: state.attemptCount,
       }
 
-      const dispatchOutcome = await autoRetryWithFallback(sessionID, result.newModel, effectiveResolvedAgent, "session.timeout")
+      const dispatchOutcome = await autoRetryWithFallback(
+        sessionID,
+        result.newModel,
+        effectiveResolvedAgent,
+        "session.timeout",
+      )
       if (dispatchOutcome.accepted) return
 
       // Identity alone is not ownership: a superseding retry can advance the same

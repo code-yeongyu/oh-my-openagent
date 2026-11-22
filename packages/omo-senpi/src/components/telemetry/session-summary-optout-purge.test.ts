@@ -14,8 +14,17 @@ const PURGER = { pid: process.pid, bootId: "purger" }
 
 function windowRecord(owner: typeof LIVE, heartbeatAt: number, cwd: string): WindowRecord {
   return {
-    consent: "enabled", scope: { cwd }, sessionHash: "race", sessionRole: "root", owner, heartbeatAt,
-    epoch: "0123456789abcdef", seq: 1, sampleRate: 0, windowId: null, window: null,
+    consent: "enabled",
+    scope: { cwd },
+    sessionHash: "race",
+    sessionRole: "root",
+    owner,
+    heartbeatAt,
+    epoch: "0123456789abcdef",
+    seq: 1,
+    sampleRate: 0,
+    windowId: null,
+    window: null,
   }
 }
 
@@ -72,7 +81,9 @@ describe("the entry purge against a live owner's write in progress", () => {
       await owner.summary.recordTurn("race", summaryTurn())
       await owner.summary.finish("race", "shutdown")
       owner.summary.dispose()
-      for (const name of readdirSync(base, { recursive: true, encoding: "utf8" }).filter((entry) => entry.endsWith(".json"))) {
+      for (const name of readdirSync(base, { recursive: true, encoding: "utf8" }).filter((entry) =>
+        entry.endsWith(".json"),
+      )) {
         expect(() => JSON.parse(readFileSync(join(base, name), "utf8"))).not.toThrow()
       }
       expect(owner.diagnostics.filter(({ event }) => event === "telemetry_capture_failed")).toEqual([])

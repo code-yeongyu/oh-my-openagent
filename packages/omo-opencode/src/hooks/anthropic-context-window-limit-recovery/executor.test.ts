@@ -72,7 +72,8 @@ function createFakeTimeouts(): FakeTimeouts {
         }
       }
       if (!next) break
-      if (++fired > 10_000) throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
+      if (++fired > 10_000)
+        throw new Error("fake clock fired more than 10000 timers in one advance: a timer keeps rescheduling itself")
 
       now = next.time
       timers.delete(next.id)
@@ -179,9 +180,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when summarize throws exception", async () => {
     // given: Summarize will fail
-    mockClient.session.summarize = mock(() =>
-      Promise.reject(new Error("Network timeout")),
-    )
+    mockClient.session.summarize = mock(() => Promise.reject(new Error("Network timeout")))
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 100000,
@@ -257,15 +256,7 @@ describe("executeCompact lock management", () => {
     }
 
     //#when - Execute compaction with experimental flag
-    await executeCompact(
-      sessionID,
-      msg,
-      autoCompactState,
-      asClient(mockClient),
-      directory,
-      pluginConfig,
-      experimental,
-    )
+    await executeCompact(sessionID, msg, autoCompactState, asClient(mockClient), directory, pluginConfig, experimental)
 
     //#then - Lock should be cleared even on early return
     expect(autoCompactState.compactionInProgress.has(sessionID)).toBe(false)
@@ -281,9 +272,7 @@ describe("executeCompact lock management", () => {
 
     // then: Toast should be shown
     const toastCalls = mockClient.tui.showToast.mock.calls
-    const blockedToast = toastCalls.find(
-      (call) => call[0]?.body?.title === "Compact In Progress",
-    )
+    const blockedToast = toastCalls.find((call) => call[0]?.body?.title === "Compact In Progress")
     expect(blockedToast).toBeDefined()
 
     // then: Lock should still be held (not cleared by blocked attempt)
@@ -314,9 +303,7 @@ describe("executeCompact lock management", () => {
 
     // then: Should show failure toast
     const toastCalls = mockClient.tui.showToast.mock.calls
-    const failureToast = toastCalls.find(
-      (call) => call[0]?.body?.title === "Auto Compact Failed",
-    )
+    const failureToast = toastCalls.find((call) => call[0]?.body?.title === "Auto Compact Failed")
     expect(failureToast).toBeDefined()
 
     // then: Lock should still be cleared
@@ -325,9 +312,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when client.tui.showToast throws", async () => {
     // given: Toast will fail (this should never happen but testing robustness)
-    mockClient.tui.showToast = mock(() =>
-      Promise.reject(new Error("Toast failed")),
-    )
+    mockClient.tui.showToast = mock(() => Promise.reject(new Error("Toast failed")))
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 100000,
@@ -343,9 +328,7 @@ describe("executeCompact lock management", () => {
 
   test("clears lock when promptAsync in continuation throws", async () => {
     // given: promptAsync will fail during continuation
-    mockClient.session.promptAsync = mock(() =>
-      Promise.reject(new Error("Prompt failed")),
-    )
+    mockClient.session.promptAsync = mock(() => Promise.reject(new Error("Prompt failed")))
     autoCompactState.errorDataBySession.set(sessionID, {
       errorType: "token_limit",
       currentTokens: 100000,
@@ -371,28 +354,19 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(
-      recoveryStrategy,
-      "runAggressiveTruncationStrategy",
-    ).mockImplementation(async (params) => ({
-      handled: false,
-      nextTruncateAttempt: params.truncateAttempt + 1,
-    }))
+    const truncateSpy = spyOn(recoveryStrategy, "runAggressiveTruncationStrategy").mockImplementation(
+      async (params) => ({
+        handled: false,
+        nextTruncateAttempt: params.truncateAttempt + 1,
+      }),
+    )
 
     const experimental = {
       aggressive_truncation: true,
     }
 
     // when: Execute compaction with aggressive truncation enabled
-    await executeCompact(
-      sessionID,
-      msg,
-      autoCompactState,
-      asClient(mockClient),
-      directory,
-      pluginConfig,
-      experimental,
-    )
+    await executeCompact(sessionID, msg, autoCompactState, asClient(mockClient), directory, pluginConfig, experimental)
 
     // then: Truncation was attempted
     expect(truncateSpy).toHaveBeenCalled()
@@ -419,13 +393,12 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(
-      recoveryStrategy,
-      "runAggressiveTruncationStrategy",
-    ).mockImplementation(async (params) => ({
-      handled: false,
-      nextTruncateAttempt: params.truncateAttempt + 1,
-    }))
+    const truncateSpy = spyOn(recoveryStrategy, "runAggressiveTruncationStrategy").mockImplementation(
+      async (params) => ({
+        handled: false,
+        nextTruncateAttempt: params.truncateAttempt + 1,
+      }),
+    )
 
     //#when - Execute compaction without experimental config (default behavior)
     await executeCompact(sessionID, msg, autoCompactState, asClient(mockClient), directory, pluginConfig)
@@ -447,28 +420,19 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(
-      recoveryStrategy,
-      "runAggressiveTruncationStrategy",
-    ).mockImplementation(async (params) => ({
-      handled: false,
-      nextTruncateAttempt: params.truncateAttempt + 1,
-    }))
+    const truncateSpy = spyOn(recoveryStrategy, "runAggressiveTruncationStrategy").mockImplementation(
+      async (params) => ({
+        handled: false,
+        nextTruncateAttempt: params.truncateAttempt + 1,
+      }),
+    )
 
     const experimental = {
       aggressive_truncation: false,
     }
 
     //#when - Execute compaction with explicit false
-    await executeCompact(
-      sessionID,
-      msg,
-      autoCompactState,
-      asClient(mockClient),
-      directory,
-      pluginConfig,
-      experimental,
-    )
+    await executeCompact(sessionID, msg, autoCompactState, asClient(mockClient), directory, pluginConfig, experimental)
 
     //#then - Aggressive truncation must be skipped
     expect(truncateSpy).not.toHaveBeenCalled()
@@ -487,40 +451,31 @@ describe("executeCompact lock management", () => {
       maxTokens: 200000,
     })
 
-    const truncateSpy = spyOn(
-      recoveryStrategy,
-      "runAggressiveTruncationStrategy",
-    ).mockImplementation(async (params) => {
-      setTimeout(() => {
-        void params.client.session
-          .promptAsync({
-            path: { id: params.sessionID },
-            body: { auto: true } as never,
-            query: { directory: params.directory },
-          })
-          .catch(() => {})
-      }, 500)
+    const truncateSpy = spyOn(recoveryStrategy, "runAggressiveTruncationStrategy").mockImplementation(
+      async (params) => {
+        setTimeout(() => {
+          void params.client.session
+            .promptAsync({
+              path: { id: params.sessionID },
+              body: { auto: true } as never,
+              query: { directory: params.directory },
+            })
+            .catch(() => {})
+        }, 500)
 
-      return {
-        handled: true,
-        nextTruncateAttempt: params.truncateAttempt + 1,
-      }
-    })
+        return {
+          handled: true,
+          nextTruncateAttempt: params.truncateAttempt + 1,
+        }
+      },
+    )
 
     const experimental = {
       aggressive_truncation: true,
     }
 
     // when: Execute compaction with aggressive truncation enabled
-    await executeCompact(
-      sessionID,
-      msg,
-      autoCompactState,
-      asClient(mockClient),
-      directory,
-      pluginConfig,
-      experimental,
-    )
+    await executeCompact(sessionID, msg, autoCompactState, asClient(mockClient), directory, pluginConfig, experimental)
 
     // Wait for setTimeout callback
     await fakeTimeouts.advanceBy(600)

@@ -53,7 +53,12 @@ export function claimsMemorySyncAtBoot(
   if (engineRerunsInChild(env, runtime)) return false
   try {
     const parsed: unknown = JSON.parse(table)
-    return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed) && Object.hasOwn(parsed, MEMORY_SYNC_CHANNEL)
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      !Array.isArray(parsed) &&
+      Object.hasOwn(parsed, MEMORY_SYNC_CHANNEL)
+    )
   } catch {
     return false
   }

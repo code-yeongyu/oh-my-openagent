@@ -14,8 +14,10 @@ export { resolveMemoryRoot } from "../identity/layout"
 export { syncPinDir } from "./pin-dir"
 
 export const trustAnchorRoot = (pinDir: string): string => join(pinDir, "trust-anchor")
-export const trustAnchorKey = (account: string): string => createHash("sha256").update(account, "utf8").digest("base64url")
-export const trustAnchorDir = (pinDir: string, account: string): string => join(trustAnchorRoot(pinDir), trustAnchorKey(account))
+export const trustAnchorKey = (account: string): string =>
+  createHash("sha256").update(account, "utf8").digest("base64url")
+export const trustAnchorDir = (pinDir: string, account: string): string =>
+  join(trustAnchorRoot(pinDir), trustAnchorKey(account))
 
 /** Whether any account has a live (not retired) pin under `pinDir`. */
 export const hasLiveTrustAnchor = async (pinDir: string): Promise<boolean> => {

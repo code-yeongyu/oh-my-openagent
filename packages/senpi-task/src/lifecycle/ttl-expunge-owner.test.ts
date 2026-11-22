@@ -9,6 +9,7 @@ import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps, hostSession } from "./__fixtures__/host-session-fakes"
 import { seedRecord } from "./__fixtures__/lifecycle-fakes"
 import type { LifecycleDeps } from "./port"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Invariant: only the sweep attempt that tombstoned a record restores or deletes it, and never while
 // its close of the record's session is still unanswered.
@@ -20,14 +21,28 @@ let sequence = 0
 
 type Close = { readonly answer: PromiseWithResolvers<void> }
 
-function expiredSession(options: { readonly closeTimeoutMs?: number; readonly hostPid?: number; readonly livePids?: readonly number[] } = {}) {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+function expiredSession(
+  options: { readonly closeTimeoutMs?: number; readonly hostPid?: number; readonly livePids?: readonly number[] } = {},
+) {
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   sequence += 1
   const taskId = `st_${(0xabc00000 + sequence).toString(16)}`
   const identity = hostSession(taskId)
-  seedRecord(store, { task_id: taskId, status: "completed", residency_state: "rpc_detached", execution_mode: "process", runner_kind: "host-session", host_session: identity, updated_at: EXPIRED })
+  seedRecord(store, {
+    task_id: taskId,
+    status: "completed",
+    residency_state: "rpc_detached",
+    execution_mode: "process",
+    runner_kind: "host-session",
+    host_session: identity,
+    updated_at: EXPIRED,
+  })
   const hostPid = options.hostPid ?? 11_001
-  const fixture = hostLifecycleDeps({ store, hostPid, isAlive: (pid) => pid === hostPid || (options.livePids ?? []).includes(pid) })
+  const fixture = hostLifecycleDeps({
+    store,
+    hostPid,
+    isAlive: (pid) => pid === hostPid || (options.livePids ?? []).includes(pid),
+  })
   fixture.daemon.hold(identity.session_path)
   const closes: Close[] = []
   const asked: Array<PromiseWithResolvers<Close>> = []
@@ -55,7 +70,15 @@ function expiredSession(options: { readonly closeTimeoutMs?: number; readonly ho
       return close.answer.promise
     },
   }
-  return { store, taskId, identity, deps, closes, closeAsked: (index: number) => askedAt(index).promise, settled: settled.promise }
+  return {
+    store,
+    taskId,
+    identity,
+    deps,
+    closes,
+    closeAsked: (index: number) => askedAt(index).promise,
+    settled: settled.promise,
+  }
 }
 
 function sweep(deps: LifecycleDeps, overrides: Partial<LifecycleDeps> = {}) {
@@ -190,7 +213,9 @@ describe("TTL expunge ownership", () => {
     // given
     const f = expiredSession()
     f.store.tombstoneIfExpired(f.taskId, () => false, { pid: 11_001, token: "old-attempt" })
-    expect(f.store.takeOverExpunging(f.taskId, { pid: 11_001, token: "old-attempt" }, { pid: 11_001, token: "new-attempt" })).toBe(true)
+    expect(
+      f.store.takeOverExpunging(f.taskId, { pid: 11_001, token: "old-attempt" }, { pid: 11_001, token: "new-attempt" }),
+    ).toBe(true)
 
     // when
     const deleted = f.store.completeExpunge(f.taskId, { pid: 11_001, token: "old-attempt" })

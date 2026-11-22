@@ -47,7 +47,10 @@ async function killAndAwait(child: ChildProcess): Promise<void> {
 function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string): Promise<void> {
   return new Promise((resolve, reject) => {
     let output = ""
-    const timeout = setTimeout(() => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)), 5_000)
+    const timeout = setTimeout(
+      () => reject(new Error(`timed out waiting for ${expected}; stderr=${child.stderr.read() ?? ""}`)),
+      5_000,
+    )
     const onData = (chunk: Buffer): void => {
       output += chunk.toString("utf8")
       if (!output.includes(expected)) return
@@ -63,7 +66,9 @@ function waitForOutput(child: ChildProcessWithoutNullStreams, expected: string):
   })
 }
 
-function waitForExit(child: ChildProcessWithoutNullStreams): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+function waitForExit(
+  child: ChildProcessWithoutNullStreams,
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error("timed out waiting for child exit")), 5_000)
     child.once("exit", (code, signal) => {
@@ -83,7 +88,7 @@ async function createFixture(): Promise<{ directory: string; lockPath: string; c
   return { directory, lockPath: path.join(directory, "writer.lock"), counterPath, logPath }
 }
 
-afterEach(async () => {
+async function tearDownFixtures(): Promise<void> {
   // Temp directories die only after every tracked child is confirmed exited: rm under a live
   // holder strands it, and a fire-and-forget SIGKILL is not a confirmation.
   const tracked = [...children]
@@ -98,10 +103,14 @@ afterEach(async () => {
       }
     }
   }
-  await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
-  }))
-})
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directory) => {
+      await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
+    }),
+  )
+}
+
+afterEach(tearDownFixtures)
 
 describe("real subprocess lock contention", () => {
   test("#given two Bun subprocess writers #when they contend on one counter #then critical-section log entries never interleave", async () => {
@@ -110,7 +119,13 @@ describe("real subprocess lock contention", () => {
     const first = spawnWorker(["gated-increment", fixture.lockPath, fixture.counterPath, fixture.logPath, "first"])
     const firstExitPromise = waitForExit(first)
     await waitForOutput(first, "ready\n")
-    const second = spawnWorker(["contending-increment", fixture.lockPath, fixture.counterPath, fixture.logPath, "second"])
+    const second = spawnWorker([
+      "contending-increment",
+      fixture.lockPath,
+      fixture.counterPath,
+      fixture.logPath,
+      "second",
+    ])
     const secondExitPromise = waitForExit(second)
     await waitForOutput(second, "contended\n")
 
@@ -123,7 +138,10 @@ describe("real subprocess lock contention", () => {
     expect(secondExit).toEqual({ code: 0, signal: null })
     expect(await readFile(fixture.counterPath, "utf8")).toBe("2\n")
     expect((await readFile(fixture.logPath, "utf8")).trim().split("\n")).toEqual([
-      "first:enter", "first:exit", "second:enter", "second:exit",
+      "first:enter",
+      "first:exit",
+      "second:enter",
+      "second:exit",
     ])
   })
 
@@ -154,7 +172,10 @@ describe("real subprocess lock contention", () => {
     const contender = await createLockRecord("memory-write", { runId: "contender" })
 
     // #when
-    const error = await acquireLock(fixture.lockPath, contender).then(() => null, (cause: unknown) => cause)
+    const error = await acquireLock(fixture.lockPath, contender).then(
+      () => null,
+      (cause: unknown) => cause,
+    )
 
     // #then
     expect(error).toBeInstanceOf(LockContentionError)
@@ -195,7 +216,9 @@ describe("subprocess lock holder lifecycle", () => {
     const fixture = await createFixture()
     const workerPidPath = path.join(fixture.directory, "worker.pid")
     const wrapperPath = path.join(fixture.directory, "abrupt-wrapper.mjs")
-    await writeFile(wrapperPath, `
+    await writeFile(
+      wrapperPath,
+      `
 import { spawn } from "node:child_process"
 import { writeFileSync } from "node:fs"
 const worker = spawn(
@@ -215,22 +238,29 @@ worker.stdout.on("data", (chunk) => {
 process.stdin.on("data", () => { acknowledged = true; dieOnceArmed() })
 process.stdin.on("end", () => process.kill(process.pid, "SIGKILL"))
 process.stdin.resume()
-`, "utf8")
-    const wrapper = track(spawn(process.execPath, [wrapperPath], {
-      stdio: ["pipe", "ignore", "ignore"],
-      env: {
-        ...process.env,
-        WORKER_PATH: workerPath,
-        LOCK_PATH: fixture.lockPath,
-        COUNTER_PATH: fixture.counterPath,
-        LOG_PATH: fixture.logPath,
-        WORKER_PID_PATH: workerPidPath,
-      },
-    }))
+`,
+      "utf8",
+    )
+    const wrapper = track(
+      spawn(process.execPath, [wrapperPath], {
+        stdio: ["pipe", "ignore", "ignore"],
+        env: {
+          ...process.env,
+          WORKER_PATH: workerPath,
+          LOCK_PATH: fixture.lockPath,
+          COUNTER_PATH: fixture.counterPath,
+          LOG_PATH: fixture.logPath,
+          WORKER_PID_PATH: workerPidPath,
+        },
+      }),
+    )
     // Subscribe to the wrapper's death BEFORE it can fire: the wrapper SIGKILLs itself in the
     // same tick it reads the acknowledgement, so listening only afterwards would miss the event.
     const wrapperExit = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("wrapper did not terminate after worker readiness")), READY_TIMEOUT_MS)
+      const timer = setTimeout(
+        () => reject(new Error("wrapper did not terminate after worker readiness")),
+        READY_TIMEOUT_MS,
+      )
       wrapper.once("exit", (code, signal) => {
         clearTimeout(timer)
         resolve({ code, signal })
@@ -262,42 +292,26 @@ process.stdin.resume()
       await killAndAwait(wrapper)
       // Identity-guarded: never signal a pid that has since been reused by another process.
       if (workerIdentity !== null) killIfAlive(workerIdentity)
-      else if (workerPid !== null && pidAlive(workerPid)) throw new Error(`worker pid ${String(workerPid)} is alive but its identity was never captured`)
+      else if (workerPid !== null && pidAlive(workerPid))
+        throw new Error(`worker pid ${String(workerPid)} is alive but its identity was never captured`)
     }
   }, 30_000)
 
-  // The two tests below run back to back on purpose: the first leaves a live holder for the
-  // file-level afterEach to tear down, the second observes what that teardown left behind.
-  let teardownProbe: ChildProcessWithoutNullStreams | null = null
-
-  test("#given a hold-mode worker still holding the lock when its test ends #when the test returns #then it is handed to afterEach", async () => {
+  test("#given a tracked live lock holder #when fixture teardown runs #then it awaits exit and stops tracking the holder", async () => {
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "teardown"])
     await waitForOutput(holder, "entered\n")
 
-    // #when: the test returns without killing the holder.
-    teardownProbe = holder
-
-    // #then
+    expect(children.has(holder)).toBe(true)
     expect(holder.exitCode).toBeNull()
     expect(holder.signalCode).toBeNull()
-  }, 30_000)
 
-  test("#given the holder handed to afterEach #when afterEach has run #then no tracked child remains alive", async () => {
-    const holder = teardownProbe
-    teardownProbe = null
-    try {
-      // #given
-      expect(holder).not.toBeNull()
-      if (holder === null) throw new Error("unreachable")
+    // #when
+    await tearDownFixtures()
 
-      // #then: teardown awaited the exit (exitCode or signalCode is set) and untracked the child
-      // before this test started, so a subsequent rm can never strand a live holder.
-      expect(holder.exitCode !== null || holder.signalCode !== null).toBe(true)
-      expect(children.has(holder)).toBe(false)
-    } finally {
-      if (holder !== null) await killAndAwait(holder)
-    }
+    // #then
+    expect(holder.exitCode !== null || holder.signalCode !== null).toBe(true)
+    expect(children.has(holder)).toBe(false)
   }, 30_000)
 })

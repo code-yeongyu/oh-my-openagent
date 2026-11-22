@@ -6,17 +6,13 @@ import { log } from "../../shared/logger"
 import type { ModelFallbackState } from "./hook"
 
 function canonicalizeModelID(modelID: string): string {
-  return modelID
-    .toLowerCase()
-    .replace(/\./g, "-")
+  return modelID.toLowerCase().replace(/\./g, "-")
 }
 
 function createReachabilityChecker(state: ModelFallbackState): (entry: FallbackEntry) => boolean {
   const providerModelsCache = readProviderModelsCache()
   const connectedProviders = providerModelsCache?.connected ?? readConnectedProvidersCache()
-  const connectedSet = connectedProviders
-    ? new Set(connectedProviders.map((provider) => provider.toLowerCase()))
-    : null
+  const connectedSet = connectedProviders ? new Set(connectedProviders.map((provider) => provider.toLowerCase())) : null
 
   return (entry: FallbackEntry): boolean => {
     if (!connectedSet) return true
@@ -51,23 +47,44 @@ export function getNextReachableFallback(
     state.attemptCount++
 
     if (!isReachable(fallback)) {
-      log("[model-fallback] Skipping unreachable fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
+      log(
+        "[model-fallback] Skipping unreachable fallback for session: " +
+          sessionID +
+          ", attempt: " +
+          attemptCount +
+          ", model: " +
+          fallback.model,
+      )
       continue
     }
 
     const providerID = selectFallbackProvider(fallback.providers, state.providerID)
     const modelID = transformModelForProvider(providerID, fallback.model)
     const isNoOpFallback =
-      providerID.toLowerCase() === state.providerID.toLowerCase()
-      && canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)
+      providerID.toLowerCase() === state.providerID.toLowerCase() &&
+      canonicalizeModelID(modelID) === canonicalizeModelID(state.modelID)
 
     if (isNoOpFallback) {
-      log("[model-fallback] Skipping no-op fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
+      log(
+        "[model-fallback] Skipping no-op fallback for session: " +
+          sessionID +
+          ", attempt: " +
+          attemptCount +
+          ", model: " +
+          fallback.model,
+      )
       continue
     }
 
     state.pending = false
-    log("[model-fallback] Using fallback for session: " + sessionID + ", attempt: " + attemptCount + ", model: " + fallback.model)
+    log(
+      "[model-fallback] Using fallback for session: " +
+        sessionID +
+        ", attempt: " +
+        attemptCount +
+        ", model: " +
+        fallback.model,
+    )
 
     return {
       providerID,

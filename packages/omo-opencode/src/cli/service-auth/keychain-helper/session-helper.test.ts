@@ -26,7 +26,11 @@ describe("sign-in through the signed keychain helper (#11262 design 3, addendum)
     expect(keychain.items.get(A)).toMatchObject({ owner: "helper", marker: true })
     expect([...keychain.items.keys()]).toEqual([A])
     expect(keychain.stats).toEqual({ approves: 0, unleasedMutations: 0 })
-    expect(keychain.events.filter(event => /stage|retire|promote/.test(event))).toEqual(["stage <A>", "retire <A>", "promote <A>"])
+    expect(keychain.events.filter((event) => /stage|retire|promote/.test(event))).toEqual([
+      "stage <A>",
+      "retire <A>",
+      "promote <A>",
+    ])
   })
 
   test("#given an item the app created, app gone (rows 7, 22) #when token, refresh-free reads and accessToken run #then one plain dialog in total and the item is the helper's afterwards", async () => {
@@ -73,7 +77,7 @@ describe("sign-in through the signed keychain helper (#11262 design 3, addendum)
     keychain.put(`${A}.staging`, stored, "helper")
     keychain.put(`${A}.old`, stored, "bun")
     const { session } = await helperSession(keychain)
-    await session.update(async current => expect(current).toEqual(credentials))
+    await session.update(async (current) => expect(current).toEqual(credentials))
     expect(keychain.items.get(A)?.owner).toBe("helper")
     expect([...keychain.items.keys()]).toEqual([A])
   })
@@ -91,25 +95,28 @@ describe("sign-in through the signed keychain helper (#11262 design 3, addendum)
     expect(keychain.stats.approves).toBe(0)
   })
 
-  test.each(["linux", "win32"] as const)("#given %s #when the store reads and writes #then the helper is never consulted", async platform => {
-    const keychain = fakeKeychain()
-    let consulted = 0
-    const store = createCredentialStore(API, {
-      secrets: keychain.secrets,
-      platform,
-      lockProbe: async () => "unlocked",
-      keychainHelper: {
-        access: async () => {
-          consulted++
-          return keychain.access
+  test.each(["linux", "win32"] as const)(
+    "#given %s #when the store reads and writes #then the helper is never consulted",
+    async (platform) => {
+      const keychain = fakeKeychain()
+      let consulted = 0
+      const store = createCredentialStore(API, {
+        secrets: keychain.secrets,
+        platform,
+        lockProbe: async () => "unlocked",
+        keychainHelper: {
+          access: async () => {
+            consulted++
+            return keychain.access
+          },
         },
-      },
-    })
-    await store.write(credentials)
-    expect(await store.read()).toEqual({ ...credentials, credentialGeneration: expect.any(String) })
-    expect(consulted).toBe(0)
-    expect(keychain.events).toEqual([])
-  })
+      })
+      await store.write(credentials)
+      expect(await store.read()).toEqual({ ...credentials, credentialGeneration: expect.any(String) })
+      expect(consulted).toBe(0)
+      expect(keychain.events).toEqual([])
+    },
+  )
 })
 
 // Addendum change 1 with the #11613 review: the hand-off runs only where this process would show its one dialog, and the

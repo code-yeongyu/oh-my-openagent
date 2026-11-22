@@ -132,9 +132,7 @@ function formatKeyValues(input: Record<string, unknown>, exclude: string[]): str
   })
   if (!entries.length) return undefined
 
-  return entries
-    .map(([key, value]) => `${key}=${String(value)}`)
-    .join(" ")
+  return entries.map(([key, value]) => `${key}=${String(value)}`).join(" ")
 }
 
 function str(value: unknown): string | undefined {

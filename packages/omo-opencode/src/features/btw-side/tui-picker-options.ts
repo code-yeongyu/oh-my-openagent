@@ -30,9 +30,7 @@ function sideSummary(title: string): string {
   return summary || "Untitled side"
 }
 
-export function parseBtwPickerValue(
-  value: string,
-): BtwPickerSelection | undefined {
+export function parseBtwPickerValue(value: string): BtwPickerSelection | undefined {
   if (value.startsWith(SESSION_VALUE_PREFIX)) {
     const sessionID = value.slice(SESSION_VALUE_PREFIX.length)
     return sessionID
@@ -93,9 +91,7 @@ export function buildBtwPickerOptions(
       category: "Actions",
     },
   ]
-  const current = options.some(
-    (option) => option.value === sessionValue(currentSessionID),
-  )
+  const current = options.some((option) => option.value === sessionValue(currentSessionID))
     ? sessionValue(currentSessionID)
     : sessionValue(catalog.main.id)
   return {

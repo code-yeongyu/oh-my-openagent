@@ -45,7 +45,12 @@ describe("registerStoreIndex", () => {
     // then
     expect(readTaskStoreIndex(path)).toEqual({
       version: 1,
-      stores: { [resolve("/p1/.omo/senpi-task")]: { first_seen: new Date(1_000).toISOString(), last_seen: new Date(1_000).toISOString() } },
+      stores: {
+        [resolve("/p1/.omo/senpi-task")]: {
+          first_seen: new Date(1_000).toISOString(),
+          last_seen: new Date(1_000).toISOString(),
+        },
+      },
     })
   })
 
@@ -90,37 +95,43 @@ describe("registerStoreIndex", () => {
     expect(Object.keys(readTaskStoreIndex(path).stores)).toEqual([resolve("/p1/.omo/senpi-task")])
   })
 
-  posixHostRunnerTest("#given a same-process admission whose durable write outlasts the lock's holder budget #when a second store is admitted from this process #then it waits for the first and both land", async () => {
-    // given - the time is the behavior: the index lock's holder budget (10 s) bounds how long a waiter spins on
-    // another holder. A same-process second admission (pre-warm plus an auto spawn's gate) must wait for the first
-    // one instead, as it did when that write froze the loop, not fail with store_index_unavailable (#10868).
-    const path = indexPath()
-    const writeStarted = Promise.withResolvers<void>()
-    const releaseWrite = Promise.withResolvers<void>()
-    const slowFs = {
-      read: DURABLE_JSON_FS_ASYNC.read,
-      write: async (target: string, text: string) => {
-        writeStarted.resolve()
-        await releaseWrite.promise
-        await DURABLE_JSON_FS_ASYNC.write(target, text)
-      },
-    }
-    const first = registerStoreIndex({ indexPath: path, storeDir: "/p1/.omo/senpi-task", now: Date.now, fs: slowFs })
-    await writeStarted.promise
+  posixHostRunnerTest(
+    "#given a same-process admission whose durable write outlasts the lock's holder budget #when a second store is admitted from this process #then it waits for the first and both land",
+    async () => {
+      // given - the time is the behavior: the index lock's holder budget (10 s) bounds how long a waiter spins on
+      // another holder. A same-process second admission (pre-warm plus an auto spawn's gate) must wait for the first
+      // one instead, as it did when that write froze the loop, not fail with store_index_unavailable (#10868).
+      const path = indexPath()
+      const writeStarted = Promise.withResolvers<void>()
+      const releaseWrite = Promise.withResolvers<void>()
+      const slowFs = {
+        read: DURABLE_JSON_FS_ASYNC.read,
+        write: async (target: string, text: string) => {
+          writeStarted.resolve()
+          await releaseWrite.promise
+          await DURABLE_JSON_FS_ASYNC.write(target, text)
+        },
+      }
+      const first = registerStoreIndex({ indexPath: path, storeDir: "/p1/.omo/senpi-task", now: Date.now, fs: slowFs })
+      await writeStarted.promise
 
-    // when - the second admission starts while the first holds the lock, and the first outlasts the holder budget
-    const second = registerStoreIndex({ indexPath: path, storeDir: "/p2/.omo/senpi-task", now: Date.now }).then(
-      () => "admitted",
-      (error: unknown) => error,
-    )
-    await new Promise((resolveWait) => setTimeout(resolveWait, DURABLE_JSON_LOCK_OPTIONS.holderWaitMs + 1_000))
-    releaseWrite.resolve()
-    await first
+      // when - the second admission starts while the first holds the lock, and the first outlasts the holder budget
+      const second = registerStoreIndex({ indexPath: path, storeDir: "/p2/.omo/senpi-task", now: Date.now }).then(
+        () => "admitted",
+        (error: unknown) => error,
+      )
+      await new Promise((resolveWait) => setTimeout(resolveWait, DURABLE_JSON_LOCK_OPTIONS.holderWaitMs + 1_000))
+      releaseWrite.resolve()
+      await first
 
-    // then
-    expect(await second).toBe("admitted")
-    expect(Object.keys(readTaskStoreIndex(path).stores).sort()).toEqual([resolve("/p1/.omo/senpi-task"), resolve("/p2/.omo/senpi-task")].sort())
-  }, 30_000)
+      // then
+      expect(await second).toBe("admitted")
+      expect(Object.keys(readTaskStoreIndex(path).stores).sort()).toEqual(
+        [resolve("/p1/.omo/senpi-task"), resolve("/p2/.omo/senpi-task")].sort(),
+      )
+    },
+    30_000,
+  )
 
   test("#given a write whose read-back does not contain the store #when registering #then it is unavailable", async () => {
     // given - the write lands nowhere: every read returns the empty index
@@ -128,7 +139,9 @@ describe("registerStoreIndex", () => {
     const fs = { read: () => undefined, write: () => undefined }
 
     // when
-    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now, fs }).catch((error: unknown) => error)
+    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now, fs }).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(StoreIndexUnavailableError)
@@ -140,7 +153,9 @@ describe("registerStoreIndex", () => {
     DURABLE_JSON_FS.write(path, "{not json")
 
     // when
-    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now }).catch((error: unknown) => error)
+    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now }).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(StoreIndexUnavailableError)
@@ -154,7 +169,9 @@ describe("registerStoreIndex", () => {
     writeFileSync(join(agentDir, "rpc"), "file")
 
     // when
-    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now }).catch((error: unknown) => error)
+    const failure = await registerStoreIndex({ indexPath: path, storeDir: "/tmp/x-store", now: Date.now }).catch(
+      (error: unknown) => error,
+    )
 
     // then
     expect(failure).toBeInstanceOf(StoreIndexUnavailableError)
@@ -217,7 +234,9 @@ describe("registerStoreIndex", () => {
 
     // then
     await Promise.all([slowHolder, registered])
-    expect(Object.keys(readTaskStoreIndex(path).stores).sort()).toEqual([existingStore, resolve("/p2/.omo/senpi-task")].sort())
+    expect(Object.keys(readTaskStoreIndex(path).stores).sort()).toEqual(
+      [existingStore, resolve("/p2/.omo/senpi-task")].sort(),
+    )
   })
 
   test("#given compiled launcher pruning #when one indexed store is missing #then the sync port removes only that entry", async () => {
@@ -231,24 +250,27 @@ describe("registerStoreIndex", () => {
     expect(Object.keys(readTaskStoreIndex(path).stores)).toEqual([existingStore])
   })
 
-  posixHostRunnerTest("#given 32 processes each registering 25 distinct stores at once #when they all finish #then every one of the 800 stores is in the index", async () => {
+  posixHostRunnerTest(
+    "#given 32 processes each registering 25 distinct stores at once #when they all finish #then every one of the 800 stores is in the index",
+    async () => {
+      // given
+      const path = indexPath()
+      const writer = join(import.meta.dir, "__fixtures__", "register-stores.ts")
 
-    // given
-    const path = indexPath()
-    const writer = join(import.meta.dir, "__fixtures__", "register-stores.ts")
-
-    // when
-    const writers = Array.from({ length: 32 }, (_, writerIndex) =>
-      Bun.spawn([process.execPath, writer, path, `p${writerIndex}`, "25"], { stdout: "pipe", stderr: "pipe" }),
-    )
-    const failed = (
-      await Promise.all(
-        writers.map(async (child) => ({ code: await child.exited, stderr: await new Response(child.stderr).text() })),
+      // when
+      const writers = Array.from({ length: 32 }, (_, writerIndex) =>
+        Bun.spawn([process.execPath, writer, path, `p${writerIndex}`, "25"], { stdout: "pipe", stderr: "pipe" }),
       )
-    ).filter((exit) => exit.code !== 0)
+      const failed = (
+        await Promise.all(
+          writers.map(async (child) => ({ code: await child.exited, stderr: await new Response(child.stderr).text() })),
+        )
+      ).filter((exit) => exit.code !== 0)
 
-    // then
-    expect(failed).toEqual([])
-    expect(Object.keys(readTaskStoreIndex(path).stores)).toHaveLength(800)
-  }, 60_000)
+      // then
+      expect(failed).toEqual([])
+      expect(Object.keys(readTaskStoreIndex(path).stores)).toHaveLength(800)
+    },
+    60_000,
+  )
 })

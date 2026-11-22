@@ -111,24 +111,24 @@ describe("senpi-task static import guard", () => {
   test("#given the guard scanner #when fed runtime and type-only clauses #then only runtime clauses are flagged", () => {
     // given
     const runtimeSource = [
-      "import { SessionManager } from \"@code-yeongyu/senpi\"",
-      "import { Box, type Component, Text } from \"@earendil-works/pi-tui\"",
-      "import {\n  DEFAULT_MAX_BYTES,\n  type ToolDefinition,\n} from \"@code-yeongyu/senpi\"",
-      "import DefaultBinding, { type OnlyType } from \"@code-yeongyu/senpi\"",
-      "export { defineTool } from \"@code-yeongyu/senpi\"",
-      "import \"@earendil-works/pi-tui\"",
+      'import { SessionManager } from "@code-yeongyu/senpi"',
+      'import { Box, type Component, Text } from "@earendil-works/pi-tui"',
+      'import {\n  DEFAULT_MAX_BYTES,\n  type ToolDefinition,\n} from "@code-yeongyu/senpi"',
+      'import DefaultBinding, { type OnlyType } from "@code-yeongyu/senpi"',
+      'export { defineTool } from "@code-yeongyu/senpi"',
+      'import "@earendil-works/pi-tui"',
     ].join("\n")
     const typeOnlySource = [
-      "import type { ToolDefinition } from \"@code-yeongyu/senpi\"",
-      "import { type Component } from \"@earendil-works/pi-tui\"",
-      "import type { loadSkillsFromDir } from \"@code-yeongyu/senpi\"",
-      "import type DefaultBinding from \"@code-yeongyu/senpi\"",
-      "export type { Theme } from \"@code-yeongyu/senpi\"",
+      'import type { ToolDefinition } from "@code-yeongyu/senpi"',
+      'import { type Component } from "@earendil-works/pi-tui"',
+      'import type { loadSkillsFromDir } from "@code-yeongyu/senpi"',
+      'import type DefaultBinding from "@code-yeongyu/senpi"',
+      'export type { Theme } from "@code-yeongyu/senpi"',
     ].join("\n")
     const untouchedSource = [
-      "import { senpiBarrel } from \"../lazy/senpi-barrel\"",
-      "const barrel = await import(\"@code-yeongyu/senpi\")",
-      "import { Type } from \"typebox\"",
+      'import { senpiBarrel } from "../lazy/senpi-barrel"',
+      'const barrel = await import("@code-yeongyu/senpi")',
+      'import { Type } from "typebox"',
     ].join("\n")
 
     // when / then

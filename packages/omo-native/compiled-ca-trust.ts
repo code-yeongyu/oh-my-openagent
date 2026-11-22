@@ -34,7 +34,8 @@ export function parseExtraCaCertificates(text: string): string[] {
     } catch {
       throw new ExtraCaCertificatesError(`${ENGINE_EXTRA_CA_ENV} holds a certificate that cannot be read`)
     }
-    if (!certificate.ca) throw new ExtraCaCertificatesError(`${ENGINE_EXTRA_CA_ENV} holds a certificate that is not a CA`)
+    if (!certificate.ca)
+      throw new ExtraCaCertificatesError(`${ENGINE_EXTRA_CA_ENV} holds a certificate that is not a CA`)
     certificates.set(certificate.fingerprint256, certificate.toString())
   }
   if (certificates.size === 0 || normalized.replace(PEM_BLOCK, "").trim().length > 0) {

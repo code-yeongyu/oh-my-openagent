@@ -10,9 +10,15 @@ import type { RunnerOutcome } from "./child-handle"
 export type RunHoldSession = {
   pauseForRun?(owner: RunPauseOwner): Promise<EngineInheritReceipt>
   resumeForRun?(request: {
-    parentSessionId: string; parentPauseSeq: number; childSeqCutoff: number
-  }): Promise<({ readonly released: true; readonly otherHoldLive: boolean }
-    | { readonly released: false; readonly reason: "stale" | "wrong_parent" | "not_held" }) & { turnId?: string }>
+    parentSessionId: string
+    parentPauseSeq: number
+    childSeqCutoff: number
+  }): Promise<
+    (
+      | { readonly released: true; readonly otherHoldLive: boolean }
+      | { readonly released: false; readonly reason: "stale" | "wrong_parent" | "not_held" }
+    ) & { turnId?: string }
+  >
   holdInput?(input: { inputId: string; revision: number; text: string }): EngineHoldInputResult
   readonly pauseView?: {
     readonly pauseSeq?: number
@@ -23,16 +29,22 @@ export type RunHoldSession = {
 /** A turn the engine itself starts on Resume; armed before the call so its agent_start is never missed. */
 export type EngineTurnWatch = { readonly outcome: Promise<RunnerOutcome>; cancel(): void }
 
-export function createInProcessRunPause(session: RunHoldSession, watchEngineTurn: () => EngineTurnWatch): NativeRunPause | undefined {
+export function createInProcessRunPause(
+  session: RunHoldSession,
+  watchEngineTurn: () => EngineTurnWatch,
+): NativeRunPause | undefined {
   const { pauseForRun, resumeForRun, holdInput, pauseView } = session
-  if (pauseForRun === undefined || resumeForRun === undefined || holdInput === undefined || pauseView === undefined) return undefined
+  if (pauseForRun === undefined || resumeForRun === undefined || holdInput === undefined || pauseView === undefined)
+    return undefined
   return {
-    pauseForRun: owner => pauseForRun.call(session, owner),
+    pauseForRun: (owner) => pauseForRun.call(session, owner),
     async resumeForRun(request) {
       const watch = watchEngineTurn()
       try {
         const result = await resumeForRun.call(session, {
-          parentSessionId: request.parentSessionId, parentPauseSeq: request.parentPauseSeq, childSeqCutoff: request.childSeqCutoff,
+          parentSessionId: request.parentSessionId,
+          parentPauseSeq: request.parentPauseSeq,
+          childSeqCutoff: request.childSeqCutoff,
         })
         if (!result.released) {
           watch.cancel()
@@ -50,8 +62,10 @@ export function createInProcessRunPause(session: RunHoldSession, watchEngineTurn
     },
     async holdInput(parentSessionId, input) {
       // An RPC child refuses another parent at its connection; in-process the parent is checked here.
-      const owned = session.pauseView?.records.some(record =>
-        record.kind === "inherited_hold" && record.parentSessionId === parentSessionId) === true
+      const owned =
+        session.pauseView?.records.some(
+          (record) => record.kind === "inherited_hold" && record.parentSessionId === parentSessionId,
+        ) === true
       if (!owned) throw new TaskParentControlError("wrong_parent")
       return holdInput.call(session, { inputId: input.inputId, revision: input.revision, text: input.text })
     },
@@ -60,7 +74,9 @@ export function createInProcessRunPause(session: RunHoldSession, watchEngineTurn
       const view = session.pauseView
       if (view?.pauseSeq === undefined) return undefined
       return {
-        held: view.records.some(record => record.kind === "inherited_hold" && record.parentSessionId === parentSessionId),
+        held: view.records.some(
+          (record) => record.kind === "inherited_hold" && record.parentSessionId === parentSessionId,
+        ),
         childSeq: view.pauseSeq,
       }
     },

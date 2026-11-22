@@ -26,7 +26,16 @@ export function machineCandidates(home: string, arch: string = process.arch): re
   const runtimeArch = arch === "arm64" ? "arm64" : "x64"
   return [
     `/Applications/OmO.app/Contents/Resources/omo-runtime/darwin-${runtimeArch}/omo-keychain`,
-    posix.join(home, "Applications", "OmO.app", "Contents", "Resources", "omo-runtime", `darwin-${runtimeArch}`, "omo-keychain"),
+    posix.join(
+      home,
+      "Applications",
+      "OmO.app",
+      "Contents",
+      "Resources",
+      "omo-runtime",
+      `darwin-${runtimeArch}`,
+      "omo-keychain",
+    ),
     posix.join(home, ".bun", "install", "global", "node_modules", "omo-ai", "bin", "darwin", "omo-keychain"),
   ]
 }

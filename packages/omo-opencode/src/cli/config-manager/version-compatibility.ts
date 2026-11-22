@@ -32,10 +32,7 @@ function compareVersions(a: string, b: string): number {
   return 0
 }
 
-export function checkVersionCompatibility(
-  currentVersion: string | null,
-  newVersion: string
-): VersionCompatibility {
+export function checkVersionCompatibility(currentVersion: string | null, newVersion: string): VersionCompatibility {
   if (!currentVersion) {
     return {
       canUpgrade: true,

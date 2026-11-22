@@ -10,7 +10,14 @@ import { collectHits, fingerprintSource, isExcluded } from "./agent-command-stri
 describe("agent command string scan", () => {
   describe("#given a tracked file whose lines shift", () => {
     const source = ["# title", "", "run `omo doctor` to diagnose", ""].join("\n")
-    const shifted = ["# title", "", "new paragraph inserted by a docs or release commit", "", "run `omo doctor` to diagnose", ""].join("\n")
+    const shifted = [
+      "# title",
+      "",
+      "new paragraph inserted by a docs or release commit",
+      "",
+      "run `omo doctor` to diagnose",
+      "",
+    ].join("\n")
 
     test("#when a release version stamp or doc edit inserts lines above the hit #then the fingerprint is unchanged", () => {
       expect(fingerprintSource("AGENTS.md", shifted)).toEqual(fingerprintSource("AGENTS.md", source))
@@ -41,7 +48,10 @@ describe("agent command string scan", () => {
         mkdirSync(join(root, "changes/unreleased"), { recursive: true })
         writeFileSync(join(root, "changes/unreleased/11370.md"), "- `omo run` now uses a per-run password\n")
         writeFileSync(join(root, "guide.md"), "run `omo doctor`\n")
-        for (const args of [["init", "-q"], ["add", "."]]) {
+        for (const args of [
+          ["init", "-q"],
+          ["add", "."],
+        ]) {
           expect(Bun.spawnSync(["git", ...args], { cwd: root }).exitCode).toBe(0)
         }
         expect(isExcluded("changes/unreleased/11370.md")).toBe(true)
@@ -59,7 +69,10 @@ describe("agent command string scan", () => {
         mkdirSync(join(root, "changes/unreleased"), { recursive: true })
         mkdirSync(join(root, "packages/omo-native"), { recursive: true })
         const entry = "## 2026-11-06 - Doctor names the wrapper\n\n`omo doctor` now reports it.\n"
-        writeFileSync(join(root, "changes/unreleased/12534.md"), `${entry}<!-- changes-log: packages/omo-native/changes.md -->\n`)
+        writeFileSync(
+          join(root, "changes/unreleased/12534.md"),
+          `${entry}<!-- changes-log: packages/omo-native/changes.md -->\n`,
+        )
         writeFileSync(join(root, "changes.md"), "")
         writeFileSync(join(root, "packages/omo-native/changes.md"), "")
         writeFileSync(join(root, "guide.md"), "run `omo doctor`\n")

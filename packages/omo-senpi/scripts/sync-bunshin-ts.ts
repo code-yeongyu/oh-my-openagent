@@ -16,20 +16,20 @@ import { join, relative, sep } from "node:path"
 // src/bunshin-ts-vendor.test.ts holds the vendored bytes to PIN.json between syncs.
 
 type PinnedPackage = {
-	readonly name: string
-	readonly version: string
-	readonly commit: string
-	readonly packageDir: string
-	readonly dependencies: Readonly<Record<string, string>>
-	readonly files: Readonly<Record<string, string>>
+  readonly name: string
+  readonly version: string
+  readonly commit: string
+  readonly packageDir: string
+  readonly dependencies: Readonly<Record<string, string>>
+  readonly files: Readonly<Record<string, string>>
 }
 
 type Pin = { readonly note: string; readonly packages: Readonly<Record<string, PinnedPackage>> }
 
 type PublishManifest = {
-	readonly name: string
-	readonly version: string
-	readonly dependencies?: Readonly<Record<string, string>>
+  readonly name: string
+  readonly version: string
+  readonly dependencies?: Readonly<Record<string, string>>
 }
 
 const VENDOR_ROOT = join(import.meta.dir, "..", "vendor")
@@ -48,134 +48,148 @@ const isVendored = (path: string): boolean => path !== MANIFEST
 // `<prefix><name>/*` to omo-senpi's own exactly pinned install of that dependency.
 export const DEPENDENCY_IMPORT_PREFIX = "#bunshin-ts-dep/"
 
-const ownsSpecifier = (name: string, specifier: string): boolean => specifier === name || specifier.startsWith(`${name}/`)
+const ownsSpecifier = (name: string, specifier: string): boolean =>
+  specifier === name || specifier.startsWith(`${name}/`)
 
 export const pinDependencyImports = (source: string, dependencies: readonly string[]): string => {
-	const pinned = source.replace(
-		/(\bfrom\s*|\bimport\s*)(["'])([^"']+)\2/g,
-		(statement, keyword: string, quote: string, specifier: string) =>
-			dependencies.some((name) => ownsSpecifier(name, specifier))
-				? `${keyword}${quote}${DEPENDENCY_IMPORT_PREFIX}${specifier}${quote}`
-				: statement,
-	)
-	const bare = new Bun.Transpiler({ loader: "js" })
-		.scanImports(pinned)
-		.map((entry) => entry.path)
-		.filter((specifier) => dependencies.some((name) => ownsSpecifier(name, specifier)))
-	if (bare.length > 0) throw new Error(`bare dependency imports left after pinning: ${[...new Set(bare)].join(", ")}`)
-	return pinned
+  const pinned = source.replace(
+    /(\bfrom\s*|\bimport\s*)(["'])([^"']+)\2/g,
+    (statement, keyword: string, quote: string, specifier: string) =>
+      dependencies.some((name) => ownsSpecifier(name, specifier))
+        ? `${keyword}${quote}${DEPENDENCY_IMPORT_PREFIX}${specifier}${quote}`
+        : statement,
+  )
+  const bare = new Bun.Transpiler({ loader: "js" })
+    .scanImports(pinned)
+    .map((entry) => entry.path)
+    .filter((specifier) => dependencies.some((name) => ownsSpecifier(name, specifier)))
+  if (bare.length > 0) throw new Error(`bare dependency imports left after pinning: ${[...new Set(bare)].join(", ")}`)
+  return pinned
 }
 
 const rewriteDependencyImports = (out: string, dependencies: readonly string[]): void => {
-	if (dependencies.length === 0) return
-	for (const file of walk(out).filter((path) => /\.[cm]?js$/.test(path))) {
-		writeFileSync(file, pinDependencyImports(readFileSync(file, "utf8"), dependencies))
-	}
+  if (dependencies.length === 0) return
+  for (const file of walk(out).filter((path) => /\.[cm]?js$/.test(path))) {
+    writeFileSync(file, pinDependencyImports(readFileSync(file, "utf8"), dependencies))
+  }
 }
 
 const portable = (root: string, file: string): string => relative(root, file).split(sep).join("/")
 
 const run = async (command: readonly string[], cwd: string): Promise<string> => {
-	const child = Bun.spawn([...command], { cwd, stdout: "pipe", stderr: "pipe" })
-	const [out, err, code] = await Promise.all([
-		new Response(child.stdout).text(),
-		new Response(child.stderr).text(),
-		child.exited,
-	])
-	if (code !== 0) throw new Error(`${command.join(" ")} exited ${code} in ${cwd}:\n${err.trim()}`)
-	return out.trim()
+  const child = Bun.spawn([...command], { cwd, stdout: "pipe", stderr: "pipe" })
+  const [out, err, code] = await Promise.all([
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
+  if (code !== 0) throw new Error(`${command.join(" ")} exited ${code} in ${cwd}:\n${err.trim()}`)
+  return out.trim()
 }
 
 const sha256 = (bytes: Uint8Array): string => new Bun.CryptoHasher("sha256").update(bytes).digest("hex")
 
 const walk = (dir: string): string[] =>
-	readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-		entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)],
-	)
+  readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? walk(join(dir, entry.name)) : [join(dir, entry.name)],
+  )
 
 export const digestTree = (dir: string): Record<string, string> =>
-	Object.fromEntries(
-		walk(dir)
-			.map((file) => [portable(dir, file), sha256(readFileSync(file))] as const)
-			.filter(([path]) => isVendored(path))
-			.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
-	)
+  Object.fromEntries(
+    walk(dir)
+      .map((file) => [portable(dir, file), sha256(readFileSync(file))] as const)
+      .filter(([path]) => isVendored(path))
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  )
 
 export const copyVendored = (out: string, dest: string): void => {
-	cpSync(out, dest, { recursive: true, filter: (src) => src === out || isVendored(portable(out, src)) })
+  cpSync(out, dest, { recursive: true, filter: (src) => src === out || isVendored(portable(out, src)) })
 }
 
 const flag = (argv: readonly string[], name: string): string | undefined => {
-	const at = argv.indexOf(name)
-	return at >= 0 ? argv[at + 1] : undefined
+  const at = argv.indexOf(name)
+  return at >= 0 ? argv[at + 1] : undefined
 }
 
+/**
+ * `git archive <commit> | tar -x` into `tree`. Every path reaches the shell as a positional argument, never
+ * spliced into the script, so a TMPDIR holding a quote, `$` or a backtick cannot break or alter it (#12498).
+ */
+export const archiveExtractCommand = (checkout: string, commit: string, tree: string): string[] => [
+  "sh",
+  "-c",
+  'mkdir -p "$2" && git -C "$0" archive "$1" | tar -x -C "$2"',
+  checkout,
+  commit,
+  tree,
+]
+
 const buildAt = async (checkout: string, pinned: PinnedPackage, commit: string, work: string): Promise<string> => {
-	const tree = join(work, "tree")
-	const out = join(work, "out")
-	const sha = await run(["git", "-C", checkout, "rev-parse", "--verify", `${commit}^{commit}`], work)
-	await run(["sh", "-c", `mkdir -p "${tree}" && git -C "$0" archive "$1" | tar -x -C "${tree}"`, checkout, sha], work)
-	await run(["bun", "install", "--frozen-lockfile", "--ignore-scripts"], tree)
-	await run(["bun", join(pinned.packageDir, "scripts", "build.ts"), out], tree)
-	return out
+  const tree = join(work, "tree")
+  const out = join(work, "out")
+  const sha = await run(["git", "-C", checkout, "rev-parse", "--verify", `${commit}^{commit}`], work)
+  await run(archiveExtractCommand(checkout, sha, tree), work)
+  await run(["bun", "install", "--frozen-lockfile", "--ignore-scripts"], tree)
+  await run(["bun", join(pinned.packageDir, "scripts", "build.ts"), out], tree)
+  return out
 }
 
 const syncPackage = async (
-	key: string,
-	pinned: PinnedPackage,
-	checkout: string,
-	commit: string,
-	write: boolean,
+  key: string,
+  pinned: PinnedPackage,
+  checkout: string,
+  commit: string,
+  write: boolean,
 ): Promise<PinnedPackage | undefined> => {
-	const work = mkdtempSync(join(tmpdir(), `sync-${key}-`))
-	try {
-		const out = await buildAt(checkout, pinned, commit, work)
-		const manifest = JSON.parse(readFileSync(join(out, MANIFEST), "utf8")) as PublishManifest
-		rewriteDependencyImports(out, Object.keys(manifest.dependencies ?? {}))
-		const next: PinnedPackage = {
-			...pinned,
-			name: manifest.name,
-			version: manifest.version,
-			commit: await run(["git", "-C", checkout, "rev-parse", `${commit}^{commit}`], work),
-			dependencies: manifest.dependencies ?? {},
-			files: digestTree(out),
-		}
-		if (JSON.stringify(next) === JSON.stringify(pinned)) {
-			console.log(`${key}: matches ${pinned.name}@${pinned.version} built at ${pinned.commit}`)
-			return undefined
-		}
-		const drifted = Object.keys({ ...pinned.files, ...next.files }).filter((p) => pinned.files[p] !== next.files[p])
-		console.log(`${key}: differs from PIN (${drifted.length} file(s)): ${drifted.join(", ") || "manifest only"}`)
-		if (!write) return next
-		rmSync(join(VENDOR_ROOT, key), { recursive: true, force: true })
-		copyVendored(out, join(VENDOR_ROOT, key))
-		return next
-	} finally {
-		rmSync(work, { recursive: true, force: true })
-	}
+  const work = mkdtempSync(join(tmpdir(), `sync-${key}-`))
+  try {
+    const out = await buildAt(checkout, pinned, commit, work)
+    const manifest = JSON.parse(readFileSync(join(out, MANIFEST), "utf8")) as PublishManifest
+    rewriteDependencyImports(out, Object.keys(manifest.dependencies ?? {}))
+    const next: PinnedPackage = {
+      ...pinned,
+      name: manifest.name,
+      version: manifest.version,
+      commit: await run(["git", "-C", checkout, "rev-parse", `${commit}^{commit}`], work),
+      dependencies: manifest.dependencies ?? {},
+      files: digestTree(out),
+    }
+    if (JSON.stringify(next) === JSON.stringify(pinned)) {
+      console.log(`${key}: matches ${pinned.name}@${pinned.version} built at ${pinned.commit}`)
+      return undefined
+    }
+    const drifted = Object.keys({ ...pinned.files, ...next.files }).filter((p) => pinned.files[p] !== next.files[p])
+    console.log(`${key}: differs from PIN (${drifted.length} file(s)): ${drifted.join(", ") || "manifest only"}`)
+    if (!write) return next
+    rmSync(join(VENDOR_ROOT, key), { recursive: true, force: true })
+    copyVendored(out, join(VENDOR_ROOT, key))
+    return next
+  } finally {
+    rmSync(work, { recursive: true, force: true })
+  }
 }
 
 const main = async (argv: readonly string[]): Promise<number> => {
-	const pin = JSON.parse(readFileSync(PIN_PATH, "utf8")) as Pin
-	const write = argv.includes("--write")
-	const recommits = new Map(
-		argv.flatMap((arg, i) => (argv[i - 1] === "--commit" ? [arg.split("=", 2) as [string, string]] : [])),
-	)
-	const packages: Record<string, PinnedPackage> = { ...pin.packages }
-	let drift = false
-	for (const [key, pinned] of Object.entries(pin.packages)) {
-		const checkout = flag(argv, `--${key}`)
-		if (checkout === undefined) throw new Error(`pass --${key} <local checkout of the ${pinned.name} source>`)
-		const next = await syncPackage(key, pinned, checkout, recommits.get(key) ?? pinned.commit, write)
-		if (next === undefined) continue
-		drift = true
-		packages[key] = next
-	}
-	if (!drift) return 0
-	if (!write) return 1
-	await Bun.write(PIN_PATH, `${JSON.stringify({ ...pin, packages }, null, "\t")}\n`)
-	console.log("vendor/PIN.json updated; rebuild the plugin (build-extension.mjs) and commit vendor/ with it")
-	return 0
+  const pin = JSON.parse(readFileSync(PIN_PATH, "utf8")) as Pin
+  const write = argv.includes("--write")
+  const recommits = new Map(
+    argv.flatMap((arg, i) => (argv[i - 1] === "--commit" ? [arg.split("=", 2) as [string, string]] : [])),
+  )
+  const packages: Record<string, PinnedPackage> = { ...pin.packages }
+  let drift = false
+  for (const [key, pinned] of Object.entries(pin.packages)) {
+    const checkout = flag(argv, `--${key}`)
+    if (checkout === undefined) throw new Error(`pass --${key} <local checkout of the ${pinned.name} source>`)
+    const next = await syncPackage(key, pinned, checkout, recommits.get(key) ?? pinned.commit, write)
+    if (next === undefined) continue
+    drift = true
+    packages[key] = next
+  }
+  if (!drift) return 0
+  if (!write) return 1
+  await Bun.write(PIN_PATH, `${JSON.stringify({ ...pin, packages }, null, "\t")}\n`)
+  console.log("vendor/PIN.json updated; rebuild the plugin (build-extension.mjs) and commit vendor/ with it")
+  return 0
 }
 
 if (import.meta.main) process.exit(await main(process.argv.slice(2)))

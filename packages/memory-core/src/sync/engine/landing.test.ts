@@ -28,7 +28,9 @@ test("win32 refuses a path at or past the length its git opens, and only from th
   expect(grammarValidKeyOfLength(longestAllowed)).toHaveLength(longestAllowed)
   expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed), "win32")).toBeNull()
   expect(commitPathProblem(`${GIT_WINDOWS_ROOT}\\`, grammarValidKeyOfLength(longestAllowed), "win32")).toBeNull()
-  expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed + 1), "win32")).toBe("git-path-too-long")
+  expect(commitPathProblem(GIT_WINDOWS_ROOT, grammarValidKeyOfLength(longestAllowed + 1), "win32")).toBe(
+    "git-path-too-long",
+  )
 })
 
 test("win32 refuses a key inside the grammar whose working path git cannot open", () => {
@@ -48,40 +50,46 @@ test("a landing follows this platform's git capacity", async () => {
   try {
     const key = grammarValidKeyOfLength(300)
     // POSIX decides through its own probe and accepts this path; Windows reaches the same key past MAX_PATH, where git could not stage it, so it is refused before anything is written.
-    expect(await prepareLanding(root, key)).toEqual(process.platform === "win32" ? { refused: "git-path-too-long" } : { path: key, working: null })
+    expect(await prepareLanding(root, key)).toEqual(
+      process.platform === "win32" ? { refused: "git-path-too-long" } : { path: key, working: null },
+    )
   } finally {
     await rm(root, { recursive: true, force: true })
   }
 })
 
-posix("a FIFO at a received key's path is refused with a receipt instead of blocking the cycle", async () => {
-  const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
-  try {
-    const key = "memory/note.md"
-    await mkdir(join(root, "memory"), { recursive: true })
-    const made = Bun.spawn(["mkfifo", join(root, key)])
-    expect(await made.exited).toBe(0)
-    // The pre-fix code read the leaf here, which blocks on a FIFO until a writer opens it. The
-    // bounded race keeps that run from hanging the suite: it settles as a timeout instead.
-    // #12568 review: clear the 5-second race timer once `prepareLanding` wins, so the test
-    // does not leave a stray timer alive after it settles.
-    let timeoutId: ReturnType<typeof setTimeout> | undefined
-    const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
-      timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
-    })
+posix(
+  "a FIFO at a received key's path is refused with a receipt instead of blocking the cycle",
+  async () => {
+    const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))
     try {
-      const settled = await Promise.race([
-        prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
-        timeout,
-      ])
-      expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+      const key = "memory/note.md"
+      await mkdir(join(root, "memory"), { recursive: true })
+      const made = Bun.spawn(["mkfifo", join(root, key)])
+      expect(await made.exited).toBe(0)
+      // The pre-fix code read the leaf here, which blocks on a FIFO until a writer opens it. The
+      // bounded race keeps that run from hanging the suite: it settles as a timeout instead.
+      // #12568 review: clear the 5-second race timer once `prepareLanding` wins, so the test
+      // does not leave a stray timer alive after it settles.
+      let timeoutId: ReturnType<typeof setTimeout> | undefined
+      const timeout = new Promise<{ kind: "timed-out" }>((resolve) => {
+        timeoutId = setTimeout(() => resolve({ kind: "timed-out" }), 5_000)
+      })
+      try {
+        const settled = await Promise.race([
+          prepareLanding(root, key).then((result) => ({ kind: "landed" as const, result })),
+          timeout,
+        ])
+        expect(settled).toEqual({ kind: "landed", result: { refused: "non-regular-file" } })
+      } finally {
+        if (timeoutId !== undefined) clearTimeout(timeoutId)
+      }
     } finally {
-      if (timeoutId !== undefined) clearTimeout(timeoutId)
+      await rm(root, { recursive: true, force: true })
     }
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
-}, 10_000)
+  },
+  10_000,
+)
 
 test("an existing directory at a received key's path is refused as a non-regular leaf", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-sync-landing-"))

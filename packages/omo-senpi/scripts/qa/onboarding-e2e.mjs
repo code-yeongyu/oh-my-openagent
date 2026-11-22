@@ -22,8 +22,11 @@ const before = {
 const requests = []
 const server = startMockCompletionsServer({
   steps: [
-    ...(scenario === "failure" ? [{ type: "error", status: 400, body: { error: { message: "synthetic terminal failure" } } }] : []),
-    { type: "text", text: "first response" }, { type: "text", text: "second response" },
+    ...(scenario === "failure"
+      ? [{ type: "error", status: 400, body: { error: { message: "synthetic terminal failure" } } }]
+      : []),
+    { type: "text", text: "first response" },
+    { type: "text", text: "second response" },
   ],
   onRequest: (body) => requests.push(body),
 })
@@ -36,30 +39,60 @@ try {
   sandbox.memoryHome = join(sandbox.root, "memory")
   mkdirSync(sandbox.sessionsDir, { recursive: true })
   // Load the actual component through the real extension loader, without unrelated components.
-  writeFileSync(join(sandbox.agentDir, "settings.json"), JSON.stringify({
-    defaultProjectTrust: "ask", packages: [], sessionTitle: { enabled: false },
-  }))
-  writeFileSync(join(sandbox.agentDir, "models.json"), JSON.stringify({
-    providers: {
-      "omo-mock": {
-        api: "openai-completions", baseUrl: await server.ready, apiKey: "mock",
-        models: [{ id: "mock-1", name: "Mock", reasoning: false, input: ["text"],
-          cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 200000, maxTokens: 8192 }],
+  writeFileSync(
+    join(sandbox.agentDir, "settings.json"),
+    JSON.stringify({
+      defaultProjectTrust: "ask",
+      packages: [],
+      sessionTitle: { enabled: false },
+    }),
+  )
+  writeFileSync(
+    join(sandbox.agentDir, "models.json"),
+    JSON.stringify({
+      providers: {
+        "omo-mock": {
+          api: "openai-completions",
+          baseUrl: await server.ready,
+          apiKey: "mock",
+          models: [
+            {
+              id: "mock-1",
+              name: "Mock",
+              reasoning: false,
+              input: ["text"],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 200000,
+              maxTokens: 8192,
+            },
+          ],
+        },
       },
-    },
-  }))
+    }),
+  )
   const command = {
     file: process.execPath,
-    prefix: [join(repo, "node_modules/@code-yeongyu/senpi/dist/cli.js"),
-      "--multi-session", "--session-runtime", "in-process", "--no-extensions", "-e", join(here, "onboarding-extension.ts"),
-      ...(scenario === "forced" ? ["--onboard"] : [])],
+    prefix: [
+      join(repo, "node_modules/@code-yeongyu/senpi/dist/cli.js"),
+      "--multi-session",
+      "--session-runtime",
+      "in-process",
+      "--no-extensions",
+      "-e",
+      join(here, "onboarding-extension.ts"),
+      ...(scenario === "forced" ? ["--onboard"] : []),
+    ],
   }
   session = launchRpc(command, sandbox, sandboxEnv(sandbox))
   let sequence = 0
   const request = async (command) => {
     const id = `onboarding-${++sequence}`
-    const response = session.waitFrom(session.mark(),
-      (event) => event.type === "response" && event.id === id, 60_000, command.type)
+    const response = session.waitFrom(
+      session.mark(),
+      (event) => event.type === "response" && event.id === id,
+      60_000,
+      command.type,
+    )
     session.send({ id, ...command })
     const result = await response
     assert.equal(result.success, true, JSON.stringify(result.error))
@@ -77,19 +110,33 @@ try {
   let sessionId = opened.sessionId
   const outcomes = []
   const send = async (message) => {
-    const ended = session.waitFrom(session.mark(),
-      (event) => event.type === "agent_end" && event.sessionId === sessionId, 60_000, "agent_end")
-    const settled = session.waitFrom(session.mark(),
-      (event) => event.type === "agent_settled" && event.sessionId === sessionId, 60_000, "agent_settled")
+    const ended = session.waitFrom(
+      session.mark(),
+      (event) => event.type === "agent_end" && event.sessionId === sessionId,
+      60_000,
+      "agent_end",
+    )
+    const settled = session.waitFrom(
+      session.mark(),
+      (event) => event.type === "agent_settled" && event.sessionId === sessionId,
+      60_000,
+      "agent_settled",
+    )
     await request({ type: "prompt", sessionId, message })
     outcomes.push(await ended)
     await settled
   }
   await send("Fix my test")
   assert.equal(requests.length, 1, "the first prompt must make exactly one request")
-  assert.equal(existsSync(marker), scenario !== "failure", JSON.stringify({
-    outcomes, stderr: session.stderr(), surfaces: await request({ type: "get_loaded_surfaces", sessionId }),
-  }))
+  assert.equal(
+    existsSync(marker),
+    scenario !== "failure",
+    JSON.stringify({
+      outcomes,
+      stderr: session.stderr(),
+      surfaces: await request({ type: "get_loaded_surfaces", sessionId }),
+    }),
+  )
   const messages = await request({ type: "get_messages", sessionId })
   const contexts = messages.messages.filter((message) => message.customType === "omo-onboarding:context")
   assert.equal(contexts.length, 1)
@@ -98,8 +145,10 @@ try {
   // #12150: the context names the skill by its stable name and embeds no install path.
   assert.ok(contexts[0].content.includes(skillPointer), "emitted skill pointer must name the built-in onboarding skill")
   assert.ok(!contexts[0].content.includes("/onboarding/SKILL.md"), "emitted context must not embed the install path")
-  assert.ok(JSON.stringify(requests[0]).includes(JSON.stringify(contexts[0].content).slice(1, -1)),
-    "same provider request must contain the injected context")
+  assert.ok(
+    JSON.stringify(requests[0]).includes(JSON.stringify(contexts[0].content).slice(1, -1)),
+    "same provider request must contain the injected context",
+  )
   await send("And the next test")
   assert.equal(requests.length, 2, "no extra onboarding turn after the second prompt")
   assert.equal(existsSync(marker), true, "retry must reclaim the marker")
@@ -128,10 +177,16 @@ try {
       await send(`Continue ${name}`)
       sessionPath = (await request({ type: "get_state", sessionId })).sessionFile
       const later = await request({ type: "get_messages", sessionId })
-      assert.equal(later.messages.filter((message) => message.customType === "omo-onboarding:context").length, 0,
-        JSON.stringify({ transition: name, marker: existsSync(marker), stderr: session.stderr(), contexts: later.messages.filter(
-          (message) => message.customType === "omo-onboarding:context",
-        ) }))
+      assert.equal(
+        later.messages.filter((message) => message.customType === "omo-onboarding:context").length,
+        0,
+        JSON.stringify({
+          transition: name,
+          marker: existsSync(marker),
+          stderr: session.stderr(),
+          contexts: later.messages.filter((message) => message.customType === "omo-onboarding:context"),
+        }),
+      )
       transitions.push(name)
     }
     await request({ type: "close_session", sessionId })
@@ -144,10 +199,20 @@ try {
   }
   assert.deepEqual(after, before)
   const result = {
-    verdict: "PASS", scenario, surface: "real pinned Senpi RPC with built onboarding component",
-    backgroundSessions: 3, backgroundRequests: 0, firstPromptRequests: 1, totalRequestsAfterTwoPrompts: 2,
-    hiddenContextCount: 1, contextCounts, transitions, markerClaimedOnFirstPrompt: scenario !== "failure", realSenpiUntouched: true,
-    isolatedAgentDir: sandbox.agentDir, cleanup,
+    verdict: "PASS",
+    scenario,
+    surface: "real pinned Senpi RPC with built onboarding component",
+    backgroundSessions: 3,
+    backgroundRequests: 0,
+    firstPromptRequests: 1,
+    totalRequestsAfterTwoPrompts: 2,
+    hiddenContextCount: 1,
+    contextCounts,
+    transitions,
+    markerClaimedOnFirstPrompt: scenario !== "failure",
+    realSenpiUntouched: true,
+    isolatedAgentDir: sandbox.agentDir,
+    cleanup,
   }
   writeFileSync(join(evidence, `onboarding-live-${scenario}.json`), JSON.stringify(result, null, 2) + "\n")
   console.log(JSON.stringify(result))

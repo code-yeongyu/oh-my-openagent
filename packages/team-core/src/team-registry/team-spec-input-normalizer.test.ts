@@ -81,9 +81,10 @@ describe("normalizeTeamSpecInput", () => {
     }
 
     // when
-    const result = () => normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("explore"),
-    })
+    const result = () =>
+      normalizeTeamSpecInput(rawSpec, {
+        callerTeamLead: resolveCallerTeamLead("explore"),
+      })
 
     // then
     expect(result).toThrow("Caller agent explore is not eligible as team lead; specify leadAgentId explicitly")
@@ -100,9 +101,10 @@ describe("normalizeTeamSpecInput", () => {
     }
 
     // when
-    const result = () => normalizeTeamSpecInput(rawSpec, {
-      callerTeamLead: resolveCallerTeamLead("explore"),
-    })
+    const result = () =>
+      normalizeTeamSpecInput(rawSpec, {
+        callerTeamLead: resolveCallerTeamLead("explore"),
+      })
 
     // then
     expect(result).toThrow("Caller agent explore is not eligible as team lead; specify leadAgentId explicitly")
@@ -129,11 +131,7 @@ describe("normalizeTeamSpecInput", () => {
     expect(normalizedSpec).toMatchObject({
       name: "project-analysis-team",
       leadAgentId: "agent-lead",
-      members: [
-        { name: "agent-lead" },
-        { name: "agent-1-structure-analyst" },
-        { name: "agent-1-structure-analyst-2" },
-      ],
+      members: [{ name: "agent-lead" }, { name: "agent-1-structure-analyst" }, { name: "agent-1-structure-analyst-2" }],
     })
   })
 
@@ -141,9 +139,7 @@ describe("normalizeTeamSpecInput", () => {
     // given
     const rawSpec = {
       name: "analysis-team",
-      members: [
-        { name: "Structure Analyst", role: "Structure Analyst", capabilities: ["structure", "modules"] },
-      ],
+      members: [{ name: "Structure Analyst", role: "Structure Analyst", capabilities: ["structure", "modules"] }],
     }
 
     // when
@@ -156,7 +152,12 @@ describe("normalizeTeamSpecInput", () => {
     expect(normalizedSpec).toMatchObject({
       members: [
         { name: "lead", kind: "subagent_type" },
-        { name: "structure-analyst", kind: "category", category: "analysis", prompt: "Role: Structure Analyst\nstructure, modules" },
+        {
+          name: "structure-analyst",
+          kind: "category",
+          category: "analysis",
+          prompt: "Role: Structure Analyst\nstructure, modules",
+        },
       ],
     })
   })
@@ -197,7 +198,16 @@ describe("normalizeTeamSpecInput", () => {
     const rawSpec = {
       name: "hyperplan-smoke-test",
       members: [
-        { name: "worker", kind: "category", category: "quick", subagent_type: "", prompt: "Temporary smoke test member.", cwd: "", worktreePath: "", color: "" },
+        {
+          name: "worker",
+          kind: "category",
+          category: "quick",
+          subagent_type: "",
+          prompt: "Temporary smoke test member.",
+          cwd: "",
+          worktreePath: "",
+          color: "",
+        },
       ],
       leadAgentId: "",
       sessionPermission: "",

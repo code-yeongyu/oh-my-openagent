@@ -31,10 +31,7 @@ const BUILTIN_SKILLS = new Set<string>(BUILTIN_SKILL_NAMES)
 const BUILTIN_CATEGORIES = new Set<string>(BUILTIN_CATEGORY_NAMES)
 const BUILTIN_AGENTS = new Set<string>(CURATED_AGENTS)
 
-export function registerOmoNativeToolTelemetry(
-  pi: SenpiExtensionAPI,
-  options: ToolTelemetryOptions,
-): void {
+export function registerOmoNativeToolTelemetry(pi: SenpiExtensionAPI, options: ToolTelemetryOptions): void {
   const featureUsage = new Map<string, Set<string>>()
   const sessionHash = options.hashSessionId ?? hashSessionId
   const skillsRoot = options.skillsRoot ?? getBuiltinSkillsRoot()
@@ -84,10 +81,7 @@ export function registerOmoNativeToolTelemetry(
   })
 }
 
-function readToolResult(
-  value: unknown,
-  diagnostics: ToolTelemetryOptions["diagnostics"],
-): ToolResult | undefined {
+function readToolResult(value: unknown, diagnostics: ToolTelemetryOptions["diagnostics"]): ToolResult | undefined {
   if (!isRecord(value) || value.type !== "tool_result" || typeof value.toolName !== "string") return undefined
   if (!isRecord(value.input)) {
     diagnostics?.("omo-native tool_result missing input", { toolName: value.toolName })
@@ -122,7 +116,13 @@ export function builtinSkillNameFromCanonicalPaths(
   const comparableRoot = windows ? windowsPathWithoutNamespace(root) : root
   const comparableTarget = windows ? windowsPathWithoutNamespace(target) : target
   const pathFromRoot = path.relative(comparableRoot, comparableTarget)
-  if (pathFromRoot === "" || pathFromRoot.startsWith(`..${path.sep}`) || pathFromRoot === ".." || path.isAbsolute(pathFromRoot)) return undefined
+  if (
+    pathFromRoot === "" ||
+    pathFromRoot.startsWith(`..${path.sep}`) ||
+    pathFromRoot === ".." ||
+    path.isAbsolute(pathFromRoot)
+  )
+    return undefined
   const parts = pathFromRoot.split(path.sep)
   if (parts.length !== 2) return undefined
   const skillName = parts[0]
@@ -160,9 +160,7 @@ function spawnTarget(item: Record<string, unknown>, parent: Record<string, unkno
   const category = itemCategory ?? (itemSubagent === undefined ? identifier(parent.category) : undefined)
   const subagent = itemSubagent ?? (itemCategory === undefined ? identifier(parent.subagent_type) : undefined)
   if ((category === undefined) === (subagent === undefined)) return undefined
-  return category === undefined
-    ? { kind: "subagent", name: subagent ?? "" }
-    : { kind: "category", name: category }
+  return category === undefined ? { kind: "subagent", name: subagent ?? "" } : { kind: "category", name: category }
 }
 
 function featureForTool(toolName: string): "goal_tool" | "team_create" | "memory_tool" | undefined {
@@ -188,7 +186,12 @@ function extractSessionId(eventContext: unknown): string | undefined {
 function matchesToolName(toolName: string, expected: string): boolean {
   const normalized = normalizeToolName(toolName)
   const suffix = normalizeToolName(expected)
-  return normalized === suffix || normalized.endsWith(`_${suffix}`) || normalized.endsWith(`:${suffix}`) || normalized.endsWith(`/${suffix}`)
+  return (
+    normalized === suffix ||
+    normalized.endsWith(`_${suffix}`) ||
+    normalized.endsWith(`:${suffix}`) ||
+    normalized.endsWith(`/${suffix}`)
+  )
 }
 
 function normalizeToolName(toolName: string): string {

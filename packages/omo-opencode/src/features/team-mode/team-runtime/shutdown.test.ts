@@ -9,12 +9,7 @@ import { getRuntimeStateDir, resolveBaseDir } from "../team-registry/paths"
 import * as runtimeStateStore from "../team-state-store/store"
 import { loadRuntimeState, transitionRuntimeState } from "../team-state-store/store"
 import type { DeleteTeamDeps } from "./delete-team"
-import {
-  createFixture,
-  createTestMessage,
-  readInboxMessages,
-  updateMemberStatuses,
-} from "./shutdown-test-fixtures"
+import { createFixture, createTestMessage, readInboxMessages, updateMemberStatuses } from "./shutdown-test-fixtures"
 import {
   clearSessionTeamRunCleanupRegistry,
   getSessionCreatedTeamRunIds,
@@ -27,9 +22,11 @@ describe("team-runtime shutdown", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
     clearSessionTeamRunCleanupRegistry()
     mock.restore()
   })
@@ -48,7 +45,9 @@ describe("team-runtime shutdown", () => {
 
     // then
     await result.then(
-      () => { throw new Error("expected deleteTeam to reject") },
+      () => {
+        throw new Error("expected deleteTeam to reject")
+      },
       (error: unknown) => {
         if (!(error instanceof Error)) throw error
         expect(error.message).toBe("members still active")
@@ -56,10 +55,9 @@ describe("team-runtime shutdown", () => {
     )
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
     expect(runtimeState.status).toBe("active")
-    expect(runtimeState.members.filter((member) => member.agentType !== "leader").map((member) => member.status)).toEqual([
-      "running",
-      "running",
-    ])
+    expect(
+      runtimeState.members.filter((member) => member.agentType !== "leader").map((member) => member.status),
+    ).toEqual(["running", "running"])
   })
 
   test("writes shutdown requests to the target inbox and records runtime metadata", async () => {
@@ -74,12 +72,14 @@ describe("team-runtime shutdown", () => {
     const inboxMessages = await readInboxMessages(fixture.teamRunId, "member-a", fixture.config)
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
     expect(inboxMessages).toHaveLength(1)
-    expect(inboxMessages[0]).toEqual(expect.objectContaining({
-      from: "lead",
-      to: "member-a",
-      kind: "shutdown_request",
-      body: "",
-    }))
+    expect(inboxMessages[0]).toEqual(
+      expect.objectContaining({
+        from: "lead",
+        to: "member-a",
+        kind: "shutdown_request",
+        body: "",
+      }),
+    )
     expect(runtimeState.shutdownRequests).toEqual([
       expect.objectContaining({
         memberId: "member-a",
@@ -101,15 +101,20 @@ describe("team-runtime shutdown", () => {
     // then
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
     const leadInboxMessages = await readInboxMessages(fixture.teamRunId, "lead", fixture.config)
-    const approvedRequest = runtimeState.shutdownRequests.find((shutdownRequest) => shutdownRequest.memberId === "member-a")
+    const approvedRequest = runtimeState.shutdownRequests.find(
+      (shutdownRequest) => shutdownRequest.memberId === "member-a",
+    )
     expect(approvedRequest?.approvedAt).toEqual(expect.any(Number))
     expect(runtimeState.members.find((member) => member.name === "member-a")?.status).toBe("shutdown_approved")
-    expect(leadInboxMessages.some((message) => (
-      message.kind === "shutdown_approved"
-      && message.from === "member-a"
-      && message.to === "lead"
-      && message.body === "member-a"
-    ))).toBe(true)
+    expect(
+      leadInboxMessages.some(
+        (message) =>
+          message.kind === "shutdown_approved" &&
+          message.from === "member-a" &&
+          message.to === "lead" &&
+          message.body === "member-a",
+      ),
+    ).toBe(true)
   })
 
   test("rejects shutdown requests and replies to the original requester", async () => {
@@ -124,17 +129,24 @@ describe("team-runtime shutdown", () => {
     // then
     const runtimeState = await loadRuntimeState(fixture.teamRunId, fixture.config)
     const leadInboxMessages = await readInboxMessages(fixture.teamRunId, "lead", fixture.config)
-    const rejectedRequest = runtimeState.shutdownRequests.find((shutdownRequest) => shutdownRequest.memberId === "member-a")
-    expect(rejectedRequest).toEqual(expect.objectContaining({
-      rejectedAt: expect.any(Number),
-      rejectedReason: "not done yet",
-    }))
-    expect(leadInboxMessages.some((message) => (
-      message.kind === "shutdown_rejected"
-      && message.from === "member-a"
-      && message.to === "lead"
-      && message.body === "not done yet"
-    ))).toBe(true)
+    const rejectedRequest = runtimeState.shutdownRequests.find(
+      (shutdownRequest) => shutdownRequest.memberId === "member-a",
+    )
+    expect(rejectedRequest).toEqual(
+      expect.objectContaining({
+        rejectedAt: expect.any(Number),
+        rejectedReason: "not done yet",
+      }),
+    )
+    expect(
+      leadInboxMessages.some(
+        (message) =>
+          message.kind === "shutdown_rejected" &&
+          message.from === "member-a" &&
+          message.to === "lead" &&
+          message.body === "not done yet",
+      ),
+    ).toBe(true)
   })
 
   test("rejects shutdown requests from a lead caller as the lead member", async () => {
@@ -148,12 +160,15 @@ describe("team-runtime shutdown", () => {
 
     // then
     const requesterInboxMessages = await readInboxMessages(fixture.teamRunId, "member-b", fixture.config)
-    expect(requesterInboxMessages.some((message) => (
-      message.kind === "shutdown_rejected"
-      && message.from === "lead"
-      && message.to === "member-b"
-      && message.body === "still needed"
-    ))).toBe(true)
+    expect(
+      requesterInboxMessages.some(
+        (message) =>
+          message.kind === "shutdown_rejected" &&
+          message.from === "lead" &&
+          message.to === "member-b" &&
+          message.body === "still needed",
+      ),
+    ).toBe(true)
   })
 
   test("deletes team runtime resources after all non-lead members are approved", async () => {
@@ -164,24 +179,32 @@ describe("team-runtime shutdown", () => {
       "member-a": "shutdown_approved",
       "member-b": "shutdown_approved",
     })
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await mkdir(worktreePath, { recursive: true })
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await mkdir(worktreePath, { recursive: true })
+      }),
+    )
     // when
     const result = await deleteTeam(fixture.teamRunId, fixture.config)
 
     // then
     expect(result.removedLayout).toBe(false)
     expect(result.removedWorktrees.sort()).toEqual([...fixture.worktreePaths].sort())
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await access(worktreePath).then(
-        () => { throw new Error(`expected ${worktreePath} to be removed`) },
-        () => undefined,
-      )
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await access(worktreePath).then(
+          () => {
+            throw new Error(`expected ${worktreePath} to be removed`)
+          },
+          () => undefined,
+        )
+      }),
+    )
     const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     await access(runtimeStateDirectory).then(
-      () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+      () => {
+        throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -211,9 +234,11 @@ describe("team-runtime shutdown", () => {
       "member-a": "running",
       "member-b": "running",
     })
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await mkdir(worktreePath, { recursive: true })
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await mkdir(worktreePath, { recursive: true })
+      }),
+    )
 
     // when
     const result = await deleteTeam(fixture.teamRunId, fixture.config, undefined, undefined, { force: true })
@@ -221,15 +246,21 @@ describe("team-runtime shutdown", () => {
     // then
     expect(result.removedLayout).toBe(false)
     expect(result.removedWorktrees.sort()).toEqual([...fixture.worktreePaths].sort())
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await access(worktreePath).then(
-        () => { throw new Error(`expected ${worktreePath} to be removed`) },
-        () => undefined,
-      )
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await access(worktreePath).then(
+          () => {
+            throw new Error(`expected ${worktreePath} to be removed`)
+          },
+          () => undefined,
+        )
+      }),
+    )
     const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     await access(runtimeStateDirectory).then(
-      () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+      () => {
+        throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -257,7 +288,9 @@ describe("team-runtime shutdown", () => {
     expect(transitionedStatuses).toContain("deleted")
     const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     await access(runtimeStateDirectory).then(
-      () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+      () => {
+        throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -285,7 +318,9 @@ describe("team-runtime shutdown", () => {
     expect(transitionedStatuses).toContain("deleted")
     const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     await access(runtimeStateDirectory).then(
-      () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+      () => {
+        throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -295,16 +330,22 @@ describe("team-runtime shutdown", () => {
     const fixture = await createFixture()
     temporaryDirectories.push(fixture.baseDir)
     const leadWorktreePath = path.join(fixture.baseDir, "fixture-worktrees", "lead")
-    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
-      ...runtimeState,
-      members: runtimeState.members.map((member) => member.name === "lead"
-        ? { ...member, worktreePath: leadWorktreePath }
-        : member),
-    }), fixture.config)
+    await transitionRuntimeState(
+      fixture.teamRunId,
+      (runtimeState) => ({
+        ...runtimeState,
+        members: runtimeState.members.map((member) =>
+          member.name === "lead" ? { ...member, worktreePath: leadWorktreePath } : member,
+        ),
+      }),
+      fixture.config,
+    )
     await mkdir(leadWorktreePath, { recursive: true })
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await mkdir(worktreePath, { recursive: true })
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await mkdir(worktreePath, { recursive: true })
+      }),
+    )
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "running",
       "member-b": "running",
@@ -316,7 +357,9 @@ describe("team-runtime shutdown", () => {
     // then
     expect(result.removedWorktrees.sort()).toEqual([leadWorktreePath, ...fixture.worktreePaths].sort())
     await access(leadWorktreePath).then(
-      () => { throw new Error(`expected ${leadWorktreePath} to be removed`) },
+      () => {
+        throw new Error(`expected ${leadWorktreePath} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -335,16 +378,20 @@ describe("team-runtime shutdown", () => {
     const logMock = mock(() => {})
     const deps = {
       canVisualize: () => true,
-      removeTeamLayout: async () => { throw new Error("layout failed") },
+      removeTeamLayout: async () => {
+        throw new Error("layout failed")
+      },
       log: logMock,
     } satisfies DeleteTeamDeps
     await updateMemberStatuses(fixture.teamRunId, fixture.config, {
       "member-a": "running",
       "member-b": "idle",
     })
-    await Promise.all(fixture.worktreePaths.map(async (worktreePath) => {
-      await mkdir(worktreePath, { recursive: true })
-    }))
+    await Promise.all(
+      fixture.worktreePaths.map(async (worktreePath) => {
+        await mkdir(worktreePath, { recursive: true })
+      }),
+    )
 
     // when
     const result = await deleteTeam(
@@ -365,7 +412,9 @@ describe("team-runtime shutdown", () => {
     })
     const runtimeStateDirectory = getRuntimeStateDir(resolveBaseDir(fixture.config), fixture.teamRunId)
     await access(runtimeStateDirectory).then(
-      () => { throw new Error(`expected ${runtimeStateDirectory} to be removed`) },
+      () => {
+        throw new Error(`expected ${runtimeStateDirectory} to be removed`)
+      },
       () => undefined,
     )
   })
@@ -446,22 +495,26 @@ describe("team-runtime shutdown", () => {
       "member-a": "shutdown_approved",
       "member-b": "shutdown_approved",
     })
-    await transitionRuntimeState(fixture.teamRunId, (runtimeState) => ({
-      ...runtimeState,
-      status: "deleting",
-    }), fixture.config)
+    await transitionRuntimeState(
+      fixture.teamRunId,
+      (runtimeState) => ({
+        ...runtimeState,
+        status: "deleting",
+      }),
+      fixture.config,
+    )
 
     // when
-    const result = sendMessage(
-      createTestMessage(),
-      fixture.teamRunId,
-      fixture.config,
-      { isLead: true, activeMembers: ["lead", "member-a", "member-b"] },
-    )
+    const result = sendMessage(createTestMessage(), fixture.teamRunId, fixture.config, {
+      isLead: true,
+      activeMembers: ["lead", "member-a", "member-b"],
+    })
 
     // then
     await result.then(
-      () => { throw new Error("expected sendMessage to reject") },
+      () => {
+        throw new Error("expected sendMessage to reject")
+      },
       (error: unknown) => {
         if (!(error instanceof Error)) throw error
         expect(error.message).toBe("team is deleting")

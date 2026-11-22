@@ -18,7 +18,10 @@ export async function createMirrorRepo(dir: string): Promise<{ dir: string; repo
 }
 
 export async function initBareMirror(dir: string): Promise<void> {
-  const result = await createNodeGitExec().run(["init", "--bare", "--quiet", "--initial-branch=main"], { cwd: dir, timeoutMs: 30_000 })
+  const result = await createNodeGitExec().run(["init", "--bare", "--quiet", "--initial-branch=main"], {
+    cwd: dir,
+    timeoutMs: 30_000,
+  })
   if (result.code !== 0) throw new Error(result.stderr)
   disableFixtureAutoMaintenance(dir, true)
 }

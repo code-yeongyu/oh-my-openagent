@@ -54,9 +54,7 @@ export class MemoryApplyPatchError extends Error {
 
 const utf8Decoder = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true })
 
-export async function runMemoryApplyPatch(
-  options: RunMemoryApplyPatchOptions,
-): Promise<MemoryApplyPatchResult> {
+export async function runMemoryApplyPatch(options: RunMemoryApplyPatchOptions): Promise<MemoryApplyPatchResult> {
   const { repo, lock, params } = options
   try {
     const reason = typeof params.reason === "string" ? params.reason.trim() : ""
@@ -73,12 +71,16 @@ export async function runMemoryApplyPatch(
       if (violation !== undefined) throw new MemoryApplyPatchError(violation)
       let result
       try {
-        result = await repo.commitWrite(paths, memoryCommitMessage(reason, params.provenance, provenanceStrippedTrailers(applied.strippedPaths)), params.author)
+        result = await repo.commitWrite(
+          paths,
+          memoryCommitMessage(reason, params.provenance, provenanceStrippedTrailers(applied.strippedPaths)),
+          params.author,
+        )
       } catch (error) {
         if (error instanceof NoEffectiveChangesError) {
           throw new MemoryApplyPatchError(
             "made no effective changes; nothing was committed. " +
-            "The patched content matched what was already on disk.",
+              "The patched content matched what was already on disk.",
             { cause: error },
           )
         }
@@ -108,12 +110,17 @@ export async function runMemoryApplyPatch(
       error instanceof MemoryApplyPatchError ||
       error instanceof MemoryPatchParseError ||
       error instanceof MemoryPatchHunkError
-    ) throw error
+    )
+      throw error
     throw new MemoryApplyPatchError(errorMessage(error), { cause: error })
   }
 }
 
-async function applyOperations(root: string, operations: readonly PatchOperation[], claim: ClaimReceipt | undefined): Promise<AppliedPatch> {
+async function applyOperations(
+  root: string,
+  operations: readonly PatchOperation[],
+  claim: ClaimReceipt | undefined,
+): Promise<AppliedPatch> {
   const pendingWrites = new Map<string, string>()
   const pendingDeletes = new Set<string>()
   const affectedPaths = new Set<string>()
@@ -157,7 +164,10 @@ async function applyOperations(root: string, operations: readonly PatchOperation
         throw new Error(`memory_apply_patch: cannot add existing memory file: ${target.relative}`)
       }
       const rawContent = operation.contentLines.join("\n")
-      pendingWrites.set(target.absolute, restampContent(undefined, normalizeAddedContent(target.relative.slice(0, -3), rawContent), claim))
+      pendingWrites.set(
+        target.absolute,
+        restampContent(undefined, normalizeAddedContent(target.relative.slice(0, -3), rawContent), claim),
+      )
       pendingDeletes.delete(target.absolute)
       affectedPaths.add(target.relative)
       continue
@@ -190,8 +200,11 @@ async function applyOperations(root: string, operations: readonly PatchOperation
     if (hasLegacyUserHeader(current) && !hasLegacyUserHeader(written)) strippedPaths.push(source.relative)
     // The destination's content before this move overwrites it: what this patch already wrote there, nothing when an earlier
     // op freed the path (that op handled its own note), else the file on disk read leniently (only its header is looked at).
-    const overwritten = pendingWrites.get(target.absolute)
-      ?? (pendingDeletes.has(target.absolute) || !(await exists(target.absolute)) ? undefined : await readFile(target.absolute, "utf8"))
+    const overwritten =
+      pendingWrites.get(target.absolute) ??
+      (pendingDeletes.has(target.absolute) || !(await exists(target.absolute))
+        ? undefined
+        : await readFile(target.absolute, "utf8"))
     if (source.absolute !== target.absolute && hasLegacyUserHeader(overwritten)) strippedPaths.push(target.relative)
     pendingWrites.set(target.absolute, written)
     pendingDeletes.delete(target.absolute)
@@ -221,7 +234,9 @@ function parseForTool(content: string): ReturnType<typeof parseMemoryFile> {
     return parseMemoryFile(content)
   } catch (error) {
     if (isMissingFrontmatterError(error)) {
-      throw new Error("memory_apply_patch: target file is missing required frontmatter; add frontmatter with update_description")
+      throw new Error(
+        "memory_apply_patch: target file is missing required frontmatter; add frontmatter with update_description",
+      )
     }
     throw new Error(`memory_apply_patch: ${errorMessage(error).replace(/^frontmatter: /, "")}`)
   }
@@ -249,9 +264,8 @@ function assertEditable(readOnly: string | undefined, path: string): void {
 
 async function readUtf8TextStrict(path: string): Promise<string> {
   const bytes = await readFile(path)
-  const bom = bytes[0] === 0xff && bytes[1] === 0xfe
-    ? "UTF-16LE"
-    : bytes[0] === 0xfe && bytes[1] === 0xff ? "UTF-16BE" : null
+  const bom =
+    bytes[0] === 0xff && bytes[1] === 0xfe ? "UTF-16LE" : bytes[0] === 0xfe && bytes[1] === 0xff ? "UTF-16BE" : null
   if (bom !== null) {
     throw new Error(`File is not valid UTF-8 text: ${path}. Detected ${bom} BOM; convert the file to UTF-8 and retry.`)
   }
@@ -276,7 +290,11 @@ async function exists(path: string): Promise<boolean> {
   }
 }
 
-function memoryCommitMessage(reason: string, provenance: MemoryToolProvenance | undefined, stripped: readonly string[]): string {
+function memoryCommitMessage(
+  reason: string,
+  provenance: MemoryToolProvenance | undefined,
+  stripped: readonly string[],
+): string {
   if (provenance === undefined) return stripped.length === 0 ? reason : [reason, "", ...stripped].join("\n")
   return [
     reason,

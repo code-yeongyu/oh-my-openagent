@@ -11,8 +11,17 @@ import { FakeRegistry, settings } from "../lifecycle/__fixtures__/lifecycle-fake
 import type { TaskRecord } from "../state"
 import type { ManagedChildHandle } from "../manager/child-handle"
 import type { SteeringPort } from "./types"
-import { roots, cleanupRoots, detachedTerminal, fakeHandle, rpcHandle, portFor, storeLoad } from "./__fixtures__/residency"
+import {
+  roots,
+  cleanupRoots,
+  detachedTerminal,
+  fakeHandle,
+  rpcHandle,
+  portFor,
+  storeLoad,
+} from "./__fixtures__/residency"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupRoots)
 
@@ -20,16 +29,25 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given the detached terminal RPC respawn fails #when manager task_send targets it #then it returns not-continuable and rolls back to detached", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-manager-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings() })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings(),
+    })
     const manager = createTaskManager({
       store,
       runners: { "in-process": new FakeRunner(), process: new FakeRunner() },
       planner: () => ({ kind: "resolved", plan: { model: "anthropic/claude" } }),
       config: settings(),
       cwd: project,
-      rpcRespawnRunner: { start: async () => { throw new Error("respawn unavailable") } },
+      rpcRespawnRunner: {
+        start: async () => {
+          throw new Error("respawn unavailable")
+        },
+      },
     })
 
     const outcome = await manager.sendToTask({ idOrName: record.task_id, message: "retry" })
@@ -44,7 +62,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given detached terminal revival fails #when task_send sends a message #then it returns not-continuable and leaves the record detached", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const reviveReasons: string[] = []
     const engine = createSteeringEngine(portFor(store, undefined, reviveReasons))
@@ -60,7 +78,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a detached terminal process at concurrency capacity #when task_send revives it #then capacity is deferred before respawn", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-capacity-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const processRunner = new FakeRunner()
     let respawns = 0
@@ -77,7 +95,12 @@ describe("task_send lazy terminal RPC revival", () => {
         },
       },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ default_concurrency: 1, global_concurrency: 1 }) })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ default_concurrency: 1, global_concurrency: 1 }),
+    })
     const holder = await manager.start({ prompt: "hold", parent_session_id: "parent", depth: 1 })
     if (holder.kind !== "started") throw new Error("expected holder")
 
@@ -93,7 +116,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child whose followUp rejects while alive #when task_send delivers #then it destroys, restores terminal status, and remains lazily revivable", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-followup-failure-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let attempts = 0
@@ -112,9 +135,17 @@ describe("task_send lazy terminal RPC revival", () => {
       pid: 7000,
       abort: async () => undefined,
       terminate: async () => undefined,
-      dispose: async () => { live = false },
+      dispose: async () => {
+        live = false
+      },
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings(), hostPid: 6000 })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings(),
+      hostPid: 6000,
+    })
     const port: SteeringPort = {
       store,
       liveHandle: () => (live ? handle : undefined),
@@ -157,7 +188,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given persistence of the revived running record throws #when task_send delivers #then it rolls back before delivery", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-persistence-failure-"))
     roots.push(project)
-    const baseStore = createTaskRecordStore({ project_dir: project })
+    const baseStore = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(baseStore)
     const followUps: string[] = []
     let live = false
@@ -165,11 +196,12 @@ describe("task_send lazy terminal RPC revival", () => {
     const handle = fakeHandle(record.task_id, followUps)
     const failingStore = {
       ...baseStore,
-      mutate: (taskId: string, update: (fresh: TaskRecord) => TaskRecord) => baseStore.mutate(taskId, (fresh) => {
-        const next = update(fresh)
-        if (next.status === "running") throw new Error("persistence failed")
-        return next
-      }),
+      mutate: (taskId: string, update: (fresh: TaskRecord) => TaskRecord) =>
+        baseStore.mutate(taskId, (fresh) => {
+          const next = update(fresh)
+          if (next.status === "running") throw new Error("persistence failed")
+          return next
+        }),
     }
     const port: SteeringPort = {
       store: failingStore,

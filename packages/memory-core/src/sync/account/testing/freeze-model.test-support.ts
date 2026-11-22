@@ -69,9 +69,16 @@ export class FreezeModel {
   deviceList(currentId: string): unknown {
     return {
       devices: [...this.devices.values()].map((d) => ({
-        id: d.id, name: d.id, kind: d.kind, platform: "linux", createdAt: new Date(0).toISOString(),
-        lastSeenAt: new Date(0).toISOString(), current: d.id === currentId, syncing: true,
-        revokedAt: d.revokedAt, syncPrincipal: d.principal,
+        id: d.id,
+        name: d.id,
+        kind: d.kind,
+        platform: "linux",
+        createdAt: new Date(0).toISOString(),
+        lastSeenAt: new Date(0).toISOString(),
+        current: d.id === currentId,
+        syncing: true,
+        revokedAt: d.revokedAt,
+        syncPrincipal: d.principal,
       })),
       browsers: [],
     }
@@ -98,7 +105,9 @@ export class FreezeModel {
   /** The revoke and device-list routes; null when the request is not one of them. */
   route(method: string, path: string, callerDeviceId: string): Response | null {
     if (method === "GET" && path === "/v1/devices") {
-      return this.unreadable.has(callerDeviceId) ? envelope(503, "unavailable") : Response.json(this.deviceList(callerDeviceId))
+      return this.unreadable.has(callerDeviceId)
+        ? envelope(503, "unavailable")
+        : Response.json(this.deviceList(callerDeviceId))
     }
     const revoke = /^\/v1\/devices\/([^/]+)$/.exec(path)
     if (method === "DELETE" && revoke !== null) {

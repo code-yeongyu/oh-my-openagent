@@ -17,6 +17,8 @@ reis.workspace = true
 senpi-desktop-backend-atspi = { path = "../senpi-desktop-backend-atspi" }
 senpi-desktop-core = { path = "../senpi-desktop-core", features = ["system-clipboard"] }
 senpi-desktop-safety = { path = "../senpi-desktop-safety" }
+serde.workspace = true
+serde_json.workspace = true
 tokio = { workspace = true, features = ["macros", "sync", "time"] }
 xkeysym.workspace = true
 zbus.workspace = true

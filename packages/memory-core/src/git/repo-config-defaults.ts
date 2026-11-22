@@ -18,7 +18,9 @@ export interface RepoGitRunner {
 }
 
 export async function ensureRepoConfigDefaults(
-  port: RepoConfigTarget, run: RepoGitRunner, authorName: string,
+  port: RepoConfigTarget,
+  run: RepoGitRunner,
+  authorName: string,
 ): Promise<void> {
   // Every open runs this, so the six keys come from one `git config --list` instead of one git process
   // per key: each process costs tens of ms on an idle host and hundreds on a loaded one (#12103).
@@ -33,7 +35,10 @@ export async function ensureRepoConfigDefaults(
   // Forced, not defaulted: a memory repository is machine-owned and must keep note bytes exactly.
   // The repair never fails init(); an incomplete repair leaves the key unset so the next open retries.
   // The single guard for the whole repair: a rejected git call (spawn error, timeout, abort) counts as incomplete.
-  if ((await configGet("core.autocrlf")) !== "false" && (await restoreConvertedCheckouts(port.dir, run).catch(() => false))) {
+  if (
+    (await configGet("core.autocrlf")) !== "false" &&
+    (await restoreConvertedCheckouts(port.dir, run).catch(() => false))
+  ) {
     await port.configSet("core.autocrlf", "false")
   }
 }

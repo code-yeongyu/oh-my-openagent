@@ -30,7 +30,11 @@ async function run(stdin: Uint8Array) {
     // A circuit breaker above the helper's own 20 s watchdog, never a synchronization point.
     timeout: 60_000,
   })
-  const [stdout, stderr, code] = await Promise.all([new Response(child.stdout).bytes(), new Response(child.stderr).text(), child.exited])
+  const [stdout, stderr, code] = await Promise.all([
+    new Response(child.stdout).bytes(),
+    new Response(child.stderr).text(),
+    child.exited,
+  ])
   return { stdout, stderr, code }
 }
 
@@ -40,7 +44,12 @@ describe.skipIf(process.platform !== "win32" || targetDirectory === undefined)("
   beforeAll(async () => {
     base = await mkdtemp(join(tmpdir(), "omo-windows-trust-helper-"))
     const issued = await issueCertificates(base, [
-      { name: "B", subject: "/CN=Example Trust Test windows helper bundled root", days: 30, extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign" },
+      {
+        name: "B",
+        subject: "/CN=Example Trust Test windows helper bundled root",
+        days: 30,
+        extensions: "basicConstraints=critical,CA:TRUE\nkeyUsage=critical,keyCertSign,cRLSign",
+      },
     ])
     bundled = new Uint8Array(issued.get("B") ?? [])
   })
@@ -54,15 +63,32 @@ describe.skipIf(process.platform !== "win32" || targetDirectory === undefined)("
     const decoded = decodeWindowsTrustHelperOutput(result.stdout)
     if (decoded.kind !== "decoded") throw new Error(`${decoded.check} at ${decoded.path}`)
     const { facts, sources, ctl } = decoded.document
-    expect(facts.bundledRoots).toEqual([{
-      sha256: createHash("sha256").update(bundled).digest("hex"),
-      sha1: createHash("sha1").update(bundled).digest("hex"),
-    }])
+    expect(facts.bundledRoots).toEqual([
+      {
+        sha256: createHash("sha256").update(bundled).digest("hex"),
+        sha1: createHash("sha1").update(bundled).digest("hex"),
+      },
+    ])
     // Outcomes only: no store content is asserted.
-    const unread = sources.filter((source) => source.store === "Disallowed" && source.outcome !== "read" && source.outcome !== "absent")
-    expect({ complete: facts.complete, ctl, unread }).toEqual({ complete: true, ctl: expect.stringMatching(/^(read|absent)$/), unread: [] })
-    const attempted = new Set(sources.filter((source) => source.store === "Disallowed").map((source) => source.location))
-    for (const location of ["CURRENT_USER", "LOCAL_MACHINE", "CURRENT_USER_GROUP_POLICY", "LOCAL_MACHINE_GROUP_POLICY", "LOCAL_MACHINE_ENTERPRISE", "USER_SID"] as const) {
+    const unread = sources.filter(
+      (source) => source.store === "Disallowed" && source.outcome !== "read" && source.outcome !== "absent",
+    )
+    expect({ complete: facts.complete, ctl, unread }).toEqual({
+      complete: true,
+      ctl: expect.stringMatching(/^(read|absent)$/),
+      unread: [],
+    })
+    const attempted = new Set(
+      sources.filter((source) => source.store === "Disallowed").map((source) => source.location),
+    )
+    for (const location of [
+      "CURRENT_USER",
+      "LOCAL_MACHINE",
+      "CURRENT_USER_GROUP_POLICY",
+      "LOCAL_MACHINE_GROUP_POLICY",
+      "LOCAL_MACHINE_ENTERPRISE",
+      "USER_SID",
+    ] as const) {
       expect(attempted.has(location)).toBe(true)
     }
     expect(selectEngineTrust(facts).status).toBe("selected")
@@ -70,6 +96,9 @@ describe.skipIf(process.platform !== "win32" || targetDirectory === undefined)("
 
   test("#given stdin that is not a DER certificate list #when the helper runs #then it exits badStdin with no stdout", async () => {
     const result = await run(new Uint8Array([0x30, 0x05, 0x00]))
-    expect({ code: result.code, stdout: result.stdout.length }).toEqual({ code: WINDOWS_TRUST_HELPER_EXIT.badStdin, stdout: 0 })
+    expect({ code: result.code, stdout: result.stdout.length }).toEqual({
+      code: WINDOWS_TRUST_HELPER_EXIT.badStdin,
+      stdout: 0,
+    })
   })
 })

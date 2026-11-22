@@ -23,10 +23,7 @@ function routing(socket: string) {
 describe("RpcHostRunner host failure classification", () => {
   test("#given the daemon transport is unreachable #when a child starts #then the runner raises host_unavailable with a closed reason", async () => {
     // given
-    const transportError = Object.assign(
-      new Error("connect ECONNREFUSED /private/socket"),
-      { code: "ECONNREFUSED" },
-    )
+    const transportError = Object.assign(new Error("connect ECONNREFUSED /private/socket"), { code: "ECONNREFUSED" })
     const runner = new RpcHostRunner({
       policy: "upgrade",
       ...routing("/tmp/host.sock"),
@@ -55,29 +52,36 @@ describe("RpcHostRunner host failure classification", () => {
       policy: "upgrade",
       ...routing("/tmp/host.sock"),
       modelAdmission: async () => {},
-      ensureDaemon: () => Promise.resolve({
-        action: "reuse",
-        reason: "compatible",
-        socket: "/tmp/host.sock",
-        pid: 1,
-        reused: true,
-        upgradeable: true,
-      }),
+      ensureDaemon: () =>
+        Promise.resolve({
+          action: "reuse",
+          reason: "compatible",
+          socket: "/tmp/host.sock",
+          pid: 1,
+          reused: true,
+          upgradeable: true,
+        }),
       // Every host call is recorded: the host must not be asked to open a session whose local
       // directory could not be created.
-      createClient: () => new Proxy({} as HostSessionChannel, {
-        get: (_target, method) => method === "then" ? undefined : () => {
-          opened.push(String(method))
-          return Promise.reject(new Error("the host must not be contacted"))
-        },
-      }),
+      createClient: () =>
+        new Proxy({} as HostSessionChannel, {
+          get: (_target, method) =>
+            method === "then"
+              ? undefined
+              : () => {
+                  opened.push(String(method))
+                  return Promise.reject(new Error("the host must not be contacted"))
+                },
+        }),
     })
 
     // when
-    const failure = await runner.start({
-      ...childSpec(),
-      state_dir: stateFile,
-    }).catch((error: unknown) => error)
+    const failure = await runner
+      .start({
+        ...childSpec(),
+        state_dir: stateFile,
+      })
+      .catch((error: unknown) => error)
     rmSync(scratch, { recursive: true, force: true })
 
     // then
@@ -95,21 +99,24 @@ describe("RpcHostRunner host failure classification", () => {
       policy: "upgrade",
       ...routing(socket),
       modelAdmission: async () => {},
-      ensureDaemon: () => Promise.resolve({
-        action: "reuse",
-        reason: "compatible",
-        socket,
-        pid: 1,
-        reused: true,
-        upgradeable: true,
-      }),
+      ensureDaemon: () =>
+        Promise.resolve({
+          action: "reuse",
+          reason: "compatible",
+          socket,
+          pid: 1,
+          reused: true,
+          upgradeable: true,
+        }),
     })
 
     // when
-    const failure = await runner.start({
-      ...childSpec(),
-      resumeSessionPath: join(tmpdir(), `omo-8960-existing-${randomUUID()}.jsonl`),
-    }).catch((error: unknown) => error)
+    const failure = await runner
+      .start({
+        ...childSpec(),
+        resumeSessionPath: join(tmpdir(), `omo-8960-existing-${randomUUID()}.jsonl`),
+      })
+      .catch((error: unknown) => error)
 
     // then
     expect(RunnerError.is(failure) ? failure.failure : undefined).toMatchObject({

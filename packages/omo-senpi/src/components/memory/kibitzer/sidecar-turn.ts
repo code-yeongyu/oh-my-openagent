@@ -8,7 +8,12 @@ import type { ChildHandle, ChildSessionEvent } from "@oh-my-opencode/senpi-task"
 
 import { KIBITZER_WAKE_MAX_TOTAL_MS } from "./sidecar-contract"
 import { describe, isRecord, numberOf, textOf, type Child, type SidecarCore, type Turn } from "./sidecar-core"
-import { isDiagnosticWakeEnd, type KibitzerWakeAbort, type KibitzerWakeEnd, type KibitzerWakeOutcome } from "./sidecar-outcome"
+import {
+  isDiagnosticWakeEnd,
+  type KibitzerWakeAbort,
+  type KibitzerWakeEnd,
+  type KibitzerWakeOutcome,
+} from "./sidecar-outcome"
 import { createWakeToolBudget } from "./tools"
 
 export interface TurnLifecycle {
@@ -34,7 +39,13 @@ export interface TurnLifecycle {
   /** Defence in depth over the closure's call-time checks: the lifetime allowed set minus the ledger. */
   validated(turn: Turn, current: Child): RecallNudge[]
   /** The closed `KibitzerWakeOutcome` for a settled wake, handed to `onWake`. */
-  report(turn: Turn, end: KibitzerWakeEnd, nudges: readonly RecallNudge[], current: Child | undefined, model?: string): void
+  report(
+    turn: Turn,
+    end: KibitzerWakeEnd,
+    nudges: readonly RecallNudge[],
+    current: Child | undefined,
+    model?: string,
+  ): void
 }
 
 export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
@@ -104,7 +115,8 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
       return
     }
     if (message.role !== "assistant") return
-    if (typeof message.provider === "string" && typeof message.model === "string") turn.model = `${message.provider}/${message.model}`
+    if (typeof message.provider === "string" && typeof message.model === "string")
+      turn.model = `${message.provider}/${message.model}`
     if (!isRecord(message.usage)) return
     const input = numberOf(message.usage.input)
     const output = numberOf(message.usage.output)
@@ -131,9 +143,13 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
   function armDeadline(turn: Turn, onExpire?: () => void): void {
     clearDeadline(turn)
     const quietMs = Math.min(core.wakeDeadlineMs, Math.max(0, turn.totalDeadlineAt - core.now()))
-    turn.deadline = core.timers.set(onExpire ?? (() => {
-      void abortTurn(turn, "deadline")
-    }), quietMs)
+    turn.deadline = core.timers.set(
+      onExpire ??
+        (() => {
+          void abortTurn(turn, "deadline")
+        }),
+      quietMs,
+    )
   }
 
   function clearDeadline(turn: Turn): void {
@@ -166,11 +182,19 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
     return validateNudges(turn.accepted, { candidates: allowed, surfaced: core.surfaced, maxItems: turn.maxItems })
   }
 
-  function report(turn: Turn, end: KibitzerWakeEnd, nudges: readonly RecallNudge[], current: Child | undefined, model?: string): void {
+  function report(
+    turn: Turn,
+    end: KibitzerWakeEnd,
+    nudges: readonly RecallNudge[],
+    current: Child | undefined,
+    model?: string,
+  ): void {
     const cursors = turn.envelopes.reduce<{ first: number; last: number } | undefined>((span, envelope) => {
       const range = envelope.payload.cursors
       if (range === undefined) return span
-      return span === undefined ? { ...range } : { first: Math.min(span.first, range.first), last: Math.max(span.last, range.last) }
+      return span === undefined
+        ? { ...range }
+        : { first: Math.min(span.first, range.first), last: Math.max(span.last, range.last) }
     }, undefined)
     const provenance = model ?? turn.model
     const outcome: KibitzerWakeOutcome = {
@@ -200,5 +224,16 @@ export function createTurnLifecycle(core: SidecarCore): TurnLifecycle {
     }
   }
 
-  return { newTurn, offerPaths, observe, contextEstimate, armDeadline, clearDeadline, abortTurn, abortHandle, validated, report }
+  return {
+    newTurn,
+    offerPaths,
+    observe,
+    contextEstimate,
+    armDeadline,
+    clearDeadline,
+    abortTurn,
+    abortHandle,
+    validated,
+    report,
+  }
 }

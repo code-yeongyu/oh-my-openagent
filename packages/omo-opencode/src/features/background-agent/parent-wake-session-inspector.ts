@@ -114,7 +114,8 @@ export class ParentWakeSessionInspector {
       const fallback: ParentWakeSessionMessage[] = []
       return normalizeSDKResponse(messagesResp, fallback)
     } catch (error) {
-      const errorText = error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
+      const errorText =
+        error instanceof Error ? `${error.name}: ${error.message}` : getErrorText(error) || String(error)
       log("[background-agent] Failed to inspect parent session messages for wake safety:", {
         sessionID,
         error: errorText,

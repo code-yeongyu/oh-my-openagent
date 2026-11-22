@@ -14,12 +14,14 @@ const TRANSIENT = `${MEMORY}\\transient-runs`
 // A bare name is a directory entry; `{ name, isFile: true }` is a regular file.
 type FakeEntry = string | { readonly name: string; readonly isFile: boolean }
 
-function listing(entries: Record<string, readonly FakeEntry[] | NodeJS.ErrnoException>): (dir: string) => readonly { readonly name: string; readonly isFile: boolean }[] {
+function listing(
+  entries: Record<string, readonly FakeEntry[] | NodeJS.ErrnoException>,
+): (dir: string) => readonly { readonly name: string; readonly isFile: boolean }[] {
   return (dir) => {
     const value = entries[dir]
     if (value === undefined) throw Object.assign(new Error(`ENOENT: ${dir}`), { code: "ENOENT" })
     if (value instanceof Error) throw value
-    return value.map((entry) => typeof entry === "string" ? { name: entry, isFile: false } : entry)
+    return value.map((entry) => (typeof entry === "string" ? { name: entry, isFile: false } : entry))
   }
 }
 
@@ -33,14 +35,22 @@ describe("scanForeignRoots under win32 path forms (#12301)", () => {
     ["lower-cased own root", "c:\\users\\bear\\.omo\\memory\\agents\\global"],
     ["forward-slash own root", "C:/Users/Bear/.omo/memory/agents/global"],
     ["trailing-separator own root", `${AGENTS}\\global\\`],
-  ])("#given a single identity and a %s #when the areas are listed #then nothing foreign is found", (_label, ownRoot) => {
-    const scan = scanForeignRoots([AGENTS, TRANSIENT], [ownRoot], listing({ [AGENTS]: ["Global"] }), win32)
+  ])(
+    "#given a single identity and a %s #when the areas are listed #then nothing foreign is found",
+    (_label, ownRoot) => {
+      const scan = scanForeignRoots([AGENTS, TRANSIENT], [ownRoot], listing({ [AGENTS]: ["Global"] }), win32)
 
-    expect(scan).toEqual({ kind: "clear" })
-  })
+      expect(scan).toEqual({ kind: "clear" })
+    },
+  )
 
   test("#given a second identity beside the own one #when the areas are listed #then the agents area is reported without naming the identity", () => {
-    const scan = scanForeignRoots([AGENTS, TRANSIENT], [`${AGENTS}\\global`], listing({ [AGENTS]: ["global", "other"] }), win32)
+    const scan = scanForeignRoots(
+      [AGENTS, TRANSIENT],
+      [`${AGENTS}\\global`],
+      listing({ [AGENTS]: ["global", "other"] }),
+      win32,
+    )
 
     expect(scan).toEqual({ kind: "foreign", area: AGENTS })
   })
@@ -49,7 +59,10 @@ describe("scanForeignRoots under win32 path forms (#12301)", () => {
     const scan = scanForeignRoots(
       [AGENTS, TRANSIENT],
       [`${AGENTS}\\global`],
-      listing({ [AGENTS]: ["global", { name: "desktop.ini", isFile: true }], [TRANSIENT]: [{ name: "Thumbs.db", isFile: true }] }),
+      listing({
+        [AGENTS]: ["global", { name: "desktop.ini", isFile: true }],
+        [TRANSIENT]: [{ name: "Thumbs.db", isFile: true }],
+      }),
       win32,
     )
 
@@ -86,12 +99,22 @@ describe("scanForeignRoots under win32 path forms (#12301)", () => {
     expect(scan).toEqual({ kind: "clear" })
   })
 
-  test.each(["EACCES", "EPERM", "ENOTDIR", "ELOOP"])("#given listing an area fails with %s #when scanned #then the area is reported unlisted", (code) => {
-    expect(scanForeignRoots([AGENTS, TRANSIENT], [`${AGENTS}\\global`], listing({ [AGENTS]: ["global"], [TRANSIENT]: errno(code) }), win32))
-      .toEqual({ kind: "unlisted", area: TRANSIENT })
-    expect(scanForeignRoots([AGENTS, TRANSIENT], [`${AGENTS}\\global`], listing({ [AGENTS]: errno(code) }), win32))
-      .toEqual({ kind: "unlisted", area: AGENTS })
-  })
+  test.each(["EACCES", "EPERM", "ENOTDIR", "ELOOP"])(
+    "#given listing an area fails with %s #when scanned #then the area is reported unlisted",
+    (code) => {
+      expect(
+        scanForeignRoots(
+          [AGENTS, TRANSIENT],
+          [`${AGENTS}\\global`],
+          listing({ [AGENTS]: ["global"], [TRANSIENT]: errno(code) }),
+          win32,
+        ),
+      ).toEqual({ kind: "unlisted", area: TRANSIENT })
+      expect(
+        scanForeignRoots([AGENTS, TRANSIENT], [`${AGENTS}\\global`], listing({ [AGENTS]: errno(code) }), win32),
+      ).toEqual({ kind: "unlisted", area: AGENTS })
+    },
+  )
 })
 
 describe("isWithin under win32 path forms (#12301)", () => {
@@ -104,7 +127,10 @@ describe("isWithin under win32 path forms (#12301)", () => {
     ["C:\\Users\\Bear\\.omo\\memory\\agents2", false],
     ["C:\\Users\\Bear\\.omo\\agent", false],
     ["D:\\Users\\Bear\\.omo", false],
-  ] as const)("#given candidate %s #when tested as an ancestor of the agents area #then it returns %p", (candidate, expected) => {
-    expect(isWithin(candidate, AGENTS, win32)).toBe(expected)
-  })
+  ] as const)(
+    "#given candidate %s #when tested as an ancestor of the agents area #then it returns %p",
+    (candidate, expected) => {
+      expect(isWithin(candidate, AGENTS, win32)).toBe(expected)
+    },
+  )
 })

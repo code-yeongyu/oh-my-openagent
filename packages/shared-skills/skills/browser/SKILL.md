@@ -75,14 +75,15 @@ you hit and ask.
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id                      // one context per page action
 try {
-  await session.navigate("https://example.com/", { waitUntil: "load" })
-  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true })  // OmOWright tree + refs, no trace in the page
-  await session.click({ selector: css.e3 })                                                 // css[ref] is null inside shadow roots:
+  await session.navigate("https://example.com/", { waitUntil: "load", context: await sync() })
+  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })  // OmOWright tree + refs, no trace in the page
+  await session.click({ selector: css.e3 }, { context: await sync() })                      // css[ref] is null inside shadow roots:
   const vom = await session.observe({ maxTokens: 4000 })                                    //   then read the daemon's own tree ...
-  await session.click("@e7")                                                                //   ... and click its @eN ref
-  await session.fill(css.e5, "hello")
-  await session.press("Enter")
+  await session.click("@e7", { context: await sync() })                                     //   ... and click its @eN ref
+  await session.fill(css.e5, "hello", { context: await sync() })
+  await session.press("Enter", { context: await sync() })
   await session.waitForNavigation({ waitUntil: "load" })
   const shot = await session.screenshot()                                                   // { buffer, width, height, captureId }
 } finally {
@@ -97,6 +98,20 @@ try {
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
 5. **Always `stop()` the session,** on success and on failure.
+6. **Sync before every page action.** The person at the keyboard can work in the same tab, so
+   BrowserSkill 0.4 refuses an action (`permission_denied`, `data.reason: "cooperation_sync_required"`)
+   unless it carries `{ context }` from the latest `session.cooperate("sync")`. A context is good
+   for one action: sync, act with `{ context }`, sync again. Navigation, every input method,
+   `evaluate` (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`, `observe({ probeHover })` and
+   `screenshot({ fullPage: true })` need it; plain reads (`observe`, `snapshot`, `getHtml`,
+   `screenshot()`, `console`, `network`, `waitForNavigation`) do not.
+7. **On `cooperation_sync_required`, wait for the person, then replan.** Call
+   `session.cooperate("wait", { timeoutMs: 25_000 })` until it reports `ready`, read the page again
+   and decide afresh; never replay the refused action blindly.
+8. **Pass only the options a method takes.** A gated action throws a `TypeError` on any other key
+   (a misspelt `contextId` would otherwise send no context). `bskSnapshot` and
+   `screenshot({ fullPage: true })` do not throw: they drop the stray key, and the daemon then
+   refuses the call with `cooperation_sync_required`.
 
 Every method, its options, and the failure codes are in [references/commands.md](references/commands.md).
 

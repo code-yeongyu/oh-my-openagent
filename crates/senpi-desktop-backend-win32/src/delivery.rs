@@ -7,7 +7,10 @@
 //! then does nothing; the matrix turns that silent drop into an explicit
 //! `BackgroundUnavailable`.
 
-use senpi_desktop_core::error::DesktopError;
+use senpi_desktop_core::error::{DesktopError, ErrorReport};
+use senpi_desktop_core::report::Disposition;
+
+use crate::input::keys::{VK_CONTROL, VK_LWIN, VK_MENU, VK_SHIFT};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum EventKind {
@@ -210,6 +213,40 @@ pub fn background_refusal_for(
             class = target.class,
         ))
     })
+}
+
+const fn modifier_name(vk: u16) -> Option<&'static str> {
+    match vk {
+        VK_CONTROL => Some("ctrl"),
+        VK_MENU => Some("alt"),
+        VK_SHIFT => Some("shift"),
+        VK_LWIN => Some("meta"),
+        _ => None,
+    }
+}
+
+/// The `BackgroundUnavailable` refusal for posting the chord `vks` (press
+/// order, implicit layout modifiers included) into window `id` when it holds
+/// a modifier while another key goes down. A posted `WM_KEYDOWN` never sets
+/// the key state the target reads through `GetKeyState`, so `ctrl+k` would
+/// arrive as a bare `k` (omo#13297); the refusal comes before anything is
+/// posted. Plain keys and modifiers alone pass.
+pub fn posted_chord_refusal(id: &str, vks: &[u16]) -> Option<DesktopError> {
+    let held: Vec<&str> = vks.iter().filter_map(|&vk| modifier_name(vk)).collect();
+    if held.is_empty() || held.len() == vks.len() {
+        return None;
+    }
+    let error = DesktopError::background_unavailable(format!(
+        "window {id} cannot take a background key chord holding {}: posted key messages never set \
+         the modifier state the application reads (GetKeyState), so the other keys would arrive \
+         without it; nothing was sent; retry with delivery:\"foreground\" or use ax actions",
+        held.join("+"),
+    ));
+    Some(error.with_report(ErrorReport {
+        reason: Some("key_route_unproven".to_owned()),
+        disposition: Some(Disposition::NOT_DELIVERED_SAFE),
+        ..ErrorReport::default()
+    }))
 }
 
 /// Refuses input to window `id` when its process runs above the engine's

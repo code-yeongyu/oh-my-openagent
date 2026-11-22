@@ -8,7 +8,8 @@ import { cleanup, content, mcp, schema, session, setup } from "./thread-tools-te
 afterEach(cleanup)
 
 const ATTACHED = {
-  name: "render_page", inputSchema: schema,
+  name: "render_page",
+  inputSchema: schema,
   _meta: { "senpi/host-tool": { name: "host_page", label: "Host page" } },
 }
 const RESULT = { content, _meta: { "senpi/tool-result-details": { prepared: true } } }
@@ -19,7 +20,8 @@ function routeOf(routes: readonly unknown[]) {
     throw new Error("no host route")
   }
   const execute = route.execute
-  return (id = "A", signal?: AbortSignal) => Promise.resolve(Reflect.apply(execute, undefined, ["call", {}, signal, undefined, session(id)]))
+  return (id = "A", signal?: AbortSignal) =>
+    Promise.resolve(Reflect.apply(execute, undefined, ["call", {}, signal, undefined, session(id)]))
 }
 
 describe("session-owned host tool routes", () => {
@@ -27,8 +29,9 @@ describe("session-owned host tool routes", () => {
     const stub = await mcp({ tools: [ATTACHED], callResult: RESULT })
     let granted = true
     const host = await setup({
-      offer: "host", hostToolNames: "host_page",
-      reply: () => granted ? { grant: stub.grant } : { refusal: { reason: "denied" } },
+      offer: "host",
+      hostToolNames: "host_page",
+      reply: () => (granted ? { grant: stub.grant } : { refusal: { reason: "denied" } }),
     })
     await host.start("A")
     const route = routeOf(host.routes)
@@ -75,7 +78,9 @@ describe("session-owned host tool routes", () => {
       const stub = await mcp(options)
       const host = await setup({
         timeoutMs: ending === "timeout" ? 100 : 1_000,
-        offer: "host", hostToolNames: "host_page", reply: () => ({ grant: stub.grant }),
+        offer: "host",
+        hostToolNames: "host_page",
+        reply: () => ({ grant: stub.grant }),
       })
       await host.start()
       const controller = new AbortController()

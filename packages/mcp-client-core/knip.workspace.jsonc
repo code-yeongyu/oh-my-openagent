@@ -1,0 +1,40 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/mcp-client-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "src/skill-mcp-manager/env-grants-store.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) buildAuthorizationUrl, generateCodeChallenge, generateCodeVerifier, runAuthorizationCodeRedirect
+    "packages/mcp-client-core/src/mcp-oauth/index.ts": ["buildAuthorizationUrl", "generateCodeChallenge", "generateCodeVerifier", "runAuthorizationCodeRedirect"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) generateCodeVerifier, generateCodeChallenge, buildAuthorizationUrl
+    "packages/mcp-client-core/src/mcp-oauth/provider.ts": ["generateCodeVerifier", "generateCodeChallenge", "buildAuthorizationUrl"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isRefreshInProgress, getActiveRefreshCount
+    "packages/mcp-client-core/src/mcp-oauth/refresh-mutex.ts": ["isRefreshInProgress", "getActiveRefreshCount"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) writeTokenIndex
+    "packages/mcp-client-core/src/mcp-oauth/storage-index.ts": ["writeTokenIndex"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getMcpOauthStorageDir, getMcpOauthServerHash
+    "packages/mcp-client-core/src/mcp-oauth/storage.ts": ["getMcpOauthStorageDir", "getMcpOauthServerHash"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) stopCleanupTimer
+    "packages/mcp-client-core/src/skill-mcp-manager/cleanup.ts": ["stopCleanupTimer"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) redactErrorSensitiveData
+    "packages/mcp-client-core/src/skill-mcp-manager/error-redaction.ts": ["redactErrorSensitiveData"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) createFileGrantStore, resolveGrantsStorePath
+    "packages/mcp-client-core/src/skill-mcp-manager/index.ts": ["createFileGrantStore", "resolveGrantsStorePath"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) getOrCreateAuthProvider
+    "packages/mcp-client-core/src/skill-mcp-manager/oauth-handler.ts": ["getOrCreateAuthProvider"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) SAFE_MCP_ENV_NAMES
+    "packages/mcp-client-core/src/skill-mcp-manager/project-env-policy.ts": ["SAFE_MCP_ENV_NAMES"]
+  }
+}

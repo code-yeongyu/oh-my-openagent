@@ -35,27 +35,21 @@ async function runProbe(probePath: string): Promise<string> {
   return stdout
 }
 
-test(
-  "#given many processes starting on the same fresh UTC day #when each evaluates once #then exactly one captures",
-  async () => {
-    // given
-    const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-race-state-"))
-    const probeDir = mkdtempSync(join(tmpdir(), "telemetry-core-race-probe-"))
-    const probePath = writeProbe(probeDir, stateDir)
+test("#given many processes starting on the same fresh UTC day #when each evaluates once #then exactly one captures", async () => {
+  // given
+  const stateDir = mkdtempSync(join(tmpdir(), "telemetry-core-race-state-"))
+  const probeDir = mkdtempSync(join(tmpdir(), "telemetry-core-race-probe-"))
+  const probePath = writeProbe(probeDir, stateDir)
 
-    try {
-      // when
-      const captures = await Promise.all(
-        Array.from({ length: PROCESS_COUNT }, () => runProbe(probePath)),
-      )
+  try {
+    // when
+    const captures = await Promise.all(Array.from({ length: PROCESS_COUNT }, () => runProbe(probePath)))
 
-      // then
-      expect(captures.filter((capture) => capture === "1")).toHaveLength(1)
-      expect(captures).toHaveLength(PROCESS_COUNT)
-    } finally {
-      rmSync(stateDir, { recursive: true, force: true })
-      rmSync(probeDir, { recursive: true, force: true })
-    }
-  },
-  60_000,
-)
+    // then
+    expect(captures.filter((capture) => capture === "1")).toHaveLength(1)
+    expect(captures).toHaveLength(PROCESS_COUNT)
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+    rmSync(probeDir, { recursive: true, force: true })
+  }
+}, 60_000)

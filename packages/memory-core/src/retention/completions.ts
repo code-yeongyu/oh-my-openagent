@@ -10,11 +10,14 @@ import type { LazyRetentionGuard } from "./guard"
 import { DAY_MS, StoreTally, listNames, type RetentionContext, type RetentionStoreResult } from "./policy"
 
 /** `readReflectionHealth` reads the latest records for its streak and last-success window. */
-const COMPLETIONS_KEEP_NEWEST = 50
+export const COMPLETIONS_KEEP_NEWEST = 50
 
 type Completion = { readonly runId: string; readonly finishedAt: number; readonly consumed: boolean }
 
-export async function pruneCompletions(context: RetentionContext, lazyGuard: LazyRetentionGuard): Promise<RetentionStoreResult> {
+export async function pruneCompletions(
+  context: RetentionContext,
+  lazyGuard: LazyRetentionGuard,
+): Promise<RetentionStoreResult> {
   const dir = join(context.paths.reflection, "completions")
   const tally = new StoreTally()
   const records: Completion[] = []
@@ -27,7 +30,9 @@ export async function pruneCompletions(context: RetentionContext, lazyGuard: Laz
     if (record === undefined) tally.keep(runId, "malformed")
     else records.push(record)
   }
-  const newestFirst = [...records].sort((left, right) => right.finishedAt - left.finishedAt || (left.runId < right.runId ? 1 : -1))
+  const newestFirst = [...records].sort(
+    (left, right) => right.finishedAt - left.finishedAt || (left.runId < right.runId ? 1 : -1),
+  )
   const newest = new Set(newestFirst.slice(0, COMPLETIONS_KEEP_NEWEST).map((record) => record.runId))
   records.sort((left, right) => (left.runId < right.runId ? -1 : left.runId > right.runId ? 1 : 0))
   const cutoff = context.now() - context.policy.completionsDays * DAY_MS
@@ -53,7 +58,11 @@ export async function pruneCompletions(context: RetentionContext, lazyGuard: Laz
 }
 
 /** The mark is read only after the guard recorded it (H1 Guard 2): no mark, no removal. */
-async function keepByGuard(context: RetentionContext, lazyGuard: LazyRetentionGuard, number: number): Promise<"scheduler-busy" | "no-mark" | "anchor" | undefined> {
+async function keepByGuard(
+  context: RetentionContext,
+  lazyGuard: LazyRetentionGuard,
+  number: number,
+): Promise<"scheduler-busy" | "no-mark" | "anchor" | undefined> {
   const guard = await lazyGuard.get()
   if (guard === undefined) return "scheduler-busy"
   const mark = await readReflectionRunIdMark(context.paths.reflection)
@@ -62,7 +71,7 @@ async function keepByGuard(context: RetentionContext, lazyGuard: LazyRetentionGu
   return undefined
 }
 
-async function readCompletion(path: string, runId: string): Promise<Completion | undefined> {
+export async function readCompletion(path: string, runId: string): Promise<Completion | undefined> {
   try {
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined

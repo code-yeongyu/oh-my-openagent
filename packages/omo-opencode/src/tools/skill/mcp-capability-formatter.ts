@@ -1,10 +1,6 @@
 import type { Prompt, Resource, Tool } from "@modelcontextprotocol/sdk/types.js"
 import { sanitizeJsonSchema } from "../../plugin/normalize-tool-arg-schemas"
-import type {
-  SkillMcpClientInfo,
-  SkillMcpManager,
-  SkillMcpServerContext,
-} from "../../features/skill-mcp-manager"
+import type { SkillMcpClientInfo, SkillMcpManager, SkillMcpServerContext } from "../../features/skill-mcp-manager"
 import type { LoadedSkill } from "../../features/opencode-skill-loader"
 import { skillMcpClientInfo } from "./skill-mcp-authority"
 
@@ -74,7 +70,7 @@ function appendToolSections(sections: string[], tools: Tool[]): void {
       "```json",
       JSON.stringify(sanitizeJsonSchema(toolDefinition.inputSchema), null, 2),
       "```",
-      ""
+      "",
     )
   }
 }

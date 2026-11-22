@@ -44,14 +44,22 @@ export interface HostSweepOptions {
 
 export type HostSweepResult =
   | { readonly status: "busy" }
-  | { readonly status: "swept"; readonly visited: readonly string[]; readonly completed: boolean; readonly lines: readonly string[] }
+  | {
+      readonly status: "swept"
+      readonly visited: readonly string[]
+      readonly completed: boolean
+      readonly lines: readonly string[]
+    }
 
 function errorCode(error: unknown): string | undefined {
   return error instanceof Error && "code" in error && typeof error.code === "string" ? error.code : undefined
 }
 
 async function isDirectory(path: string): Promise<boolean> {
-  return stat(path).then((status) => status.isDirectory(), () => false)
+  return stat(path).then(
+    (status) => status.isDirectory(),
+    () => false,
+  )
 }
 
 /** Every `agents/<id>` that has a `runtime/`, repo or not, in sorted order. */
@@ -77,7 +85,7 @@ async function listRuntimeIdentities(memoryRoot: string): Promise<readonly HostS
 export async function readHostSweepState(memoryRoot: string): Promise<HostSweepState> {
   try {
     const parsed: unknown = JSON.parse(await readFile(join(memoryRoot, HOST_SWEEP_STATE_FILE), "utf8"))
-    const fields = typeof parsed === "object" && parsed !== null ? parsed as Record<string, unknown> : {}
+    const fields = typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : {}
     return {
       version: 1,
       ...(typeof fields.cursor === "string" ? { cursor: fields.cursor } : {}),
@@ -103,7 +111,11 @@ async function writeHostSweepState(memoryRoot: string, state: HostSweepState): P
 
 // The identities still to visit in this round (after the cursor), and, for an unbounded driver, the ones
 // before it too, so `omo doctor --fix` covers every identity in one run.
-function resumeOrder(identities: readonly HostSweepIdentity[], cursor: string | undefined, unbounded: boolean): { readonly rest: readonly HostSweepIdentity[]; readonly wrap: readonly HostSweepIdentity[] } {
+function resumeOrder(
+  identities: readonly HostSweepIdentity[],
+  cursor: string | undefined,
+  unbounded: boolean,
+): { readonly rest: readonly HostSweepIdentity[]; readonly wrap: readonly HostSweepIdentity[] } {
   if (cursor === undefined) return { rest: identities, wrap: [] }
   const rest = identities.filter((identity) => identity.name > cursor)
   return { rest, wrap: unbounded ? identities.filter((identity) => identity.name <= cursor) : [] }
@@ -119,32 +131,40 @@ export async function sweepHostIdentities(options: HostSweepOptions): Promise<Ho
   const startedAt = now()
   const record = await createLockRecord("runtime-sweep")
   try {
-    return await withLock(join(options.memoryRoot, HOST_SWEEP_LOCK_FILE), record, async () => {
-      const state = await readHostSweepState(options.memoryRoot)
-      const unbounded = options.maxIdentities === undefined && options.budgetMs === undefined
-      const { rest, wrap } = resumeOrder(await listRuntimeIdentities(options.memoryRoot), state.cursor, unbounded)
-      const visited: string[] = []
-      const lines: string[] = []
-      const visit = async (identity: HostSweepIdentity): Promise<boolean> => {
-        if (options.signal?.aborted === true) return false
-        if (options.maxIdentities !== undefined && visited.length >= options.maxIdentities) return false
-        if (options.budgetMs !== undefined && visited.length > 0 && now() - startedAt >= options.budgetMs) return false
-        for (const step of options.steps) lines.push(...await step(identity))
-        visited.push(identity.name)
-        return true
-      }
-      let reachedEnd = true
-      for (const identity of rest) {
-        if (!(await visit(identity))) {
-          reachedEnd = false
-          break
+    return await withLock(
+      join(options.memoryRoot, HOST_SWEEP_LOCK_FILE),
+      record,
+      async () => {
+        const state = await readHostSweepState(options.memoryRoot)
+        const unbounded = options.maxIdentities === undefined && options.budgetMs === undefined
+        const { rest, wrap } = resumeOrder(await listRuntimeIdentities(options.memoryRoot), state.cursor, unbounded)
+        const visited: string[] = []
+        const lines: string[] = []
+        const visit = async (identity: HostSweepIdentity): Promise<boolean> => {
+          if (options.signal?.aborted === true) return false
+          if (options.maxIdentities !== undefined && visited.length >= options.maxIdentities) return false
+          if (options.budgetMs !== undefined && visited.length > 0 && now() - startedAt >= options.budgetMs)
+            return false
+          for (const step of options.steps) lines.push(...(await step(identity)))
+          visited.push(identity.name)
+          return true
         }
-        if (options.dryRun !== true) await writeHostSweepState(options.memoryRoot, { version: 1, cursor: identity.name })
-      }
-      if (reachedEnd && options.dryRun !== true) await writeHostSweepState(options.memoryRoot, { version: 1, completedAt: new Date(now()).toISOString() })
-      if (reachedEnd) for (const identity of wrap) if (!(await visit(identity))) break
-      return { status: "swept", visited, completed: reachedEnd, lines }
-    }, { waitTimeoutMs: 0 })
+        let reachedEnd = true
+        for (const identity of rest) {
+          if (!(await visit(identity))) {
+            reachedEnd = false
+            break
+          }
+          if (options.dryRun !== true)
+            await writeHostSweepState(options.memoryRoot, { version: 1, cursor: identity.name })
+        }
+        if (reachedEnd && options.dryRun !== true)
+          await writeHostSweepState(options.memoryRoot, { version: 1, completedAt: new Date(now()).toISOString() })
+        if (reachedEnd) for (const identity of wrap) if (!(await visit(identity))) break
+        return { status: "swept", visited, completed: reachedEnd, lines }
+      },
+      { waitTimeoutMs: 0 },
+    )
   } catch (error) {
     if (error instanceof LockContentionError) return { status: "busy" }
     throw error

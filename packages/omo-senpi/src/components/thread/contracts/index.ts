@@ -6,6 +6,7 @@ export {
   THREAD_READ_MAX_BYTES,
   THREAD_SUMMARY_MAX_LENGTH,
   ThreadDeliveryMode,
+  DEFAULT_THREAD_DELIVERY,
 } from "./fields"
 export * from "./params"
 export * from "./parse"

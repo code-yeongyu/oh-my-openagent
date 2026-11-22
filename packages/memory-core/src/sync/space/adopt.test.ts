@@ -11,7 +11,7 @@ const live = (currentText: string | null, lastMaterialised: string | null = null
   currentText,
   tombstoned: false,
   lastMaterialised,
-  registers: soleRegisters(currentText)
+  registers: soleRegisters(currentText),
 })
 
 describe("planAdoption (sync-design §3 insert-only adoption)", () => {
@@ -56,7 +56,7 @@ describe("planAdoption (sync-design §3 insert-only adoption)", () => {
       currentText: renderDocContent(doc),
       tombstoned: true,
       lastMaterialised: text,
-      registers: soleRegisters(renderDocContent(doc))
+      registers: soleRegisters(renderDocContent(doc)),
     })
     expect(plan.action).toBe("remove")
     expect(isLive(doc)).toBe(false)
@@ -67,7 +67,10 @@ describe("planAdoption (sync-design §3 insert-only adoption)", () => {
     const doc = await newDoc("1")
     captureInto(doc, "", [], "alpha beta gamma\n")
     const current = renderDocContent(doc)
-    const plan = planAdoption([{ path: "n.md", text: "alpha beta CHANGED gamma\n" }], live(current, "alpha beta gamma\n"))
+    const plan = planAdoption(
+      [{ path: "n.md", text: "alpha beta CHANGED gamma\n" }],
+      live(current, "alpha beta gamma\n"),
+    )
     expect(plan.action).toBe("capture")
     if (plan.action !== "capture") return
     applyPlan(doc, current, plan)
@@ -98,7 +101,7 @@ describe("planAdoption (sync-design §3 insert-only adoption)", () => {
       currentText: current,
       tombstoned: true,
       lastMaterialised: "alpha beta\n",
-      registers: soleRegisters(current)
+      registers: soleRegisters(current),
     })
     expect(plan.action).toBe("capture")
     if (plan.action !== "capture") return
@@ -188,7 +191,12 @@ describe("HIGH-1 regression: a fact is never dropped while its source is deleted
 
   test("a CRLF side file's frontmatter keys survive adoption", () => {
     const plan = planAdoption(
-      [{ path: "n.sync-conflict-20261015-mac.md", text: "---\r\ntitle: 茶 log\r\ntags: [a, b]\r\n---\r\nkept line\r\n" }],
+      [
+        {
+          path: "n.sync-conflict-20261015-mac.md",
+          text: "---\r\ntitle: 茶 log\r\ntags: [a, b]\r\n---\r\nkept line\r\n",
+        },
+      ],
       live("- base line\n", null),
     )
     expect(plan.action).toBe("capture")

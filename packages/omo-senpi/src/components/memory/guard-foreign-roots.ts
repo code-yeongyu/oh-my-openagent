@@ -34,8 +34,9 @@ export function scanForeignRoots(
       if (error instanceof Error && "code" in error && error.code === "ENOENT") continue
       return { kind: "unlisted", area }
     }
-    const foreign = entries.some((entry) =>
-      !entry.isFile && !ownRoots.some((own) => isWithin(path.resolve(area, entry.name), own, path)))
+    const foreign = entries.some(
+      (entry) => !entry.isFile && !ownRoots.some((own) => isWithin(path.resolve(area, entry.name), own, path)),
+    )
     if (foreign) return { kind: "foreign", area }
   }
   return { kind: "clear" }

@@ -14,21 +14,36 @@ describe("test git environment (#12354)", () => {
     for (const dir of dirs.splice(0)) removeTreeSync(dir, { maxRetries: 10, retryDelay: 200 })
   })
 
-  test.skipIf(process.platform === "win32")("#given a fixture repository's own pre-commit hook #when a test commits with the inherited environment #then the hook runs", () => {
-    // #given
-    const dir = mkdtempSync(join(tmpdir(), "omo-test-git-env-"))
-    dirs.push(dir)
-    const git = (...args: string[]) => spawnSync("git", args, { cwd: dir, encoding: "utf8" })
-    git("init", "-q")
-    git("config", "maintenance.auto", "false")
-    writeFileSync(join(dir, ".git", "hooks", "pre-commit"), "#!/bin/sh\necho 'fixture hook ran' >&2\nexit 1\n")
-    chmodSync(join(dir, ".git", "hooks", "pre-commit"), 0o755)
+  test.skipIf(process.platform === "win32")(
+    "#given a fixture repository's own pre-commit hook #when a test commits with the inherited environment #then the hook runs",
+    () => {
+      // #given
+      const dir = mkdtempSync(join(tmpdir(), "omo-test-git-env-"))
+      dirs.push(dir)
+      const git = (...args: string[]) => spawnSync("git", args, { cwd: dir, encoding: "utf8" })
+      git("init", "-q")
+      git("config", "maintenance.auto", "false")
+      writeFileSync(join(dir, ".git", "hooks", "pre-commit"), "#!/bin/sh\necho 'fixture hook ran' >&2\nexit 1\n")
+      chmodSync(join(dir, ".git", "hooks", "pre-commit"), 0o755)
 
-    // #when
-    const result = git("-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false", "commit", "--allow-empty", "-q", "-m", "probe")
+      // #when
+      const result = git(
+        "-c",
+        "user.name=t",
+        "-c",
+        "user.email=t@t",
+        "-c",
+        "commit.gpgsign=false",
+        "commit",
+        "--allow-empty",
+        "-q",
+        "-m",
+        "probe",
+      )
 
-    // #then
-    expect(result.stderr).toContain("fixture hook ran")
-    expect(result.status).not.toBe(0)
-  })
+      // #then
+      expect(result.stderr).toContain("fixture hook ran")
+      expect(result.status).not.toBe(0)
+    },
+  )
 })

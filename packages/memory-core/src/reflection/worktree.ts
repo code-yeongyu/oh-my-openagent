@@ -2,7 +2,7 @@ import { existsSync } from "../fs/resilient"
 import { mkdir, readFile, rm } from "../fs/resilient"
 import { basename, isAbsolute, join, resolve } from "node:path"
 import { GitMemoryRepo, createNodeGitExec, type GitExec } from "../git"
-import { describeDroppedEntries, validateCompletion } from "./completion-validation"
+import { describeDroppedEntries, pathsOutsideTarget, validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions, type DescriptionPreflightWarn } from "./description-preflight"
 import { cleanupReflectionWorktree, integrateValidatedReflection } from "./worktree-integration"
 
@@ -115,17 +115,21 @@ export async function finalizeReflectionWorktree(
   try {
     await preflightReflectionDescriptions(worktree, worktree.baseSha, worktree.exec, options.warn)
     const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
-    const droppedNote = "dropped" in validation && validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
+    const droppedNote =
+      "dropped" in validation && validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
     if (validation.status !== "valid") {
       status = validation.status
       detail = "detail" in validation ? validation.detail : droppedNote
-    } else if (options.mode === "auto" && options.allowedPaths !== undefined
-      && validation.changedPaths.some((path) => !options.allowedPaths?.includes(path))) {
+    } else if (
+      options.mode === "auto" &&
+      options.allowedPaths !== undefined &&
+      pathsOutsideTarget(validation, options.allowedPaths).length > 0
+    ) {
       detail = `Dream document maintenance changed paths outside its target: ${validation.changedPaths.join(", ")}`
     } else {
       const integrated = await integrateValidatedReflection(worktree, {
         mode: options.mode === "auto" ? "auto" : "integration",
-        runId: options.mode === "auto" ? options.runId ?? worktree.branch : worktree.branch,
+        runId: options.mode === "auto" ? (options.runId ?? worktree.branch) : worktree.branch,
         summary: options.mode === "auto" ? options.summary : "external integration",
         validated: validation,
         withWriterLock: options.withWriterLock,
@@ -185,7 +189,9 @@ function run(exec: GitExec, cwd: string, argv: readonly string[]) {
 }
 
 function sanitizeRunId(runId: string): string {
-  const id = basename(runId.trim()).replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^-+|-+$/g, "")
+  const id = basename(runId.trim())
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
   if (!id || id === "." || id === "..") throw new TypeError("runId must contain a safe identifier")
   return id.slice(0, 80)
 }

@@ -48,7 +48,10 @@ describe("npm spawn options", () => {
     // given
     const fixture = mkdtempSync(join(tmpdir(), "omo-npm-pack-"))
     packFixtures.push(fixture)
-    writeFileSync(join(fixture, "package.json"), JSON.stringify({ name: "omo-pack-probe", version: "1.0.0", private: true }))
+    writeFileSync(
+      join(fixture, "package.json"),
+      JSON.stringify({ name: "omo-pack-probe", version: "1.0.0", private: true }),
+    )
 
     // when
     const raw = execFileSync("npm", ["pack", "--dry-run", "--json", "--ignore-scripts"], {

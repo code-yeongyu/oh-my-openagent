@@ -250,6 +250,31 @@ pub struct OpenedSurface {
     pub ref_: Option<String>,
 }
 
+/// How long each stage of one mutating request took, in microseconds. A
+/// stage the request did not run is absent.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct StageTimings {
+    /// Resolving an accessibility ref to its element.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ax_resolve: Option<u64>,
+    /// Capturing the focus and cursor state the request restores.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capture: Option<u64>,
+    /// Making the target window key before background keys.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prime: Option<u64>,
+    /// Sending the input itself.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dispatch: Option<u64>,
+    /// The checks after the input was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verify: Option<u64>,
+    /// Restoring focus and cursor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restore: Option<u64>,
+}
+
 /// The suggested next request; never followed automatically.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -283,6 +308,9 @@ pub struct ActionReport {
     /// Open token set, e.g. `secure_field`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub warning: Option<String>,
+    /// Per-stage durations; only in a session opened with `trace: true`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timings: Option<StageTimings>,
     /// Ids of the `audit` notifications this request emitted.
     #[schemars(length(min = 1))]
     pub audit_ids: Vec<String>,

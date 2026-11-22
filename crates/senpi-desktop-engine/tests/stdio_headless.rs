@@ -107,13 +107,14 @@ fn a_window_resized_since_its_capture_is_invalid_coordinate_frame_with_a_recaptu
 }
 
 #[test]
-fn an_ax_ref_older_than_the_previous_snapshot_is_stale_ref() {
-    // Given: the Save button's ref from a snapshot, then two newer snapshots
+fn an_ax_ref_older_than_the_eight_newest_snapshots_is_stale_ref() {
+    // Given: the Save button's ref from a snapshot, then eight newer snapshots
     let mut engine = two_displays();
     make_stop_path_live(&mut engine);
     let save = snapshot_ref(&mut engine, WINDOW, "\"Save\"");
-    engine.invoke("ax.snapshot", json!({"target": WINDOW}));
-    engine.invoke("ax.snapshot", json!({"target": WINDOW}));
+    for _ in 0..8 {
+        engine.invoke("ax.snapshot", json!({"target": WINDOW}));
+    }
     // When
     let performed = engine.invoke("ax.perform", json!({"ref": save, "action": "press"}));
     // Then

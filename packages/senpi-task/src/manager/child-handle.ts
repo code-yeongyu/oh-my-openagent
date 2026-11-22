@@ -2,7 +2,13 @@ import type { ChildHandle as InProcessChildHandle, RunnerOutcome } from "../runn
 import { mapExitOutcomeToError } from "../runners/rpc/exit-mapping"
 import type { HostSessionChildHandle } from "../runners/rpc-host/handle-port"
 import type { HostSessionReplaced } from "../runners/rpc-host/session-client"
-import type { InputIdentity, RpcChildHandle, RpcEntriesResult, RpcSpawnSpec, RpcSwitchSessionResult } from "../runners/types"
+import type {
+  InputIdentity,
+  RpcChildHandle,
+  RpcEntriesResult,
+  RpcSpawnSpec,
+  RpcSwitchSessionResult,
+} from "../runners/types"
 import type { SuspensionReason, TaskStatus } from "../state"
 import type { ChildExtensionListener } from "../runners/child-extension-events"
 import { HOST_TURN_RESUMED_EVENT } from "./host-turn-resumed"
@@ -156,9 +162,13 @@ export function adaptRpcHandle(handle: RpcChildHandle): ManagedChildHandle {
     followUp: (text, identity) => handle.followUp(text, identity),
     abort: () => handle.abort(),
     subscribe: (listener) => subscribeManagedRpc(handle, listener),
-    ...(handle.subscribeExtensionEvents === undefined ? {} : { subscribeExtensionEvents: handle.subscribeExtensionEvents }),
-    ...(handle.onSelfResumed === undefined ? {} : { onSelfResumed: (listener: () => void) => handle.onSelfResumed?.(listener) ?? (() => undefined) }),
-    waitForOutcome: () => handle.waitForOutcome === undefined ? rpcOutcome(handle) : handle.waitForOutcome(),
+    ...(handle.subscribeExtensionEvents === undefined
+      ? {}
+      : { subscribeExtensionEvents: handle.subscribeExtensionEvents }),
+    ...(handle.onSelfResumed === undefined
+      ? {}
+      : { onSelfResumed: (listener: () => void) => handle.onSelfResumed?.(listener) ?? (() => undefined) }),
+    waitForOutcome: () => (handle.waitForOutcome === undefined ? rpcOutcome(handle) : handle.waitForOutcome()),
     hasExited: () => handle.hasExited?.() ?? handle.exitOutcome() !== undefined,
     ...(switchSession === undefined ? {} : { switchSession: (sessionPath: string) => switchSession(sessionPath) }),
     ...(getEntries === undefined ? {} : { getEntries: (since?: string) => getEntries(since) }),
@@ -197,10 +207,15 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
   if (exit !== undefined && exit.kind !== "clean") {
     const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
     const message = facts?.error_message ?? "RPC child terminated abnormally"
-    const processExit = exit.facts.pid !== undefined && exit.kind !== "spawn_error"
-      ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
-      : {}
-    return { status: "error", failure: { kind: "child-prompt-failed", message, ...processExit }, killed: facts?.killed === true }
+    const processExit =
+      exit.facts.pid !== undefined && exit.kind !== "spawn_error"
+        ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
+        : {}
+    return {
+      status: "error",
+      failure: { kind: "child-prompt-failed", message, ...processExit },
+      killed: facts?.killed === true,
+    }
   }
   // A user-requested abort is a cancellation, never a turn failure. Handles that expose the tracked
   // per-turn outcome never reach here; this fallback serves legacy/custom handles only.
@@ -235,7 +250,10 @@ async function rpcOutcome(handle: RpcChildHandle): Promise<RunnerOutcome> {
  * The same child, reporting `onReleased` only once a teardown of it succeeds: a rejected dispose
  * leaves it owned, so the next teardown attempt retries it.
  */
-export function releaseOnDispose(handle: ManagedChildHandle, onReleased: (owner: ManagedChildHandle) => void): ManagedChildHandle {
+export function releaseOnDispose(
+  handle: ManagedChildHandle,
+  onReleased: (owner: ManagedChildHandle) => void,
+): ManagedChildHandle {
   const owner: ManagedChildHandle = new Proxy(handle, {
     get: (target, property) => {
       if (property === "dispose") {
@@ -274,4 +292,3 @@ export async function discardRpcHandle(handle: RpcChildHandle): Promise<void> {
     await handle.dispose()
   }
 }
-

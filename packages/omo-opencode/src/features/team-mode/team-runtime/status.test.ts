@@ -21,7 +21,12 @@ function createConfig(baseDir: string): TeamModeConfig {
   return TeamModeConfigSchema.parse({ base_dir: baseDir, enabled: true })
 }
 
-async function seedRuntimeState(baseDir: string, teamName: string, leadSessionId: string, memberSessionIds: string[]): Promise<string> {
+async function seedRuntimeState(
+  baseDir: string,
+  teamName: string,
+  leadSessionId: string,
+  memberSessionIds: string[],
+): Promise<string> {
   const config = createConfig(baseDir)
   const runtimeState = await createRuntimeState(
     {
@@ -30,7 +35,14 @@ async function seedRuntimeState(baseDir: string, teamName: string, leadSessionId
       createdAt: Date.now(),
       leadAgentId: "lead",
       members: [
-        { kind: "subagent_type", name: "lead", subagent_type: "sisyphus", backendType: "in-process", isActive: true, color: "red" },
+        {
+          kind: "subagent_type",
+          name: "lead",
+          subagent_type: "sisyphus",
+          backendType: "in-process",
+          isActive: true,
+          color: "red",
+        },
         ...memberSessionIds.map((sessionID, index) => ({
           kind: "category" as const,
           name: `member-${index + 1}`,
@@ -48,7 +60,11 @@ async function seedRuntimeState(baseDir: string, teamName: string, leadSessionId
   )
   const updatedRuntimeState = {
     ...runtimeState,
-    members: runtimeState.members.map((member, index) => index === 0 ? { ...member, sessionId: leadSessionId, status: "running" as const } : { ...member, sessionId: memberSessionIds[index - 1], status: "running" as const }),
+    members: runtimeState.members.map((member, index) =>
+      index === 0
+        ? { ...member, sessionId: leadSessionId, status: "running" as const }
+        : { ...member, sessionId: memberSessionIds[index - 1], status: "running" as const },
+    ),
   }
   await saveRuntimeState(updatedRuntimeState, config)
   return updatedRuntimeState.teamRunId
@@ -58,7 +74,9 @@ describe("aggregateStatus", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),
+    )
   })
 
   test("surfaces stale locks from claims directory", async () => {
@@ -88,8 +106,30 @@ describe("aggregateStatus", () => {
     const teamRunId = await seedRuntimeState(baseDir, "team-alpha", "lead-1", ["session-a", "session-b"])
     const inboxDir = getInboxDir(resolveBaseDir(config), teamRunId, "member-1")
     await mkdir(inboxDir, { recursive: true })
-    await writeFile(path.join(inboxDir, "1.json"), JSON.stringify({ version: 1, messageId: randomUUID(), from: "lead", to: "member-1", kind: "message", body: "a", timestamp: 1 }) + "\n")
-    await writeFile(path.join(inboxDir, "2.json"), JSON.stringify({ version: 1, messageId: randomUUID(), from: "lead", to: "member-1", kind: "message", body: "b", timestamp: 2 }) + "\n")
+    await writeFile(
+      path.join(inboxDir, "1.json"),
+      JSON.stringify({
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-1",
+        kind: "message",
+        body: "a",
+        timestamp: 1,
+      }) + "\n",
+    )
+    await writeFile(
+      path.join(inboxDir, "2.json"),
+      JSON.stringify({
+        version: 1,
+        messageId: randomUUID(),
+        from: "lead",
+        to: "member-1",
+        kind: "message",
+        body: "b",
+        timestamp: 2,
+      }) + "\n",
+    )
     await createTask(teamRunId, createTaskInput({ subject: "a" }), config)
     await createTask(teamRunId, createTaskInput({ subject: "b" }), config)
     await createTask(teamRunId, createTaskInput({ subject: "c" }), config)

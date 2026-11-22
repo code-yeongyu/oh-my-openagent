@@ -2,8 +2,16 @@ import { afterEach, expect, test } from "bun:test"
 import { seedRecord } from "../lifecycle/__fixtures__/lifecycle-fakes"
 import { AdmissionBarrier } from "../pause/admission-barrier"
 import { createTaskRecordStore } from "../store"
-import { categoryPlanner, cleanupProjects, FakeRunner, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -11,11 +19,16 @@ afterEach(cleanupProjects)
 // surviving child must not start a new task epoch or subscribe to its old turn.
 test("reattaching a paused child preserves its epoch and leaves its old turn unobserved", async () => {
   const cwd = tempProject()
-  const store = createTaskRecordStore({ project_dir: cwd })
+  const store = createTaskRecordStore(ownedTaskState(cwd))
   const taskId = "st_0a675201"
   const before = seedRecord(store, {
-    task_id: taskId, status: "paused", residency_state: "resident", host_pid: process.pid,
-    parent_session_id: "parent", child_session_id: "old-child-session", run_epoch: 7,
+    task_id: taskId,
+    status: "paused",
+    residency_state: "resident",
+    host_pid: process.pid,
+    parent_session_id: "parent",
+    child_session_id: "old-child-session",
+    run_epoch: 7,
   })
   const barrier = new AdmissionBarrier()
   barrier.close("parent", 1)
@@ -30,8 +43,12 @@ test("reattaching a paused child preserves its epoch and leaves its old turn uno
     },
   }
   const manager = createTaskManager({
-    cwd, store, admissionBarrier: barrier, planner: categoryPlanner(),
-    config: settings(), runners: { "in-process": runner, process: runner },
+    cwd,
+    store,
+    admissionBarrier: barrier,
+    planner: categoryPlanner(),
+    config: settings(),
+    runners: { "in-process": runner, process: runner },
   })
   try {
     const result = await manager.reattach(before, handle)

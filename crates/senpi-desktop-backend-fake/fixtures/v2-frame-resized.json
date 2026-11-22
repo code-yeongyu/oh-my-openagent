@@ -1,0 +1,51 @@
+{
+  "displays": [
+    {
+      "id": "1",
+      "name": "Built-in Display",
+      "x": 0,
+      "y": 0,
+      "width": 1920,
+      "height": 1080,
+      "scale": 1,
+      "pixelX": 0,
+      "pixelY": 0,
+      "pixelWidth": 1920,
+      "pixelHeight": 1080,
+      "isPrimary": true
+    }
+  ],
+  "windows": [
+    {
+      "id": "101",
+      "title": "Untitled - Notes",
+      "app": "Notes",
+      "pid": 4242,
+      "x": 100,
+      "y": 120,
+      "width": 800,
+      "height": 600,
+      "focused": false,
+      "elevated": null
+    }
+  ],
+  "identity": {
+    "101": {
+      "processStart": 1700000000
+    }
+  },
+  "hit_at": [
+    {
+      "x": 120,
+      "y": 140,
+      "role": "button",
+      "label": "Delete",
+      "secure": false
+    }
+  ],
+  "resize_window": {
+    "id": "101",
+    "width": 640,
+    "height": 480
+  }
+}

@@ -21,7 +21,7 @@ describe("createTrackedSession", () => {
     expect(session.attachActivated).toBe(true)
     expect(session.attachActivatedAt).toBe(now)
     expect(session.stableIdlePolls).toBe(0)
-    expect(session.observedIdleActivityVersion).toBe(0)  // matches activityVersion at creation
+    expect(session.observedIdleActivityVersion).toBe(0) // matches activityVersion at creation
     expect(session.activityVersion).toBe(0)
     expect(session.createdAt).toBe(now)
     expect(session.lastSeenAt).toBe(now)

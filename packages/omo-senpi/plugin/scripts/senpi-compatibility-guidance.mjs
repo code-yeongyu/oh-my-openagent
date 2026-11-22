@@ -29,9 +29,7 @@ If a code block below conflicts with this section, this section wins.
 
 `
 
-const senpiCompatibilityEndMarkers = [
-  "If a code block below conflicts with this section, this section wins.\n\n",
-]
+const senpiCompatibilityEndMarkers = ["If a code block below conflicts with this section, this section wins.\n\n"]
 
 function findSenpiCompatibilitySectionEnd(content, searchStart) {
   const structuralEndPattern = /\n(?:---|export\s+const\s+|#{1,6}\s)/g

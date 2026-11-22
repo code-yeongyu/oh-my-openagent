@@ -29,29 +29,42 @@ export function createFileGrantStore(configDir?: string): GrantStore {
     try {
       const info = await stat(path)
       revision = `${info.dev}:${info.ino}`
-    } catch (error) { if (!(error instanceof Error)) throw error }
+    } catch (error) {
+      if (!(error instanceof Error)) throw error
+    }
     return { ...snapshot, revision }
   }
   return {
     read,
-    add: async (digest, grant) => { await shared.addGrant(path, digest, grant.label, grant.names) },
-    revoke: async (digest) => { await shared.revoke(path, digest) },
+    add: async (digest, grant) => {
+      await shared.addGrant(path, digest, grant.label, grant.names)
+    },
+    revoke: async (digest) => {
+      await shared.revoke(path, digest)
+    },
     list: async () => (await read()).grants,
     digest: async () => shared.declarationDigest(await shared.read(path)),
     watch: (listener) => {
       let closed = false
       let stop: (() => void) | undefined
-      void shared.observe(path, (event) => {
-        if (!closed) void Promise.resolve(listener(event)).catch((error: unknown) => {
-          log("[skill-mcp-env] grant listener failed", { error: error instanceof Error ? error.name : "unknown" })
+      void shared
+        .observe(path, (event) => {
+          if (!closed)
+            void Promise.resolve(listener(event)).catch((error: unknown) => {
+              log("[skill-mcp-env] grant listener failed", { error: error instanceof Error ? error.name : "unknown" })
+            })
         })
-      }).then((unsubscribe) => {
-        if (closed) unsubscribe()
-        else stop = unsubscribe
-      }).catch((error: unknown) => {
-        log("[skill-mcp-env] grant observer failed", { error: error instanceof Error ? error.name : "unknown" })
-      })
-      return () => { closed = true; stop?.() }
+        .then((unsubscribe) => {
+          if (closed) unsubscribe()
+          else stop = unsubscribe
+        })
+        .catch((error: unknown) => {
+          log("[skill-mcp-env] grant observer failed", { error: error instanceof Error ? error.name : "unknown" })
+        })
+      return () => {
+        closed = true
+        stop?.()
+      }
     },
   }
 }

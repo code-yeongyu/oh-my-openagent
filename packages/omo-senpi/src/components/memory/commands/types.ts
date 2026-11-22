@@ -133,10 +133,7 @@ export function identityForInit(deps: MemoryCommandDeps, ctx: MemoryCommandConte
   return identityFor(deps, ctx) ?? deps.resolveIdentity?.()
 }
 
-export function requireIdentity(
-  deps: MemoryCommandDeps,
-  ctx: MemoryCommandContext,
-): MemoryCommandIdentity | string {
+export function requireIdentity(deps: MemoryCommandDeps, ctx: MemoryCommandContext): MemoryCommandIdentity | string {
   const identity = identityFor(deps, ctx)
   if (identity !== undefined) return identity
   return "memory is not bound to this session; start a session with memory enabled and retry"

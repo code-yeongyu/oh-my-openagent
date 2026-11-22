@@ -18,7 +18,9 @@ const landsIn = (dir: string, to: fs.PathLike): boolean => {
   const rel = relative(dir, String(to))
   return rel !== "" && !rel.startsWith("..") && !isAbsolute(rel)
 }
-afterEach(async () => { for (const close of cleanup.splice(0).reverse()) await close() })
+afterEach(async () => {
+  for (const close of cleanup.splice(0).reverse()) await close()
+})
 
 for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as const) {
   test(`pin boundary serializes a sibling credential ${change} without notification`, async () => {
@@ -27,35 +29,61 @@ for (const change of ["replacement", "aba", "refresh", "signing", "sealing"] as 
     const verified = await walk(f.built.request, f.keyring)
     if (!verified.ok || verified.state.pin === null) throw new Error("fixture pin")
     const credentials = join(f.input.pinDir, "synthetic-credentials.json")
-    writeFileSync(credentials, JSON.stringify({ identity: "A", generation: 1, token: 1, signingKey: "signing-1", sealingKey: "sealing-1" }))
+    writeFileSync(
+      credentials,
+      JSON.stringify({ identity: "A", generation: 1, token: 1, signingKey: "signing-1", sealingKey: "sealing-1" }),
+    )
     const locked = Promise.withResolvers<void>()
-    const child = Bun.spawn([process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, change], {
-      stdout: "inherit", stderr: "inherit",
-      ipc(message) {
-        if (message === "locked") locked.resolve()
+    const child = Bun.spawn(
+      [process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, change],
+      {
+        stdout: "inherit",
+        stderr: "inherit",
+        ipc(message) {
+          if (message === "locked") locked.resolve()
+        },
       },
+    )
+    cleanup.push(async () => {
+      if (child.exitCode === null) child.kill()
+      await child.exited
     })
-    cleanup.push(async () => { if (child.exitCode === null) child.kill(); await child.exited })
-    await Promise.race([locked.promise, child.exited.then(code => { throw new Error(`writer exited early: ${code}`) })])
+    await Promise.race([
+      locked.promise,
+      child.exited.then((code) => {
+        throw new Error(`writer exited early: ${code}`)
+      }),
+    ])
     const entered = Promise.withResolvers<void>()
     const controller = new AbortController()
     let boundaries = 0
     const authority = {
       signal: controller.signal,
-      admit<T>(effect: () => T): T { controller.signal.throwIfAborted(); return effect() },
+      admit<T>(effect: () => T): T {
+        controller.signal.throwIfAborted()
+        return effect()
+      },
       async boundary<T>(dispatch: () => T): Promise<T> {
         boundaries++
         entered.resolve()
-        return withLock(`${credentials}.lock`, await createLockRecord("credential-test-pin"), async () => {
-          const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
-          if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
-          return dispatch()
-        }, { waitTimeoutMs: 10_000 })
+        return withLock(
+          `${credentials}.lock`,
+          await createLockRecord("credential-test-pin"),
+          async () => {
+            const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
+            if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
+            return dispatch()
+          },
+          { waitTimeoutMs: 10_000 },
+        )
       },
     }
     let renames = 0
     const original = fs.renameSync
-    const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => { if (landsIn(f.input.pinDir, to)) renames++; original(from, to) })
+    const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
+      if (landsIn(f.input.pinDir, to)) renames++
+      original(from, to)
+    })
     cleanup.push(() => spy.mockRestore())
     const result = pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })
     const first = await Promise.race([entered.promise.then(() => "boundary"), result.then(() => "published")])
@@ -80,15 +108,23 @@ const lockedBoundary = (credentials: string, onHeld: () => Promise<void>) => {
     entries,
     authority: {
       signal: controller.signal,
-      admit<T>(effect: () => T): T { controller.signal.throwIfAborted(); return effect() },
+      admit<T>(effect: () => T): T {
+        controller.signal.throwIfAborted()
+        return effect()
+      },
       async boundary<T>(dispatch: () => T): Promise<T> {
-        return withLock(`${credentials}.lock`, await createLockRecord("credential-test-pin"), async () => {
-          const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
-          entries.push(state.generation)
-          await onHeld()
-          if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
-          return dispatch()
-        }, { waitTimeoutMs: 10_000 })
+        return withLock(
+          `${credentials}.lock`,
+          await createLockRecord("credential-test-pin"),
+          async () => {
+            const state = JSON.parse(readFileSync(credentials, "utf8")) as { generation: number }
+            entries.push(state.generation)
+            await onHeld()
+            if (state.generation !== 1) throw new DOMException("Generation retired", "AbortError")
+            return dispatch()
+          },
+          { waitTimeoutMs: 10_000 },
+        )
       },
     },
   }
@@ -105,11 +141,17 @@ test("pin boundary taken first publishes once, and a sibling replacement waiting
   const held = Promise.withResolvers<void>()
   const trying = Promise.withResolvers<void>()
   const locked = Promise.withResolvers<void>()
-  const { authority, entries } = lockedBoundary(credentials, async () => { held.resolve(); await trying.promise })
+  const { authority, entries } = lockedBoundary(credentials, async () => {
+    held.resolve()
+    await trying.promise
+  })
   let renames = 0
   const original = fs.renameSync
   const spy = spyOn(fs, "renameSync").mockImplementation((from, to) => {
-    if (landsIn(f.input.pinDir, to)) { renames++; order.push("rename") }
+    if (landsIn(f.input.pinDir, to)) {
+      renames++
+      order.push("rename")
+    }
     original(from, to)
   })
   cleanup.push(() => spy.mockRestore())
@@ -117,14 +159,24 @@ test("pin boundary taken first publishes once, and a sibling replacement waiting
   // given: the pin boundary holds the credential lock before the sibling writer starts
   const result = pinTrustAnchor(f.input.pinDir, ACCOUNT, verified.state.pin, { authority })
   await held.promise
-  const child = Bun.spawn([process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, "replacement"], {
-    stdout: "inherit", stderr: "inherit",
-    ipc(message) {
-      if (message === "trying") trying.resolve()
-      if (message === "locked") { order.push("writer-locked"); locked.resolve() }
+  const child = Bun.spawn(
+    [process.execPath, join(import.meta.dir, "testing/credential-writer.test-support.ts"), credentials, "replacement"],
+    {
+      stdout: "inherit",
+      stderr: "inherit",
+      ipc(message) {
+        if (message === "trying") trying.resolve()
+        if (message === "locked") {
+          order.push("writer-locked")
+          locked.resolve()
+        }
+      },
     },
+  )
+  cleanup.push(async () => {
+    if (child.exitCode === null) child.kill()
+    await child.exited
   })
-  cleanup.push(async () => { if (child.exitCode === null) child.kill(); await child.exited })
 
   // when: the writer is already contending for the lock while the publication proceeds,
   // and an unrelated file elsewhere in this process is renamed in the same window (#11963)

@@ -1,6 +1,15 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync } from "node:fs"
+import {
+  appendFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -10,13 +19,26 @@ import type { InboxDrainOptions } from "./drain"
 import { createGatewayEngine, resolveFromEntries, type GatewayAddressEntry, type GatewayEngine } from "./engine"
 import { gatewayInboxDirectory } from "./paths"
 import { processStartTime } from "./process-identity"
-import { createControlEndpointRegistrant, type ControlEndpointRegistrant, type SenpiWakeEvent, type SessionControlActionsPort } from "./registration"
+import {
+  createControlEndpointRegistrant,
+  type ControlEndpointRegistrant,
+  type SenpiWakeEvent,
+  type SessionControlActionsPort,
+} from "./registration"
 import { createGatewayStore, type GatewayStore } from "./store"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import type { DeliveryRow, DeliveryState, GatewayDeliveryResult, ProcessIdentity } from "./types"
 
 type Reason = "idle" | "submission" | "draft_cleared" | "command" | "inbox" | "emitted" | "continue"
-const REASON_PRIORITY: readonly Reason[] = ["submission", "draft_cleared", "idle", "continue", "command", "emitted", "inbox"]
+const REASON_PRIORITY: readonly Reason[] = [
+  "submission",
+  "draft_cleared",
+  "idle",
+  "continue",
+  "command",
+  "emitted",
+  "inbox",
+]
 
 /**
  * `pi.session` of one terminal, mirroring senpi's `session-control-wake.ts` / `-lifecycle.ts`: one
@@ -33,12 +55,17 @@ class FakeSessionControl implements SessionControlActionsPort {
   readonly errors: string[] = []
   persisted = 0
   referencedAtExit: boolean | undefined
-  private drainFn: ((event: SenpiWakeEvent) => SessionControlDrainResult | undefined | Promise<SessionControlDrainResult | undefined>) | undefined
+  private drainFn:
+    | ((
+        event: SenpiWakeEvent,
+      ) => SessionControlDrainResult | undefined | Promise<SessionControlDrainResult | undefined>)
+    | undefined
   private inboxDir: string | undefined
   private inboxListing = ""
   private crashed = false
   private running = false
-  private next: { reasons: Set<Reason>; ids: Set<string>; waiters: Array<(result: SessionControlDrainResult) => void> } | undefined
+  private next:
+    { reasons: Set<Reason>; ids: Set<string>; waiters: Array<(result: SessionControlDrainResult) => void> } | undefined
   private idleWaiters: Array<() => void> = []
 
   constructor(readonly runtime: FakeSessionRuntime) {
@@ -64,8 +91,10 @@ class FakeSessionControl implements SessionControlActionsPort {
   }
 
   readonly admissionGate: SessionControlActionsPort["admissionGate"] = () => this.runtime.admissionGate()
-  readonly admitExternalMessage: SessionControlActionsPort["admitExternalMessage"] = (input) => this.runtime.admitExternalMessage(input)
-  readonly listAdmittedDeliveries: SessionControlActionsPort["listAdmittedDeliveries"] = () => this.runtime.listAdmittedDeliveries()
+  readonly admitExternalMessage: SessionControlActionsPort["admitExternalMessage"] = (input) =>
+    this.runtime.admitExternalMessage(input)
+  readonly listAdmittedDeliveries: SessionControlActionsPort["listAdmittedDeliveries"] = () =>
+    this.runtime.listAdmittedDeliveries()
   readonly persistHeaderNow: SessionControlActionsPort["persistHeaderNow"] = async () => {
     this.persisted += 1
   }
@@ -126,7 +155,12 @@ class FakeSessionControl implements SessionControlActionsPort {
         const drain = this.drainFn
         if (drain !== undefined && !this.crashed) {
           try {
-            result = (await drain({ type: "session_control_wake", reason, reasons, ...(batch.ids.size > 0 ? { delivery_ids: [...batch.ids] } : {}) })) ?? { admitted: [] }
+            result = (await drain({
+              type: "session_control_wake",
+              reason,
+              reasons,
+              ...(batch.ids.size > 0 ? { delivery_ids: [...batch.ids] } : {}),
+            })) ?? { admitted: [] }
           } catch (error) {
             this.errors.push(error instanceof Error ? error.message : String(error))
           }
@@ -149,7 +183,10 @@ type World = {
   readonly released: string[]
   readonly engine: GatewayEngine
   readonly senderStore: GatewayStore
-  readonly process: (options?: { readonly reopen?: boolean; readonly drain?: Pick<InboxDrainOptions, "_test"> }) => Promise<Proc>
+  readonly process: (options?: {
+    readonly reopen?: boolean
+    readonly drain?: Pick<InboxDrainOptions, "_test">
+  }) => Promise<Proc>
   readonly current: () => Proc | undefined
 }
 
@@ -176,16 +213,18 @@ async function world(): Promise<World> {
   const released: string[] = []
   let proc: Proc | undefined
 
-  const entries = (): readonly GatewayAddressEntry[] => [{
-    thread_id: "B",
-    name: "b-terminal",
-    status: liveness.value === "routable" ? "live" : "resumable",
-    cwd: agentDir,
-    created_at: new Date(clock.now).toISOString(),
-    updated_at: new Date(clock.now).toISOString(),
-    endpoint: { kind: "tui", socket: "fake:tui", routing_id: "B", durable_session_id: "B" },
-    liveness: liveness.value,
-  }]
+  const entries = (): readonly GatewayAddressEntry[] => [
+    {
+      thread_id: "B",
+      name: "b-terminal",
+      status: liveness.value === "routable" ? "live" : "resumable",
+      cwd: agentDir,
+      created_at: new Date(clock.now).toISOString(),
+      updated_at: new Date(clock.now).toISOString(),
+      endpoint: { kind: "tui", socket: "fake:tui", routing_id: "B", durable_session_id: "B" },
+      liveness: liveness.value,
+    },
+  ]
   const endpoints: GatewayEndpointPort = {
     wake: async (_endpoint, deliveryIds) => {
       if (proc === undefined || liveness.value !== "routable") throw new Error("the terminal did not answer")
@@ -198,15 +237,28 @@ async function world(): Promise<World> {
   }
   const senderStore = createGatewayStore({ agentDir, now })
   disposers.push(() => senderStore.dispose())
-  const engine = createGatewayEngine({ store: senderStore, endpoints, resolve: resolveFromEntries(entries, () => agentDir), now })
+  const engine = createGatewayEngine({
+    store: senderStore,
+    endpoints,
+    resolve: resolveFromEntries(entries, () => agentDir),
+    now,
+  })
 
   const process: World["process"] = async (options = {}) => {
     const runtime = new FakeSessionRuntime(sessionPath, "B", agentDir, { reopen: options.reopen === true })
     const control = new FakeSessionControl(runtime)
     const store = createGatewayStore({ agentDir, now })
     disposers.push(() => store.dispose())
-    const registrant = createControlEndpointRegistrant({ control, agentDir: () => agentDir, _test: { store, drain: { now, ...(options.drain ?? {}) } } })
-    const outcome = await registrant.start({ durableId: "B", sessionPath: () => sessionPath, isIdle: () => runtime.phaseValue === "idle" })
+    const registrant = createControlEndpointRegistrant({
+      control,
+      agentDir: () => agentDir,
+      _test: { store, drain: { now, ...(options.drain ?? {}) } },
+    })
+    const outcome = await registrant.start({
+      durableId: "B",
+      sessionPath: () => sessionPath,
+      isIdle: () => runtime.phaseValue === "idle",
+    })
     expect(outcome).toEqual({ status: "registered", socket: "fake:tui" })
     await control.settled()
     proc = { runtime, control, store, registrant }
@@ -234,7 +286,13 @@ function tokensOnDisk(path: string): string[] {
     .split("\n")
     .filter((line) => line.length > 0)
     .map((line) => JSON.parse(line) as { type?: string; customType?: string; details?: { delivery_id?: string } })
-    .flatMap((entry) => (entry.type === "custom_message" && entry.customType === SESSION_CONTROL_DELIVERY_TYPE && typeof entry.details?.delivery_id === "string" ? [entry.details.delivery_id] : []))
+    .flatMap((entry) =>
+      entry.type === "custom_message" &&
+      entry.customType === SESSION_CONTROL_DELIVERY_TYPE &&
+      typeof entry.details?.delivery_id === "string"
+        ? [entry.details.delivery_id]
+        : [],
+    )
 }
 
 function markerExists(w: World, id: string): boolean {
@@ -266,7 +324,8 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     // then
     expect(b.runtime.enqueueCalls.map((call) => call.delivery_id)).toEqual(ids)
-    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "followUp", "followUp"])
+    // The first delivery starts the turn; the default lane steers the next two into it (gateway/decision.ts).
+    expect(b.runtime.enqueueCalls.map((call) => call.lane)).toEqual(["start", "steer", "steer"])
     expect(tokensOnDisk(w.sessionPath)).toEqual(ids)
     expect(await Promise.all(ids.map((id) => stateOf(w.senderStore, id)))).toEqual(["applied", "applied", "applied"])
     expect(b.control.persisted).toBe(1)
@@ -279,7 +338,10 @@ describe("session inbox drain through the control endpoint registrant", () => {
     await b.control.settled()
     expect(result).toMatchObject({ kind: "ok", delivery: { kind: "started" }, endpoint_kind: "tui" })
     const id = okId(result)
-    expect({ state: await stateOf(w.senderStore, id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({ state: "applied", tokens: [id] })
+    expect({ state: await stateOf(w.senderStore, id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({
+      state: "applied",
+      tokens: [id],
+    })
   })
 
   test("#given the user is composing a draft #when a delivery arrives and its marker lands #then the receiver writes nothing, takes at most one inbox wake and keeps the marker; Enter then runs the draft first and applies the delivery exactly once", async () => {
@@ -297,7 +359,13 @@ describe("session inbox drain through the control endpoint registrant", () => {
     await b.control.settled()
     b.control.observeInbox()
     await b.control.settled()
-    const held = { writes: (await b.store.stats()).writes - writesBefore, inboxWakes: b.control.inboxPasses() - inboxBefore, state: await stateOf(b.store, id), marker: markerExists(w, id), row: (await b.store.deliveryView(id))?.row }
+    const held = {
+      writes: (await b.store.stats()).writes - writesBefore,
+      inboxWakes: b.control.inboxPasses() - inboxBefore,
+      state: await stateOf(b.store, id),
+      marker: markerExists(w, id),
+      row: (await b.store.deliveryView(id))?.row,
+    }
     const inboxBeforeEnter = b.control.inboxPasses()
     b.control.submit()
     await b.control.settled()
@@ -306,12 +374,21 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     // then
     expect(result).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
-    expect({ writes: held.writes, state: held.state, marker: held.marker, attempt: held.row?.attempt, claimedBy: held.row?.admitted_by ?? null }).toEqual({ writes: 0, state: "queued", marker: true, attempt: 0, claimedBy: null })
+    expect({
+      writes: held.writes,
+      state: held.state,
+      marker: held.marker,
+      attempt: held.row?.attempt,
+      claimedBy: held.row?.admitted_by ?? null,
+    }).toEqual({ writes: 0, state: "queued", marker: true, attempt: 0, claimedBy: null })
     expect(held.inboxWakes).toBeLessThanOrEqual(1)
     expect(b.control.inboxPasses() - inboxBeforeEnter).toBeLessThanOrEqual(1)
     expect(await stateOf(b.store, id)).toBe("applied")
     expect(markerExists(w, id)).toBe(false)
-    const lines = readFileSync(w.sessionPath, "utf8").split("\n").filter((line) => line.length > 0).map((line) => JSON.parse(line) as { type: string; message?: { role?: string } })
+    const lines = readFileSync(w.sessionPath, "utf8")
+      .split("\n")
+      .filter((line) => line.length > 0)
+      .map((line) => JSON.parse(line) as { type: string; message?: { role?: string } })
     const draftAt = lines.findIndex((line) => line.type === "message" && line.message?.role === "user")
     const deliveryAt = lines.findIndex((line) => line.type === "custom_message")
     expect(draftAt).toBeGreaterThan(0)
@@ -329,7 +406,12 @@ describe("session inbox drain through the control endpoint registrant", () => {
     const midTurn = await stateOf(b.store, id)
     b.runtime.endTurn()
     await b.control.settled()
-    expect({ midTurn, final: await stateOf(b.store, id), enqueued: b.runtime.enqueueCount(id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({ midTurn: "admitted", final: "applied", enqueued: 1, tokens: [id] })
+    expect({
+      midTurn,
+      final: await stateOf(b.store, id),
+      enqueued: b.runtime.enqueueCount(id),
+      tokens: tokensOnDisk(w.sessionPath),
+    }).toEqual({ midTurn: "admitted", final: "applied", enqueued: 1, tokens: [id] })
   })
 
   test("#given the terminal is not running #when a delivery is sent and the session is resumed later #then it is queued_offline first and the resumed session drains it once", async () => {
@@ -340,7 +422,11 @@ describe("session inbox drain through the control endpoint registrant", () => {
     expect(markerExists(w, id)).toBe(true)
     const b = await w.process()
     await b.control.settled()
-    expect({ state: await stateOf(b.store, id), tokens: tokensOnDisk(w.sessionPath), marker: markerExists(w, id) }).toEqual({ state: "applied", tokens: [id], marker: false })
+    expect({
+      state: await stateOf(b.store, id),
+      tokens: tokensOnDisk(w.sessionPath),
+      marker: markerExists(w, id),
+    }).toEqual({ state: "applied", tokens: [id], marker: false })
   })
 
   test("#given a stopped (SIGSTOPped) terminal #when a delivery is sent and the terminal continues #then it is queued_offline with its row committed, and the continue edge alone applies it once with no second send", async () => {
@@ -354,7 +440,11 @@ describe("session inbox drain through the control endpoint registrant", () => {
     w.liveness.value = "routable"
     await b.control.wake("continue")
     await b.control.settled()
-    expect({ state: await stateOf(b.store, id), tokens: tokensOnDisk(w.sessionPath), released: w.released }).toEqual({ state: "applied", tokens: [id], released: [] })
+    expect({ state: await stateOf(b.store, id), tokens: tokensOnDisk(w.sessionPath), released: w.released }).toEqual({
+      state: "applied",
+      tokens: [id],
+      released: [],
+    })
   })
 
   test("#given a sender that committed and died before its wake #when only the inbox marker's edge reaches the terminal #then the delivery is applied once", async () => {
@@ -366,7 +456,10 @@ describe("session inbox drain through the control endpoint registrant", () => {
     expect(markerExists(w, id)).toBe(true)
     await b.control.wake("inbox")
     await b.control.settled()
-    expect({ state: await stateOf(b.store, id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({ state: "applied", tokens: [id] })
+    expect({ state: await stateOf(b.store, id), tokens: tokensOnDisk(w.sessionPath) }).toEqual({
+      state: "applied",
+      tokens: [id],
+    })
   })
 
   test("#given a live_unresponsive (suspended or remote) terminal #when deliveries are sent to it #then it is never released or reopened elsewhere, and its queued message is applied once after it answers again", async () => {
@@ -379,7 +472,12 @@ describe("session inbox drain through the control endpoint registrant", () => {
     w.liveness.value = "routable"
     await b.control.wake("continue")
     await b.control.settled()
-    expect({ state: await stateOf(b.store, id), enqueued: b.runtime.enqueueCount(id), tokens: tokensOnDisk(w.sessionPath), released: w.released }).toEqual({ state: "applied", enqueued: 1, tokens: [id], released: [] })
+    expect({
+      state: await stateOf(b.store, id),
+      enqueued: b.runtime.enqueueCount(id),
+      tokens: tokensOnDisk(w.sessionPath),
+      released: w.released,
+    }).toEqual({ state: "applied", enqueued: 1, tokens: [id], released: [] })
   })
 
   test("#given a fresh session holding only its header and a draft #when a delivery is held and the user exits without submitting, then reopens the same session #then the file is kept (referenced) and the reopened session applies the delivery once under the same durable id", async () => {
@@ -396,8 +494,15 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     // then
     expect(first.control.referencedAtExit).toBe(true)
-    expect(JSON.parse(readFileSync(w.sessionPath, "utf8").split("\n")[0] ?? "{}")).toMatchObject({ type: "session", id: "B" })
-    expect({ state: await stateOf(reopened.store, id), tokens: tokensOnDisk(w.sessionPath), enqueued: reopened.runtime.enqueueCount(id) }).toEqual({ state: "applied", tokens: [id], enqueued: 1 })
+    expect(JSON.parse(readFileSync(w.sessionPath, "utf8").split("\n")[0] ?? "{}")).toMatchObject({
+      type: "session",
+      id: "B",
+    })
+    expect({
+      state: await stateOf(reopened.store, id),
+      tokens: tokensOnDisk(w.sessionPath),
+      enqueued: reopened.runtime.enqueueCount(id),
+    }).toEqual({ state: "applied", tokens: [id], enqueued: 1 })
   })
 
   describe("crash between the two phases, then a fresh process for the same durable id", () => {
@@ -415,11 +520,17 @@ describe("session inbox drain through the control endpoint registrant", () => {
         drain: {
           _test: {
             identity: dead,
-            ...(fault === "after_claim" ? { afterClaim: (_row: DeliveryRow) => crash() } : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }),
+            ...(fault === "after_claim"
+              ? { afterClaim: (_row: DeliveryRow) => crash() }
+              : { afterAdmit: (_row: DeliveryRow, _kind: string) => crash() }),
           },
         },
       })
-      if (fault === "after_start") appendFileSync(w.sessionPath, `${JSON.stringify({ type: "message", message: { role: "assistant", content: "earlier answer" } })}\n`)
+      if (fault === "after_start")
+        appendFileSync(
+          w.sessionPath,
+          `${JSON.stringify({ type: "message", message: { role: "assistant", content: "earlier answer" } })}\n`,
+        )
       if (fault === "after_mid_turn_queue") victim.runtime.beginUserTurn()
       const id = okId(await send(w, `fault ${fault}`))
       await victim.control.settled()
@@ -436,24 +547,45 @@ describe("session inbox drain through the control endpoint registrant", () => {
 
     test("#given a crash after T1 and before the runtime call #when a fresh process registers #then the row is re-admitted exactly once", async () => {
       const run = await crashThenResume("after_claim")
-      expect({ crashed: run.crashedState, victimEnqueued: run.victim.runtime.enqueueCount(run.id), freshEnqueued: run.fresh.runtime.enqueueCount(run.id) }).toEqual({ crashed: "admitting", victimEnqueued: 0, freshEnqueued: 1 })
+      expect({
+        crashed: run.crashedState,
+        victimEnqueued: run.victim.runtime.enqueueCount(run.id),
+        freshEnqueued: run.fresh.runtime.enqueueCount(run.id),
+      }).toEqual({ crashed: "admitting", victimEnqueued: 0, freshEnqueued: 1 })
       expect(tokensOnDisk(run.sessionPath)).toEqual([run.id])
     })
 
     test("#given a crash after the runtime started the turn and wrote the entry, on a session that already had an assistant message #when a fresh process registers #then the disk token makes it applied and it is not re-admitted", async () => {
       const run = await crashThenResume("after_start")
-      expect({ crashed: run.crashedState, atCrash: run.tokensAtCrash, final: await stateOf(run.store, run.id), freshEnqueued: run.fresh.runtime.enqueueCount(run.id), tokens: tokensOnDisk(run.sessionPath) }).toEqual({ crashed: "admitting", atCrash: [run.id], final: "applied", freshEnqueued: 0, tokens: [run.id] })
+      expect({
+        crashed: run.crashedState,
+        atCrash: run.tokensAtCrash,
+        final: await stateOf(run.store, run.id),
+        freshEnqueued: run.fresh.runtime.enqueueCount(run.id),
+        tokens: tokensOnDisk(run.sessionPath),
+      }).toEqual({ crashed: "admitting", atCrash: [run.id], final: "applied", freshEnqueued: 0, tokens: [run.id] })
     })
 
     test("#given the same crash on a fresh session holding only its header #when a fresh process registers under the same durable id #then the row is applied and not re-admitted", async () => {
       const run = await crashThenResume("after_start_header_only")
       const header = JSON.parse(readFileSync(run.sessionPath, "utf8").split("\n")[0] ?? "{}") as { id?: string }
-      expect({ header: header.id, final: await stateOf(run.store, run.id), freshEnqueued: run.fresh.runtime.enqueueCount(run.id), tokens: tokensOnDisk(run.sessionPath) }).toEqual({ header: "B", final: "applied", freshEnqueued: 0, tokens: [run.id] })
+      expect({
+        header: header.id,
+        final: await stateOf(run.store, run.id),
+        freshEnqueued: run.fresh.runtime.enqueueCount(run.id),
+        tokens: tokensOnDisk(run.sessionPath),
+      }).toEqual({ header: "B", final: "applied", freshEnqueued: 0, tokens: [run.id] })
     })
 
     test("#given a crash after a mid-turn queued admission the runtime never wrote #when a fresh process registers #then the dead claimant's row goes back to queued and is admitted exactly once", async () => {
       const run = await crashThenResume("after_mid_turn_queue")
-      expect({ crashed: run.crashedState, atCrash: run.tokensAtCrash, freshEnqueued: run.fresh.runtime.enqueueCount(run.id), final: await stateOf(run.store, run.id), tokens: tokensOnDisk(run.sessionPath) }).toEqual({ crashed: "admitting", atCrash: [], freshEnqueued: 1, final: "applied", tokens: [run.id] })
+      expect({
+        crashed: run.crashedState,
+        atCrash: run.tokensAtCrash,
+        freshEnqueued: run.fresh.runtime.enqueueCount(run.id),
+        final: await stateOf(run.store, run.id),
+        tokens: tokensOnDisk(run.sessionPath),
+      }).toEqual({ crashed: "admitting", atCrash: [], freshEnqueued: 1, final: "applied", tokens: [run.id] })
     })
   })
 
@@ -465,23 +597,62 @@ describe("session inbox drain through the control endpoint registrant", () => {
     const store = createGatewayStore({ agentDir: w.agentDir, now: () => w.clock.now })
     disposers.push(() => store.dispose())
     let entered!: () => void
-    const drainEntered = new Promise<void>((resolve) => { entered = resolve })
+    const drainEntered = new Promise<void>((resolve) => {
+      entered = resolve
+    })
     let incarnationRecorded = false
     const drainReads: { readonly op: string; readonly incarnationRecorded: boolean }[] = []
     // Every store operation but the registrant's own (the identity read and the incarnation write) is a drain pass reading the store.
-    const recording = Object.fromEntries(Object.entries(store).map(([name, value]) => [name, typeof value !== "function" ? value : (...args: unknown[]) => {
-      if (name !== "identity" && name !== "registerIncarnation" && name !== "dispose") drainReads.push({ op: name, incarnationRecorded })
-      return (value as (...a: unknown[]) => unknown).apply(store, args)
-    }])) as GatewayStore
+    const recording = Object.fromEntries(
+      Object.entries(store).map(([name, value]) => [
+        name,
+        typeof value !== "function"
+          ? value
+          : (...args: unknown[]) => {
+              if (name !== "identity" && name !== "registerIncarnation" && name !== "dispose")
+                drainReads.push({ op: name, incarnationRecorded })
+              return (value as (...a: unknown[]) => unknown).apply(store, args)
+            },
+      ]),
+    ) as GatewayStore
     // The incarnation write starts only once the first wake reached the drain, plus one worker round trip: a drain that did not wait for it would read the store first.
-    const slowIncarnation: GatewayStore = { ...recording, registerIncarnation: async (request) => { await drainEntered; await store.journalMode(); await store.registerIncarnation(request); incarnationRecorded = true } }
+    const slowIncarnation: GatewayStore = {
+      ...recording,
+      registerIncarnation: async (request) => {
+        await drainEntered
+        await store.journalMode()
+        await store.registerIncarnation(request)
+        incarnationRecorded = true
+      },
+    }
     // The fake asks for its first `inbox` pass inside registerControlEndpoint, as senpi does.
-    const port: SessionControlActionsPort = { ...control, registerControlEndpoint: async (options) => await control.registerControlEndpoint({ ...options, drain: async (event) => { entered(); return await options.drain(event) } }) }
-    const registrant = createControlEndpointRegistrant({ control: port, agentDir: () => w.agentDir, _test: { store: slowIncarnation, drain: { now: () => w.clock.now } } })
-    expect(await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })).toEqual({ status: "registered", socket: "fake:tui" })
+    const port: SessionControlActionsPort = {
+      ...control,
+      registerControlEndpoint: async (options) =>
+        await control.registerControlEndpoint({
+          ...options,
+          drain: async (event) => {
+            entered()
+            return await options.drain(event)
+          },
+        }),
+    }
+    const registrant = createControlEndpointRegistrant({
+      control: port,
+      agentDir: () => w.agentDir,
+      _test: { store: slowIncarnation, drain: { now: () => w.clock.now } },
+    })
+    expect(await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })).toEqual({
+      status: "registered",
+      socket: "fake:tui",
+    })
     await control.settled()
     await registrant.stop()
-    expect({ drained: drainReads.length > 0, beforeIncarnation: drainReads.filter((read) => !read.incarnationRecorded), state: await stateOf(w.senderStore, id) }).toEqual({ drained: true, beforeIncarnation: [], state: "applied" })
+    expect({
+      drained: drainReads.length > 0,
+      beforeIncarnation: drainReads.filter((read) => !read.incarnationRecorded),
+      state: await stateOf(w.senderStore, id),
+    }).toEqual({ drained: true, beforeIncarnation: [], state: "applied" })
   })
 
   test("#given the store cannot record the session's incarnation #when the terminal registers #then registration fails, no endpoint is exposed, and a delivery sent to it stays queued", async () => {
@@ -490,13 +661,29 @@ describe("session inbox drain through the control endpoint registrant", () => {
     const control = new FakeSessionControl(runtime)
     const store = createGatewayStore({ agentDir: w.agentDir })
     disposers.push(() => store.dispose())
-    const failing: GatewayStore = { ...store, registerIncarnation: async () => { throw new Error("disk I/O error") } }
+    const failing: GatewayStore = {
+      ...store,
+      registerIncarnation: async () => {
+        throw new Error("disk I/O error")
+      },
+    }
     const logs: string[] = []
-    const registrant = createControlEndpointRegistrant({ control, agentDir: () => w.agentDir, log: (line) => logs.push(line), _test: { store: failing } })
+    const registrant = createControlEndpointRegistrant({
+      control,
+      agentDir: () => w.agentDir,
+      log: (line) => logs.push(line),
+      _test: { store: failing },
+    })
     const outcome = await registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })
     const id = okId(await send(w, "while unregistered"))
     const wake = await control.wake("command", [id])
-    expect({ outcome, endpoint: registrant.currentDrain(), wake, state: await stateOf(w.senderStore, id), enqueued: runtime.enqueueCalls.length }).toEqual({
+    expect({
+      outcome,
+      endpoint: registrant.currentDrain(),
+      wake,
+      state: await stateOf(w.senderStore, id),
+      enqueued: runtime.enqueueCalls.length,
+    }).toEqual({
       outcome: { status: "failed", reason: "disk I/O error" },
       endpoint: undefined,
       wake: { admitted: [] },
@@ -512,6 +699,10 @@ describe("session inbox drain through the control endpoint registrant", () => {
     const again = await b.registrant.start({ durableId: "B", sessionPath: () => w.sessionPath, isIdle: () => true })
     await b.registrant.stop()
     const after = await b.control.wake("command", ["nothing"])
-    expect({ again, persisted: b.control.persisted, after }).toEqual({ again: { status: "already_registered" }, persisted: 1, after: { admitted: [] } })
+    expect({ again, persisted: b.control.persisted, after }).toEqual({
+      again: { status: "already_registered" },
+      persisted: 1,
+      after: { admitted: [] },
+    })
   })
 })

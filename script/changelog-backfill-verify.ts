@@ -47,9 +47,7 @@ async function main() {
     body: "## Fixed\n\n- Some change",
   }
   const noMarkerErrors = validateReleaseRequirements(noMarkerRelease)
-  console.log(
-    `   Result: ${noMarkerErrors.length > 0 ? "✅ FAIL (as expected)" : "❌ PASS (should fail)"}`
-  )
+  console.log(`   Result: ${noMarkerErrors.length > 0 ? "✅ FAIL (as expected)" : "❌ PASS (should fail)"}`)
   console.log(`   Errors: ${noMarkerErrors.map((e) => e.code).join(", ")}\n`)
 
   // RED test 2: Release without publishedAt should fail validation
@@ -61,9 +59,7 @@ async function main() {
     body: "## Fixed\n\n- Change\n\n<!-- omo-backfill-marker: v5.0.0-beta.99 -->",
   }
   const noDateErrors = validateReleaseRequirements(noDateRelease)
-  console.log(
-    `   Result: ${noDateErrors.length > 0 ? "✅ FAIL (as expected)" : "❌ PASS (should fail)"}`
-  )
+  console.log(`   Result: ${noDateErrors.length > 0 ? "✅ FAIL (as expected)" : "❌ PASS (should fail)"}`)
   console.log(`   Errors: ${noDateErrors.map((e) => e.code).join(", ")}\n`)
 
   // GREEN test 1: Valid release should transform

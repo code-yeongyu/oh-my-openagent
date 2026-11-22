@@ -39,8 +39,11 @@ function shownState(previous: NudgeState, now: number, version: string): NudgeSt
 }
 
 export function decideNativeEditionNudge(input: NudgeDecisionInput): NudgeDecision {
-  const deny = (reason: NudgeSuppressionReason, nextState: NudgeState | null = null): NudgeDecision =>
-    ({ show: false, reason, nextState })
+  const deny = (reason: NudgeSuppressionReason, nextState: NudgeState | null = null): NudgeDecision => ({
+    show: false,
+    reason,
+    nextState,
+  })
 
   // A recorded opt-out or a completed migration outranks every other field, so a corrupted or
   // hand-edited state file can never resurrect a nudge the user already dismissed for good.

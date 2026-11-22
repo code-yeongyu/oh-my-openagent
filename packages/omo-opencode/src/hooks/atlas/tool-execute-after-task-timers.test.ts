@@ -17,7 +17,9 @@ const collectGitDiffStatsMock = mock(() => ({
 }))
 const formatFileChangesMock = mock(() => "No file changes")
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 
@@ -74,9 +76,9 @@ describe("createToolExecuteAfterHandler task timers", () => {
     } as PluginInput["client"]
 
     if (parentSessionIDs) {
-      spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-        createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""]),
-      ) as never)
+      spyOn(client.session, "get").mockImplementation(
+        (input) => Promise.resolve(createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""])) as never,
+      )
     }
 
     const pendingFilePaths = new Map<string, string>()
@@ -266,7 +268,13 @@ describe("createToolExecuteAfterHandler task timers", () => {
 
     await beforeHandler(
       { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-1" },
-      { args: { filePath: planPath, oldString: "- [ ] 1. Implement auth flow", newString: "- [x] 1. Implement auth flow" } },
+      {
+        args: {
+          filePath: planPath,
+          oldString: "- [ ] 1. Implement auth flow",
+          newString: "- [x] 1. Implement auth flow",
+        },
+      },
     )
 
     writeFileSync(planPath, "# Plan\n\n## TODOs\n- [x] 1. Implement auth flow\n", "utf-8")
@@ -343,7 +351,9 @@ describe("createToolExecuteAfterHandler task timers", () => {
 
     await beforeHandler(
       { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-nested" },
-      { args: { filePath: planPath, oldString: "  - [ ] 1. nested evidence", newString: "  - [x] 1. nested evidence" } },
+      {
+        args: { filePath: planPath, oldString: "  - [ ] 1. nested evidence", newString: "  - [x] 1. nested evidence" },
+      },
     )
 
     writeFileSync(planPath, "# Plan\n\n## TODOs\n- [ ] 1. Implement auth flow\n  - [x] 1. nested evidence\n", "utf-8")
@@ -418,7 +428,13 @@ describe("createToolExecuteAfterHandler task timers", () => {
 
     await beforeHandler(
       { tool: "edit", sessionID: parentSessionID, callID: "call-task-timer-edit-top-level" },
-      { args: { filePath: planPath, oldString: "- [ ] 1. Implement auth flow", newString: "- [x] 1. Implement auth flow" } },
+      {
+        args: {
+          filePath: planPath,
+          oldString: "- [ ] 1. Implement auth flow",
+          newString: "- [x] 1. Implement auth flow",
+        },
+      },
     )
 
     writeFileSync(planPath, "# Plan\n\n## TODOs\n- [x] 1. Implement auth flow\n  - [ ] 1. nested evidence\n", "utf-8")
@@ -579,5 +595,4 @@ describe("createToolExecuteAfterHandler task timers", () => {
     const taskSessions = readBoulderState(testDirectory)?.works?.["work-1"]?.task_sessions
     expect(taskSessions?.["todo:1"]?.task_key).toBe("todo:1")
   })
-
 })

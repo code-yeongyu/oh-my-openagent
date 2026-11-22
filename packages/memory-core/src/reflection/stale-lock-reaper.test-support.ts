@@ -1,6 +1,15 @@
 import { spawn } from "node:child_process"
 import { createHash } from "node:crypto"
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs"
+import {
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { hostname, tmpdir } from "node:os"
 import { dirname, join, relative } from "node:path"
 
@@ -50,7 +59,10 @@ export function activeLock(paths: MemoryIdentityPaths, fields: Record<string, un
 }
 
 export function pendingRun(paths: MemoryIdentityPaths, runId = "reflection-run-65"): void {
-  writeJson(join(paths.reflection, "pending.json"), { runId, request: { trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] } })
+  writeJson(join(paths.reflection, "pending.json"), {
+    runId,
+    request: { trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] },
+  })
 }
 
 export function validLedger(runId: string, fields: Record<string, unknown> = {}): Record<string, unknown> {

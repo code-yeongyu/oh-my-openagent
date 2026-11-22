@@ -32,10 +32,14 @@ export function createChildExtensionEvents() {
     publish,
     ingest(record: unknown): boolean {
       if (
-        typeof record !== "object" || record === null ||
-        !("type" in record) || record.type !== "extension_event" ||
-        !("name" in record) || record.name !== CHILD_PERMISSION_EVENT
-      ) return false
+        typeof record !== "object" ||
+        record === null ||
+        !("type" in record) ||
+        record.type !== "extension_event" ||
+        !("name" in record) ||
+        record.name !== CHILD_PERMISSION_EVENT
+      )
+        return false
       const event = parseChildExtensionEvent("data" in record ? record.data : undefined)
       if (event !== undefined) publish(event)
       return true
@@ -45,7 +49,9 @@ export function createChildExtensionEvents() {
       listeners.add(listener)
       attached = true
       for (const event of pending.splice(0)) listener(event)
-      return () => { listeners.delete(listener) }
+      return () => {
+        listeners.delete(listener)
+      }
     },
     clear(): void {
       retired = true

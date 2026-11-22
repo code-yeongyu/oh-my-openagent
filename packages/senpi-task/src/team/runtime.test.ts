@@ -233,5 +233,4 @@ describe("createTeam", () => {
     expect(manager.started[0]?.cwd).toBe(worktreePath)
     expect((await stat(worktreePath)).isDirectory()).toBe(true)
   })
-
 })

@@ -25,11 +25,13 @@ export async function readMemoryRpcJournalState(
   // double count a step, including when journal reconciliation is still pending.
   const entries = await new TranscriptJournal({
     journalDir: join(context.identityPaths.transcripts, sessionId),
-  }).readEntriesSnapshot().catch((error: unknown) => {
-    // An unreadable transcript must not drop the required update; state.json remains usable.
-    if (error instanceof Error && "code" in error && typeof error.code === "string") return undefined
-    throw error
   })
+    .readEntriesSnapshot()
+    .catch((error: unknown) => {
+      // An unreadable transcript must not drop the required update; state.json remains usable.
+      if (error instanceof Error && "code" in error && typeof error.code === "string") return undefined
+      throw error
+    })
   if (entries === undefined) return { ...state, transcriptReadFailed: true }
   const steps = new Set(observedSteps)
   for (const entry of entries) {

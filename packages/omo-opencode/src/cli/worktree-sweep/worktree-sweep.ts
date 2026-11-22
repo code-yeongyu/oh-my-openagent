@@ -7,9 +7,7 @@ export async function worktreeSweep(options: WorktreeSweepOptions = {}): Promise
   try {
     result = await sweepWorktrees(options)
   } catch (error) {
-    process.stderr.write(
-      `[omo] worktree-sweep failed: ${error instanceof Error ? error.message : String(error)}\n`,
-    )
+    process.stderr.write(`[omo] worktree-sweep failed: ${error instanceof Error ? error.message : String(error)}\n`)
     return 1
   }
 

@@ -1,4 +1,7 @@
-import { createTelemetryClient as createInjectedTelemetryClient, type CreateTelemetryClientInput } from "./injected-client"
+import {
+  createTelemetryClient as createInjectedTelemetryClient,
+  type CreateTelemetryClientInput,
+} from "./injected-client"
 import { createDefaultPostHogTransport } from "./posthog-transport"
 import type { TelemetryClient } from "./types"
 
@@ -12,5 +15,8 @@ export function createTelemetryClient(
     readonly transportFactory?: CreateTelemetryClientInput["transportFactory"]
   },
 ): TelemetryClient {
-  return createInjectedTelemetryClient({ ...input, transportFactory: input.transportFactory ?? createDefaultPostHogTransport })
+  return createInjectedTelemetryClient({
+    ...input,
+    transportFactory: input.transportFactory ?? createDefaultPostHogTransport,
+  })
 }

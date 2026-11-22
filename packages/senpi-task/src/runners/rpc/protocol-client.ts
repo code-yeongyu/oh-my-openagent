@@ -5,13 +5,17 @@ import { TEARDOWN_STEP_BUDGET_MS } from "../../lifecycle/teardown-budget"
 
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
-import { RpcCommandError, RpcRequestTimeout } from "./errors"
+import { RpcRequestTimeout } from "./errors"
+import { commandError, isHarmlessRpcShutdownError } from "./protocol-errors"
 import { tailStderr } from "./exit-mapping"
-import { buildAutoUiResponse } from "./ui-auto-answer"
+import { ChildParentLink } from "../parent-link"
 import type { TaskParentCommand } from "../task-parent-control"
+
+export { isHarmlessRpcShutdownError } from "./protocol-errors"
 
 const STDERR_BUFFER_CAP = 16_384
 const WRITE_EXIT_GRACE_MS = 100
+export const RPC_REQUEST_DEADLINE_MS = 30_000
 
 export type MalformedLineHandler = (line: string, error: unknown) => void
 
@@ -19,6 +23,8 @@ export type RpcProtocolClientOptions = {
   readonly child: ChildProcess
   readonly onMalformedLine?: MalformedLineHandler
   readonly autoAnswerUi?: boolean
+  // The parent session this child answers dialogs on and follows the approval mode of (#6189 F2d/F2e).
+  readonly parent?: ChildParentLink
 }
 
 type PendingRequest = {
@@ -39,6 +45,7 @@ export class RpcProtocolClient {
   private readonly child: ChildProcess
   private readonly onMalformedLine: MalformedLineHandler
   private readonly autoAnswerUi: boolean
+  private readonly parent: ChildParentLink
   private readonly pending = new Map<string, PendingRequest>()
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly exitListeners = new Set<(error?: Error) => void>()
@@ -55,7 +62,10 @@ export class RpcProtocolClient {
     this.onMalformedLine =
       options.onMalformedLine ?? ((line, error) => log("senpi-task rpc malformed line", { line, error: String(error) }))
     this.autoAnswerUi = options.autoAnswerUi ?? true
+    // Without a parent link every UI request gets the safe deny/cancel default and nothing is followed.
+    this.parent = options.parent ?? new ChildParentLink("rpc-child")
     this.attach()
+    this.parent.follow((preset) => this.setPermissionPreset(preset))
   }
 
   get pid(): number | undefined {
@@ -85,13 +95,17 @@ export class RpcProtocolClient {
     return this.request(command, {})
   }
 
-  private request(command: { readonly type: string; readonly id?: string }, options: { readonly deadlineMs?: number }): Promise<RpcResponse> {
+  private request(
+    command: { readonly type: string; readonly id?: string },
+    options: { readonly deadlineMs?: number },
+  ): Promise<RpcResponse> {
     const stdin = this.child.stdin
     if (this.isDetached) return Promise.reject(new Error("RPC client detached"))
     if (this.isExited || stdin === null || stdin === undefined) {
       return Promise.reject(new Error(`RPC process is not running. Stderr: ${this.stderrTail}`))
     }
     const id = command.id ?? `senpi-task_${++this.nextRequestId}`
+    if (command.type === "abort") this.parent.turnAborted()
     return new Promise<RpcResponse>((resolve, reject) => {
       const isInput = command.type === "prompt" || command.type === "steer" || command.type === "follow_up"
       let received = false
@@ -102,10 +116,23 @@ export class RpcProtocolClient {
           reject(new RpcRequestTimeout(command.type, ms))
         }, ms)
       }
-      arm(options.deadlineMs ?? (command.type === "get_state" ? 10_000 : command.type === "abort" ? TEARDOWN_STEP_BUDGET_MS : 30_000))
+      arm(
+        options.deadlineMs ??
+          (command.type === "get_state"
+            ? 10_000
+            : command.type === "abort"
+              ? TEARDOWN_STEP_BUDGET_MS
+              : RPC_REQUEST_DEADLINE_MS),
+      )
       const pending: PendingRequest = {
-        resolve: (response) => { clearTimeout(timer); resolve(response) },
-        reject: (error) => { clearTimeout(timer); reject(error) },
+        resolve: (response) => {
+          clearTimeout(timer)
+          resolve(response)
+        },
+        reject: (error) => {
+          clearTimeout(timer)
+          reject(error)
+        },
         received: () => {
           if (!isInput || received) return
           received = true
@@ -116,6 +143,18 @@ export class RpcProtocolClient {
       this.pending.set(id, pending)
       this.write(`${JSON.stringify({ ...command, id })}\n`)
     })
+  }
+
+  // The classic child's live mode setter (senpi set_permission_preset_v1): applied only when the echo names it.
+  private async setPermissionPreset(permissionPreset: string): Promise<void> {
+    const response = await this.send({ type: "set_permission_preset", permissionPreset })
+    if (
+      response.success &&
+      response.command === "set_permission_preset" &&
+      response.data.permissionPreset === permissionPreset
+    )
+      return
+    throw commandError(response, "set_permission_preset")
   }
 
   async switchSession(sessionPath: string): Promise<RpcSwitchSessionResult> {
@@ -147,6 +186,7 @@ export class RpcProtocolClient {
 
   detach(): void {
     this.isDetached = true
+    this.parent.close()
     clearTimeout(this.writeErrorTimer)
     for (const [id, pending] of this.pending) {
       this.pending.delete(id)
@@ -168,7 +208,9 @@ export class RpcProtocolClient {
       this.writeFailed(error)
     })
     this.child.once("error", (error) => this.finalize(error))
-    this.child.once("exit", () => { this.processExited = true })
+    this.child.once("exit", () => {
+      this.processExited = true
+    })
     this.child.once("close", () => this.finalize())
   }
 
@@ -226,13 +268,8 @@ export class RpcProtocolClient {
   }
 
   private answerUi(request: RpcExtensionUIRequest): void {
-    if (!this.autoAnswerUi) {
-      return
-    }
-    const answer = buildAutoUiResponse(request)
-    if (answer) {
-      this.write(`${JSON.stringify(answer)}\n`)
-    }
+    if (!this.autoAnswerUi) return
+    this.parent.answer(request, (answer) => this.write(`${JSON.stringify(answer)}\n`))
   }
 
   private write(payload: string): void {
@@ -269,6 +306,7 @@ export class RpcProtocolClient {
     }
     clearTimeout(this.writeErrorTimer)
     this.isExited = true
+    this.parent.close()
     const failure = error ?? new Error(`RPC process exited. Stderr: ${this.stderrTail}`)
     for (const [id, pending] of this.pending) {
       this.pending.delete(id)
@@ -278,17 +316,4 @@ export class RpcProtocolClient {
       listener(error)
     }
   }
-}
-
-export function isHarmlessRpcShutdownError(error: unknown): boolean {
-  if (!(error instanceof Error) || !("code" in error)) return false
-  return error.code === "EPIPE"
-    || error.code === "ERR_STREAM_DESTROYED"
-    || error.code === "ERR_STREAM_WRITE_AFTER_END"
-    || error.code === "EOF"
-}
-
-function commandError(response: RpcResponse, expectedCommand: string): RpcCommandError {
-  if (!response.success) return new RpcCommandError(expectedCommand, response.error, response)
-  return new RpcCommandError(expectedCommand, `unexpected response command: ${response.command}`)
 }

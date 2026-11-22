@@ -34,7 +34,9 @@ describe("removeTree", () => {
     }
 
     // when
-    const failure = await removeTree("/unused", { maxRetries: 2, retryDelay: 1 }, remove).catch((caught: unknown) => caught)
+    const failure = await removeTree("/unused", { maxRetries: 2, retryDelay: 1 }, remove).catch(
+      (caught: unknown) => caught,
+    )
 
     // then
     expect(failure).toBe(error)
@@ -51,7 +53,9 @@ describe("removeTree", () => {
     }
 
     // when
-    const failure = await removeTree("/unused", { maxRetries: 5, retryDelay: 1 }, remove).catch((caught: unknown) => caught)
+    const failure = await removeTree("/unused", { maxRetries: 5, retryDelay: 1 }, remove).catch(
+      (caught: unknown) => caught,
+    )
 
     // then
     expect(failure).toBe(error)
@@ -63,8 +67,10 @@ describe("removeTreeSync", () => {
   // The remover returns normally while the path is still there: Bun's forced recursive rm does exactly that when a
   // concurrent remover deletes a child mid-walk (#11806). Both helpers must report it, never pass it as removed.
   const helpers = {
-    sync: (root: string, remove: () => void) => Promise.resolve().then(() => removeTreeSync(root, { maxRetries: 2, retryDelay: 0 }, remove)),
-    async: (root: string, remove: () => void) => removeTree(root, { maxRetries: 2, retryDelay: 0 }, async () => remove()),
+    sync: (root: string, remove: () => void) =>
+      Promise.resolve().then(() => removeTreeSync(root, { maxRetries: 2, retryDelay: 0 }, remove)),
+    async: (root: string, remove: () => void) =>
+      removeTree(root, { maxRetries: 2, retryDelay: 0 }, async () => remove()),
   }
   for (const [helper, run] of Object.entries(helpers)) {
     for (const stays of [false, true]) {

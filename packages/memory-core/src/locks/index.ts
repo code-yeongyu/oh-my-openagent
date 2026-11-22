@@ -1,11 +1,4 @@
-export {
-  LockContentionError,
-  acquireLock,
-  isHeld,
-  releaseLock,
-  withLock,
-  setLockCandidateFsForTests,
-} from "./acquire"
+export { LockContentionError, acquireLock, isHeld, releaseLock, withLock, setLockCandidateFsForTests } from "./acquire"
 export type { AcquireLockOptions } from "./acquire"
 export {
   LOCK_DOMAINS,

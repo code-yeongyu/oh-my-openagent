@@ -12,25 +12,41 @@ export function registerWorkpoolTool(
 ): void {
   const workpools = engine.manager.workpools
   if (workpools === undefined) throw new Error("Task engine does not expose workpool admission")
-  pi.registerTool({ ...createWorkpoolTool({
-    ...engine.taskToolDeps(sessionId => skills.stateFor(sessionId)),
-    workpools,
-  }), runs: "brain" })
+  pi.registerTool({
+    ...createWorkpoolTool({
+      ...engine.taskToolDeps((sessionId) => skills.stateFor(sessionId)),
+      workpools,
+    }),
+    runs: "brain",
+  })
   workpools.bindAggregate({
     enqueue: (message, receipts) => {
       if (coordinator === undefined) {
-        pi.sendMessage({ customType: "senpi-task.workpool-aggregate", content: JSON.stringify(message.results), display: false, details: { ...message, runRef: { kind: "workpool", id: message.pool_id } } }, { triggerTurn: true, deliverAs: "steer" })
+        pi.sendMessage(
+          {
+            customType: "senpi-task.workpool-aggregate",
+            content: JSON.stringify(message.results),
+            display: false,
+            details: { ...message, runRef: { kind: "workpool", id: message.pool_id } },
+          },
+          { triggerTurn: true, deliverAs: "steer" },
+        )
         receipts.ack()
         return
       }
       const accepted = coordinator.enqueue({
-        key: `workpool:${message.pool_id}:${message.generation}`, source: "workpool-aggregate",
+        key: `workpool:${message.pool_id}:${message.generation}`,
+        source: "workpool-aggregate",
         runRef: { kind: "workpool", id: message.pool_id },
-        customType: "senpi-task.workpool-aggregate", content: JSON.stringify(message.results), display: false, details: message,
+        customType: "senpi-task.workpool-aggregate",
+        content: JSON.stringify(message.results),
+        display: false,
+        details: message,
         onFlushed: () => receipts.ack(),
-        onDeliveryFailed: error => receipts.fail(error),
+        onDeliveryFailed: (error) => receipts.fail(error),
       })
-      if (accepted === false) throw new Error("idle-injection coordinator retired on session shutdown; injection not delivered")
+      if (accepted === false)
+        throw new Error("idle-injection coordinator retired on session shutdown; injection not delivered")
       coordinator.flushSoon()
     },
   })

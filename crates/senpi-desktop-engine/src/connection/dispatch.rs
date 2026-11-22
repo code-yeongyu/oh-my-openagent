@@ -1,19 +1,22 @@
 //! Session admission and cancellation, shared by NDJSON and XPC connections.
-use super::{deliver, InFlight, Queued};
+use super::{deliver, InFlight, Outbound, Queued};
 use crate::{
     engine::Engine,
     rpc::{reply_line, Failure},
     settle::{settle, settle_hold},
 };
-use senpi_desktop_core::error::DesktopError;
+use senpi_desktop_core::error::{DesktopError, ErrorCode, ErrorReport};
+use senpi_desktop_core::methods::Method;
+use senpi_desktop_core::protocol::RequestId;
 use senpi_desktop_core::report::Disposition;
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinSet};
 
 pub(super) async fn dispatch(
     engine: Arc<Engine>,
     mut queued: mpsc::UnboundedReceiver<Queued>,
-    out: mpsc::Sender<String>,
+    out: Outbound,
     in_flight: InFlight,
 ) {
     let mut waiters = JoinSet::new();
@@ -22,6 +25,7 @@ pub(super) async fn dispatch(
         method,
         call,
         mut cancel,
+        generation,
     }) = queued.recv().await
     {
         let permits = engine.permits(method.spec().effect);
@@ -54,8 +58,11 @@ pub(super) async fn dispatch(
                 }
                 None => settle(started.wait(), cancel, || Err(Failure::cancelled())).await,
             };
+            let current = engine.stop_paths().generation();
             // This request's own mode: an open applied after it started does not count.
-            let outcome = if reports_action() {
+            let outcome = if method.reports_action() && current != generation {
+                quarantine(reports_action(), &id, method, (generation, current), &outcome)
+            } else if reports_action() {
                 outcome.map_err(Failure::with_unreported_disposition)
             } else {
                 outcome
@@ -84,6 +91,40 @@ fn not_dispatched(failure: Failure, reports: bool) -> Failure {
         }
         failure => failure,
     }
+}
+
+/// An input reply that came back across a stop (G15): what it says belongs
+/// to the generation before the stop, so it is dropped with an audit line
+/// and the waiter learns only that the outcome is unknown.
+fn quarantine(
+    reports: bool,
+    id: &RequestId,
+    method: Method,
+    (begun, current): (u64, u64),
+    dropped: &Result<Value, Failure>,
+) -> Result<Value, Failure> {
+    let reply = match dropped {
+        Ok(_) => "success".to_owned(),
+        Err(Failure::Engine(error)) => format!("{:?}", error.code),
+        Err(_) => "failure".to_owned(),
+    };
+    eprintln!(
+        "senpi-desktop-engine: audit: quarantined a late {} reply ({reply}) to request {id:?}: \
+         stop generation {begun} -> {current}",
+        method.spec().name
+    );
+    let error = DesktopError::new(
+        ErrorCode::Suspended,
+        "a stop landed while this input was in flight; its reply was quarantined and what it did is unknown",
+    );
+    Err(Failure::Engine(if reports {
+        error.with_report(ErrorReport {
+            disposition: Some(Disposition::UNKNOWN),
+            ..ErrorReport::default()
+        })
+    } else {
+        error
+    }))
 }
 
 fn report(joined: Result<(), tokio::task::JoinError>) {
