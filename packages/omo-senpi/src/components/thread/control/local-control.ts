@@ -5,7 +5,7 @@ import { threadState } from "../tools/thread-state"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
 import { interruptOver } from "./interrupt"
-import { refuse, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
@@ -28,12 +28,13 @@ export function createLocalControl(
     visible: async () => visible(),
     interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
     close: async (closeOptions) => {
-      if (session.endpoint_kind === "tui")
+      // A terminal closes its own session only gracefully, and then exits by itself (omo#14313).
+      if (session.endpoint_kind === "tui" && closeOptions?.graceful !== true)
         throw refuse(
           "unsupported",
-          `Thread ${threadId} belongs to an interactive terminal, which closes it when the terminal exits.`,
-          "Close that terminal, or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn.",
-          { command: "close_session" },
+          `Thread ${threadId} belongs to an interactive terminal, which closes only gracefully.`,
+          "Close it with graceful: true (the terminal exits once its turn ends), or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn.",
+          { command: "close_session", retry_with: { graceful: true } },
         )
       if (port.closeSession === undefined)
         throw refuse(
@@ -46,6 +47,7 @@ export function createLocalControl(
     },
     setName: (name) => port.setSessionName(routing, name, threadId),
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
+    getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
     setModel: async (provider, id) => {
       const selected = await port.setModel(routing, provider, id, threadId)
       return { provider: selected.provider, id: selected.id }

@@ -89,7 +89,10 @@ export type SessionRow = {
   readonly thread: ThreadHandle
   /** The session's omo durable id when its device publishes it: the id every thread tool names it by (decision 0027 D2). */
   readonly durable_id?: string
+  /** The session's name, else its fallback (thread-address-core `rowName`), the same on both legs. */
   readonly name: string
+  /** Set when `name` is a fallback: the session has no name of its own, and only a real name is an address. */
+  readonly unnamed?: true
   readonly title: string
   readonly device: DeviceRow
   readonly project: string
@@ -439,7 +442,7 @@ export type RemoteClient = {
     /** `dropped_deliveries`: messages the session had not read that the close handed back to their senders (omo#14234). */
     readonly close: (
       thread: ThreadHandle,
-      opts?: Opts & { readonly force?: boolean },
+      opts?: Opts & { readonly force?: boolean; readonly graceful?: boolean; readonly wait_ms?: number },
     ) => R<{ readonly closed: boolean; readonly dropped_deliveries: readonly string[] }>
     readonly archive: (thread: ThreadHandle, archived: boolean, opts?: Opts) => R<{ readonly archived: boolean }>
   }

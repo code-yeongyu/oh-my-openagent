@@ -43,6 +43,8 @@ export function createdThreadId(callerId: string, idempotencyKey: string): strin
 /** `warnings`: steps after the session was created that failed; the thread exists and is answered anyway. */
 export type HostedThread = ThreadToolSummary & {
   readonly device?: string
+  /** Set when `name` is a fallback: the thread has no name of its own. */
+  readonly unnamed?: true
   /** A row from another device's cached listing: when that listing was taken. */
   readonly as_of?: string
   readonly worktree?: ThreadWorktree
@@ -82,5 +84,13 @@ export type SessionHost = {
   readonly device?: string
   /** The threads visible on that device: this device's address book, or the account listing's live rows of that device. */
   readonly visible: () => Promise<readonly ThreadSummary[]>
-  readonly open: (request: SessionOpenRequest) => Promise<SessionOpenOutcome>
+  /**
+   * `confirmReach`: thread_create goes on to use the new session, so another device's host first checks that its route
+   * reaches the session it opened (#14394), with the name it applies or one state read. It is a hint to the host,
+   * never a field of the engine's open.
+   */
+  readonly open: (
+    request: SessionOpenRequest,
+    options?: { readonly confirmReach?: boolean },
+  ) => Promise<SessionOpenOutcome>
 }

@@ -1,3 +1,24 @@
+## 2026-11-20 - omo sync status (#14437)
+
+- `sync-status-cli.ts` collects the report (`collectSyncStatus`, one typed section per source) and renders it (`syncStatusLines`). Joined = a live trust pin under `trustAnchorDir`; switch = `isDeviceSyncOff`; devices come from `service-auth/devices.ts` `listLiveDevices` (the same read and schema `omo account devices` uses; it parses `syncing`), exposed on `SyncContext.listDevices`.
+- `sync-engine-status.ts` reports engine presence only: the operator socket (`resolveTaskHostSocket`) is read with senpi-task's shared `probeSocket` (the host liveness probe): `no_engine` when absent, not a socket, or refused; `running` when a connect succeeds; `unreadable` with the reason for a permission error or a host that does not answer within 2 s. The probe closes without sending a request, so it neither authenticates nor attaches; on POSIX the supervisor still counts the connection as activity, so it resets an idle engine's idle-exit clock. The engine answers `omo.memory.sync.status` only inside a session, and attaching to read it would resume and re-park another surface's session, so the engine's sync details are not read here: code-yeongyu/senpi#7107 tracks the session-less read and #14456 wires it into this command.
+- `sync-cli.ts` (399 lines) is split by verb: `sync-recover-cli.ts`, `sync-approve-cli.ts` and `sync-void-notice.ts`.
+
+## 2026-11-21 - `omo account sign-in` (#14513)
+
+`account-cli.ts` / `account-sign-in.ts`: the machine-interface verb `sign-in [--stdin|--check]` prints one JSON object per line (`code`, then `signed_in` or `refused`) and nothing else on stdout; the interface's description says this verb alone widens one line to lines. The origin comes from `OMO_SERVICE_API_URL`; there is no origin flag.
+
+## 2026-11-20 - the brand profile names the plugin the launcher prepends (#14467)
+
+`bin/lib/engine-environment.js` `brandProfile()` and `compiled-environment.ts` add `extensions: [<plugin dir>]` to `SENPI_BRAND`: the exact path `spawnSenpi` / `buildSenpiArgs` pass with `--extension`. senpi's attach plan (senpi#6914) refuses every `--extension` on a start that attaches to a host-held session, and the brand field is how it tells the distribution's own plugin from a user flag (#14465). Older engines ignore the key.
+
+## 2026-11-19 - omo update for the side-by-side versions layout (#14256)
+
+- `versioned-install.js`: `findVersionedInstall` recognises `<versions>/<ver>/node_modules/omo-ai` with `<versions>/current` linking into `<versions>`; `updateVersionedInstall` bun-installs the same package.json shape into `.stage-<ver>-<pid>`, rewrites the `omo` wrapper to the new dir, renames it to `<ver>`, runs it, writes `.complete`, then renames a fresh symlink over `current`. A failed install or a dir reporting another version never becomes `current` (`.failed-<ver>-<ts>`).
+- A target dir another writer already installed is adopted when it runs the target (no reinstall, `.complete` added); a live `.stage-<target>-<pid>` of another installer stops the update; `versioned-leftovers.js` keeps the 2 newest `.failed-*` and removes stages whose pid is gone. The `omo` wrapper is generated from its template for the new dir.
+- `path-omo.js`: the first executable `omo` on PATH and its `--version` line; a mismatch after the switch exits 1 naming both paths (#12022).
+- `self-update.js` chooses the versioned layout before the npm/bun target; `RunOptions` gains `cwd`.
+
 ## 2026-11-17 - omo sync disable (#14093)
 
 - `sync-cli.ts`: `omo sync disable` turns memory sync off for this device through `disableSync`; exit 0 with the off line, exit 1 when the service refuses or the device is signed out. `bin/lib/service-auth.generated.js` is rebuilt.

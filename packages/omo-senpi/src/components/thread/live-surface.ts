@@ -83,6 +83,9 @@ export const ENDPOINT_LIST_TIMEOUT_MS = 10_000
  * most this long, the same bound senpi's `status --all` probes a `tui` row under (TUI_PROBE_TIMEOUT_MS).
  */
 export const TUI_REQUEST_TIMEOUT_MS = 1_500
+
+/** How long past a graceful close's drain its answer may take to arrive (the teardown and the reply). */
+const LADDER_ANSWER_MARGIN_MS = 5_000
 /** How long one endpoint enumeration is reused before it is read again. */
 export const HOST_ENDPOINTS_CACHE_TTL_MS = 5_000
 /**
@@ -117,6 +120,8 @@ type RequestOptions = {
   readonly rpcHost?: boolean
   /** An exempt read sent attached anyway (`attachment-fence.ts`): the close ladder's "still held" probe. */
   readonly attached?: boolean
+  /** Receives the host's `get_protocol_info` answer the connection opened with (rpc_host only); a listing reads its version. */
+  readonly onProtocol?: (protocol: Record<string, unknown>) => void
 }
 
 /**
@@ -148,6 +153,7 @@ export async function requestFrame(
       if (command.type === "get_protocol_info") return info
       // An older host that refuses get_protocol_info advertises nothing: it gets today's unfenced request, as askHost does.
       const protocol = info.success === true && record(info.data) ? info.data : {}
+      options.onProtocol?.(protocol)
       const capabilities = new Set(Array.isArray(protocol.capabilities) ? protocol.capabilities : [])
       return await fencedCommand(
         request,
@@ -314,6 +320,13 @@ export type LiveThreadSurface = ThreadHost &
     readonly gateway: GatewayEndpointPort
   }
 
+/** The engine version a host's get_protocol_info names: its engine's own, else its package's (an older host). */
+function engineVersionOf(protocol: unknown): string | undefined {
+  if (!record(protocol)) return undefined
+  const named = typeof protocol.engineVersion === "string" ? protocol.engineVersion : protocol.serverVersion
+  return typeof named === "string" && named !== "" ? named : undefined
+}
+
 function isConnectRefusal(error: unknown): boolean {
   const code = record(error) ? error.code : undefined
   return code === "ENOENT" || code === "ECONNREFUSED"
@@ -355,12 +368,16 @@ export function createLiveThreadSurface(
   const kinds = new Map<string, EndpointKind>()
 
   // What each terminal answered get_protocol_info with: the commands it accepts beyond the read-mostly set.
+  // A terminal's engine is its process's: one answer per socket holds for the socket's life, its version with it.
   const tuiCommands = new Map<string, ReadonlySet<string>>()
+  const tuiVersions = new Map<string, string>()
   const learnTuiCommands = async (socket: string): Promise<ReadonlySet<string>> => {
     const known = tuiCommands.get(resolve(socket))
     if (known !== undefined) return known
     const info = await callFrame(socket, "get_protocol_info", {}, TUI_REQUEST_TIMEOUT_MS)
     const commands = tuiCommandsFrom(info.success === true ? info.data : undefined)
+    const version = engineVersionOf(info.success === true ? info.data : undefined)
+    if (version !== undefined) tuiVersions.set(resolve(socket), version)
     tuiCommands.set(resolve(socket), commands)
     return commands
   }
@@ -402,6 +419,7 @@ export function createLiveThreadSurface(
     durableSessionId?: string,
     openedName?: string,
     attached?: boolean,
+    onProtocol?: (protocol: Record<string, unknown>) => void,
   ): Promise<RpcFrame> => {
     const { tui, dial, secret } = await dialFor(socket, type)
     const frame = await requestFrame(socket, { type, ...data }, dial, {
@@ -410,6 +428,7 @@ export function createLiveThreadSurface(
       durableSessionId,
       openedName,
       ...(attached === true ? { attached } : {}),
+      ...(onProtocol === undefined ? {} : { onProtocol }),
       rpcHost: !tui,
       keyRoot,
     })
@@ -718,21 +737,32 @@ export function createLiveThreadSurface(
         endpoint.verdict.reason ?? "live_unresponsive",
       )
     try {
-      const [{ sessions }, commands] = await Promise.all([
-        callOn<{ sessions: ThreadHostSession[] }>(
+      // An rpc_host connection opens with get_protocol_info: this listing's own answer names the engine, at no extra call.
+      let hostVersion: string | undefined
+      const [listed, commands] = await Promise.all([
+        callFrame(
           endpoint.socket,
           "list_sessions",
           tui ? {} : OBSERVE,
           tui ? TUI_REQUEST_TIMEOUT_MS : ENDPOINT_LIST_TIMEOUT_MS,
+          undefined,
+          undefined,
+          undefined,
+          (protocol) => {
+            hostVersion = engineVersionOf(protocol)
+          },
         ),
         tui ? learnTuiCommands(endpoint.socket).catch(() => LEGACY_TUI_COMMANDS) : Promise.resolve(undefined),
       ])
+      const { sessions } = dataRecord(listed, "list_sessions") as { sessions: ThreadHostSession[] }
+      const version = tui ? tuiVersions.get(resolve(endpoint.socket)) : hostVersion
       const controls = acceptedControls(endpoint.kind, commands)
       const tagged = sessions.map((session) => ({
         ...session,
         socket: endpoint.socket,
         endpoint_kind: endpoint.kind,
         controls,
+        ...(version === undefined ? {} : { engine_version: version }),
         ...(tui && session.durableSessionId === undefined ? { durableSessionId: session.sessionId } : {}),
       }))
       lastListed.set(
@@ -784,7 +814,7 @@ export function createLiveThreadSurface(
   ): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => ({
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
-    getState: (sessionId) => send("get_state", { sessionId }),
+    getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
     interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),
@@ -820,24 +850,34 @@ export function createLiveThreadSurface(
     closeSession: (sessionId, durableId, options) =>
       closeLadder(
         sessionId,
-        async ({ type, ...data }) => {
+        async ({ type, ...data }, record) => {
           try {
             return {
               kind: "ok",
               data:
-                type === "get_state"
+                // A graceful close is answered when the drain ends (omo#14313): its request outlives the drain it names,
+                // whatever this endpoint's own bound is (a terminal's is 1.5 s).
+                record?.waitMs !== undefined
                   ? await callOn<Record<string, unknown>>(
                       socket ?? legacy,
-                      "get_state",
+                      String(type),
                       data,
-                      undefined,
+                      record.waitMs + LADDER_ANSWER_MARGIN_MS,
                       durableId,
-                      true,
                     )
-                  : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
-                    type === "get_protocol_info"
-                    ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
-                    : await send<Record<string, unknown>>(String(type), data, durableId),
+                  : type === "get_state"
+                    ? await callOn<Record<string, unknown>>(
+                        socket ?? legacy,
+                        "get_state",
+                        data,
+                        undefined,
+                        durableId,
+                        true,
+                      )
+                    : // The host's own capabilities, read the way every connection opens (an observing read, no fence).
+                      type === "get_protocol_info"
+                      ? await callOn<Record<string, unknown>>(socket ?? legacy, "get_protocol_info", { observe: true })
+                      : await send<Record<string, unknown>>(String(type), data, durableId),
             }
           } catch (error) {
             const reason = error instanceof Error ? error.message.slice(0, Math.max(0, error.message.indexOf(":"))) : ""
@@ -1021,11 +1061,11 @@ export function createLiveThreadSurface(
 export { createServiceAliasRegistry } from "./remote/alias-registry"
 export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
-export { deviceOnline } from "./remote/remote-ops"
-export { createRemoteMonitorSource } from "./remote/monitor-source"
+export { createRemoteMonitorSource, resolveMonitorTarget } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"
 export { createRelayControl } from "./control/relay-control"
+export { resolveAddress } from "./address"
 // thread_create's folder and worktree code (#13450): the local open and the worktree request another device sends.
 export { openLocally } from "./control/local-open"
 export { answerWorktreeRequest } from "./worktree/worktree-rpc"

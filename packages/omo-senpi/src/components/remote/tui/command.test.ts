@@ -5,7 +5,7 @@ import { COMMAND_DEADLINE_MS, registerRemoteCommand, SEND_DEADLINE_MS } from "./
 import type { OmoRun, OmoRunner, OmoRunOptions } from "./run-omo"
 
 const DEVICES = [
-  { device: "dev_mac", label: "mengmota-mac", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true },
+  { device: "dev_mac", label: "studio-mac", kind: "desktop", platform: "darwin", last_seen_ms: 1, online: true },
   { device: "dev_ny2", label: "ny2", kind: "server", platform: "linux", last_seen_ms: null, online: false },
 ]
 const LISTING = {
@@ -32,7 +32,7 @@ const LISTING = {
 // {rows: SessionRow {thread,...}, unanswered: DeviceRow[]}, OpenResult {thread, device} and a flat RemoteFailure.
 const MODULE_SELF = {
   id: "dev_mac",
-  name: "mengmota-mac",
+  name: "studio-mac",
   kind: "cli",
   platform: "darwin",
   online: true,
@@ -161,7 +161,7 @@ describe("/remote", () => {
     // then
     expect(run.calls).toEqual([["remote", "devices", "--json"]])
     const printed = ui.notes.map((note) => note.message).join("\n")
-    expect(printed).toContain("mengmota-mac")
+    expect(printed).toContain("studio-mac")
     expect(printed).toContain("online")
     expect(printed).toContain("ny2")
     expect(printed).toContain("offline")
@@ -419,7 +419,7 @@ describe("/remote", () => {
     })
     const ui = fakeUi(
       [
-        (options) => options.find((option) => option.includes("mengmota-mac")),
+        (options) => options.find((option) => option.includes("studio-mac")),
         (options) => options.find((option) => option.includes("dev_mac/s1")),
         (options) => options.find((option) => option.startsWith("Send")),
       ],
@@ -507,7 +507,7 @@ describe("/remote", () => {
       { calls, options: [] },
     )
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.includes("dev_mac/s1")),
       (options) => options.find((option) => option === "Close"),
       (options) => options.find((option) => option.startsWith("Close anyway")),
@@ -531,7 +531,7 @@ describe("/remote", () => {
       open: ok({ kind: "ok", thread: "s2", device: "dev_mac", deduplicated: false }),
     })
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.startsWith("Open a new session")),
     ])
 
@@ -554,7 +554,7 @@ describe("/remote", () => {
 
     // then
     const [devices, sessions] = ui.notes.map((note) => note.message)
-    expect(devices).toContain("mengmota-mac  dev_mac  online  (this device)")
+    expect(devices).toContain("studio-mac  dev_mac  online  (this device)")
     expect(devices).toContain("seoul  dev_seoul  online")
     expect(sessions).toContain("dev_seoul/s7  idle  nightly")
     expect(sessions).toContain("No answer from: ny2")
@@ -606,7 +606,7 @@ describe("/remote", () => {
   it("#given the person cancels the picker at each step #when /remote runs #then nothing past the listings runs", async () => {
     // given
     const script = { devices: ok(DEVICES), sessions: ok(LISTING) }
-    const pickMac = (options: readonly string[]) => options.find((option) => option.includes("mengmota-mac"))
+    const pickMac = (options: readonly string[]) => options.find((option) => option.includes("studio-mac"))
     const pickRow = (options: readonly string[]) => options.find((option) => option.includes("dev_mac/s1"))
     const pickSend = (options: readonly string[]) => options.find((option) => option.startsWith("Send"))
     const cancels = [
@@ -657,7 +657,7 @@ describe("/remote", () => {
       interrupt: ok({ kind: "ok", thread: "s1", device: "dev_mac", interrupted: false }),
     })
     const ui = fakeUi([
-      (options) => options.find((option) => option.includes("mengmota-mac")),
+      (options) => options.find((option) => option.includes("studio-mac")),
       (options) => options.find((option) => option.includes("dev_mac/s1")),
       (options) => options.find((option) => option.startsWith("Interrupt")),
     ])

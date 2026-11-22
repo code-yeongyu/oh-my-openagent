@@ -5,7 +5,10 @@ import type { IntakeAdmission } from "../gateway/intake-admission"
 import type { GatewayStore } from "../gateway/store"
 import type { RpcObject } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import type { CarrierHostConnection } from "./carrier-connection"
+import { settleClosedIntake } from "./closed-intake"
 import { readEngineState, type EngineView } from "./engine-state"
+import { WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
+import { waitBlocksDelivery } from "../gateway/session-wait-types"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
 
 /** A person's wait that arose after admission is closed after this long with only the carrier attached (A3.2.6). */
@@ -24,7 +27,8 @@ export type CarrierWakeOutcome =
   | { readonly kind: "gone" }
   | { readonly kind: "ambiguous"; readonly session_paths: readonly string[] }
   | { readonly kind: "not_wakeable"; readonly session_kind: Exclude<WakeSessionKind, "interactive"> }
-  | { readonly kind: "overloaded" }
+  /** The host's measured memory headroom is below the floor; the row stays requested and the sweep retries it. */
+  | { readonly kind: "host_memory_pressure"; readonly available_bytes: number; readonly floor_bytes: number }
   | { readonly kind: "not_yet"; readonly next_attempt_at: number }
   | { readonly kind: "busy"; readonly code: string }
   | { readonly kind: "deferred"; readonly attempts: number }
@@ -71,6 +75,14 @@ export type CarrierOptions = {
    * lost admission between the accept check and the retry or lease takeover starts nothing.
    */
   readonly admitIntake?: (device: string) => Promise<IntakeAdmission>
+  /**
+   * The host's memory headroom in bytes (`memory-headroom.ts` `readHostMemoryHeadroom` in production), read before a
+   * row is started: the only admission a wake has is real capacity, never a count. Undefined (no reading, or no probe)
+   * never defers a wake.
+   */
+  readonly memoryHeadroom?: () => number | undefined
+  /** The headroom a wake needs (`readWakeMemoryFloor` in production); `WAKE_MEMORY_FLOOR_BYTES` when absent. */
+  readonly memoryFloor?: () => number
   readonly schedule: (run: () => void, ms: number) => () => void
   readonly onEvent?: (event: CarrierEvent) => void
 }
@@ -353,8 +365,9 @@ export function createCarrier(options: CarrierOptions): Carrier {
     if (target.kind === "gone" || target.kind === "ambiguous") return target
     if (target.session_kind !== "interactive") return { kind: "not_wakeable", session_kind: target.session_kind }
     const wait = await store.sessionWait.read({ durable_id: durableId })
-    if (wait?.wait === "held" && wait.file_size === fileSize(target.session_path)) return { kind: "held" }
-    const allowance = await openAllowance(durableId, target.cwd)
+    if (wait?.wait === "held" && waitBlocksDelivery(wait) && wait.file_size === fileSize(target.session_path))
+      return { kind: "held" }
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       if (allowance === "nothing_queued") {
         // Only a record that is still `requested` is ended, compared on its generation: another carrier's record that
@@ -373,8 +386,14 @@ export function createCarrier(options: CarrierOptions): Carrier {
       return { kind: "wake_limit_reached" }
 
     await store.woken.request({ durable_id: durableId, session_file: target.session_path })
+    // Read outside the store's transaction: a short host defers the wake with its row requested (the send keeps
+    // answering waiting on the wake), and the sweep starts it once the headroom is back.
+    const available = options.memoryHeadroom?.()
+    const floor = available === undefined ? undefined : (options.memoryFloor?.() ?? WAKE_MEMORY_FLOOR_BYTES)
+    if (available !== undefined && floor !== undefined && available < floor)
+      return { kind: "host_memory_pressure", available_bytes: available, floor_bytes: floor }
     const started = await store.woken.start({ durable_id: durableId })
-    if (started.kind === "overloaded" || started.kind === "not_yet") return started
+    if (started.kind === "not_yet") return started
     if (started.kind !== "started") return { kind: "busy", code: "wake_in_progress" }
     const fence = { durable_id: durableId, generation: started.row.generation }
 
@@ -433,7 +452,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
     }
     // A takeover opens only what a wake would open (the switches and the sender's admission included); with nothing
     // to open for, or a row that no longer allows it, the record ends and the queued rows wait for the next wake.
-    const allowance = await openAllowance(durableId, target.cwd)
+    const allowance = await openAllowance(durableId, target)
     if (allowance !== "open") {
       await store.woken.end({ durable_id: durableId, generation: taken.row.generation })
       return
@@ -451,14 +470,17 @@ export function createCarrier(options: CarrierOptions): Carrier {
    * opens a session only when the session holds a queued row whose own switch allows the open. A row from another
    * device (it carries the intake's ledger id) reads the wake the consumer was told and its sender's admission NOW,
    * failing closed when the answer is unknown or refused (#13456's noted follow-up); a same-device row reads
-   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open.
+   * `session_wake.same_device` for the TARGET session's cwd. All are read here, at the moment of the open. A row queued
+   * before the session was closed on request is settled `target_closed` first and opens nothing (#14273).
    */
-  const openAllowance = async (durableId: string, cwd: string): Promise<"open" | "switched_off" | "nothing_queued"> => {
-    const sameDevice = options.sameDevice?.(cwd) ?? false
+  const openAllowance = async (
+    durableId: string,
+    target: { readonly cwd: string; readonly closed_at?: number },
+  ): Promise<"open" | "switched_off" | "nothing_queued"> => {
+    const sameDevice = options.sameDevice?.(target.cwd) ?? false
     const remoteWake = options.remoteWake?.() ?? false
     let queued = false
-    for (const row of await store.list({ target_durable_id: durableId })) {
-      if (row.state !== "queued") continue
+    for (const row of await settleClosedIntake(store, durableId, target.closed_at)) {
       queued = true
       if (typeof row.ledger_id !== "string") {
         if (sameDevice) return "open"

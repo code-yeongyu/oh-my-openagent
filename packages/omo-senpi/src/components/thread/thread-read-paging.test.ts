@@ -261,4 +261,16 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     log.refuse = "unsupported"
     expect(await run({ cursor, max_bytes: 800 })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
   })
+
+  test("#given an entry cursor in the t2 shape an earlier build issued #when it pages b's thread #then it is cursor_stale, never cursor_invalid from the whole-transcript reader (#14180)", async () => {
+    const { run } = pagingAccount(sessionEntries(MESSAGES))
+    // The revision a current read binds its cursors to, with the t2 layout (revision, one entry id) around it.
+    const current = cursorOf(await run({ max_bytes: 1500 })) ?? ""
+    const revision = Buffer.from(current, "base64url").toString("utf8").split("\n")[1] ?? ""
+    const older = Buffer.from(`t2\n${revision}\ne1500`, "utf8").toString("base64url")
+    expect(await run({ cursor: older, max_bytes: 1500 })).toMatchObject({
+      kind: "error",
+      error: { code: "cursor_stale" },
+    })
+  })
 })

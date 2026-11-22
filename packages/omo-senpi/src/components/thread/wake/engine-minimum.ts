@@ -7,7 +7,9 @@
 export const MIN_WAKE_ENGINE_VERSION: string | null = "2026.11.15-2"
 
 // The engine's version scheme, YYYY.MM.DD-N with optional +build metadata; a release without `-N` orders before `-1`.
-const ENGINE_VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-(\d+))?(?:\+.*)?$/
+// A dev engine built on a release stamps that release's CalVer first (`2026.11.19-2-1-omob.<omo>.<senpi>+<build>`), so
+// the CalVer prefix is the engine's version, as senpi's own ordinal reads it (engine-build-identity.ts `CALVER`).
+const ENGINE_VERSION = /^(\d+)\.(\d+)\.(\d+)(?:-(\d+))?(?:[-+.].*)?$/
 
 function fieldsOf(version: string): readonly number[] | undefined {
   const match = ENGINE_VERSION.exec(version)

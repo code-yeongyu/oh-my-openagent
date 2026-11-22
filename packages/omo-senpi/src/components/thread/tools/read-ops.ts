@@ -7,7 +7,8 @@ import { controlIdentity, controlRefusalOf, type SessionControl } from "../contr
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
-import { addressBook, degradedSummary, failure, sendAddressBook, summary, transcriptRole } from "./internals"
+import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
+import { readItem } from "./read-item"
 import { threadRow } from "./thread-row"
 import { listedStates } from "./thread-state"
 import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./ports"
@@ -18,8 +19,9 @@ import type { ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from
  * knows. A session no engine holds is still a thread, listed `inactive` from its JSONL: one whose
  * endpoint stopped answering (with the endpoint's failure in error_note), and one whose session file
  * is in the scanned session directories (the caller's workspace, every workspace with `all_scope`;
- * the newest files only, `inactive_truncated` when more were there) after its engine closed it.
- * `states` filters the rows; the default lists every state but archived.
+ * the newest files only) after its engine closed it. `inactive_dropped` counts the threads of the files that listing did not
+ * read, each inactive or archived (with `inactive_truncated`), when the filter shows either: a running or idle thread is
+ * listed from its endpoint, never dropped. `states` filters the rows; the default lists every state but archived.
  */
 export function listThreads(
   options: ThreadToolSurfaceOptions,
@@ -31,7 +33,7 @@ export function listThreads(
   const sessionsDirectory = options.sessionsDirectory?.()
   const scanned =
     sessionsDirectory === undefined
-      ? { sessions: [], truncated: false }
+      ? { sessions: [], unread: [] }
       : listDiskSessions(sessionsDirectory, { all_scope: allScope, workspaceRoots: workspaceDirectories(root) })
   const book = addressBook(options, current, scanned.sessions)
   const scoped = workspaceEntries(toThreadAddressEntries(book), root)
@@ -54,7 +56,13 @@ export function listThreads(
   )
   const order = new Map(book.map((entry, index) => [entry.thread_id, index]))
   const shown = listedStates(states)
-  const threads = [...visible.map((session) => summary(session, entryOf(session))), ...inactive.map(degradedSummary)]
+  const threads = [
+    ...visible.map((session) => {
+      const entry = entryOf(session)
+      return rowNamed(summary(session, entry), entry?.name ?? session.name, entry?.title)
+    }),
+    ...inactive.map((entry) => rowNamed(degradedSummary(entry), entry.name, entry.title)),
+  ]
     .filter((thread) => shown.has(thread.state))
     .sort(
       (left, right) =>
@@ -62,11 +70,55 @@ export function listThreads(
         (order.get(right.thread_id) ?? Number.MAX_SAFE_INTEGER),
     )
     .map((thread) => threadRow(thread))
+  const rowIds = new Set(threads.map((thread) => thread.thread))
+  // An unread file's thread is inactive or archived (only its file knows which), so a filter showing either is partial.
+  const dropped =
+    shown.has("inactive") || shown.has("archived")
+      ? scanned.unread.filter((id) => !listed.has(id) && !rowIds.has(id)).length
+      : 0
+  // An endpoint that did not answer (timed out, an auth or protocol failure) may hold threads this listing reads from their
+  // files as inactive; one known dead (its socket gone or refusing) holds none, so only the former makes it partial (#14308).
+  const unanswered = current.hosts.filter(
+    (host) => (host.error !== undefined || host.alive === false) && host.reason !== "dead",
+  ).length
   return {
     kind: "ok",
     threads,
     scope: allScope === true ? "all" : "workspace",
-    ...(scanned.truncated ? { inactive_truncated: true as const } : {}),
+    ...(dropped > 0 ? { inactive_truncated: true as const, inactive_dropped: dropped } : {}),
+    ...(unanswered > 0 ? { listing: "incomplete" as const, unanswered_endpoints: unanswered } : {}),
+  }
+}
+
+/** Names each listed thread's undelivered messages from this device's gateway store (#14428): how many, where, since when. */
+export async function withBacklog(
+  store: Pick<ThreadToolSurfaceOptions["store"], "backlogs">,
+  listed: ThreadToolResult,
+): Promise<ThreadToolResult> {
+  if (listed.kind !== "ok" || !("threads" in listed) || listed.threads.length === 0) return listed
+  let backlogs: Awaited<ReturnType<typeof store.backlogs>>
+  try {
+    backlogs = await store.backlogs(listed.threads.map((thread) => thread.thread))
+  } catch (error) {
+    // The backlog is an optional detail: a store that cannot be read (a newer schema, a worker that failed to start) never
+    // costs the listing, which is how a stuck gateway is diagnosed, and the listing names why the backlog is missing.
+    return { ...listed, backlog_error: error instanceof Error ? error.message : String(error) }
+  }
+  return {
+    ...listed,
+    threads: listed.threads.map((thread) => {
+      const found = backlogs[thread.thread]
+      if (found === undefined || found.oldest_at === null) return thread
+      return {
+        ...thread,
+        backlog: {
+          held: found.held,
+          held_by_session: found.held_by_session,
+          waiting_in_gateway: found.waiting_in_gateway,
+          oldest_at: new Date(found.oldest_at).toISOString(),
+        },
+      }
+    }),
   }
 }
 
@@ -147,11 +199,7 @@ async function pagedReadResult(control: SessionControl, value: ThreadReadInput):
 
 /** A live slice's messages as items, numbered from 1, on every leg. */
 function liveItems(messages: readonly ThreadTranscriptEntry[]) {
-  return messages.map((item, index) => ({
-    seq: index + 1,
-    role: transcriptRole(item.role),
-    content: JSON.stringify(item.content ?? item),
-  }))
+  return messages.map(readItem)
 }
 
 /** A live session's transcript through the bounded reader; the same window rules on this device and on another one. */
@@ -200,11 +248,7 @@ function readDegraded(
     if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
     return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
   })
-  const items = messages.map((message, index) => ({
-    seq: index + 1,
-    role: transcriptRole(message.role),
-    content: JSON.stringify(message.content ?? message),
-  }))
+  const items = messages.map(readItem)
   return {
     kind: "ok",
     thread: threadId,

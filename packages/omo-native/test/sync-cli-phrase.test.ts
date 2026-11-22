@@ -127,8 +127,10 @@ test("#given the phrase flag off #when enable must create a phrase #then it says
   const terminal = scriptedTerminal()
   const r = await runEnable({ env: {}, terminal: terminal.open })
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
-  expect(r.err.join("\n")).toContain("isn't available on this device yet")
+  expect(r.err.at(-1)).toContain("Recovery phrase setup is disabled in this CLI")
   expect(terminal.opened()).toBe(0)
+  expect(r.f.entries).toEqual([])
+  expect(r.f.server.switches).toEqual([])
 })
 
 test("#given a person at the terminal #when enable creates a phrase genesis #then the words appear only on the terminal, never in stdout or stderr", async () => {
@@ -180,7 +182,7 @@ for (const [label, acceptsPhraseKeys] of [
       return
     }
     expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
-    expect(r.err.join("\n")).toContain("isn't available on this device yet")
+    expect(r.err.at(-1)).toContain("could not confirm that the service accepts recovery phrases")
     expect(r.err.join("\n")).toContain("(service-floor-off)")
     expect(shownWords(terminal.written)).toEqual([])
     expect(r.f.entries).toEqual([])

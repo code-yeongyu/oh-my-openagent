@@ -1,6 +1,7 @@
 import type { CommandResult } from "@oh-my-opencode/device-service-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import { REFUSAL_CODES } from "../gateway/result"
 import type { RemoteCommandOutcome } from "./ports"
 
 /**
@@ -182,6 +183,14 @@ export function outcomeFailure(
       { device, reason: outcome.reason },
     )
   if (outcome.reason === "chain_count_limit") return chainCountLimitFailure(device)
+  // #14320: the session there is busy (its turn changed) or cannot be steered now; nothing about that device needs updating.
+  if (outcome.reason === "turn_conflict" || outcome.reason === "not_steerable")
+    return fail(
+      REFUSAL_CODES[outcome.reason].code,
+      `Device ${device} refused the steer: ${outcome.reason}.`,
+      REFUSAL_CODES[outcome.reason].next,
+      { device, reason: outcome.reason },
+    )
   if (outcome.reason === "record_too_large")
     return fail(
       "unsupported",

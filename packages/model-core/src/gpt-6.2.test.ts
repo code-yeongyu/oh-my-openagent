@@ -45,38 +45,29 @@ describe("GPT-6.2 capabilities", () => {
   test("treats GPT-6.2 Astra as the Astra tier and GPT-6.2 Sol as not", () => {
     expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-astra")).toBe(true)
     expect(isGpt6AstraModel("openai/gpt-6.2-astra-fast")).toBe(true)
+    expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-astra-ultrafast")).toBe(true)
     expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-sol")).toBe(false)
+    expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-sol-ultrafast")).toBe(false)
   })
 })
 
-describe("GPT-6.2 lanes with and without 6.2 in the registry", () => {
-  test("deep-low resolves gpt-6.2-sol at medium when the registry serves it beside 6.1 Sol", () => {
-    expect(
-      resolveCategory("deep-low", ["chatgpt-subscription/gpt-6.2-sol", "chatgpt-subscription/gpt-6.1-sol"]),
-    ).toMatchObject({ model: "chatgpt-subscription/gpt-6.2-sol", variant: "medium" })
+describe("GPT-6.2 lanes resolve only their exact model (#14155)", () => {
+  test.each([
+    ["ultrabrain", "gpt-6.2-astra", "max"],
+    ["deep-high", "gpt-6.2-astra", "high"],
+    ["deep-low", "gpt-6.2-sol", "medium"],
+  ])("%s resolves %s at %s beside older and Fast tiers", (category, model, variant) => {
+    const registry = [`chatgpt-subscription/${model}`, "chatgpt-subscription/gpt-6-astra", "openai/gpt-6.1-sol"]
+
+    expect(resolveCategory(category, registry)).toMatchObject({ model: `chatgpt-subscription/${model}`, variant })
   })
 
-  test("deep-low keeps gpt-6.1-sol at medium on a registry without 6.2", () => {
-    expect(
-      resolveCategory("deep-low", ["chatgpt-subscription/gpt-6.1-sol", "chatgpt-subscription/gpt-5.6-sol"]),
-    ).toMatchObject({ model: "chatgpt-subscription/gpt-6.1-sol", variant: "medium" })
-  })
+  test.each(["ultrabrain", "deep-high", "deep-low"])(
+    "%s finds no rung on a registry with only older GPT and Copilot models",
+    (category) => {
+      const registry = ["openai/gpt-6-astra", "openai/gpt-6.1-sol", "openai/gpt-5.6-sol", "github-copilot/gpt-6-astra"]
 
-  test("deep-high resolves gpt-6.2-astra at high, and gpt-6-astra at high without 6.2", () => {
-    expect(resolveCategory("deep-high", ["openai/gpt-6.2-astra", "openai/gpt-6-astra"])).toMatchObject({
-      model: "openai/gpt-6.2-astra",
-      variant: "high",
-    })
-    expect(resolveCategory("deep-high", ["openai/gpt-6-astra"])).toMatchObject({
-      model: "openai/gpt-6-astra",
-      variant: "high",
-    })
-  })
-
-  test("ultrabrain keeps Copilot on gpt-6-astra max", () => {
-    expect(resolveCategory("ultrabrain", ["github-copilot/gpt-6-astra"])).toMatchObject({
-      model: "github-copilot/gpt-6-astra",
-      variant: "max",
-    })
-  })
+      expect(resolveCategory(category, registry)).toEqual({ model: "system/default", source: "system-default" })
+    },
+  )
 })

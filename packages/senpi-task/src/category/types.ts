@@ -12,6 +12,9 @@ export type BuiltinCategoryDefinition = {
   readonly resolvePromptAppend?: (model: string | undefined) => string
   // One model id, or several ids any one of which satisfies the gate (see builtins.ts).
   readonly requiresModel?: string | readonly string[]
+  // The builtin default and chain resolve on exact registry ids only: no substring match onto a Fast
+  // tier or a longer id of the same family (see exactServedRungs in builtins.ts).
+  readonly exactModels?: true
 }
 
 export type SenpiModelPort = {

@@ -1,19 +1,15 @@
+import { mergeRows, rowKey, type DeviceListing } from "@oh-my-opencode/thread-address-core"
 import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { displayedThread } from "../control/relay-session-host"
 import { threadRow } from "../tools/thread-row"
-import { listedStates, rowState } from "../tools/thread-state"
-import {
-  rowThreadId,
-  type AliasRegistry,
-  type RemoteDevice,
-  type RemoteSessionRow,
-  type RemoteThreadSurface,
-} from "./ports"
-import { accountListing, remoteNotSetUp } from "./address-book"
+import { listedStates } from "../tools/thread-state"
+import { type AliasRegistry, type RemoteDevice, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import { remoteNotSetUp } from "./address-book"
+import { readAccount } from "../address/account"
 import type { WorktreeRequest } from "../worktree/thread-worktree"
 import { placeFolder } from "./create-folder"
-import { accountDevices, onAccount } from "./account"
+import { accountDevices } from "../address/account"
 import { aliasFailure, remoteReady } from "./remote-ops"
 import {
   planCreate as placeCreate,
@@ -161,14 +157,15 @@ export async function renameAlias(
 }
 
 // `threads` counts the threads THIS result lists on the device, so it reads the same for every row: this device's are
-// the caller's scoped local threads, another device's are its rows merged into the result.
+// the caller's scoped local threads, another device's are its rows merged into the result. `listing` is the one
+// per-device state the resolver reads too (design section 6).
 function deviceRows(
   roster: readonly RemoteDevice[],
   self: { readonly id: string | null; readonly name: string | null },
-  incomplete: readonly string[],
+  listingOf: (device: string) => DeviceListing,
   threads: readonly { readonly device?: string }[],
+  local: { readonly dropped?: number; readonly incomplete: boolean },
 ): readonly ThreadDevice[] {
-  const missing = new Set(incomplete)
   // The account roster leaves this device out (relayd lists only peers), so this device's row is made here.
   const devices: readonly RemoteDevice[] =
     self.id === null || roster.some((row) => row.device === self.id)
@@ -194,8 +191,10 @@ function deviceRows(
       last_seen:
         row.last_seen_ms === undefined || row.last_seen_ms === null ? null : new Date(row.last_seen_ms).toISOString(),
       this_device: thisDevice,
-      listing: thisDevice ? "listed" : !row.online ? "offline" : missing.has(row.device) ? "incomplete" : "listed",
+      // This device's threads come from its own endpoints, whose answers say whether it listed them in full.
+      listing: thisDevice ? (local.incomplete ? "incomplete" : "listed") : listingOf(row.device),
       threads: threads.filter((thread) => (thread.device ?? self.id) === row.device).length,
+      ...(thisDevice && local.dropped !== undefined ? { dropped: local.dropped } : {}),
     }
   })
 }
@@ -205,7 +204,8 @@ function deviceRows(
  * (each with its device, any workspace), with aliases, and the account's devices with their listing state. A device
  * whose rows this listing could not include is named `incomplete` in `devices`, never silently left out. `states` filters
  * the other devices' rows as `listThreads` filters this device's (the default leaves archived threads out), and a device
- * counts only the threads listed.
+ * counts only the threads listed. The order is design section 6's: read (one account read) -> identity (`rowKey`) ->
+ * merge (`mergeRows`) -> name (`rowName`) -> state -> filter; nothing of another device is capped.
  */
 export async function listAcross(
   remote: RemoteThreadSurface | undefined,
@@ -215,7 +215,8 @@ export async function listAcross(
 ): Promise<ThreadToolResult> {
   if (remote === undefined || local.kind !== "ok" || !("threads" in local)) return local
   const ids = local.threads.map((thread) => thread.thread)
-  const ready = await remoteReady(remote)
+  const status = remoteReady(remote)
+  const ready = await status
   if ("kind" in ready) {
     const notSetUp = ready.error.code === "host_unavailable" && remoteNotSetUp(ready.error.details?.["state"])
     const listed = !allScope && notSetUp ? local : { ...local, remote_unavailable: ready.error.code }
@@ -223,46 +224,58 @@ export async function listAcross(
     // not connected, nor on a plan without a relay (plan_required). A row's missing alias is then unknown, never "holds none" (#13923).
     return remote.aliases === undefined || ids.length === 0 ? listed : { ...listed, aliases_unavailable: "not_asked" }
   }
-  const known = new Set(ids)
-  const [here, hereName, listed, roster] = await Promise.all([
-    // This device's id came with the relay state, in the same status round (#13414 U5).
-    Promise.resolve(ready.here),
+  // The roster is the sessions port's, which lists each device's platform and kind; readAccount judges rows by it.
+  const [hereName, roster] = await Promise.all([
     remote.sessions.thisDeviceName?.().catch(() => null) ?? Promise.resolve(null),
-    accountListing(remote).then(
-      (listing) => ({ ok: true as const, listing }),
-      () => ({ ok: false as const }),
-    ),
     remote.sessions.devices().then(
       (devices) => ({ ok: true as const, devices }),
       () => ({ ok: false as const }),
     ),
   ])
-  // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
-  if (!listed.ok || here === null) return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
-  const listing = listed.listing
-  const shown = listedStates(states)
-  // A device the account no longer lists contributes no rows (#13505); an offline one keeps its rows.
-  const others = onAccount(listing.rows, roster.ok ? roster.devices : undefined, here).filter(
-    (row) => row.device !== here && !known.has(rowThreadId(row)) && shown.has(rowState(row)),
+  const read = await readAccount(remote, { ready: status, roster: roster.ok ? roster.devices : undefined }).catch(
+    () => undefined,
   )
+  // Without this device's id its own rows cannot be told apart from another device's, so none are merged.
+  if (read?.kind !== "account" || read.account.here === null)
+    return withAliases(remote, { ...local, remote_unavailable: "host_unavailable" }, ids)
+  const account = read.account
+  const here = read.account.here
+  // A device the account no longer lists contributes no rows (#13505, readAccount); an offline one keeps its rows.
+  const merged = mergeRows<{ readonly key: string; readonly device: string; readonly row?: RemoteSessionRow }>(
+    ids.map((key) => ({ key, device: here })),
+    account.rows.map((row) => ({ key: rowKey(row), device: row.device, row })),
+    here,
+  )
+  const shown = listedStates(states)
   // Every row names the machine that holds it (#14044 step 4a): this device's name on its own rows, the roster's name on
   // another device's.
   const machines = new Map(roster.ok ? roster.devices.map((device) => [device.device, device.label]) : [])
+  const others = merged
+    .flatMap((entry) => (entry.row === undefined ? [] : [entry.row]))
+    .map((row) => ({ row, thread: threadRow(displayedThread(row), machines.get(row.device)) }))
+    .filter(({ thread }) => shown.has(thread.state))
   const threads = [
     ...local.threads.map((thread) =>
       hereName === null || thread.machine !== undefined ? thread : { ...thread, machine: hereName },
     ),
-    ...others.map((row) => threadRow(displayedThread(row), machines.get(row.device))),
+    ...others.map(({ thread }) => thread),
   ]
   // A roster that fails is said, never silently dropped: the threads stay merged and remote_unavailable names it.
-  const merged: ThreadToolResult = {
+  const listed: ThreadToolResult = {
     ...local,
     threads,
     ...(roster.ok
-      ? { devices: deviceRows(roster.devices, { id: here, name: hereName }, listing.incomplete, threads) }
+      ? {
+          devices: deviceRows(roster.devices, { id: here, name: hereName }, account.listingOf, threads, {
+            dropped: local.inactive_dropped,
+            incomplete: local.listing === "incomplete",
+          }),
+        }
       : { remote_unavailable: "devices_unavailable" }),
   }
-  return withAliases(remote, merged, [...ids, ...others.map(rowThreadId).filter((id) => id !== "")])
+  // Aliases are held by thread id: a row whose device publishes none holds no alias.
+  const aliased = others.flatMap(({ row }) => (row.durable_id === undefined ? [] : [row.durable_id]))
+  return withAliases(remote, listed, [...ids, ...aliased])
 }
 
 async function withAliases(

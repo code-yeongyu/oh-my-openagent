@@ -36,3 +36,23 @@ export async function engineEndpointOf(client: LocalApiClient, device: string): 
   if (!asksPrimary && rest.length === 0) return only
   throw new NoPrimaryEndpointError(device, listed.endpoints.length)
 }
+
+/**
+ * omo#14271: every engine endpoint key `device` lists, and the one it names as its own (0.1.11+). The primary is named
+ * by key, never by position: a host may list it last (the omo#14195 contract test lists `[OTHER_DIR, SHARD, PRIMARY]`).
+ */
+export type EngineEndpoints = {
+  readonly keys: readonly string[]
+  /** The host's primary engine endpoint, when it names one (0.1.11+). Absent: it names none, or predates the field. */
+  readonly primary?: string
+}
+
+/**
+ * omo#14271: the engine endpoints a read-only lookup may go to. Asked with `primary: true` where the service knows it, so
+ * the caller can skip the primary by its key instead of guessing it is `endpoints[0]`.
+ */
+export async function engineEndpointsOf(client: LocalApiClient, device: string): Promise<EngineEndpoints> {
+  const asksPrimary = compareVersions(client.welcome.service_version, ENDPOINT_PRIMARY_MIN_SERVICE_VERSION) >= 0
+  const listed = await client.request("session.endpoints", asksPrimary ? { device, primary: true } : { device })
+  return { keys: listed.endpoints, ...(listed.primary === undefined ? {} : { primary: listed.primary }) }
+}

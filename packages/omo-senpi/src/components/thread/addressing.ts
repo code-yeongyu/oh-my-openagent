@@ -34,7 +34,14 @@
  * `all_scope: true` widens visibility to every entry the daemon knows.
  */
 
+import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import {
+  ID_PREFIX_SHAPE,
+  normalizeName,
+  SESSION_ID_SHAPE,
+  THREAD_ID_SHAPE as DURABLE_ID_SHAPE,
+} from "@oh-my-opencode/thread-address-core"
 import { execFileSync } from "node:child_process"
 import type { RemoteSessionRow } from "./remote/ports"
 import { realpathSync } from "node:fs"
@@ -71,6 +78,8 @@ export type ThreadCandidate = {
   readonly state: ThreadStatus
   /** The account device that holds it, when the candidates span devices (a name matched across the account). */
   readonly device?: string
+  /** `name` is a fallback (thread-address-core `rowName`): the thread has no name of its own. */
+  readonly unnamed?: true
 }
 
 /** How a resolveTarget hit was found. */
@@ -115,7 +124,7 @@ export type ThreadFuzzyResult =
 
 export type ThreadNameConflictResult = { readonly kind: "ok" } | ThreadAddressError
 
-export const AMBIGUOUS_CANDIDATE_LIMIT = 10
+const AMBIGUOUS_CANDIDATE_LIMIT = 10
 const FUZZY_MIN_QUERY_LENGTH = 3
 const FUZZY_MAX_CANDIDATES = 500
 const FUZZY_PREVIEW_WEIGHT = 0.85
@@ -128,14 +137,8 @@ const FUZZY_ACCEPT_MARGIN = 0.08
 // garbage an address must never silently match.
 const UNFOLDABLE_CONTROLS = /[\u0000-\u0008\u000e-\u001f\u007f]/
 
-/**
- * NFKC-normalize, trim, lowercase, and collapse internal whitespace. The
- * single canonical name form used by every comparison in this module, so a
- * composed and a decomposed spelling of the same name are one name.
- */
-export function normalizeThreadName(value: string): string {
-  return value.normalize("NFKC").trim().toLowerCase().replace(/\s+/g, " ")
-}
+/** The one name comparison of threads and devices (thread-address-core `normalizeName`). */
+export const normalizeThreadName = normalizeName
 
 type Guarded =
   { readonly ok: true; readonly normalized: string } | { readonly ok: false; readonly error: ThreadAddressError }
@@ -188,12 +191,18 @@ function addressError(
   return candidates === undefined ? { kind: "error", ...failure } : { kind: "error", ...failure, candidates }
 }
 
+/** What a candidate is passed back as: its thread id, or for a listed row that publishes none, its row key. */
+const candidateThread = (entry: ThreadAddressEntry): string =>
+  entry.thread_id === "" && entry.transport !== undefined ? rowKey(entry.transport.row) : entry.thread_id
+
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
   // #13304: a candidate from another device prints its title and project escaped; the entry itself stays as received.
   const shown = entry.transport?.kind === "relay" ? escapeForDisplay : (text: string) => text
+  const named = rowName({ name: entry.name, first_message: entry.preview, folder: entry.cwd })
   return {
-    thread: entry.thread_id,
-    name: shown(entry.name),
+    thread: candidateThread(entry),
+    name: shown(named.name),
+    ...(named.unnamed ? { unnamed: true } : {}),
     cwd: shown(entry.cwd),
     preview: entry.preview ?? "",
     updatedAt: entry.updated_at,
@@ -330,13 +339,6 @@ function scopedIdHit(
   )
 }
 
-const SESSION_ID_SHAPE = /^(?:rpc-\d+|[A-Za-z0-9_-]{16,})$/
-/** A durable session id is the thread_id itself: a miss on one is never a routing key passed by mistake (#14049). */
-const DURABLE_ID_SHAPE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** The shortest address that may name a thread by a prefix of its durable id: 8 hex characters, hyphens allowed after. */
-const ID_PREFIX_SHAPE = /^[0-9a-f]{8}[0-9a-f-]*$/i
-
 function notFound(target: string, scope: string, visible: readonly ThreadAddressEntry[]): ThreadAddressError {
   const base = `No visible thread matches "${target}" in ${scope}.`
   if (DURABLE_ID_SHAPE.test(target))
@@ -400,7 +402,7 @@ export function resolveTarget(
     return hit
   }
   if (sessionHits.length >= 2) {
-    const ids = sessionHits.map((entry) => entry.thread_id).filter((id) => id.length > 0)
+    const ids = sessionHits.map(candidateThread).filter((id) => id.length > 0)
     return addressError(
       "ambiguous_target",
       `${sessionHits.length} visible threads share the session id "${target}". Pass one thread: ${ids.join(", ")}.`,

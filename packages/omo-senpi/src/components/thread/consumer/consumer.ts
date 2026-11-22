@@ -63,16 +63,20 @@ function intakeRecord(event: DeliveryInboundEvent): IntakeRecord | undefined {
 
 const UNKNOWN_SHAPE = new Set(["unknown_type", "unsupported"])
 
+/** The numbers a refusal's details carry to the sender: a chain limit's counts, the pair loop guard's burst and wait. */
+const REFUSAL_NUMBERS = ["chain_count", "limit", "burst", "window_ms", "retry_after_ms"] as const
+
 /**
  * The answer for a record the intake refused. The store names the precise cause in `details.reason` (for example
  * `chain_count_limit`, with `chain_count` and `limit`); the sender maps that reason (`relay-transport.ts` `wakeRefusal`),
- * so it is sent in place of the coarse tool code, which stays the reason only when the store named none.
+ * so it is sent in place of the coarse tool code, which stays the reason only when the store named none (the pair loop
+ * guard: `pair_loop_guard`, with `burst`, `window_ms` and `retry_after_ms`).
  */
 function intakeRefusal(refusal: Extract<IntakeOutcome, { kind: "refused" }>): Record<string, unknown> {
   const details = refusal.details ?? {}
   const reason = typeof details["reason"] === "string" ? details["reason"] : refusal.code
   const counts = Object.fromEntries(
-    ["chain_count", "limit"].flatMap((key) => (typeof details[key] === "number" ? [[key, details[key]]] : [])),
+    REFUSAL_NUMBERS.flatMap((key) => (typeof details[key] === "number" ? [[key, details[key]]] : [])),
   )
   return { kind: "refused", reason, ...counts }
 }

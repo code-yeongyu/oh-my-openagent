@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { createDagFileStore } from "./store"
 import type { DagRunId } from "./types"
+import { ownedTaskStateDir } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -25,7 +26,11 @@ const NOW = Date.parse("2026-02-01T00:00:00.000Z")
 describe("createDagFileStore retention cost", () => {
   test("#given many expired runs each owning a key #when retention runs #then the keys directory is scanned once, not once per run", () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { retention_days: 7 } } })
+    const project = tempProject()
+    const store = createDagFileStore({
+      project_dir: project,
+      task: { state_dir: ownedTaskStateDir(project), dag: { retention_days: 7 } },
+    })
     const runIds = ["run-a", "run-b", "run-c", "run-d", "run-e"].map((id) => id as DagRunId)
     for (const runId of runIds) {
       store.writeCheckpoint(runId, {
@@ -54,7 +59,11 @@ describe("createDagFileStore retention cost", () => {
 
   test("#given expired runs sharing the directory with a live run's key #when retention runs #then only the expired runs' keys are removed", () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject(), task: { dag: { retention_days: 7 } } })
+    const project = tempProject()
+    const store = createDagFileStore({
+      project_dir: project,
+      task: { state_dir: ownedTaskStateDir(project), dag: { retention_days: 7 } },
+    })
     const expiredId = "run-expired" as DagRunId
     const liveId = "run-live" as DagRunId
     store.writeCheckpoint(expiredId, {

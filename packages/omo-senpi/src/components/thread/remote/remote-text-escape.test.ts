@@ -20,6 +20,7 @@ const poisoned = (device: string, key: string, durable: string, title = PAYLOAD)
   durable_id: durable,
   title,
   project: `/w/${PAYLOAD}`,
+  path: `/w/${PAYLOAD}`,
 })
 
 const clean = (texts: readonly string[]) => {

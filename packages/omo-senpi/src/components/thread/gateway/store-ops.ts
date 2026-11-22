@@ -19,23 +19,24 @@ import { join } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
-  MAX_FANOUT_PER_TURN,
   PAIR_BUCKET_BURST,
   PAIR_BUCKET_REFILL_MS,
   QUEUED_TTL_MS,
+  RETENTION_SWEEP_BATCH,
   ROOT_LIFETIME_MS,
   SESSION_CONTROL_DELIVERY_TYPE,
   SESSION_RELEASED_ENTRY_TYPE,
-  TARGET_MAX_BYTES,
-  TARGET_MAX_MESSAGES,
+  OPEN_STATES,
 } from "./constants"
+import { pairLoopGuardMessage } from "../errors"
+import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
 import { gatewayInboxDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { GATEWAY_MIGRATIONS, GatewaySchemaVersionError } from "./schema"
+import { GATEWAY_MIGRATIONS, GATEWAY_TABLE_REBUILDS, GatewaySchemaVersionError } from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -103,9 +104,9 @@ const DELIVERY_COLUMNS = [
   "ledger_id",
   "verbatim_text",
   "verbatim_display_text",
+  "collapse_key",
 ] as const
 
-export const OPEN_STATES = "('queued', 'admitting', 'admitted')"
 const DURABLE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/
 
 function refused(
@@ -150,6 +151,7 @@ function rowFrom(record: SqlRow): DeliveryRow {
     ledger_id: nullableString(record.ledger_id),
     verbatim_text: nullableString(record.verbatim_text),
     verbatim_display_text: nullableString(record.verbatim_display_text),
+    collapse_key: nullableString(record.collapse_key),
   }
 }
 
@@ -162,7 +164,12 @@ function engineKey(row: DeliveryRow): string {
   return row.ledger_id ?? row.delivery_id
 }
 
-function selectRows(ctx: StoreContext, where: string, params: readonly SqlValue[], orderBy?: string): DeliveryRow[] {
+export function selectRows(
+  ctx: StoreContext,
+  where: string,
+  params: readonly SqlValue[],
+  orderBy?: string,
+): DeliveryRow[] {
   return ctx.sql
     .all(DELIVERY_COLUMNS, `SELECT ${DELIVERY_COLUMNS.join(", ")} FROM deliveries WHERE ${where}`, params, orderBy)
     .map(rowFrom)
@@ -341,6 +348,7 @@ function insertDelivery(ctx: StoreContext, row: DeliveryRow): void {
       row.ledger_id ?? null,
       row.verbatim_text ?? null,
       row.verbatim_display_text ?? null,
+      row.collapse_key ?? null,
     ],
   )
 }
@@ -378,11 +386,12 @@ export async function migrate(ctx: StoreContext): Promise<void> {
   for (;;) {
     const version = schemaVersion(ctx)
     if (version >= GATEWAY_MIGRATIONS.length) return
-    // The CHECK-widening v7 rebuild must run with foreign_keys OFF, which SQLite only honors when
-    // the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key
-    // actions from extension tables referencing `bindings`). The pragma is restored to its prior
-    // value afterwards, and foreign_key_check is verified from TypeScript before the bump commits.
-    const needsForeignKeysOff = GATEWAY_NEEDS_FK_OFF.has(version)
+    // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) must run with foreign_keys OFF, which SQLite only
+    // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
+    // extension tables referencing the rebuilt table). The pragma is restored to its prior value afterwards, and
+    // foreign_key_check is verified from TypeScript before the bump commits.
+    const rebuilt = GATEWAY_TABLE_REBUILDS.get(version)
+    const needsForeignKeysOff = rebuilt !== undefined
     const priorForeignKeys = needsForeignKeysOff
       ? Number(ctx.sql.one(["foreign_keys"], "SELECT foreign_keys FROM pragma_foreign_keys")?.foreign_keys ?? 1)
       : 1
@@ -392,13 +401,13 @@ export async function migrate(ctx: StoreContext): Promise<void> {
         const current = schemaVersion(ctx)
         if (current !== version) return
         for (const statement of GATEWAY_MIGRATIONS[current]) ctx.sql.exec(statement)
-        if (needsForeignKeysOff) {
+        if (rebuilt !== undefined) {
           const violations = ctx.sql.all(["parent"], "SELECT parent FROM pragma_foreign_key_check")
-          const introduced = violations.filter((row) => row.parent === "bindings")
+          const introduced = violations.filter((row) => row.parent === rebuilt)
           if (introduced.length > 0) {
             throw new GatewayMigrationError(
               current + 1,
-              `gateway schema ${current + 1} would leave a foreign-key violation referencing bindings; staying at v${current}`,
+              `gateway schema ${current + 1} would leave a foreign-key violation referencing ${rebuilt}; staying at v${current}`,
             )
           }
         }
@@ -409,9 +418,6 @@ export async function migrate(ctx: StoreContext): Promise<void> {
     }
   }
 }
-
-/** Migration indexes (0-based) whose steps must run with foreign_keys OFF; see migrate(). */
-const GATEWAY_NEEDS_FK_OFF: ReadonlySet<number> = new Set([6])
 
 type ReceiptRecord = {
   readonly args_hash: string
@@ -556,21 +562,6 @@ function placeCausally(ctx: StoreContext, request: EnqueueRequest): CausalPlacem
   return placement
 }
 
-function checkFanout(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
-  if (request.sender_turn === null) return undefined
-  const targets = new Set(
-    ctx.sql
-      .all(
-        ["t"],
-        "SELECT DISTINCT target_durable_id AS t FROM deliveries WHERE sender = ? AND sender_turn = ? AND state != 'refused'",
-        [request.sender_principal, request.sender_turn],
-      )
-      .map((row) => String(row.t)),
-  )
-  if (targets.has(request.target_durable_id) || targets.size < MAX_FANOUT_PER_TURN) return undefined
-  return refused("overloaded", `One turn may reach at most ${MAX_FANOUT_PER_TURN} sessions.`, { budget: "fanout" })
-}
-
 function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal | undefined {
   const sender = request.rate_principal ?? request.sender_principal
   const bucket = ctx.sql.one(
@@ -585,11 +576,20 @@ function takePairToken(ctx: StoreContext, request: EnqueueRequest): StoreRefusal
           PAIR_BUCKET_BURST,
           Number(bucket.tokens) + Math.max(0, request.now - Number(bucket.updated_at)) / PAIR_BUCKET_REFILL_MS,
         )
+  // An empty bucket means the sender spent at least the whole burst on this target within the time the bucket takes to
+  // refill from empty: that is the burst the refusal reports, measured from the bucket it read.
   if (tokens < 1) {
-    return refused("overloaded", "Too many deliveries to this session; wait before sending again.", {
-      budget: "pair_rate",
-      retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
-    })
+    const windowMs = PAIR_BUCKET_BURST * PAIR_BUCKET_REFILL_MS
+    return refused(
+      "pair_loop_guard",
+      pairLoopGuardMessage(sender, request.target_durable_id, PAIR_BUCKET_BURST, windowMs),
+      {
+        guard: "pair_loop",
+        burst: PAIR_BUCKET_BURST,
+        window_ms: windowMs,
+        retry_after_ms: Math.ceil((1 - tokens) * PAIR_BUCKET_REFILL_MS),
+      },
+    )
   }
   write(
     ctx,
@@ -648,6 +648,7 @@ export async function enqueue(
   if (!DURABLE_ID_PATTERN.test(request.target_durable_id) || !DURABLE_ID_PATTERN.test(request.delivery_id)) {
     return refused("invalid_arguments", "The target session id is not a durable session id.")
   }
+  const deadClaims = await expiredDeadClaims(ctx, request.target_durable_id, request.now)
   if (!(await beginImmediate(ctx, "enqueue", false))) return { kind: "busy" }
   let marker: string | null = null
   let committed = false
@@ -679,25 +680,41 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return binding
     }
-    const backlog = ctx.sql.one(
-      ["n", "b"],
-      `SELECT COUNT(*) AS n, COALESCE(SUM(bytes), 0) AS b FROM deliveries WHERE target_durable_id = ? AND state IN ${OPEN_STATES}`,
-      [request.target_durable_id],
-    )
+    // Expired queued rows of this target are refused first, so neither a collapse nor the cap counts them (#14466).
+    const expired = refuseExpiredQueued(ctx, request.now, RETENTION_SWEEP_BATCH, request.target_durable_id)
+    const collapse = collapseEarlier(ctx, request)
+    if (collapse.absorbing !== undefined) {
+      // The absorbed send keeps its own receipt, which the engine completes: a retry under its key replays this answer.
+      insertReceipt(ctx, request, collapse.absorbing.delivery_id, undefined)
+      const outcome: EnqueueOutcome = {
+        kind: "collapsed",
+        row: collapse.absorbing,
+        queue_position: queuePosition(ctx, collapse.absorbing),
+      }
+      ctx.sql.exec(commitSql)
+      committed = true
+      for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
+      return outcome
+    }
     const bytes = Buffer.byteLength(request.body)
-    if (Number(backlog?.n ?? 0) >= TARGET_MAX_MESSAGES || Number(backlog?.b ?? 0) + bytes > TARGET_MAX_BYTES) {
+    const full = backlogRefusal(ctx, {
+      target: request.target_durable_id,
+      mode: request.mode,
+      bytes,
+      now: request.now,
+      deadClaims,
+      targetRunning: request.endpoint_kind !== null,
+    })
+    if (full !== undefined) {
       rollbackQuietly(ctx)
-      return refused("queue_full", "The target's delivery backlog is full.", {
-        max_messages: TARGET_MAX_MESSAGES,
-        max_bytes: TARGET_MAX_BYTES,
-      })
+      return full
     }
     const placement = placeCausally(ctx, request)
     if ("kind" in placement) {
       rollbackQuietly(ctx)
       return placement
     }
-    const budget = checkFanout(ctx, request) ?? takePairToken(ctx, request)
+    const budget = takePairToken(ctx, request)
     if (budget !== undefined) {
       rollbackQuietly(ctx)
       return budget
@@ -750,31 +767,21 @@ export async function enqueue(
       ledger_id: intakeFields?.ledger_id ?? null,
       verbatim_text: intakeFields?.verbatim_text ?? null,
       verbatim_display_text: intakeFields?.verbatim_display_text ?? null,
+      collapse_key: request.collapse_key ?? null,
     }
     insertDelivery(ctx, row)
     const position = queuePosition(ctx, row)
-    const answer = intakeFields?.answer(row, position)
-    write(
-      ctx,
-      "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [
-        request.sender_principal,
-        request.receipt.idempotency_key,
-        request.receipt.args_hash,
-        answer === undefined ? "prepared" : "completed",
-        row.delivery_id,
-        ctx.config.instance_id,
-        answer === undefined ? null : JSON.stringify(answer),
-        request.now,
-        request.now,
-        request.now + GATEWAY_RECEIPT_RETENTION_MS,
-      ],
-    )
+    insertReceipt(ctx, request, row.delivery_id, intakeFields?.answer(row, position))
     marker = createMarker(ctx, row.target_durable_id, row.delivery_id, false)
     sweepRetentionIfDue(ctx, request.now, cleared)
     if (ctx.afterCommit === undefined) await ctx.hook("beforeDbCommit")
     ctx.sql.exec(commitSql)
     committed = true
+    // Markers of rows this enqueue refused (expired, superseded) go only once those refusals committed: a later refusal
+    // in this enqueue rolls them back to queued, and a queued row always keeps its wake (a receiver's reconcile removes a
+    // marker left behind).
+    for (const gone of expired) unlinkMarker(ctx, gone.target_durable_id, gone.delivery_id)
+    for (const id of collapse.superseded) unlinkMarker(ctx, request.target_durable_id, id)
     if (ctx.afterCommit === undefined) await ctx.hook("afterDbCommit")
     return { kind: "inserted", row, queue_position: position }
   } catch (error) {
@@ -785,6 +792,56 @@ export async function enqueue(
     }
     throw error
   }
+}
+
+/**
+ * A delivery under a collapse key replaces its sender's earlier undelivered one under that key (#14428): a row still
+ * waiting in the gateway is refused `superseded`; a row the session's runtime already took absorbs the repeat (the
+ * runtime cannot give it back), so one key never leaves more than one undelivered message.
+ */
+function collapseEarlier(
+  ctx: StoreContext,
+  request: EnqueueRequest,
+): { readonly absorbing?: DeliveryRow; readonly superseded: readonly string[] } {
+  if (request.collapse_key === undefined) return { superseded: [] }
+  const earlier = selectRows(
+    ctx,
+    `target_durable_id = ? AND sender = ? AND collapse_key = ? AND state IN ${OPEN_STATES}`,
+    [request.target_durable_id, request.sender_principal, request.collapse_key],
+    "seq",
+  )
+  const taken = earlier.find((row) => row.state !== "queued")
+  if (taken !== undefined) return { absorbing: taken, superseded: [] }
+  for (const row of earlier) {
+    transition(ctx, row, "refused", request.now, { reason: "superseded" })
+    // A retry of the superseded send replays its refusal, not the queued answer it got when it was sent.
+    const refusedRow = selectRow(ctx, row.delivery_id) as DeliveryRow
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'completed', result = ?, updated_at = ? WHERE operation = 'deliver' AND delivery_id = ?",
+      [JSON.stringify(resultFromRow(refusedRow, 0, null, true, false)), request.now, row.delivery_id],
+    )
+  }
+  return { superseded: earlier.map((row) => row.delivery_id) }
+}
+
+function insertReceipt(ctx: StoreContext, request: EnqueueRequest, deliveryId: string, answer: unknown): void {
+  write(
+    ctx,
+    "INSERT INTO receipts (principal, operation, idempotency_key, args_hash, status, delivery_id, owner_instance, result, created_at, updated_at, expires_at) VALUES (?, 'deliver', ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [
+      request.sender_principal,
+      request.receipt.idempotency_key,
+      request.receipt.args_hash,
+      answer === undefined ? "prepared" : "completed",
+      deliveryId,
+      ctx.config.instance_id,
+      answer === undefined ? null : JSON.stringify(answer),
+      request.now,
+      request.now,
+      request.now + GATEWAY_RECEIPT_RETENTION_MS,
+    ],
+  )
 }
 
 function transcriptText(sessionPath: string | null, cache: Map<string, string>): string {
@@ -864,7 +921,63 @@ function sessionHasToken(sessionPath: string | null, deliveryId: string, cache: 
   return false
 }
 
-function claimFingerprint(row: DeliveryRow): string {
+/**
+ * Rows of `target` past their TTL that a runtime took and then died holding. No process can still write them, so they
+ * do not count against the target's backlog; the target's own `reconcile` settles each one (applied or expired) when it
+ * runs again. Read before the write lock because judging a claimant may run `ps`; the claim fingerprint lets the
+ * count notice a row reclaimed in between.
+ */
+async function expiredDeadClaims(ctx: StoreContext, target: string, now: number): Promise<ReadonlyMap<string, string>> {
+  const found = new Map<string, string>()
+  const dead = new Map<string, boolean>()
+  for (const row of selectRows(
+    ctx,
+    "target_durable_id = ? AND state IN ('admitting', 'admitted') AND admitted_by IS NOT NULL AND expires_at <= ?",
+    [target, now],
+  )) {
+    if (row.admitted_by === null) continue
+    const key = JSON.stringify(row.admitted_by)
+    let verdict = dead.get(key)
+    if (verdict === undefined) {
+      verdict = await isClaimantDead(row.admitted_by)
+      dead.set(key, verdict)
+    }
+    if (verdict) found.set(row.delivery_id, claimFingerprint(row))
+  }
+  return found
+}
+
+/** What still counts against a target's cap, and when its oldest queued row expires and frees a slot without the target. */
+
+/**
+ * Settles queued rows past their TTL as `refused`/`expired` without the target's drain, at most `limit` of them (of
+ * `target` only when given). An intake row (`ledger_id` set) is left to the target's `reconcile`, which first checks
+ * whether the same delivery already reached the transcript live and then settles it `applied`. Answers what it refused;
+ * the caller unlinks their inbox markers once its transaction commits, so a rolled-back call leaves every marker in place.
+ */
+export function refuseExpiredQueued(
+  ctx: StoreContext,
+  now: number,
+  limit: number,
+  target?: string,
+): { readonly delivery_id: string; readonly target_durable_id: string }[] {
+  const rows = ctx.sql
+    .all(
+      ["delivery_id", "target_durable_id"],
+      `SELECT delivery_id, target_durable_id FROM deliveries WHERE state = 'queued' AND ledger_id IS NULL AND expires_at <= ?${target === undefined ? "" : " AND target_durable_id = ?"} LIMIT ?`,
+      target === undefined ? [now, limit] : [now, target, limit],
+    )
+    .map((row) => ({ delivery_id: String(row.delivery_id), target_durable_id: String(row.target_durable_id) }))
+  for (const row of rows)
+    write(
+      ctx,
+      "UPDATE deliveries SET state = 'refused', reason = 'expired', updated_at = ? WHERE delivery_id = ? AND state = 'queued'",
+      [now, row.delivery_id],
+    )
+  return rows
+}
+
+export function claimFingerprint(row: DeliveryRow): string {
   return `${JSON.stringify(row.admitted_by)}#${row.attempt}`
 }
 
@@ -1036,6 +1149,24 @@ export async function refuseQueued(
   return await transaction(ctx, "refuse", () => {
     const row = selectRow(ctx, request.delivery_id)
     if (row === undefined || row.state !== "queued") return false
+    transition(ctx, row, "refused", request.now, { reason: request.reason })
+    unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
+    return true
+  })
+}
+
+/**
+ * omo#14313: a delivery the engine took in (`admitting`/`admitted`) and then handed back unread when its session was
+ * closed gracefully. The row is refused with `reason`, so its sender reads it as not delivered instead of admitted.
+ * An `applied` row (the session read it) is never touched. Answers whether this call refused it.
+ */
+export async function refuseReturned(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly delivery_id: string; readonly reason: RefusalReason },
+): Promise<boolean> {
+  return await transaction(ctx, "refuse_returned", () => {
+    const row = selectRow(ctx, request.delivery_id)
+    if (row === undefined || (row.state !== "admitting" && row.state !== "admitted")) return false
     transition(ctx, row, "refused", request.now, { reason: request.reason })
     unlinkMarker(ctx, row.target_durable_id, row.delivery_id)
     return true

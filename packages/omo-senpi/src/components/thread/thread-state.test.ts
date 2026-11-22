@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, utimesSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -9,6 +9,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import type { RemoteSessionRow } from "./remote/ports"
 import { B_ROW, createRemoteThreadFixture } from "./thread-remote-fixture"
 import { createThreadTools } from "./tools"
+import { listAcross } from "./remote/cross-device"
 import { listThreads } from "./tools/read-ops"
 import { threadState } from "./tools/thread-state"
 import type { ThreadHost, ThreadHostSession, ThreadHostView, ThreadToolSurfaceOptions } from "./tools/ports"
@@ -175,6 +176,91 @@ describe("thread state on this device's rows", () => {
     })
   })
 
+  test("#given more session files than one listing reads, one of the unread threads live #when listed #then the result counts the inactive threads it left out, never the live one, and a filter without inactive counts none (#14295)", async () => {
+    const directory = scratch()
+    const sessionsDirectory = join(directory, "sessions")
+    const project = join(sessionsDirectory, "--work--")
+    mkdirSync(project, { recursive: true })
+    const ids: string[] = []
+    for (let index = 0; index < 203; index += 1) {
+      const id = `0195f0c2-1a2b-7c3d-8e4f-${index.toString(16).padStart(12, "0")}`
+      const created = new Date(Date.UTC(2026, 0, 1) + index * 1000).toISOString()
+      const file = join(project, `${created.replace(/[:.]/g, "-")}_${id}.jsonl`)
+      writeFileSync(file, `${JSON.stringify({ type: "session", id, cwd: "/work", timestamp: created })}\n`)
+      // The listing reads the newest by modification time: older files are touched earlier.
+      utimesSync(file, 1_800_000_000 + index, 1_800_000_000 + index)
+      ids.push(id)
+    }
+    // The three oldest files are left unread; the oldest of them runs on this device's endpoint.
+    const running: ThreadHostSession = {
+      sessionId: "route-old",
+      durableSessionId: ids[0] ?? "",
+      cwd: "/work",
+      status: "open",
+      activity: "running",
+    }
+    const options = { ...surfaceOptions(directory), sessionsDirectory: () => sessionsDirectory }
+    const view: ThreadHostView = { sessions: [running], hosts: [], disk: [] }
+    expect(listThreads(options, view, true)).toMatchObject({ inactive_truncated: true, inactive_dropped: 2 })
+    expect(rows(listThreads(options, view, true)).map((row) => row.thread)).toContain(ids[0])
+    expect(listThreads(options, view, true, ["running", "idle"])).not.toHaveProperty("inactive_dropped")
+    // An unread file may be archived: a listing of archived threads is as partial as one of inactive threads.
+    expect(listThreads(options, view, true, ["archived"])).toMatchObject({
+      inactive_truncated: true,
+      inactive_dropped: 2,
+    })
+    // With an account, the count is this device's own: its device row carries it.
+    const across = await listAcross(remoteFixture.account({}).remote, listThreads(options, view, true), true)
+    const devices = across.kind === "ok" && "devices" in across ? (across.devices ?? []) : []
+    expect(devices.find((device) => device.this_device)).toMatchObject({ device: "here", dropped: 2 })
+    expect(devices.filter((device) => !device.this_device).every((device) => device.dropped === undefined)).toBe(true)
+  })
+
+  test("#given an engine endpoint of this device that did not answer the listing in time #when listed #then the result and this device's row say the listing is incomplete, while a listing whose only failed endpoint is known dead stays complete (#14308)", async () => {
+    const directory = scratch()
+    const live = "/tmp/thread-state-14308-live.sock"
+    const slow = "/tmp/thread-state-14308-slow.sock"
+    const dead = "/tmp/thread-state-14308-dead.sock"
+    const running: ThreadHostSession = {
+      sessionId: "r1",
+      durableSessionId: "t-running",
+      cwd: directory,
+      status: "open",
+      activity: "running",
+      socket: live,
+    }
+    const answered = {
+      socket: live,
+      endpoint_kind: "rpc_host" as const,
+      alive: true,
+      list_sessions: { sessions: [running] },
+    }
+    const view = (failed: ThreadHostView["hosts"]): ThreadHostView => ({
+      sessions: [running],
+      hosts: [answered, ...failed],
+      disk: [],
+    })
+    const timedOut = {
+      socket: slow,
+      endpoint_kind: "rpc_host" as const,
+      alive: false,
+      reason: "live_unresponsive" as const,
+      error: "thread RPC request timed out",
+    }
+    const gone = { socket: dead, endpoint_kind: "tui" as const, alive: false, reason: "dead" as const, error: "dead" }
+    const options = surfaceOptions(directory)
+
+    const partial = listThreads(options, view([timedOut, gone]), true)
+    expect(partial).toMatchObject({ listing: "incomplete", unanswered_endpoints: 1 })
+    const across = await listAcross(remoteFixture.account({}).remote, partial, true)
+    const devices = across.kind === "ok" && "devices" in across ? (across.devices ?? []) : []
+    expect(devices.find((device) => device.this_device)?.listing).toBe("incomplete")
+
+    const complete = listThreads(options, view([gone]), true)
+    expect(complete).not.toHaveProperty("listing")
+    expect(complete).not.toHaveProperty("unanswered_endpoints")
+  })
+
   test("#given the same rows #when listed by default #then archived threads are hidden; state archived shows only them", () => {
     const directory = scratch()
     const options = surfaceOptions(directory)
@@ -239,6 +325,38 @@ describe("thread state on this device's rows", () => {
       }
     }
     expect(seen).toEqual(expected)
+  })
+
+  test("#given an engine publishing senpi#7025's retry wait on list_sessions #when listed #then a running thread sleeping in a backoff carries waiting_on retry with its kind, until and attempts, and no other row carries one (#14278)", () => {
+    const until = "2026-11-19T05:00:45.000Z"
+    const wait = (kind: string) => ({ kind, attempt: 2, maxAttempts: 5, delayMs: 45_000, until, error: "429 too many" })
+    const row = (id: string, fields: Record<string, unknown>): ThreadHostSession =>
+      ({ sessionId: id, durableSessionId: id, cwd: "/w", name: id, status: "open", ...fields }) as ThreadHostSession
+    const sessions = [
+      row("rate-limited", { activity: "running", waiting: wait("rate_limit") }),
+      row("retrying", { activity: "running", waiting: wait("retry") }),
+      row("working", { activity: "running" }),
+      // A wait on a thread that is not running, or one of a shape this build does not know, is not a wait.
+      row("idle-stale", { activity: "idle", waiting: wait("rate_limit") }),
+      row("unknown-kind", { activity: "running", waiting: wait("quota") }),
+      row("closed", { status: "closed", activity: "running", waiting: wait("rate_limit") }),
+    ]
+    const result = listThreads(surfaceOptions(scratch()), { sessions, hosts: [], disk: [] }, true, [
+      "running",
+      "idle",
+      "inactive",
+    ])
+    const waits = Object.fromEntries(
+      rows(result).map((listed) => [listed.thread, (listed as { waiting_on?: unknown }).waiting_on ?? null]),
+    )
+    expect(waits).toEqual({
+      "rate-limited": { kind: "retry", reason: "rate_limit", until, attempt: 2, max_attempts: 5 },
+      retrying: { kind: "retry", reason: "retry", until, attempt: 2, max_attempts: 5 },
+      working: null,
+      "idle-stale": null,
+      "unknown-kind": null,
+      closed: null,
+    })
   })
 })
 

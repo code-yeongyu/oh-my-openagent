@@ -1,10 +1,16 @@
-import { TOOL_CALL_BUDGET_MS, withCallDeadline } from "../call-budget/call-deadline"
+import {
+  TOOL_CALL_BUDGET_MS,
+  waitWithinCallBudget,
+  withCallDeadline,
+  withinCallBudget,
+} from "../call-budget/call-deadline"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { gatewaySchemaRefusal, threadToolFailure } from "./errors"
 import type { ThreadToolFailure } from "./errors"
 import { type Static } from "typebox"
 import { toThreadAddressEntries } from "./address-book"
-import { type ThreadAddressEntry, type ThreadResolveResult } from "./addressing"
+import { type ThreadAddressEntry } from "./addressing"
+import { resolveAddress } from "./address/lazy"
 import {
   parseThreadParams,
   threadToolParamSchemas,
@@ -21,9 +27,9 @@ import {
   type ThreadArchiveInput,
   type ThreadToolName,
   type ThreadToolResult,
+  DEFAULT_THREAD_DELIVERY,
 } from "./contracts"
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
-import { relayAddressBook, type RelayAddressBook } from "./remote/address-book"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
 export type { ThreadTranscriptEntry } from "./reader"
@@ -34,7 +40,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget } from "./gateway/transport"
 import type { DeliveryAuthority } from "./gateway/types"
 import { createGatewayServices } from "./tools/gateway-services"
-import { listThreads, readThread } from "./tools/read-ops"
+import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { archiveThread } from "./tools/archive-ops"
 import { rowState, threadModel } from "./tools/thread-state"
 import { createRelayTools } from "./tools/relay-tools"
@@ -42,14 +48,24 @@ import { threadToolPermission } from "./tools/local-permission"
 import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
-import { accountDevices } from "./remote/account"
+import { accountDevices } from "./address/account"
 import { listAcross } from "./remote/lazy-ops"
+import { rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
-import { closeThread, interruptThread, NOT_LIVE, setModelOn, setThinkingLevelOn } from "./control/operations"
+import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
+import {
+  closeOptions,
+  closeThread,
+  interruptThread,
+  NOT_LIVE,
+  setModelOn,
+  setThinkingLevelOn,
+} from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
 import { registerExtensionTools, type ExtensionToolHost } from "./tools/extension-tools"
+import { createMonitorTargetResolver, installMonitorTargetResolution } from "./tools/monitor-target"
 export type { ThreadHost, ThreadHostSession, ThreadToolSurfaceOptions } from "./tools/ports"
 export { UNKNOWN_CALLER } from "./tools/ports"
 import {
@@ -63,16 +79,14 @@ import {
   failure,
   hostView,
   metadata,
+  addressBook,
   output,
-  resolution,
-  resolveEntries,
   sendAddressBook,
+  sendBookFor,
   summary,
   targetSession,
   type AnyTool,
   type ToolOutput,
-  replyOnDevice,
-  resolveAcross,
   uncertainFailure,
 } from "./tools/internals"
 import { currentResult, threadRow } from "./tools/thread-row"
@@ -95,8 +109,12 @@ export function createThreadTools(options: ThreadToolSurfaceOptions): readonly A
   return buildThreadTools(options).tools
 }
 
+/** thread_send as `callerId` with no tool call behind it, through the same wrapper a tool call takes (#14430 operator alerts). */
+export type ThreadSendAs = (callerId: string, args: ThreadSendInput) => Promise<ThreadToolResult>
+
 function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   readonly tools: readonly AnyTool[]
+  readonly sendAs: ThreadSendAs
   readonly dispose: () => void
 } {
   // One ledger of the threads these tools closed on other devices, read by every tool through the remote surface (#14170).
@@ -354,6 +372,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           view: () => view(),
           deliverPrompt: (prompted, target, send, key) =>
             deliverThrough(options, pipeline, prompted, target, send, key, callerId, undefined, "creator"),
+          awaitPromptStart: (deliveryId) =>
+            awaitPromptStart(
+              store,
+              deliveryId,
+              waitWithinCallBudget(
+                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
+                FIRST_PROMPT_START_RESERVE_MS,
+              ),
+            ),
         }),
       ),
   }
@@ -369,7 +396,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         async (current, value) =>
           await listAcross(
             options.remote,
-            listThreads(options, current, value.all_scope, value.state),
+            await withBacklog(options.store, listThreads(options, current, value.all_scope, value.state)),
             value.all_scope === true,
             value.state,
           ),
@@ -392,6 +419,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         deliver(current, value.thread, value, operationId, callerId),
       ),
   }
+  const sendAs: ThreadSendAs = async (callerId, args) => {
+    const sent = await execute(
+      "thread_send",
+      `send-as:${args.idempotency_key ?? callerId}`,
+      args,
+      { sessionManager: { getSessionId: () => callerId } },
+      async (current, value, operationId, id) => deliver(current, value.thread, value, operationId, id),
+    )
+    return sent.details.result
+  }
   const interrupt: AnyTool = {
     ...metadata("thread_interrupt"),
     parameters: threadToolParamSchemas.thread_interrupt,
@@ -413,7 +450,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
         if (located.kind === "not_live")
           return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(located.control, value.force)
+        return await closeThread(located.control, closeOptions(value))
       }),
   }
   const handoff: AnyTool = {
@@ -488,6 +525,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         permissionParser: tool.permissionParser ?? threadToolPermission(tool.name, options),
       }),
     ),
+    sendAs,
     dispose,
   }
 
@@ -516,13 +554,22 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     if (typeof here === "object") return refuse(here)
     const replyTo = replySender(address, senders, here)
     if (replyTo !== undefined && "code" in replyTo) return refuse(replyTo)
+    const localFor = sendBookFor(options, current)
+    const context = (local: readonly ThreadAddressEntry[], account = true) => ({
+      remote: account ? options.remote : undefined,
+      callerWorkspaceRoot: options.callerWorkspaceRoot(),
+      local,
+      ...(match === "fuzzy" ? {} : { localFor }),
+      callerId,
+    })
     if (replyTo?.device !== undefined) {
-      const resolved = await replyOnDevice(options, { session_id: replyTo.session_id, device: replyTo.device })
-      if (resolved.kind === "error")
-        return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
+      const resolved = await resolveAddress(context([]), address, {
+        pin: { device: replyTo.device, thread: replyTo.session_id },
+      })
+      if (resolved.kind === "error") return refuse(resolved)
       const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
       if (mismatch !== undefined) return refuse(mismatch)
-      if (resolved.entry.transport?.kind === "relay") return { kind: "remote", row: resolved.entry.transport.row }
+      if (resolved.where.kind === "device") return { kind: "remote", row: resolved.where.row }
     }
     if (current === PUBLISHED_SEND_VIEW) {
       // A reply approved by the sender's stated name must still land on that sender, not on a published thread that happens to carry the same spelling as its id.
@@ -539,46 +586,50 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         },
         here,
       )
-      if (mismatch !== undefined)
-        return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
+      if (mismatch !== undefined) return refuse(mismatch)
       return { kind: "local", thread_id: address, all_scope: scope }
     }
-    // Decision 0027: ONE resolver over this device's book and the relay transport's book (the account's other devices);
-    // the entry it returns says which transport carries the send. An unreachable relay leaves the local book alone.
-    const entries =
-      match === "fuzzy"
-        ? resolveEntries(options, current)
-        : toThreadAddressEntries(sendAddressBook(options, current, address, true))
+    // Decision 0027: ONE resolver over this device's book and the account's other devices (resolveAddress, which takes
+    // <device>/<thread> too); where it resolved says which transport carries the send.
+    const entries = match === "fuzzy" ? toThreadAddressEntries(addressBook(options, current)) : localFor(address)
     // A reply to a sender on this device resolves among this device's entries only (A4.3.1), and only by the sender's
     // exact id or stated name: an id prefix never turns an approved reply into a send to another thread. A send never
     // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).
-    let resolved: ThreadResolveResult & { readonly all_scope?: boolean | undefined } =
+    let resolved =
       replyTo === undefined
-        ? await resolveAcross(options, entries, address, callerId, scope, match, true, { exclude: callerId })
-        : resolution(options, entries, address, callerId, scope, false)
+        ? await resolveAddress(context(entries), address, {
+            all_scope: scope,
+            match,
+            probe: true,
+            id_prefix: { exclude: callerId },
+          })
+        : await resolveAddress(context(entries, false), address, { all_scope: scope, id_prefix: false })
     // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
     // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
     // not hold is then looked up account-wide (exact id or name only, never an id prefix), and the reply goes only to the
     // session its durable id names, on the one device that lists it: with no device to pin, a copy of that id on a second
     // device makes the sender ambiguous.
     if (replyTo !== undefined && resolved.kind === "error" && resolved.code === "not_found") {
-      resolved = await resolveAcross(options, entries, address, callerId, scope, match, true, false)
-      if (resolved.kind === "ok" && resolved.entry.transport?.kind === "relay") {
-        if (resolved.entry.thread_id !== replyTo.session_id) return refuse(replyTargetFailure(address, resolved.entry))
-        const ambiguous = await unattestedSenderAmbiguity(options, entries, replyTo.session_id)
-        if (ambiguous !== undefined) return refuse(ambiguous)
-        return { kind: "remote", row: resolved.entry.transport.row }
+      resolved = await resolveAddress(context(entries), address, {
+        all_scope: scope,
+        match,
+        probe: true,
+        id_prefix: false,
+        unique_holder: true,
+      })
+      if (resolved.kind === "ok" && resolved.where.kind === "device") {
+        if (resolved.thread !== replyTo.session_id) return refuse(replyTargetFailure(address, resolved.entry))
+        return { kind: "remote", row: resolved.where.row }
       }
     }
-    if (resolved.kind === "error")
-      return { kind: "error", result: { kind: "error", error: resolved } as ThreadToolResult }
+    if (resolved.kind === "error") return refuse(resolved)
     // The allowance approved this send as a reply to a consumed delivery's sender (by id or stated name): deliver only when
     // the address resolves to that sender on that sender's device, else refuse by name without sending (decision 0027
     // section 6, A4.3.1).
     const mismatch = replyTargetMismatch(options, address, resolved.entry, here)
-    if (mismatch !== undefined) return { kind: "error", result: { kind: "error", error: mismatch } as ThreadToolResult }
-    if (resolved.entry.transport?.kind === "relay") return { kind: "remote", row: resolved.entry.transport.row }
-    return { kind: "local", thread_id: resolved.entry.thread_id, all_scope: resolved.all_scope ?? scope }
+    if (mismatch !== undefined) return refuse(mismatch)
+    if (resolved.where.kind === "device") return { kind: "remote", row: resolved.where.row }
+    return { kind: "local", thread_id: resolved.thread, all_scope: resolved.all_scope ?? scope }
   }
 
   async function deliver(
@@ -636,9 +687,10 @@ async function deliverThrough(
     caller_id: callerId,
     target,
     text: value.message,
-    mode: value.delivery ?? "auto",
+    mode: value.delivery ?? DEFAULT_THREAD_DELIVERY,
     ...(value.expected_turn_id === undefined ? {} : { expected_turn_id: value.expected_turn_id }),
     idempotency_key: idempotencyKey,
+    ...("collapse_key" in value && value.collapse_key !== undefined ? { collapse_key: value.collapse_key } : {}),
     args: value,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
@@ -672,7 +724,7 @@ async function deliverThrough(
         status: "live",
         state: rowState(row),
         ...threadModel(row.model),
-        cwd: escapeForDisplay(row.project),
+        cwd: escapeForDisplay(rowFolder(row)),
         created_at: seen,
         updated_at: seen,
         device: row.device,
@@ -688,6 +740,7 @@ async function deliverThrough(
   const facts = {
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
+    ...(sent.collapsed === true ? { collapsed: true as const } : {}),
   }
   if (resolvedBy === undefined) {
     const title = current.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === threadId)?.name
@@ -731,13 +784,16 @@ export function registerThreadTools(
   pi: ExtensionToolHost,
   options: ThreadToolSurfaceOptions,
   log: (line: string) => void = () => undefined,
-): { readonly dispose: () => void } {
+): { readonly sendAs: ThreadSendAs; readonly dispose: () => void } {
   const built = buildThreadTools(options)
   // Thread tools run on the loop side of a split session (engine `ToolDefinition.runs`).
   for (const tool of built.tools) pi.registerTool({ ...tool, runs: "brain" })
-  if (pi.on !== undefined)
-    registerExtensionTools(pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>, options, log)
-  return { dispose: built.dispose }
+  if (pi.on !== undefined) {
+    const host = pi as ExtensionToolHost & Required<Pick<ExtensionToolHost, "on">>
+    registerExtensionTools(host, options, log)
+    installMonitorTargetResolution(host, createMonitorTargetResolver(options), options.callerSessionId)
+  }
+  return { sendAs: built.sendAs, dispose: built.dispose }
 }
 
 type ConsumedSender = { readonly session_id: string; readonly device?: string }
@@ -752,49 +808,24 @@ async function thisDeviceOf(
   senders: readonly ConsumedSender[],
 ): Promise<string | undefined | ThreadToolFailure> {
   if (options.remote === undefined || !senders.some((sender) => sender.device !== undefined)) return undefined
-  try {
-    return (await accountDevices(options.remote.client)).here ?? undefined
-  } catch (error) {
-    const devices = [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))]
-    return threadToolFailure(
+  const unavailable = (reason: string) =>
+    threadToolFailure(
       "host_unavailable",
       "This device's id could not be read, so a reply to a sender named by its device cannot be routed; nothing was sent.",
       "Retry when the device service is reachable.",
-      { devices, reason: error instanceof Error ? error.message : String(error) },
+      {
+        devices: [...new Set(senders.flatMap((sender) => (sender.device === undefined ? [] : [sender.device])))],
+        reason,
+      },
     )
+  try {
+    // #14226: the read is cut by what is left of the call's budget, not only by the device client's own deadline.
+    const listed = await withinCallBudget(accountDevices(options.remote.client))
+    if (listed === undefined) return unavailable("request_timeout")
+    return listed.here ?? undefined
+  } catch (error) {
+    return unavailable(error instanceof Error ? error.message : String(error))
   }
-}
-
-/**
- * #14048: the refusal of a reply to an unattested sender whose durable id more than one device lists (this device's entries
- * and the account listing), as the account-wide lookup answers several holders; undefined when one device lists it.
- */
-async function unattestedSenderAmbiguity(
-  options: ThreadToolSurfaceOptions,
-  local: readonly ThreadAddressEntry[],
-  sessionId: string,
-): Promise<ThreadToolFailure | undefined> {
-  if (options.remote === undefined) return undefined
-  const book = await relayAddressBook(options.remote, sessionId).catch((error: unknown): RelayAddressBook => ({
-    entries: [],
-    unavailable: threadToolFailure(
-      "host_unavailable",
-      "The account's session listing could not be read again to confirm the sender's device.",
-      "Retry when the device service is reachable.",
-      { reason: error instanceof Error ? error.message : String(error) },
-    ),
-  }))
-  if (book.unavailable !== undefined) return book.unavailable
-  const devices = [
-    ...new Set([...local, ...book.entries].filter((e) => e.thread_id === sessionId).map((e) => e.device ?? "")),
-  ]
-  if (devices.length <= 1) return undefined
-  return threadToolFailure(
-    "ambiguous_target",
-    `Session ${sessionId} is listed on more than one device and this run's delivery names none; nothing was sent.`,
-    "Address the session on one device with <device>/<session id>.",
-    { candidates: devices.map((device) => ({ id: sessionId, ...(device === "" ? {} : { device }) })) },
-  )
 }
 
 /**

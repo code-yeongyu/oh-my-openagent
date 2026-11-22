@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "bun:test"
+import { describe, expect, jest, setSystemTime, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -320,7 +320,8 @@ describe("device-service adapter of the thread tools' account surface", () => {
         { device: "b", session_id: "s1", title: "t", project: "/p", path: "/p/s1.jsonl", state: "idle", updated_ms: 2 },
         { model: "a/m1" },
       ),
-    ).toEqual({ kind: "ok", thread: "", device: "b", model: { provider: "a", id: "m1" } })
+      // A row whose device publishes no thread id is addressed as <device id>/<listing key> (#14305 U6), never "".
+    ).toEqual({ kind: "ok", thread: "b/s1", device: "b", model: { provider: "a", id: "m1" } })
     expect(closed).toBe(false)
   })
 
@@ -939,8 +940,11 @@ describe("device-service adapter: relay round trips per thread op", () => {
         history_truncated: false,
         oldest_entry_id: null,
       })
+    // The clock the port ages held reads by (#14252); a test moves it, nothing waits.
+    let clock = 1_000_000
     const port = sessionsPort({
       version: "0.0.0-test",
+      now: () => clock,
       connect: () =>
         connectDeviceService({ version: "0.0.0-test", stateDir: "/unused", connect: async () => dial() as never }).then(
           (conn) => ({ conn, owned: true }),
@@ -967,6 +971,9 @@ describe("device-service adapter: relay round trips per thread op", () => {
     return {
       port,
       surface,
+      advance: (ms: number) => {
+        clock += ms
+      },
       take,
       snapshot,
       removeModel,
@@ -1266,6 +1273,24 @@ describe("device-service adapter: relay round trips per thread op", () => {
     expect((await read()).kind).toBe("ok")
     expect(w.take()).toEqual(["session.attach", "session.command"])
     w.snapshot()
+    expect((await read()).kind).toBe("ok")
+    expect(w.take()).toEqual(["session.command"])
+  })
+
+  test("#given a held engine capability read #when the clock passes the 10-minute bound #then the next read goes to the device, and one inside the bound is answered locally (#14252)", async () => {
+    const w = relayWorld()
+    const read = () =>
+      w.port.sessionCommand("b", row.session_id, {
+        type: "get_protocol_info",
+        sessionId: row.session_id,
+        observe: true,
+      })
+    expect((await read()).kind).toBe("ok")
+    w.take()
+    w.advance(600_000)
+    expect(await read()).toMatchObject({ kind: "ok", local: true })
+    expect(w.take()).toEqual([])
+    w.advance(1)
     expect((await read()).kind).toBe("ok")
     expect(w.take()).toEqual(["session.command"])
   })
@@ -1634,12 +1659,19 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service(), owned: true }),
+      // The dial spends 60 ms of the budget on a controlled clock (the deadline and commandWaitMs read
+      // Date.now()); a real sleep let a loaded runner overrun the whole budget before the open was sent.
       dialEndpoint: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 60))
+        setSystemTime(new Date(Date.now() + 60))
         return { conn: service(), owned: true }
       },
     })
-    await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    setSystemTime(new Date(Date.now()))
+    try {
+      await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    } finally {
+      setSystemTime()
+    }
     expect(waits).toHaveLength(1)
     expect(waits[0]).toBeLessThanOrEqual(45)
   })
