@@ -1,18 +1,11 @@
 import { createHash } from "node:crypto"
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
+import { watch } from "node:fs"
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "bun:test"
 
-import { spawnSync } from "node:child_process"
-
 import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
-
-// The shared minifier is this process's `--minify-server` child; find it the way a runner's timeout would.
-function minifierChildPids() {
-  const found = spawnSync("pgrep", ["-P", String(process.pid), "-f", "minify-server"], { encoding: "utf8" })
-  return found.stdout.split("\n").filter(Boolean).map(Number)
-}
 
 test("#given Node and Bun builtin catalogs #when imports are normalized #then Bun namespaces stay unchanged and both outputs match", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-builtin-normalize-"))
@@ -69,33 +62,62 @@ test("#given the Node minifier starts closing #when another bundle is queued #th
   }
 }, 30_000)
 
-test("#given a bundle is queued on the shared minifier #when that child is killed before it answers #then the build still completes on a fresh child (#13965)", async () => {
+test("#given the shared minifier finished a bundle but never answered #when that child is killed #then the bundle is minified from its untouched source on a fresh child (#13965)", async () => {
+  // given
   const root = await mkdtemp(join(tmpdir(), "omo-minifier-killed-"))
   const reference = join(root, "reference.js")
   const queued = join(root, "queued.js")
+  const holdPath = join(root, "held.pid")
   const source = "export const value = 1 + 1\n"
   try {
     await Promise.all([writeFile(reference, source), writeFile(queued, source)])
     await minifyBundle(reference)
-    const [pid] = minifierChildPids()
-    expect(pid).toBeNumber()
-
-    // when: the child is stopped, so the request written to it now cannot be answered, then it is killed the way
-    // a test runner's timeout kills it; SIGTERM stays pending until SIGCONT, so the child dies without reading it
-    process.kill(pid, "SIGSTOP")
+    closeNodeMinifier()
+    process.env.OMO_MINIFY_SERVER_HOLD_REPLY = holdPath
+    const held = heldChildPid(root, holdPath)
     const pending = minifyBundle(queued)
-    process.kill(pid, "SIGTERM")
-    process.kill(pid, "SIGCONT")
+    const pid = await held
+    delete process.env.OMO_MINIFY_SERVER_HOLD_REPLY
+
+    // when
+    const untouchedWhileHeld = await readFile(queued, "utf8")
+    process.kill(pid)
+    await pending
 
     // then
-    await pending
+    expect(untouchedWhileHeld).toBe(source)
     expect(await readFile(queued, "utf8")).toBe(await readFile(reference, "utf8"))
-    expect(minifierChildPids()).not.toContain(pid)
+    expect((await readdir(root)).filter((name) => name.endsWith(".tmp"))).toEqual([])
   } finally {
+    delete process.env.OMO_MINIFY_SERVER_HOLD_REPLY
     closeNodeMinifier()
     await rm(root, { recursive: true, force: true })
   }
 })
+
+// Resolves with the pid the held minifier child writes; the watch is armed before the request is sent.
+function heldChildPid(dir, holdPath) {
+  return new Promise((resolvePid, reject) => {
+    const deadline = setTimeout(
+      () => finish(new Error(`waited 20s for ${holdPath}, the minifier never held its reply`)),
+      20_000,
+    )
+    const watcher = watch(dir, () => {
+      readFile(holdPath, "utf8").then(
+        (text) => {
+          if (/^\d+$/.test(text)) finish(undefined, Number(text))
+        },
+        () => {},
+      )
+    })
+    function finish(error, pid) {
+      clearTimeout(deadline)
+      watcher.close()
+      if (error === undefined) resolvePid(pid)
+      else reject(error)
+    }
+  })
+}
 
 function artifact(sourceDigest, body) {
   return `// omo:${sourceDigest}:${digest(body)}\n${body}`
