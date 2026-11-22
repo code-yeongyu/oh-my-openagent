@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { windowsTaskkillArgs } from "./windows-taskkill-args"
 
 export type ProcessTreeSignalTarget = "process" | "process-group" | "process-tree"
 export type ProcessTreeSignalOutcome = "denied" | "failed" | "missing" | "sent"
@@ -96,7 +97,8 @@ function attemptPosixSignal(
 }
 
 function attemptWindowsTreeSignal(pid: number, signal: "SIGKILL" | "SIGTERM"): Promise<ProcessTreeSignalAttempt> {
-  const args = ["/PID", String(pid), "/T", ...(signal === "SIGKILL" ? ["/F"] : [])]
+  const args = windowsTaskkillArgs(pid, signal === "SIGKILL")
+  if (args.length === 0) return Promise.resolve({ outcome: "missing", pid, signal, target: "process-tree" })
   return new Promise((resolvePromise) => {
     execFile("taskkill.exe", args, { timeout: 5_000, windowsHide: true }, (error) => {
       if (error === null) {
