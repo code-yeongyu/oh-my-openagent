@@ -46,6 +46,8 @@ const LATEST_MODEL_LITERAL = latestModelLiteralPattern(Object.values(LATEST_MODE
 
 async function trackedSourceFiles(): Promise<string[]> {
   // :(glob) makes `**/` match zero directories too; the plain pathspec skipped every file directly under src/.
+  // Coverage (#11033): package TypeScript sources and the Codex plugin components' TypeScript sources. The Codex
+  // edition's data files (agent TOMLs, catalog.mjs, model-catalog.json) are not TypeScript and stay out of scope.
   const sources = [":(glob)packages/*/src/**/*.ts", ":(glob)packages/omo-codex/plugin/components/*/src/**/*.ts"]
   const proc = Bun.spawn(["git", "ls-files", "-z", "--", ...sources], {
     cwd: REPOSITORY_ROOT,
