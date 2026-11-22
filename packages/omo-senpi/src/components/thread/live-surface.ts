@@ -1051,6 +1051,7 @@ export function createLiveThreadSurface(
 export { createServiceAliasRegistry } from "./remote/alias-registry"
 export { createCliRemoteSurface, remoteClient, remoteSessionsPort } from "../remote/port/thread-runtime"
 export { claimCreatedAlias, listAcross, planCreate, renameAlias, withAlias } from "./remote/cross-device"
+export { readReceipt } from "./remote/receipt"
 export { createRemoteMonitorSource, resolveMonitorTarget } from "./remote/monitor-source"
 export { outcomeFailure } from "./remote/outcome"
 export { createRelayTransport } from "./remote/relay-transport"

@@ -18,12 +18,19 @@ import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
+import { reconcileRemoteReceipt } from "./receipt"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
   readonly store: Pick<
     GatewayStore,
-    "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRevise" | "toolReceiptRelease" | "deliveryView"
+    | "now"
+    | "toolReceiptBegin"
+    | "toolReceiptSettle"
+    | "toolReceiptRevise"
+    | "toolReceiptRelease"
+    | "deliveryView"
+    | "reconcileRemoteReceipt"
   >
   readonly now?: () => number
   readonly senderProvenance: () => Promise<Provenance>
@@ -336,7 +343,7 @@ export function createRelayTransport(
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
     if (admission.kind === "replay") {
       const first = admission.result as SendOutcome
-      return first.kind === "ok" ? { ...first, deduplicated: true } : first
+      return first.kind === "ok" ? await reconcileRemoteReceipt(store, remote, callerId, idempotencyKey, first) : first
     }
     if (admission.kind === "conflict")
       return fail(

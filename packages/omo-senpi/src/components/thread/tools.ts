@@ -48,7 +48,7 @@ import { withThreadRenderers } from "./tools/render"
 import { consumedSendersOf, threadSendPermission } from "./tools/reply-permission"
 import { otherDevice, replyTargetFailure, replyTargetMismatch } from "./tools/reply-target"
 import { accountDevices } from "./address/account"
-import { listAcross } from "./remote/lazy-ops"
+import { listAcross, readReceipt } from "./remote/lazy-ops"
 import { rowCreatedAt, rowFolder } from "./remote/ports"
 import { locateControl } from "./control/locate"
 import { createThread } from "./control/create"
@@ -186,6 +186,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
+    if (
+      name === "thread_read" &&
+      "delivery_id" in value &&
+      typeof value.delivery_id === "string" &&
+      "thread" in value &&
+      typeof value.thread === "string"
+    ) {
+      // This branch precedes view()/ensureHost and the read tool's own receipt admission.
+      return output(await readReceipt(store, options.remote, callerId, value.thread, value.delivery_id, now()))
+    }
     const explicitKey =
       "idempotency_key" in value ? (value as { idempotency_key?: string }).idempotency_key?.trim() : undefined
     const scope = {
@@ -721,6 +731,7 @@ async function deliverThrough(
   if ("device" in sent) {
     // The relay leg answers with the same delivery facts as the local one (#13014, #13036); it knows no endpoint on that device.
     const facts = {
+      ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
       ...(sent.delivery_id === undefined ? {} : { delivery_id: sent.delivery_id }),
       ...(sent.effective_mode === undefined ? {} : { effective_mode: sent.effective_mode }),
       device: sent.device,
@@ -760,6 +771,7 @@ async function deliverThrough(
   }
   const threadId = sent.thread_id
   const facts = {
+    ...(sent.outcome === undefined ? {} : { outcome: sent.outcome }),
     delivery_id: sent.delivery_id,
     effective_mode: sent.effective_mode,
     ...(sent.collapsed === true ? { collapsed: true as const } : {}),

@@ -3,6 +3,8 @@
  * only in the store worker, like `store-ops.ts`. Every operation is one `BEGIN IMMEDIATE` transaction.
  */
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./constants"
+import type { RelayDeliverySuccess } from "./transport"
+import type { ReceiptOutcome } from "./types"
 import { type StoreContext, transaction, write } from "./store-ops"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 
@@ -180,4 +182,64 @@ export async function toolReceiptRelease(ctx: StoreContext, request: Omit<Receip
         [request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
       ) === 1,
   )
+}
+
+export type RemoteReceipt = { readonly idempotency_key: string; readonly result: RelayDeliverySuccess }
+const REMOTE_SEND_OPERATION = "thread_send:remote"
+
+export function remoteReceipt(
+  ctx: StoreContext,
+  request: { readonly now: number; readonly principal: string; readonly delivery_id: string },
+): RemoteReceipt | null {
+  const row = ctx.sql.one(
+    ["idempotency_key", "result"],
+    "SELECT idempotency_key, result FROM receipts WHERE principal = ? AND operation = ? AND status = 'completed' AND expires_at > ? AND json_extract(result, '$.delivery_id') = ?",
+    [request.principal, REMOTE_SEND_OPERATION, request.now, request.delivery_id],
+  )
+  return row === undefined
+    ? null
+    : {
+        idempotency_key: String(row.idempotency_key),
+        result: JSON.parse(String(row.result)) as RelayDeliverySuccess,
+      }
+}
+
+export type ReconcileRemoteReceiptRequest = {
+  readonly now: number
+  readonly principal: string
+  readonly idempotency_key: string
+  readonly delivery_id: string
+  readonly target_durable_id: string
+  readonly device: string
+  readonly outcome: ReceiptOutcome
+}
+
+export async function reconcileRemoteReceipt(
+  ctx: StoreContext,
+  request: ReconcileRemoteReceiptRequest,
+): Promise<ReceiptOutcome> {
+  return await transaction(ctx, "reconcile_remote_receipt", () => {
+    const prior = remoteReceipt(ctx, request)
+    if (
+      prior === null ||
+      prior.idempotency_key !== request.idempotency_key ||
+      prior.result.device !== request.device ||
+      prior.result.thread_id !== request.target_durable_id
+    )
+      return { kind: "outcome_unavailable" }
+    const known = prior.result.outcome
+    if (known?.kind === "applied" || known?.kind === "refused") return known
+    write(
+      ctx,
+      "UPDATE receipts SET result = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+      [
+        JSON.stringify({ ...prior.result, outcome: request.outcome }),
+        request.now,
+        request.principal,
+        REMOTE_SEND_OPERATION,
+        request.idempotency_key,
+      ],
+    )
+    return request.outcome
+  })
 }

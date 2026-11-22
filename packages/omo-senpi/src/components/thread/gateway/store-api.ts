@@ -1,6 +1,7 @@
 import type { ExtensionFacade } from "./store-extension-facade"
-import type { ToolReceiptBegin } from "./store-tool-receipts"
+import type { RemoteReceipt, ReconcileRemoteReceiptRequest, ToolReceiptBegin } from "./store-tool-receipts"
 import type { TargetBacklog } from "./backlog"
+import type { ReceiptOutcomeRequest } from "./store-ops"
 import type { IntakeMarkStore, SessionWaitStore } from "./session-wait-types"
 import type { WokenSessionStore } from "./woken-types"
 import type { ClearEndpointRequest, RegisterIncarnationRequest, SessionOwner } from "./store-ownership"
@@ -19,6 +20,8 @@ import type {
   ReconcileRequest,
   RecordOutcomeRequest,
   RefusalReason,
+  ReceiptOutcome,
+  RefusalNotice,
 } from "./types"
 
 /** The gateway store facade's API (`createGatewayStore` in `store.ts`). */
@@ -68,6 +71,19 @@ export type GatewayStore = ExtensionFacade & {
     readonly error_note: string
   }) => Promise<boolean>
   readonly deliveryView: (deliveryId: string) => Promise<DeliveryView | null>
+  readonly receiptOutcome: (request: ReceiptOutcomeRequest) => Promise<ReceiptOutcome>
+  readonly refusalNotices: (now: number) => Promise<readonly RefusalNotice[]>
+  readonly claimRefusalNotice: (request: {
+    readonly now: number
+    readonly notice: RefusalNotice
+    readonly suppress?: boolean
+  }) => Promise<boolean>
+  readonly remoteReceipt: (request: {
+    readonly now: number
+    readonly principal: string
+    readonly delivery_id: string
+  }) => Promise<RemoteReceipt | null>
+  readonly reconcileRemoteReceipt: (request: ReconcileRemoteReceiptRequest) => Promise<ReceiptOutcome>
   readonly list: (filter?: {
     readonly target_durable_id?: string
     readonly root_id?: string
