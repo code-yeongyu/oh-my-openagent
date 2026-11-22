@@ -1,6 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 import { seedRecord } from "../lifecycle/__fixtures__/lifecycle-fakes"
-import { createTaskRecordStore } from "../store"
+import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { TaskConcurrency } from "./concurrency"
 import { createTaskRunPause } from "./run-pause"
@@ -14,7 +14,13 @@ const unusedChild = {
   holdInput: async () => ({ kind: "held" as const, entryId: "unused", duplicate: false }),
 }
 
-function pausedChild(options: { readonly liveHandle: boolean }) {
+function pausedChild(
+  options: { readonly liveHandle: boolean },
+  wrapPorts?: (ports: { readonly store: TaskRecordStore; readonly concurrency: TaskConcurrency }) => {
+    readonly store: TaskRecordStore
+    readonly concurrency: TaskConcurrency
+  },
+) {
   const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const record = seedRecord(store, { task_id: "st_0e1d0001", status: "paused", run_epoch: 0 })
   store.mutate(record.task_id, (fresh) => ({
@@ -24,9 +30,9 @@ function pausedChild(options: { readonly liveHandle: boolean }) {
   const concurrency = new TaskConcurrency({ provider_concurrency: { test: 1 } })
   expect(concurrency.tryAcquire(record.model, record.task_id, 0)).toBe(true)
   const handle = makeHandle(record.task_id).handle
+  const ports = wrapPorts?.({ store, concurrency }) ?? { store, concurrency }
   const pause = createTaskRunPause({
-    store,
-    concurrency,
+    ...ports,
     now: () => Date.parse("2026-11-03T04:28:14.000Z"),
     child: unusedChild,
     liveHandle: () => (options.liveHandle ? handle : undefined),
@@ -66,4 +72,39 @@ test("#given a paused child whose handle is still live #when ending its run is a
 
   expect(f.store.load(f.taskId)).toMatchObject({ status: "paused" })
   expect(f.concurrency.leaseState(f.taskId, 0)).toBe("held")
+})
+
+test("#given a lost paused child is ended #when the end runs #then the terminal write lands first, the audit event second and the lane slot release last", () => {
+  const order: string[] = []
+  const f = pausedChild({ liveHandle: false }, ({ store, concurrency }) => ({
+    store: {
+      ...store,
+      mutate: (taskId, mutation) =>
+        store.mutate(taskId, (fresh) => {
+          const next = mutation(fresh)
+          if (next !== fresh) order.push("terminal write")
+          return next
+        }),
+      appendEvent: (taskId, event) => {
+        order.push("audit event")
+        return store.appendEvent(taskId, event)
+      },
+    },
+    concurrency: {
+      ...concurrency,
+      releaseTask: (taskId) => {
+        order.push("lane slot released")
+        concurrency.releaseTask(taskId)
+      },
+    },
+  }))
+
+  // when
+  const ended = f.pause.endLostPausedTask(f.taskId, "respawn_failed")
+
+  // then: the end is one locked mutate, so every store-side observer of the terminal write (the
+  // parent notification included) fires while the record lock is still held, before the audit
+  // event is appended and before the lane slot is freed. This order is deliberate (#12296).
+  expect(ended).toBe(true)
+  expect(order).toEqual(["terminal write", "audit event", "lane slot released"])
 })
