@@ -26,10 +26,12 @@ export const PRIMARY_MODEL_ID = "claude-fable-5"
 export const ALT_PRIMARY_MODEL_ID = "claude-opus-5"
 /**
  * Registry-only model. The builtin architect category is gated on `requiresModel: "claude-fable-5-1"`,
- * so the undeclared-category scenario can only reach an active architect when the live registry
- * exposes that exact id. No scenario drives it.
+ * and since #9146 a rung only resolves on the providers it lists, so the undeclared-category scenario
+ * reaches an active architect only when a listed provider (`anthropic`) exposes that exact id. It is
+ * registered under that provider id here and no scenario drives it.
  */
 export const ARCHITECT_GATE_MODEL_ID = "claude-fable-5-1"
+export const ARCHITECT_GATE_PROVIDER_ID = "anthropic"
 export const FALLBACK_MODEL_ID = "mock-weak"
 export const POLICY_REJECTION_MESSAGE =
   "This request triggered restrictions on mock content and was blocked under Anthropic's Usage Policy"
@@ -100,7 +102,6 @@ export default function registerFallbackArchitectMockProvider(pi: {
     models: [
       mockModel(PRIMARY_MODEL_ID, "Mock Fable 5"),
       mockModel(ALT_PRIMARY_MODEL_ID, "Mock Opus 5"),
-      mockModel(ARCHITECT_GATE_MODEL_ID, "Mock Fable 5.1"),
       mockModel(FALLBACK_MODEL_ID, "Mock Weak"),
     ],
     streamSimple(model: { id: string }, context: { cwd?: string }) {
@@ -132,5 +133,14 @@ export default function registerFallbackArchitectMockProvider(pi: {
 
       return stream
     },
+  })
+  // Registry-only: never selected, so it needs no stream. Its credential is a placeholder; the
+  // sandboxed agent dir holds no real key.
+  pi.registerProvider(ARCHITECT_GATE_PROVIDER_ID, {
+    name: "omo fallback-architect gate provider",
+    baseUrl: "file://fallback-architect-gate-provider",
+    apiKey: "mock",
+    api: "openai-completions",
+    models: [mockModel(ARCHITECT_GATE_MODEL_ID, "Mock Fable 5.1")],
   })
 }
