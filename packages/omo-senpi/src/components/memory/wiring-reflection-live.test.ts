@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
+import { join } from "node:path"
 
-import { createReflectionCompletionApi } from "./wiring-reflection-live"
+import { loadedMemoryConfig, memorySettings } from "./memory.test-support"
+import { fixture } from "./prompt.test-support"
+import { createMemoryReflectionLiveWiring, createReflectionCompletionApi } from "./wiring-reflection-live"
+import { recordReflectionCompletion } from "./worker/completion"
 import type { SenpiExtensionAPI } from "../../extension/types"
 
 function createFakePi(overrides: {
@@ -12,6 +16,57 @@ function createFakePi(overrides: {
     registerEntryRenderer: overrides.registerEntryRenderer ?? (() => undefined),
   } as unknown as SenpiExtensionAPI
 }
+
+test("session bind warns once for three all-dropped completions that happened offline", async () => {
+  const { repo, context } = await fixture()
+  const dir = join(context.identityPaths.reflection, "completions")
+  const now = Date.parse("2026-09-09T12:00:00.000Z")
+  const sessionId = "reflection-recipient"
+  for (const index of [1, 2, 3]) {
+    const at = new Date(now - index * 1000).toISOString()
+    await recordReflectionCompletion(dir, {
+      schemaVersion: 1,
+      runId: `offline-${index}`,
+      identity: context.identity,
+      category: "quick",
+      conversationIds: [],
+      trigger: "manual",
+      outcome: "no_changes",
+      droppedCount: 1,
+      dropReason: "frontmatter",
+      startedAt: at,
+      finishedAt: at,
+      delivery: { status: "pending" },
+    })
+  }
+  const wiring = createMemoryReflectionLiveWiring(
+    {
+      sessions: new Map([[sessionId, { context }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => repo.dir,
+      env: {},
+      now: () => now,
+    },
+    { current: sessionId },
+    {},
+  )
+  const warnings: string[] = []
+  const ui = {
+    setStatus() {},
+    notify(message: string, level: string) {
+      if (level === "warning") warnings.push(message)
+    },
+  }
+  const pi = createFakePi({})
+  try {
+    await wiring.bind(pi, sessionId, context, { ui }, () => {})
+    await wiring.bind(pi, sessionId, context, { ui }, () => {})
+    expect(warnings).toEqual(["Memory reflection dropped every entry in 3 runs in a row."])
+  } finally {
+    await wiring.settled()
+    wiring.shutdown(context.identity)
+  }
+})
 
 describe("createReflectionCompletionApi stale extension ctx guard (#7946)", () => {
   test("#given a pi retired by session replacement #when appendEntry is called #then the stale-ctx throw is swallowed", () => {
