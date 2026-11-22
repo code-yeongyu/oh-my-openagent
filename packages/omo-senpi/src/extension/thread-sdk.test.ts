@@ -67,4 +67,4 @@ test("#given a script that opens the shipped SDK without a remote #when it lists
   expect(listed).toMatchObject({ kind: "ok" })
   const devices = listed.kind === "ok" && "devices" in listed ? (listed.devices ?? []) : []
   expect(devices.map((device) => device.device)).toContain(PEER)
-}, 30_000)
+})
