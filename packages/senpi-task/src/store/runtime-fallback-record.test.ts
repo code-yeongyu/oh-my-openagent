@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "./record-store"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -17,7 +18,7 @@ describe("task record runtime fallback metadata", () => {
     // given
     const project = mkdtempSync(join(tmpdir(), "senpi-task-runtime-fallback-record-"))
     cleanupRoots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const requestedModel = {
       source: "category",
       provider: "kimi-coding",
@@ -49,7 +50,7 @@ describe("task record runtime fallback metadata", () => {
     store.save(record)
 
     // when
-    const loaded = createTaskRecordStore({ project_dir: project }).list()
+    const loaded = createTaskRecordStore(ownedTaskState(project)).list()
 
     // then
     expect(loaded.diagnostics).toEqual([])

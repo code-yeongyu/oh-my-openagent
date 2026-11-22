@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
 import type { ExecutorContext } from "../executor-types"
 import type { DelegateTaskArgs } from "../types"
 
@@ -74,13 +75,14 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
     loadProjectAgentsMock.mockImplementation(() => ({
       "claude-reviewer": { description: "Project Claude Code agent", mode: "subagent" },
     }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
     mock.module("../../../features/claude-code-agent-loader", () => ({
       loadUserAgents: loadUserAgentsMock,
       loadProjectAgents: loadProjectAgentsMock,

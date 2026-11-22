@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
 import type { ExecutorContext } from "../executor-types"
 import type { DelegateTaskArgs } from "../types"
 
@@ -56,13 +57,14 @@ describe("resolveSubagentExecution agent overrides", () => {
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
     readProviderModelsCacheMock.mockReturnValue(null)
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
