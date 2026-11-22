@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import * as storageDetection from "../../shared/opencode-storage-detection"
 
@@ -41,6 +42,7 @@ mock.module("./constants", () => ({
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 function makeFixtureDir(root: string, id: string): string {
   const directory = join(root, id)

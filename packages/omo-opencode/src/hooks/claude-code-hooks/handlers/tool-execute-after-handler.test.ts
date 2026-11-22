@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 type PostToolUseMockResult = {
   block?: boolean
@@ -35,6 +35,7 @@ mock.module("../transcript", () => ({
   appendTranscriptEntry,
   getTranscriptPath: () => "/tmp/transcript.jsonl",
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()

@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it, mock, spyOn } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 import type { PreToolUseContext } from "../pre-tool-use"
 
 type PreToolUseMockResult = {
@@ -34,6 +34,7 @@ mock.module("../pre-tool-use", () => ({
 mock.module("../../../features/boulder-state", () => ({
   getWorkForSession: mockGetWorkForSession,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()

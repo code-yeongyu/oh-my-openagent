@@ -3,6 +3,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import * as storageDetection from "../../shared/opencode-storage-detection"
 import { MESSAGE_STORAGE, SESSION_STORAGE } from "../../shared/opencode-storage-paths"
 
@@ -14,6 +15,7 @@ mock.module("./constants", () => ({
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: join(TEST_DIR, "transcripts"),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()

@@ -430,7 +430,7 @@
   "packages/memory-core/src/sync/item/convergence.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/memory-core/src/sync/item/idempotence.r3.test.ts": {
+  "packages/memory-core/src/sync/item/idempotence.r3.test-support.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/sync/item/render-for-disk.property.test.ts": {

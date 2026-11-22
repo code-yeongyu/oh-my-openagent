@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string; transcriptPath?: string }) => ({
   block: false,
@@ -19,6 +19,7 @@ mock.module("../config-loader", () => ({
 mock.module("../stop", () => ({
   executeStopHooks,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
