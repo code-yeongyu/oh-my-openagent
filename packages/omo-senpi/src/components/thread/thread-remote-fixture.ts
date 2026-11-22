@@ -263,6 +263,8 @@ export function createRemoteThreadFixture() {
       silent?: readonly string[]
       /** Devices whose lookup exceeds the caller's cap. */
       lookupTimeouts?: readonly string[]
+      /** Devices whose lookup exceeds the caller's cap while another lookup is in flight, and answers when asked alone. */
+      crowdedLookups?: readonly string[]
       /** omo#13037: this device's service carries the wake mark and the single probe (both gates open). Off by default, as shipped. */
       wakeFeature?: boolean
       /** omo#14270: what kind of device b registers as (`cli` daemon or `desktop` app); unset, b names none. */
@@ -369,6 +371,7 @@ export function createRemoteThreadFixture() {
     }
     const hops: number[] = []
     const lookups: Array<{ readonly device: string; readonly durable_id: string }> = []
+    let lookupsInFlight = 0
     const deviceReads = { thisDevice: 0, devices: 0 }
     // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.
     const listings = { all: 0, device: 0 }
@@ -589,6 +592,7 @@ export function createRemoteThreadFixture() {
       ...Object.keys(options.ended ?? {}),
       ...(options.silent ?? []),
       ...(options.lookupTimeouts ?? []),
+      ...(options.crowdedLookups ?? []),
     ])
       if (!devices.some((known) => known.device === device) && !(options.removed ?? []).includes(device))
         devices.push({ device, label: device, online: true })
@@ -822,6 +826,14 @@ export function createRemoteThreadFixture() {
           if (options.noLookup === true || options.wakeFeature !== true) return { kind: "unavailable" }
           lookups.push({ device, durable_id: durableId })
           if (options.lookupTimeouts?.includes(device) === true) return { kind: "silent", reason: "lookup_timeout" }
+          lookupsInFlight += 1
+          // Every lookup of one wave is counted before any of them reads the count, and reads it before any leaves.
+          await Promise.resolve()
+          const crowded = lookupsInFlight > 1
+          await Promise.resolve()
+          lookupsInFlight -= 1
+          if (crowded && options.crowdedLookups?.includes(device) === true)
+            return { kind: "silent", reason: "lookup_timeout" }
           if (options.silent?.includes(device) === true) return { kind: "silent", reason: "host_not_answering" }
           const key = options.ended?.[device]?.[durableId]
           return key === undefined ? { kind: "none" } : { kind: "found", key }
