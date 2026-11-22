@@ -17,6 +17,8 @@
 // (citation-field, date, name, numeral); only a numeral is checked. A heading is not a prose sentence. Pure.
 // Korean markers are \u escapes.
 
+import { columnHeader } from "./fact-locate.mjs"
+import { proseText } from "./html-lite.mjs"
 import { DOT_GROUPED, UNIT } from "./numerals.mjs"
 import { dimensionOf, normalizeUnit } from "./units.mjs"
 
@@ -55,6 +57,7 @@ const CONTAINERS = [
   new RegExp(`${A_OPEN}[^${A_CLOSE}]*${A_CLOSE}`, "g"),
 ]
 /** Date fields: full dates, month/day, a Korean quarter, dotted dates (with spaces, or DD.MM.YY), years and year ranges. */
+const MONTH_DAY = /(?<![\d/.,])(?:1[0-2]|0?[1-9])\/(?:3[01]|[12]\d|0?[1-9])(?![\d/]|[.,]\d|\s+of\b)/gi
 const DATES = [
   new RegExp(`${YEAR}[-./]\\d{1,2}(?:[-./]\\d{1,2})?|\\d{1,2}[-./]\\d{1,2}[-./]${YEAR}`, "g"),
   new RegExp(
@@ -63,7 +66,7 @@ const DATES = [
   ),
   /\d{1,2}\s*\uC6D4(?:\s*\d{1,2}\s*\uC77C)?|(?<!\d)[1-4]\s*\uBD84\uAE30/g,
   new RegExp(`${YEAR}\\.\\s+\\d{1,2}\\.\\s+\\d{1,2}\\.?`, "g"),
-  /(?<![\d/.,])(?:1[0-2]|0?[1-9])\/(?:3[01]|[12]\d|0?[1-9])(?![\d/]|[.,]\d)/g,
+  MONTH_DAY,
   /(?<![\d.])\d{2}\.\d{2}\.\d{2}(?!\d|\.\d)/g,
   new RegExp(`(?<![\\d.,])${YEAR}(?:\\s*[-\\u2013~]\\s*${YEAR})?(?![\\d]|[.,]\\d)`, "g"),
 ]
@@ -172,8 +175,23 @@ function containerSpans(text) {
   return spans
 }
 
-const typedSpans = (text, list) =>
-  list.flatMap((re) => [...text.matchAll(re)].map((match) => [match.index, match.index + match[0].length]))
+const typedSpans = (text, list, scoreColumn = false) =>
+  list.flatMap((re) =>
+    [...text.matchAll(re)]
+      .filter((match) => {
+        if (re !== MONTH_DAY) return true
+        const before = text.slice(0, match.index)
+        const after = text.slice(match.index + match[0].length)
+        // "응답자 중 2/3가", "이용자의 3/4이": the group and the case particle identify a fraction.
+        if (/(?:\s중|[가-힣]의)\s*$/u.test(before) && /^(?:가|이|는|은|을|를)(?:\s|$)/u.test(after)) return false
+        return (
+          !scoreColumn ||
+          /(?:\b(?:released|published|dated|date|19\d\d|20\d\d)|공개|발행|게시|날짜)\s*[:(]?\s*$/iu.test(before) ||
+          /^\s*(?:공개|발행|게시|(?:19|20)\d{2}\b)/u.test(after)
+        )
+      })
+      .map((match) => [match.index, match.index + match[0].length]),
+  )
 
 const fieldSpans = (text) => [...containerSpans(text), ...typedSpans(text, TYPED)]
 
@@ -195,8 +213,12 @@ function sentences(line) {
 }
 
 /** Each digit run of `text` with its class: "citation-field" (a container or a marker), "date", "name", or "numeral". */
-export function numeralKinds(text) {
-  const [containers, markers, dates] = [containerSpans(text), typedSpans(text, MARKERS), typedSpans(text, DATES)]
+export function numeralKinds(text, scoreColumn = false) {
+  const [containers, markers, dates] = [
+    containerSpans(text),
+    typedSpans(text, MARKERS),
+    typedSpans(text, DATES, scoreColumn),
+  ]
   return [...text.matchAll(NUMERAL)].map((match) => {
     const [start, end] = [match.index, match.index + match[0].length]
     const kind =
@@ -228,15 +250,20 @@ function plain(text) {
     .replace(/\s+/g, " ")
     .trim()
 }
-const lineClaims = (line) => sentences(line).filter(isClaimSegment).map(plain)
+const lineClaims = (line, scoreColumn = false) =>
+  sentences(line)
+    .filter((text) => numeralKinds(text, scoreColumn).some(({ kind }) => kind === "numeral"))
+    .map(plain)
 
 /** The checked sentences of an element under Sources ([] when every numeral is a citation field). */
 export function sourcesClaims(node) {
   if (/^h[1-6]$/.test(node.tag)) return []
-  return lines(node).flatMap(lineClaims)
+  const header = columnHeader(node)
+  const scoreColumn = header && /(?:\b(?:scores?|ratios?|results?)\b|점수|비율|결과)/iu.test(proseText(header))
+  return lines(node).flatMap((line) => lineClaims(line, scoreColumn))
 }
 
 /** The checked sentences of loose text (a text node owned by a container element rather than a prose element). */
 export function textClaims(text) {
-  return lines({ children: [{ tag: "#text", text }] }).flatMap(lineClaims)
+  return lines({ children: [{ tag: "#text", text }] }).flatMap((line) => lineClaims(line))
 }

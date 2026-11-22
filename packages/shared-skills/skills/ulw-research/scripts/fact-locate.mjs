@@ -141,6 +141,23 @@ export function rowsOf(table) {
   return rows
 }
 
+/** Header for an unambiguous visual column, including data cells nested in a table section. */
+export function columnHeader(node) {
+  let cell = node
+  while (cell && cell.tag !== "td" && cell.tag !== "table") cell = cell.parent
+  if (cell?.tag !== "td" || cell.attrs.colspan || cell.attrs.rowspan) return null
+  let table = cell.parent
+  while (table && table.tag !== "table") table = table.parent
+  if (!table) return null
+  const rows = rowsOf(table)
+  if (rows.some((row) => row.children.some((cur) => cur.attrs?.rowspan && cur.attrs.rowspan !== "1"))) return null
+  const header = rows.find(
+    (row) => row.parent?.tag === "thead" || (cellsOf(row).length > 0 && cellsOf(row).every((cur) => cur.tag === "th")),
+  )
+  if (!header || header === cell.parent) return null
+  return cellsOf(header)[cellsOf(cell.parent).indexOf(cell)] ?? null
+}
+
 function tablesOf(root) {
   const tables = []
   const walk = (node) => {

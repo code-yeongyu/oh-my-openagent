@@ -4,7 +4,7 @@
 // right after it; or the same visual column's table header. A currency the element's own text carries (fill renders a
 // prefix currency value from its raw text, $<data>$12</data>) binds too: every bound sign, outside or inside, must agree. Unknown words are advisory, never guessed units,
 // unless fill recorded a bound unit for the value: then losing it is a unit edit.
-import { cellsOf, rowsOf } from "./fact-locate.mjs"
+import { columnHeader } from "./fact-locate.mjs"
 import { unitKey } from "./fidelity-binding.mjs"
 import { parseHtml, proseText } from "./html-lite.mjs"
 import { NUMBER_SOURCE } from "./number-grammar.mjs"
@@ -161,27 +161,12 @@ function agrees(found, row) {
   return unitKey(found.token) === unitKey(row.unit)
 }
 
-const closest = (node, test) => {
-  for (let cur = node.parent; cur; cur = cur.parent) if (test(cur)) return cur
-  return null
-}
 /** All text under a node, code included: a unit may be set in code ("320 <code>ms</code>"). */
 const plainText = (node) => (node.tag === "#text" ? node.text : node.children.map(plainText).join(""))
 
-/** A column-header row: a thead row or a row made only of th cells. A th first in a body row is a row header. */
-const isHeaderRow = (row) =>
-  row.parent?.tag === "thead" || (cellsOf(row).length > 0 && cellsOf(row).every((cur) => cur.tag === "th"))
-
 /** The header of the cell's visual column; nothing binds in a table with a rowspan or without a header row. */
 function headerUnit(node) {
-  const cell = closest(node, (cur) => cur.tag === "td")
-  const table = cell && closest(cell, (cur) => cur.tag === "table")
-  if (!table || cell.attrs.colspan || cell.attrs.rowspan) return null
-  const rows = rowsOf(table)
-  if (rows.some((row) => row.children.some((cur) => cur.attrs?.rowspan && cur.attrs.rowspan !== "1"))) return null
-  const header = rows.find(isHeaderRow)
-  if (!header || header === cell.parent) return null
-  const head = cellsOf(header)[cellsOf(cell.parent).indexOf(cell)]
+  const head = columnHeader(node)
   if (!head) return null
   const text = proseText(head)
   const label = (/\(([^()]+)\)\s*$/u.exec(text)?.[1] ?? text).trim()
