@@ -1,7 +1,3 @@
-## 2026-11-22 - Show an unintegrated reflection in the memory footer (#12330)
-
-The normal TUI footer shows why the latest reflection could not integrate its changes, even if its completion has already been consumed. Reopening the session restores the same status without adding a toast or transcript row.
-
 ## 2026-11-21 - the omo SDK signs in by device code and renames a device (#14513)
 
 `src/components/omo-sdk/account/sign-in.ts` runs `loginDevice` on the SDK's clock port, stores the credential through the credential store and runs the device-service setup `runLoginSetup` runs; `devices/index.ts` adds `rename`. `service-auth/device-flow.ts` refuses with a code (`approval_expired`, `approval_denied`, ...) and its display value carries `expiresAt`. Part of #14364.
