@@ -330,7 +330,8 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
     async afterBind(pi, sessionId, identity, eventCtx): Promise<void> {
       // Off the prompt path: a NEW session's first prompt shares this compile of HEAD, or reads what it persisted.
       // A resumed session is pinned to its recorded revision, which may not be HEAD; it gets no prebuild.
-      if (branchEntryCount(eventCtx) === 0)
+      const entryCount = branchEntryCount(eventCtx)
+      if (entryCount === 0)
         void promptPrebuild.current?.(identity).catch((error: unknown) => {
           options.logger?.warn("omo-senpi memory block prebuild failed; the first prompt compiles it", {
             error: error instanceof Error ? error.message : String(error),
@@ -343,7 +344,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
       maintenance.schedule(identity)
-      if (branchEntryCount(eventCtx) > 0) {
+      if (entryCount !== undefined && entryCount > 0) {
         await journalWiringFor(identity).reconcileSession(eventCtx)
       }
       factsWiringFor(identity).reconcileExtractor(sessionId)
@@ -388,8 +389,4 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await kibitzerRef.current?.whenIdle()
     },
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
 }
