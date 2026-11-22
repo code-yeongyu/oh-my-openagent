@@ -20,7 +20,7 @@ omo remote control [on|off]      # whether your other devices may view and comma
 omo remote wake [on|off|default] # whether a message from your other devices may start a session here that is not running
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
 omo remote attach <session>      # open a session in the terminal UI, to watch and type
-omo remote open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+omo remote open <device> --project P [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
                 [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
 omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
@@ -29,6 +29,9 @@ omo remote model <session> <provider/id> [--json]   # switch the session's model
 omo remote interrupt <session> [--json]   # stop the session's running turn
 omo remote close <session> [--force] [--json]  # end the session on its device; --force also drops messages it has not read
 ```
+
+`open` requires `--project` to name the working folder on the target device. Without it the command reports
+`invalid_arguments` and does not create a session in the service's working directory.
 
 `devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
 `last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has

@@ -1,5 +1,6 @@
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import type { ThreadToolResult } from "../omo-senpi/src/components/thread/contracts"
+import { threadToolFailure } from "../omo-senpi/src/components/thread/errors"
 import { createRelaySessionHost } from "../omo-senpi/src/components/thread/control/relay-session-host"
 import {
   answered,
@@ -244,9 +245,21 @@ async function openOn(
   // open_session frame, so a model the device cannot run refuses the open and no session is left behind.
   const device = await resolveTypedDevice(remote.client, args.device)
   if (device.kind === "error") return show(device, "")
+  if (!args.project?.trim())
+    return show(
+      {
+        kind: "error",
+        error: threadToolFailure(
+          "invalid_arguments",
+          "No target project folder was specified.",
+          "Pass --project with the project folder on the target device.",
+        ),
+      },
+      "",
+    )
   const open = await createRelaySessionHost(remote, device.device).open({
     permissionPreset: mode,
-    ...(args.project === undefined ? {} : { cwd: args.project }),
+    cwd: args.project,
     ...(args.model === undefined ? {} : { provider: args.model.provider, modelId: args.model.modelId }),
     ...(args.thinking === undefined ? {} : { thinkingLevel: args.thinking }),
     ...(args.worktree === undefined ? {} : { worktree: args.worktree }),

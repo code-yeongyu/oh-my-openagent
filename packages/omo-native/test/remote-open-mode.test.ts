@@ -79,14 +79,24 @@ async function open(
 // omo#13409 / omo#13410 / omo#13399: `omo remote open` names the model, the thinking level, a new worktree and the first
 // prompt in the one open, through the same create path as thread_create.
 describe("omo remote open with create options", () => {
+  test("an open with no target project refuses before creating a session (#13401)", async () => {
+    const result = await open(["--json"])
+    expect(result.frames).toEqual([])
+    expect(result.code).not.toBe(REMOTE_EXIT.ok)
+    expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
+      kind: "error",
+      error: { code: "invalid_arguments", next_action: expect.stringContaining("--project") },
+    })
+  })
+
   test("#given --thinking #when opened #then the open_session frame carries the level", async () => {
-    const result = await open(["--thinking", "high"])
+    const result = await open(["--project", "/work/b", "--thinking", "high"])
     expect(result.code).toBe(REMOTE_EXIT.ok)
     expect(result.frames).toEqual([expect.objectContaining({ thinkingLevel: "high" })])
   })
 
   test("#given --prompt #when opened #then the new session is prompted once and the result names the delivery", async () => {
-    const result = await open(["--prompt", "build it", "--json"])
+    const result = await open(["--project", "/work/b", "--prompt", "build it", "--json"])
     expect(result.code).toBe(REMOTE_EXIT.ok)
     expect(result.types.filter((type) => type === "prompt")).toHaveLength(1)
     expect(JSON.parse(result.out[0] ?? "{}")).toMatchObject({
@@ -97,7 +107,7 @@ describe("omo remote open with create options", () => {
   })
 
   test("#given b knows the new session only by its relay key #when opened with --prompt #then the prompt goes to that key", async () => {
-    const result = await open(["--prompt", "build it", "--json"], undefined, {
+    const result = await open(["--project", "/work/b", "--prompt", "build it", "--json"], undefined, {
       relayKeys: new Map([["dur-new-on-b", "relay-key-9"]]),
       relayKeyOnly: true,
     })
@@ -127,11 +137,14 @@ describe("omo remote open --worktree parsing", () => {
 
 describe("omo remote open and the approval mode", () => {
   test("#given no flag #when a session is opened #then it names this device's own mode", async () => {
-    expect(await open([])).toMatchObject({ code: REMOTE_EXIT.ok, modes: ["workspace"] })
+    expect(await open(["--project", "/work/b"])).toMatchObject({ code: REMOTE_EXIT.ok, modes: ["workspace"] })
   })
 
   test("#given --permission-preset ask #when a session is opened #then it names ask", async () => {
-    expect(await open(["--permission-preset", "ask"])).toMatchObject({ code: REMOTE_EXIT.ok, modes: ["ask"] })
+    expect(await open(["--project", "/work/b", "--permission-preset", "ask"])).toMatchObject({
+      code: REMOTE_EXIT.ok,
+      modes: ["ask"],
+    })
   })
 
   test("#given this device's setting cannot be read #when no flag is given #then the command is a usage error and nothing is opened", async () => {

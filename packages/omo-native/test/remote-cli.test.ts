@@ -760,7 +760,7 @@ describe("omo remote session verbs", () => {
   test("open --model opens the session on that model in the one open_session, and --json prints the typed result", async () => {
     const a = fixture.account()
     const { code, out } = await run(
-      ["open", "b", "--model", "openai/gpt-6", "--json"],
+      ["open", "b", "--project", "/work/b", "--model", "openai/gpt-6", "--json"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
@@ -815,7 +815,7 @@ describe("omo remote session verbs", () => {
     const refusal = "model_unavailable: no model nope/none"
     const humanAccount = fixture.account({ openRefuse: refusal })
     const human = await run(
-      ["open", "b", "--model", "nope/none"],
+      ["open", "b", "--project", "/work/b", "--model", "nope/none"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
@@ -825,7 +825,7 @@ describe("omo remote session verbs", () => {
     expect(human.err[0]).toStartWith("omo remote: No thread was created: device b cannot run nope/none")
     expect(types(humanAccount.sent, "set_model")).toEqual([])
     const json = await run(
-      ["open", "b", "--model", "nope/none", "--json"],
+      ["open", "b", "--project", "/work/b", "--model", "nope/none", "--json"],
       undefined,
       SIGNED_IN,
       testBootstrap(),
@@ -1110,7 +1110,7 @@ describe("omo remote session verbs", () => {
       "Sent to b/dur-on-b: turn turn-b started.",
       ["status", "status", "sessions", "devices", "command:prompt"],
     ],
-    [["open", "b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
+    [["open", "b", "--project", "/work/b"], "b/dur-new-on-b", ["status", "devices", "endpoint:open_session", "locate"]],
   ])("%p makes only its remote op's calls and reports the answer", async (args, line, calls) => {
     const port = recorded(fixture.account().remote)
     const { code, out } = await run(args, undefined, SIGNED_IN, testBootstrap(), port.remote)

@@ -82,7 +82,7 @@ describe("#13010 remote CLI session identity", () => {
   // session whose durable id differs from its attach key.
   test("open --model succeeds when its durable ID differs from its attach key", async () => {
     const fake = await owner()
-    const result = await run(["open", PEER, "--model", "test/model", "--json"], fake.stateDir)
+    const result = await run(["open", PEER, "--project", "/work/b", "--model", "test/model", "--json"], fake.stateDir)
     expect({ code: result.code, json: JSON.parse(result.out.join("")) }).toMatchObject({
       code: REMOTE_EXIT.ok,
       json: { kind: "ok", thread: DURABLE, model: MODEL },

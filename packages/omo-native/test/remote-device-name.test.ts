@@ -68,15 +68,15 @@ async function run(args: readonly string[], world: World = defaultWorld()) {
 
 describe("omo remote session verbs take the device the table prints", () => {
   test("#given the NAME column's value #when open runs #then the session opens on that device", async () => {
-    expect(await run(["open", "studio"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
+    expect(await run(["open", "studio", "--project", "/work/b"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
   })
 
   test("#given the name in another case #when open runs #then it opens on that device", async () => {
-    expect(await run(["open", "Studio"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
+    expect(await run(["open", "Studio", "--project", "/work/b"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
   })
 
   test("#given the device id #when open runs #then it still opens there", async () => {
-    expect(await run(["open", "b"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
+    expect(await run(["open", "b", "--project", "/work/b"])).toMatchObject({ code: REMOTE_EXIT.ok, opened: ["b"] })
   })
 
   test("#given a name/session address #when close runs #then the close reaches the session on that device", async () => {
