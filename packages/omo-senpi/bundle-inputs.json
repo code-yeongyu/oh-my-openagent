@@ -1875,6 +1875,7 @@
     "packages/omo-senpi/src/extension/wake-queue-source.ts",
     "packages/omo-senpi/src/install/cli-local.ts",
     "packages/omo-senpi/src/install/install-senpi.ts",
+    "packages/omo-senpi/src/install/launcher-ownership.ts",
     "packages/omo-senpi/src/install/local-launcher.ts",
     "packages/omo-senpi/src/install/plugin-artifacts.ts",
     "packages/omo-senpi/src/install/senpi-settings.ts",
