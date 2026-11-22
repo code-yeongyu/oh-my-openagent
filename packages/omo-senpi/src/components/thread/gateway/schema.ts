@@ -468,16 +468,17 @@ export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
  */
 const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
 
-if (GATEWAY_READER_FLOORS.length !== GATEWAY_MIGRATIONS.length) {
-  throw new Error(
-    `GATEWAY_READER_FLOORS has ${GATEWAY_READER_FLOORS.length} entries for ${GATEWAY_MIGRATIONS.length} migrations: declare the new step's floor`,
-  )
-}
-
 export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 
 /** The oldest schema a binary must know to use a store at `version`: the highest floor of the steps that reached it. */
 export function gatewayReaderFloor(version: number): number {
+  // Checked here, not at module load: a top-level statement would keep this module (and every migration's SQL) in
+  // bundles that import only its error class. Every store open computes a floor, so a missing entry still fails loudly.
+  if (GATEWAY_READER_FLOORS.length !== GATEWAY_MIGRATIONS.length) {
+    throw new Error(
+      `GATEWAY_READER_FLOORS has ${GATEWAY_READER_FLOORS.length} entries for ${GATEWAY_MIGRATIONS.length} migrations: declare the new step's floor`,
+    )
+  }
   return GATEWAY_READER_FLOORS.slice(0, version).reduce((floor, step) => Math.max(floor, step), 0)
 }
 

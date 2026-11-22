@@ -67,8 +67,7 @@ test("#given this binary opens its store #then it records reader floor 14 (v15 a
 })
 
 test("#given a fresh store #when migrate commits each step #then every commit makes its version visible together with that version's reader floor", async () => {
-  const { DatabaseSync } = await import("node:sqlite")
-  const db = new DatabaseSync(":memory:")
+  const db = new Database(":memory:")
   const committed: { version: number; floor: string | null }[] = []
   const visible = () => {
     const version = Number((db.prepare("PRAGMA user_version").get() as { user_version: number }).user_version)
@@ -78,7 +77,7 @@ test("#given a fresh store #when migrate commits each step #then every commit ma
     const row =
       Number(meta.n) === 0
         ? undefined
-        : (db.prepare("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY) as
+        : (db.query("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY) as
             { value: string } | undefined)
     return { version, floor: row?.value ?? null }
   }
@@ -88,8 +87,16 @@ test("#given a fresh store #when migrate commits each step #then every commit ma
       super.exec(sql)
     }
   }
+  const connection: SqliteConnection = {
+    exec: (sql) => db.exec(sql),
+    function: (name, options, fn) => db.function(name, options, fn as never),
+    setAuthorizer: () => {
+      throw new Error("migrate never installs an authorizer")
+    },
+    close: () => db.close(),
+  }
   const ctx = {
-    sql: new CommitObservingSql(db as unknown as SqliteConnection),
+    sql: new CommitObservingSql(connection),
     config: { agent_dir: realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-commit-"))), test_hooks: {} },
     stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
     emit: () => undefined,
