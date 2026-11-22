@@ -264,7 +264,13 @@ describe("createTaskRecordStore rename contention", () => {
   test("#given a win32 store replacing a record #when renameSync is refused with EPERM twice #then the terminal status persists and no temp file remains", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore(ownedTaskState(project), { platform: "win32" })
+    const waits: number[] = []
+    const store = createTaskRecordStore(ownedTaskState(project), {
+      platform: "win32",
+      sleep: (ms) => {
+        waits.push(ms)
+      },
+    })
     const record = baseRecord("st_00000011")
     store.save(record)
     const rename = spyOn(fs, "renameSync")
@@ -276,6 +282,7 @@ describe("createTaskRecordStore rename contention", () => {
 
     // then
     expect(rename).toHaveBeenCalledTimes(3)
+    expect(waits).toEqual([10, 20])
     expect(createTaskRecordStore(ownedTaskState(project)).load(record.task_id)?.status).toBe("completed")
     expect(tempFiles(project)).toEqual([])
   })

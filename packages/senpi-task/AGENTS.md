@@ -27,6 +27,19 @@ The Senpi-coupled engine behind the `omo-senpi` task component: a durable task s
 
 ## PUBLIC API (`src/index.ts` barrel)
 
+### Contended task record writes
+
+A prelaunch failure can publish `<id>.json.spawn-failed` while Windows holds
+`<id>.json`. Store readers give the sidecar precedence, including later notification
+mutations. Direct JSON readers (desktop and older processes included) can therefore
+see the stale main record indefinitely; use `createTaskRecordStore`, not a direct
+read, to obtain authoritative status. TTL removal deletes both files.
+
+Windows rename retries synchronously block for up to 1,270 ms per write. Temporary
+file cleanup has a separate bounded retry budget and logs an exhausted cleanup
+without masking the write error. Multiple held records and queued lock holders can
+stall the main thread for tens of seconds during a large fan-out.
+
 ### Task tools (4, names as registered)
 
 | Tool | Factory | File |

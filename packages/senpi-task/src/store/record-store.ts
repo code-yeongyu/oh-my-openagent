@@ -14,8 +14,9 @@ import {
 } from "./expunge-owner"
 import { withTaskRecordLock } from "./record-lock"
 import { parseTaskRecord } from "./record-parse"
-import { writeRecord } from "./record-write"
+import { atomicReplace, TaskRecordCollisionError, writeRecord, type RecordWriteDeps } from "./record-write"
 import { resolveStateDir } from "./state-dir"
+import { toStorableTaskRecord } from "./storable-record"
 import type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
@@ -26,13 +27,14 @@ import type {
 
 export { TaskRecordCollisionError } from "./record-write"
 
-export type TaskRecordStoreOptions = {
+export type TaskRecordStoreOptions = RecordWriteDeps & {
   // Test seam: the rename-retry branch is win32-only, so tests inject the platform instead of
   // running only on Windows CI. Production omits this and reads process.platform.
   readonly platform?: NodeJS.Platform
 }
 
 type CacheEntry = {
+  readonly selectedPath: string
   readonly record: TaskRecord
   // Every rewrite is an atomic rename (record-write.ts), so a new inode marks it even when the size and a
   // coarse filesystem mtime both stay the same: a same-length effect_seq bump read stale without it (#10708).
@@ -65,10 +67,11 @@ export function createTaskRecordStore(
 
   function cacheSet(path: string): void {
     const warnings: string[] = []
-    const record = readRecord(path, warnings)
+    const selectedPath = recordWritePath(path)
+    const record = readSelectedRecord(selectedPath, warnings)
     if (record === null) return
-    const stat = statSync(path)
-    cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+    const stat = statSync(selectedPath)
+    cache.set(path, { selectedPath, record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   }
 
   return {
@@ -80,15 +83,36 @@ export function createTaskRecordStore(
     },
     save(record) {
       const path = taskPath(stateDir, parseTaskId(record.task_id))
-      writeRecord(path, record, "create", platform)
+      if (existsSync(spawnFailurePath(path))) throw new TaskRecordCollisionError({ taskId: parseTaskId(record.task_id), path })
+      writeRecord(path, record, "create", platform, options)
       cacheSet(path)
     },
     replace(record) {
       const taskId = parseTaskId(record.task_id)
       const path = taskPath(stateDir, taskId)
       withTaskRecordLock(path, () => {
-        writeRecord(path, record, "replace", platform)
+        writeRecord(recordWritePath(path), record, "replace", platform, options)
         cacheSet(path)
+      })
+    },
+    markSpawnFailed(record, errorMessage = "spawn bookkeeping failed") {
+      const path = taskPath(stateDir, parseTaskId(record.task_id))
+      return withTaskRecordLock(path, () => {
+        const fresh = readRecord(path)
+        if (fresh === null) return null
+        if (fresh.host_pid !== record.host_pid || fresh.notification.run_epoch !== record.notification.run_epoch) return fresh
+        if (fresh.status !== "pending" && fresh.status !== "running") return fresh
+        if (fresh.child_session_id !== undefined || fresh.host_session !== undefined || fresh.pid !== undefined) return fresh
+        const timestamp = new Date().toISOString()
+        const failed: TaskRecord = {
+          ...fresh, status: "error", residency_state: "disposed", error_message: errorMessage,
+          terminal_at: timestamp, updated_at: timestamp,
+        }
+        // The held target is never replaced or unlinked. Publish the complete terminal record at
+        // a separate path through the SAME atomic writer, so readers never see a partial marker.
+        atomicReplace(spawnFailurePath(path), JSON.stringify(toStorableTaskRecord(failed)), platform, options)
+        cache.delete(path)
+        return failed
       })
     },
     mutate(taskId, mutation) {
@@ -98,7 +122,7 @@ export function createTaskRecordStore(
         const current = readRecord(path)
         if (current === null) return null
         const next = mutation(current)
-        if (next !== current) writeRecord(path, next, "replace", platform)
+        if (next !== current) writeRecord(recordWritePath(path), next, "replace", platform, options)
         cacheSet(path)
         return next
       })
@@ -119,8 +143,8 @@ export function createTaskRecordStore(
         const record = readRecord(path)
         if (record === null) throw new Error(`Task record not found: ${taskId}`)
         const result = transitionTaskRecord(record, transition)
+        if (result.applied) writeRecord(recordWritePath(path), result.record, "replace", platform, options)
         appendTaskEvent(stateDir, parsedTaskId, { type: result.audit.type, payload: result.audit }, appendFds)
-        if (result.applied) writeRecord(path, result.record, "replace", platform)
         cacheSet(path)
         return result
       })
@@ -203,6 +227,7 @@ function removeRecord(
   // (4) record LAST
   const recordPath = taskPath(stateDir, taskId)
   rmSync(recordPath, { force: true })
+  rmSync(spawnFailurePath(recordPath), { force: true })
   cache.delete(recordPath)
 }
 
@@ -252,9 +277,10 @@ function readDirectoryNames(directory: string): string[] {
 }
 
 function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | null {
+  const selectedPath = recordWritePath(path)
   let stat: Stats
   try {
-    stat = statSync(path)
+    stat = statSync(selectedPath)
   } catch (error) {
     if (isEnoent(error)) {
       cache.delete(path)
@@ -264,17 +290,21 @@ function readCached(path: string, cache: Map<string, CacheEntry>): TaskRecord | 
   }
 
   const hit = cache.get(path)
-  if (hit !== undefined && hit.ino === stat.ino && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
+  if (hit !== undefined && hit.selectedPath === selectedPath && hit.ino === stat.ino && hit.mtimeMs === stat.mtimeMs && hit.size === stat.size) {
     return hit.record
   }
 
   const warnings: string[] = []
-  const record = readRecord(path, warnings)
-  if (record !== null) cache.set(path, { record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
+  const record = readSelectedRecord(selectedPath, warnings)
+  if (record !== null) cache.set(path, { selectedPath, record, ino: stat.ino, mtimeMs: stat.mtimeMs, size: stat.size, warnings })
   return record
 }
 
 function readRecord(path: string, warnings: string[] = []): TaskRecord | null {
+  return readSelectedRecord(recordWritePath(path), warnings)
+}
+
+function readSelectedRecord(path: string, warnings: string[] = []): TaskRecord | null {
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, "utf8"))
     return parseTaskRecord(parsed, path, warnings)
@@ -305,4 +335,14 @@ function isParseableTaskId(value: string): boolean {
 
 function isEnoent(error: unknown): boolean {
   return error instanceof Error && "code" in error && error.code === "ENOENT"
+}
+
+function spawnFailurePath(path: string): string {
+  return `${path}.spawn-failed`
+}
+
+function recordWritePath(path: string): string {
+  const original = path.endsWith(TOMBSTONE_SUFFIX) ? path.slice(0, -".expunging".length) : path
+  const failed = spawnFailurePath(original)
+  return existsSync(failed) ? failed : path
 }
