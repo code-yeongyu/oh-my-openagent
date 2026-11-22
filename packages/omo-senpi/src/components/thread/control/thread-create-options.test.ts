@@ -295,30 +295,59 @@ describe("thread_create whose first prompt does not start", () => {
     expect(existsSync(file)).toBe(true)
   })
 
-  test("#given a thread with a message held for its wake and a registration an earlier life left #when it is reopened with a prompt and its host never registers it #then only the prompt is taken back and the create is refused (#14648 review B2 B3)", async () => {
-    const { run, store, agentDir } = surface(account().remote, {
+  test.each([
+    ["an endpoint its exit cleared", false],
+    ["a stale endpoint a crash left", true],
+  ] as const)(
+    "#given a thread with a message held for its wake and an earlier life's registration with %s #when it is reopened with a prompt and its host never registers it #then only the prompt is taken back, the session is ended with no close recorded, and the create is refused (#14648 review B2 B3)",
+    async (_, staleEndpoint) => {
+      const { run, store, agentDir, closeRequests } = surface(account().remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        diskSessions: ["dur-saved"],
+        sameDeviceWake: wakeThatNeverAdmits,
+      })
+      writeSession(agentDir, "dur-saved")
+      // An earlier life registered it: a clean exit cleared the endpoint and kept the incarnation; a crash left both.
+      await store.registerIncarnation({
+        durable_id: "dur-saved",
+        incarnation: "earlier-life",
+        ...(staleEndpoint ? { endpoint: { socket: join(agentDir, "gone.sock"), kind: "rpc_host" as const } } : {}),
+      })
+      expect(await run("thread_send", { thread: "dur-saved", message: "held for the wake" })).toMatchObject({
+        kind: "ok",
+      })
+      const [held] = await store.list({ target_durable_id: "dur-saved" })
+      const result = await run("thread_create", { thread: "dur-saved", prompt: "build it" })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: "dur-saved" } },
+      })
+      const rows = await store.list({ target_durable_id: "dur-saved" })
+      const prompt = rows.find((row) => row.delivery_id !== held?.delivery_id)
+      expect(rows.find((row) => row.delivery_id === held?.delivery_id)?.state).toBe("queued")
+      expect([prompt?.state, prompt?.reason]).toEqual(["refused", "target_closed"])
+      expect(result).toMatchObject({ error: { details: { dropped_deliveries: [prompt?.delivery_id] } } })
+      // The wake sweep settles a thread's queued rows only after a close recorded on request; a rollback records none.
+      expect(closeRequests).toEqual([{ force: true, record: false }])
+    },
+  )
+
+  test("#given a thread that already holds an alias #when it is reopened by that alias with a prompt and its host never registers it #then the refusal keeps the alias (#14648 review B4)", async () => {
+    const a = account()
+    const { run, agentDir } = surface(a.remote, {
       firstPromptWaitMs: 50,
       createdNeverDrains: true,
       diskSessions: ["dur-saved"],
-      sameDeviceWake: wakeThatNeverAdmits,
     })
     writeSession(agentDir, "dur-saved")
-    // An earlier life registered it; its exit cleared the endpoint and kept the incarnation.
-    await store.registerIncarnation({ durable_id: "dur-saved", incarnation: "earlier-life" })
-    expect(await run("thread_send", { thread: "dur-saved", message: "held for the wake" })).toMatchObject({
-      kind: "ok",
-    })
-    const [held] = await store.list({ target_durable_id: "dur-saved" })
-    const result = await run("thread_create", { thread: "dur-saved", prompt: "build it" })
-    expect(result).toMatchObject({
+    const holder = { session_id: "dur-saved", device: "here" }
+    a.aliases.set("lane-held", holder)
+    expect(await run("thread_create", { thread: "dur-saved", alias: "lane-held", prompt: "build it" })).toMatchObject({
       kind: "error",
-      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: "dur-saved" } },
+      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered" } },
     })
-    const rows = await store.list({ target_durable_id: "dur-saved" })
-    const prompt = rows.find((row) => row.delivery_id !== held?.delivery_id)
-    expect(rows.find((row) => row.delivery_id === held?.delivery_id)?.state).toBe("queued")
-    expect([prompt?.state, prompt?.reason]).toEqual(["refused", "target_closed"])
-    expect(result).toMatchObject({ error: { details: { dropped_deliveries: [prompt?.delivery_id] } } })
+    expect(a.aliases.get("lane-held")).toEqual(holder)
   })
 
   test("#given a create with an alias whose new session its host never registers #when it is refused #then the alias it claimed is released (#14648 review B4)", async () => {

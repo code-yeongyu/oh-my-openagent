@@ -168,3 +168,16 @@ describe("closeLadder { graceful: true }", () => {
     expect(refusal?.details?.["wait_capped"]).toBeUndefined()
   })
 })
+
+describe("closeLadder { record: false } (#14648)", () => {
+  test("#given a rollback of a session a create opened #when it is ended with record false #then the unload carries no effectId, so no close on request is recorded for the wake sweep", async () => {
+    const { send, sent } = engine({ capabilities: GRACEFUL_ENGINE, unload: () => ({ outcome: "unloaded" }) })
+    expect(await closeLadder("s", send, { force: true, record: false })).toEqual({
+      outcome: "closed",
+      dropped_deliveries: [],
+    })
+    expect(sent).toEqual([{ type: "unload_session", sessionId: "s", force: true, children: "detach", interrupt: true }])
+    await closeLadder("s", send, { force: true })
+    expect(sent[1]?.["effectId"]).toEqual(expect.any(String))
+  })
+})

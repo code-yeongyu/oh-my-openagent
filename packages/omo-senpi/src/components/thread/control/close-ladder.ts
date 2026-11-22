@@ -92,7 +92,8 @@ export async function closeLadder(
   })
   type Unloaded = { readonly done: ThreadCloseAnswer } | { readonly refused: JsonObject }
   const unload = async (record: JsonObject): Promise<Unloaded> => {
-    const answered = await send({ ...UNLOAD, sessionId, effectId: closeEffectId(), ...record })
+    const effect = options.record === false ? {} : { effectId: closeEffectId() }
+    const answered = await send({ ...UNLOAD, sessionId, ...effect, ...record })
     if (answered.kind === "gone") return { done: done("not_live") }
     if (answered.data["outcome"] === "unloaded") return { done: done("closed", answered.data) }
     if (answered.data["reason"] === "session_closing") return { done: done("not_live", answered.data) }

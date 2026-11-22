@@ -267,9 +267,14 @@ export async function createThread(
   if (made.kind !== "ok" || opened === undefined) return made
   const thread = opened
   const here = openedHere
-  // An alias this call claimed names the thread across the account: a refused create releases it with the thread.
+  // An alias this call claimed for the thread it made names it across the account: a refused create releases it with the
+  // thread. A reopened thread may have held the alias before this call, so its alias is kept.
   const claimedAlias =
-    value.alias !== undefined && "alias" in made && typeof made.alias === "string" && !("alias_scope" in made)
+    here?.madeNew === true &&
+    value.alias !== undefined &&
+    "alias" in made &&
+    typeof made.alias === "string" &&
+    !("alias_scope" in made)
       ? made.alias
       : undefined
   const unregistered =
@@ -400,7 +405,8 @@ async function refuseUnregistered(
     failures.push(`locating it failed: ${located.result.kind === "error" ? located.result.error.code : "unknown"}`)
   if (located.kind === "control") {
     try {
-      const closed = await closeThread(located.control, { force: true })
+      // A rollback, not a close on request: other messages a reopened thread holds stay queued for its next wake.
+      const closed = await closeThread(located.control, { force: true, record: false })
       ended = closed.kind === "ok"
       if (closed.kind === "error") failures.push(`ending it failed: ${closed.error.code}`)
     } catch (error) {
@@ -625,6 +631,7 @@ async function existingHere(
   const name = entry.name?.trim()
   return {
     kind: "file",
+    thread: resolved.thread,
     sessionPath: entry.session_path,
     ...(name === undefined || name === "" ? {} : { name }),
     ...(isAbsolute(entry.cwd) ? { cwd: entry.cwd } : {}),
