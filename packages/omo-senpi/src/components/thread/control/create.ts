@@ -403,7 +403,7 @@ async function refuseUnregistered(
     left
       ? `Thread ${thread.thread_id} was opened on this device, but the thread host running it${engine} never registered it with this omo's gateway, so its first prompt could not start; the prompt was taken back, but ${failures.join("; ")}.`
       : `The thread host on this device${engine} never registered the session this create opened with this omo's gateway, so its first prompt could not start. The prompt was taken back and the session ended${madeNew ? "; nothing was left behind" : ""}.`,
-    "That host most likely runs another omo version than this session. Hand it over to this omo with `omo host handoff` (or quit and reopen the OmO Desktop app that runs it), then create the thread again.",
+    "That host most likely runs a different omo release than this session. Hand it over to this omo with `omo host handoff` (or quit and reopen the OmO Desktop app that runs it), then create the thread again.",
     {
       reason: "control_endpoint_unregistered",
       created: madeNew && left,
