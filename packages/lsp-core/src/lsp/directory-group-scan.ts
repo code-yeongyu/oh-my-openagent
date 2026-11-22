@@ -64,7 +64,7 @@ export async function scanServedGroups(options: GroupScanOptions): Promise<void>
           }),
         )
       } finally {
-        options.manager.releaseClient(group.root, group.server)
+        options.manager.releaseClient(group.root, group.server, client)
       }
     }
   })

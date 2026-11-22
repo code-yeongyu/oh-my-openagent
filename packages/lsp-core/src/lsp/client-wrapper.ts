@@ -282,7 +282,7 @@ export async function withLspClient<T>(
       }
       throw err
     } finally {
-      manager.releaseClient(root, server)
+      manager.releaseClient(root, server, client)
     }
   }
 

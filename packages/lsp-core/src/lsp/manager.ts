@@ -12,6 +12,7 @@ import {
 } from "./constants.js"
 import { LspClientRespawnBudgetExceededError } from "./errors.js"
 import { installProcessSignalCleanup } from "./process-signal-cleanup.js"
+import { realTimerProvider, repeatEvery, type TimerProvider } from "./timer-provider.js"
 import type { ResolvedServer } from "./types.js"
 
 interface RespawnBudget {
@@ -37,6 +38,8 @@ export interface LspManagerOptions {
   reaperIntervalMs?: number
   clientFactory?: (root: string, server: ResolvedServer) => LspClient
   now?: () => number
+  /** Schedules the reaper. */
+  timers?: TimerProvider
 }
 
 async function stopClientBestEffort(client: LspClient): Promise<void> {
@@ -52,14 +55,13 @@ export class LspManager {
   /** In-flight stops per key; getClient awaits these instead of spawning a duplicate client. */
   private readonly pendingStops = new Map<string, Promise<void>>()
   private readonly respawnBudgets = new Map<string, RespawnBudget>()
-  private reaperHandle: NodeJS.Timeout | null = null
+  private readonly stopReaper: () => void
   private signalDisposer: (() => void) | null = null
   private disposed = false
 
   private readonly idleTimeoutMs: number
   private readonly initTimeoutMs: number
   private readonly maxResidentClients: number
-  private readonly reaperIntervalMs: number
   private readonly clientFactory: (root: string, server: ResolvedServer) => LspClient
   private readonly now: () => number
   private readonly startups: ClientStartups
@@ -68,23 +70,13 @@ export class LspManager {
     this.idleTimeoutMs = options.idleTimeoutMs ?? IDLE_TIMEOUT_MS
     this.initTimeoutMs = options.initTimeoutMs ?? INIT_TIMEOUT_MS
     this.maxResidentClients = options.maxResidentClients ?? MAX_RESIDENT_CLIENTS
-    this.reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS
     this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server))
     this.now = options.now ?? (() => Date.now())
     this.startups = new ClientStartups(this.now, (managed) => this.discard(managed))
 
-    this.startReaper()
+    const reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS
+    this.stopReaper = repeatEvery(options.timers ?? realTimerProvider, reaperIntervalMs, () => this.reapStale())
     this.signalDisposer = installProcessSignalCleanup(() => this.stopAll())
-  }
-
-  private startReaper(): void {
-    if (this.reaperHandle) return
-    this.reaperHandle = setInterval(() => {
-      this.reapStale()
-    }, this.reaperIntervalMs)
-    if (typeof this.reaperHandle.unref === "function") {
-      this.reaperHandle.unref()
-    }
   }
 
   /**
@@ -179,13 +171,9 @@ export class LspManager {
     void this.tombstoneStop(managed.key, managed.client)
   }
 
-  private discardIfUnused(managed: ManagedClient): void {
-    if (managed.refCount === 0 && managed.pendingWaiters === 0 && !managed.isInitializing) this.discard(managed)
-  }
-
+  /** Every await here happens before the acquisition counts or while it counts as a waiter (client-startup.ts). */
   async getClient(root: string, server: ResolvedServer, signal?: AbortSignal): Promise<LspClient> {
     const key = lspClientKey(root, server)
-    let managed: ManagedClient | undefined
     for (;;) {
       if (this.disposed) {
         throw new Error("LspManager has been disposed")
@@ -196,33 +184,38 @@ export class LspManager {
         await awaitWithSignal(pendingStop, signal)
         continue
       }
-      managed = this.clients.get(key)
-      if (managed === undefined || !this.startupExpired(managed, this.now())) break
-      this.discard(managed)
-    }
+      let managed = this.clients.get(key)
+      if (managed !== undefined && this.startupExpired(managed, this.now())) {
+        this.discard(managed)
+        continue
+      }
+      if (managed === undefined) {
+        this.evictForAdmission()
+        this.ensureRespawnAllowed(key, root, server.id)
+        managed = this.startClient(key, root, server, true)
+      }
 
-    if (managed === undefined) {
-      this.evictForAdmission()
-      this.ensureRespawnAllowed(key, root, server.id)
-      managed = this.startClient(key, root, server, true)
+      const { initPromise } = managed
+      if (initPromise !== null) {
+        await this.startups.wait(managed, initPromise, signal)
+        if (signal?.aborted) {
+          this.startups.detach(managed)
+          signal.throwIfAborted()
+        }
+        managed.pendingWaiters--
+      }
+      // No await from the waiter's uncounting above to the reference below.
+      if (this.clients.get(key) !== managed) continue
+      if (!managed.client.isAlive()) {
+        this.recordDeadGeneration(key)
+        this.discard(managed)
+        continue
+      }
+      this.markHealthyGeneration(key)
+      managed.refCount++
+      managed.lastUsedAt = this.now()
+      return managed.client
     }
-
-    await this.startups.wait(managed, signal)
-    if (signal?.aborted) {
-      this.discardIfUnused(managed)
-      signal.throwIfAborted()
-    }
-
-    if (!managed.client.isAlive()) {
-      this.recordDeadGeneration(key)
-      this.discard(managed)
-      return this.getClient(root, server, signal)
-    }
-
-    this.markHealthyGeneration(key)
-    managed.refCount++
-    managed.lastUsedAt = this.now()
-    return managed.client
   }
 
   private startClient(key: string, root: string, server: ResolvedServer, heldByWaiters: boolean): ManagedClient {
@@ -232,9 +225,10 @@ export class LspManager {
     return managed
   }
 
-  releaseClient(root: string, server: ClientIdentity): void {
-    const key = lspClientKey(root, server)
-    const managed = this.clients.get(key)
+  /** Gives back the reference on `client`; a client no longer pooled for the key has none left to give back. */
+  releaseClient(root: string, server: ClientIdentity, client?: LspClient): void {
+    const managed = this.clients.get(lspClientKey(root, server))
+    if (client !== undefined && managed?.client !== client) return
     if (managed && managed.refCount > 0) {
       managed.refCount--
       managed.lastUsedAt = this.now()
@@ -295,10 +289,7 @@ export class LspManager {
   async stopAll(): Promise<void> {
     this.disposed = true
 
-    if (this.reaperHandle) {
-      clearInterval(this.reaperHandle)
-      this.reaperHandle = null
-    }
+    this.stopReaper()
 
     if (this.signalDisposer) {
       this.signalDisposer()
