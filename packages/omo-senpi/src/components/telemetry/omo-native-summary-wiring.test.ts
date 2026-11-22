@@ -227,40 +227,19 @@ describe("session_summary delivery through the real PostHog transport", () => {
     })
   })
 
-  test("#given a server answering 200 #when the session quits #then the summary is retired without a live daily-active client", async () => {
+  test("#given a server answering 200 #when the session quits #then the summary is retired and only native telemetry used a real client", async () => {
     await withTempAgentDir(async (agentDir) => {
+      const realClientBatchSizes: number[] = []
       await withServer(200, async (host) => {
-        const releaseFlush = Promise.withResolvers<undefined>()
-        const legacyClosed = Promise.withResolvers<undefined>()
-        let legacyFlushPending = false
         const factory = realTransport(host, (apiKey, options) => {
           const transport = createDefaultPostHogTransport(apiKey, options)
-          if (options.flushAt !== 1) return transport
-          const shutdown = transport.shutdown.bind(transport)
-          return Object.assign(transport, {
-            flush: () => {
-              legacyFlushPending = true
-              return releaseFlush.promise
-            },
-            shutdown: async () => {
-              try {
-                await shutdown()
-              } finally {
-                legacyFlushPending = false
-                legacyClosed.resolve(undefined)
-              }
-            },
-          })
+          realClientBatchSizes.push(options.flushAt)
+          return transport
         })
-        try {
-          await runSession(agentDir, factory, true)
-          expect(legacyFlushPending).toBe(false)
-        } finally {
-          releaseFlush.resolve(undefined)
-          if (legacyFlushPending) await legacyClosed.promise
-        }
+        await runSession(agentDir, factory, true)
       })
       expect(pendingOf(agentDir)).toEqual([])
+      expect(realClientBatchSizes).toEqual([20])
     })
   })
 })
