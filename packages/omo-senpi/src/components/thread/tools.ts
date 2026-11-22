@@ -1,5 +1,6 @@
 import {
   TOOL_CALL_BUDGET_MS,
+  unlessAborted,
   waitWithinCallBudget,
   withCallDeadline,
   withinCallBudget,
@@ -105,6 +106,19 @@ const NO_LOCAL_VIEW: ThreadHostView = { sessions: [], hosts: [], disk: [] }
  */
 const DEVICE_READ = new WeakMap<ThreadHostView, string | undefined | ThreadToolFailure>()
 
+/** #13426: the caller cancelled the call before it started; nothing ran. */
+const CANCELLED_BEFORE_START = failure(
+  "cancelled",
+  "The call was cancelled before it started; nothing ran.",
+  "Call it again if it is still wanted.",
+)
+/** #13426: the caller cancelled the call while it ran; what it already sent may have reached the thread. */
+const CANCELLED_WHILE_RUNNING = failure(
+  "cancelled",
+  "The call was cancelled while it ran; what it already sent may have reached the thread.",
+  "Read the thread (tool.thread_read() in an eval cell) before calling it again.",
+)
+
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -179,7 +193,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       callerId: string,
       retrying: { readonly error_note: string | null } | undefined,
     ) => Promise<ThreadToolResult>,
+    signal?: AbortSignal,
   ): Promise<ToolOutput> {
+    // #13426: a call its caller already cancelled runs nothing, not even its receipt.
+    if (signal?.aborted === true) return output(CANCELLED_BEFORE_START)
     const callerId =
       (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??
       options.callerSessionId()
@@ -322,6 +339,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         ),
       )
     }
+    // #13426: the call was cancelled while it ran. Its remote waits end on the same signal; what it already sent may
+    // have acted, so its receipt records that and a retry under the same key answers idempotency_uncertain.
+    const cancelled = async (): Promise<ToolOutput> => {
+      if (receipted)
+        await store
+          .toolReceiptSettle({ ...scope, now: now(), error_note: "the call was cancelled while it ran" })
+          .catch(unrecorded("the call was cancelled"))
+      running.delete(receiptKey(scope))
+      return output(CANCELLED_WHILE_RUNNING)
+    }
     let result: ThreadToolResult
     if (receipted) running.add(receiptKey(scope))
     try {
@@ -329,7 +356,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
       const sendTo = name === "thread_send" && "thread" in value && typeof value.thread === "string" ? value.thread : ""
       // omo#14130: the call's one budget (call-deadline.ts) starts before its view, so the view's reads count against it.
-      result = await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, async () => {
+      const work = withCallDeadline(
+        Date.now() + TOOL_CALL_BUDGET_MS,
+        async () => {
         let current: ThreadHostView
         if (sendTo !== "" && sendTo !== "self" && (await store.sessionOwner(sendTo)) !== null)
           current = PUBLISHED_SEND_VIEW
@@ -340,7 +369,15 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           if (route?.read === true) DEVICE_READ.set(current, route.here)
         }
         return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
-      })
+        },
+        signal,
+      )
+      if (signal === undefined) result = await work
+      else {
+        const settled = await unlessAborted(work, signal)
+        if (settled === undefined) return await cancelled()
+        result = settled.value
+      }
     } catch (error) {
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)
@@ -363,8 +400,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     ...metadata("thread_create"),
     parameters: threadToolParamSchemas.thread_create,
     promptGuidelines: [THREAD_FAMILY_PROMPT_GUIDELINES],
-    execute: (id: string, args: ThreadCreateInput, _signal, _onUpdate, ectx) =>
-      execute("thread_create", id, args, ectx, async (current, value, operationId, callerId, retrying) =>
+    execute: (id: string, args: ThreadCreateInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_create",
+        id,
+        args,
+        ectx,
+        async (current, value, operationId, callerId, retrying) =>
         createThread(options, current, value, {
           operationId,
           callerId,
@@ -382,12 +424,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
               ),
             ),
         }),
+        signal,
       ),
   }
   const list: AnyTool = {
     ...metadata("thread_list"),
     parameters: threadToolParamSchemas.thread_list,
-    execute: (id: string, args: ThreadListInput, _signal, _onUpdate, ectx) =>
+    execute: (id: string, args: ThreadListInput, signal, _onUpdate, ectx) =>
       execute(
         "thread_list",
         id,
@@ -400,23 +443,34 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
             value.all_scope === true,
             value.state,
           ),
+        signal,
       ),
   }
   const read: AnyTool = {
     ...metadata("thread_read"),
     parameters: threadToolParamSchemas.thread_read,
     execute: (id: string, args: ThreadReadInput, signal, _onUpdate, ectx) =>
-      execute("thread_read", id, args, ectx, async (current, value, _operationId, callerId) =>
-        readThread(options, current, value, callerId, signal),
+      execute(
+        "thread_read",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => readThread(options, current, value, callerId, signal),
+        signal,
       ),
   }
   const send: AnyTool = {
     ...metadata("thread_send"),
     permissionParser: threadSendPermission(options),
     parameters: threadToolParamSchemas.thread_send,
-    execute: (id: string, args: ThreadSendInput, _signal, _onUpdate, ectx) =>
-      execute("thread_send", id, args, ectx, async (current, value, operationId, callerId) =>
-        deliver(current, value.thread, value, operationId, callerId),
+    execute: (id: string, args: ThreadSendInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_send",
+        id,
+        args,
+        ectx,
+        async (current, value, operationId, callerId) => deliver(current, value.thread, value, operationId, callerId),
+        signal,
       ),
   }
   const sendAs: ThreadSendAs = async (callerId, args) => {
@@ -432,71 +486,115 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
   const interrupt: AnyTool = {
     ...metadata("thread_interrupt"),
     parameters: threadToolParamSchemas.thread_interrupt,
-    execute: (id: string, args: ThreadInterruptInput, _signal, _onUpdate, ectx) =>
-      execute("thread_interrupt", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
-        if (located.kind === "error") return located.result
-        if (located.kind === "not_live") return NOT_LIVE
-        return await interruptThread(located.control, value.turn_id)
-      }),
+    execute: (id: string, args: ThreadInterruptInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_interrupt",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => {
+          const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+          if (located.kind === "error") return located.result
+          if (located.kind === "not_live") return NOT_LIVE
+          return await interruptThread(located.control, value.turn_id)
+        },
+        signal,
+      ),
   }
   const close: AnyTool = {
     ...metadata("thread_close"),
     parameters: threadToolParamSchemas.thread_close,
-    execute: (id: string, args: ThreadCloseInput, _signal, _onUpdate, ectx) =>
-      execute("thread_close", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
-        if (located.kind === "error") return located.result
-        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (located.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(located.control, closeOptions(value))
-      }),
+    execute: (id: string, args: ThreadCloseInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_close",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => {
+          const located = await locateControl(options, current, value.thread ?? "self", value.all_scope, callerId)
+          if (located.kind === "error") return located.result
+          // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
+          if (located.kind === "not_live")
+            return { kind: "ok", ...controlIdentity(located), closed: false, reason: "not_live", dropped_deliveries: [] }
+          return await closeThread(located.control, closeOptions(value))
+        },
+        signal,
+      ),
   }
   const handoff: AnyTool = {
     ...metadata("thread_handoff"),
     parameters: threadToolParamSchemas.thread_handoff,
-    execute: (id: string, args: ThreadHandoffInput, _signal, _onUpdate, ectx) =>
-      execute("thread_handoff", id, args, ectx, async (current, value, operationId, callerId) =>
-        deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name"),
+    execute: (id: string, args: ThreadHandoffInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_handoff",
+        id,
+        args,
+        ectx,
+        async (current, value, operationId, callerId) =>
+          deliver(current, value.thread, value, operationId, callerId, value.match === "fuzzy" ? "fuzzy" : "exact_name"),
+        signal,
       ),
   }
   const rename: AnyTool = {
     ...metadata("thread_rename"),
     parameters: threadToolParamSchemas.thread_rename,
-    execute: (id: string, args: ThreadRenameInput, _signal, _onUpdate, ectx) =>
-      execute("thread_rename", id, args, ectx, async (current, value, operationId, callerId) =>
-        renameThread(options, current, value, operationId, callerId),
+    execute: (id: string, args: ThreadRenameInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_rename",
+        id,
+        args,
+        ectx,
+        async (current, value, operationId, callerId) => renameThread(options, current, value, operationId, callerId),
+        signal,
       ),
   }
   const setModel: AnyTool = {
     ...metadata("thread_set_model"),
     parameters: threadToolParamSchemas.thread_set_model,
-    execute: (id: string, args: ThreadSetModelInput, _signal, _onUpdate, ectx) =>
-      execute("thread_set_model", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
-        if (located.kind === "error") return located.result
-        if (located.kind === "not_live") return NOT_LIVE
-        return await setModelOn(located.control, value.model, value.provider)
-      }),
+    execute: (id: string, args: ThreadSetModelInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_set_model",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => {
+          const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+          if (located.kind === "error") return located.result
+          if (located.kind === "not_live") return NOT_LIVE
+          return await setModelOn(located.control, value.model, value.provider)
+        },
+        signal,
+      ),
   }
   const setReasoning: AnyTool = {
     ...metadata("thread_set_reasoning"),
     parameters: threadToolParamSchemas.thread_set_reasoning,
-    execute: (id: string, args: ThreadSetReasoningInput, _signal, _onUpdate, ectx) =>
-      execute("thread_set_reasoning", id, args, ectx, async (current, value, _operationId, callerId) => {
-        const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
-        if (located.kind === "error") return located.result
-        if (located.kind === "not_live") return NOT_LIVE
-        return await setThinkingLevelOn(located.control, value.level, value.scope)
-      }),
+    execute: (id: string, args: ThreadSetReasoningInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_set_reasoning",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => {
+          const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
+          if (located.kind === "error") return located.result
+          if (located.kind === "not_live") return NOT_LIVE
+          return await setThinkingLevelOn(located.control, value.level, value.scope)
+        },
+        signal,
+      ),
   }
   const archive: AnyTool = {
     ...metadata("thread_archive"),
     parameters: threadToolParamSchemas.thread_archive,
-    execute: (id: string, args: ThreadArchiveInput, _signal, _onUpdate, ectx) =>
-      execute("thread_archive", id, args, ectx, async (current, value, _operationId, callerId) =>
-        archiveThread(options, current, value, callerId),
+    execute: (id: string, args: ThreadArchiveInput, signal, _onUpdate, ectx) =>
+      execute(
+        "thread_archive",
+        id,
+        args,
+        ectx,
+        async (current, value, _operationId, callerId) => archiveThread(options, current, value, callerId),
+        signal,
       ),
   }
   const relayTools = createRelayTools({ options, relay, failure })
