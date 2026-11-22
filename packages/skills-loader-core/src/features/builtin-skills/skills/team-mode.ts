@@ -3,7 +3,7 @@ import type { BuiltinSkill } from "../types"
 export const teamModeSkill: BuiltinSkill = {
   name: "team-mode",
   description:
-    "Team orchestration — create and manage parallel agent teams (OFF by default; enable via team_mode.enabled in config). Loading this skill provides usage documentation; the team_* tools are registered globally when team_mode.enabled=true and access-gated by team role.",
+    "Team orchestration: create and manage parallel agent teams (OFF by default; enable via team_mode.enabled in config). Loading this skill provides usage documentation; the team_* tools are registered globally when team_mode.enabled=true and access-gated by team role.",
   template: `# Team Mode
 
 Team mode gives Claude Code Agent Teams parity. It is off by default. Enable it only when you want parallel multi-agent coordination, where each team member is an opencode child session.
@@ -91,7 +91,7 @@ Do not use \`oracle\`, \`prometheus\`, or other non-eligible agents here. For th
 
 ## Lifecycle
 
-Teams are **ephemeral**. There is no in-place reshape — restructuring is delete-then-create. Lingering teams burn sessions, mailbox quota, and member-turn budget every idle minute.
+Teams are **ephemeral**. There is no in-place reshape: restructuring is delete-then-create. Lingering teams burn sessions, mailbox quota, and member-turn budget every idle minute.
 
 One cycle:
 
@@ -109,7 +109,7 @@ A team is **closable** when ALL of the following hold, as observed by \`team_tas
 - No outstanding \`team_shutdown_request\` is still awaiting approval.
 - The user has not asked you to keep the team open for follow-up.
 
-Closure is **the lead's responsibility**, not the user's. Do not wait to be told. The check runs after every \`team_task_update\` that completes or fails a task — if the contract holds, close in the same turn. Closure now is cheaper than closure after the next user message, because by then the model has paged out the context.
+Closure is **the lead's responsibility**, not the user's. Do not wait to be told. The check runs after every \`team_task_update\` that completes or fails a task: if the contract holds, close in the same turn. Closure now is cheaper than closure after the next user message, because by then the model has paged out the context.
 
 ### Closure Sequence
 
@@ -120,7 +120,7 @@ Run in order:
    - \`team_approve_shutdown({ teamRunId, memberName: M })\`
 2. \`team_delete({ teamRunId })\`
 
-If step 2 errors because a member is still active, re-run \`team_status\`. Use \`team_delete({ teamRunId, force: true })\` **only** after confirming the remaining member is not mid-write — for example, after an unrecoverable error path where graceful shutdown is impossible. Do not use \`force: true\` to skip step 1.
+If step 2 errors because a member is still active, re-run \`team_status\`. Use \`team_delete({ teamRunId, force: true })\` **only** after confirming the remaining member is not mid-write: for example, after an unrecoverable error path where graceful shutdown is impossible. Do not use \`force: true\` to skip step 1.
 
 ## Task ownership
 
@@ -128,27 +128,27 @@ Any agent can set or change task ownership via \`team_task_update\` with the \`o
 
 ## Automatic message delivery
 
-Messages sent via \`team_send_message\` are automatically delivered to the recipient as new conversation turns — no manual inbox polling. If a recipient is mid-turn, the message is queued and injected when its turn ends, wrapped in a \`<peer_message ...>\` envelope. The UI surfaces a brief notification with the sender's name. When reporting on teammate messages, do NOT quote the original — it has already been rendered.
+Messages sent via \`team_send_message\` are automatically delivered to the recipient as new conversation turns: no manual inbox polling. If a recipient is mid-turn, the message is queued and injected when its turn ends, wrapped in a \`<peer_message ...>\` envelope. The UI surfaces a brief notification with the sender's name. When reporting on teammate messages, do NOT quote the original: it has already been rendered.
 
 ## Teammate idle state
 
-Teammates go idle after every turn — this is normal and expected. A teammate going idle immediately after sending a message does NOT mean they are done or unavailable. Idle simply means they are waiting for input.
+Teammates go idle after every turn: this is normal and expected. A teammate going idle immediately after sending a message does NOT mean they are done or unavailable. Idle simply means they are waiting for input.
 
 - Idle teammates can still receive messages; sending one wakes them up.
-- The system emits idle notifications automatically. The lead does not need to react to every idle event — only when assigning new work or following up.
+- The system emits idle notifications automatically. The lead does not need to react to every idle event: only when assigning new work or following up.
 - Do not treat idle as an error. A teammate that sent a message and went idle has done its job and is awaiting reply.
 - Peer DMs include a brief summary in the lead's idle notification, giving the lead visibility into peer collaboration without the full message text.
 
 ## Discovering team members
 
-Members and the lead use \`team_status({ teamRunId })\` to see who is active, their session IDs, message backlog, and tmux pane assignments. The team config also lives at \`~/.omo/teams/{name}/config.json\` for declared teams. Always refer to teammates by their NAME (e.g., \`"lead"\`, \`"researcher"\`) — never by raw session IDs.
+Members and the lead use \`team_status({ teamRunId })\` to see who is active, their session IDs, message backlog, and tmux pane assignments. The team config also lives at \`~/.omo/teams/{name}/config.json\` for declared teams. Always refer to teammates by their NAME (e.g., \`"lead"\`, \`"researcher"\`): never by raw session IDs.
 
 ## Task list coordination
 
 Members should:
 
 1. Check \`team_task_list\` periodically, **especially after completing each task**, to find newly unblocked work.
-2. Claim unassigned, unblocked tasks via \`team_task_update\` (set \`owner\` and \`status: "claimed"\` or \`"in_progress"\`). Prefer tasks in ID order (lowest first) — earlier tasks usually establish context for later ones.
+2. Claim unassigned, unblocked tasks via \`team_task_update\` (set \`owner\` and \`status: "claimed"\` or \`"in_progress"\`). Prefer tasks in ID order (lowest first): earlier tasks usually establish context for later ones.
 3. Create new tasks via \`team_task_create\` when they identify additional work.
 4. Mark tasks completed via \`team_task_update\` with \`status: "completed"\`, then re-check the task list.
 5. If all available tasks are blocked, send a \`team_send_message\` to the lead to either resolve blockers or assign different work.
@@ -156,8 +156,8 @@ Members should:
 ## Communication rules
 
 - Do NOT send structured JSON status messages like \`{"type":"idle",...}\` or \`{"type":"task_completed",...}\`. Communicate in plain natural language.
-- Do NOT use terminal tools (Bash, file readers) to inspect another teammate's session, inbox, or pane — always go through \`team_send_message\` and \`team_status\`.
-- Members must NOT call \`delegate-task\` — its budget is zero inside team members. Use \`team_send_message\` to coordinate with peers instead.
+- Do NOT use terminal tools (Bash, file readers) to inspect another teammate's session, inbox, or pane: always go through \`team_send_message\` and \`team_status\`.
+- Members must NOT call \`delegate-task\`: its budget is zero inside team members. Use \`team_send_message\` to coordinate with peers instead.
 
 ## Lead-only tools
 

@@ -39,7 +39,7 @@ export interface MemoryFactsWiring {
   /** Enqueue the un-enqueued delta for a settled conversation. Never throws. */
   enqueueSettled(conversationId: string, signal?: AbortSignal): Promise<FactsEnqueueResult>
   /** Enqueue the settled conversation delta. */
-  onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult>
+  onSettled(conversationId: string, selection?: FactsModelSelection, signal?: AbortSignal): Promise<FactsEnqueueResult>
   /** Leftover queue entries a crashed run left behind, ready for relaunch. */
   reconcilePending(): Promise<FactsQueueEntry[]>
   /** Recover old artifacts and reset first-turn admission for a bound session, without a child. */
@@ -52,8 +52,7 @@ export interface MemoryFactsWiring {
 }
 
 export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): MemoryFactsWiring {
-  const createJournal =
-    options.createJournal ?? ((journalDir: string) => new TranscriptJournal({ journalDir }))
+  const createJournal = options.createJournal ?? ((journalDir: string) => new TranscriptJournal({ journalDir }))
   const queue = new FactsQueue({
     identityPaths: options.identityPaths,
     ...(options.now === undefined ? {} : { now: options.now }),
@@ -63,9 +62,10 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
 
   const fire = (operation: "launch" | "reconcile", signal?: AbortSignal, selection?: FactsModelSelection): void => {
     if (signal?.aborted === true) return
-    const promise = operation === "launch"
-      ? options.extractor?.launchPending(signal, selection)
-      : options.extractor?.reconcilePending(signal)
+    const promise =
+      operation === "launch"
+        ? options.extractor?.launchPending(signal, selection)
+        : options.extractor?.reconcilePending(signal)
     void promise?.catch((error) => {
       options.logger?.warn(`facts extractor ${operation} failed`, { error: String(error) })
     })
@@ -91,9 +91,16 @@ export function createMemoryFactsWiring(options: MemoryFactsWiringOptions): Memo
       }
     },
 
-    async onSettled(conversationId: string, selection?: FactsModelSelection): Promise<FactsEnqueueResult> {
+    async onSettled(
+      conversationId: string,
+      selection?: FactsModelSelection,
+      signal?: AbortSignal,
+    ): Promise<FactsEnqueueResult> {
+      signal?.throwIfAborted()
       const pending = settledSessions.has(conversationId) ? [] : await wiring.reconcilePending()
-      const result = await wiring.enqueueSettled(conversationId)
+      signal?.throwIfAborted()
+      const result = await wiring.enqueueSettled(conversationId, signal)
+      signal?.throwIfAborted()
       if (!options.factsEnabled()) return result
       settledSessions.add(conversationId)
       settles += 1

@@ -4,6 +4,8 @@
 
 import type * as SessionHistoryRuntime from "./session-history/runtime"
 
+import { reinstallStep } from "../reinstall/reinstall-step"
+
 export type SessionHistoryRuntimeModule = Pick<
   typeof SessionHistoryRuntime,
   "createSessionDigestStore" | "createSessionHistoryScanner" | "scanSessionHistory"
@@ -32,5 +34,5 @@ export const loadSessionHistoryRuntime: SessionHistoryRuntimeLoader = createSess
 
 export function sessionHistoryRuntimeLoadFailure(error: unknown): string {
   const cause = error instanceof Error ? error.message : String(error)
-  return `The session history scan is unavailable: its runtime (${SESSION_HISTORY_RUNTIME_ARTIFACT}) failed to load: ${cause}. This build's plugin payload is incomplete; reinstall omo, then start a new session.`
+  return `The session history scan is unavailable: its runtime (${SESSION_HISTORY_RUNTIME_ARTIFACT}) failed to load: ${cause}. Part of this omo installation is missing; ${reinstallStep()}, then start a new session.`
 }

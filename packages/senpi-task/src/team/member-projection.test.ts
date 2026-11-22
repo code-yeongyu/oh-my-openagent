@@ -8,7 +8,13 @@ import { projectMemberStatus, refreshTeamMemberStatuses, type RuntimeMemberStatu
 import { toTeamCoreConfig } from "./runtime-config"
 import { createTeam } from "./runtime"
 import { resolveTeamRuntimeDirs, teamStorageBaseDir } from "./storage"
-import { FakeTeamManager, cleanupTeamRuntimeTmp, stateDirConfig, taskSettings, tempProjectDir } from "./__fixtures__/runtime-fakes"
+import {
+  FakeTeamManager,
+  cleanupTeamRuntimeTmp,
+  stateDirConfig,
+  taskSettings,
+  tempProjectDir,
+} from "./__fixtures__/runtime-fakes"
 
 afterEach(() => {
   cleanupTeamRuntimeTmp()

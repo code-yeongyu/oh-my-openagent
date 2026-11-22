@@ -16,19 +16,15 @@ async function makeRuntimeFixture() {
   const targetEntry = join(root, "staged", "cli.js")
   const manifestPath = join(root, "staged", "manifest.json")
   const content = "#!/usr/bin/env node\nconsole.log('ast-grep')\n"
-  await Promise.all([
-    mkdir(join(root, "built"), { recursive: true }),
-    mkdir(join(root, "staged"), { recursive: true }),
-  ])
-  await Promise.all([
-    writeFile(sourceEntry, content, "utf8"),
-    writeFile(targetEntry, content, "utf8"),
-  ])
+  await Promise.all([mkdir(join(root, "built"), { recursive: true }), mkdir(join(root, "staged"), { recursive: true })])
+  await Promise.all([writeFile(sourceEntry, content, "utf8"), writeFile(targetEntry, content, "utf8")])
   await Promise.all([chmod(sourceEntry, 0o755), chmod(targetEntry, 0o700)])
   await writeFile(
     manifestPath,
     `${JSON.stringify({
-      sha256: createHash("sha256").update(await readFile(targetEntry)).digest("hex"),
+      sha256: createHash("sha256")
+        .update(await readFile(targetEntry))
+        .digest("hex"),
       mode: 0o755,
       stagedAtUtc: "2026-08-03T00:00:00.000Z",
     })}\n`,

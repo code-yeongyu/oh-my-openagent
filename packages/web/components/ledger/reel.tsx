@@ -53,10 +53,7 @@ export function Reel({
       aria-labelledby={ariaLabelledBy}
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className={cn(
-        "reel focus-visible:outline-accent-32 gap-px px-8 py-px focus-visible:outline-2 focus-visible:-outline-offset-2",
-        className,
-      )}
+      className={cn("reel focus-ring-inset gap-px px-8 py-px", className)}
     >
       {children}
     </div>
@@ -74,7 +71,7 @@ export function ReelCell({ children, className }: ReelCellProps): JSX.Element {
     <article
       tabIndex={0}
       className={cn(
-        "border-line bg-ink-1 hover:bg-ink-2 focus-visible:outline-accent-32 ease-standard flex min-h-56 snap-start flex-col border p-6 transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:-outline-offset-2",
+        "border-line bg-ink-1 hover:bg-ink-2 ease-standard focus-ring-inset flex min-h-56 snap-start flex-col border p-6 transition-colors duration-[var(--dur-micro)]",
         className,
       )}
     >

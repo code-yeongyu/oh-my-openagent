@@ -1,5 +1,7 @@
 import { describe, expect, it } from "bun:test"
+import { MEMORY_AUTHORITY_RULE } from "../provenance"
 import { compileMemoryBlock } from "./compile"
+import { NAME_NOTE } from "./external-projection-names"
 import { memory, parseCompiledBlock, repoWith } from "./compile.test-support"
 
 describe("compileMemoryBlock", () => {
@@ -94,7 +96,8 @@ describe("compileMemoryBlock", () => {
     const { repo } = await repoWith([
       { relativePath: "system/persona.md", content: memory("PERSONA_DESCRIPTION", "PERSONA_BODY\n") },
     ])
-    const sentence = "Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call."
+    const sentence =
+      "Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call."
 
     // when
     const block = await compileMemoryBlock(repo, { agentId: "reminder-agent" })
@@ -121,7 +124,12 @@ describe("compileMemoryBlock", () => {
   }, 30_000)
 })
 
-const PRE_CHANGE_CLEAN_BLOCK: string = "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call.\n\n<memory>\n<human>\n  <projection>$MEMORY_DIR/system/human.md</projection>\n  <description>HUMAN_DESCRIPTION</description>\n  Prefers concise answers.\n</human>\n<external_projection>\n$MEMORY_DIR/\nreference/: notes.md\n</external_projection>\n</memory>\n\n<memory_metadata>\n- AGENT_ID: boundary-agent\n</memory_metadata>"
+const PRE_CHANGE_CLEAN_BLOCK: string =
+  "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. " +
+  MEMORY_AUTHORITY_RULE +
+  "\n\n<memory>\n<human>\n  <projection>$MEMORY_DIR/system/human.md</projection>\n  <description>HUMAN_DESCRIPTION</description>\n  Prefers concise answers.\n</human>\n<external_projection>\n" +
+  NAME_NOTE +
+  "\n$MEMORY_DIR/\nreference/: notes\n</external_projection>\n</memory>\n\n<memory_metadata>\n- AGENT_ID: boundary-agent\n</memory_metadata>"
 
 describe("compileMemoryBlock secret screening", () => {
   it("#given a system file whose body and description carry secret-like text #when compiled #then both are masked and the block is deterministic across compiles", async () => {
@@ -174,6 +182,6 @@ describe("compileMemoryBlock secret screening", () => {
     expect(first).not.toContain("abc123456")
     expect(first).not.toContain(ghpToken)
     expect(first).toContain("$MEMORY_DIR/system/***.md")
-    expect(first).toContain("reference/: ***.md")
+    expect(first).toContain("reference/: ***\n")
   }, 30_000)
 })

@@ -1,9 +1,6 @@
 import { describe, expect, it, mock } from "bun:test"
 import type { KeyEvent } from "@opentui/core"
-import type {
-  KeyInputContext,
-  RawInputContext,
-} from "@opentui/keymap"
+import type { KeyInputContext, RawInputContext } from "@opentui/keymap"
 
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { registerBtwSideKeymap } from "./tui-keymap"
@@ -51,22 +48,22 @@ describe("registerBtwSideKeymap", () => {
     })
 
     // when
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller,
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller,
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker,
+      }),
+    )
     const switchCommand = layers
       .flatMap((layer) => layer.commands ?? [])
       .find((command) => command.name === "omo.btw.toggle")
     await switchCommand?.run?.()
 
     // then
-    expect(
-      layers.flatMap((layer) => layer.bindings ?? []),
-    ).toEqual(
+    expect(layers.flatMap((layer) => layer.bindings ?? [])).toEqual(
       expect.arrayContaining([
         {
           key: "ctrl+/",
@@ -88,18 +85,13 @@ describe("registerBtwSideKeymap", () => {
 
   it("#given xterm encodes Ctrl slash as control underscore #when intercepted #then the picker command dispatches before host handling", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const openPicker = mock(async () => undefined)
     const consume = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          _name: string,
-          interceptor: (context: KeyInputContext<KeyEvent>) => void,
-        ) => {
+        intercept: (_name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
           keyInterceptor = interceptor
           return () => undefined
         },
@@ -114,31 +106,35 @@ describe("registerBtwSideKeymap", () => {
         },
       },
     })
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker,
-      isCurrentSideIdle: () => false,
-      returnToParent: () => undefined,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker,
+        isCurrentSideIdle: () => false,
+        returnToParent: () => undefined,
+      }),
+    )
 
     // when
-    keyInterceptor?.(unsafeTestValue({
-      event: {
-        name: "_",
-        ctrl: true,
-        eventType: "press",
-      },
-      setData: () => undefined,
-      getData: () => undefined,
-      consume,
-    }))
+    keyInterceptor?.(
+      unsafeTestValue({
+        event: {
+          name: "_",
+          ctrl: true,
+          eventType: "press",
+        },
+        setData: () => undefined,
+        getData: () => undefined,
+        consume,
+      }),
+    )
 
     // then
     expect(consume).toHaveBeenCalledWith({
@@ -150,18 +146,13 @@ describe("registerBtwSideKeymap", () => {
 
   it("#given xterm emits the Ctrl slash control byte #when raw input arrives #then parsing is stopped and the picker opens", () => {
     // given
-    let rawInterceptor:
-      | ((context: RawInputContext) => void)
-      | undefined
+    let rawInterceptor: ((context: RawInputContext) => void) | undefined
     const openPicker = mock(async () => undefined)
     const stop = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          name: string,
-          interceptor: (context: RawInputContext) => void,
-        ) => {
+        intercept: (name: string, interceptor: (context: RawInputContext) => void) => {
           if (name === "raw") rawInterceptor = interceptor
           return () => undefined
         },
@@ -177,19 +168,21 @@ describe("registerBtwSideKeymap", () => {
         toast: () => undefined,
       },
     })
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker,
-      isCurrentSideIdle: () => false,
-      returnToParent: () => undefined,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker,
+        isCurrentSideIdle: () => false,
+        returnToParent: () => undefined,
+      }),
+    )
 
     // when
     rawInterceptor?.({
@@ -223,29 +216,28 @@ describe("registerBtwSideKeymap", () => {
       },
       renderer: {
         stdin: {
-          prependListener: (
-            _name: string,
-            handler: (data: Buffer) => void,
-          ) => {
+          prependListener: (_name: string, handler: (data: Buffer) => void) => {
             stdinData = handler
           },
           off: () => undefined,
         },
       },
     })
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker,
-      isCurrentSideIdle: () => false,
-      returnToParent: () => undefined,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker,
+        isCurrentSideIdle: () => false,
+        returnToParent: () => undefined,
+      }),
+    )
 
     // when
     stdinData?.(Buffer.from("paste\u001fcontent"))

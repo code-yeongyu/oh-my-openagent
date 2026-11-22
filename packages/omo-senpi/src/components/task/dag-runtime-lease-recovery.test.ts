@@ -4,12 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
-import type {
-  ManagedChildHandle,
-  ManagedRunner,
-  ManagedStartSpec,
-  RunnerOutcome,
-} from "@oh-my-opencode/senpi-task"
+import type { ManagedChildHandle, ManagedRunner, ManagedStartSpec, RunnerOutcome } from "@oh-my-opencode/senpi-task"
 import {
   createDagFileStore,
   createDagManager,
@@ -24,9 +19,9 @@ import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createDagRuntime, type DagRuntime } from "./dag-runtime"
 import { composeTaskEngine } from "./engine"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 const cleanupRoots: string[] = []
-const STEP_BUDGET_MS = 3_000
 // Above every reachable pid, so it can only ever be "alive" through the injected probe.
 const FOREIGN_HOST_PID = 2_147_483_647
 
@@ -36,14 +31,16 @@ afterEach(() => {
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
 function within<T>(promise: Promise<T>, step: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const bound = new Promise<never>((_resolve, reject) => {
-    timer = setTimeout(() => reject(new Error(`within(${STEP_BUDGET_MS}ms) exceeded while awaiting ${step}`)), STEP_BUDGET_MS)
+    timer = setTimeout(() => reject(new Error(`the test budget ran out while awaiting ${step}`)), remainingTestTime())
   })
   return Promise.race([promise, bound]).finally(() => {
     if (timer !== undefined) clearTimeout(timer)
@@ -142,8 +139,15 @@ async function pausedHandoffFixture(name: string, predecessor: Predecessor = "fo
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => new ScriptedRunner(), process: () => new ScriptedRunner() },
   })
-  firstEngine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
-  const firstRuntime = createDagRuntime({ pi: firstPi, engine: firstEngine, logger: { info: () => undefined, warn: () => undefined, error: () => undefined } })
+  firstEngine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    sessionManager: { getSessionId: () => sessionId },
+  })
+  const firstRuntime = createDagRuntime({
+    pi: firstPi,
+    engine: firstEngine,
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+  })
   // #8020: retirement now drains the scheduler before releasing the lease, so the
   // pause is awaited; the fixture must not observe the checkpoint mid-drain.
   await firstRuntime.pauseForShutdown()
@@ -166,11 +170,13 @@ async function pausedHandoffFixture(name: string, predecessor: Predecessor = "fo
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
-  engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
+  engine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    sessionManager: { getSessionId: () => sessionId },
+  })
   // The same-host probe says EVERY pid is alive: the reopen must be decided by identity, not liveness.
-  const isProcessAlive = predecessor === "foreign-host"
-    ? (pid: number) => pid === FOREIGN_HOST_PID && holder.alive
-    : () => true
+  const isProcessAlive =
+    predecessor === "foreign-host" ? (pid: number) => pid === FOREIGN_HOST_PID && holder.alive : () => true
   const runtime: DagRuntime = createDagRuntime({
     pi,
     engine,
@@ -203,7 +209,10 @@ async function ownRuntimePauseFixture(name: string) {
     sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
-  engine.runtime.captureFrom({ modelRegistry: createTeamServiceTestModelRegistry(), sessionManager: { getSessionId: () => sessionId } })
+  engine.runtime.captureFrom({
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    sessionManager: { getSessionId: () => sessionId },
+  })
   const runtime: DagRuntime = createDagRuntime({
     pi,
     engine,
@@ -215,15 +224,18 @@ async function ownRuntimePauseFixture(name: string) {
     leaseWatch: { isProcessAlive: () => true, timers, intervalMs: 250 },
   })
   await within(runtime.attach(), "attach")
-  const started = await within(runtime.manager.start({
-    parentSessionId: sessionId,
-    rootSessionId: sessionId,
-    definition: {
-      key: `lease-own-${name}`,
-      name: "own runtime pause",
-      nodes: [{ id: "resume", prompt: "resume", subagent_type: "explore", model: "omo-mock/mock-1" }],
-    },
-  }), "manager.start")
+  const started = await within(
+    runtime.manager.start({
+      parentSessionId: sessionId,
+      rootSessionId: sessionId,
+      definition: {
+        key: `lease-own-${name}`,
+        name: "own runtime pause",
+        nodes: [{ id: "resume", prompt: "resume", subagent_type: "explore", model: "omo-mock/mock-1" }],
+      },
+    }),
+    "manager.start",
+  )
   const runId = started.snapshot.runId
   await within(runner.whenStarted(1), "runner.whenStarted(1)")
   await runtime.pauseForShutdown()
@@ -243,7 +255,9 @@ describe("DAG runtime recovery across a host handoff", () => {
     // then the run stays paused, the deferral is logged, and one poll is armed
     expect(status()).toBe("paused")
     expect(events().some((event) => event.type === "dag.run.resumed")).toBe(false)
-    expect(warnings.some((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === FOREIGN_HOST_PID)).toBe(true)
+    expect(
+      warnings.some((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === FOREIGN_HOST_PID),
+    ).toBe(true)
     expect(timers.pending()).toBe(1)
 
     // when the predecessor keeps running across two polls
@@ -264,7 +278,9 @@ describe("DAG runtime recovery across a host handoff", () => {
 
     // then
     expect(result.status).toBe("completed")
-    expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "resumed after handoff" }))
+    expect(result.nodes.resume).toEqual(
+      expect.objectContaining({ state: "completed", output: "resumed after handoff" }),
+    )
     expect(events().some((event) => event.type === "dag.run.resumed")).toBe(true)
     expect(timers.pending()).toBe(0)
     runtime.dispose()
@@ -310,7 +326,10 @@ describe("DAG runtime recovery across a host handoff", () => {
 describe("DAG runtime recovery when the same host reopens the session", () => {
   test("#given a paused run whose previous host is THIS process and whose session runtime was disposed #when the same host reopens the session #then attach claims and resumes it without arming a lease watch", async () => {
     // given - the checkpoint still names process.pid as the predecessor and the probe calls every pid alive
-    const { runId, sessionId, timers, warnings, runner, runtime, events, status } = await pausedHandoffFixture("same-host", "same-host")
+    const { runId, sessionId, timers, warnings, runner, runtime, events, status } = await pausedHandoffFixture(
+      "same-host",
+      "same-host",
+    )
 
     // when the successor runtime attaches in the same process (attach settles only once the claimed
     // run does, so the child is admitted first and settled below)
@@ -324,10 +343,14 @@ describe("DAG runtime recovery when the same host reopens the session", () => {
     await within(attaching, "attach")
     const result = await within(runtime.wait(runId, sessionId), "runtime.wait")
     expect(result.status).toBe("completed")
-    expect(result.nodes.resume).toEqual(expect.objectContaining({ state: "completed", output: "resumed in the same host" }))
+    expect(result.nodes.resume).toEqual(
+      expect.objectContaining({ state: "completed", output: "resumed in the same host" }),
+    )
     expect(events().some((event) => event.type === "dag.run.resumed")).toBe(true)
     expect(timers.pending()).toBe(0)
-    expect(warnings.some((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === process.pid)).toBe(false)
+    expect(warnings.some((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === process.pid)).toBe(
+      false,
+    )
     runtime.dispose()
   })
 
@@ -365,7 +388,9 @@ describe("DAG runtime recovery when the same host reopens the session", () => {
     // then - a watch on our own pid could only fire once this process is gone, and the deferral
     // warning it would log ("resuming once that pid is gone") could never come true
     expect(timers.pending()).toBe(0)
-    expect(warnings.filter((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === process.pid)).toEqual([])
+    expect(
+      warnings.filter((entry) => entry.fields?.runId === runId && entry.fields?.holderPid === process.pid),
+    ).toEqual([])
     runtime.dispose()
   })
 })

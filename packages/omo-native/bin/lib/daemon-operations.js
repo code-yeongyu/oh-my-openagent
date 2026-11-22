@@ -51,9 +51,11 @@ function liveEndpoints(endpoints) {
 function ownedEndpoints(endpoints) {
   return endpoints.filter((endpoint) => {
     if (!operable(endpoint) || typeof endpoint.socket !== "string") return false
-    return endpoint.reachable ||
+    return (
+      endpoint.reachable ||
       (endpoint.generations ?? []).some((generation) => generation.alive) ||
       (endpoint.claims_live ?? 0) > 0
+    )
   })
 }
 
@@ -100,7 +102,8 @@ export function runHandoff({ engine, pluginRoot, agentDir, env, policy, config, 
   let refused = false
   const commandEnv = hostCommandEnvironment(env, agentDir, config)
   for (const endpoint of all.endpoints) {
-    if (!operable(endpoint) && typeof endpoint.socket === "string") stdout.write(`${endpoint.socket}: skipped (tui endpoint, owned by its terminal)\n`)
+    if (!operable(endpoint) && typeof endpoint.socket === "string")
+      stdout.write(`${endpoint.socket}: skipped (tui endpoint, owned by its terminal)\n`)
   }
   for (const endpoint of liveEndpoints(all.endpoints)) {
     const daemon = basename(endpoint.socket) === "rpc.sock"
@@ -177,7 +180,12 @@ function waitForEndpoint(engine, socket, agentDir, env, timeoutSeconds, now, pau
   let polls = 0
   let latest
   while (now() <= deadline) {
-    const call = endpointCall(engine, ["host", "status", "--json", "--socket", socket, "--include-workers"], agentDir, env)
+    const call = endpointCall(
+      engine,
+      ["host", "status", "--json", "--socket", socket, "--include-workers"],
+      agentDir,
+      env,
+    )
     latest = call.parsed
     polls += 1
     const alive = (latest?.generations ?? []).some((generation) => generation.alive)

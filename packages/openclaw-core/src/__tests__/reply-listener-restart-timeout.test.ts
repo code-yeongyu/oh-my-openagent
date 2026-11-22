@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -142,13 +141,17 @@ describe("startReplyListener", () => {
     )
     writeFileSync(
       configFilePath,
-      JSON.stringify({
-        ...createConfig(),
-        replyListener: {
-          ...createConfig().replyListener,
-          discordChannelId: "stale-channel",
+      JSON.stringify(
+        {
+          ...createConfig(),
+          replyListener: {
+            ...createConfig().replyListener,
+            discordChannelId: "stale-channel",
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     )
 
     let spawnCalls = 0
@@ -156,8 +159,7 @@ describe("startReplyListener", () => {
       spawnCalls += 1
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
     const killSpy = spyOn(process, "kill").mockImplementation(() => true)
@@ -188,13 +190,17 @@ describe("startReplyListener", () => {
     )
     writeFileSync(
       configFilePath,
-      JSON.stringify({
-        ...createConfig(),
-        replyListener: {
-          ...createConfig().replyListener,
-          discordChannelId: "stale-channel",
+      JSON.stringify(
+        {
+          ...createConfig(),
+          replyListener: {
+            ...createConfig().replyListener,
+            discordChannelId: "stale-channel",
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     )
 
     let spawnCalls = 0
@@ -202,8 +208,7 @@ describe("startReplyListener", () => {
       spawnCalls += 1
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
     const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
@@ -226,5 +231,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

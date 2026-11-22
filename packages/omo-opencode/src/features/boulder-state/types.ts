@@ -5,6 +5,8 @@ export type {
   BoulderWorkResumeOption,
   BoulderWorkState,
   BoulderWorkStatus,
+  MomusReviewArtifactInput,
+  MomusReviewVerdict,
   PlanProgress,
   TaskSessionState,
   TopLevelTaskRef,

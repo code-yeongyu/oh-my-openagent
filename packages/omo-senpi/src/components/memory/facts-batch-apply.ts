@@ -3,7 +3,6 @@ import { join } from "node:path"
 import { existsSync, mkdir, rm } from "@oh-my-opencode/memory-core/fs"
 
 import {
-  FactsPlanParentDirtyError,
   GitMemoryRepo,
   LockContentionError,
   applyFactsRecovery,
@@ -12,9 +11,11 @@ import {
   findFactsBatchReceipt,
   getProcessStartIdentity,
   memoryWriterLockPath,
-  planFactsMutation,
   validateFactsRecovery,
   withLock,
+  type AgreementEvent,
+  type AgreementExtractionRecord,
+  type AgreementsPolicy,
   type FactsApplyRecovery,
   type FactsExtractionRecord,
   type FactsPeopleRouting,
@@ -33,9 +34,15 @@ const WRITER_ATTEMPTS = 3
 export type Applied =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
   | { readonly outcome: "parent_dirty"; readonly detail?: string }
+  | { readonly outcome: "unchanged" }
 
 /** The cross-process `memory-write` lock every facts apply takes (2 s wait per attempt). */
-export async function withFactsWriterLock<T>(locksDir: string, operation: () => Promise<T>, attempt: number, runId = `facts-${attempt}`): Promise<T> {
+export async function withFactsWriterLock<T>(
+  locksDir: string,
+  operation: () => Promise<T>,
+  attempt: number,
+  runId = `facts-${attempt}`,
+): Promise<T> {
   const record = await createLockRecord("memory-write", { runId })
   return withLock(memoryWriterLockPath(locksDir), record, operation, { waitTimeoutMs: 2_000 })
 }
@@ -83,18 +90,20 @@ export async function applyFactsWithRetriesUnderLock(options: {
   const kept = await readRunJson<FactsRunLedger>(ledgerPath).catch(() => undefined)
   const resumed = kept?.batchId === options.batchId && kept.applyRecovery !== undefined
   const startedAt = (options.now ?? (() => new Date()))()
-  const ledger: FactsRunLedger = resumed ? { ...kept, ...owner } : {
-    version: 1,
-    runId: `apply-${options.batchId}`,
-    kind: "facts",
-    startedAt: startedAt.toISOString(),
-    hardDeadlineAt: startedAt.getTime(),
-    terminationGraceMs: 0,
-    deadlineAt: startedAt.getTime(),
-    batchId: options.batchId,
-    queued: [],
-    ...owner,
-  }
+  const ledger: FactsRunLedger = resumed
+    ? { ...kept, ...owner }
+    : {
+        version: 1,
+        runId: `apply-${options.batchId}`,
+        kind: "facts",
+        startedAt: startedAt.toISOString(),
+        hardDeadlineAt: startedAt.getTime(),
+        terminationGraceMs: 0,
+        deadlineAt: startedAt.getTime(),
+        batchId: options.batchId,
+        queued: [],
+        ...owner,
+      }
   activeAppliedBatches().add(runDir)
   let settled = false
   try {
@@ -111,7 +120,8 @@ export async function applyFactsWithRetriesUnderLock(options: {
       people: options.people,
       identity: options.identity,
       ...(options.logger === undefined ? {} : { logger: options.logger }),
-      withWriterLock: (operation, attempt) => withFactsWriterLock(options.identity.paths.locks, operation, attempt, ledger.runId),
+      withWriterLock: (operation, attempt) =>
+        withFactsWriterLock(options.identity.paths.locks, operation, attempt, ledger.runId),
     })
     settled = applied !== undefined
     return applied
@@ -119,7 +129,8 @@ export async function applyFactsWithRetriesUnderLock(options: {
     // A throw or an exhausted lock is not terminal: the on-disk ledger, not this call's path, says
     // whether a planned recovery exists. Kept envelopes are unowned, so any later reconcile finishes them.
     const onDisk = settled ? undefined : await readRunJson<FactsRunLedger>(ledgerPath).catch(() => undefined)
-    if (onDisk?.applyRecovery !== undefined) await writeRunJsonAtomic(ledgerPath, { ...onDisk, pid: undefined, processStart: undefined })
+    if (onDisk?.applyRecovery !== undefined)
+      await writeRunJsonAtomic(ledgerPath, { ...onDisk, pid: undefined, processStart: undefined })
     activeAppliedBatches().delete(runDir)
     if (onDisk?.applyRecovery === undefined) await rm(runDir, { recursive: true, force: true })
   }
@@ -135,18 +146,25 @@ export function resolveFactsPeopleRouting(config: OmoConfig, identity: string): 
   }
 }
 
-export async function applyFactsWithRetries(options: {
+type ClaimedApplyOptions = {
   readonly runDir: string
   readonly ledger: FactsRunLedger
   readonly repo: GitMemoryRepo
   readonly records: ReturnType<typeof parseFactsExtractionJsonl>
+  readonly agreements?: readonly AgreementExtractionRecord[]
+  readonly agreementsPolicy?: AgreementsPolicy
   readonly people: FactsPeopleRouting
   readonly identity: MemoryIdentity
   readonly logger?: ComponentLogger
-  readonly withWriterLock: <T>(operation: () => Promise<T>, attempt: number) => Promise<T>
-  readonly retryDelay?: (attempt: number, delayMs: number) => Promise<void>
-  readonly random?: () => number
-}): Promise<Applied | undefined> {
+}
+
+export async function applyFactsWithRetries(
+  options: ClaimedApplyOptions & {
+    readonly withWriterLock: <T>(operation: () => Promise<T>, attempt: number) => Promise<T>
+    readonly retryDelay?: (attempt: number, delayMs: number) => Promise<void>
+    readonly random?: () => number
+  },
+): Promise<Applied | undefined> {
   for (let attempt = 1; attempt <= WRITER_ATTEMPTS; attempt += 1) {
     try {
       return await options.withWriterLock(async () => applyClaimed(options), attempt)
@@ -163,44 +181,89 @@ export async function applyFactsWithRetries(options: {
   return undefined
 }
 
-async function applyClaimed(options: {
-  readonly runDir: string
-  readonly ledger: FactsRunLedger
-  readonly repo: GitMemoryRepo
-  readonly records: ReturnType<typeof parseFactsExtractionJsonl>
-  readonly people: FactsPeopleRouting
-  readonly identity: MemoryIdentity
-  readonly logger?: ComponentLogger
-}): Promise<Applied> {
+async function applyClaimed(options: ClaimedApplyOptions): Promise<Applied> {
   const receipt = await findFactsBatchReceipt(options.repo, options.ledger.batchId)
-  if (receipt !== undefined) return { outcome: "committed", sha: receipt.sha, affectedPaths: await receiptPaths(options.repo, receipt.sha, options.ledger.batchId) }
-  const batch = { batchId: options.ledger.batchId, records: options.records }
+  if (receipt !== undefined)
+    return {
+      outcome: "committed",
+      sha: receipt.sha,
+      affectedPaths: await receiptPaths(options.repo, receipt.sha, options.ledger.batchId),
+    }
+  const agreements = options.agreements ?? []
+  const batch = {
+    batchId: options.ledger.batchId,
+    records: options.records,
+    ...(agreements.length === 0 ? {} : { agreements }),
+  }
   let recovery: FactsApplyRecovery
   if (options.ledger.applyRecovery !== undefined) {
     recovery = options.ledger.applyRecovery
     validateFactsRecovery(recovery, batch)
   } else {
+    const { planFactsMutation, FactsPlanParentDirtyError } = await import("#omo-memory-commands-runtime")
     try {
-      recovery = await planFactsMutation(options.repo, batch, options.people, (tie) => options.logger?.warn(
-        "facts person alias tie resolved by slug order",
-        { alias: tie.alias, slugs: tie.slugs.join(","), chosen: tie.chosen },
-      ))
+      recovery = await planFactsMutation(
+        options.repo,
+        batch,
+        options.people,
+        (tie) =>
+          options.logger?.warn("facts person alias tie resolved by slug order", {
+            alias: tie.alias,
+            slugs: tie.slugs.join(","),
+            chosen: tie.chosen,
+          }),
+        options.agreementsPolicy,
+        (event) => logAgreementEvent(options.logger, options.ledger.batchId, event),
+      )
     } catch (error) {
       if (error instanceof FactsPlanParentDirtyError) return { outcome: "parent_dirty" }
       throw error
     }
+    if (recovery.paths.length === 0) return { outcome: "unchanged" }
     await updateRunLedger(`${options.runDir}/ledger.json`, {
       headBeforeApply: recovery.headBeforeApply,
       applyRecovery: recovery,
     })
   }
-  const result = await applyFactsRecovery(options.repo, recovery, options.records.length, {
-    agentId: options.identity.id,
-    authorName: "Facts Extractor",
-  })
+  const result = await applyFactsRecovery(
+    options.repo,
+    recovery,
+    options.records.length + agreements.length,
+    {
+      agentId: options.identity.id,
+      authorName: "Facts Extractor",
+    },
+    {
+      batch,
+      agreementsPolicy: options.agreementsPolicy,
+      publishRecovery: async (next) => {
+        await updateRunLedger(`${options.runDir}/ledger.json`, { applyRecovery: next })
+      },
+    },
+  )
   return result.outcome === "parent_dirty"
     ? result
     : { outcome: "committed", sha: result.sha, affectedPaths: result.affectedPaths }
+}
+
+function logAgreementEvent(logger: ComponentLogger | undefined, batchId: string, event: AgreementEvent): void {
+  switch (event.kind) {
+    case "evicted":
+      logger?.warn("agreement ledger full: evicted the oldest unreaffirmed agreement", {
+        batchId,
+        id: event.item.id,
+        text: event.item.text,
+        since: event.item.since,
+        forText: event.forText,
+      })
+      return
+    case "refused":
+      logger?.warn("agreement ledger full: refused a new agreement (nothing evictable)", { batchId, text: event.text })
+      return
+    case "stale-reaffirm":
+      logger?.warn("agreement reaffirm ignored: the agreement is no longer in the ledger", { batchId, id: event.id })
+      return
+  }
 }
 
 // A batch answered from its receipt (a retried client batchId) reports the paths that commit wrote.

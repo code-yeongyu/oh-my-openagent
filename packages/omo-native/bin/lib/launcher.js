@@ -1,15 +1,25 @@
 import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
+import { pathToFileURL } from "node:url"
 import { isEngineCommand } from "./engine-commands.js"
 import { spawnNode } from "./child-process.js"
+import { privateFdHandoff } from "./private-fds.js"
+import { launchClaimsMemorySyncAtBoot } from "./memory-sync-boot.js"
 import { doctorCoverageLines } from "./category-coverage.js"
+import { runDoctorModels } from "./model-chains.js"
 import { doctorComputerUseLines } from "./computer-use-doctor.js"
 import { doctorConfigLines } from "./config-doctor.js"
 import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { runDoctor } from "./doctor.js"
+import { reflectionLockFix, reflectionLockReport } from "./doctor-reflection-lock.js"
+import {
+  memoryRuntimeDiscardResolver,
+  memoryRuntimeMaxBytesResolver,
+  memoryRuntimeReport,
+} from "./doctor-memory-runtime.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -43,14 +53,32 @@ function preparedSenpi() {
   return senpi
 }
 
+// A memory-sync launch reaches the engine through this entry, which claims before senpi's CLI loads (#11997).
+const ENGINE_BOOT_ENTRY = join(packageRoot, "bin", "lib", "engine-boot.js")
+const DEVICE_ACCOUNT_SIDECAR = join(packageRoot, "plugin", "extensions", "omo-device-account.js")
+
+/** Whether a launch that hands down a private-descriptor table claims memory sync at boot (the sidecar's gate). */
+async function bootsWithMemorySyncClaim(args, env) {
+  try {
+    const { claimsMemorySyncAtBoot } = await import(pathToFileURL(DEVICE_ACCOUNT_SIDECAR).href)
+    // spawnNode starts the engine entry on this runtime without exec arguments; engine-boot.js checks again in-process.
+    return launchClaimsMemorySyncAtBoot(args, env, claimsMemorySyncAtBoot, { execArgv: [], versions: process.versions })
+  } catch (error) {
+    // Without the sidecar the memory component's registration still selects once when the first session opens.
+    process.stderr.write(
+      `omo: memory sync could not start at boot: ${error instanceof Error ? error.message : String(error)}\n`,
+    )
+    return false
+  }
+}
+
 async function spawnSenpi(args, withExtension) {
   const senpi = preparedSenpi()
-  const finalArgs = withExtension
-    ? ["--extension", join(packageRoot, "plugin"), ...args]
-    : args
+  const finalArgs = withExtension ? ["--extension", join(packageRoot, "plugin"), ...args] : args
   const env = senpiEnvironment(senpi.packageRoot)
   if (withExtension) withHerdrAgentHint(env, args)
-  if (process.platform !== "win32" && typeof process.execve === "function") {
+  const handoff = privateFdHandoff(env)
+  if (handoff === undefined && process.platform !== "win32" && typeof process.execve === "function") {
     try {
       process.execve(process.execPath, [process.execPath, senpi.cliPath, ...finalArgs], env)
       return
@@ -58,7 +86,18 @@ async function spawnSenpi(args, withExtension) {
       // A failed replacement still uses the signal-aware child path below.
     }
   }
-  await spawnNode(senpi.cliPath, finalArgs, { env })
+  if (handoff !== undefined && (await bootsWithMemorySyncClaim(finalArgs, handoff.env))) {
+    await spawnNode(ENGINE_BOOT_ENTRY, [senpi.cliPath, ...finalArgs], handoff)
+    return
+  }
+  await spawnNode(senpi.cliPath, finalArgs, handoff ?? { env })
+}
+
+// `omo remote attach`: the engine's attach TUI runs as a signal-forwarding child, never an execve replacement,
+// because this process serves the endpoint the TUI is attached to until the TUI exits.
+export async function runAttachTui(args) {
+  const senpi = preparedSenpi()
+  await spawnNode(senpi.cliPath, args, { env: senpiEnvironment(senpi.packageRoot) })
 }
 
 // Routine launch notices go straight to stderr: Bun renders every console.error line red on a
@@ -137,13 +176,16 @@ export async function runLauncher(args = process.argv.slice(2)) {
   // The toolkit CLI is no longer part of the Native payload; the loop is driven in-process by the
   // eval SDK the extension publishes. Report that plainly instead of failing on a missing file.
   if (command === "ulw-loop") {
-    console.error('omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).')
+    console.error(
+      'omo ulw-loop is unavailable in this build: use the agent toolkit SDK from an eval js cell: const { agentToolkit } = await import(`${env("OMO_AGENT_TOOLKIT_SDK_ROOT")}/sdk.js`); print(await agentToolkit.status()) (Codex keeps the standalone CLI).',
+    )
     process.exitCode = 2
     return
   }
   if (command === "thread") {
     process.exitCode = await runThreadCommand(args.slice(1), {
       engine: { run: engineHostCall },
+      reinstall: `Reinstall omo with: ${updateTarget().command}, then retry.`,
       pluginRoot: join(packageRoot, "plugin"),
       agentDir: canonicalAgentDir(),
       env: process.env,
@@ -179,26 +221,48 @@ export async function runLauncher(args = process.argv.slice(2)) {
   if (command === "doctor") {
     // Doctor is a launch too: it reports only what the launch-time preparation could not fix.
     preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
-    const [categoryCoverage, computerUse, configDiagnostics, gateway] = args[1] === "--reap"
-      ? [[], [], [], []]
-      : await Promise.all([
-          doctorCoverageLines({ agentDir: canonicalAgentDir() }),
-          doctorComputerUseLines(),
-          doctorConfigLines(),
-          import("./gateway.js").then((hook) => hook.gatewayDoctorLines()),
-        ])
+    if (args[1] === "--models") {
+      process.exitCode = await runDoctorModels(args.slice(2), { agentDir: canonicalAgentDir() })
+      return
+    }
+    if (args[1] === "--fix") {
+      const extra = args.slice(2).filter((arg) => arg !== "--dry-run")
+      if (extra.length > 0) {
+        console.log(`FAIL unknown argument ${JSON.stringify(extra[0])}: omo doctor --fix [--dry-run]`)
+        process.exitCode = 1
+        return
+      }
+      const result = await reflectionLockFix({ dryRun: args.includes("--dry-run") })
+      console.log(result.lines.join("\n"))
+      process.exitCode = result.failed ? 1 : 0
+      return
+    }
+    const [categoryCoverage, computerUse, configDiagnostics, reflectionLock, memoryRuntime] =
+      args[1] === "--reap"
+        ? [[], [], [], [], []]
+        : await Promise.all([
+            doctorCoverageLines({ agentDir: canonicalAgentDir() }),
+            doctorComputerUseLines(),
+            doctorConfigLines(),
+            reflectionLockReport(),
+            memoryRuntimeReport({
+              maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot: join(packageRoot, "plugin") }),
+              discardFor: memoryRuntimeDiscardResolver({ pluginRoot: join(packageRoot, "plugin") }),
+            }).then(
+              (report) => report.lines,
+              (error) => [
+                `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`,
+              ],
+            ),
+          ])
     runDoctor(await detectHarnesses(), args.slice(1), {
       daemonEngine: { run: engineHostCall },
       categoryCoverage,
       computerUse,
       configDiagnostics,
-      gateway,
+      reflectionLock,
+      memoryRuntime,
     })
-    return
-  }
-  if (command === "gateway") {
-    const { runGatewayCommand } = await import("./gateway.js")
-    process.exitCode = await runGatewayCommand(args.slice(1))
     return
   }
   if (command === "setup") {

@@ -8,11 +8,14 @@ import { boundedText, budgeted, okText, rejection, type KibitzerSidecarTool } fr
 
 export const KIBITZER_READ_TOOL_NAME = "read"
 
-export const KibitzerReadParams = Type.Object({
-  path: Type.String({ description: "File path relative to the workspace root." }),
-  offset: Type.Optional(Type.Integer({ minimum: 1, description: "1-based first line to return; defaults to 1." })),
-  limit: Type.Optional(Type.Integer({ minimum: 1, description: "Maximum number of lines to return." })),
-}, { additionalProperties: false })
+export const KibitzerReadParams = Type.Object(
+  {
+    path: Type.String({ description: "File path relative to the workspace root." }),
+    offset: Type.Optional(Type.Integer({ minimum: 1, description: "1-based first line to return; defaults to 1." })),
+    limit: Type.Optional(Type.Integer({ minimum: 1, description: "Maximum number of lines to return." })),
+  },
+  { additionalProperties: false },
+)
 
 export interface KibitzerReadToolInput {
   readonly workspaceRoot: string

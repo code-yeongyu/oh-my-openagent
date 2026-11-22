@@ -10,6 +10,7 @@ export function messageability(
   isDaemonReachable?: (hostSession: HostSessionIdentity) => boolean,
 ): Messageability {
   if (killed === true) return "not-continuable"
+  if (status === "paused") return "not-continuable"
   // Persisted-only children keep the session-resume contract. A terminal RPC child is different:
   // its completed transcript can be reattached lazily when task_send explicitly targets it.
   if (residencyState === "disposed" || residencyState === "persisted_only") return "not-continuable"

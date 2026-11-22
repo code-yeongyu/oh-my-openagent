@@ -45,10 +45,11 @@ describe("parked recovery contract (#9861)", () => {
       const id = await f.start()
       f.state.revivable = true
       if (missing === "transcript") rmSync(join(f.store.stateDir, "children", id), { recursive: true, force: true })
-      else f.store.mutate(id, (record) => {
-        const { spawn_spec: _spec, ...rest } = record
-        return rest
-      })
+      else
+        f.store.mutate(id, (record) => {
+          const { spawn_spec: _spec, ...rest } = record
+          return rest
+        })
       const ended = f.wait("suspended_unresumable")
       f.park(id)
       await ended
@@ -61,7 +62,10 @@ describe("parked recovery contract (#9861)", () => {
     const f = fixture()
     const id = await f.start()
     f.store.mutate(id, (record) => ({ ...record, final_response: "saved partial output" }))
-    f.store.appendEvent(id, { type: TRANSCRIPT_ASSISTANT_EVENT, payload: { text: "transcript evidence before parking" } })
+    f.store.appendEvent(id, {
+      type: TRANSCRIPT_ASSISTANT_EVENT,
+      payload: { text: "transcript evidence before parking" },
+    })
     const attempted = f.wait("live_parent_recovery_attempt")
     f.park(id)
     await attempted
@@ -112,11 +116,12 @@ describe("parked recovery contract (#9861)", () => {
     expect(f.messages).toHaveLength(1)
   })
 
-  test("a shutdown park without a reason resumes automatically after parent restart", async () => {
+  test("a quit shutdown park is marked session_quit and resumes automatically after parent restart", async () => {
     const f = fixture()
     const id = await f.start()
     await f.lifecycle.suspendOnSessionShutdown({ parentSessionId: "parent-1", reason: "quit" })
-    expect(f.store.load(id)?.suspension_reason).toBeUndefined()
+    // senpi#3493: the park records WHY the row still says running; the auto-resume below must not change.
+    expect(f.store.load(id)?.suspension_reason).toBe("session_quit")
     expect(f.manager.concurrency?.leaseState(id, 0)).not.toBe("held")
     f.restart()
     f.state.revivable = true
@@ -146,10 +151,14 @@ describe("parked recovery contract (#9861)", () => {
       f.advance(295_000)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+        cause: reason,
+      })
       expect(f.store.load(id)?.fallback_closing_child?.requires_confirmation).toBe(true)
       expect(f.messages).toHaveLength(1)
-      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ confirmed_stop: false })
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+        confirmed_stop: false,
+      })
     })
   }
 
@@ -163,7 +172,9 @@ describe("parked recovery contract (#9861)", () => {
       f.park(id)
       await ended
       expect(f.store.load(id)?.status).toBe("error")
-      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({ cause: reason })
+      expect(f.recordedEvents.find((event) => event.type === "suspended_unresumable")?.payload).toMatchObject({
+        cause: reason,
+      })
       expect(f.messages).toHaveLength(1)
       expect(f.state.respawns).toBe(1)
     })
@@ -195,7 +206,11 @@ describe("parked recovery contract (#9861)", () => {
     const epoch = f.store.load(id)?.notification.run_epoch
     expect(epoch).toBeDefined()
     expect(f.manager.concurrency?.leaseState(id, epoch ?? -1)).not.toBe("held")
-    const sent = await f.manager.sendToTask({ idOrName: id, message: "continue with the corrected scope", deliverAs: "steer" })
+    const sent = await f.manager.sendToTask({
+      idOrName: id,
+      message: "continue with the corrected scope",
+      deliverAs: "steer",
+    })
     expect(sent.kind).toBe("queued")
     f.state.revivable = true
     const delivered = f.wait("steered")

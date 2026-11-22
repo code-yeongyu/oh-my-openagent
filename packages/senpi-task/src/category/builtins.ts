@@ -38,10 +38,9 @@ function hasRequiresModel(
   return definition.requiresModel !== undefined
 }
 
-// A gate lists every model id that opens the category; one present id is enough. ultrabrain gates on
-// gpt-6-astra OR gpt-5.6-sol so a registry carrying either GPT flagship keeps it, deep-low on either
-// GPT-6 Sol tier and deep-high on gpt-6-astra alone, and a registry with none of a lane's ids never
-// falls through to a cross-family model.
+// A gate lists every model id that opens the category; one present id is enough. ultrabrain and
+// deep-high gate on gpt-6.2-astra alone and deep-low on gpt-6.2-sol alone (#14155), so a registry
+// without a lane's exact model never falls through to an older, Fast or cross-family model.
 export const BUILTIN_CATEGORY_REQUIRES_MODEL: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
   BUILTIN_CATEGORY_DEFAULTS.filter(hasRequiresModel).map((definition) => [
     definition.name,
@@ -56,9 +55,7 @@ export function categoryGateModels(categoryName: string): readonly string[] | un
 }
 
 function categoryChainProviders(categoryName: string): readonly string[] {
-  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName)
-    ? CATEGORY_FALLBACK_CHAINS[categoryName]
-    : []
+  const chain = Object.hasOwn(CATEGORY_FALLBACK_CHAINS, categoryName) ? CATEGORY_FALLBACK_CHAINS[categoryName] : []
   return chain.flatMap((rung) => rung.providers)
 }
 
@@ -68,8 +65,10 @@ function categoryChainProviders(categoryName: string): readonly string[] {
 // part of the check: a gateway re-publishing the model (openrouter/anthropic/claude-opus-5.5) serves
 // no builtin rung, because a builtin chain resolves only on the providers it lists (#9146).
 function providerServesModel(provider: string, model: string, availableModels: ReadonlySet<string>): boolean {
-  return availableModels.has(`${provider}/${model}`)
-    || availableModels.has(`${provider}/${transformModelForProvider(provider, model)}`)
+  return (
+    availableModels.has(`${provider}/${model}`) ||
+    availableModels.has(`${provider}/${transformModelForProvider(provider, model)}`)
+  )
 }
 
 // `availableModels` holds live registry models as `provider/id`. A gate opens only when a provider
@@ -83,8 +82,37 @@ export function isCategoryGateSatisfied(
   if (gateModels === undefined || hasExplicitUserConfig) return true
   const chainProviders = categoryChainProviders(categoryName)
   return gateModels.some((gateModel) =>
-    chainProviders.some((provider) => providerServesModel(provider, gateModel, availableModels))
+    chainProviders.some((provider) => providerServesModel(provider, gateModel, availableModels)),
   )
+}
+
+export type ExactServedRung = readonly [narrowed: DelegateFallbackEntry, original: DelegateFallbackEntry]
+
+const EXACT_MODEL_CATEGORIES: ReadonlySet<string> = new Set(
+  BUILTIN_CATEGORY_DEFAULTS.filter((definition) => definition.exactModels === true).map(
+    (definition) => definition.name,
+  ),
+)
+
+function isExactModelCategory(categoryName: string): boolean {
+  return EXACT_MODEL_CATEGORIES.has(categoryName)
+}
+
+// An `exactModels` category resolves its builtin chain on exact ids only, as its gate does (#14155).
+// delegate-core matches a rung by substring and prefers the exact id only on a provider that has one, so
+// a rung still listing a provider that serves just `gpt-6.2-sol-fast` would select it for `gpt-6.2-sol`.
+// Each rung keeps only the providers serving its model exactly, paired with the rung it came from;
+// undefined for every other category, whose chain resolves as listed.
+export function exactServedRungs(
+  categoryName: string,
+  chain: readonly DelegateFallbackEntry[],
+  availableModels: ReadonlySet<string>,
+): readonly ExactServedRung[] | undefined {
+  if (!isExactModelCategory(categoryName)) return undefined
+  return chain.flatMap((rung): readonly ExactServedRung[] => {
+    const providers = rung.providers.filter((provider) => providerServesModel(provider, rung.model, availableModels))
+    return providers.length === 0 ? [] : [[{ ...rung, providers }, rung]]
+  })
 }
 
 // A chain rung resolves when one of its own providers serves its model in the live registry.
@@ -113,9 +141,10 @@ export function isCategoryChainViable(
 
 export const CATEGORY_PROMPT_APPEND_RESOLVERS: Readonly<Record<string, (model: string | undefined) => string>> =
   Object.fromEntries(
-    BUILTIN_CATEGORY_DEFAULTS
-      .filter(hasPromptAppendResolver)
-      .map((definition) => [definition.name, definition.resolvePromptAppend]),
+    BUILTIN_CATEGORY_DEFAULTS.filter(hasPromptAppendResolver).map((definition) => [
+      definition.name,
+      definition.resolvePromptAppend,
+    ]),
   )
 
 function hasPromptAppendResolver(

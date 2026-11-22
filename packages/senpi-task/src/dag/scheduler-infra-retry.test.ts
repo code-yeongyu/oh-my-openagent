@@ -1,19 +1,39 @@
 import { afterEach, expect, test } from "bun:test"
+import { journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import { dagNode, infraFixture, infrastructureFailure, success, RetryClock } from "./infra-retry-fixture"
 import { createDagScheduler } from "./scheduler"
 import { RunnerError } from "../runners/in-process/runner-error"
 
 const fixtures: ReturnType<typeof infraFixture>[] = []
+// The journal is in memory here (#11621), so this budget is no longer about per-commit disk cost. It
+// bounds the EVENT VOLUME a case produces: #10711 shrank this case from 306 commits to ~112 by keeping
+// the fan-in and dropping the incident's 54 dependents, and a case that regrows its node count would
+// bring the same cost straight back to any file-backed caller (hosted Windows measured ~110-160 ms per
+// commit). The assertion fails before that can happen unnoticed.
+const MAX_JOURNAL_COMMITS_PER_CASE = 150
+
 afterEach(() => {
+  // These cases assert retry semantics, never crash durability, so their journal stays in memory. A
+  // file-backed journal charges contended host I/O per commit - run lock, WAL append, WAL rescans and a
+  // checkpoint rewrite - which is what pushed two of them past the 5 s default under host load (#11621).
+  // Read the evidence before cleanup and assert after it, so a regression reports the disk journal
+  // instead of leaking the temp directory it failed on. Result artifacts and skill manifests are written
+  // by callers that bypass the store (results.ts, skills materialization), so <dag>/results and
+  // <dag>/skills may exist; no case here reads them, and routing those writers through the store is
+  // #11629.
+  const journaled = fixtures.map((fixture) => journalFilesOnDisk(fixture.store))
   for (const fixture of fixtures.splice(0)) fixture.cleanup()
+  for (const files of journaled) expect(files).toEqual([])
 })
 
-test("retries seven infrastructure-failed roots before skipping their 54 dependents", async () => {
-  // Given seven first-wave failures and the production incident's dependent count.
+test("retries seven infrastructure-failed roots so all their fan-in dependents run", async () => {
+  // Given the production incident's seven first-wave failures, each gating every dependent. The fan-in,
+  // not the incident's 54 dependents, is what a premature skip cascade would break.
   const roots = Array.from({ length: 7 }, (_, index) => `root-${index}`)
-  const dependents = Array.from({ length: 54 }, (_, index) => dagNode(`dependent-${index}`, roots))
+  const dependents = Array.from({ length: 7 }, (_, index) => dagNode(`dependent-${index}`, roots))
   const fixture = infraFixture((name, attempt) =>
-    roots.includes(name) && attempt === 1 ? infrastructureFailure() : success())
+    roots.includes(name) && attempt === 1 ? infrastructureFailure() : success(),
+  )
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([...roots.map((id) => dagNode(id)), ...dependents])
 
@@ -22,24 +42,31 @@ test("retries seven infrastructure-failed roots before skipping their 54 depende
 
   // Then every root is retried and every dependent executes.
   expect(result.status).toBe("completed")
-  expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(61)
+  expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(14)
   expect(roots.map((id) => fixture.starts.get(id))).toEqual(Array(7).fill(2))
   const events = fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events
+  expect(events.length).toBeLessThanOrEqual(MAX_JOURNAL_COMMITS_PER_CASE)
   const retries = events.filter((event) => event.type === "dag.node.retried")
   expect(retries).toHaveLength(7)
   expect(retries.map((event) => event.automatic?.attempt)).toEqual(Array(7).fill(1))
   expect(result.diagnostics.filter((diagnostic) => diagnostic.kind === "node_flag")).toHaveLength(7)
-  // 61 real task-manager runs on a file store: ~3 s alone, past bun's 5 s default when the host is loaded.
 }, 30_000)
 
 test("exhausts two infrastructure retries and skips only that root's descendants", async () => {
   // Given a broken branch and an independent branch, with a controlled backoff clock.
   const clock = new RetryClock()
-  const fixture = infraFixture((name) => name === "broken" ? infrastructureFailure() : success(), clock.schedule, clock.now)
+  const fixture = infraFixture(
+    (name) => (name === "broken" ? infrastructureFailure() : success()),
+    clock.schedule,
+    clock.now,
+  )
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([
-    dagNode("broken"), dagNode("child", ["broken"]), dagNode("grandchild", ["child"]),
-    dagNode("independent"), dagNode("independent-child", ["independent"]),
+    dagNode("broken"),
+    dagNode("child", ["broken"]),
+    dagNode("grandchild", ["child"]),
+    dagNode("independent"),
+    dagNode("independent-child", ["independent"]),
   ])
   const first = clock.whenScheduled(1)
   // When each infrastructure attempt fails and the injected timers fire.
@@ -57,10 +84,14 @@ test("exhausts two infrastructure retries and skips only that root's descendants
   expect(result.status).toBe("failed")
   expect(fixture.starts.get("broken")).toBe(3)
   expect(clock.delays).toEqual([1000, 2000])
-  expect(result.nodes.filter((node) => node.state === "skipped").map((node) => String(node.id))).toEqual(["child", "grandchild"])
+  expect(result.nodes.filter((node) => node.state === "skipped").map((node) => String(node.id))).toEqual([
+    "child",
+    "grandchild",
+  ])
   expect(result.nodes.filter((node) => node.state === "completed")).toHaveLength(2)
-  const retries = fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events
-    .filter((event) => event.type === "dag.node.retried")
+  const retries = fixture.store
+    .readEvents(result.runId, 0, { limit: 1000 })
+    .events.filter((event) => event.type === "dag.node.retried")
   expect(retries.map((event) => event.automatic?.attempt)).toEqual([1, 2])
 })
 
@@ -148,7 +179,8 @@ test("preserves the infrastructure retry budget and backoff across scheduler re-
 test("retries a typed host-unavailable start refusal", async () => {
   // Given an unavailable host before the child can start.
   const fixture = infraFixture((_name, attempt) => {
-    if (attempt === 1) throw new RunnerError({ kind: "host_unavailable", reason: "host_unreachable", message: "synthetic host failure" })
+    if (attempt === 1)
+      throw new RunnerError({ kind: "host_unavailable", reason: "host_unreachable", message: "synthetic host failure" })
     return success()
   })
   fixtures.push(fixture)
@@ -161,7 +193,7 @@ test("retries a typed host-unavailable start refusal", async () => {
 })
 
 test("manually retries an exhausted infrastructure node with a prompt override", async () => {
-  const fixture = infraFixture((prompt) => prompt === "work" ? infrastructureFailure() : success())
+  const fixture = infraFixture((prompt) => (prompt === "work" ? infrastructureFailure() : success()))
   fixtures.push(fixture)
   const scheduler = await fixture.scheduler([dagNode("work"), dagNode("child", ["work"])])
   const failed = await scheduler.run()
@@ -187,5 +219,7 @@ test("manually retries an exhausted infrastructure node with a prompt override",
   // Completed work must still be rejected before an override can amend its definition.
   expect(() => retry.scheduler.retryNode(result.runId, nodeIds, { prompt: "again" })).toThrow()
   expect(fixture.store.readEvents(result.runId, 0, { limit: 1000 }).events).toHaveLength(events.length)
-  expect(fixture.store.readCheckpoint<typeof result>(result.runId)?.definitionFingerprint).toBe(result.definitionFingerprint)
+  expect(fixture.store.readCheckpoint<typeof result>(result.runId)?.definitionFingerprint).toBe(
+    result.definitionFingerprint,
+  )
 })

@@ -108,7 +108,12 @@ function durationOf(wave: ClassifiableWave): number {
 function matchesToolName(toolName: string, expected: string): boolean {
   const normalized = normalizeToolName(toolName)
   const suffix = normalizeToolName(expected)
-  return normalized === suffix || normalized.endsWith(`_${suffix}`) || normalized.endsWith(`:${suffix}`) || normalized.endsWith(`/${suffix}`)
+  return (
+    normalized === suffix ||
+    normalized.endsWith(`_${suffix}`) ||
+    normalized.endsWith(`:${suffix}`) ||
+    normalized.endsWith(`/${suffix}`)
+  )
 }
 
 function normalizeToolName(toolName: string): string {

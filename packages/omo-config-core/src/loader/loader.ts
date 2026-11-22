@@ -9,6 +9,7 @@ import {
   type LegacyHarnessRename,
   type OmoConfig,
 } from "../schema"
+import { collectExcludedModels } from "./disabled-skills"
 import { invalidValueDiagnostics, validateConfigLayer, validationDiagnostic } from "./layer-validation"
 import { mergeOmoConfigRecords } from "./merge"
 import { resolveOmoConfigPaths } from "./paths"
@@ -92,11 +93,13 @@ function readConfigSource(
   const parsed = parseJsoncSafe<unknown>(content)
   if (parsed.errors.length > 0) {
     return {
-      diagnostics: [{
-        kind: "parse",
-        message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
-        path,
-      }],
+      diagnostics: [
+        {
+          kind: "parse",
+          message: `JSONC parse error in ${path}: ${parsed.errors.map((error) => error.message).join(", ")}`,
+          path,
+        },
+      ],
       source: { exists: true, loaded: false, path, scope },
     }
   }
@@ -109,9 +112,11 @@ function readConfigSource(
 
 function legacyCategoryDiagnostic(path: string, renames: readonly LegacyCategoryRename[]): OmoConfigDiagnostic {
   const detail = renames
-    .map((rename) => rename.dropped
-      ? `${rename.path} ignored because ${rename.canonical} is also configured`
-      : `${rename.path} renamed to ${rename.canonical}`)
+    .map((rename) =>
+      rename.dropped
+        ? `${rename.path} ignored because ${rename.canonical} is also configured`
+        : `${rename.path} renamed to ${rename.canonical}`,
+    )
     .join(", ")
   return {
     kind: "deprecated-keys",
@@ -123,9 +128,11 @@ function legacyCategoryDiagnostic(path: string, renames: readonly LegacyCategory
 
 function legacyHarnessDiagnostic(path: string, renames: readonly LegacyHarnessRename[]): OmoConfigDiagnostic {
   const detail = renames
-    .map((rename) => rename.dropped
-      ? `${rename.path} ignored because ${rename.canonical} is also configured`
-      : `${rename.path} renamed to ${rename.canonical}`)
+    .map((rename) =>
+      rename.dropped
+        ? `${rename.path} ignored because ${rename.canonical} is also configured`
+        : `${rename.path} renamed to ${rename.canonical}`,
+    )
     .join(", ")
   return {
     kind: "deprecated-keys",
@@ -180,9 +187,17 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   })
   const finalInput = mergeOmoConfigRecords(DEFAULT_RAW_CONFIG, resolved.config)
   const finalConfig = OmoConfigSchema.safeParse(finalInput)
+  // The generic merge lets a later array replace an earlier one; the model denylist is a union.
+  const excludeModels = collectExcludedModels({
+    layers,
+    ...(options.harness === undefined ? {} : { harness: options.harness }),
+    ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
+  })
+  const withExcludedModels = (config: OmoConfig): OmoConfig =>
+    excludeModels.length === 0 ? config : { ...config, exclude_models: [...excludeModels] }
   if (finalConfig.success) {
     return {
-      config: stripResolutionControlKeys(finalConfig.data),
+      config: withExcludedModels(stripResolutionControlKeys(finalConfig.data)),
       diagnostics: [...diagnostics, ...resolved.diagnostics],
       layers,
       ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
@@ -198,8 +213,12 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
   })
   if (pruned.ok) {
     return {
-      config: stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config)),
-      diagnostics: [...diagnostics, ...resolved.diagnostics, ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped)],
+      config: withExcludedModels(stripResolutionControlKeys(OmoConfigSchema.parse(pruned.config))),
+      diagnostics: [
+        ...diagnostics,
+        ...resolved.diagnostics,
+        ...invalidValueDiagnostics(MERGED_OMO_CONFIG_PATH, pruned.dropped),
+      ],
       layers,
       ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
       sources,
@@ -208,7 +227,11 @@ export function loadOmoConfig(options: LoadOmoConfigOptions = {}): LoadOmoConfig
 
   return {
     config: stripResolutionControlKeys(OmoConfigSchema.parse(DEFAULT_RAW_CONFIG)) satisfies OmoConfig,
-    diagnostics: [...diagnostics, ...resolved.diagnostics, validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues)],
+    diagnostics: [
+      ...diagnostics,
+      ...resolved.diagnostics,
+      validationDiagnostic(MERGED_OMO_CONFIG_PATH, finalConfig.error.issues),
+    ],
     layers,
     ...(resolved.profile === undefined ? {} : { profile: resolved.profile }),
     sources,

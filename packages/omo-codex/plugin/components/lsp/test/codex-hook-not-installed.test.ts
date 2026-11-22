@@ -30,7 +30,7 @@ const UNDECIDED_TEXT = [
 	"  npm install -g @biomejs/biome",
 ].join("\n");
 const DECLINED_TEXT =
-	"LSP server 'biome' (.json, .jsonc) is NOT INSTALLED; user previously declined installation — proceed without LSP.";
+	"LSP server 'biome' (.json, .jsonc) is NOT INSTALLED; user previously declined installation: proceed without LSP.";
 const TS_ERROR = "error[typescript] (2322) at 1:7: Type 'string' is not assignable to type 'number'.";
 
 const tempDirs: string[] = [];

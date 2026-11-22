@@ -183,17 +183,20 @@ describe("checkCompletionConditions continuation coverage", () => {
     const ctx = createMockContext(directory)
     ctx.sessionID = "child-session"
     setSessionAgent("child-session", "atlas")
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "child-session" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "child-session"
-        ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "child-session" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "child-session" ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }] : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -215,13 +218,17 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "lineage-only-session"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "lineage-only-session" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async () => ({ data: [] })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "lineage-only-session" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async () => ({ data: [] })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -246,17 +253,22 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "mismatch-subagent-session"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "mismatch-subagent-session" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "mismatch-subagent-session"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "mismatch-subagent-session" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "mismatch-subagent-session"
+            ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -281,17 +293,22 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "appended-mismatch-session"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "appended-mismatch-session" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "appended-mismatch-session"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "appended-mismatch-session" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "appended-mismatch-session"
+            ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -311,19 +328,24 @@ describe("checkCompletionConditions continuation coverage", () => {
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["root-session", "ses_appended_descendant"], {
       "root-session": "direct",
-      "ses_appended_descendant": "appended",
+      ses_appended_descendant: "appended",
     })
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_appended_descendant"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async () => {
-      throw new Error("session lookup failed")
-    }))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "ses_appended_descendant"
-        ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async () => {
+        throw new Error("session lookup failed")
+      }),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "ses_appended_descendant"
+            ? [{ info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } }]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -345,12 +367,14 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_child"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "ses_direct_child" ? "ses_parent" : undefined,
-      },
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "ses_direct_child" ? "ses_parent" : undefined,
+        },
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -369,18 +393,20 @@ describe("checkCompletionConditions continuation coverage", () => {
     mkdirSync(join(directory, ".omo", "plans"), { recursive: true })
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["ses_other_tracked", "ses_direct_tracked"], {
-      "ses_other_tracked": "direct",
-      "ses_direct_tracked": "direct",
+      ses_other_tracked: "direct",
+      ses_direct_tracked: "direct",
     })
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_tracked"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: undefined,
-      },
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: undefined,
+        },
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -402,9 +428,11 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_unknown_child"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async () => {
-      throw new Error("lineage unavailable")
-    }))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async () => {
+        throw new Error("lineage unavailable")
+      }),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -423,23 +451,28 @@ describe("checkCompletionConditions continuation coverage", () => {
     mkdirSync(join(directory, ".omo", "plans"), { recursive: true })
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["ses_root_tracked", "ses_direct_child"], {
-      "ses_root_tracked": "direct",
-      "ses_direct_child": "direct",
+      ses_root_tracked: "direct",
+      ses_direct_child: "direct",
     })
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_direct_child"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "ses_direct_child" ? "ses_root_tracked" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "ses_direct_child"
-        ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "ses_direct_child" ? "ses_root_tracked" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "ses_direct_child"
+            ? [{ info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4" } }]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -459,26 +492,31 @@ describe("checkCompletionConditions continuation coverage", () => {
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["root-session", "ses_child_after_compaction"], {
       "root-session": "direct",
-      "ses_child_after_compaction": "appended",
+      ses_child_after_compaction: "appended",
     })
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_child_after_compaction"
     setSessionAgent("ses_child_after_compaction", "atlas")
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "ses_child_after_compaction" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "ses_child_after_compaction"
-        ? [
-            { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
-            { info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4" } },
-          ]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "ses_child_after_compaction" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "ses_child_after_compaction"
+            ? [
+                { info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4" } },
+                { info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4" } },
+              ]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -500,21 +538,35 @@ describe("checkCompletionConditions continuation coverage", () => {
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_sqlite_descendant"
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "ses_sqlite_descendant" ? "root-session" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: path.id === "ses_sqlite_descendant"
-        ? [
-            { id: "msg_0001", info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
-            { id: "msg_0003", info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4", time: { created: 200 } } },
-            { id: "msg_0002", info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } } },
-          ]
-        : [],
-    })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "ses_sqlite_descendant" ? "root-session" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data:
+          path.id === "ses_sqlite_descendant"
+            ? [
+                {
+                  id: "msg_0001",
+                  info: { agent: "atlas", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } },
+                },
+                {
+                  id: "msg_0003",
+                  info: { agent: "compaction", providerID: "openai", modelID: "gpt-5.4", time: { created: 200 } },
+                },
+                {
+                  id: "msg_0002",
+                  info: { agent: "sisyphus-junior", providerID: "openai", modelID: "gpt-5.4", time: { created: 100 } },
+                },
+              ]
+            : [],
+      })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 
@@ -533,20 +585,24 @@ describe("checkCompletionConditions continuation coverage", () => {
     mkdirSync(join(directory, ".omo", "plans"), { recursive: true })
     writeFileSync(planPath, "- [ ] unfinished task\n", "utf-8")
     writeBoulderStateFile(directory, planPath, ["ses_root_tracked", "ses_appended_child"], {
-      "ses_root_tracked": "direct",
-      "ses_appended_child": "appended",
+      ses_root_tracked: "direct",
+      ses_appended_child: "appended",
     })
 
     const ctx = createMockContext(directory)
     ctx.sessionID = "ses_appended_child"
     setSessionAgent("ses_appended_child", "atlas")
-    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(mock(async ({ path }: { path: { id: string } }) => ({
-      data: {
-        id: path.id,
-        parentID: path.id === "ses_appended_child" ? "ses_root_tracked" : undefined,
-      },
-    })))
-    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(mock(async () => ({ data: [] })))
+    ctx.client.session.get = unsafeTestValue<RunContext["client"]["session"]["get"]>(
+      mock(async ({ path }: { path: { id: string } }) => ({
+        data: {
+          id: path.id,
+          parentID: path.id === "ses_appended_child" ? "ses_root_tracked" : undefined,
+        },
+      })),
+    )
+    ctx.client.session.messages = unsafeTestValue<RunContext["client"]["session"]["messages"]>(
+      mock(async () => ({ data: [] })),
+    )
 
     const { checkCompletionConditions } = await import("./completion")
 

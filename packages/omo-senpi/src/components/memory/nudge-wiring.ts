@@ -3,9 +3,8 @@ import type { GitMemoryRepo, MemoryToolProvenance } from "@oh-my-opencode/memory
 
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
-import {
-  MEMORY_TOOL_NAME,
-} from "./tool-metadata"
+import { activeBranchEntries, memoryToolProvenance } from "./memory-tool-provenance"
+import { MEMORY_TOOL_NAME } from "./tool-metadata"
 import { joinFields, noticeComponent } from "./worker/entry-renderers"
 
 export const ACCEPTED_TURNS_ENTRY_TYPE = "omo-memory:accepted-turns"
@@ -92,12 +91,15 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       timeoutMs: NUDGE_GIT_TIMEOUT_MS,
       ...(previous !== undefined
         ? { range: `${previous.head}..${head}` }
-        : since === undefined ? {} : { since: new Date(since.getTime() - SESSION_START_MARGIN_MS) }),
+        : since === undefined
+          ? {}
+          : { since: new Date(since.getTime() - SESSION_START_MARGIN_MS) }),
     })
-    const save = commits.find((commit) =>
-      commit.trailers["Omo-Writer"] === "memory-tool"
-      && commit.trailers["Omo-Session"] === sessionId
-      && parseTurn(commit.trailers["Omo-Turn"]) !== undefined
+    const save = commits.find(
+      (commit) =>
+        commit.trailers["Omo-Writer"] === "memory-tool" &&
+        commit.trailers["Omo-Session"] === sessionId &&
+        parseTurn(commit.trailers["Omo-Turn"]) !== undefined,
     )
     const savedTurn = save === undefined ? previous?.savedTurn : parseTurn(save.trailers["Omo-Turn"])
     scans.set(sessionId, { head, savedTurn })
@@ -154,22 +156,20 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
 
       pi.on("tool_call", (payload, eventCtx) => {
         if (!isRecord(payload) || !isMemoryToolName(payload.toolName) || !isRecord(payload.input)) return
-        const sessionId = readSessionId(eventCtx)
-        if (sessionId === undefined) return
-        const context = options.resolveContext(sessionId)
-        const state = sessions.get(sessionId)
+        delete payload.input.provenance
+        const session = readSession(eventCtx)
+        if (session === undefined) return
+        const context = options.resolveContext(session.id)
+        const state = sessions.get(session.id)
         if (context === undefined || state === undefined) return
-        payload.input.provenance = {
-          sessionId,
+        payload.input.provenance = memoryToolProvenance({
+          sessionId: session.id,
           userTurns: state.priorUserTurns,
-          identityId: context.identity,
-          repoPath: context.identityPaths.repo,
-          // The receipt key for the IC-17 outbound half: unforgeable because the bridge
-          // overwrites the whole provenance object; never read from model arguments.
-          ...(typeof payload.toolCallId === "string" && payload.toolCallId.length > 0
-            ? { toolCallId: payload.toolCallId }
-            : {}),
-        }
+          context,
+          toolCallId: payload.toolCallId,
+          input: payload.input,
+          entries: activeBranchEntries(eventCtx) ?? session.entries,
+        })
       })
     },
 
@@ -179,8 +179,8 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
       const settings = options.resolveSettings(identity)
       if (!settings.enabled) return undefined
       const head = await repo.head()
-      const savedAt = (head === null ? undefined : await latestSaveTurn(repo, sessionId, head))
-        ?? state.sessionBaselineTurns
+      const savedAt =
+        (head === null ? undefined : await latestSaveTurn(repo, sessionId, head)) ?? state.sessionBaselineTurns
       const pendingTurn = [...pendingInputs.values()].some((pendingSessionId) => pendingSessionId === sessionId) ? 1 : 0
       const turns = state.priorUserTurns + pendingTurn - savedAt
       return turns >= settings.everyUserTurns ? turns : undefined
@@ -193,10 +193,7 @@ export function createMemoryNudgeWiring(options: MemoryNudgeWiringOptions): Memo
   }
 }
 
-function findLatestAcceptedTurns(
-  entries: readonly unknown[],
-  sessionId: string,
-): AcceptedTurnsRecord | undefined {
+function findLatestAcceptedTurns(entries: readonly unknown[], sessionId: string): AcceptedTurnsRecord | undefined {
   for (let index = entries.length - 1; index >= 0; index -= 1) {
     const entry = entries[index]
     if (!isRecord(entry) || entry.type !== "custom" || entry.customType !== ACCEPTED_TURNS_ENTRY_TYPE) continue
@@ -206,12 +203,14 @@ function findLatestAcceptedTurns(
 }
 
 function isAcceptedTurnsRecord(value: unknown): value is AcceptedTurnsRecord {
-  return isRecord(value)
-    && value.version === 1
-    && typeof value.sessionId === "string"
-    && isTurn(value.priorUserTurns)
-    && isTurn(value.sessionBaselineTurns)
-    && value.sessionBaselineTurns <= value.priorUserTurns
+  return (
+    isRecord(value) &&
+    value.version === 1 &&
+    typeof value.sessionId === "string" &&
+    isTurn(value.priorUserTurns) &&
+    isTurn(value.sessionBaselineTurns) &&
+    value.sessionBaselineTurns <= value.priorUserTurns
+  )
 }
 
 function readSession(eventCtx: unknown): { id: string; entries: readonly unknown[] } | undefined {
@@ -230,7 +229,10 @@ function sessionStartedAt(eventCtx: unknown, entries: readonly unknown[]): Date 
   const manager = isRecord(eventCtx) && isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
   const getHeader = manager?.getHeader
   const header = typeof getHeader === "function" ? Reflect.apply(getHeader, manager, []) : undefined
-  const stamps = [isRecord(header) ? header.timestamp : undefined, ...entries.map((entry) => isRecord(entry) ? entry.timestamp : undefined)]
+  const stamps = [
+    isRecord(header) ? header.timestamp : undefined,
+    ...entries.map((entry) => (isRecord(entry) ? entry.timestamp : undefined)),
+  ]
   let earliest: number | undefined
   for (const stamp of stamps) {
     const time = typeof stamp === "string" ? Date.parse(stamp) : typeof stamp === "number" ? stamp : Number.NaN

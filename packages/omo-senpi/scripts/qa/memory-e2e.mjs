@@ -43,7 +43,15 @@ function findOnPath(bin) {
 const senpiBin = process.env.SENPI_BIN ?? findOnPath("senpi")
 if (senpiBin === null) fail("senpi binary not found (set SENPI_BIN)")
 
-const ISOLATION_EXCLUDE = new Set(["sessions", "senpi-debug.log", "mcp-cache.json", "mcp-auth", "settings.json", "telemetry.log", "goals"])
+const ISOLATION_EXCLUDE = new Set([
+  "sessions",
+  "senpi-debug.log",
+  "mcp-cache.json",
+  "mcp-auth",
+  "settings.json",
+  "telemetry.log",
+  "goals",
+])
 
 function hashDir(root, exclude = undefined) {
   if (!existsSync(root)) return "absent"
@@ -53,8 +61,12 @@ function hashDir(root, exclude = undefined) {
       if (exclude !== undefined && exclude(name)) continue
       const full = join(dir, name)
       const st = statSync(full)
-      if (st.isDirectory()) { walk(full); continue }
-      hash.update(name); hash.update(readFileSync(full))
+      if (st.isDirectory()) {
+        walk(full)
+        continue
+      }
+      hash.update(name)
+      hash.update(readFileSync(full))
     }
   }
   walk(root)
@@ -78,7 +90,21 @@ function baseEnv(sandbox, extra = {}) {
 }
 
 function runSenpi(sandbox, { prompt, env = {}, args = [], cwd }) {
-  const fullArgs = ["-e", mockProviderEntry, "-p", "--mode", "json", "--provider", "omo-mock", "--model", "mock-1", "--session-dir", join(sandbox.agentDir, "sessions"), ...args, prompt]
+  const fullArgs = [
+    "-e",
+    mockProviderEntry,
+    "-p",
+    "--mode",
+    "json",
+    "--provider",
+    "omo-mock",
+    "--model",
+    "mock-1",
+    "--session-dir",
+    join(sandbox.agentDir, "sessions"),
+    ...args,
+    prompt,
+  ]
   const run = spawnSync(senpiBin, fullArgs, {
     cwd: cwd ?? sandbox.cwd,
     env: baseEnv(sandbox, env),
@@ -94,7 +120,10 @@ function waitFor(predicate, { timeoutMs = 90_000, intervalMs = 500, description 
     const poll = () => {
       try {
         const value = predicate()
-        if (value) { resolvePromise(value); return }
+        if (value) {
+          resolvePromise(value)
+          return
+        }
       } catch {}
       if (Date.now() - start > timeoutMs) {
         rejectPromise(new Error(`timeout waiting for ${description}`))
@@ -113,7 +142,10 @@ function scenarioSandbox() {
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
   // The category resolver gates on registry.getAvailable(), which drops providers without
   // configured auth; the scripted mock provider therefore needs an auth entry to be selectable.
-  writeFileSync(join(sandbox.agentDir, "auth.json"), `${JSON.stringify({ "omo-mock": { type: "api_key", key: "mock" } }, null, 2)}\n`)
+  writeFileSync(
+    join(sandbox.agentDir, "auth.json"),
+    `${JSON.stringify({ "omo-mock": { type: "api_key", key: "mock" } }, null, 2)}\n`,
+  )
   return sandbox
 }
 
@@ -137,7 +169,9 @@ function writeMockScript(sandbox, script, name = "mock-script.json") {
 function memoryRepos(memoryHome) {
   const agentsDir = join(memoryHome, "agents")
   if (!existsSync(agentsDir)) return []
-  return readdirSync(agentsDir).map((name) => join(agentsDir, name, "repo")).filter(existsSync)
+  return readdirSync(agentsDir)
+    .map((name) => join(agentsDir, name, "repo"))
+    .filter(existsSync)
 }
 
 function gitLog(repo) {
@@ -150,7 +184,17 @@ async function scenario1() {
   writeOmoConfig(sandbox)
   writeMockScript(sandbox, {
     parentSteps: [
-      { type: "tool_call", name: "memory", arguments: { command: "create", file_path: "system/facts.md", description: "harness facts", file_text: "senpi is a pi harness", reason: "seed harness fact for QA" } },
+      {
+        type: "tool_call",
+        name: "memory",
+        arguments: {
+          command: "create",
+          file_path: "system/facts.md",
+          description: "harness facts",
+          file_text: "senpi is a pi harness",
+          reason: "seed harness fact for QA",
+        },
+      },
       { type: "text", text: "memory seeded" },
     ],
     childSteps: [{ type: "text", text: "unused" }],
@@ -186,7 +230,17 @@ async function scenario2() {
 
   writeMockScript(sandbox, {
     parentSteps: [
-      { type: "tool_call", name: "memory", arguments: { command: "create", file_path: "system/facts.md", description: "seed", file_text: "seed for dreaming", reason: "seed memory before reflection" } },
+      {
+        type: "tool_call",
+        name: "memory",
+        arguments: {
+          command: "create",
+          file_path: "system/facts.md",
+          description: "seed",
+          file_text: "seed for dreaming",
+          reason: "seed memory before reflection",
+        },
+      },
       { type: "text", text: "first answer" },
     ],
     childSteps: [],
@@ -201,8 +255,19 @@ async function scenario2() {
 
   const childScript = {
     parentSteps: [
-      { type: "tool_call", name: "edit", arguments: { path: "system/facts.md", edits: [{ oldText: "seed for dreaming", newText: "seed for dreaming\ndreamed fact" }] } },
-      { type: "tool_call", name: "bash", arguments: { command: "git add system/facts.md && git commit -m 'feat(reflection): dreamed a memory'" } },
+      {
+        type: "tool_call",
+        name: "edit",
+        arguments: {
+          path: "system/facts.md",
+          edits: [{ oldText: "seed for dreaming", newText: "seed for dreaming\ndreamed fact" }],
+        },
+      },
+      {
+        type: "tool_call",
+        name: "bash",
+        arguments: { command: "git add system/facts.md && git commit -m 'feat(reflection): dreamed a memory'" },
+      },
       { type: "text", text: "reflection written" },
     ],
     childSteps: [],
@@ -211,7 +276,8 @@ async function scenario2() {
   const scriptCommit = spawnSync("git", ["add", "mock-script.json"], { cwd: repo })
   if (scriptCommit.status !== 0) return record("S2 child script staging", false, scriptCommit.stderr?.toString() ?? "")
   const scriptCommitResult = spawnSync("git", ["commit", "-m", "qa: child script"], { cwd: repo })
-  if (scriptCommitResult.status !== 0) return record("S2 child script commit", false, scriptCommitResult.stderr?.toString() ?? "")
+  if (scriptCommitResult.status !== 0)
+    return record("S2 child script commit", false, scriptCommitResult.stderr?.toString() ?? "")
 
   writeMockScript(sandbox, { parentSteps: [{ type: "text", text: "triggering turn" }], childSteps: [] })
   const run = runSenpi(sandbox, { prompt: "trigger one reflection", env: { SENPI_BIN: shimPath } })
@@ -238,7 +304,16 @@ async function scenario2() {
   ).catch((error) => error)
 
   if (completion instanceof Error) {
-    console.error("S2 completion wait failed. reflection dirs:", existsSync(join(memoryHome, "agents")) ? readdirSync(join(memoryHome, "agents")).map((a) => readdirSync(join(memoryHome, "agents", a, "runtime"), { withFileTypes: true }).map((d) => d.name).join(",")) : "none")
+    console.error(
+      "S2 completion wait failed. reflection dirs:",
+      existsSync(join(memoryHome, "agents"))
+        ? readdirSync(join(memoryHome, "agents")).map((a) =>
+            readdirSync(join(memoryHome, "agents", a, "runtime"), { withFileTypes: true })
+              .map((d) => d.name)
+              .join(","),
+          )
+        : "none",
+    )
     return record("S2 completion record", false, completion.message)
   }
   record("S2 completion record", true, String(completion.record.outcome))
@@ -246,7 +321,12 @@ async function scenario2() {
   record("S2 quick category recorded", completion.record.category === "quick", completion.record.category)
   const log = gitLog(repo)
   record("S2 merge commit landed", /merge\(reflection\)/.test(log), log.split("\n").slice(0, 3).join(" || "))
-  record("S2 dreamed fact merged into parent repo", existsSync(join(repo, "system", "facts.md")) && readFileSync(join(repo, "system", "facts.md"), "utf8").includes("dreamed fact"), "system/facts.md")
+  record(
+    "S2 dreamed fact merged into parent repo",
+    existsSync(join(repo, "system", "facts.md")) &&
+      readFileSync(join(repo, "system", "facts.md"), "utf8").includes("dreamed fact"),
+    "system/facts.md",
+  )
 }
 
 function buildCommandContext(sandbox, overrides = {}) {
@@ -264,7 +344,17 @@ async function scenario3And4() {
   writeOmoConfig(sandbox)
   writeMockScript(sandbox, {
     parentSteps: [
-      { type: "tool_call", name: "memory", arguments: { command: "create", file_path: "system/facts.md", description: "qa fact", file_text: "searchable unique phrase zqxwvb", reason: "seed searchable memory" } },
+      {
+        type: "tool_call",
+        name: "memory",
+        arguments: {
+          command: "create",
+          file_path: "system/facts.md",
+          description: "qa fact",
+          file_text: "searchable unique phrase zqxwvb",
+          reason: "seed searchable memory",
+        },
+      },
       { type: "text", text: "searchable unique phrase zqxwvb" },
     ],
     childSteps: [],
@@ -287,21 +377,35 @@ async function scenario3And4() {
     const composed = bundleModule.default
     await composed(pi, {})
     const searchCommand = pi.commands.find((command) => command.name === "search")
-    if (searchCommand === undefined) return record("S3 search command registered", false, `commands: ${pi.commands.map((c) => c.name).join(",")}`)
+    if (searchCommand === undefined)
+      return record("S3 search command registered", false, `commands: ${pi.commands.map((c) => c.name).join(",")}`)
     const output = await searchCommand.options.handler("zqxwvb", buildCommandContext(sandbox))
-    record("S3 search finds prior message", typeof output === "string" && output.includes("zqxwvb"), String(output).slice(0, 200))
+    record(
+      "S3 search finds prior message",
+      typeof output === "string" && output.includes("zqxwvb"),
+      String(output).slice(0, 200),
+    )
 
     const palaceCommand = pi.commands.find((command) => command.name === "palace")
     if (palaceCommand === undefined) return record("S4 palace command registered", false, "not registered")
-    await pi.dispatch("session_start", {}, buildCommandContext(sandbox, {
-      sessionManager: { getSessionId: () => "palace-session", getEntries: () => [] },
-    }))
+    await pi.dispatch(
+      "session_start",
+      {},
+      buildCommandContext(sandbox, {
+        sessionManager: { getSessionId: () => "palace-session", getEntries: () => [] },
+      }),
+    )
     let palacePath = ""
-    const palaceOutput = await palaceCommand.options.handler("", buildCommandContext(sandbox, {
-      hasUI: false,
-      output: (text) => { palacePath = text },
-      sessionManager: { getSessionId: () => "palace-session" },
-    }))
+    const palaceOutput = await palaceCommand.options.handler(
+      "",
+      buildCommandContext(sandbox, {
+        hasUI: false,
+        output: (text) => {
+          palacePath = text
+        },
+        sessionManager: { getSessionId: () => "palace-session" },
+      }),
+    )
     const htmlPathMatch = String(palacePath || palaceOutput).match(/(\/\S+\.html)/)
     if (htmlPathMatch === null) return record("S4 palace path returned", false, String(palaceOutput).slice(0, 200))
     const htmlPath = htmlPathMatch[1]
@@ -310,7 +414,11 @@ async function scenario3And4() {
     const html = readFileSync(htmlPath, "utf8")
     record("S4 palace file mode 0600", mode === 0o600, String(mode.toString(8)))
     const tabValues = new Set([...html.matchAll(/data-tab="([^"]+)"/g)].map((match) => match[1]))
-    record("S4 palace tabs", ["core", "external", "history", "reflection"].every((tab) => tabValues.has(tab)), [...tabValues].join(","))
+    record(
+      "S4 palace tabs",
+      ["core", "external", "history", "reflection"].every((tab) => tabValues.has(tab)),
+      [...tabValues].join(","),
+    )
     record("S4 palace persona entry", html.includes("system/persona.md"), htmlPath)
   } finally {
     process.chdir(originalCwd)
@@ -330,7 +438,11 @@ async function scenario5() {
   if (run.status !== 0) return record("S5 disabled run", false, run.stderr.slice(-400))
   const dump = existsSync(dumpLog) ? readFileSync(dumpLog, "utf8") : ""
   record("S5 no sentinel when disabled", !dump.includes("<!-- senpi-memory:"), dumpLog)
-  record("S5 no memory dirs when disabled", memoryRepos(join(sandbox.root, "memory")).length === 0, join(sandbox.root, "memory"))
+  record(
+    "S5 no memory dirs when disabled",
+    memoryRepos(join(sandbox.root, "memory")).length === 0,
+    join(sandbox.root, "memory"),
+  )
 }
 
 async function main() {
@@ -342,8 +454,16 @@ async function main() {
 
   const realSenpiAfter = hashDir(join(homedir(), ".senpi", "agent"), isolationExclude)
   const realOmoMemoryAfter = hashDir(join(homedir(), ".omo", "memory"))
-  record("isolation: real ~/.senpi/agent untouched (volatile paths excluded)", realSenpiBefore === realSenpiAfter, `${realSenpiBefore.slice(0, 12)} vs ${realSenpiAfter.slice(0, 12)}`)
-  record("isolation: real ~/.omo/memory untouched", realOmoMemoryBefore === realOmoMemoryAfter, `${realOmoMemoryBefore.slice(0, 12)} vs ${realOmoMemoryAfter.slice(0, 12)}`)
+  record(
+    "isolation: real ~/.senpi/agent untouched (volatile paths excluded)",
+    realSenpiBefore === realSenpiAfter,
+    `${realSenpiBefore.slice(0, 12)} vs ${realSenpiAfter.slice(0, 12)}`,
+  )
+  record(
+    "isolation: real ~/.omo/memory untouched",
+    realOmoMemoryBefore === realOmoMemoryAfter,
+    `${realOmoMemoryBefore.slice(0, 12)} vs ${realOmoMemoryAfter.slice(0, 12)}`,
+  )
 
   console.log(JSON.stringify({ ok: failures.length === 0, total: results.length, failures }, null, 2))
   process.exit(failures.length === 0 ? 0 : 1)

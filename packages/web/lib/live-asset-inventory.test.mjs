@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test"
 import { liveAssetInventory } from "./live-asset-inventory.mjs"
 
-async function live({ advertised = false, broken = false } = {}, verify) {
+async function live({ advertised = false, marker = "data-dpl-id", broken = false } = {}, verify) {
   const server = Bun.serve({
     hostname: "127.0.0.1",
     port: 0,
@@ -14,7 +14,7 @@ async function live({ advertised = false, broken = false } = {}, verify) {
         )
       if (path === "/" || path === "/ko/manifesto")
         return new Response(
-          `<html${advertised ? ' data-dpl-id="new"' : ""}><link href="/_next/static/chunks/a.css?dpl=old"><script src="/_next/static/chunks/a.js"></script></html>`,
+          `<html${advertised ? ` ${marker}="new"` : ""}><link href="/_next/static/chunks/a.css?dpl=old"><script src="/_next/static/chunks/a.js"></script></html>`,
           {
             headers: {
               "content-type": "text/html",
@@ -103,5 +103,13 @@ test("the waiver never hides an unavailable asset", async () => {
     await expect(
       liveAssetInventory(origin, { acceptMissingHistory: "first deploy after the account move" }),
     ).rejects.toThrow()
+  })
+})
+
+test("a deployment marked with its commit build id cannot be mistaken for a first migration either", async () => {
+  // Given: the live HTML carries the pipeline's data-omo-build marker, but its asset history is gone.
+  await live({ advertised: true, marker: "data-omo-build" }, async (origin) => {
+    // Then: bootstrap refuses, as it does for the older data-dpl-id marker.
+    await expect(liveAssetInventory(origin)).rejects.toThrow("asset history is missing")
   })
 })

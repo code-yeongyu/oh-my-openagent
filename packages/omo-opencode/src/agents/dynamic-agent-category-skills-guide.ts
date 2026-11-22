@@ -1,7 +1,4 @@
-import type {
-  AvailableCategory,
-  AvailableSkill,
-} from "./dynamic-agent-prompt-types"
+import type { AvailableCategory, AvailableSkill } from "./dynamic-agent-prompt-types"
 
 function buildSkillsSection(skills: AvailableSkill[]): string {
   const builtinSkills = skills.filter((skill) => skill.location === "plugin")
@@ -45,10 +42,7 @@ function buildSkillsSection(skills: AvailableSkill[]): string {
   return ""
 }
 
-export function buildCategorySkillsDelegationGuide(
-  categories: AvailableCategory[],
-  skills: AvailableSkill[],
-): string {
+export function buildCategorySkillsDelegationGuide(categories: AvailableCategory[], skills: AvailableSkill[]): string {
   if (categories.length === 0 && skills.length === 0) {
     return ""
   }
@@ -120,7 +114,7 @@ Every delegation MUST use the category that matches the task's domain. Mismatche
 
 **ANY VISUAL DESIGN RELATION = ALWAYS \`visual-engineering\`. NO EXCEPTIONS.**
 
-Any task with even a minor visual-design relationship — including UI, UX, CSS, styling, layout, animation, design systems, frontend components, screenshots, diagrams, visual polish, or presentation — MUST go to \`visual-engineering\`. Never delegate it to \`quick\`, \`unspecified-*\`, or any other category.
+Any task with even a minor visual-design relationship (including UI, UX, CSS, styling, layout, animation, design systems, frontend components, screenshots, diagrams, visual polish, or presentation) MUST go to \`visual-engineering\`. Never delegate it to \`quick\`, \`unspecified-*\`, or any other category.
 
 \`\`\`typescript
 // CORRECT: Visual work → visual-engineering category

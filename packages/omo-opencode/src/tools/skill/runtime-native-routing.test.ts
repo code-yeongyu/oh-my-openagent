@@ -45,20 +45,26 @@ describe("skill tool runtime and native routing", () => {
   })
 
   test("does not call native skills when a runtime/base skill matches", async () => {
-    const nativeAll = mock(() => [{
-      name: "native-only-skill",
-      description: "Native only skill",
-      location: "/external/skills/native-only-skill/SKILL.md",
-      content: "Native only skill body",
-    }])
+    const nativeAll = mock(() => [
+      {
+        name: "native-only-skill",
+        description: "Native only skill",
+        location: "/external/skills/native-only-skill/SKILL.md",
+        content: "Native only skill body",
+      },
+    ])
     const tool = createSkillTool({
       directory: "/test",
       skills: [createConfigSkill("base-skill")],
       commands: [],
       nativeSkills: {
         all: nativeAll,
-        get() { return undefined },
-        dirs() { return [] },
+        get() {
+          return undefined
+        },
+        dirs() {
+          return []
+        },
       },
     })
     nativeAll.mockClear()
@@ -69,20 +75,26 @@ describe("skill tool runtime and native routing", () => {
   })
 
   test("falls back to native OpenCode skills after runtime/base miss", async () => {
-    const nativeAll = mock(async () => [{
-      name: "user-normal-skill",
-      description: "User normal-path skill",
-      location: "/external/skills/user-normal-skill/SKILL.md",
-      content: "User normal skill body",
-    }])
+    const nativeAll = mock(async () => [
+      {
+        name: "user-normal-skill",
+        description: "User normal-path skill",
+        location: "/external/skills/user-normal-skill/SKILL.md",
+        content: "User normal skill body",
+      },
+    ])
     const tool = createSkillTool({
       directory: "/test",
       skills: [],
       commands: [],
       nativeSkills: {
         all: nativeAll,
-        async get() { return undefined },
-        async dirs() { return [] },
+        async get() {
+          return undefined
+        },
+        async dirs() {
+          return []
+        },
       },
     })
 

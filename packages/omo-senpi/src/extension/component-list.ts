@@ -1,23 +1,27 @@
 import { createAstGrepComponent } from "../components/ast-grep"
 import { createBrowserBridgeComponent } from "../components/browser-bridge"
+import { createDesktopToolkitComponent } from "../components/desktop-toolkit"
 import { createBuiltinMcpsComponent } from "../components/builtin-mcps"
 import { createBundledSkillsComponent } from "../components/bundled-skills"
+import { createClaimReceiptComponent } from "../components/claim-receipt"
 import { createClaudeCodeComponent } from "../components/claude-code"
 import { createCommentCheckerComponent } from "../components/comment-checker"
 import { createComputerUseComponent } from "../components/computer-use"
 import { createConfigStartupComponent } from "../components/config-startup"
 import { createConfigWatchComponent } from "../components/config-watch"
+import { createDeviceServiceComponent } from "../components/device-service"
 import { createFallbackArchitectComponent } from "../components/fallback-architect"
 import { createFeedbackComponent } from "../components/feedback"
-import { createGatewayComponent } from "../components/gateway"
 import { createGitMasterAttributionComponent } from "../components/git-master"
 import { createInitDeepAdvisorComponent } from "../components/init-deep-advisor"
+import { createJsKernelGuardComponent } from "../components/js-kernel-guard"
 import { createLspComponent } from "../components/lsp"
 import { createMemoryComponent } from "../components/memory"
 import { createModelProfileComponent } from "../components/model-profile"
 import { createNativeBadgeComponent } from "../components/native-badge"
 import { createOnboardingComponent, createOnboardingScanComponent } from "../components/onboarding"
 import { createQuestionGatesComponent } from "../components/question-gates"
+import { createRemoteTuiComponent } from "../components/remote/tui"
 import { createSkillCommandsComponent } from "../components/skill-commands"
 import { createSidePanelComponent } from "../components/side-panel"
 import { createSkillPointersComponent } from "../components/skill-pointers"
@@ -52,8 +56,10 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createSkillPointersComponent(),
     createUlwExecuteContinuationComponent(),
     createUlwLoopComponent(),
+    createJsKernelGuardComponent(),
     createTodoFanoutReminderComponent(),
     createQuestionGatesComponent(),
+    createClaimReceiptComponent(),
     createGitMasterAttributionComponent(),
     createFallbackArchitectComponent(),
     createAstGrepComponent(),
@@ -62,14 +68,15 @@ export function createOmoSenpiComponents(taskComponent: OmoSenpiComponent): OmoS
     createXSearchComponent(),
     createComputerUseComponent(),
     createFeedbackComponent(),
+    createDeviceServiceComponent(),
+    createRemoteTuiComponent(),
     createBrowserBridgeComponent(),
+    createDesktopToolkitComponent(),
     createClaudeCodeComponent(),
     createCommentCheckerComponent(),
     taskComponent,
     createThreadComponent(),
     createMemoryComponent(),
-    // After memory so the gateway block composes after the memory block in the system prompt.
-    createGatewayComponent(),
     createConfigWatchComponent(),
   ]
 }

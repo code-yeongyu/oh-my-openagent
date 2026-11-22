@@ -192,7 +192,7 @@ def _annotate_search(item: Session, counts: dict[tuple[str, str], int], reasons:
 
 
 def _detail_hint(item: Session) -> str:
-    return f"python3 scripts/find-agent-sessions.py read {item.id} --platform {item.platform}"
+    return f"python3 -B scripts/find-agent-sessions.py read {item.id} --platform {item.platform}"
 
 
 def _events(item: Session) -> list[Json]:

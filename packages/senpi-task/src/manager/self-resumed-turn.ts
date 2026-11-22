@@ -4,6 +4,7 @@ import { nextRunEpoch, type TaskRecord } from "../state"
 import type { TaskRecordStore } from "../store"
 import { buildRevived } from "../steering/engine-policy"
 import type { ManagedChildHandle } from "./child-handle"
+import { publishHostTaskStatus } from "./host-task-status"
 import { nowIso } from "./manager-helpers"
 
 export type SelfResumedTurnPorts = {
@@ -13,14 +14,22 @@ export type SelfResumedTurnPorts = {
   readonly liveModel: (taskId: string) => string | undefined
   readonly tryLoad: (taskId: string) => TaskRecord | null
   readonly waitForTerminal: (taskId: string) => Promise<TaskRecord>
-  readonly reserveForRevive: (taskId: string) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
+  readonly reserveForRevive: (
+    taskId: string,
+  ) => { readonly ok: false } | { readonly ok: true; commit(): void; release(): void }
   readonly trackOutcome: (taskId: string, handle: ManagedChildHandle, model: string, epoch: number) => void
 }
 
-function reopenable(record: TaskRecord | null, handle: ManagedChildHandle, ports: SelfResumedTurnPorts): record is TaskRecord {
+function reopenable(
+  record: TaskRecord | null,
+  handle: ManagedChildHandle,
+  ports: SelfResumedTurnPorts,
+): record is TaskRecord {
   return (
     record !== null &&
-    (record.status === "completed" || record.status === "error" || (record.status === "interrupted" && record.stop_reason !== "deadline")) &&
+    (record.status === "completed" ||
+      record.status === "error" ||
+      (record.status === "interrupted" && record.stop_reason !== "deadline")) &&
     record.residency_state === "resident" &&
     ports.liveHandle(record.task_id) === handle
   )
@@ -35,7 +44,11 @@ function reopenable(record: TaskRecord | null, handle: ManagedChildHandle, ports
  * first, so the reopen waits for it; a child that was cancelled, suspended or replaced meanwhile is
  * left alone.
  */
-export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId: string, handle: ManagedChildHandle): Promise<void> {
+export async function reopenSelfResumedTurn(
+  ports: SelfResumedTurnPorts,
+  taskId: string,
+  handle: ManagedChildHandle,
+): Promise<void> {
   if (ports.liveHandle(taskId) !== handle) return
   await ports.waitForTerminal(taskId)
   const settled = ports.tryLoad(taskId)
@@ -54,6 +67,8 @@ export async function reopenSelfResumedTurn(ports: SelfResumedTurnPorts, taskId:
     return
   }
   ports.store.appendEvent(taskId, { type: "task_self_resumed", payload: { run_epoch: epoch } })
+  // The run may have started before its finished turn was recorded and marked on the host (#11092).
+  publishHostTaskStatus(handle, taskId, "running")
   // A resumed run is already doing its work: a full lane may deny it a slot, but never its result.
   if (reservation.ok) reservation.commit()
   else ports.trackOutcome(taskId, handle, model, epoch)

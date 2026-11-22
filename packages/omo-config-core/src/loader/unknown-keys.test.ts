@@ -79,10 +79,7 @@ describe("loadOmoConfig unknown-key tolerance", () => {
   test("#given a prototype-pollution key beside a valid block #when loading the senpi view #then only the unsafe key is stripped and reported", () => {
     // given
     const fixture = makeFixture()
-    writeUserConfig(
-      fixture.homeDir,
-      '{"__proto__":{"polluted":true},"categories":{"quick":{"model":"user-model"}}}',
-    )
+    writeUserConfig(fixture.homeDir, '{"__proto__":{"polluted":true},"categories":{"quick":{"model":"user-model"}}}')
 
     try {
       // when

@@ -2,7 +2,8 @@ import type { KeyringEntry, WrapEntry } from "./entry.ts"
 import type { Authority, FoldedRecord } from "./fold.ts"
 import { wrapSetDigest } from "./links.ts"
 import type { ParsedBody } from "./parse.ts"
-import { deviceIdOf, taggedHash, verifyTagged } from "./signatures.ts"
+import { deviceIdOf, isStrongKeyText, taggedHash, verifyTagged } from "./signatures.ts"
+import type { JsonValue } from "./vendor/sync-format/jcs.ts"
 
 export type RuleRejection =
   | "bad_genesis"
@@ -20,6 +21,7 @@ export type RuleRejection =
   | "unknown_join"
   | "veto_signer_not_member"
   | "unexpected_wraps"
+  | "weak_key"
 
 const same = (a: ReadonlyArray<string>, b: ReadonlyArray<string>): boolean =>
   a.length === b.length && a.every((value, index) => value === b[index])
@@ -59,6 +61,39 @@ const countersignOk = (
     countersign,
   )
 
+/** Every `signing_public_key` value anywhere in `value`; a non-string one is returned as "" so it refuses. */
+const signingKeysIn = (value: JsonValue | undefined): ReadonlyArray<string> => {
+  if (Array.isArray(value)) return value.flatMap(signingKeysIn)
+  if (typeof value !== "object" || value === null) return []
+  return Object.entries(value).flatMap(([key, field]) =>
+    key === "signing_public_key" ? [typeof field === "string" ? field : ""] : signingKeysIn(field),
+  )
+}
+
+/**
+ * The signing keys a record brings into the authority; each must be a strong key (#10742). A
+ * fork-resolution contributes every key anywhere in its body, including records that appear only in
+ * its evidence branches and nested resolutions: the vendored receiver verifies those under keys the
+ * client never admitted, so they are checked here before the resolution can be accepted.
+ */
+const admittedKeys = (entry: KeyringEntry, body: ParsedBody): ReadonlyArray<string> => {
+  switch (body.kind) {
+    case "genesis":
+      return [body.firstDevice.signing_public_key, body.recoveryKey.signing_public_key]
+    case "recovery-key":
+      return [body.key.signing_public_key]
+    case "approval":
+    case "recovery-join":
+      return [body.principal.signing_public_key]
+    case "fork-resolution":
+      return signingKeysIn(entry.body)
+    case "rotation":
+    case "recovery-key-removed":
+    case "recovery-join-vetoed":
+      return []
+  }
+}
+
 const registryIds = (authority: Authority): ReadonlyArray<string> =>
   [...authority.registry.keys()].map((id) => `recovery:${id}`)
 
@@ -76,6 +111,7 @@ export const checkRecordRules = async (
   predecessor: string,
 ): Promise<RuleRejection | null> => {
   const account = entry.account
+  if (!admittedKeys(entry, body).every(isStrongKeyText)) return "weak_key"
   if (body.kind === "genesis") {
     if (before !== null || entry.seq !== 1) return "bad_genesis"
     if ((await deviceIdOf(body.firstDevice.signing_public_key)) !== body.firstDevice.id) {
@@ -85,7 +121,9 @@ export const checkRecordRules = async (
       return "bad_custody_root"
     }
     const key = body.recoveryKey
-    if (!(await countersignOk(account, body.custodyRoot, "", body.wrapsDigest, key.signing_public_key, body.countersign))) {
+    if (
+      !(await countersignOk(account, body.custodyRoot, "", body.wrapsDigest, key.signing_public_key, body.countersign))
+    ) {
       return "bad_countersign"
     }
     return checkWrapSet(entry.wraps, body.wrapsDigest, 1, [
@@ -126,7 +164,9 @@ export const checkRecordRules = async (
       return checkWrapSet(entry.wraps, body.wrapsDigest, before.epoch, [`device:${principal.id}`])
     }
     case "rotation": {
-      if (body.members.some((member) => before.members.get(member.id)?.signing_public_key !== member.signing_public_key)) {
+      if (
+        body.members.some((member) => before.members.get(member.id)?.signing_public_key !== member.signing_public_key)
+      ) {
         return "member_not_in_fold"
       }
       const recipients = [...body.members.map((member) => `device:${member.id}`), ...registryIds(before)]

@@ -61,7 +61,7 @@ async function* bytesFromReadableStream(stream: ReadableStream<Uint8Array>): Asy
 
 export async function* streamHashLinesFromUtf8(
   source: ReadableStream<Uint8Array> | AsyncIterable<Uint8Array>,
-  options: HashlineStreamOptions = {}
+  options: HashlineStreamOptions = {},
 ): AsyncGenerator<string> {
   const startLine = options.startLine ?? 1
   const maxChunkLines = options.maxChunkLines ?? 200
@@ -124,7 +124,7 @@ export async function* streamHashLinesFromUtf8(
 
 export async function* streamHashLinesFromLines(
   lines: Iterable<string> | AsyncIterable<string>,
-  options: HashlineStreamOptions = {}
+  options: HashlineStreamOptions = {},
 ): AsyncGenerator<string> {
   const startLine = options.startLine ?? 1
   const maxChunkLines = options.maxChunkLines ?? 200

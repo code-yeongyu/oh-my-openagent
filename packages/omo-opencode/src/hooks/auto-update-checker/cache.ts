@@ -82,7 +82,7 @@ function removeFromBunLock(cacheDir: string, packageNames: readonly string[]): b
 function getInvalidationPackageNames(
   packageName: string,
   defaultPackageName: string,
-  acceptedPackageNames: readonly string[]
+  acceptedPackageNames: readonly string[],
 ): readonly string[] {
   if (packageName === defaultPackageName) {
     return acceptedPackageNames
@@ -93,7 +93,7 @@ function getInvalidationPackageNames(
 
 function removeSpecifierRootDirs(cacheDir: string, packageNames: readonly string[]): boolean {
   const parentDirs = [cacheDir, path.join(cacheDir, "packages")]
-  const prefixes = packageNames.map(packageName => `${packageName}@`)
+  const prefixes = packageNames.map((packageName) => `${packageName}@`)
   let removed = false
 
   for (const parentDir of parentDirs) {
@@ -102,7 +102,7 @@ function removeSpecifierRootDirs(cacheDir: string, packageNames: readonly string
     }
 
     for (const entry of fs.readdirSync(parentDir, { withFileTypes: true })) {
-      if (!entry.isDirectory() || !prefixes.some(prefix => entry.name.startsWith(prefix))) {
+      if (!entry.isDirectory() || !prefixes.some((prefix) => entry.name.startsWith(prefix))) {
         continue
       }
 
@@ -116,10 +116,7 @@ function removeSpecifierRootDirs(cacheDir: string, packageNames: readonly string
   return removed
 }
 
-export function invalidatePackage(
-  packageName?: string,
-  options: InvalidatePackageOptions = {}
-): boolean {
+export function invalidatePackage(packageName?: string, options: InvalidatePackageOptions = {}): boolean {
   try {
     const acceptedPackageNames = options.acceptedPackageNames ?? ACCEPTED_PACKAGE_NAMES
     const cacheDir = options.cacheDir ?? CACHE_DIR
@@ -127,7 +124,7 @@ export function invalidatePackage(
     const userConfigDir = options.userConfigDir ?? getUserConfigDir()
     const targetPackageName = packageName ?? defaultPackageName
     const packageNames = getInvalidationPackageNames(targetPackageName, defaultPackageName, acceptedPackageNames)
-    const pkgDirs = packageNames.flatMap(name => [
+    const pkgDirs = packageNames.flatMap((name) => [
       path.join(userConfigDir, "node_modules", name),
       path.join(cacheDir, "node_modules", name),
     ])

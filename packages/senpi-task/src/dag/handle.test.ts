@@ -10,6 +10,7 @@ import { createDagJournal, type DagJournal } from "./journal"
 import type { DagRunRecordV1 } from "./manager"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeCounts, DagNodeId, DagRunEvent, DagRunId, DagRunStatus } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -86,8 +87,12 @@ function counts(nodes: readonly DagNode[]): DagNodeCounts {
     cancelled: 0,
     skipped: 0,
   }
-  for (const entry of nodes) tally[entry.state] += 1
-  return tally
+  let paused = 0
+  for (const entry of nodes) {
+    if (entry.state === "paused") paused += 1
+    else tally[entry.state] += 1
+  }
+  return paused === 0 ? tally : { ...tally, paused }
 }
 
 function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
@@ -122,8 +127,11 @@ type Fixture = {
   readonly settle: (nodes: readonly DagNode[], status: DagRunStatus, reason?: string) => void
 }
 
-function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: DagRunId, reason?: string) => void } = {}): Fixture {
-  const store = createDagFileStore({ project_dir: tempProject() })
+function fixture(
+  nodes: readonly DagNode[],
+  overrides: { readonly cancel?: (id: DagRunId, reason?: string) => void } = {},
+): Fixture {
+  const store = createDagFileStore(ownedTaskState(tempProject()))
   const initial = record(nodes)
   store.writeCheckpoint(runId, initial)
   const journal = createDagJournal<DagRunRecordV1>({ store, runId, initialCheckpoint: initial, applyEvent })
@@ -144,11 +152,16 @@ function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: 
       store.writeCheckpoint(runId, { ...current, nodes: settledNodes })
       if (status === "completed") journal.append(dagRunCompletedEvent({ counts: counts(settledNodes) }))
       else if (status === "failed") {
-        journal.append(dagRunFailedEvent({
-          error: { code: "task_error", message: "build failed", nodeId: "build" as DagNodeId, at },
-          counts: counts(settledNodes),
-        }))
-      } else journal.append(dagRunCancelledEvent({ counts: counts(settledNodes), ...(reason === undefined ? {} : { reason }) }))
+        journal.append(
+          dagRunFailedEvent({
+            error: { code: "task_error", message: "build failed", nodeId: "build" as DagNodeId, at },
+            counts: counts(settledNodes),
+          }),
+        )
+      } else
+        journal.append(
+          dagRunCancelledEvent({ counts: counts(settledNodes), ...(reason === undefined ? {} : { reason }) }),
+        )
     },
   }
 }
@@ -156,7 +169,10 @@ function fixture(nodes: readonly DagNode[], overrides: { readonly cancel?: (id: 
 describe("createDagWaitSurface wait terminal projection", () => {
   test("#given a two node run #when both nodes complete #then wait resolves with each node output and run stats", async () => {
     // given
-    const running = [node("plan", { state: "running", taskId: "task-plan" }), node("build", { state: "running", taskId: "task-build" })]
+    const running = [
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("build", { state: "running", taskId: "task-build" }),
+    ]
     const harness = fixture(running)
     harness.store.writeResult(runId, "plan", "plan output")
     harness.store.writeResult(runId, "build", "build output")
@@ -165,7 +181,12 @@ describe("createDagWaitSurface wait terminal projection", () => {
     const waiting = harness.surface.wait(runId, parentSessionId)
     harness.settle(
       [
-        node("plan", { state: "completed", taskId: "task-plan", completedAt: at, runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 } }),
+        node("plan", {
+          state: "completed",
+          taskId: "task-plan",
+          completedAt: at,
+          runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 },
+        }),
         node("build", { state: "completed", taskId: "task-build", completedAt: at }),
       ],
       "completed",
@@ -177,14 +198,22 @@ describe("createDagWaitSurface wait terminal projection", () => {
     expect(result.runId).toBe(runId)
     expect(result.snapshot.status).toBe("completed")
     expect(result.nodes).toEqual({
-      plan: { state: "completed", taskId: "task-plan", output: "plan output", runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 } },
+      plan: {
+        state: "completed",
+        taskId: "task-plan",
+        output: "plan output",
+        runStats: { runtime_ms: 10, turns: 2, tool_calls: 1 },
+      },
       build: { state: "completed", taskId: "task-build", output: "build output" },
     })
   })
 
   test("#given a failed node with a dependent #when the run ends failed #then wait resolves with the node error and the dependency skip", async () => {
     // given
-    const harness = fixture([node("plan", { state: "running", taskId: "task-plan" }), node("ship", { state: "blocked", dependsOn: ["plan" as DagNodeId] })])
+    const harness = fixture([
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("ship", { state: "blocked", dependsOn: ["plan" as DagNodeId] }),
+    ])
 
     // when
     const waiting = harness.surface.wait(runId, parentSessionId)
@@ -215,15 +244,15 @@ describe("createDagWaitSurface wait terminal projection", () => {
 
   test("#given a cancelled run #when wait is pending #then it resolves rather than rejects and carries the cancellation reason", async () => {
     // given
-    const harness = fixture([node("plan", { state: "running", taskId: "task-plan" }), node("build", { state: "pending" })])
+    const harness = fixture([
+      node("plan", { state: "running", taskId: "task-plan" }),
+      node("build", { state: "pending" }),
+    ])
 
     // when
     const waiting = harness.surface.wait(runId, parentSessionId)
     harness.settle(
-      [
-        node("plan", { state: "cancelled", taskId: "task-plan" }),
-        node("build", { state: "cancelled" }),
-      ],
+      [node("plan", { state: "cancelled", taskId: "task-plan" }), node("build", { state: "cancelled" })],
       "cancelled",
       "user_requested",
     )
@@ -255,7 +284,7 @@ describe("createDagWaitSurface wait terminal projection", () => {
 
   test("#given a run terminalizes during live subscription setup #when wait registers #then the final checkpoint read resolves without an event callback", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const running = record([node("plan", { state: "running", taskId: "task-plan" })])
     store.writeCheckpoint(runId, running)
     store.writeResult(runId, "plan", "plan output")

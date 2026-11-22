@@ -41,7 +41,7 @@ export function InstallerList({
             <div className="min-w-0">
               <a
                 href={installer.url}
-                className="text-text-hi hover:text-accent focus-visible:outline-accent-32 ease-standard font-mono text-sm break-all underline decoration-[var(--line-strong)] underline-offset-4 transition-colors duration-[var(--dur-micro)] focus-visible:outline-2 focus-visible:outline-offset-2"
+                className="text-text-hi hover:text-accent ease-standard focus-ring font-mono text-sm break-all underline decoration-[var(--line-strong)] underline-offset-4 transition-colors duration-[var(--dur-micro)]"
               >
                 {installer.fileName}
               </a>

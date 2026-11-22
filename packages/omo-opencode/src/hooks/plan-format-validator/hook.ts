@@ -22,7 +22,8 @@ export const PLAN_EFFORT_BANDS = ["Quick", "Short", "Medium", "Large", "XL"] as 
 export type PlanEffortBand = (typeof PLAN_EFFORT_BANDS)[number]
 
 const EFFORT_LINE = /^(\*\*Effort:\*\*[ \t]*)(.*)$/
-const DURATION_VALUE = /(\d+(?:[.,]\d+)?)\s*(?:-|–|to)?\s*(\d+(?:[.,]\d+)?)?\s*(min(?:ute)?s?|h(?:ou)?rs?|d(?:ay)?s?|w(?:ee)?ks?|mo(?:nth)?s?)\b/i
+const DURATION_VALUE =
+  /(\d+(?:[.,]\d+)?)\s*(?:-|–|to)?\s*(\d+(?:[.,]\d+)?)?\s*(min(?:ute)?s?|h(?:ou)?rs?|d(?:ay)?s?|w(?:ee)?ks?|mo(?:nth)?s?)\b/i
 
 const HOURS_PER_UNIT: Readonly<Record<string, number>> = {
   min: 1 / 60,
@@ -205,9 +206,9 @@ function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: bo
       "Those sections will contribute no tasks to `/ulw-execute` progress.",
       "",
       "**Fix**: Every task checkbox under `## TODOs` MUST start with a bare number",
-      "followed by dot + space: `1.`, `2.`, `3.` — NOT `Phase 1:`, `Task-1.` etc.",
+      "followed by dot + space (`1.`, `2.`, `3.`), NOT `Phase 1:`, `Task-1.` etc.",
       "Every Final Verification Wave checkbox MUST start with `F` + number:",
-      "`F1.`, `F2.` — NOT `T-F1.`, `F-1.`, `Final-1.` etc.",
+      "`F1.`, `F2.`, NOT `T-F1.`, `F-1.`, `Final-1.` etc.",
       "</plan-format-warning>",
     ].join("\n")
   }
@@ -217,7 +218,7 @@ function buildWarning(rawCount: number, parsedCount: number, hasEmptySection: bo
     "<plan-format-warning>",
     `Plan has **${rawCount} task checkbox(es)** but \`getPlanProgress()\` only parsed **${parsedCount}**. `,
     `**${skipped} task(s)** have malformed labels and will be SKIPPED by the progress counter.`,
-    `\`/ulw-execute\` will show \"Progress: ${parsedCount} tasks\" — missing ${skipped} task(s).`,
+    `\`/ulw-execute\` will show \"Progress: ${parsedCount} tasks\": missing ${skipped} task(s).`,
     "",
     "**Fix**: Ensure every skipped task checkbox uses bare-number format:",
     "  `## TODOs` → `1.`, `2.`, `3.` (NOT `Phase 1:`, `Task-1.`)",

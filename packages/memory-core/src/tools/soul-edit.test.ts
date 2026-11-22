@@ -16,7 +16,6 @@ const AUTHOR: GitCommitAuthor = {
 }
 
 const roots: string[] = []
-const WINDOWS_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
 
 afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => removeTree(root, { maxRetries: 10, retryDelay: 200 })))
@@ -30,11 +29,7 @@ async function fixture(): Promise<{ repo: GitMemoryRepo; lock: MemoryToolLock }>
   return { repo, lock }
 }
 
-async function seed(
-  setup: Awaited<ReturnType<typeof fixture>>,
-  path: string,
-  text: string,
-): Promise<void> {
+async function seed(setup: Awaited<ReturnType<typeof fixture>>, path: string, text: string): Promise<void> {
   const fullPath = join(setup.repo.dir, path)
   await mkdir(dirname(fullPath), { recursive: true })
   await writeFile(fullPath, renderMemoryFile({ description: "Seed" }, text), "utf8")
@@ -66,7 +61,7 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md"])
     expect(result.commit?.subject).toBe("rewrite my persona")
     expect(result.commit?.sha).toBe((await setup.repo.head()) ?? undefined)
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given a str_replace on system/identity.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
@@ -90,7 +85,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/identity.md"])
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given an insert into system/boundaries.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
@@ -106,7 +101,7 @@ describe("runMemoryTool soul-edit result", () => {
         reason: "record what the user said not to do",
         file_path: "system/boundaries.md",
         insert_line: 999,
-        insert_text: "- [2026-09-13] \"never force-push shared branches\" <!-- src: session-1 -->",
+        insert_text: '- [2026-09-13] "never force-push shared branches" <!-- src: session-1 -->',
         author: AUTHOR,
       },
     })
@@ -114,7 +109,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/boundaries.md"])
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given a rename that moves system/persona.md #when the tool runs #then the soul-edit directive appears", async () => {
     // given
@@ -137,7 +132,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/persona.md", "reference/old-persona.md"])
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given an insert into system/self-aware.md #when the tool runs #then no soul-edit directive appears (self-aware is not a soul path)", async () => {
     // given
@@ -153,7 +148,8 @@ describe("runMemoryTool soul-edit result", () => {
         reason: "promote an observation",
         file_path: "system/self-aware.md",
         insert_line: 999,
-        insert_text: "- [2026-09-14] cond: a remote machine is named | reaction: \"why here\" (msg-1) | obs: searched local fs first, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->",
+        insert_text:
+          '- [2026-09-14] cond: a remote machine is named | reaction: "why here" (msg-1) | obs: searched local fs first, 2 of 9 | next: run the host check first <!-- status: observed; expires: 2026-12-14 -->',
         author: AUTHOR,
       },
     })
@@ -161,7 +157,7 @@ describe("runMemoryTool soul-edit result", () => {
     // then
     expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["system/self-aware.md"])
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given a commit that touches only non-soul files #when the tool runs #then no soul-edit directive appears but commit metadata is present", async () => {
     // given
@@ -185,5 +181,5 @@ describe("runMemoryTool soul-edit result", () => {
     expect(result.message).not.toContain(MEMORY_SOUL_EDIT_RESULT_TOKEN)
     expect(result.commit?.affectedPaths).toEqual(["notes/facts/2026-08.md"])
     expect(result.commit?.subject).toBe("record a fact")
-  }, WINDOWS_INTEGRATION_TEST_TIMEOUT)
+  })
 })

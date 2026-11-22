@@ -15,7 +15,8 @@ const packageRoot = dirname(scriptDir)
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
 
 const SUMMARY = "Audit auth session flow"
-const OVER_LIMIT_MARKER = "audit auth session flow and the surrounding token refresh pipeline for regressions across the relay"
+const OVER_LIMIT_MARKER =
+  "audit auth session flow and the surrounding token refresh pipeline for regressions across the relay"
 
 const OMO_CONFIG = {
   categories: {
@@ -132,7 +133,20 @@ async function run() {
   try {
     run = await runChild(
       senpiBin,
-      ["-e", mockProviderEntry, "--provider", "omo-mock", "--model", "mock-1", "--session-dir", sessionDir, "--offline", "--approve", "--no-context-files", "Run the task_summary QA scenario."],
+      [
+        "-e",
+        mockProviderEntry,
+        "--provider",
+        "omo-mock",
+        "--model",
+        "mock-1",
+        "--session-dir",
+        sessionDir,
+        "--offline",
+        "--approve",
+        "--no-context-files",
+        "Run the task_summary QA scenario.",
+      ],
       { cwd: sandbox.cwd, env: childEnv(process.env, sandbox, sessionDir), stdio: "inherit" },
     )
     check("senpi-run", run.status === 0, `exit ${run.status}${run.error ? ` (${run.error})` : ""}`)
@@ -146,13 +160,19 @@ async function run() {
 
     const records = readRecords(sandbox)
     const normal = records["sum-child"]
-    check("record-summary", normal?.task_summary === SUMMARY, `sum-child record task_summary=${JSON.stringify(normal?.task_summary)}`)
+    check(
+      "record-summary",
+      normal?.task_summary === SUMMARY,
+      `sum-child record task_summary=${JSON.stringify(normal?.task_summary)}`,
+    )
     const long = records["sum-long"]
     const clampOk =
-      typeof long?.task_summary === "string" &&
-      long.task_summary.length === 80 &&
-      long.task_summary.endsWith("...")
-    check("record-clamp", clampOk, `sum-long record task_summary length=${long?.task_summary?.length} tail=${JSON.stringify(long?.task_summary?.slice(-8))}`)
+      typeof long?.task_summary === "string" && long.task_summary.length === 80 && long.task_summary.endsWith("...")
+    check(
+      "record-clamp",
+      clampOk,
+      `sum-long record task_summary length=${long?.task_summary?.length} tail=${JSON.stringify(long?.task_summary?.slice(-8))}`,
+    )
 
     const rowChecks = Object.values(records)
       .filter((record) => record.task_summary !== undefined)

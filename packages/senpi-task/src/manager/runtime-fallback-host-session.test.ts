@@ -9,6 +9,7 @@ import { createTaskRecordStore } from "../store"
 import { baseSpec, cleanupProjects, FakeRunner, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -31,9 +32,16 @@ class HostSessionRunner extends FakeRunner {
 
   override async start(spec: ManagedStartSpec): Promise<ManagedChildHandle> {
     const handle = await super.start(spec)
-    const sessioned = Object.assign(handle, { kind: "host-session" as const, hostSession: sessionFor(spec.taskId, spec.model ?? "") })
+    const sessioned = Object.assign(handle, {
+      kind: "host-session" as const,
+      hostSession: sessionFor(spec.taskId, spec.model ?? ""),
+    })
     // The manager stamps spawn facts after it subscribes, so resolve on the subscription.
-    if (spec.model === NEXT && spec.taskId === this.watchedTaskId) void this.handles.get(spec.taskId)?.waitForSubscription().then(() => this.nextRungStarted.resolve())
+    if (spec.model === NEXT && spec.taskId === this.watchedTaskId)
+      void this.handles
+        .get(spec.taskId)
+        ?.waitForSubscription()
+        .then(() => this.nextRungStarted.resolve())
     return sessioned
   }
 }
@@ -74,7 +82,8 @@ describe("runtime fallback of a daemon-session child", () => {
     const runner = new HostSessionRunner()
     const { manager, store } = makeManager({
       inProcess: runner,
-      planner: (spec) => (spec.name === "holder" ? { kind: "resolved", plan: { model: NEXT } } : { kind: "resolved", plan: plan() }),
+      planner: (spec) =>
+        spec.name === "holder" ? { kind: "resolved", plan: { model: NEXT } } : { kind: "resolved", plan: plan() },
       config: settings({ default_concurrency: 1, global_concurrency: 2, max_depth: 1 }),
     })
     const holder = await manager.start(baseSpec({ name: "holder" }))
@@ -119,7 +128,7 @@ describe("runtime fallback of a daemon-session child", () => {
   test("#given the failed rung's session is still closing #when a daemon-side session reconciles #then the live parent keeps its task and only the next rung's result lands", async () => {
     // given
     const runner = new SlowCloseRunner()
-    const store = createTaskRecordStore({ project_dir: tempProject() })
+    const store = createTaskRecordStore(ownedTaskState(tempProject()))
     const config = settings({ default_execution_mode: "process" })
     const owner = createTaskManager({
       store,
@@ -130,7 +139,13 @@ describe("runtime fallback of a daemon-session child", () => {
       planner: () => ({ kind: "resolved", plan: plan() }),
       destruction: { destroyResidentTask: (taskId, cause) => ownerLifecycle.destroyResidentTask(taskId, cause) },
     })
-    const ownerLifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, config, hostPid: OWNER_PID, registry: createManagerResidencyRegistry(() => owner) })
+    const ownerLifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      config,
+      hostPid: OWNER_PID,
+      registry: createManagerResidencyRegistry(() => owner),
+    })
     const daemonSide = hostLifecycleDeps({ store, hostPid: OWNER_PID + 1, isAlive: (pid) => pid === OWNER_PID })
     const task = await owner.start(baseSpec({ execution_mode: "process" }))
     if (task.kind !== "started") throw new Error("expected the task to start")
@@ -140,7 +155,9 @@ describe("runtime fallback of a daemon-session child", () => {
     try {
       // when: the first rung fails and, while the daemon is still closing its session, the next
       // rung's child session reconciles the shared records from inside the daemon
-      runner.handles.get(task.task_id)?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
+      runner.handles
+        .get(task.task_id)
+        ?.settle({ status: "error", failure: { kind: "child-turn-failed", message: "500: upstream overloaded" } })
       await runner.closing.promise
       const closing = store.load(task.task_id)
       const sweep = await createTaskLifecycle(daemonSide.deps).reconcileOnSessionStart("next-rung-child-session")
@@ -149,7 +166,12 @@ describe("runtime fallback of a daemon-session child", () => {
       runner.handles.get(task.task_id)?.settle({ status: "completed", finalResponse: "NEXT RUNG RESULT" })
 
       // then
-      expect(closing).toMatchObject({ model: NEXT, host_pid: OWNER_PID, fallback_handoff_epoch: 1, notification: { run_epoch: 1 } })
+      expect(closing).toMatchObject({
+        model: NEXT,
+        host_pid: OWNER_PID,
+        fallback_handoff_epoch: 1,
+        notification: { run_epoch: 1 },
+      })
       expect(closing?.host_session).toBeUndefined()
       expect(sweep.outcomes).toContainEqual({ task_id: task.task_id, kind: "deferred", reason: "foreign_live_owner" })
       expect(daemonSide.respawned).toEqual([])

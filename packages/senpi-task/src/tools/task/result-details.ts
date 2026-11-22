@@ -21,13 +21,13 @@ export function recordSummary(record: TaskRecord, includeLifecycle?: boolean) {
     failure_kind: record.failure_kind,
     failure_reason: record.failure_reason,
     ...(includeLifecycle && {
-          description: record.description,
-          agent_type: record.agent_type,
-          residency_state: record.residency_state,
-          depth: record.depth,
-          created_at: record.created_at,
-          updated_at: record.updated_at,
-        }),
+      description: record.description,
+      agent_type: record.agent_type,
+      residency_state: record.residency_state,
+      depth: record.depth,
+      created_at: record.created_at,
+      updated_at: record.updated_at,
+    }),
   }
 }
 
@@ -71,6 +71,22 @@ export function startedDetails(
     queue_position: started.queue_position,
     ...(started.isolation === undefined ? {} : { isolation: started.isolation }),
     ...(skills === undefined ? {} : { skills }),
+  }
+}
+
+// The start report holds the launched spawn facts only when the launch settled inside the manager's
+// report window (#10042). A progress partial reads them from the live record instead, so what it
+// reports never depends on how fast the launch settled (#11691).
+export function withLiveSpawnFacts<T extends Extract<StartResult, { kind: "started" }>>(
+  started: T,
+  record: TaskRecord | undefined,
+): T {
+  if (record === undefined) return started
+  return {
+    ...started,
+    run_epoch: record.notification.run_epoch,
+    ...(record.resolved_model === undefined ? {} : { resolved_model: record.resolved_model }),
+    ...(record.effective_model === undefined ? {} : { effective_model: record.effective_model }),
   }
 }
 

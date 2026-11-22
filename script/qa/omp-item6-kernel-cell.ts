@@ -16,5 +16,11 @@ export async function definedKernel(sessionId: string): Promise<{ kernel: Produc
   const cell = kernel.run({ cellId: `${sessionId}-cell`, code: DEFINE_CELL })
   const hold = await bounded(kernel.nextToolCall(), "hold-call")
   assert.equal(hold.toolName, "hold")
-  return { kernel, release: () => { kernel.reply(hold.callId, "released"); void cell } }
+  return {
+    kernel,
+    release: () => {
+      kernel.reply(hold.callId, "released")
+      void cell
+    },
+  }
 }

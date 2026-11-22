@@ -8,6 +8,8 @@ mod common;
 use common::{error_code, fake_backend, Engine, TWO_DISPLAYS};
 use serde_json::{json, Value};
 
+const WINDOW: &str = "101";
+
 const CHORD: &str = "ctrl+alt+shift+escape";
 
 fn engine() -> Engine {
@@ -36,12 +38,14 @@ fn live_session(engine: &mut Engine) -> String {
     let token = open(engine, true);
     engine.call(2, "stopPath.start", json!({"chord": CHORD}));
     engine.call(3, "stopPath.heartbeat", json!({}));
-    engine.call(4, "capture", json!({"target": "desktop"}));
+    engine.call(4, "capture", json!({"target": WINDOW}));
     token
 }
 
+/// A background click on one window: the stop path gates it, and it needs no
+/// control grant (desktop input does, #10788).
 fn click(engine: &mut Engine, id: i64) -> Value {
-    engine.call(id, "click", json!({"target": "desktop", "x": 10.0, "y": 10.0}))
+    engine.call(id, "click", json!({"target": WINDOW, "x": 10.0, "y": 10.0}))
 }
 
 fn stop_path_unavailable(reply: &Value) -> (&Value, &Value) {
@@ -73,7 +77,7 @@ fn a_host_relay_alone_never_enables_input_without_the_policy() {
     // When: the host arms the relay on a host without a Global listener
     let started = engine.call(2, "stopPath.start", json!({"chord": CHORD}));
     engine.call(3, "stopPath.heartbeat", json!({}));
-    engine.call(4, "capture", json!({"target": "desktop"}));
+    engine.call(4, "capture", json!({"target": WINDOW}));
     let refused = click(&mut engine, 5);
     // Then
     let status = &started["result"];

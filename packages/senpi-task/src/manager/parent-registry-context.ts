@@ -1,13 +1,10 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
+import { excludedModelPattern } from "@oh-my-opencode/omo-config-core"
 
 import { asSenpiThinkingLevel } from "../senpi/thinking-level"
 import { splitModelDecorators } from "../senpi/explicit-pin"
 import { RunnerError } from "../runners/in-process/runner-error"
-import type {
-  InProcessSessionContext,
-  InProcessSessionContextProvider,
-  ResumeSessionContextResult,
-} from "./runner"
+import type { InProcessSessionContext, InProcessSessionContextProvider, ResumeSessionContextResult } from "./runner"
 import type { ManagedStartSpec } from "./types"
 
 // The concrete senpi ModelRegistry the parent session owns. `createAgentSession` needs this exact
@@ -44,6 +41,7 @@ type ModelFinder<TModel> = {
 export function createParentRegistrySessionContext(
   resolveRegistry: ParentModelRegistryResolver,
   resolveProjectTrust: ParentProjectTrustResolver = () => undefined,
+  resolveExcludeModels: () => readonly string[] | undefined = () => undefined,
 ): InProcessSessionContextProvider {
   const trust = (): Pick<InProcessSessionContext, "projectTrusted"> => {
     const projectTrusted = resolveProjectTrust()
@@ -61,9 +59,17 @@ export function createParentRegistrySessionContext(
       return trust()
     }
     if (spec.model !== undefined) {
+      const excludedBy = excludedModelPattern(splitModelDecorators(spec.model).base, resolveExcludeModels())
+      if (excludedBy !== undefined) {
+        throw new RunnerError({
+          kind: "model_unavailable",
+          message: `model "${spec.model}" is kept out by exclude_models in omo.json ("${excludedBy}"); refusing it`,
+        })
+      }
       // A record written before #9722 may still carry a `:level` in its model id; resolve it by its
       // canonical base and let the suffix ride the thinking level instead of failing the respawn.
-      const model = findModelReference(registry, spec.model) ?? findModelReference(registry, splitModelDecorators(spec.model).base)
+      const model =
+        findModelReference(registry, spec.model) ?? findModelReference(registry, splitModelDecorators(spec.model).base)
       if (model === undefined) {
         throw new RunnerError({
           kind: "model_unavailable",
@@ -71,7 +77,8 @@ export function createParentRegistrySessionContext(
         })
       }
       const modelRuntime = registry.modelRuntime
-      const thinkingLevel = asSenpiThinkingLevel(spec.variant) ?? asSenpiThinkingLevel(splitModelDecorators(spec.model).thinkingLevel)
+      const thinkingLevel =
+        asSenpiThinkingLevel(spec.variant) ?? asSenpiThinkingLevel(splitModelDecorators(spec.model).thinkingLevel)
       return {
         ...trust(),
         modelRegistry: registry,
@@ -93,7 +100,7 @@ export function createParentRegistrySessionContext(
   }
   return Object.assign(provide, {
     resolveResumeContext: (spec: ManagedStartSpec): ResumeContextResult => {
-      const resolved = resolveResumeContext(resolveRegistry, spec)
+      const resolved = resolveResumeContext(resolveRegistry, spec, resolveExcludeModels())
       return resolved.ok ? { ok: true, context: { ...trust(), ...resolved.context } } : resolved
     },
   })
@@ -121,6 +128,7 @@ export function findModelReference<TModel>(registry: ModelFinder<TModel>, modelR
 export function resolveResumeContext(
   resolveRegistry: ParentModelRegistryResolver,
   spec: ManagedStartSpec,
+  excludeModels?: readonly string[],
 ): ResumeContextResult {
   const registry = resolveRegistry()
   if (registry === undefined) {
@@ -130,6 +138,15 @@ export function resolveResumeContext(
   const resolvedModel = spec.resolvedModel
   if (resolvedModel === undefined) {
     return { ok: false, code: "model_unavailable", reason: "spec carries no resolved_model to match against" }
+  }
+
+  const excludedBy = excludedModelPattern(`${resolvedModel.provider}/${resolvedModel.model_id}`, excludeModels)
+  if (excludedBy !== undefined) {
+    return {
+      ok: false,
+      code: "model_unavailable",
+      reason: `provider "${resolvedModel.provider}" model "${resolvedModel.model_id}" is kept out by exclude_models ("${excludedBy}")`,
+    }
   }
 
   // Key on the canonical provider+model_id pair, NOT on the display string.

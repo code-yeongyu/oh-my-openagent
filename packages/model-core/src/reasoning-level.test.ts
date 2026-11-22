@@ -27,7 +27,10 @@ describe("reasoning-level", () => {
   })
 
   test("given max suffix without provider prefix when allowMaxSuffix then it extracts the suffix", () => {
-    expect(splitReasoningSuffix("gpt-5.6-sol:max", { allowMaxSuffix: true })).toEqual({ base: "gpt-5.6-sol", level: "max" })
+    expect(splitReasoningSuffix("gpt-5.6-sol:max", { allowMaxSuffix: true })).toEqual({
+      base: "gpt-5.6-sol",
+      level: "max",
+    })
   })
 
   test("given max suffix without provider prefix and no option when split then it stays attached", () => {

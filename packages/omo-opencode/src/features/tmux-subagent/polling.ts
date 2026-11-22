@@ -1,18 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { TmuxConfig } from "../../config/schema"
-import {
-  POLL_INTERVAL_BACKGROUND_MS,
-  SESSION_MISSING_GRACE_MS,
-} from "../../shared/tmux"
+import { POLL_INTERVAL_BACKGROUND_MS, SESSION_MISSING_GRACE_MS } from "../../shared/tmux"
 import { log } from "../../shared"
 import type { TrackedSession } from "./types"
 import { queryWindowState } from "./pane-state-querier"
 import { executeAction } from "./action-executor"
-import {
-  MIN_STABILITY_TIME_MS,
-  SESSION_TIMEOUT_MS,
-  STABLE_POLLS_REQUIRED,
-} from "./polling-constants"
+import { MIN_STABILITY_TIME_MS, SESSION_TIMEOUT_MS, STABLE_POLLS_REQUIRED } from "./polling-constants"
 import { parseSessionStatusResponse } from "./session-status-parser"
 import { getMessageCount } from "./session-message-count"
 import { waitForSessionReady as waitForSessionReadyFromClient } from "./session-ready-waiter"
@@ -118,10 +111,10 @@ export function createSessionPollingController(params: {
                   shouldCloseViaStability = true
                 } else {
                   tracked.stableIdlePolls = 0
-                  log(
-                    "[tmux-session-manager] stability reached but session not idle on recheck, resetting",
-                    { sessionId, recheckStatus: recheckStatus?.type },
-                  )
+                  log("[tmux-session-manager] stability reached but session not idle on recheck, resetting", {
+                    sessionId,
+                    recheckStatus: recheckStatus?.type,
+                  })
                 }
               }
             } else {

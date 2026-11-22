@@ -2,7 +2,11 @@ import { randomUUID } from "node:crypto"
 import { log } from "@oh-my-opencode/utils"
 import type { PendingSteeringEntry, TaskRecord } from "../state"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
-import { HostSessionDetachedError, SessionHeldElsewhereError } from "../runners/rpc-host/session-wire"
+import {
+  HostSessionDetachedError,
+  HostSessionUnresponsiveError,
+  SessionHeldElsewhereError,
+} from "../runners/rpc-host/session-wire"
 import type { SendDelivery, SendOutcome, SteeringPort } from "./types"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
@@ -25,7 +29,12 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
   function enqueuePending(record: TaskRecord, message: string, deliverAs: SendDelivery): SendOutcome {
     let position = 0
     const updated = port.store.mutate(record.task_id, (fresh) => {
-      if ((fresh.status !== "pending" && fresh.status !== "running") || fresh.killed === true || fresh.cancel_requested !== undefined) return fresh
+      if (
+        (fresh.status !== "pending" && fresh.status !== "running") ||
+        fresh.killed === true ||
+        fresh.cancel_requested !== undefined
+      )
+        return fresh
       const entry: PendingSteeringEntry = {
         // Unique per entry: a clock-plus-length id repeats after a partial drain, and clearing a
         // delivered id would then also drop the later entry that reused it.
@@ -41,9 +50,14 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       return { kind: "not_found", reason: `No task found for "${record.task_id}".`, suggestion: NOT_FOUND_SUGGESTION }
     }
     if (position === 0) {
-      return { kind: "not_continuable", task_id: updated.task_id,
-        reason: [updated.error_message, updated.final_response].filter(Boolean).join("\n\n") || `Task ${updated.task_id} is ${updated.status}.`,
-        suggestion: TASK_OUTPUT_SUGGESTION }
+      return {
+        kind: "not_continuable",
+        task_id: updated.task_id,
+        reason:
+          [updated.error_message, updated.final_response].filter(Boolean).join("\n\n") ||
+          `Task ${updated.task_id} is ${updated.status}.`,
+        suggestion: TASK_OUTPUT_SUGGESTION,
+      }
     }
     port.store.appendEvent(record.task_id, {
       type: "steer_queued",
@@ -68,12 +82,18 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       if (drainedIds === undefined) dropped = queue.length
       if (remaining.length === 0) {
         const { pending_steering: _cleared, ...rest } = fresh
-        return dropped === 0 ? rest : { ...rest, error_message: withDroppedSteeringNotice(fresh.error_message, dropped) }
+        return dropped === 0
+          ? rest
+          : { ...rest, error_message: withDroppedSteeringNotice(fresh.error_message, dropped) }
       }
       return { ...fresh, pending_steering: remaining }
     })
     // Undelivered messages never vanish silently: a whole-queue clear records how many it dropped and why.
-    if (dropped > 0) port.store.appendEvent(taskId, { type: "steer_dropped", payload: { count: dropped, reason: dropReason ?? "queue_cleared" } })
+    if (dropped > 0)
+      port.store.appendEvent(taskId, {
+        type: "steer_dropped",
+        payload: { count: dropped, reason: dropReason ?? "queue_cleared" },
+      })
     return dropped
   }
 
@@ -88,18 +108,20 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
       requestedAgain.add(taskId)
       return existing
     }
-    const work = Promise.resolve().then(async () => {
-      // Re-read after each delivered batch: sends accepted during delivery retain their order.
-      for (let pass = 0; pass < MAX_DRAIN_PASSES; pass += 1) {
-        if (!(await drainPending(taskId))) return
-        await nextTurn()
-      }
-      port.store.appendEvent(taskId, { type: "steer_drain_deferred", payload: { passes: MAX_DRAIN_PASSES } })
-      setTimeout(() => void notifyStarted(taskId), FOLLOW_UP_DRAIN_MS).unref?.()
-    }).finally(() => {
-      draining.delete(taskId)
-      if (requestedAgain.delete(taskId)) void notifyStarted(taskId)
-    })
+    const work = Promise.resolve()
+      .then(async () => {
+        // Re-read after each delivered batch: sends accepted during delivery retain their order.
+        for (let pass = 0; pass < MAX_DRAIN_PASSES; pass += 1) {
+          if (!(await drainPending(taskId))) return
+          await nextTurn()
+        }
+        port.store.appendEvent(taskId, { type: "steer_drain_deferred", payload: { passes: MAX_DRAIN_PASSES } })
+        setTimeout(() => void notifyStarted(taskId), FOLLOW_UP_DRAIN_MS).unref?.()
+      })
+      .finally(() => {
+        draining.delete(taskId)
+        if (requestedAgain.delete(taskId)) void notifyStarted(taskId)
+      })
     draining.set(taskId, work)
     return work
   }
@@ -110,22 +132,37 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
     // already dropped them with a diagnostic.
     const fresh = tryLoad(taskId)
     // Pool assignments are captured by their admitted turn, never replayed as individual sends.
-    const queue = fresh?.pending_steering?.filter(entry => entry.workpool === undefined)
-    if (fresh === undefined || (fresh.status !== "running" && fresh.status !== "pending") || fresh.killed === true || fresh.cancel_requested !== undefined
-      || fresh.residency_state !== "resident" || queue === undefined || queue.length === 0) return false
+    const queue = fresh?.pending_steering?.filter((entry) => entry.workpool === undefined)
+    if (
+      fresh === undefined ||
+      (fresh.status !== "running" && fresh.status !== "pending") ||
+      fresh.killed === true ||
+      fresh.cancel_requested !== undefined ||
+      fresh.residency_state !== "resident" ||
+      queue === undefined ||
+      queue.length === 0
+    )
+      return false
     const handle = port.liveHandle(taskId)
     if (handle === undefined) return false
+    const liveness = handle.liveness?.()
+    if (liveness !== undefined && liveness.state !== "running") return false
     const delivered = new Set<string>()
     for (const entry of queue) {
       try {
-        if (entry.deliver_as === "steer") await handle.steer(entry.message)
-        else await handle.followUp(entry.message)
+        // The entry's own id travels with it, so the child holds it under the id it was queued with and a
+        // drain repeated after a lost acknowledgment or a parent restart replays it instead of sending a
+        // second copy (#2838 step 4).
+        const identity = { clientMessageId: entry.id }
+        if (entry.deliver_as === "steer") await handle.steer(entry.message, identity)
+        else await handle.followUp(entry.message, identity)
         port.store.appendEvent(taskId, {
           type: "steered",
           payload: { delivered: entry.deliver_as, queued: true, run_epoch: fresh.notification.run_epoch },
         })
         delivered.add(entry.id)
       } catch (error) {
+        if (error instanceof HostSessionUnresponsiveError) break
         log("senpi-task steering queued delivery failed", {
           taskId,
           error: error instanceof Error ? error.message : String(error),
@@ -133,11 +170,18 @@ export function createPendingSteering(port: SteeringPort, tryLoad: (taskId: stri
         if (error instanceof HostSessionDetachedError || error instanceof SessionHeldElsewhereError) {
           let parked = false
           port.store.mutate(taskId, (current) => {
-            if (current.status !== "running" || current.killed === true
-              || current.notification.run_epoch !== fresh.notification.run_epoch) return current
+            if (
+              current.status !== "running" ||
+              current.killed === true ||
+              current.notification.run_epoch !== fresh.notification.run_epoch
+            )
+              return current
             parked = true
-            return { ...current, residency_state: "rpc_detached",
-              suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable" }
+            return {
+              ...current,
+              residency_state: "rpc_detached",
+              suspension_reason: error instanceof SessionHeldElsewhereError ? "host_draining" : "daemon_unavailable",
+            }
           })
           if (parked && port.liveHandle(taskId) === handle) {
             await port.destruction.destroyResidentTask(taskId, "recovery_detach")

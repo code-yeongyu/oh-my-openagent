@@ -19,9 +19,8 @@ export function buildFileRows(status: PanelGitStatus | undefined, width: number,
   const summary = hidden > 0 ? `${status.files.length} changed · +${hidden} more` : `${status.files.length} changed`
   const rows: PanelRow[] = [heading("FILES", summary)]
   for (const file of shown) {
-    const delta = file.added === undefined && file.removed === undefined
-      ? ""
-      : `  +${file.added ?? 0}/-${file.removed ?? 0}`
+    const delta =
+      file.added === undefined && file.removed === undefined ? "" : `  +${file.added ?? 0}/-${file.removed ?? 0}`
     const text = `${file.xy} ${basename(file.path)}${delta}`
     // The row shows the basename because the column is narrow; the click carries the real path.
     rows.push({

@@ -1,25 +1,27 @@
-import type { OpenedHostSession, HostSessionCommand, HostSessionParked, HostSessionClosed, HostSessionReplaced, HostSessionClientOptions } from "./session-client-contract"
+import type {
+  OpenedHostSession,
+  HostSessionCommand,
+  HostSessionParked,
+  HostSessionClosed,
+  HostSessionReplaced,
+  HostSessionClientOptions,
+} from "./session-client-contract"
 import type { RpcSessionState, RpcTransportGoneError } from "@code-yeongyu/senpi"
 import { log } from "@oh-my-opencode/utils"
 
-import { loadSenpiBarrel, type SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
-import { buildAutoUiResponse, type AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
+import type { SenpiHostProtocolInfo } from "../../lazy/senpi-barrel"
+import type { AutoAnswerableUiRequest } from "../rpc/ui-auto-answer"
+import { ChildParentLink } from "../parent-link"
 import type { ChildEventListener, RpcEntriesResult, RpcSwitchSessionResult } from "../types"
 import { createChildExtensionEvents } from "../child-extension-events"
 import { socketAcceptsConnection } from "./busy-host"
-import { HostUnavailableError } from "./daemon"
 import { SESSION_PARKED_CAUSE } from "./exit-mapping"
+import { dispatchHostCommand } from "./host-command-dispatch"
 import {
-  assertHostUsable,
   createSenpiRpcClient,
   probeWithEngine,
-  RETRY_FALLBACK_PROFILE_CAPABILITY,
-  toWireOpen,
-  type HostPromptDisposition,
-  type HostProtocolProbe,
-  type HostQueuedInputDisposition,
+  type HostPendingInputs,
   type HostRpcClient,
-  type HostRpcClientFactory,
   type HostSessionOpenInput,
 } from "./session-transport"
 import {
@@ -27,13 +29,13 @@ import {
   isAgentSessionEvent,
   isRoutedTo,
   parseControlRecord,
-  toOpenFailure,
   type HostControlRecord,
 } from "./session-wire"
-
-
-// send() settles with no value: the runner does not consume the host's input disposition.
-const ignoreHostDisposition = (_disposition: HostPromptDisposition | HostQueuedInputDisposition): void => undefined
+import { hostTaskParentWireOf } from "./task-parent-wire"
+import type { TaskParentWire } from "../task-parent-control"
+import { confirmHostSessionAbsent } from "./session-close-proof"
+import { openHostSessionConnection } from "./session-client-opening"
+import { reapplyPermissionPreset, type PermissionPushPorts } from "./permission-push"
 
 /**
  * ONE senpi `RpcClient` per child, over the machine-wide daemon's public socket. The client probes
@@ -51,9 +53,7 @@ export class HostSessionClient {
   readonly onExtensionEvent = this.extensionEvents.subscribe
   readonly socketPath: string
   readonly transportGone: Promise<RpcTransportGoneError>
-  private readonly createClient: HostRpcClientFactory
-  private readonly probeProtocolInfo: HostProtocolProbe
-  private readonly socketAccepts: (socketPath: string) => Promise<boolean>
+  private readonly ports: PermissionPushPorts
   private readonly transportLoss = Promise.withResolvers<RpcTransportGoneError>()
   private readonly eventListeners = new Set<ChildEventListener>()
   private readonly parkedListeners = new Set<(event: HostSessionParked) => void>()
@@ -63,12 +63,19 @@ export class HostSessionClient {
   private routingId: string | undefined
   private identity: SenpiHostProtocolInfo | undefined
   private reattached = false
+  private confirmingClose = false
+  private openInput: HostSessionOpenInput | undefined
+  private readonly parent: ChildParentLink
 
   constructor(options: HostSessionClientOptions) {
     this.socketPath = options.socketPath
-    this.createClient = options.ports?.createClient ?? createSenpiRpcClient
-    this.probeProtocolInfo = options.ports?.probeProtocolInfo ?? probeWithEngine
-    this.socketAccepts = options.ports?.socketAccepts ?? socketAcceptsConnection
+    this.parent = options.parent ?? new ChildParentLink("host-child")
+    this.ports = {
+      socketPath: options.socketPath,
+      createClient: options.ports?.createClient ?? createSenpiRpcClient,
+      probeProtocolInfo: options.ports?.probeProtocolInfo ?? probeWithEngine,
+      socketAccepts: options.ports?.socketAccepts ?? socketAcceptsConnection,
+    }
     this.transportGone = this.transportLoss.promise
   }
 
@@ -91,70 +98,34 @@ export class HostSessionClient {
   }
 
   async open(input: HostSessionOpenInput): Promise<OpenedHostSession> {
-    const probed = await this.probeProtocolInfo(this.socketPath)
-    if (probed === undefined && (await this.socketAccepts(this.socketPath))) {
-      throw new HostUnavailableError("host_busy", {
-        fallbackAllowed: false,
-        detail: "the daemon accepts connections but did not answer get_protocol_info",
-      })
-    }
-    const identity = assertHostUsable(probed)
-    const client = await this.createClient({
-      socketPath: this.socketPath,
+    this.openInput = this.parent.named(input)
+    const { opened, identity } = await openHostSessionConnection(this.openInput, {
+      ...this.ports,
       onDisconnect: (error) => this.handleTransportLoss(error),
-    })
-    client.onEvent((record) => this.ingest(record))
-    await client.start()
-    this.client = client
-    // An older host would ignore the field and run the child on its own settings; leave it off there
-    // and report that the chain was not applied, so the caller can say so once.
-    const profileHonored = identity.capabilities.includes(RETRY_FALLBACK_PROFILE_CAPABILITY)
-    const retryFallbackDropped = !profileHonored && input.retryFallback !== undefined
-    const wire = toWireOpen(profileHonored ? input : withoutRetryFallback(input))
-    const opened = await client.openSession(wire).catch(async (error: unknown) => {
-      this.client = undefined
-      await client.stop()
-      // The host went away with the open in flight: that is an unreachable host, not a session the
-      // host refused, so the start failure carries the host reason instead of a bare session error.
-      const { isTransportGoneError } = await loadSenpiBarrel()
-      if (isTransportGoneError(error)) {
-        throw new HostUnavailableError("host_unreachable", {
-          fallbackAllowed: false,
-          detail: `the host went away during open_session: ${error instanceof Error ? error.message : String(error)}`,
-        })
-      }
-      throw toOpenFailure(error, input.sessionPath)
+      onEvent: (record) => this.ingest(record),
+      bindClient: (client) => {
+        this.client = client
+      },
     })
     this.identity = identity
     this.routingId = opened.sessionId
     this.reattached = opened.attached ?? false
+    this.parent.follow((preset) => this.pushPermissionPreset(preset))
     return {
       sessionId: opened.sessionId,
       attached: this.reattached,
       instanceId: identity.instanceId,
       engineVersion: identity.engineVersion,
-      ...(retryFallbackDropped ? { retryFallbackDropped } : {}),
     }
   }
 
   send(command: HostSessionCommand): Promise<void> {
-    const client = this.connected(command.type)
-    switch (command.type) {
-      case "prompt":
-        return client.prompt(
-          command.message,
-          { ...(command.streamingBehavior === undefined ? {} : { streamingBehavior: command.streamingBehavior }),
-            ...(command.clientMessageId === undefined ? {} : { clientMessageId: command.clientMessageId }) },
-        ).then(ignoreHostDisposition)
-      case "steer":
-        return client.steer(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "followUp":
-        return client.followUp(command.message, undefined, { clientMessageId: command.clientMessageId }).then(ignoreHostDisposition)
-      case "abort":
-        return client.abort()
-      default:
-        return unreachable(command)
-    }
+    if (command.type === "abort") this.parent.turnAborted()
+    return dispatchHostCommand(this.connected(command.type), this.routingId, command)
+  }
+
+  taskParentWire(): TaskParentWire {
+    return hostTaskParentWireOf(this.connected("task_parent"))
   }
 
   getState(): Promise<RpcSessionState> {
@@ -167,6 +138,11 @@ export class HostSessionClient {
 
   getEntries(since?: string): Promise<RpcEntriesResult> {
     return this.connected("get_entries").getEntries(since)
+  }
+
+  async getPendingInputs(knownClientMessageIds: readonly string[]): Promise<HostPendingInputs | undefined> {
+    const client = this.connected("get_pending_inputs")
+    return client.getPendingInputs === undefined ? undefined : client.getPendingInputs(knownClientMessageIds)
   }
 
   switchSession(sessionPath: string): Promise<RpcSwitchSessionResult> {
@@ -194,23 +170,52 @@ export class HostSessionClient {
   }
 
   /** End the session on the host (`close_session`), then drop this child's connection. */
-  async close(): Promise<void> {
+  async close(): Promise<boolean> {
     this.extensionEvents.clear()
+    this.parent.close()
     const client = this.client
     const routingId = this.routingId
+    // Keep the transport reachable by detach() while close_session is in flight. A bounded
+    // handle teardown can give up waiting for its acknowledgement and must still release it.
+    this.routingId = undefined
+    if (client === undefined) return false
+    let answered = false
+    try {
+      if (routingId !== undefined) {
+        await client.closeSession(routingId)
+        answered = true
+      }
+    } finally {
+      if (this.client === client) this.client = undefined
+      // A stop failure after the host answered must not erase that answer (omo#11765).
+      await client.stop().catch((error: unknown) => {
+        if (!answered) throw error
+        log("senpi-task host session client stop failed after an answered close", {
+          socket: this.socketPath,
+          error: String(error),
+        })
+      })
+    }
+    return answered
+  }
+
+  /** Only a live post-close host listing releases ownership; ACKs and frames are not proof. */
+  async closeConfirmed(): Promise<void> {
+    const client = this.connected("close_session")
+    const routingId = this.routingId
+    if (routingId === undefined) throw new HostSessionDetachedError("close_session")
+    this.confirmingClose = true
+    await confirmHostSessionAbsent(client, routingId, () => this.client === client)
+    this.extensionEvents.clear()
     this.client = undefined
     this.routingId = undefined
-    if (client === undefined) return
-    try {
-      if (routingId !== undefined) await client.closeSession(routingId)
-    } finally {
-      await client.stop()
-    }
+    await client.stop()
   }
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */
   async detach(): Promise<void> {
     this.extensionEvents.clear()
+    this.parent.close()
     const client = this.client
     this.client = undefined
     this.routingId = undefined
@@ -241,16 +246,19 @@ export class HostSessionClient {
         this.answerUi(control)
         return
       case "session_parked": {
+        if (this.confirmingClose) return
         const sessionId = this.routingId ?? control.sessionId
         this.routingId = undefined
         try {
-          for (const listener of this.parkedListeners) listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
+          for (const listener of this.parkedListeners)
+            listener({ sessionId, sessionPath: control.sessionPath, reason: SESSION_PARKED_CAUSE })
         } finally {
           this.releaseEndedSession()
         }
         return
       }
       case "session_closed": {
+        if (this.confirmingClose) return
         const sessionId = this.routingId ?? control.sessionId ?? ""
         this.routingId = undefined
         try {
@@ -283,17 +291,22 @@ export class HostSessionClient {
     })
   }
 
-  // The child must never wait on a human: the deny/cancel answer is written and NOT awaited, so a
-  // UI request cannot hold up the record stream or a command in flight.
-  private answerUi(request: AutoAnswerableUiRequest): void {
-    const answer = buildAutoUiResponse(request)
-    if (answer === null) return
-    void this.client?.sendExtensionUIResponse(answer).catch((error: unknown) => {
-      log("senpi-task host session ui auto-answer failed", { socket: this.socketPath, error: String(error) })
+  // Never awaited, so a UI request cannot hold up the record stream or a command in flight: a forwardable dialog
+  // waits for the parent's answer (#6189 F2d), anything else gets the deny/cancel default at once.
+  private answerUi(request: AutoAnswerableUiRequest & Readonly<Record<string, unknown>>): void {
+    this.parent.answer(request, async (answer) => {
+      await this.client?.sendExtensionUIResponse(answer)
     })
   }
 
+  private async pushPermissionPreset(preset: string): Promise<void> {
+    if (this.openInput === undefined || this.routingId === undefined)
+      throw new HostSessionDetachedError("set_permission_preset")
+    await reapplyPermissionPreset({ ...this.openInput, permissionPreset: preset }, this.ports)
+  }
+
   private handleTransportLoss(error: RpcTransportGoneError): void {
+    this.parent.close()
     this.routingId = undefined
     this.client = undefined
     this.transportLoss.resolve(error)
@@ -302,9 +315,4 @@ export class HostSessionClient {
 
 function unreachable(value: never): never {
   throw new Error(`unhandled host session command: ${JSON.stringify(value)}`)
-}
-
-function withoutRetryFallback(input: HostSessionOpenInput): HostSessionOpenInput {
-  const { retryFallback: _retryFallback, ...rest } = input
-  return rest
 }

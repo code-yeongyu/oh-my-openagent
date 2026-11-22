@@ -29,9 +29,7 @@ function getLayoutCleanupTarget(runtimeState: Awaited<ReturnType<typeof loadRunt
     return member.agentType === "leader" ? [] : ids
   })
 
-  return paneIds.length > 0
-    ? { ...runtimeState.tmuxLayout, paneIds }
-    : runtimeState.tmuxLayout
+  return paneIds.length > 0 ? { ...runtimeState.tmuxLayout, paneIds } : runtimeState.tmuxLayout
 }
 
 export async function cleanupTeamRunResources(args: {
@@ -83,7 +81,11 @@ export async function cleanupTeamRunResources(args: {
     }
   }
 
-  await transitionRuntimeState(args.teamRunId, (runtimeState) => ({ ...runtimeState, status: "failed" }), args.config).catch((transitionError) => {
+  await transitionRuntimeState(
+    args.teamRunId,
+    (runtimeState) => ({ ...runtimeState, status: "failed" }),
+    args.config,
+  ).catch((transitionError) => {
     cleanupReport.errors.push(`state ${args.teamRunId}: ${normalizeError(transitionError).message}`)
     return undefined
   })

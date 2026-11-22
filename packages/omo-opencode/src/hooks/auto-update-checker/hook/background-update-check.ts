@@ -118,11 +118,7 @@ function getUnappliedRefreshToastMessage(latestVersion: string, reason: string, 
  * if `bun install` succeeds against the flat cache path, OpenCode reads from
  * the sandbox on next restart and the version never switches (#4318).
  */
-function isOpenCodeManagedSandbox(
-  moduleWorkspace: string | null,
-  cacheWorkspace: string,
-  configDir: string,
-): boolean {
+function isOpenCodeManagedSandbox(moduleWorkspace: string | null, cacheWorkspace: string, configDir: string): boolean {
   if (!moduleWorkspace) return false
   if (moduleWorkspace === cacheWorkspace) return false
   if (moduleWorkspace === configDir) return false
@@ -153,7 +149,7 @@ function resolveActiveInstallWorkspace(deps: BackgroundUpdateCheckDeps): string 
 
   const cachePackageJsonPath = deps.join(cacheDir, "package.json")
   if (deps.existsSync(cachePackageJsonPath)) {
-    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`) 
+    deps.log(`[auto-update-checker] Active workspace: cache-dir (${cacheDir}, package.json present)`)
     return cacheDir
   }
 
@@ -176,10 +172,7 @@ async function runBunInstallSafe(workspaceDir: string, deps: BackgroundUpdateChe
   }
 }
 
-async function primeCacheWorkspace(
-  activeWorkspace: string,
-  deps: BackgroundUpdateCheckDeps,
-): Promise<boolean> {
+async function primeCacheWorkspace(activeWorkspace: string, deps: BackgroundUpdateCheckDeps): Promise<boolean> {
   const cacheWorkspace = getCacheWorkspaceDir(deps)
   if (activeWorkspace === cacheWorkspace) {
     return true
@@ -222,7 +215,9 @@ export function createBackgroundUpdateCheckRunner(
     if (!isStrictlyNewerVersion(currentVersion, latestVersion)) {
       // Equal means already current; a newer loaded version means the registry
       // tag lags behind a local/newer install — never offer a downgrade.
-      deps.log(`[auto-update-checker] No newer version for channel ${channel} (current: ${currentVersion}, registry: ${latestVersion})`)
+      deps.log(
+        `[auto-update-checker] No newer version for channel ${channel} (current: ${currentVersion}, registry: ${latestVersion})`,
+      )
       return
     }
 
@@ -236,7 +231,9 @@ export function createBackgroundUpdateCheckRunner(
 
     if (pluginInfo.isPinned) {
       await deps.showUpdateAvailableToast(ctx, latestVersion, () => getPinnedVersionToastMessage(latestVersion))
-      deps.log(`[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`)
+      deps.log(
+        `[auto-update-checker] User-pinned version detected (${pluginInfo.entry}), skipping auto-update. Notification only.`,
+      )
       return
     }
 
@@ -254,7 +251,13 @@ export function createBackgroundUpdateCheckRunner(
     // import from it), so the next OpenCode start re-runs `Npm.add()` against
     // a missing sandbox and installs the channel's current version.
     const moduleWorkspace = deps.getModuleHostingWorkspace()
-    if (isOpenCodeManagedSandbox(moduleWorkspace, getCacheWorkspaceDir(deps), deps.getOpenCodeConfigPaths({ binary: "opencode" }).configDir)) {
+    if (
+      isOpenCodeManagedSandbox(
+        moduleWorkspace,
+        getCacheWorkspaceDir(deps),
+        deps.getOpenCodeConfigPaths({ binary: "opencode" }).configDir,
+      )
+    ) {
       const unapplied = moduleWorkspace ? deps.scheduleSandboxRefresh(moduleWorkspace) : null
       await deps.showUpdateAvailableToast(
         ctx,

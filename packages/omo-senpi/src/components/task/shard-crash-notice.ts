@@ -55,9 +55,15 @@ export function createShardCrashNotices(deps: ShardCrashNoticeDeps): Required<Ho
     const crash = readCrash(deps.agentDir, info.socket, info.instanceId, now())
     const supervisorPid = info.supervisorPid ?? crash.supervisorPid
     record(SHARD_CRASH_TOKEN, {
-      episode: episode.id, shard: episode.key, socket: info.socket, instanceId: info.instanceId,
-      supervisorPid, cause: crash.cause ?? "cause unknown", members: episode.members.size,
-      taskIds: [...episode.members], turnWasInFlight: info.turnWasInFlight,
+      episode: episode.id,
+      shard: episode.key,
+      socket: info.socket,
+      instanceId: info.instanceId,
+      supervisorPid,
+      cause: crash.cause ?? "cause unknown",
+      members: episode.members.size,
+      taskIds: [...episode.members],
+      turnWasInFlight: info.turnWasInFlight,
     })
   }
 
@@ -70,8 +76,13 @@ export function createShardCrashNotices(deps: ShardCrashNoticeDeps): Required<Ho
     const lost = count(episode.outcomes, "lost", "host_incompatible")
     const reattached = count(episode.outcomes, "attached", "resumed", "continued")
     record(SHARD_CRASH_DONE_TOKEN, {
-      episode: episode.id, shard: episode.key, taskIds: [...episode.members],
-      reattached, lost, cancelled, outcomes: episode.outcomes,
+      episode: episode.id,
+      shard: episode.key,
+      taskIds: [...episode.members],
+      reattached,
+      lost,
+      cancelled,
+      outcomes: episode.outcomes,
     })
   }
 
@@ -114,10 +125,17 @@ function endpointKey(agentDir: string, socket: string): string {
 const CRASH_RECORD_FRESH_MS = 5 * 60_000
 
 // The generation record names the SUPERVISOR; it survives only until the crash path cleans it.
-export function readNewestHostCrash(agentDir: string, socket: string, instanceId: string, now: number): ShardCrashFacts {
+export function readNewestHostCrash(
+  agentDir: string,
+  socket: string,
+  instanceId: string,
+  now: number,
+): ShardCrashFacts {
   const dir = hostDaemonDir(agentDir, socket)
   const supervisorPid = readPid(join(dir, "generations", instanceId, "host.pid"))
-  const newest = readLines(join(dir, "crashes.jsonl")).map(parseRecord).findLast((record) => record !== undefined)
+  const newest = readLines(join(dir, "crashes.jsonl"))
+    .map(parseRecord)
+    .findLast((record) => record !== undefined)
   const fresh = newest !== undefined && now - Date.parse(newest.at) <= CRASH_RECORD_FRESH_MS
   const cause = fresh ? newest.cause : undefined
   return { ...(supervisorPid === undefined ? {} : { supervisorPid }), ...(cause === undefined ? {} : { cause }) }
@@ -151,7 +169,9 @@ function readText(file: string): string | undefined {
 function parseJson(text: string): Record<string, unknown> | undefined {
   try {
     const value: unknown = JSON.parse(text)
-    return typeof value === "object" && value !== null && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined
+    return typeof value === "object" && value !== null && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : undefined
   } catch {
     return undefined
   }

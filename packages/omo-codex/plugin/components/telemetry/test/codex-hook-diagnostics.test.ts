@@ -58,7 +58,6 @@ describe("runSessionStartHook diagnostics", () => {
 
 			const output = await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => throwingClient,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
@@ -83,7 +82,6 @@ describe("runSessionStartHook diagnostics", () => {
 
 			const output = await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => throwingClient,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");
@@ -106,7 +104,6 @@ describe("runSessionStartHook diagnostics", () => {
 
 			const output = await runSessionStartHook(makeSessionStartInput(), {
 				createClient: () => rejectingClient,
-				getDistinctId: () => "distinct-id-abc",
 			});
 
 			expect(output).toBe("");

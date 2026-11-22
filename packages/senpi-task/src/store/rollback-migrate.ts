@@ -1,10 +1,11 @@
 import { log } from "@oh-my-opencode/utils/logger"
 import { createTaskRecordStore } from "./record-store"
-import { R0_FAILURE_KINDS, R0_FAILURE_REASONS, R0_SUSPENSION_REASONS } from "./rollback-r0-contract"
+import { R0_COST_STATUSES, R0_FAILURE_KINDS, R0_FAILURE_REASONS, R0_SUSPENSION_REASONS } from "./rollback-r0-contract"
 
 const r0SuspensionReasons = new Set<string>(R0_SUSPENSION_REASONS)
 const r0FailureReasons = new Set<string>(R0_FAILURE_REASONS)
 const r0FailureKinds = new Set<string>(R0_FAILURE_KINDS)
+const r0CostStatuses = new Set<string>(R0_COST_STATUSES)
 
 export type HostSessionMigrationPlan = {
   readonly store_dir: string
@@ -69,7 +70,8 @@ export function migrateHostSessionSockets(
 ): HostSessionMigrationResult {
   const plan = planHostSessionSocketMigration(storeDir, options.to)
   for (const socket of plan.sockets) {
-    if (!options.deadEndpoints.has(socket)) throw new Error(`rollback migration refused live or unverified endpoint ${socket}`)
+    if (!options.deadEndpoints.has(socket))
+      throw new Error(`rollback migration refused live or unverified endpoint ${socket}`)
   }
   if (options.dryRun) return { ...plan, migrated: 0 }
   for (const warning of plan.warnings ?? []) {
@@ -103,6 +105,10 @@ export function migrateHostSessionSockets(
                 current.failure_kind === "suspended_unresumable" ? ("session_unavailable" as const) : undefined,
             }
           : {}),
+        // A partial cost is still a provider-reported (lower-bound) figure: R0's nearest value is "reported".
+        ...(current.run_stats?.cost_status !== undefined && !r0CostStatuses.has(current.run_stats.cost_status)
+          ? { run_stats: { ...current.run_stats, cost_status: "reported" as const } }
+          : {}),
       }
     })
     if (next === null) continue
@@ -123,6 +129,7 @@ function needsMigration(
     readonly suspension_reason?: string
     readonly failure_reason?: string
     readonly failure_kind?: string
+    readonly run_stats?: { readonly cost_status?: string }
   },
   to: string,
 ): boolean {
@@ -130,6 +137,7 @@ function needsMigration(
     (record.host_session !== undefined && record.host_session.socket !== to) ||
     (record.suspension_reason !== undefined && !r0SuspensionReasons.has(record.suspension_reason)) ||
     (record.failure_reason !== undefined && !r0FailureReasons.has(record.failure_reason)) ||
-    (record.failure_kind !== undefined && !r0FailureKinds.has(record.failure_kind))
+    (record.failure_kind !== undefined && !r0FailureKinds.has(record.failure_kind)) ||
+    (record.run_stats?.cost_status !== undefined && !r0CostStatuses.has(record.run_stats.cost_status))
   )
 }

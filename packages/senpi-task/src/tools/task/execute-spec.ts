@@ -4,7 +4,7 @@ import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
 import { createFsSkillLoader } from "./skills"
 import { taskSkillSummary } from "./skill-result"
-import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDeps } from "./types"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDeps } from "./types"
 
 type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -32,11 +32,15 @@ export function buildStartSpec(
   const isolated = params.isolated ?? isolation?.enabled ?? false
   return {
     prompt: skills.prepend + params.prompt,
-    ...(isolated ? {
-      isolated,
-      apply: params.apply ?? isolation?.apply ?? true,
-      merge: params.merge ?? isolation?.merge ?? "patch",
-    } : params.isolated === undefined ? {} : { isolated }),
+    ...(isolated
+      ? {
+          isolated,
+          apply: params.apply ?? isolation?.apply ?? true,
+          merge: params.merge ?? isolation?.merge ?? "patch",
+        }
+      : params.isolated === undefined
+        ? {}
+        : { isolated }),
     ...(skillSummary === undefined ? {} : { skills: skillSummary }),
     ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
     parent_session_id: parentSessionId,
@@ -108,7 +112,10 @@ function resolvedAgentMode(
   deps: TaskToolDeps,
 ): ExecutionMode | undefined {
   if (!("subagentType" in target)) return undefined
-  return toExecutionMode(deps.agents[target.subagentType]?.executionMode) ?? deps.omoConfig.agents?.[target.subagentType]?.execution_mode
+  return (
+    toExecutionMode(deps.agents[target.subagentType]?.executionMode) ??
+    deps.omoConfig.agents?.[target.subagentType]?.execution_mode
+  )
 }
 
 function resolvedTaskExecutionMode(
@@ -141,4 +148,3 @@ export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: bool
     ...(runInBackground !== undefined && { run_in_background: runInBackground }),
   }
 }
-

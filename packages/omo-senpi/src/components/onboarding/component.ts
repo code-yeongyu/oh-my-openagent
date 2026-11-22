@@ -1,7 +1,9 @@
 import type { ExtensionContext, SessionStartEvent } from "@code-yeongyu/senpi"
+import { join } from "node:path"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { getBuiltinSkillsRoot, getOmoNativeStateDir } from "../telemetry/product-identity"
+import { readDisabledSkills, resolveBundledSkillProvenance } from "../bundled-skills/contributed-skill"
 import { readAgentEndOutcome } from "../ulw-execute-continuation/agent-end-eligibility"
 import { loadOnboardingScanRuntime } from "./scan-component"
 import type { OnboardingScanEnvironment } from "./scan-runtime"
@@ -23,6 +25,11 @@ import { createOnboardingMemoryTools, type TuiOnboardingScan } from "./tui-memor
 export interface OnboardingComponentDependencies {
   claimOnboarding(stateDir: string, claimOwnerSeams?: ClaimOwnerSeams): boolean | Promise<boolean>
   isOnboardingComplete(stateDir: string): boolean
+  /**
+   * Read-only: whether `claimOnboarding` would take the claim now (a dead owner's claim is taken over).
+   * A preview asks this instead of claiming; omitted, it is `!isOnboardingComplete` (the plain claim's rule).
+   */
+  isOnboardingClaimable?(stateDir: string, claimOwnerSeams?: ClaimOwnerSeams): boolean | Promise<boolean>
   releaseOnboarding(stateDir: string): void
   /** Records a finished onboarding; omitted, a finished TUI turn records nothing (test fakes). */
   completeOnboarding?(stateDir: string): void
@@ -60,6 +67,7 @@ const defaultDependencies: OnboardingComponentDependencies = {
   claimOnboarding: claimWithOwner,
   completeOnboarding,
   isOnboardingComplete,
+  isOnboardingClaimable: claimableWithOwner,
   releaseOnboarding,
   resetOnboarding,
 }
@@ -78,6 +86,19 @@ async function claimWithOwner(stateDir: string, seams?: ClaimOwnerSeams): Promis
   return runtime.claimOnboardingOwned(stateDir, seams)
 }
 
+// The same decision as `claimWithOwner`, read without writing: no claim, or one whose owner is gone.
+export async function claimableWithOwner(stateDir: string, seams?: ClaimOwnerSeams): Promise<boolean> {
+  if (isOnboardingCompletionRecorded(stateDir)) return false
+  let runtime
+  try {
+    runtime = await loadOnboardingScanRuntime()
+  } catch {
+    return !isOnboardingComplete(stateDir)
+  }
+  const state = await runtime.readOnboardingState(stateDir, seams)
+  return state.completedAt === null && !state.inProgress
+}
+
 export function isSessionStartEvent(v: unknown): v is SessionStartEvent {
   return isRecord(v) && "reason" in v
 }
@@ -93,9 +114,31 @@ export function createOnboardingComponent(
   const processState = globalThis as { [forcedKey]?: boolean }
   return {
     name: "onboarding",
-    register(pi: SenpiExtensionAPI, _ctx: ComponentContext): void {
+    register(pi: SenpiExtensionAPI, componentContext: ComponentContext): void {
       const stateDir = dependencies.stateDir ?? getOmoNativeStateDir(process.env)
-      const tour = `Follow ${getBuiltinSkillsRoot()}/onboarding/SKILL.md.`
+      // #12150: the tour names the skill, never its install path, so the context is identical
+      // for identical builds whatever the install location. The skills listing resolves
+      // the built-in `onboarding` skill by name.
+      // #12544 review: a user or project skill named `onboarding` loads before extension skill
+      // paths, so the listing resolves the name to that file and the built-in drops out. The
+      // pointer is therefore resolved at prompt time from the listing's provenance: the name
+      // form when the listing resolves to the built-in, the built-in file's absolute path when
+      // it is shadowed. The path form is the old behavior's escape hatch, not a new default:
+      // two installs at different paths still produce byte-identical context unless a shadow
+      // is present. `disabled_skills` hiding `onboarding` leaves no listing entry, so the name
+      // form would point at nothing on the `/skill:` surface; that case falls back to the path
+      // too (#12544 review follow-up), because the tour itself is gated separately by
+      // `omo-senpi-onboarding-disabled` and still runs.
+      const builtinOnboardingSkill = join(
+        getBuiltinSkillsRoot(process.env, componentContext.logger),
+        "onboarding",
+        "SKILL.md",
+      )
+      const tour = (): string => {
+        const shadowed = resolveBundledSkillProvenance(pi, "onboarding", builtinOnboardingSkill).shadowed
+        const disabled = readDisabledSkills(pi.cwd ?? process.cwd(), process.env).has("onboarding")
+        return shadowed || disabled ? `Follow ${builtinOnboardingSkill}.` : "Follow the built-in `onboarding` skill."
+      }
       const scanEnvironment = dependencies.scanEnvironment ?? (() => ({}))
       // The first onboarding turn awaits only `omo setup`'s sources (sessions: false): its rows, value
       // summary and migration inventory. Session digests are read by a second scan that starts only
@@ -109,18 +152,26 @@ export function createOnboardingComponent(
       // Session history is never awaited: it starts with the claim, runs bounded in the background and
       // rides the next turn when it lands; a hang or failure just leaves it out until the next claim.
       const history = onceUntilSuccess(async () => {
-        const content = await (dependencies.sessionHistory
-          ?? (async () => (await loadOnboardingScanRuntime()).onboardingHistorySummary(scanEnvironment())))()
+        const content = await (
+          dependencies.sessionHistory ??
+          (async () => (await loadOnboardingScanRuntime()).onboardingHistorySummary(scanEnvironment()))
+        )()
         if (content !== undefined && pending !== undefined) {
-          await pi.sendMessage({ customType: "omo-onboarding:history", content, display: false }, { deliverAs: "nextTurn" })
+          await pi.sendMessage(
+            { customType: "omo-onboarding:history", content, display: false },
+            { deliverAs: "nextTurn" },
+          )
         }
       })
       const withInventory = async (base: string): Promise<string> => {
         void history()
-        const result = injectedFacts !== undefined && dependencies.scan === undefined ? undefined : await inventoryScan()
-        const facts = injected === undefined
-          ? result?.inventory
-          : await injected()
+        return inventoryText(base)
+      }
+      // The same addition without starting the history read, so a preview consumes no one-shot work.
+      const inventoryText = async (base: string): Promise<string> => {
+        const result =
+          injectedFacts !== undefined && dependencies.scan === undefined ? undefined : await inventoryScan()
+        const facts = injected === undefined ? result?.inventory : await injected()
         const parts = [base]
         if (facts !== undefined) parts.push(` Migration inventory (from the same scan omo setup runs): ${facts}`)
         if (result !== undefined) parts.push(`\n\n${result.context}`)
@@ -128,27 +179,28 @@ export function createOnboardingComponent(
       }
       const force = () => pi.getFlag("onboard") === true && !processState[forcedKey]
       // Undefined is unclaimed; null is a successfully completed onboarding turn.
-      let pending: {
-        id: string
-        owned: boolean
-        active: boolean
-        end?: unknown
-      } | null | undefined
+      let pending:
+        | {
+            id: string
+            owned: boolean
+            active: boolean
+            end?: unknown
+          }
+        | null
+        | undefined
 
       const eligible = (ctx: unknown): ctx is ExtensionContext =>
-        isExtensionContext(ctx) && ctx.hasUI && pi.sessionKind === "interactive"
-        && pi.getFlag("omo-senpi-onboarding-disabled") !== true
+        isExtensionContext(ctx) &&
+        ctx.hasUI &&
+        pi.sessionKind === "interactive" &&
+        pi.getFlag("omo-senpi-onboarding-disabled") !== true
 
       const showWelcome = (ctx: ExtensionContext): void => {
         if (ctx.mode !== "tui") return
-        ctx.ui.setWidget("omo-onboarding", [
-          "Welcome to OmO. Ask anything.",
-          "Use ulw for full workflows.",
-        ])
+        ctx.ui.setWidget("omo-onboarding", ["Welcome to OmO. Ask anything.", "Use ulw for full workflows."])
       }
       const ownsRun = (ctx: unknown): ctx is ExtensionContext =>
-        isExtensionContext(ctx) && pending != null
-        && ctx.sessionManager.getSessionId() === pending.id
+        isExtensionContext(ctx) && pending != null && ctx.sessionManager.getSessionId() === pending.id
 
       const release = (ctx: ExtensionContext): void => {
         if (pending?.owned) dependencies.releaseOnboarding(stateDir)
@@ -184,7 +236,9 @@ export function createOnboardingComponent(
         stateDir,
         completeOnboarding: dependencies.completeOnboarding ?? completeOnboarding,
         resetOnboarding: dependencies.resetOnboarding ?? resetOnboarding,
-        onReset: () => { pending = undefined },
+        onReset: () => {
+          pending = undefined
+        },
         ...(dependencies.claimOwnerSeams === undefined ? {} : { claimOwnerSeams: dependencies.claimOwnerSeams }),
       })
       registerSessionHistoryRpc(pi)
@@ -196,42 +250,63 @@ export function createOnboardingComponent(
       })
 
       pi.on("session_start", async (event, ctx) => {
-        if (!isSessionStartEvent(event) || event.reason !== "startup"
-          || !eligible(ctx) || ctx.mode !== "tui") return
+        if (!isSessionStartEvent(event) || event.reason !== "startup" || !eligible(ctx) || ctx.mode !== "tui") return
         if (!force()) {
           if (!dependencies.isOnboardingComplete(stateDir)) showWelcome(ctx)
           return
         }
         if (!(await claim(ctx, true))) return
         try {
-          await pi.sendMessage({
-            customType: "omo-onboarding:bootstrap",
-            content: await withInventory(`${tour} Greet first.`),
-            display: false,
-          }, { triggerTurn: true, deliverAs: "followUp" })
+          await pi.sendMessage(
+            {
+              customType: "omo-onboarding:bootstrap",
+              content: await withInventory(`${tour()} Greet first.`),
+              display: false,
+            },
+            { triggerTurn: true, deliverAs: "followUp" },
+          )
         } catch (error) {
           release(ctx)
           throw error
         }
       })
 
-      // Deliberately not previewSafe: previews must never acquire install-wide state.
-      pi.on("before_agent_start", async (event, ctx) => {
-        if (!isRecord(event) || event.trigger !== "prompt" || event.preview === true || !eligible(ctx)) return
-        const forced = force()
-        if (!(await claim(ctx, forced))) return
-        if (ctx.sessionManager.getBranch().some((entry) =>
-          entry.type === "custom_message" && entry.customType === "omo-onboarding:context")) return
-        return {
-          message: {
-            customType: "omo-onboarding:context",
-            display: false,
-            content: await withInventory(forced
-              ? `${tour} Tour using their message.`
-              : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour}`),
-          },
-        }
-      })
+      // Preview-safe: a preview neither claims onboarding nor starts the background history read.
+      pi.on(
+        "before_agent_start",
+        async (event, ctx) => {
+          if (!isRecord(event) || event.trigger !== "prompt" || !eligible(ctx)) return
+          const preview = event.preview === true
+          const forced = force()
+          if (preview) {
+            if (pending !== undefined || claiming) return
+            if (
+              !forced &&
+              !(await (dependencies.isOnboardingClaimable?.(stateDir, dependencies.claimOwnerSeams) ??
+                !dependencies.isOnboardingComplete(stateDir)))
+            )
+              return
+          } else if (!(await claim(ctx, forced))) return
+          if (
+            ctx.sessionManager
+              .getBranch()
+              .some((entry) => entry.type === "custom_message" && entry.customType === "omo-onboarding:context")
+          )
+            return
+          return {
+            message: {
+              customType: "omo-onboarding:context",
+              display: false,
+              content: await (preview ? inventoryText : withInventory)(
+                forced
+                  ? `${tour()} Tour using their message.`
+                  : `Answer fully; greet in their language; offer a one-line tour. On request/acceptance: ${tour()}`,
+              ),
+            },
+          }
+        },
+        { previewSafe: true },
+      )
 
       pi.on("agent_start", (_event, ctx) => {
         if (ownsRun(ctx) && pending) {
@@ -259,8 +334,8 @@ export function createOnboardingComponent(
         }
       })
       pi.on("input_disposition", (event, ctx) => {
-        if (ownsRun(ctx) && pending && !pending.active
-          && isRecord(event) && event.disposition === "rejected") release(ctx)
+        if (ownsRun(ctx) && pending && !pending.active && isRecord(event) && event.disposition === "rejected")
+          release(ctx)
       })
       for (const event of ["session_abort", "session_shutdown"]) {
         pi.on(event, (_event, ctx) => {
@@ -276,7 +351,7 @@ export function createOnboardingComponent(
 function onceUntilSuccess<T>(run: () => Promise<T>): () => Promise<T | undefined> {
   let kept: Promise<T> | undefined
   return () => {
-    const current = kept ??= Promise.resolve().then(run)
+    const current = (kept ??= Promise.resolve().then(run))
     return current.catch(() => {
       if (kept === current) kept = undefined
       return undefined

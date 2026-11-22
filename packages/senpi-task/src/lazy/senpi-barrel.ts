@@ -37,11 +37,41 @@ function sharedState(): SenpiBarrelSharedState {
 
 export function loadSenpiBarrel(): Promise<SenpiBarrelModule> {
   const state = sharedState()
-  state.promise ??= import("@code-yeongyu/senpi").then((loaded) => {
-    state.module = loaded
-    return loaded
-  })
+  state.promise ??= import("@code-yeongyu/senpi").then(
+    (loaded) => {
+      state.module = loaded
+      return loaded
+    },
+    (error: unknown) => {
+      throw senpiBarrelLoadFailure(error)
+    },
+  )
   return state.promise
+}
+
+/** The engine's own refusal code when its process-wide redaction registry slot is foreign or incompatible (#12965). */
+const REDACTION_SLOT_REFUSAL = "SENPI_REDACTION_SLOT_INCOMPATIBLE"
+
+/**
+ * The engine refuses to load next to a redaction registry it did not pin, and the refusal is permanent for the
+ * process (a failed module evaluation is cached), so the only remedy is a restart. Child starts await this load and
+ * fail with this error, naming that remedy.
+ */
+export class SenpiEngineRestartRequiredError extends Error {
+  override readonly name = "SenpiEngineRestartRequiredError"
+  readonly code = REDACTION_SLOT_REFUSAL
+
+  constructor(cause: unknown) {
+    super(
+      "The @code-yeongyu/senpi engine refused to load because an incompatible engine copy is already loaded in this process. Restart omo to start task children again.",
+      { cause },
+    )
+  }
+}
+
+function senpiBarrelLoadFailure(error: unknown): unknown {
+  const code = typeof error === "object" && error !== null ? Reflect.get(error, "code") : undefined
+  return code === REDACTION_SLOT_REFUSAL ? new SenpiEngineRestartRequiredError(error) : error
 }
 
 /**
@@ -219,7 +249,9 @@ export function senpiEngineBuildIdentity(): EngineBuildIdentityFn {
   return requireHostSymbol<EngineBuildIdentityFn>("engineBuildIdentity")
 }
 
-export type CreateHostDaemonPathsFn = (target: { readonly socket: string; readonly agentDir?: string }) => { readonly dir: string }
+export type CreateHostDaemonPathsFn = (target: { readonly socket: string; readonly agentDir?: string }) => {
+  readonly dir: string
+}
 
 /**
  * The engine's own answer to "which directory holds this endpoint's daemon state". Undefined while

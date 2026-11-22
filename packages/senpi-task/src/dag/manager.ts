@@ -2,6 +2,11 @@
 import { randomUUID } from "node:crypto"
 import * as fs from "node:fs"
 import { join } from "node:path"
+import type { Guidance } from "../pause/guidance"
+import { applyDagRunMutation } from "./run-mutation"
+import { liveLeaseHolder, pausedAmendmentUnsafe } from "./amend-safety"
+export { applyDagRunMutation } from "./run-mutation"
+import { countDagNodes as countNodes } from "./counts"
 
 import { defaultSignaller } from "../lifecycle/context"
 import { dagDefinitionAmendedEvent, dagRunCreatedEvent, type DagRunEventType } from "./events"
@@ -34,7 +39,12 @@ import type {
 // noise (dag_923ad20e seq38 journaled completed->completed). Every DagRunRecordV1 journal passes
 // this to createDagJournal so the locked recover inside append drops the duplicate instead of
 // journaling it.
-const DUPLICATE_TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["completed", "failed", "cancelled", "skipped"])
+const DUPLICATE_TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set([
+  "completed",
+  "failed",
+  "cancelled",
+  "skipped",
+])
 export function skipDuplicateTerminalTransition(record: DagRunRecordV1, payload: DagRunEventPayload): boolean {
   if (payload.type !== "dag.node.transitioned" || !DUPLICATE_TERMINAL_NODE_STATES.has(payload.to)) return false
   return record.nodes.some((node) => node.id === payload.nodeId && node.state === payload.to)
@@ -109,6 +119,11 @@ export type DagPersistedDefinition = {
 export type { AmendRecord } from "./types"
 
 export type DagRunRecordV1 = DagJournalCheckpoint & {
+  readonly guidance?: readonly Guidance[]
+  readonly retryOnResume?: readonly DagNodeId[]
+  readonly cancelRequestedNodes?: readonly DagNodeId[]
+  readonly pausedChildAcks?: Readonly<Record<string, number>>
+  readonly pause?: { readonly reason: "user_stop"; readonly pauseSeq: number }
   readonly runId: DagRunId
   readonly runKey: string
   readonly name: string
@@ -236,7 +251,13 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   function runSummary(runId: DagRunId): DagRunSummary | undefined {
     const stats = fs.statSync(store.paths.run(runId), { throwIfNoEntry: false })
     const cached = summaryCache.get(runId)
-    if (stats !== undefined && cached !== undefined && cached.ino === stats.ino && cached.size === stats.size && cached.mtimeMs === stats.mtimeMs) {
+    if (
+      stats !== undefined &&
+      cached !== undefined &&
+      cached.ino === stats.ino &&
+      cached.size === stats.size &&
+      cached.mtimeMs === stats.mtimeMs
+    ) {
       return cached.summary
     }
     const record = store.readCheckpoint<DagRunRecordV1>(runId)
@@ -254,7 +275,8 @@ export function createDagManager(options: DagManagerOptions): DagManager {
       updatedAt: record.updatedAt,
       counts: countNodes(record.nodes),
     }
-    if (stats !== undefined) summaryCache.set(runId, { ino: stats.ino, size: stats.size, mtimeMs: stats.mtimeMs, summary })
+    if (stats !== undefined)
+      summaryCache.set(runId, { ino: stats.ino, size: stats.size, mtimeMs: stats.mtimeMs, summary })
     return summary
   }
 
@@ -265,7 +287,11 @@ export function createDagManager(options: DagManagerOptions): DagManager {
     }
     // Session ownership is absolute: a foreign caller that already knows the runId still gets no data.
     if (record.parentSessionId !== parentSessionId) {
-      throw new DagManagerError({ code: "run_not_owned", message: `dag run "${runId}" belongs to another session`, runId })
+      throw new DagManagerError({
+        code: "run_not_owned",
+        message: `dag run "${runId}" belongs to another session`,
+        runId,
+      })
     }
     return record
   }
@@ -273,19 +299,21 @@ export function createDagManager(options: DagManagerOptions): DagManager {
   return {
     // start is async so every rejection path (invalid_definition, definition_conflict) reaches the
     // caller as a promise rejection rather than a synchronous throw.
-    start: async (params) => startRun(params, {
-      store,
-      now,
-      newRunId,
-      settings,
-      ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-    }),
-    amend: async (params) => amendRun(params, {
-      store,
-      now,
-      settings,
-      ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
-    }),
+    start: async (params) =>
+      startRun(params, {
+        store,
+        now,
+        newRunId,
+        settings,
+        ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
+      }),
+    amend: async (params) =>
+      amendRun(params, {
+        store,
+        now,
+        settings,
+        ...(options.materializeSkills === undefined ? {} : { materializeSkills: options.materializeSkills }),
+      }),
     attach(runId, parentSessionId) {
       ownedRecord(runId, parentSessionId)
       return {
@@ -319,7 +347,11 @@ export function createDagManager(options: DagManagerOptions): DagManager {
       ownedRecord(params.runId, params.parentSessionId)
       const sinceSeq = params.sinceSeq ?? 0
       if (!Number.isInteger(sinceSeq) || sinceSeq < 0) {
-        throw new DagManagerError({ code: "invalid_arguments", message: "sinceSeq must be a non-negative integer", runId: params.runId })
+        throw new DagManagerError({
+          code: "invalid_arguments",
+          message: "sinceSeq must be a non-negative integer",
+          runId: params.runId,
+        })
       }
       return store.readEvents(params.runId, sinceSeq, {
         limit: resolveLimit(params.limit, settings.history_default_limit, settings.history_max_limit),
@@ -340,16 +372,6 @@ type StartContext = {
 }
 
 type AmendContext = Omit<StartContext, "newRunId">
-
-type DagDefinitionAmendedMutationEvent = Extract<DagRunEvent, { readonly type: "dag.definition.amended" }> & {
-  readonly definition: DagPersistedDefinition
-  readonly nodes: readonly DagNode[]
-  readonly edges: readonly DagEdge[]
-  readonly waves: readonly DagWave[]
-  readonly criticalPath: readonly DagNodeId[]
-  readonly bottlenecks: readonly DagBottleneck[]
-  readonly diagnostics: readonly DagDiagnostic[]
-}
 
 function startRun(params: DagStartParams, context: StartContext): DagStartResult {
   const at = new Date(context.now()).toISOString()
@@ -439,13 +461,15 @@ function startRun(params: DagStartParams, context: StartContext): DagStartResult
       now: context.now,
       skipDuplicate: skipDuplicateTerminalTransition,
     })
-    journal.append(dagRunCreatedEvent({
-      runKey: definition.key,
-      name: definition.name,
-      definitionFingerprint,
-      nodeCount: compiled.nodes.length,
-      edgeCount: compiled.edges.length,
-    }))
+    journal.append(
+      dagRunCreatedEvent({
+        runKey: definition.key,
+        name: definition.name,
+        definitionFingerprint,
+        nodeCount: compiled.nodes.length,
+        edgeCount: compiled.edges.length,
+      }),
+    )
     return { reused: false, snapshot: projectSnapshot(journal.snapshot(), context.store.stateDir) }
   })
 }
@@ -460,13 +484,25 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
   }
   const oldRecord = context.store.readCheckpoint<DagRunRecordV1>(selectedRunId)
   if (oldRecord === null) {
-    throw new DagManagerError({ code: "run_not_found", message: `unknown dag run "${selectedRunId}"`, runId: selectedRunId })
+    throw new DagManagerError({
+      code: "run_not_found",
+      message: `unknown dag run "${selectedRunId}"`,
+      runId: selectedRunId,
+    })
   }
   if (oldRecord.parentSessionId !== params.parentSessionId) {
-    throw new DagManagerError({ code: "run_not_owned", message: `dag run "${selectedRunId}" belongs to another session`, runId: selectedRunId })
+    throw new DagManagerError({
+      code: "run_not_owned",
+      message: `dag run "${selectedRunId}" belongs to another session`,
+      runId: selectedRunId,
+    })
   }
-  if (oldRecord.status === "paused" && liveLeaseHolder(oldRecord)) {
-    throw new DagManagerError({ code: "invalid_amendment", message: `dag run "${selectedRunId}" is paused by another live lease`, runId: selectedRunId })
+  if (oldRecord.status === "paused" && oldRecord.pause?.reason !== "user_stop" && liveLeaseHolder(oldRecord)) {
+    throw new DagManagerError({
+      code: "invalid_amendment",
+      message: `dag run "${selectedRunId}" is paused by another live lease`,
+      runId: selectedRunId,
+    })
   }
 
   const at = new Date(context.now()).toISOString()
@@ -481,7 +517,11 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     })
   }
   if (params.definition.key !== oldRecord.runKey) {
-    throw new DagManagerError({ code: "invalid_amendment", message: "an amendment cannot change the run key", runId: selectedRunId })
+    throw new DagManagerError({
+      code: "invalid_amendment",
+      message: "an amendment cannot change the run key",
+      runId: selectedRunId,
+    })
   }
 
   const diff = diffNodeFingerprints(
@@ -489,8 +529,7 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     params.definition.nodes.map(nodeFingerprintFromInput),
   )
   const unsafeIds = [...diff.changedIds, ...diff.removedIds].filter((id) => {
-    const state = oldRecord.nodes.find((node) => node.id === id)?.state
-    return state === "scheduled" || state === "running"
+    return pausedAmendmentUnsafe(oldRecord, id)
   })
   if (unsafeIds.length > 0) {
     throw new DagManagerError({
@@ -501,11 +540,16 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     })
   }
   if (oldRecord.status === "running") {
-    throw new DagManagerError({ code: "run_still_active", message: `dag run "${selectedRunId}" is still active`, runId: selectedRunId })
+    throw new DagManagerError({
+      code: "run_still_active",
+      message: `dag run "${selectedRunId}" is still active`,
+      runId: selectedRunId,
+    })
   }
 
-  const invalidatedIds = transitiveDependents(compiled.edges, [...diff.changedIds, ...diff.addedIds])
-    .filter((id) => !diff.addedIds.includes(id))
+  const invalidatedIds = transitiveDependents(compiled.edges, [...diff.changedIds, ...diff.addedIds]).filter(
+    (id) => !diff.addedIds.includes(id),
+  )
   const materializedDefinition = materializeAmendedDefinition(
     context,
     oldRecord,
@@ -520,7 +564,16 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     const oldNode = oldNodes.get(compiledNode.id)
     if (oldNode === undefined) return compiledNode
     if (!invalidated.has(compiledNode.id)) return oldNode
-    const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, output: _output, outputBytes: _outputBytes, ...kept } = oldNode as DagNode & {
+    const {
+      error: _error,
+      resultArtifact: _resultArtifact,
+      runStats: _runStats,
+      completedAt: _completedAt,
+      startedAt: _startedAt,
+      output: _output,
+      outputBytes: _outputBytes,
+      ...kept
+    } = oldNode as DagNode & {
       readonly resultArtifact?: unknown
     }
     return {
@@ -565,7 +618,12 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
     definitionFingerprint,
   })
   const amended = context.store.readCheckpoint<DagRunRecordV1>(selectedRunId)
-  if (amended === null) throw new DagManagerError({ code: "run_not_found", message: `unknown dag run "${selectedRunId}"`, runId: selectedRunId })
+  if (amended === null)
+    throw new DagManagerError({
+      code: "run_not_found",
+      message: `unknown dag run "${selectedRunId}"`,
+      runId: selectedRunId,
+    })
   // The reducer no-ops instead of throwing (see applyDagRunMutation), so an unadvanced fingerprint is
   // how a lost race surfaces. Report it here, where the WAL is already durable and consistent.
   if (amended.definitionFingerprint !== definitionFingerprint) {
@@ -578,62 +636,6 @@ function amendRun(params: DagAmendParams, context: AmendContext): DagRunRecordV1
   return amended
 }
 
-export function applyDagRunMutation(record: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {
-  if (event.type === "dag.run.created") return { ...record, updatedAt: event.at }
-  if (event.type === "dag.node.retried") {
-    return {
-      ...record,
-      nodes: record.nodes.map((node) => {
-        if (node.id !== event.nodeId) return node
-        const { error: _error, resultArtifact: _resultArtifact, runStats: _runStats, completedAt: _completedAt, startedAt: _startedAt, output: _output, outputBytes: _outputBytes, ...kept } = node as DagNode & {
-          readonly resultArtifact?: unknown
-        }
-        return { ...kept, state: "pending", execAttempt: event.execAttempt }
-      }),
-      updatedAt: event.at,
-    }
-  }
-  if (event.type !== "dag.definition.amended") return record
-  const mutation = event as DagDefinitionAmendedMutationEvent
-  // This reducer runs as the journal's applyEvent, and the journal writes the WAL BEFORE applying it
-  // (journal.ts appendPayload). Throwing from here would leave a durable event whose every replay
-  // throws again, wedging the run permanently. So a precondition that no longer holds returns the
-  // record UNCHANGED: replay stays idempotent, and amendRun below turns the unadvanced fingerprint
-  // into the caller's typed refusal. amendRun re-checks all of these before appending, so reaching
-  // one here means the run changed underneath a live amendment.
-  if (record.definitionFingerprint !== event.previousFingerprint) return record
-  const mutationNodeIds = new Set(mutation.nodes.map((node) => node.id))
-  const removedNodeIds = record.nodes.filter((node) => !mutationNodeIds.has(node.id)).map((node) => node.id)
-  const unsafeIds = [...event.changedNodeIds, ...removedNodeIds].filter((id) => {
-    const state = record.nodes.find((node) => node.id === id)?.state
-    return state === "scheduled" || state === "running"
-  })
-  if (unsafeIds.length > 0) return record
-  if (record.status === "running") return record
-  if (record.status === "paused" && liveLeaseHolder(record)) return record
-  return {
-    ...record,
-    name: mutation.definition.name,
-    definition: mutation.definition,
-    definitionFingerprint: event.fingerprint,
-    nodes: mutation.nodes,
-    edges: mutation.edges,
-    waves: mutation.waves,
-    criticalPath: mutation.criticalPath,
-    bottlenecks: mutation.bottlenecks,
-    diagnostics: mutation.diagnostics,
-    amendHistory: [...(record.amendHistory ?? []), {
-      at: event.at,
-      previousFingerprint: event.previousFingerprint,
-      fingerprint: event.fingerprint,
-      changedNodeIds: event.changedNodeIds,
-      addedNodeIds: event.addedNodeIds,
-      invalidatedNodeIds: event.invalidatedNodeIds,
-    }],
-    updatedAt: event.at,
-  }
-}
-
 function applyRunEvent(record: DagRunRecordV1, event: DagRunEvent): DagRunRecordV1 {
   return applyDagRunMutation(record, event)
 }
@@ -644,9 +646,10 @@ function nodeFingerprintFromInput(node: DagNodeInput): DagNodeFingerprintInputV1
     label: node.label ?? node.id,
     dependsOn: (node.dependsOn ?? []) as readonly DagNodeId[],
     prompt: node.prompt,
-    route: node.category !== undefined
-      ? { kind: "category", category: node.category }
-      : { kind: "agent", agent: node.subagent_type, ...(node.model === undefined ? {} : { model: node.model }) },
+    route:
+      node.category !== undefined
+        ? { kind: "category", category: node.category }
+        : { kind: "agent", agent: node.subagent_type, ...(node.model === undefined ? {} : { model: node.model }) },
     ...(node.task_summary === undefined ? {} : { taskSummary: node.task_summary }),
     ...(node.description === undefined ? {} : { description: node.description }),
     childName: node.id,
@@ -672,12 +675,6 @@ function transitiveDependents(edges: readonly DagEdge[], seeds: readonly DagNode
   return [...visited]
 }
 
-function liveLeaseHolder(record: DagRunRecordV1): boolean {
-  const pid = record.leaseHolderPid ?? record.previousLeaseHolderPid
-  if (pid === undefined) return false
-  return defaultSignaller.isAlive(pid)
-}
-
 function materializeAmendedDefinition(
   context: AmendContext,
   oldRecord: DagRunRecordV1,
@@ -691,24 +688,40 @@ function materializeAmendedDefinition(
       definition: {
         key: definition.key,
         name: definition.name,
-        nodes: definition.nodes.map((node) => ({ ...node, effectivePrompt: oldDefinition.get(node.id)?.effectivePrompt ?? node.prompt })),
+        nodes: definition.nodes.map((node) => ({
+          ...node,
+          effectivePrompt: oldDefinition.get(node.id)?.effectivePrompt ?? node.prompt,
+        })),
       },
       diagnostics: oldRecord.diagnostics,
     }
   }
   const manifestPath = join(context.store.paths.root, "skills", `${oldRecord.runId}.json`)
-  const oldManifest = fs.existsSync(manifestPath) ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { cwd?: string; nodes?: readonly { nodeId: string }[] } : undefined
+  const oldManifest = fs.existsSync(manifestPath)
+    ? (JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { cwd?: string; nodes?: readonly { nodeId: string }[] })
+    : undefined
   const selected = definition.nodes.filter((node) => rematerializedIds.includes(node.id as DagNodeId))
-  const materialized = context.materializeSkills({ runId: oldRecord.runId, definition: { ...definition, nodes: selected }, at })
+  const materialized = context.materializeSkills({
+    runId: oldRecord.runId,
+    definition: { ...definition, nodes: selected },
+    at,
+  })
   const effective = new Map(materialized.nodes.map((node) => [node.nodeId, node.effectivePrompt] as const))
   if (oldManifest !== undefined && fs.existsSync(manifestPath)) {
     const freshManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as { nodes?: readonly { nodeId: string }[] }
     const replaced = new Set(selected.map((node) => node.id))
-    fs.writeFileSync(manifestPath, JSON.stringify({
-      ...freshManifest,
-      cwd: oldManifest.cwd,
-      nodes: [...(oldManifest.nodes ?? []).filter((node) => !replaced.has(node.nodeId)), ...(freshManifest.nodes ?? [])],
-    }), "utf8")
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify({
+        ...freshManifest,
+        cwd: oldManifest.cwd,
+        nodes: [
+          ...(oldManifest.nodes ?? []).filter((node) => !replaced.has(node.nodeId)),
+          ...(freshManifest.nodes ?? []),
+        ],
+      }),
+      "utf8",
+    )
   }
   return {
     definition: {
@@ -725,7 +738,7 @@ function materializeAmendedDefinition(
 
 // States whose node still owns a child that could be doing work right now. The activity clock is
 // projected for exactly these, so a settled node never reports a stale "last seen" time.
-const LIVE_CHILD_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["scheduled", "running"])
+const LIVE_CHILD_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["scheduled", "running", "paused"])
 
 function withNodeActivity(nodes: readonly DagNode[], stateDir: string): readonly DagNode[] {
   return nodes.map((node) => {
@@ -737,6 +750,7 @@ function withNodeActivity(nodes: readonly DagNode[], stateDir: string): readonly
 
 function projectSnapshot(record: DagRunRecordV1, stateDir: string): DagRunSnapshot {
   return {
+    ...(record.pause === undefined ? {} : { pause: record.pause }),
     schemaVersion: 1,
     runId: record.runId,
     runKey: record.runKey,
@@ -762,26 +776,13 @@ function projectSnapshot(record: DagRunRecordV1, stateDir: string): DagRunSnapsh
   }
 }
 
-function countNodes(nodes: readonly DagNode[]): DagNodeCounts {
-  const counts = {
-    total: nodes.length,
-    pending: 0,
-    blocked: 0,
-    scheduled: 0,
-    running: 0,
-    completed: 0,
-    failed: 0,
-    cancelled: 0,
-    skipped: 0,
-  }
-  for (const node of nodes) counts[node.state] += 1
-  return counts
-}
-
 function resolveLimit(requested: number | undefined, fallback: number, max: number): number {
   if (requested === undefined) return fallback
   if (!Number.isInteger(requested) || requested <= 0) {
-    throw new DagManagerError({ code: "invalid_arguments", message: `limit must be a positive integer, received ${requested}` })
+    throw new DagManagerError({
+      code: "invalid_arguments",
+      message: `limit must be a positive integer, received ${requested}`,
+    })
   }
   return Math.min(requested, max)
 }

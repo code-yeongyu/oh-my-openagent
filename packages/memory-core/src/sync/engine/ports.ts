@@ -57,6 +57,38 @@ export interface StreamHandlers {
   readonly onAdvanced: (head: number) => void
   /** The stream connected (true) or dropped (false); while down the engine polls. */
   readonly onConnected: (connected: boolean) => void
+  /** `sync.state.changed`: the account state moved without an append (a rotation is pending, or sync was toggled). */
+  readonly onStateChanged: () => void
+}
+
+/**
+ * Why pushes are frozen (sync-design section 7, rotation on revoke), as a closed set of codes. The
+ * presentation layer owns every word shown for them.
+ */
+export type FreezeReason =
+  | "rotating"
+  | "waiting_recovery"
+  | "waiting_unsupported_freeze"
+  | "unverified"
+  | "device_list_unusable"
+  | "self_revoked"
+  | "refused"
+  | "flag_stuck"
+  | "no_epoch_key"
+  | "rate_limited"
+  | "unavailable"
+
+/** What one settle of a service freeze found or did. */
+export type FreezeOutcome =
+  | { readonly kind: "clear" }
+  | { readonly kind: "rotated" }
+  | { readonly kind: "adopted" }
+  | { readonly kind: "not_member" }
+  | { readonly kind: "frozen"; readonly reason: FreezeReason }
+
+/** Ends a service freeze by rotating the account key when this device may (the account session's settler). */
+export interface FreezeSettler {
+  settle(): Promise<FreezeOutcome>
 }
 
 export interface Transport {
@@ -126,6 +158,18 @@ export interface SealedBatch {
 /** The outgoing half of the crypto port: encrypt and sign a batch for upload. */
 export interface Sealer {
   seal(batchId: string, baseSeq: number, payload: BatchPayload): Promise<SealedBatch>
+  /**
+   * Whether a batch sealed earlier carries this session's own record signature. A journal can hold a
+   * batch a previous principal of this machine sealed (its keys were discarded, then a new principal
+   * re-joined, #12280): that batch is re-sealed, never sent.
+   */
+  sealedBySelf?(sealed: {
+    readonly baseSeq: number
+    readonly digest: string
+    readonly epoch: number
+    readonly link: string
+    readonly recordSig: string
+  }): Promise<boolean>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */
@@ -136,6 +180,14 @@ export interface ItemStore {
   peer(): string
   /** Item keys the store knows, live or dead. */
   keys(): readonly string[]
+  /**
+   * Whether `ops` (this device's unsent ops for the key, oldest first) are its very first capture of the key, the only
+   * history-less copy a join may rewind (#13730 review L1): "first" when the oldest op starts from an empty version and
+   * the doc holds nothing but this device's ops; "rewound" when they start from an empty version but the doc holds no
+   * ops any more (a rewind that reached the store before the journal dropped them, review M1); "no" otherwise, e.g. a
+   * key this device created and already sent.
+   */
+  firstCapture(key: string, ops: readonly Uint8Array[]): Promise<"first" | "rewound" | "no">
   /** captureOnDevice: the working text against the item's materialised baseline; null = no edit. */
   capture(key: string, workingText: string | null): Promise<Uint8Array | null>
   /** Import a verified remote update (or this device's own captured ops). */
@@ -153,6 +205,20 @@ export interface ItemStore {
   applySnapshot(payload: BatchPayload): Promise<void>
   /** Make CRDT state and baselines durable (temp file + rename) before the journal advances. */
   persist(): Promise<void>
+  /**
+   * Winds this device's own unpublished updates `ops` out of the item (#12284 review M1): the doc goes
+   * back to the version before the earliest of them and that version's render becomes the baseline,
+   * so the working file is captured afresh. Only for ops that never left the device. "kept" when the
+   * ops cannot be attributed to this device (undecodable, or no op of its peer): nothing changes.
+   */
+  rewind(key: string, ops: readonly Uint8Array[]): Promise<"rewound" | "kept">
+  /**
+   * Finishes the import a crash between journaling and importing one of this device's captures left
+   * owed (#12284): "held" when the doc already has `ops`; "imported" when it imported them and set the
+   * baseline to what that capture recorded; "refused" when they are not this device's to import (no op
+   * of its peer, missing deps, undecodable or refused by the doc), with the doc left as it was. Never throws.
+   */
+  adoptJournaled(key: string, ops: Uint8Array): Promise<"held" | "imported" | "refused">
 }
 
 /** The memory writer lock: network work never runs while it is held. */
@@ -181,8 +247,20 @@ export interface SyncRepo {
    * meanwhile never swallows the sync's rendered files.
    */
   stageTree(paths: readonly string[]): Promise<string>
-  /** Commit exactly `paths` as `OmO Sync` with `message` (trailers included). */
+  /** Commit exactly `paths` as `OmO Sync` with `message` (trailers included); the shared index is left as it was. */
   commit(paths: readonly string[], message: string): Promise<string>
+  /**
+   * Brings the shared index's entries for `paths` in line with HEAD. Run once the sync commit is
+   * recorded, including on resume, so an index update a crash or a stranded lock cut short is redone
+   * instead of leaving the synced files staged as deleted and untracked.
+   */
+  syncIndex(paths: readonly string[]): Promise<void>
   /** True when a commit reachable from HEAD carries `Sync-Seq: <range>`. */
   hasSyncCommit(range: string): Promise<boolean>
 }
+
+/**
+ * The engine's log line. A failed cycle is a warning a person or harness must see (#13635); every
+ * other line is routine and stays at info.
+ */
+export type SyncLog = (line: string, level?: "info" | "warn") => void

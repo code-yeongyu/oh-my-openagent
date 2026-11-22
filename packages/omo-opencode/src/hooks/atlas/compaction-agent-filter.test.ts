@@ -30,7 +30,9 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createAtlasHook } = await import("./index")
 

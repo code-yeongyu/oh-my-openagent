@@ -224,9 +224,9 @@ function rewriteMcpArg(arg: unknown): unknown {
   return rewrite?.[1] ?? arg
 }
 
-const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude"])
+const PLUGIN_COPY_DENYLIST = new Set([".git", "node_modules", ".ulw", ".claude", "test"])
 
-function shouldCopyPluginPath(path: string, root: string): boolean {
+export function shouldCopyPluginPath(path: string, root: string): boolean {
   const relative = path === root ? "" : path.slice(root.length + sep.length)
   if (relative.length === 0) return true
   const parts = relative.split(sep)
@@ -247,8 +247,6 @@ function shouldCopyPluginPath(path: string, root: string): boolean {
   return name !== ".gitignore"
 }
 
-
-
 if (import.meta.main) {
   const args = process.argv.slice(2)
   const positional = args.filter((a) => !a.startsWith("--"))
@@ -257,5 +255,9 @@ if (import.meta.main) {
   if (lazycodexRoot === undefined) {
     throw new Error("Usage: bun run script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>")
   }
-  await syncLazycodexMarketplace({ sourceRoot, lazycodexRoot, allowMissingBundledDists: args.includes("--previous-payload") })
+  await syncLazycodexMarketplace({
+    sourceRoot,
+    lazycodexRoot,
+    allowMissingBundledDists: args.includes("--previous-payload"),
+  })
 }

@@ -5,6 +5,7 @@
 
 import type { GitMemoryRepo, RecallCorpusCache, RecallNudge } from "@oh-my-opencode/memory-core"
 
+import type { ProjectRecallCorpus } from "../../project-recall-seats"
 import type { WakeToolBudget } from "./budget"
 import { resolveKibitzerToolCaps, type KibitzerToolCaps } from "./caps"
 import { createKibitzerGrepTool, KIBITZER_GREP_TOOL_NAME } from "./grep"
@@ -12,12 +13,22 @@ import { createKibitzerMemoryTool, KIBITZER_MEMORY_TOOL_NAME } from "./memory"
 import { createKibitzerSidecarNudgeTool, KIBITZER_NUDGE_TOOL_NAME } from "./nudge"
 import { createKibitzerReadTool, KIBITZER_READ_TOOL_NAME } from "./read"
 import type { AnyKibitzerSidecarTool } from "./result"
-import { createKibitzerSessionEntriesTool, KIBITZER_SESSION_ENTRIES_TOOL_NAME, type SessionBranchSnapshot } from "./session-read"
+import {
+  createKibitzerSessionEntriesTool,
+  KIBITZER_SESSION_ENTRIES_TOOL_NAME,
+  type SessionBranchSnapshot,
+} from "./session-read"
 
 export { createWakeToolBudget, type WakeToolBudget } from "./budget"
 export { DEFAULT_KIBITZER_TOOL_CAPS, type KibitzerToolCaps } from "./caps"
 export { MemoryToolOperations } from "./memory"
-export type { AnyKibitzerSidecarTool, KibitzerRejection, KibitzerRejectionCode, KibitzerSidecarTool, KibitzerToolResult } from "./result"
+export type {
+  AnyKibitzerSidecarTool,
+  KibitzerRejection,
+  KibitzerRejectionCode,
+  KibitzerSidecarTool,
+  KibitzerToolResult,
+} from "./result"
 export { createSessionBranchSnapshot, HIDDEN_SESSION_CUSTOM_TYPES, type SessionBranchSnapshot } from "./session-read"
 
 export const KIBITZER_SIDECAR_TOOL_NAMES = [
@@ -40,6 +51,7 @@ export interface KibitzerSidecarToolsInput {
     readonly cache?: RecallCorpusCache
     /** `memory.recall.query_expansion`; the search accepts no added terms when omitted. */
     readonly queryExpansion?: boolean
+    readonly projectCorpora?: () => Promise<readonly ProjectRecallCorpus[]>
   }
   readonly nudge: {
     readonly offered: ReadonlySet<string>
@@ -73,6 +85,7 @@ export function createKibitzerSidecarTools(input: KibitzerSidecarToolsInput): Ki
       budget: input.budget,
       searchedPaths,
       queryExpansion: input.memory.queryExpansion === true,
+      ...(input.memory.projectCorpora === undefined ? {} : { projectCorpora: input.memory.projectCorpora }),
     }),
     createKibitzerSidecarNudgeTool({ ...input.nudge, searched: searchedPaths, budget: input.budget }),
   ]

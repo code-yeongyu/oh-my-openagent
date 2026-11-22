@@ -5,7 +5,7 @@ import { normalizeThreadName, type ThreadAddressEntry } from "./addressing"
 import type { ThreadStatus } from "./contracts"
 import type { EndpointKind } from "./endpoint-registry"
 import type { GatewayAddressEntry } from "./gateway/engine"
-import { readSessionFacts, threadTitle, type SessionFacts } from "./session-facts"
+import { readSessionFacts, readSessionFactsAsync, threadTitle, type SessionFacts } from "./session-facts"
 
 export type HostSessionStatus = "opening" | "open" | "closing" | "closed"
 
@@ -51,6 +51,7 @@ export type AddressEndpoint = {
   readonly kind: EndpointKind
   readonly socket: string
   readonly routing_id: string | null
+  readonly durable_session_id: string
 }
 
 /** Where a thread runs: a terminal, a Desktop thread shard, a task child, or the shared daemon. */
@@ -61,7 +62,11 @@ export type ThreadSurface = "tui" | "desktop" | "child" | "daemon"
  * a worker session or a per-parent `p-*` shard is a task `child`, a per-thread `i-*` shard is a
  * `desktop` thread, and the legacy host's interactive sessions are `daemon` sessions.
  */
-export function deriveSurface(endpointKind: EndpointKind | undefined, sessionKind: string | undefined, socket: string): ThreadSurface {
+export function deriveSurface(
+  endpointKind: EndpointKind | undefined,
+  sessionKind: string | undefined,
+  socket: string,
+): ThreadSurface {
   if (endpointKind === "tui") return "tui"
   if (sessionKind === "worker") return "child"
   const name = basename(socket)
@@ -81,6 +86,8 @@ export type DiskSession = {
   readonly source_host: string | null
   /** Text of the first user message, when the session has one; the title of an unnamed thread. */
   readonly first_user_text?: string
+  /** The session file's archived flag, read like its name (`readSessionFacts`). */
+  readonly archived?: true
 }
 
 /**
@@ -104,10 +111,15 @@ export type AddressEntry = {
   /** The endpoint that serves (or last served) the thread; `null` for a session no endpoint names. */
   readonly endpoint: AddressEndpoint | null
   readonly surface: ThreadSurface | null
-  /** The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. */
+  /**
+   * The endpoint's liveness verdict: `true` only while an endpoint that answered lists the session. Internal to routing
+   * (the gateway's `liveness`, `omo daemon adopt`); a listed thread reports `state` instead.
+   */
   readonly alive: boolean
   /** What a listing shows: the name, else the first user message's opening, never the durable id. */
   readonly title: string | null
+  /** Only on an entry read from its session file: that file's archived flag. */
+  readonly archived?: true
 }
 
 export type AssembleAddressBookOptions = {
@@ -160,7 +172,15 @@ function validTimestamp<T extends string | null>(value: unknown, fallback: T): s
 }
 
 function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failure?: string): AddressEntry {
-  const endpoint = session.source_host === null ? null : { kind: host?.endpoint_kind ?? "rpc_host", socket: session.source_host, routing_id: null }
+  const endpoint =
+    session.source_host === null
+      ? null
+      : {
+          kind: host?.endpoint_kind ?? "rpc_host",
+          socket: session.source_host,
+          routing_id: null,
+          durable_session_id: session.durable_id,
+        }
   return {
     durable_id: session.durable_id,
     routing_id: null,
@@ -178,6 +198,7 @@ function fromDisk(session: DiskSession, host: AddressBookHost | undefined, failu
     surface: endpoint === null ? null : deriveSurface(endpoint.kind, undefined, endpoint.socket),
     alive: false,
     title: threadTitle(session.name, session.first_user_text),
+    ...(session.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -203,8 +224,14 @@ export function assembleAddressBook(
 
   for (const session of diskSessions) {
     if (session.durable_id.length === 0) continue
+    // The workspace scan reads a file an endpoint already claimed with no endpoint: the endpoint's record, which carries its
+    // failure (a timed-out engine's `live_unresponsive`), wins, so the thread never reads as a plain closed one (#14308).
+    if (session.source_host === null && byDurableId.get(session.durable_id)?.source_host != null) continue
     const failure = session.source_host === null ? undefined : failures.get(session.source_host)
-    byDurableId.set(session.durable_id, fromDisk(session, session.source_host === null ? undefined : bySocket.get(session.source_host), failure))
+    byDurableId.set(
+      session.durable_id,
+      fromDisk(session, session.source_host === null ? undefined : bySocket.get(session.source_host), failure),
+    )
   }
 
   for (const host of hosts) {
@@ -217,8 +244,13 @@ export function assembleAddressBook(
       if (typeof durableId !== "string" || durableId.length === 0) continue
       const disk = byDurableId.get(durableId)
       const sessionPath = session.sessionPath ?? disk?.session_path ?? null
-      const reported = { name: session.name ?? null, created: session.created_at ?? session.createdAt, updated: session.updated_at ?? session.updatedAt }
-      const needsFacts = reported.name === null || typeof reported.created !== "string" || typeof reported.updated !== "string"
+      const reported = {
+        name: session.name ?? null,
+        created: session.created_at ?? session.createdAt,
+        updated: session.updated_at ?? session.updatedAt,
+      }
+      const needsFacts =
+        reported.name === null || typeof reported.created !== "string" || typeof reported.updated !== "string"
       const facts = needsFacts && sessionPath !== null ? (opts.facts?.(sessionPath) ?? null) : null
       const createdAt = validTimestamp(reported.created, facts?.created_at ?? disk?.created_at ?? assembledAt)
       const updatedAt = validTimestamp(reported.updated, facts === null ? (disk?.updated_at ?? null) : facts.updated_at)
@@ -235,7 +267,12 @@ export function assembleAddressBook(
         created_at: createdAt,
         updated_at: updatedAt,
         thread_id: durableId,
-        endpoint: { kind: host.endpoint_kind ?? "rpc_host", socket: host.socket, routing_id: session.sessionId },
+        endpoint: {
+          kind: host.endpoint_kind ?? "rpc_host",
+          socket: host.socket,
+          routing_id: session.sessionId,
+          durable_session_id: durableId,
+        },
         surface: deriveSurface(host.endpoint_kind, session.kind, host.socket),
         alive: host.alive !== false,
         title: threadTitle(name, facts?.first_user_text) ?? disk?.title ?? null,
@@ -244,21 +281,38 @@ export function assembleAddressBook(
   }
 
   return [...byDurableId.values()].sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at)
+      return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }
 
 /** Convert nullable display names to the addressing layer's empty-name form. */
+function sessionIdsOf(threadId: string, routingId: string | null | undefined): readonly string[] | undefined {
+  if (
+    threadId.length === 0 ||
+    routingId === null ||
+    routingId === undefined ||
+    routingId === "" ||
+    routingId === threadId
+  )
+    return undefined
+  return [routingId]
+}
+
 export function toThreadAddressEntries(entries: readonly AddressEntry[]): ThreadAddressEntry[] {
-  return entries.map((entry) => ({
-    thread_id: entry.thread_id,
-    name: entry.name ?? "",
-    status: entry.status,
-    cwd: entry.cwd,
-    created_at: entry.created_at,
-    updated_at: entry.updated_at,
-  }))
+  return entries.map((entry) => {
+    const session_ids = sessionIdsOf(entry.thread_id, entry.endpoint?.routing_id)
+    return {
+      thread_id: entry.thread_id,
+      name: entry.name ?? "",
+      status: entry.status,
+      cwd: entry.cwd,
+      created_at: entry.created_at,
+      updated_at: entry.updated_at,
+      ...(session_ids === undefined ? {} : { session_ids }),
+    }
+  })
 }
 
 /**
@@ -289,6 +343,12 @@ export function readDiskSession(path: string, sourceHost: string | null): DiskSe
   return session === null ? null : { ...session, source_host: sourceHost }
 }
 
+/** `readDiskSession` through the async reader, for a listing that runs on the event loop (a dead endpoint's, #13579). */
+export async function readDiskSessionAsync(path: string, sourceHost: string | null): Promise<DiskSession | null> {
+  const session = diskSessionOf(path, await readSessionFactsAsync(path))
+  return session === null ? null : { ...session, source_host: sourceHost }
+}
+
 export type FindDiskSessionsOptions = {
   /** Match a name in every workspace; otherwise only the session directories of `workspaceRoots` are read. */
   readonly all_scope?: boolean
@@ -299,12 +359,17 @@ export type FindDiskSessionsOptions = {
 }
 
 /** senpi's session directory name for a cwd (`getDefaultSessionDirPath`), without the closing `--`: every cwd under `root` starts with it. */
-function sessionDirectoryPrefix(root: string): string {
-  return `--${resolve(root).replace(/^[/\\]/, "").replace(/[/\\:]/g, "-")}-`
+export function sessionDirectoryPrefix(root: string): string {
+  return `--${resolve(root)
+    .replace(/^[/\\]/, "")
+    .replace(/[/\\:]/g, "-")}-`
 }
 
 function diskSessionFromFacts(path: string): DiskSession | null {
-  const facts = readSessionFacts(path)
+  return diskSessionOf(path, readSessionFacts(path))
+}
+
+function diskSessionOf(path: string, facts: SessionFacts | null): DiskSession | null {
   if (facts === null) return null
   return {
     durable_id: facts.durable_id,
@@ -315,6 +380,7 @@ function diskSessionFromFacts(path: string): DiskSession | null {
     session_path: path,
     source_host: null,
     ...(facts.first_user_text === null ? {} : { first_user_text: facts.first_user_text }),
+    ...(facts.archived === true ? { archived: true as const } : {}),
   }
 }
 
@@ -327,7 +393,11 @@ function diskSessionFromFacts(path: string): DiskSession | null {
  * workspace; `resolveTarget` still judges the scope of what is returned. `source_host` is null: no
  * endpoint serves these sessions.
  */
-export function findDiskSessions(sessionsDir: string, address: string, opts: FindDiskSessionsOptions = {}): DiskSession[] {
+export function findDiskSessions(
+  sessionsDir: string,
+  address: string,
+  opts: FindDiskSessionsOptions = {},
+): DiskSession[] {
   let projectDirs: string[]
   try {
     projectDirs = readdirSync(sessionsDir, { withFileTypes: true })
@@ -351,21 +421,28 @@ export function findDiskSessions(sessionsDir: string, address: string, opts: Fin
   }
 
   const idSuffix = `_${address}.jsonl`
-  const byId = projectDirs.flatMap((dir) => filesOf(dir).flatMap((name) => {
-    if (!name.endsWith(idSuffix)) return []
-    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
-    return session !== null && session.durable_id === address ? [session] : []
-  }))
+  const byId = projectDirs.flatMap((dir) =>
+    filesOf(dir).flatMap((name) => {
+      if (!name.endsWith(idSuffix)) return []
+      const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+      return session !== null && session.durable_id === address ? [session] : []
+    }),
+  )
   if (byId.length > 0 || opts.id_only === true) return byId
 
   const wanted = normalizeThreadName(address)
   if (wanted.length === 0) return []
   const prefixes = opts.all_scope === true ? undefined : (opts.workspaceRoots ?? []).map(sessionDirectoryPrefix)
-  const readable = prefixes === undefined ? projectDirs : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
-  return readable.flatMap((dir) => filesOf(dir).flatMap((name) => {
-    const session = diskSessionFromFacts(join(sessionsDir, dir, name))
-    return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
-  }))
+  const readable =
+    prefixes === undefined
+      ? projectDirs
+      : projectDirs.filter((dir) => prefixes.some((prefix) => dir.startsWith(prefix)))
+  return readable.flatMap((dir) =>
+    filesOf(dir).flatMap((name) => {
+      const session = diskSessionFromFacts(join(sessionsDir, dir, name))
+      return session !== null && session.name !== null && normalizeThreadName(session.name) === wanted ? [session] : []
+    }),
+  )
 }
 
 /**
@@ -373,10 +450,7 @@ export function findDiskSessions(sessionsDir: string, address: string, opts: Fin
  * only a traversal boundary; cwd and durable identity always come from the
  * JSONL header, avoiding the encoding's intentionally lossy dash replacement.
  */
-export function scanDiskSessions(
-  sessionsDir: string,
-  opts: ScanDiskSessionsOptions = {},
-): DiskSession[] {
+export function scanDiskSessions(sessionsDir: string, opts: ScanDiskSessionsOptions = {}): DiskSession[] {
   const found: DiskSession[] = []
   let projectDirs
   try {
@@ -402,7 +476,8 @@ export function scanDiskSessions(
   }
 
   return found.sort((left, right) => {
-    if (left.updated_at !== right.updated_at) return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
+    if (left.updated_at !== right.updated_at)
+      return left.updated_at === null ? 1 : right.updated_at === null ? -1 : left.updated_at < right.updated_at ? 1 : -1
     return left.durable_id.localeCompare(right.durable_id)
   })
 }

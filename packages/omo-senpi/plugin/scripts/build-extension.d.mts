@@ -6,16 +6,25 @@ export interface BuildExtensionOptions {
   advisorRuntimeOutputPath?: string
   sidePanelRuntimeOutputPath?: string
   toolkitSdkOutputPath?: string
+  bunshinTsOutputPath?: string
+  omoSdkOutputPath?: string
   rollbackRuntimeOutputPath?: string
   memoryDoctorOutputPath?: string
   memoryMemfsOutputPath?: string
   memoryPalaceOutputPath?: string
+  deviceAccountOutputPath?: string
+  memoryCommandsOutputPath?: string
   sessionHistoryOutputPath?: string
   recallStoreOutputPath?: string
+  deviceServiceOutputPath?: string
   telemetryPosthogOutputPath?: string
   memorySyncOutputPath?: string
   threadClientOutputPath?: string
+  wakeOutputPath?: string
+  telemetryRecoveryOutputPath?: string
   feedbackOutputPath?: string
+  desktopToolkitOutputPath?: string
+  claimReceiptOutputPath?: string
   computerUseOutputPath?: string
   gatewayStoreWorkerOutputPath?: string
   threadSdkOutputPath?: string
@@ -30,19 +39,35 @@ export function buildExtension(options?: BuildExtensionOptions): Promise<{
   memoryDoctorInputs: string[]
   memoryMemfsInputs: string[]
   memoryPalaceInputs: string[]
+  deviceAccountInputs: string[]
+  memoryCommandsInputs: string[]
   sessionHistoryInputs: string[]
   recallStoreInputs: string[]
+  deviceServiceInputs: string[]
   telemetryPosthogInputs: string[]
   memorySyncInputs: string[]
   threadClientInputs: string[]
+  wakeInputs: string[]
+  telemetryRecoveryInputs: string[]
   feedbackInputs: string[]
+  desktopToolkitInputs: string[]
+  claimReceiptInputs: string[]
   computerUseInputs: string[]
+  computerRunWorkerInputs: string[]
   toolkitSdkInputs: string[]
+  bunshinTsInputs: string[]
+  omoSdkInputs: string[]
   rollbackRuntimeInputs: string[]
   gatewayStoreWorkerInputs: string[]
   threadSdkInputs: string[]
 }>
-export function checkExtensionCurrent(options?: BuildExtensionOptions): Promise<
+export interface CheckExtensionCurrentOptions extends BuildExtensionOptions {
+  /** An already-built reproduction root to compare against instead of building a fresh one; left in place. */
+  expectedRoot?: string
+}
+export function checkExtensionCurrent(
+  options?: CheckExtensionCurrentOptions,
+): Promise<
   | { ok: true; output: string; gatewayStoreWorkerOutput: string; threadSdkOutput: string }
   | { ok: false; reason: "missing-output" | "stale-output"; output: string }
 >
@@ -56,6 +81,7 @@ export const SENPI_LOADER_ALIASES: readonly [
   "@earendil-works/pi-ai/compat",
   "@earendil-works/pi-ai/oauth",
   "@code-yeongyu/senpi",
+  "@code-yeongyu/senpi/session-worker-data",
   "@mariozechner/pi-coding-agent",
   "@mariozechner/pi-agent-core",
   "@mariozechner/pi-tui",

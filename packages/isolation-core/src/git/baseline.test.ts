@@ -84,7 +84,7 @@ test("spaces, quotes and unicode paths round-trip through patches and parsing", 
   // NTFS forbids quotes and control characters in filenames; the quoted and
   // tab-separated spellings stay on filesystems that permit them.
   const posixOnly = process.platform !== "win32"
-  const names = ['space name', ...(posixOnly ? ['quote"name', 'tab\tname'] as const : []), '한글']
+  const names = ["space name", ...(posixOnly ? (['quote"name', "tab\tname"] as const) : []), "한글"]
   for (const name of names) await writeFile(join(isolated, name), "new\n")
   const { rootPatch } = await captureDeltaPatch(isolated, baseline)
   expect(paths(rootPatch)).toEqual(names.sort())
@@ -99,12 +99,12 @@ test("nested repository delta is separate and node_modules is excluded", async (
   await mkdir(join(repoRoot, "node_modules"))
   await cp(nested.repoRoot, join(repoRoot, "node_modules/ignored"), { recursive: true })
   const baseline = await captureBaseline(repoRoot)
-  expect(baseline.nested.map(n => n.relativePath)).toEqual(["libs/inner"])
+  expect(baseline.nested.map((n) => n.relativePath)).toEqual(["libs/inner"])
   const isolated = await child(repoRoot, root)
   await writeFile(join(isolated, "libs/inner/new"), "nested\n")
   const result = await captureDeltaPatch(isolated, baseline)
   expect(result.rootPatch).toBe("")
-  expect(result.nestedPatches.map(n => n.relativePath)).toEqual(["libs/inner"])
+  expect(result.nestedPatches.map((n) => n.relativePath)).toEqual(["libs/inner"])
   expect(paths(result.nestedPatches[0]!.patch)).toEqual(["new"])
 })
 test("a timed-out baseline read retries once with a fresh process and completes", async () => {
@@ -129,24 +129,30 @@ test("a timed-out baseline read retries once with a fresh process and completes"
   }
 
   // when
-  const baseline = await captureRepoBaseline(
-    repoRoot,
-    ISOLATION_BASELINE_MAX_CONTENT_BYTES,
-    { runGit: executeGit, onReadRetry: details => retries.push(details) },
-  )
+  const baseline = await captureRepoBaseline(repoRoot, ISOLATION_BASELINE_MAX_CONTENT_BYTES, {
+    runGit: executeGit,
+    onReadRetry: (details) => retries.push(details),
+  })
 
   // then
   expect(baseline.untrackedFiles).toEqual(["untracked"])
   expect(untrackedReadAttempts).toBe(2)
   expect(successfulArgs.slice(0, 6)).toEqual([
-    "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", "ls-files", "--others",
+    "-c",
+    "core.fsmonitor=false",
+    "-c",
+    "core.untrackedCache=false",
+    "ls-files",
+    "--others",
   ])
   expect(successfulOptionalLocks).toBe("0")
-  expect(retries).toEqual([{
-    args: ["ls-files", "--others", "--exclude-standard", "-z"],
-    cwd: repoRoot,
-    timeoutMs: 50,
-  }])
+  expect(retries).toEqual([
+    {
+      args: ["ls-files", "--others", "--exclude-standard", "-z"],
+      cwd: repoRoot,
+      timeoutMs: 50,
+    },
+  ])
   expect(await readFile(join(repoRoot, ".git/index"))).toEqual(indexBefore)
 })
 test("untracked content over injected 1 KiB cap is refused before rendering", async () => {

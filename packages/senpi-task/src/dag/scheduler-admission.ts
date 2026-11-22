@@ -15,11 +15,13 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     const deniedIds = new Set(denied)
     const snapshot = context.journal.snapshot()
     const runnable = snapshot.nodes
-      .filter((node) =>
-        (node.state === "pending" || node.state === "blocked") &&
-        !deniedIds.has(node.id) &&
-        !context.infrastructureRetries.pending(node.id) &&
-        isRunnable(snapshot, node.id))
+      .filter(
+        (node) =>
+          (node.state === "pending" || node.state === "blocked") &&
+          !deniedIds.has(node.id) &&
+          !context.infrastructureRetries.pending(node.id) &&
+          isRunnable(snapshot, node.id),
+      )
       .map((node) => node.id)
     if (denied.length === 0 && runnable.length === 0) return true
 
@@ -34,10 +36,18 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     context.admissionInProgress = true
     let results: PromiseSettledResult<{ readonly nodeId: DagNodeId; readonly result: OwnedStartResult }>[]
     try {
-      results = await Promise.allSettled(awaitingAdmission.map(async (nodeId) => ({
-        nodeId,
-        result: await context.taskManager.startOwned(startSpec(context, nodeId), owner(context, nodeId)),
-      })))
+      results = await Promise.allSettled(
+        awaitingAdmission.map(async (nodeId) => ({
+          nodeId,
+          result: await context.taskManager.startOwned(
+            {
+              ...startSpec(context, nodeId),
+              ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
+            },
+            owner(context, nodeId),
+          ),
+        })),
+      )
     } finally {
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
@@ -76,7 +86,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     // A contended or displaced admission lease is a bounded wait inside acquisition itself, so the
     // next probe is already paced; only a cap denial has to wait for a slot to free.
     if (leaseDenied) continue
-    if (!await settleOne(context, residencyReleased)) return false
+    if (!(await settleOne(context, residencyReleased))) return false
   }
 }
 
@@ -126,6 +136,12 @@ function attachOrFail(
   nodeId: DagNodeId,
   result: Exclude<OwnedStartResult, { readonly kind: "residency_denied" }>,
 ): void {
+  if (result.kind === "held") {
+    context.journal.append({ type: "dag.run.paused", reason: "user_stop", pauseSeq: result.pauseSeq })
+    context.suspended = true
+    context.resolveCancellationRequested()
+    return
+  }
   if (result.kind === "owner_conflict") {
     attachStarted(context, nodeId, {
       kind: "started",
@@ -149,7 +165,7 @@ function attachOrFail(
   attachStarted(context, nodeId, result)
 }
 
-function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" }>): {
+function startFailure(result: Exclude<OwnedStartResult, { readonly kind: "started" | "residency_denied" | "held" }>): {
   readonly code: DagNodeErrorCode
   readonly message: string
 } {

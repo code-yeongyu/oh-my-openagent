@@ -3,7 +3,8 @@
 import { describe, expect, it } from "bun:test"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
+import { ULTRAWORK_DIRECTIVES } from "./directive-variants"
+import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
 import { armingSnapshot, classifyUltraworkInput, createSessionArming, createUltraworkComponent } from "./index"
 import {
   createTestContext,
@@ -39,7 +40,13 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     }
     // The same shared host can next serve a root session. Its explicit request still arms.
     Object.defineProperty(pi, "sessionContext", { value: {}, configurable: true })
-    const result = await dispatchInput(pi, "ulw: implement the assigned unit", "rpc", undefined, sessionEventCtx("root-session"))
+    const result = await dispatchInput(
+      pi,
+      "ulw: implement the assigned unit",
+      "rpc",
+      undefined,
+      sessionEventCtx("root-session"),
+    )
     expectHiddenInjection(pi, result)
     expect(arming.isArmed("root-session")).toBe(true)
   })
@@ -51,7 +58,13 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
       await createUltraworkComponent(arming).register(pi, createTestContext(pi))
-      const result = await dispatchInput(pi, "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl", "rpc", undefined, sessionEventCtx("legacy-child"))
+      const result = await dispatchInput(
+        pi,
+        "ulw: implement the unit; evidence goes in .omo/ulw-execute/ledger.jsonl",
+        "rpc",
+        undefined,
+        sessionEventCtx("legacy-child"),
+      )
       expect(result).toEqual({ action: "continue" })
       expect(pi.messages).toHaveLength(0)
       expect(arming.isArmed("legacy-child")).toBe(false)
@@ -92,8 +105,13 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "[gh-feed -> lane] the ulw-execute PR landed",
       "Lead (main), lane: your report quoted ulw and armed my session",
       "Lead (main) to duty: the lane quoted mass ulw research in its report",
-      "the bug: a message that says \"please ulw this\" arms the directive",
+      'the bug: a message that says "please ulw this" arms the directive',
       "> ulw research the market\nwhat do you think of this request?",
+      // #10822: a relay whose header names several recipients, pasted twice, quoting a test name. Its only
+      // keyword is the test name, and it armed a coordinator session's ultrawork mode.
+      "[lane-r3 -> coordinator + ledger-lane] (1) the one-time copy STARTED. (2) no parser bug: the recorded names are exact, and the other is 'omo-senpi ultrawork packaged reload > ...'.\n[lane-r3 -> coordinator + ledger-lane] the rerun is filed.",
+      "[LEAD via coordinator -> lane-a, omo#1 FIX_FIRST] fold both findings, then ulw the delta",
+      "the failing test is 'omo-senpi ultrawork packaged reload > injects the reminder'",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
@@ -110,6 +128,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
       "mass ulw research the housing market",
       "fix the login redirect, ulw, and open a PR",
       "ulw add a dark mode toggle",
+      "don't stop until it's done, ulw",
     ]) {
       const pi = new FakeExtensionAPI()
       const arming = createSessionArming()
@@ -183,9 +202,17 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     // when: first trigger, repeat trigger, rejected compact, then accepted compact
     await dispatchInput(pi, "ulw first")
     await dispatchInput(pi, "ulw second")
-    await pi.dispatch("session_compact", { type: "session_compact", accepted: false }, sessionEventCtx("session-characterization"))
+    await pi.dispatch(
+      "session_compact",
+      { type: "session_compact", accepted: false },
+      sessionEventCtx("session-characterization"),
+    )
     await dispatchInput(pi, "ulw after rejected compact")
-    await pi.dispatch("session_compact", { type: "session_compact", accepted: true }, sessionEventCtx("session-characterization"))
+    await pi.dispatch(
+      "session_compact",
+      { type: "session_compact", accepted: true },
+      sessionEventCtx("session-characterization"),
+    )
     await dispatchInput(pi, "ulw after accepted compact")
 
     // then: only accepted compaction permits the full directive to return
@@ -226,7 +253,7 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     const arming = createSessionArming()
     arming.markArmed("session-snapshot")
     arming.rearmOnCompact("session-snapshot")
-    const restoreSlot = seedSharedArmingSlot({ directive: SENPI_ULTRAWORK_DIRECTIVE, astraDirective: SENPI_ASTRA_ULTRAWORK_DIRECTIVE, arming })
+    const restoreSlot = seedSharedArmingSlot({ directives: Object.values(ULTRAWORK_DIRECTIVES), arming })
 
     try {
       const before = {
@@ -261,7 +288,9 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
 
     expect(classifyUltraworkInput(input, { wasArmed: false, compactRearmPending: false }).stage).toBe("first_arm")
     expect(classifyUltraworkInput(input, { wasArmed: true, compactRearmPending: false }).stage).toBe("remention")
-    expect(classifyUltraworkInput(input, { wasArmed: false, compactRearmPending: true }).stage).toBe("post_compact_rearm")
+    expect(classifyUltraworkInput(input, { wasArmed: false, compactRearmPending: true }).stage).toBe(
+      "post_compact_rearm",
+    )
   })
 
   it("#given a known fresh session #when the first trigger dispatches #then injects the full directive byte-identically", async () => {
@@ -399,36 +428,40 @@ describe("omo-senpi ultrawork once-per-session arming", () => {
     expectReminderMessage(piAfterResume, 0)
   })
 
-  it.each(["baseline", "astra"] as const)("#given a slot left under different %s directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive", async (variant) => {
-    // given: an earlier bundle evaluation armed the session and left the REAL
-    // slot shape — { directive, astraDirective, arming } — on the process-global registry, tagged
-    // with directive text the CURRENT directive no longer matches (omo.js or
-    // SENPI_ULTRAWORK_DIRECTIVE changed mid-process). `arming` is present and IS
-    // the stale ledger, so the directive-text mismatch alone must discard it.
-    const staleLedger = createSessionArming()
-    staleLedger.markArmed("session-upgraded")
-    const restoreSlot = seedSharedArmingSlot({
-      directive: variant === "baseline" ? "stale baseline directive" : SENPI_ULTRAWORK_DIRECTIVE,
-      astraDirective: variant === "astra" ? "stale Astra directive" : SENPI_ASTRA_ULTRAWORK_DIRECTIVE,
-      arming: staleLedger,
-    })
-    try {
-      // when: the reloaded bundle constructs its component against the shared slot
-      const pi = new FakeExtensionAPI()
-      await createUltraworkComponent().register(pi, createTestContext(pi))
-      await pi.dispatch("session_start", {}, sessionEventCtx("session-upgraded"))
-      const result = await dispatchInput(pi, "ulw after upgrade")
+  it.each(Object.keys(ULTRAWORK_DIRECTIVES))(
+    "#given a slot left under different %s directive text #when the bundle re-evaluates #then the session is not armed and receives the full directive",
+    async (variant) => {
+      // given: an earlier bundle evaluation armed the session and left the REAL
+      // slot shape — { directives, arming } — on the process-global registry, tagged
+      // with directive text the CURRENT variant no longer matches (omo.js or
+      // that variant's source changed mid-process). `arming` is present and IS
+      // the stale ledger, so the directive-text mismatch alone must discard it.
+      const staleLedger = createSessionArming()
+      staleLedger.markArmed("session-upgraded")
+      const restoreSlot = seedSharedArmingSlot({
+        directives: Object.entries(ULTRAWORK_DIRECTIVES).map(([name, directive]) =>
+          name === variant ? `stale ${name} directive` : directive,
+        ),
+        arming: staleLedger,
+      })
+      try {
+        // when: the reloaded bundle constructs its component against the shared slot
+        const pi = new FakeExtensionAPI()
+        await createUltraworkComponent().register(pi, createTestContext(pi))
+        await pi.dispatch("session_start", {}, sessionEventCtx("session-upgraded"))
+        const result = await dispatchInput(pi, "ulw after upgrade")
 
-      // then: the directive mismatch discards the stale ledger, so the session gets
-      // the FULL directive again — never a reminder pointing at rules its
-      // transcript no longer holds.
-      expect(result).toEqual({ action: "continue" })
-      expect(pi.messages).toHaveLength(1)
-      expect(pi.messages[0]?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
-    } finally {
-      restoreSlot()
-    }
-  })
+        // then: the directive mismatch discards the stale ledger, so the session gets
+        // the FULL directive again — never a reminder pointing at rules its
+        // transcript no longer holds.
+        expect(result).toEqual({ action: "continue" })
+        expect(pi.messages).toHaveLength(1)
+        expect(pi.messages[0]?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
+      } finally {
+        restoreSlot()
+      }
+    },
+  )
 
   it("#given a bare ledger left by a pre-slot bundle #when the bundle re-evaluates #then the session is not armed and receives the full directive", async () => {
     // given: the oldest bundles wrote the ledger ITSELF to the process-global

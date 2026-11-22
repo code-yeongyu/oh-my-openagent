@@ -8,6 +8,7 @@ import { KIBITZER_SUMMARY_SCHEMA } from "./kibitzer-schema"
 import { KNOWN_MODELS, KNOWN_PROVIDERS } from "./model-vocabulary"
 import { PARALLELISM_SUMMARY_SCHEMA } from "./parallelism-schema"
 import { SESSION_SUMMARY_SCHEMA } from "./session-summary-schema"
+import { TELEMETRY_SESSION_ROLES } from "./session-role"
 
 export type OmoNativePropertyType = "boolean" | "number" | "string"
 
@@ -20,7 +21,9 @@ const BOOLEAN_PROPERTY = Object.freeze({ type: "boolean" } as const)
 const NUMBER_PROPERTY = Object.freeze({ type: "number" } as const)
 const STRING_PROPERTY = Object.freeze({ type: "string" } as const)
 
-function enumProperty<const Values extends readonly string[]>(values: Values): Readonly<{
+function enumProperty<const Values extends readonly string[]>(
+  values: Values,
+): Readonly<{
   type: "string"
   values: Values
 }> {
@@ -30,17 +33,49 @@ function enumProperty<const Values extends readonly string[]>(values: Values): R
 export const CURATED_AGENTS = Object.freeze([...CURATED_READONLY_AGENT_NAMES])
 export const BUILTIN_CATEGORY_NAMES = Object.freeze(BUILTIN_CATEGORY_DEFAULTS.map(({ name }) => name))
 export const BUILTIN_SKILL_NAMES = Object.freeze([
-  "ast-grep", "browser", "coding-agent-sessions", "dag-library", "data-scientist", "debugging", "frontend", "git-master",
-  "give-me-tips", "hyperplan", "init-deep", "lsp-setup", "mass-ulw", "onboarding", "programming", "refactor",
+  "ast-grep",
+  "browser",
+  "coding-agent-sessions",
+  "dag-library",
+  "data-scientist",
+  "debugging",
+  "eval-integrity",
+  "frontend",
+  "git-master",
+  "give-me-tips",
+  "hyperplan",
+  "init-deep",
+  "lsp-setup",
+  "mass-ulw",
+  "omo-relay",
+  "onboarding",
+  "programming",
+  "refactor",
   "remove-ai-slops",
-  "review-work", "ulw-execute", "ultimate-browsing", "ultrawork", "ulw-loop", "ulw-plan", "ulw-research",
-  "visual-qa", "visualize",
+  "review-work",
+  "ulw-execute",
+  "ultimate-browsing",
+  "ultrawork",
+  "ulw-loop",
+  "ulw-plan",
+  "ulw-research",
+  "visual-qa",
+  "visualize",
 ] as const)
 export const COMPUTER_USE_ACTIVATION_SOURCES = Object.freeze([
-  "tool_call", "command_on", "command_off", "other",
+  "tool_call",
+  "command_on",
+  "command_off",
+  "other",
 ] as const)
 export const COMPUTER_USE_BACKENDS = Object.freeze([
-  "quartz", "x11", "wayland", "win32", "fake", "unavailable", "other",
+  "quartz",
+  "x11",
+  "wayland",
+  "win32",
+  "fake",
+  "unavailable",
+  "other",
 ] as const)
 export const COMPUTER_USE_ENGINE_ERROR_CODES = Object.freeze([
   ...ERROR_CODES,
@@ -49,22 +84,21 @@ export const COMPUTER_USE_ENGINE_ERROR_CODES = Object.freeze([
   "abi-mismatch",
   "other",
 ] as const)
-export const COMPUTER_USE_PERMISSIONS = Object.freeze([
-  "capture", "input", "ax", "read", "exec",
-] as const)
+export const COMPUTER_USE_PERMISSIONS = Object.freeze(["capture", "input", "ax", "read", "exec"] as const)
 export const COMPUTER_USE_PERMISSION_SCOPES = Object.freeze(["os", "tier"] as const)
+export const HANDOFF_HINT_ACTIONS = Object.freeze(["shown", "accepted", "dismissed"] as const)
 export const COMPUTER_USE_PLATFORMS = Object.freeze(["darwin", "linux", "win32", "other"] as const)
 
 export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
   daily_active: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     day_utc: STRING_PROPERTY,
     reason: enumProperty(["session_start"] as const),
   }),
   session_started: Object.freeze({
-    "$session_id": STRING_PROPERTY,
-    "$os": STRING_PROPERTY,
-    "$os_version": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
+    $os: STRING_PROPERTY,
+    $os_version: STRING_PROPERTY,
     arch: STRING_PROPERTY,
     cpu_count: NUMBER_PROPERTY,
     default_model: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
@@ -72,14 +106,18 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     memory_bucket: enumProperty(["lt_8_gb", "8_15_gb", "16_31_gb", "32_63_gb", "64_plus_gb"] as const),
     model_count: NUMBER_PROPERTY,
     provider_count: NUMBER_PROPERTY,
+    configured_provider_count: NUMBER_PROPERTY,
+    connected_account_count: STRING_PROPERTY,
+    signed_in_provider_count: NUMBER_PROPERTY,
     providers: STRING_PROPERTY,
     reason: enumProperty(["startup", "reload", "new", "resume", "fork"] as const),
+    session_role: enumProperty(TELEMETRY_SESSION_ROLES),
     // Device-reported IANA zone. A timezone signal, never a country signal: countries share zones,
     // span zones, and users override them. Country comes from PostHog's server-side GeoIP.
     timezone: STRING_PROPERTY,
   }),
   prompt_submitted: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     input_source: enumProperty(["interactive", "rpc", "extension"] as const),
     invocation_stage: enumProperty(["none", "first_arm", "remention", "post_compact_rearm"] as const),
     is_effective_ultrawork_invocation: BOOLEAN_PROPERTY,
@@ -94,13 +132,22 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     queue_mode: enumProperty(["immediate", "follow_up", "steer", "other"] as const),
     real_prompt_ordinal_bucket: enumProperty(["1", "2_3", "4_10", "11_25", "26_plus"] as const),
     suppression_reason: enumProperty([
-      "none", "no_keyword", "identifier_reference", "negated_mention", "extension_source", "child_session", "embedded_directive", "skill_expansion", "skill_name_only",
+      "none",
+      "no_keyword",
+      "identifier_reference",
+      "negated_mention",
+      "extension_source",
+      "child_session",
+      "embedded_directive",
+      "skill_expansion",
+      "skill_name_only",
     ] as const),
   }),
   turn_completed: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     cache_read_tokens: NUMBER_PROPERTY,
     cache_write_tokens: NUMBER_PROPERTY,
+    cost_1e4: NUMBER_PROPERTY,
     cost_usd: NUMBER_PROPERTY,
     input_tokens: NUMBER_PROPERTY,
     model_id: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
@@ -108,44 +155,56 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
     provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
     reasoning_tokens: NUMBER_PROPERTY,
     sample_rate: NUMBER_PROPERTY,
+    session_role: enumProperty(TELEMETRY_SESSION_ROLES),
     total_tokens: NUMBER_PROPERTY,
     turn_index: NUMBER_PROPERTY,
   }),
   session_summary: SESSION_SUMMARY_SCHEMA,
   skill_loaded: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     skill_name: enumProperty(BUILTIN_SKILL_NAMES),
   }),
   delegation_started: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     background: BOOLEAN_PROPERTY,
     batch_size_bucket: enumProperty(["1", "2_4", "5_plus"] as const),
     kind: enumProperty(["category", "subagent"] as const),
     name: enumProperty([...BUILTIN_CATEGORY_NAMES, ...CURATED_AGENTS, "custom"] as const),
   }),
   feature_used: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     feature: enumProperty(["goal_tool", "team_create", "memory_tool"] as const),
   }),
   computer_use_activation: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     active: BOOLEAN_PROPERTY,
     backend: enumProperty(COMPUTER_USE_BACKENDS),
     host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
     source: enumProperty(COMPUTER_USE_ACTIVATION_SOURCES),
   }),
   computer_use_permission_denied: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     backend: enumProperty(COMPUTER_USE_BACKENDS),
     host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
     permission: enumProperty(COMPUTER_USE_PERMISSIONS),
     scope: enumProperty(COMPUTER_USE_PERMISSION_SCOPES),
   }),
   computer_use_engine_error: Object.freeze({
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     backend: enumProperty(COMPUTER_USE_BACKENDS),
     code: enumProperty(COMPUTER_USE_ENGINE_ERROR_CODES),
     host_platform: enumProperty(COMPUTER_USE_PLATFORMS),
+  }),
+  handoff_hint: Object.freeze({
+    $session_id: STRING_PROPERTY,
+    action: enumProperty(HANDOFF_HINT_ACTIONS),
+    context_tokens: NUMBER_PROPERTY,
+    fresh_usd: NUMBER_PROPERTY,
+    model_id: enumProperty([...new Set(Object.values(KNOWN_MODELS).flat()), "custom"] as const),
+    next_reply_usd: NUMBER_PROPERTY,
+    provider: enumProperty([...KNOWN_PROVIDERS, "custom"] as const),
+    saving_usd: NUMBER_PROPERTY,
+    subscription: BOOLEAN_PROPERTY,
   }),
   kibitzer_summary: KIBITZER_SUMMARY_SCHEMA,
   parallelism_summary: PARALLELISM_SUMMARY_SCHEMA,
@@ -160,11 +219,10 @@ export const OMO_NATIVE_EVENT_SCHEMAS = Object.freeze({
 // Properties the event client stamps on EVERY event (telemetry-core shared block plus the omo-native
 // attribution). They bypass the per-event allowlists, so this table is their only published contract.
 export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
-  "$process_person_profile": BOOLEAN_PROPERTY,
+  $process_person_profile: BOOLEAN_PROPERTY,
   ci: BOOLEAN_PROPERTY,
   event_id: STRING_PROPERTY,
   install_hash: STRING_PROPERTY,
-  machine_hash: STRING_PROPERTY,
   package_version: STRING_PROPERTY,
   platform: enumProperty(["omo-senpi"] as const),
   product_name: enumProperty(["omo-native"] as const),
@@ -172,11 +230,17 @@ export const OMO_NATIVE_COMMON_PROPERTY_SCHEMAS = Object.freeze({
   surface: enumProperty(["cli", "desktop"] as const),
 } as const)
 
-export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(Object.fromEntries(
-  Object.entries(OMO_NATIVE_EVENT_SCHEMAS).map(([eventName, properties]) => [
-    eventName,
-    Object.freeze(Object.keys(properties)),
-  ]),
-) as { readonly [EventName in keyof typeof OMO_NATIVE_EVENT_SCHEMAS]: readonly (keyof typeof OMO_NATIVE_EVENT_SCHEMAS[EventName] & string)[] })
+export const OMO_NATIVE_PROPERTY_ALLOWLISTS = Object.freeze(
+  Object.fromEntries(
+    Object.entries(OMO_NATIVE_EVENT_SCHEMAS).map(([eventName, properties]) => [
+      eventName,
+      Object.freeze(Object.keys(properties)),
+    ]),
+  ) as {
+    readonly [
+      EventName in keyof typeof OMO_NATIVE_EVENT_SCHEMAS
+    ]: readonly (keyof (typeof OMO_NATIVE_EVENT_SCHEMAS)[EventName] & string)[]
+  },
+)
 
 export type OmoNativeEventName = keyof typeof OMO_NATIVE_EVENT_SCHEMAS

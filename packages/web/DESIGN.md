@@ -44,13 +44,14 @@ An operations ledger read at night. The whole site is one framed sheet of ink ru
 | Line / strong | `--line-strong` | `rgba(255,255,255,0.12)` | Focused cell, active tab underline base                                                                               |
 | Line          | `--line`        | `rgba(255,255,255,0.08)` | Frame, rows, dividers (the default hairline)                                                                          |
 | Line / faint  | `--line-faint`  | `rgba(255,255,255,0.04)` | Dot grid, quiet cell separators                                                                                       |
+| Line / input  | `--line-input`  | `rgba(255,255,255,0.40)` | Form control edge (`--input`), 3.8:1 on every ink: the WCAG 1.4.11 floor for an input boundary                        |
 | Accent        | `--accent`      | `#00d4ff`                | Prompt glyph, live wires, active state, links on hover, primary CTA fill                                              |
 | Accent / hot  | `--accent-hot`  | `#e6fdff`                | White-hot node core, cursor block, verified flash                                                                     |
 | Accent / dim  | `--accent-dim`  | `#0ea5c4`                | Primary CTA hover fill, edge idle color in the 3D scene                                                               |
 | Accent / 4    | `--accent-4`    | `rgba(0,212,255,0.04)`   | Row hover tint                                                                                                        |
 | Accent / 8    | `--accent-8`    | `rgba(0,212,255,0.08)`   | Selected tile fill, glass chip fill                                                                                   |
 | Accent / 16   | `--accent-16`   | `rgba(0,212,255,0.16)`   | Node halo, glow wash center                                                                                           |
-| Accent / 32   | `--accent-32`   | `rgba(0,212,255,0.32)`   | 1px inset selection ring, focus ring                                                                                  |
+| Accent / 32   | `--accent-32`   | `rgba(0,212,255,0.32)`   | Live chip border, secondary button hover border; never a focus or selection indicator (2.0:1 on ink)                  |
 | Status / ok   | `--status-ok`   | `#10b981`                | Done dots, health                                                                                                     |
 | Status / busy | `--status-busy` | `#f5c451`                | Working dots (terminal, team grid)                                                                                    |
 | Status / err  | `--status-err`  | `#ef4444`                | Blocked / failed dots only                                                                                            |
@@ -144,17 +145,17 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### Nav (`components/nav-header.tsx`)
 
-- Sticky (`sticky-header`), height 60px, `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
+- Sticky (`sticky-header`), height `--nav-h` (60px; the document `scroll-padding-top` keeps focused controls clear of it), `--ink-0/72%` + `backdrop-filter: blur(12px)` after `scrollY > 24px` (transparent before), bottom hairline `--line`.
 - Left: OmO mark (24px SVG from `.github/assets/omo-icon-light.svg` re-exported to `public/brand/omo-mark.svg`) + wordmark `OmO` (Geist 500 15px, -0.02em). The brand is `OmO` on every surface (nav, footer, titles, OG, JSON-LD); the old long-form name is never rendered.
 - Center/right: links `Features · Docs · Manifesto` in `--text-mid` mono 12px uppercase 0.12em; hover → `--text-hi` with a 1px underline growing `scaleX(0→1)` 320ms.
 - Right: GitHub chip (mono `★ 68.8k` live count, `--ink-1` fill, `--line` border) and primary button `Install` (sm size).
 - Mobile: hamburger 44×44; sheet `--ink-3` with `--line` top rule; items 44px tall.
-- States: default, scrolled, open (mobile), link hover/focus-visible (2px `--accent-32` outline offset 2px), active route (underline visible at scaleX(1), `--text-hi`).
+- States: default, scrolled, open (mobile), link hover/focus-visible (`focus-ring`, §8), active route (underline visible at scaleX(1), `--text-hi`).
 
 ### Button (`components/ui/button.tsx`)
 
 - Variants: `primary` (fill `--accent`, text `#09090b`, hover fill `--accent-dim`, active `translateY(1px)`), `secondary` (fill `--ink-1`, border `--line-strong`, text `--text-hi`, hover border `--accent-32` + text `--accent`), `ghost` (text `--text-mid`, hover `--text-hi`), `link` (mono uppercase 12px with arrow, underline scaleX on hover).
-- Sizes: sm `h-9 px-3 text-sm`, md `h-11 px-5 text-sm`, lg `h-12 px-6 text-base`. Radius 2px. Focus-visible: 2px `--accent-32` outline, offset 2px. Disabled: opacity .5, no pointer.
+- Sizes: sm `h-9 px-3 text-sm`, md `h-11 px-5 text-sm`, lg `h-12 px-6 text-base`. Radius 2px. Focus-visible: `focus-ring` (§8). Disabled: opacity .5, no pointer.
 - Transitions: color/background/border 150ms `cubic-bezier(0.4,0,0.2,1)`; transform 150ms.
 
 ### CommandBar (`components/landing/install-command.tsx`)
@@ -192,7 +193,7 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 ### LedgerRow (`components/ledger/ledger-row.tsx`)
 
-- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-faint`. Used by the `/design` showcase; the landing page (v3) no longer renders ledger rows.
+- Grid `[minmax(0,130px)] 1fr 1fr` at ≥ lg (index / explanation / evidence); `[54px] 1fr` below with evidence stacked under the explanation. Row padding 24px 0, hairline between rows, `--accent-4` fill on hover, index in Numeral style `--text-lo`. Used by the `/design` showcase; the landing page (v3) no longer renders ledger rows.
 - States: default, hover, focus-within (index turns `--accent`), `data-active` (left 2px `--accent` rule) when linked from the graph.
 
 ### BentoCell (`components/ledger/bento-cell.tsx`)
@@ -209,13 +210,19 @@ All primitives live in `components/ui/*` (existing shadcn shells re-tokened) or 
 
 - `display: grid; grid-auto-flow: column; grid-auto-columns: minmax(280px, 34%); overflow-x: auto; scroll-snap-type: x mandatory;` the reel owns the scroll; edge fade masks 32px; keyboard: cells are focusable, arrow keys scroll by one cell. Used by Reviews.
 
+### Tooltip (`components/ui/tooltip.tsx`)
+
+- shadcn anatomy: one focusable trigger (Radix `Slot`, gains `aria-describedby`) and a `role="tooltip"` label, mono Meta text on `--ink-3` with a `--line` border. Toolbar icon controls (the DAG camera buttons) carry one; `title=` is never used. The mobile menu toggle is the exception: its Menu/X icon is named by its `aria-label` and its state by `aria-expanded`.
+- Shows on hover and on focus; WCAG 1.4.13: hoverable (an 8px transparent bridge between trigger and label keeps it open while the pointer crosses), persistent, and dismissed by Escape until both pointer and focus leave.
+- `side` is `left` (default) or `top`. No portal: the label renders inside the trigger's container, so pick the side that stays inside a clipping ancestor.
+
 ### Chip (`components/ui/badge.tsx` → `Chip`)
 
 - Mono Meta text, `--ink-2` fill, `--line` border, 2px radius, 24px tall; `accent` variant fills `--accent-8` with `--accent` text (live/selected only).
 
 ### DocsShell (`components/docs/docs-shell.tsx`)
 
-- `fixed-sidenav-shell` as in §4; sidebar: search input (Chip-styled, focus ring), section list with active item marked by a 2px `--accent` left rule; main: prose with `--line` ruled H2s, code blocks `--code-bg` with `overflow-x: auto`.
+- `fixed-sidenav-shell` as in §4; sidebar: search input (`--input` edge at 3.8:1, a visually hidden label, focus ring) above a section list in a `<nav>` with its own name, section list with active item marked by a 2px `--accent` left rule; main: prose with `--line` ruled H2s, code blocks `--code-bg` with `overflow-x: auto`.
 
 ### Footer (`components/footer.tsx`)
 
@@ -277,8 +284,9 @@ Grain is not used (omp.sh's canvas grain and factory's texture PNG would fight t
 
 - `<html lang>` per locale; unique `<title>` per route; skip link to `#main-content`; landmarks `header/nav/main/footer/section[aria-labelledby]`.
 - Contrast: `--text-hi` on `--ink-0` 17.8:1, `--text-mid` 11.5:1, `--text-lo` 5.9:1 (AA for 11px+ mono uppercase is met because eyebrows are ≥ 11px 500 with tracking; body never uses `--text-faint`), `--accent` on `--ink-0` 11.4:1, primary button `#09090b` on `--accent` 11.4:1.
-- Focus-visible ring on every interactive element (2px `--accent-32`, offset 2px); the canvas wrapper is focusable with arrow-key orbit and is `aria-hidden` for AT while the poster `<img alt>` describes the scene.
+- Focus-visible ring on every interactive element: the `focus-ring` utility, a 2px solid `--ring` outline offset 2px (`--ring` = `--accent`, 11.2:1 on `--ink-0`, at least 3:1 on every ink per `lib/focus-ring.test.ts`); `focus-ring-inset` draws it inside the box where a container clips (scroll viewports, `overflow-hidden` frames, full-width rows), and a base `:focus-visible` rule gives the same ring to anything without a class. Composite focus-within and selection cues use `--ring` / `--accent`, never `--accent-32`; the canvas wrapper is focusable with arrow-key orbit and is `aria-hidden` for AT while the poster `<img alt>` describes the scene.
 - Touch targets ≥ 44px on mobile (nav items, COPY cell, bento cells are ≥ 44px tall).
+- Escape closes the open mobile nav sheet; focus returns to the toggle only when it was inside the sheet (or on the toggle), never pulled from elsewhere. Toolbar icon controls carry a `Tooltip` (§5), never `title=`; the mobile menu toggle is named by `aria-label` and `aria-expanded`.
 - Reduced motion honored everywhere (§6). Reduced data (`navigator.connection.saveData`) and low memory skip the 3D chunk (§9).
 - Reel and docs main announce as scroll regions (`role="region"` + `aria-label`, `tabindex=0`).
 - Personas: terminal power user (keyboard-first, copyable commands, dense reference), mobile evaluator (no horizontal overflow on `/`, `/manifesto`, `/docs` at 375), CJK reader (heading tracking reset, keep-all), motion-sensitive user (poster hero, static terminal).
@@ -316,7 +324,7 @@ The GitHub one-liner calls the user "the master of graph engineering". The focal
 
 ### Section order (`app/_components/landing-page.tsx`)
 
-`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta` → `dori-teaser` (§16). Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
+`hero` → `proof` → `secret` → `ultrawork` → `multi-model` → `mass-ulw` → `kibitzer` → `skills` → `crafted` → `platforms` → `reviews` → `cta`. Editions, the agent roster, profiles, orchestration, team mode and the principles ledger were removed from `/`; their substance lives in docs and inside `crafted`. No section carries a numeral label.
 
 - **secret**: the fold. The body alone owns the word sweep, from its top at 80vh until its bottom reaches 50vh. Every word then remains fully lit for `--lit-read-hold: 18vh` of additional scroll with the follow-up fully hidden. The follow-up has an independent opacity/rise animation over `--lit-follow-fade: 22vh`, starting only after both the reading hold and its untransformed top crossing the viewport midpoint. `--lit-follow-gap: 1.25em` preserves the existing prose paragraph gap (40px mobile, about 64px desktop); `--lit-follow-rise: var(--space-6)` preserves the 24px rise. No extra layout space or time-based delay is added. Anchoring completion to the body's bottom, not the combined block or its containment range, keeps taller Korean mobile paragraphs correct and the follow-up on-screen while appearing.
 - The secret body preserves authored newline boundaries with `white-space: pre-line`. English uses three short sentences, one per line on desktop; each sentence may wrap naturally on mobile. Whitespace stays outside animated word spans, preserving both readable spacing and the continuous sweep.
@@ -490,28 +498,3 @@ plus Japanese/Chinese smoke. Check each changed panel's own scroll width,
 not just the root's clipped overflow. Exercise Copy, navigation, DAG controls,
 normal progress/memory and reduced-motion states. Keep frame and nudge
 containment visible in the evidence. No new accessibility debt is accepted.
-
-## 16. Dori teaser (2026-10-12)
-
-The last section of the landing page, under the CTA band and above the footer: a glimpse of
-Dori, the 24/7 agent engineer from the same makers (sisyphuslabs.ai). It is a spoiler, not a
-pitch, and it must read as a different product.
-
-- Surface: `ink-0` with a top `--line` hairline; the CTA band's bottom hairline stays above it.
-  Copy column padding `pt-16 pb-10 lg:py-24`; the art box carries no padding so it clips at the section's bottom edge.
-- Layout: Frame → grid `minmax(0,1fr) minmax(0,20rem)` at ≥ lg (copy left, art right,
-  `items-end`); stacked below lg with the art centred under the copy.
-- Copy: Eyebrow (`rule`, `busy` dot — it pulses because someone is literally working) →
-  Title → Lead → one `link` Button to `https://sisyphuslabs.ai` (`target=_blank`,
-  `rel="noopener noreferrer"`, no UTM, like every other outbound link). All strings live in
-  `messages/*.json` under `landing.dori`.
-- Art: `public/images/dori-mascot.png` (480×480, the sisyphuslabs.ai mascot; no new character
-  art). It sits in a `.dori-peek-clip` box (`h-40 w-56`, `lg:h-56 lg:w-80`) that clips at its
-  bottom edge and fades out over the last third (the reel's edge mask, vertical). The image rests at
-  `translate3d(0, 26%, 0)` and `opacity: .8`, so only the head and the rock show.
-- Motion: hovering or focusing the link (`:has(a:hover)` / `:has(a:focus-visible)`) lifts the
-  art to `14%` and full opacity over `--dur-reveal` / `--ease-out-quart`. Transform and
-  opacity only. Reduced motion: no transition; the resting glimpse is the final state. Browsers
-  without `:has()` keep the resting glimpse.
-- Share card: the link target serves its own `og:image` (`/og-dori.png`, 1200×630). omo.dev
-  has no per-section share links, so no second OG image is added here.

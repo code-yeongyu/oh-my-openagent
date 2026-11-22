@@ -6,7 +6,9 @@ const OTHER_PID = 456
 
 function deferred<T>() {
   let resolve!: (value: T) => void
-  const promise = new Promise<T>((settle) => { resolve = settle })
+  const promise = new Promise<T>((settle) => {
+    resolve = settle
+  })
   return { promise, resolve }
 }
 
@@ -21,9 +23,7 @@ describe("process start identity cache", () => {
     const first = read(OWN_PID)
     const second = read(OWN_PID)
     answer.resolve("win32-creation-date:original")
-    expect(await Promise.all([first, second])).toEqual([
-      "win32-creation-date:original", "win32-creation-date:original",
-    ])
+    expect(await Promise.all([first, second])).toEqual(["win32-creation-date:original", "win32-creation-date:original"])
     expect(await read(OWN_PID)).toBe("win32-creation-date:original")
     expect(calls).toEqual([OWN_PID])
   })

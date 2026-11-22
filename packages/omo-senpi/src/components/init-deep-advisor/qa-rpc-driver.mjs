@@ -15,11 +15,11 @@ import {
   writeSnapshot,
 } from "./qa-rpc-support.mjs"
 
-const FROZEN_PLUGIN = "/Volumes/mengmotaStorage/local-workspaces/omo-wt/feat-senpi-onboarding-init-deep-advisor/packages/omo-senpi/plugin/extensions/omo.js"
 const mode = process.argv[2]
 if (mode !== "e" && mode !== "f") throw new Error("usage: qa-rpc-driver.mjs <e|f>")
-if (process.env.SENPI_BIN !== FROZEN_PLUGIN) throw new Error(`SENPI_BIN must be the frozen plugin path: ${FROZEN_PLUGIN}`)
-if (!existsSync(FROZEN_PLUGIN)) throw new Error(`frozen plugin does not exist: ${FROZEN_PLUGIN}`)
+const FROZEN_PLUGIN = process.env.SENPI_BIN
+if (!FROZEN_PLUGIN) throw new Error("SENPI_BIN must be set to the built plugin (packages/omo-senpi/plugin/extensions/omo.js); qa-sandbox.sh sets it")
+if (!existsSync(FROZEN_PLUGIN)) throw new Error(`SENPI_BIN plugin does not exist: ${FROZEN_PLUGIN}`)
 
 const result = mode === "e" ? await scenarioE() : await scenarioF()
 const output = `${JSON.stringify(result, null, 2)}\n`

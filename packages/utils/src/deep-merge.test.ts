@@ -39,12 +39,7 @@ describe("deepMerge", () => {
     test.each([
       ["merges two simple objects", { a: 1 }, { b: 2 }, { a: 1, b: 2 }],
       ["override value takes precedence", { a: 1 }, { a: 2 }, { a: 2 }],
-      [
-        "deeply merges nested objects",
-        { a: { b: 1, c: 2 } },
-        { a: { b: 10 } },
-        { a: { b: 10, c: 2 } },
-      ],
+      ["deeply merges nested objects", { a: { b: 1, c: 2 } }, { a: { b: 10 } }, { a: { b: 10, c: 2 } }],
       [
         "handles multiple levels of nesting",
         { a: { b: { c: { d: 1 } } } },
@@ -65,13 +60,16 @@ describe("deepMerge", () => {
       ["returns undefined when both are undefined", undefined, undefined, undefined],
       ["returns override when base is undefined", undefined, { a: 1 }, { a: 1 }],
       ["returns base when override is undefined", { a: 1 }, undefined, { a: 1 }],
-    ] satisfies Array<[string, AnyObject | undefined, AnyObject | undefined, AnyObject | undefined]>)("%s", (_label, base, override, expected) => {
-      // when
-      const result = deepMerge<AnyObject>(base, override)
+    ] satisfies Array<[string, AnyObject | undefined, AnyObject | undefined, AnyObject | undefined]>)(
+      "%s",
+      (_label, base, override, expected) => {
+        // when
+        const result = deepMerge<AnyObject>(base, override)
 
-      // then
-      expect(result).toEqual(expected)
-    })
+        // then
+        expect(result).toEqual(expected)
+      },
+    )
 
     test("preserves base value when override value is undefined", () => {
       // given

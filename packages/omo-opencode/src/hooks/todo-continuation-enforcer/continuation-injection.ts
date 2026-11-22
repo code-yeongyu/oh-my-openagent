@@ -19,18 +19,10 @@ import {
 } from "../../features/hook-message-injector"
 import { log } from "../../shared/logger"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
-import {
-  getAgentConfigKey,
-  normalizeAgentForPrompt,
-} from "../../shared/agent-display-names"
+import { getAgentConfigKey, normalizeAgentForPrompt } from "../../shared/agent-display-names"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
 
-import {
-  CONTINUATION_PROMPT,
-  CONTINUATION_COOLDOWN_MS,
-  DEFAULT_SKIP_AGENTS,
-  HOOK_NAME,
-} from "./constants"
+import { CONTINUATION_PROMPT, CONTINUATION_COOLDOWN_MS, DEFAULT_SKIP_AGENTS, HOOK_NAME } from "./constants"
 import { isCompactionGuardActive } from "./compaction-guard"
 import { getMessageDir } from "./message-directory"
 import { isTokenLimitError } from "./token-limit-detection"
@@ -89,8 +81,10 @@ export async function injectContinuation(args: {
   }
 
   const hasRunningBgTasks = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
-      || backgroundManager.hasPendingParentWake?.(sessionID) === true
+    ? backgroundManager
+        .getTasksByParentSession(sessionID)
+        .some((task: { status: string }) => task.status === "running" || task.status === "pending") ||
+      backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasRunningBgTasks) {
@@ -133,9 +127,7 @@ export async function injectContinuation(args: {
         ? {
             providerID: previousMessage.model.providerID,
             modelID: previousMessage.model.modelID,
-            ...(previousMessage.model.variant
-              ? { variant: previousMessage.model.variant }
-              : {}),
+            ...(previousMessage.model.variant ? { variant: previousMessage.model.variant } : {}),
           }
         : undefined)
     tools = tools ?? previousMessage?.tools
@@ -143,11 +135,12 @@ export async function injectContinuation(args: {
 
   const agentConfigKey = getAgentConfigKey(agentName ?? "")
   const registeredAgentName = resolveRegisteredAgentName(agentName)
-  const promptAgent = registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
-    ? registeredAgentName
-    : normalizeAgentForPrompt(agentName)
+  const promptAgent =
+    registeredAgentName !== undefined && registeredAgentName !== agentConfigKey
+      ? registeredAgentName
+      : normalizeAgentForPrompt(agentName)
 
-  if (promptAgent && skipAgents.some(s => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
+  if (promptAgent && skipAgents.some((s) => getAgentConfigKey(s) === getAgentConfigKey(promptAgent))) {
     log(`[${HOOK_NAME}] Skipped: agent in skipAgents list`, { sessionID, agent: agentName })
     return
   }
@@ -175,8 +168,10 @@ Remaining tasks:
 ${todoList}`
 
   const hasBackgroundWorkBeforeDispatch = backgroundManager
-    ? backgroundManager.getTasksByParentSession(sessionID).some((task: { status: string }) => task.status === "running" || task.status === "pending")
-      || backgroundManager.hasPendingParentWake?.(sessionID) === true
+    ? backgroundManager
+        .getTasksByParentSession(sessionID)
+        .some((task: { status: string }) => task.status === "running" || task.status === "pending") ||
+      backgroundManager.hasPendingParentWake?.(sessionID) === true
     : false
 
   if (hasBackgroundWorkBeforeDispatch) {
@@ -212,9 +207,7 @@ ${todoList}`
 
     const inheritedTools = resolveInheritedPromptTools(sessionID, tools)
 
-    const launchModel = model
-      ? { providerID: model.providerID, modelID: model.modelID }
-      : undefined
+    const launchModel = model ? { providerID: model.providerID, modelID: model.modelID } : undefined
     const launchVariant = model?.variant
 
     const promptResult = await dispatchInternalPrompt({
@@ -277,15 +270,16 @@ ${todoList}`
       injectionState.lastInjectedAt = Date.now()
       injectionState.consecutiveFailures = (injectionState.consecutiveFailures ?? 0) + 1
 
-      const errorObj = error instanceof Error
-        ? { name: error.name, message: error.message }
-        : { message: String(error) }
+      const errorObj =
+        error instanceof Error ? { name: error.name, message: error.message } : { message: String(error) }
       if (isTokenLimitError(errorObj)) {
         injectionState.tokenLimitDetected = true
         log(`[${HOOK_NAME}] Token limit error detected during injection, stopping continuation`, { sessionID })
       } else if (isUnrecoverableRequestError(error)) {
         injectionState.unrecoverableErrorDetected = true
-        log(`[${HOOK_NAME}] Non-retryable request error detected during injection, stopping continuation`, { sessionID })
+        log(`[${HOOK_NAME}] Non-retryable request error detected during injection, stopping continuation`, {
+          sessionID,
+        })
       }
     }
   }

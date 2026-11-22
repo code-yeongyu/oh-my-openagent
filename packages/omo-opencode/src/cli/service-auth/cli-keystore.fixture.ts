@@ -1,3 +1,6 @@
+import { chmodSync, mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+
 const fakeStoreUrl = process.env.OMO_TEST_KEYSTORE_URL
 if (!fakeStoreUrl?.startsWith("http://127.0.0.1:")) throw new Error("local fake keystore required")
 const get = async () => {
@@ -13,24 +16,44 @@ const remove = async () => {
   await fetch(fakeStoreUrl, { method: "DELETE", proxy: "" })
   return true
 }
-Object.defineProperty(Bun, "secrets", { value: { get, set, delete: remove } })
-Object.assign(globalThis, { [Symbol.for("omo.test.serviceAccountsOpen")]: true })
+// Marked as injected: the sign-in store must treat it as a stand-in, never as the real macOS store (store-binding.ts).
+Object.defineProperty(Bun, "secrets", {
+  value: { get, set, delete: remove, [Symbol.for("omo.test.injectedSecrets")]: true },
+})
+// The fake keystore stands in for an unlocked keyring; on Linux the CLI asks the Secret Service over D-Bus
+// whether the default collection is locked before any secret call, so answer that probe the same way.
+if (process.platform === "linux") {
+  if (!process.env.HOME) throw new Error("a temporary HOME is required")
+  const bin = join(process.env.HOME, ".fake-gdbus")
+  mkdirSync(bin, { recursive: true })
+  writeFileSync(join(bin, "gdbus"), "#!/bin/sh\necho '(<false>,)'\n")
+  chmodSync(join(bin, "gdbus"), 0o755)
+  process.env.PATH = `${bin}:${process.env.PATH ?? ""}`
+}
+Object.assign(globalThis, {
+  [Symbol.for("omo.test.serviceAccountsOpen")]: true,
+  // A test login must not install or link a device service on the host running the suite (omo#13627).
+  [Symbol.for("omo.test.skipRemoteLoginSetup")]: true,
+})
 
 const failure = process.env.OMO_TEST_FETCH_FAILURE
 if (failure === "offline" || failure === "lost-response" || failure === "timeout") {
   const original = globalThis.fetch
-  const failing: typeof fetch = Object.assign(async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
-    const url = input instanceof Request ? input.url : String(input)
-    if (url.endsWith("/v1/session/refresh")) {
-      if (failure !== "offline") {
-        const response = await original(input, init)
-        await response.arrayBuffer()
-        if (failure === "timeout") throw new DOMException("synthetic timeout after send", "TimeoutError")
-        throw Object.assign(new Error("synthetic response loss"), { code: "ECONNRESET" })
+  const failing: typeof fetch = Object.assign(
+    async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      const url = input instanceof Request ? input.url : String(input)
+      if (url.endsWith("/v1/session/refresh")) {
+        if (failure !== "offline") {
+          const response = await original(input, init)
+          await response.arrayBuffer()
+          if (failure === "timeout") throw new DOMException("synthetic timeout after send", "TimeoutError")
+          throw Object.assign(new Error("synthetic response loss"), { code: "ECONNRESET" })
+        }
+        throw Object.assign(new Error((await get()) ?? "offline"), { code: "ECONNREFUSED" })
       }
-      throw Object.assign(new Error(await get() ?? "offline"), { code: "ECONNREFUSED" })
-    }
-    return original(input, init)
-  }, { preconnect: original.preconnect })
+      return original(input, init)
+    },
+    { preconnect: original.preconnect },
+  )
   globalThis.fetch = failing
 }

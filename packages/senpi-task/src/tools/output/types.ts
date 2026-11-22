@@ -2,7 +2,15 @@ import type { AgentToolResult } from "@code-yeongyu/senpi"
 import type { IsolationDetails } from "../../isolation/details"
 
 import type { TaskManager } from "../../manager"
-import type { StartQueued, EffectiveModelRecord, ResolvedModelRecord, ResidencyState, TaskRunStats, TaskStatus, AwaitingInputReason } from "../../state"
+import type {
+  StartQueued,
+  EffectiveModelRecord,
+  ResolvedModelRecord,
+  ResidencyState,
+  TaskRunStats,
+  TaskStatus,
+  AwaitingInputReason,
+} from "../../state"
 import type { CallerSessionResolver } from "../control"
 
 export type OutputManager = Pick<TaskManager, "get" | "list" | "concurrency">
@@ -65,6 +73,7 @@ export type TaskSnapshot = {
   readonly pid?: number
   readonly child_session_id?: string
   readonly last_seen_at?: string
+  readonly host_liveness?: import("../../state/host-liveness").HostLivenessStatus
   readonly final_response?: string
   readonly error_message?: string
   readonly run_stats?: TaskRunStats
@@ -74,6 +83,12 @@ export type TaskSnapshot = {
 
 export type TaskOutputDetails =
   | { readonly kind: "status"; readonly snapshot: TaskSnapshot }
+  | {
+      readonly kind: "no_progress"
+      readonly task_id: string
+      readonly status: TaskStatus
+      readonly reason: string
+    }
   | {
       readonly kind: "transcript"
       readonly mode: "tail" | "full"

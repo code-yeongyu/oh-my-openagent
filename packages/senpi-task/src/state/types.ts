@@ -12,7 +12,7 @@ export type TaskIsolationSpec = {
 }
 
 export type IsolationMergeKind =
-  | "applied" | "already-applied" | "not-applied" | "branch-merged" | "branch-merge-failed" | "no-changes" | "retained"
+  "applied" | "already-applied" | "not-applied" | "branch-merged" | "branch-merge-failed" | "no-changes" | "retained"
 
 export type IsolationMergeResult = {
   readonly kind: IsolationMergeKind
@@ -37,6 +37,7 @@ export type IsolationRecord = TaskIsolationSpec & {
 export const TASK_STATUSES = [
   "pending",
   "running",
+  "paused",
   "completed",
   "error",
   "cancelled",
@@ -46,13 +47,7 @@ export const TASK_STATUSES = [
 
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 
-export const RESIDENCY_STATES = [
-  "resident",
-  "evicted",
-  "disposed",
-  "persisted_only",
-  "rpc_detached",
-] as const
+export const RESIDENCY_STATES = ["resident", "evicted", "disposed", "persisted_only", "rpc_detached"] as const
 
 export type ResidencyState = (typeof RESIDENCY_STATES)[number]
 export type Messageability = "steer" | "revive" | "not-continuable"
@@ -112,6 +107,9 @@ export const SUSPENSION_REASONS = [
   // The session that owns the child was resumed, but its reconcile could not revive the child yet;
   // `revival_deferred_reason` names the reconcile's deferral (omo#9498).
   "revival_deferred",
+  // The owning session QUIT while the child was parked: it stays "running" on purpose and nothing
+  // revives it until that session resumes (senpi#3493).
+  "session_quit",
   "store_index_unavailable",
 ] as const
 
@@ -120,10 +118,7 @@ export type SuspensionReason = (typeof SUSPENSION_REASONS)[number]
 // Why a task reattached onto a session that cannot continue on its own is waiting (senpi#3266):
 // the resumed turn ENDED on an abort, or it never answered at all. `awaiting_input.since` is the
 // reattach timestamp; the flag clears on a successful delivery, a plain reattach, or terminal.
-export const AWAITING_INPUT_REASONS = [
-  "resumed_turn_aborted",
-  "resumed_turn_unfinished",
-] as const
+export const AWAITING_INPUT_REASONS = ["resumed_turn_aborted", "resumed_turn_unfinished"] as const
 
 export type AwaitingInputReason = (typeof AWAITING_INPUT_REASONS)[number]
 
@@ -156,20 +151,19 @@ export type ResolvedModelRecord = {
   readonly source: ResolvedModelSource
 }
 
-export {
-  COST_REPORT_STATUSES,
-  DURATION_SOURCE_STATUSES,
-  TOKEN_COVERAGE_STATUSES,
-} from "./run-stats-types"
+export { COST_REPORT_STATUSES, DURATION_SOURCE_STATUSES, TOKEN_COVERAGE_STATUSES } from "./run-stats-types"
 export type {
   CostReportStatus,
   DurationSourceStatus,
   TaskRunStats,
+  LiveRunStats,
   TokenCoverageStatus,
 } from "./run-stats-types"
-export { isSpawnSpecV1 } from "./record-types"
+export { isSpawnSpecV1, MODEL_REFUSAL_REASONS } from "./record-types"
 export type {
   LegacyProcessSpawnSpec,
+  ModelRefusal,
+  ModelRefusalReason,
   PendingSteeringEntry,
   ReviveDeliveryUncertainty,
   SpawnSpecV1,
@@ -180,8 +174,4 @@ export type {
   TaskRecordInput,
   TaskSpawnSpec,
 } from "./record-types"
-export type {
-  TaskTransition,
-  TaskTransitionAudit,
-  TaskTransitionResult,
-} from "./transition-types"
+export type { TaskTransition, TaskTransitionAudit, TaskTransitionResult } from "./transition-types"

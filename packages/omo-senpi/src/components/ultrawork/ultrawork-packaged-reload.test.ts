@@ -7,44 +7,69 @@ import { basename, join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { SENPI_ULTRAWORK_DIRECTIVE } from "./generated-directive"
-import { cleanUpReloadRun, ownsHostSocket, type ReloadHost } from "./packaged-reload-cleanup.test-support"
+import {
+  cleanUpReloadRun,
+  ownsHostSocket,
+  RELOAD_CLEANUP_HOOK_TIMEOUT_MS,
+  type ReloadHost,
+  reloadRootParent,
+} from "./packaged-reload-cleanup.test-support"
 import { dispatchInput, sessionEventCtx } from "./ultrawork.test-support"
 
 describe("omo-senpi ultrawork packaged reload", () => {
   it("#given the packaged extension reloaded uncached #when the same session triggers on the second load #then injects the reminder not the full directive", async () => {
     // The full plugin also prewarms a real task host. Own its short socket/temp root,
     // observe each warmup's directory removal, and retain its spawn handle (#9766).
-    const root = mkdtempSync(process.platform === "win32" ? join(tmpdir(), "omo-ulw-reload-") : "/tmp/omo-ulw-reload-")
+    const root = mkdtempSync(join(reloadRootParent(), "omo-ulw-reload-"))
     const hosts: ReloadHost[] = []
     const sessions: FakeExtensionAPI[] = []
-    const pinned = { TMPDIR: root, TEMP: root, TMP: root, OMO_CODING_AGENT_DIR: join(root, "agent"), OMO_RPC_SHARD_ROOT: join(root, "shards") }
+    const pinned = {
+      TMPDIR: root,
+      TEMP: root,
+      TMP: root,
+      OMO_CODING_AGENT_DIR: join(root, "agent"),
+      OMO_RPC_SHARD_ROOT: join(root, "shards"),
+    }
     const previous = Object.fromEntries(Object.keys(pinned).map((name) => [name, process.env[name]]))
-    const restores: Array<() => void> = [() => {
-      for (const [name, value] of Object.entries(previous)) {
-        if (value === undefined) delete process.env[name]
-        else process.env[name] = value
-      }
-    }]
-    onTestFinished(() => cleanUpReloadRun({
-      root,
-      shutdowns: sessions.map((pi) => () => pi.dispatch("session_shutdown", {})),
-      hosts,
-      restore: () => { for (const restore of restores) restore() },
-    }))
+    const restores: Array<() => void> = [
+      () => {
+        for (const [name, value] of Object.entries(previous)) {
+          if (value === undefined) delete process.env[name]
+          else process.env[name] = value
+        }
+      },
+    ]
+    onTestFinished(
+      () =>
+        cleanUpReloadRun({
+          root,
+          shutdowns: sessions.map((pi) => () => pi.dispatch("session_shutdown", {})),
+          hosts,
+          restore: () => {
+            for (const restore of restores) restore()
+          },
+        }),
+      { timeout: RELOAD_CLEANUP_HOOK_TIMEOUT_MS },
+    )
     Object.assign(process.env, pinned)
+    // The warmups below are observed by their directory, which warmTaskHost creates under os.tmpdir(). If an earlier
+    // file detached process.env, the pin never reaches os.tmpdir() and the wait would hang until the body timeout (#10846).
+    expect(tmpdir()).toBe(root)
     const spawn = childProcess.spawn
     const spawnSpy = spyOn(childProcess, "spawn")
     restores.push(() => spawnSpy.mockRestore())
-    spawnSpy.mockImplementation(new Proxy(spawn, {
-      apply(target, thisArg, args) {
-        const child: childProcess.ChildProcess = Reflect.apply(target, thisArg, args)
-        if (ownsHostSocket(args[1], root)) {
-          const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
-          hosts.push({ child, exited })
-        }
-        return child
-      },
-    }))
+    spawnSpy.mockImplementation(
+      new Proxy(spawn, {
+        apply(target, thisArg, args) {
+          const child: childProcess.ChildProcess = Reflect.apply(target, thisArg, args)
+          if (ownsHostSocket(args[1], root)) {
+            const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+            hosts.push({ child, exited })
+          }
+          return child
+        },
+      }),
+    )
     const warmups = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
     let completedWarmups = 0
     const remove = fs.rm
@@ -61,18 +86,24 @@ describe("omo-senpi ultrawork packaged reload", () => {
     // A query-suffixed relative import reproduces Senpi's uncached Jiti importer:
     // Bun keys its module cache on the full specifier (a file URL drops the query).
     const loadPackagedExtension = async (reload: number): Promise<(pi: unknown) => Promise<void>> => {
-      const module = (await import(`../../../plugin/extensions/omo.js?reload=${reload}`)) as { default: (pi: unknown) => Promise<void> }
+      const module = (await import(`../../../plugin/extensions/omo.js?reload=${reload}`)) as {
+        default: (pi: unknown) => Promise<void>
+      }
       return module.default
     }
     const ctx = { ...sessionEventCtx("session-reload"), cwd: root }
     const piBeforeReload = new FakeExtensionAPI()
     piBeforeReload.cwd = root
     sessions.push(piBeforeReload)
-    await (await loadPackagedExtension(1))(piBeforeReload)
+    await (
+      await loadPackagedExtension(1)
+    )(piBeforeReload)
     await piBeforeReload.dispatch("session_start", {}, ctx)
     await dispatchInput(piBeforeReload, "ulw first pass")
     if (process.platform !== "win32") await warmups[0]?.promise
-    const firstInjection = piBeforeReload.messages.find((call) => call.message["customType"] === "omo-ultrawork:directive")
+    const firstInjection = piBeforeReload.messages.find(
+      (call) => call.message["customType"] === "omo-ultrawork:directive",
+    )
     expect(firstInjection?.message["content"]).toBe(SENPI_ULTRAWORK_DIRECTIVE)
 
     // Reload the entire packaged extension for the same session, whose transcript
@@ -80,7 +111,9 @@ describe("omo-senpi ultrawork packaged reload", () => {
     const piAfterReload = new FakeExtensionAPI()
     piAfterReload.cwd = root
     sessions.push(piAfterReload)
-    await (await loadPackagedExtension(2))(piAfterReload)
+    await (
+      await loadPackagedExtension(2)
+    )(piAfterReload)
     await piAfterReload.dispatch("session_start", {}, ctx)
     await dispatchInput(piAfterReload, "ulw keep going")
     if (process.platform !== "win32") await warmups[1]?.promise

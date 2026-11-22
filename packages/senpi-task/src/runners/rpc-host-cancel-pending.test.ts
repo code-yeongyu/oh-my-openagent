@@ -55,7 +55,9 @@ describe("a pending cancel always ends the run", () => {
     // then
     expect(failed).toBe(true)
     expect(stopped.status).toBe("cancelled")
-    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe("host child parent-a #1")
+    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe(
+      "host child parent-a #1",
+    )
     expect(recordAt(parent, 1).status).toBe("running")
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
   })
@@ -73,7 +75,9 @@ describe("a pending cancel always ends the run", () => {
     // when - every remaining reopen attempt is refused
     world.host.failOpen({ code: "open_failed", detail: "the session store is unavailable" })
     world.host.allowReply("open_session")
-    const lastAttempt = commandsSeen(world.host, "open_session", opensBefore + 1).then(() => world.host.failOpen(undefined))
+    const lastAttempt = commandsSeen(world.host, "open_session", opensBefore + 1).then(() =>
+      world.host.failOpen(undefined),
+    )
     const nextPrompt = world.host.waitForCommand("prompt")
     world.host.cutConnections()
     await bounded(lastAttempt, "the last reopen attempt")
@@ -83,7 +87,9 @@ describe("a pending cancel always ends the run", () => {
     expect(stopped.status).toBe("cancelled")
     await bounded(session.processExit ?? Promise.resolve(), "the cancelled child's process exit")
     expect(hostHolds(world, child)).toBe(false)
-    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe("host child parent-a #1")
+    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe(
+      "host child parent-a #1",
+    )
     expect(recordAt(parent, 1).status).toBe("running")
   })
 
@@ -123,7 +129,11 @@ describe("a pending cancel always ends the run", () => {
     // when
     const interrupted = await bounded(parent.manager.interruptTask(child.task_id), "task interrupt")
     const again = await bounded(runTaskCancel(parent.manager, { task_id: child.task_id }), "the second task_cancel")
-    const pendingView = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: child.task_id }, parent.sessionId)
+    const pendingView = await runTaskOutput(
+      { manager: parent.manager, stateDir: parent.store.stateDir },
+      { task_id: child.task_id },
+      parent.sessionId,
+    )
 
     // then - still pending, still running
     expect(interrupted.kind).toBe("noop")
@@ -141,7 +151,11 @@ describe("a pending cancel always ends the run", () => {
     // then
     expect(stopped.status).toBe("cancelled")
     expect(world.commandsOfType("close_session")).toBe(1)
-    const finalView = await runTaskOutput({ manager: parent.manager, stateDir: parent.store.stateDir }, { task_id: child.task_id }, parent.sessionId)
+    const finalView = await runTaskOutput(
+      { manager: parent.manager, stateDir: parent.store.stateDir },
+      { task_id: child.task_id },
+      parent.sessionId,
+    )
     expect(finalView.details.kind === "status" ? finalView.details.snapshot.stop : "no status view").toBeUndefined()
   })
 
@@ -174,7 +188,9 @@ describe("a pending cancel always ends the run", () => {
     // then
     expect(skipped).toBe(true)
     expect(stopped.status).toBe("cancelled")
-    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe("host child parent-a #1")
+    expect(String((await bounded(nextPrompt, "the next child's prompt")).payload.message)).toBe(
+      "host child parent-a #1",
+    )
     expect(concurrencyOf(parent).getCount(HOST_CHILD_MODEL)).toBe(1)
   })
 
@@ -243,5 +259,4 @@ describe("a pending cancel always ends the run", () => {
     expect(hostHolds(world, child)).toBe(false)
     await bounded(session.processExit ?? Promise.resolve(), "the cancelled child's process exit")
   })
-
 })

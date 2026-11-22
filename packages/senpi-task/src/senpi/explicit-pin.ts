@@ -1,13 +1,13 @@
 import type { CreateAgentSessionOptions } from "@code-yeongyu/senpi"
 
 import { senpiBarrel } from "../lazy/senpi-barrel"
+import { SENPI_SERVICE_TIERS, SENPI_THINKING_LEVELS, splitModelDecorators } from "./model-decorators"
+
+export { splitModelDecorators } from "./model-decorators"
 
 // The concrete ModelRuntime a live senpi ModelRegistry carries; unit fakes satisfy it with the
 // same barrel class, so no structural re-declaration can drift from the engine's.
 export type ExplicitPinRuntime = NonNullable<CreateAgentSessionOptions["modelRuntime"]>
-
-const SENPI_THINKING_LEVELS: ReadonlySet<string> = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"])
-const SENPI_SERVICE_TIERS: ReadonlySet<string> = new Set(["auto", "flex", "priority", "ultrafast"])
 
 export type ResolvedExplicitPin = {
   readonly kind: "resolved"
@@ -23,39 +23,6 @@ export type ExplicitPinFailure = {
 }
 
 export type ExplicitPinResolution = ResolvedExplicitPin | ExplicitPinFailure
-
-/**
- * Strip trailing `:<thinking-level>` and `:<service-tier>` decorators from a model reference,
- * right to left and at most two - the same suffix grammar senpi's `parseModelPattern` consumes
- * after its full-id match. A suffix that matches neither vocabulary stays glued to the id, so a
- * genuine colon id (`provider/model:exacto`) is never mangled.
- */
-export function splitModelDecorators(reference: string): { readonly base: string; readonly thinkingLevel?: string; readonly serviceTier?: string } {
-  let base = reference
-  let thinkingLevel: string | undefined
-  let serviceTier: string | undefined
-  for (let count = 0; count < 2; count += 1) {
-    const colon = base.lastIndexOf(":")
-    if (colon <= 0) break
-    const suffix = base.slice(colon + 1)
-    if (thinkingLevel === undefined && SENPI_THINKING_LEVELS.has(suffix)) {
-      thinkingLevel = suffix
-      base = base.slice(0, colon)
-      continue
-    }
-    if (serviceTier === undefined && SENPI_SERVICE_TIERS.has(suffix)) {
-      serviceTier = suffix
-      base = base.slice(0, colon)
-      continue
-    }
-    break
-  }
-  return {
-    base,
-    ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
-    ...(serviceTier === undefined ? {} : { serviceTier }),
-  }
-}
 
 /**
  * Parse an explicit task model pin ONCE with senpi's own resolver, so a pin and `senpi --model`
@@ -134,15 +101,20 @@ export type SettingsDefaultRoute = {
  * the caller sees the route the failure just protected it from. Best-effort: an unreadable or
  * unset default omits the suffix rather than breaking the failure it decorates.
  */
-export function readSettingsDefaultRoute(input: { readonly cwd: string; readonly agentDir: string }): SettingsDefaultRoute | undefined {
+export function readSettingsDefaultRoute(input: {
+  readonly cwd: string
+  readonly agentDir: string
+}): SettingsDefaultRoute | undefined {
   try {
     const { SettingsManager } = senpiBarrel()
     const settings = SettingsManager.create(input.cwd, input.agentDir)
     const provider = settings.getDefaultProvider()
     const modelId = settings.getDefaultModel()
-    if (typeof provider !== "string" || typeof modelId !== "string" || provider.length === 0 || modelId.length === 0) return undefined
+    if (typeof provider !== "string" || typeof modelId !== "string" || provider.length === 0 || modelId.length === 0)
+      return undefined
     return { provider, modelId }
-  } catch { // no-excuse-ok: catch - a best-effort message detail never breaks the failure it describes.
+  } catch {
+    // no-excuse-ok: catch - a best-effort message detail never breaks the failure it describes.
     return undefined
   }
 }

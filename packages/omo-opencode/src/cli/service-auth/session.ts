@@ -1,106 +1,458 @@
-import { mkdir } from "node:fs/promises"
 import { homedir } from "node:os"
-import { join } from "node:path"
-import { withLock } from "@oh-my-opencode/team-core/team-state-store/locks"
-import { credentialId, type CredentialStore } from "./keystore"
+import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
+import { heldCredentialLease, withCredentialLock } from "./credential-lock"
+import { signInHint } from "./accounts-gate"
+import type { CredentialOwner } from "./credential-owner"
 import {
-  ApiRefusal, type ChooseDevice, type Credentials, deviceListSchema, jsonRequest,
-  parseReply, requestApi, RequestFailure, serviceOrigin, SignInError, tokenSchema,
+  CredentialIdentityChanged,
+  credentialId,
+  type CredentialStore,
+  CredentialStoreError,
+  InvalidCredentialState,
+  type LockedStore,
+} from "./keystore"
+import {
+  ApiRefusal,
+  type ChooseDevice,
+  type Credentials,
+  deviceListSchema,
+  jsonRequest,
+  parseReply,
+  refusalGuidance,
+  refusalMessage,
+  RequestFailure,
+  serviceOrigin,
+  SignInError,
+  tokenSchema,
 } from "./protocol"
+import { requestApi } from "./protocol-request"
+import {
+  DEVICE_FIXUP_BUDGET_MS,
+  type MachineIdentity,
+  machineRefusalPath,
+  reconcileDevice,
+  thisMachine,
+} from "./machine-reconcile"
+import {
+  clearSignedOutMarker,
+  readSignedOutMarker,
+  signedOutMarkerPath,
+  writeSignedOutMarker,
+} from "./signed-out-marker"
 
-class SessionEnded extends SignInError {
-  constructor(message: string, readonly deviceRevoked: boolean) { super(message) }
+export class SessionEnded extends SignInError {
+  constructor(
+    message: string,
+    readonly deviceRevoked: boolean,
+    readonly code: string,
+  ) {
+    super(message)
+  }
 }
 
-// The service revokes the device row before answering reauth_required on refresh (token reuse);
-// account_deleted removes the account. unauthorized and invalid_grant leave the device's slot held.
-const DEVICE_REVOKING_REFUSALS = new Set(["account_deleted", "reauth_required"])
+const DEVICE_REVOKING_REFUSALS = new Set(["account_deleted", "reauth_required", "device_revoked"])
+
+/**
+ * A stored principal whose private keys are about to be discarded (#12280), or a stored item that
+ * could not be read when a save replaced it. The hook retires that principal's memory-sync pin; it
+ * never throws, so a failure to retire never blocks the discard.
+ */
+export type DiscardedCredential =
+  | {
+      readonly kind: "credential"
+      readonly deviceId: string
+      readonly accountId: string | undefined
+      readonly owner: CredentialOwner | undefined
+      readonly cause: "refused" | "forget" | "logout" | "replaced"
+    }
+  | { readonly kind: "unreadable" }
+
+export type BeforeKeysDiscarded = ((discarded: DiscardedCredential) => Promise<void>) & {
+  /** Whether a sign-in that names no account should have it read from the service before its keys are discarded. */
+  readonly wantsAccount?: () => Promise<boolean>
+}
+
+/**
+ * This machine's device service, told about the sign-in from memory (design D r9 sections 4-5): `adopt` gets a fresh
+ * sign-in's credential after the signed-out marker is gone, `forget` runs at every local end of a sign-in (logout on
+ * every path, forget, a session the service ended). Neither ever reads the credential store, and neither throws: a
+ * device service that is down or refuses never fails a sign-in or a sign-out.
+ */
+export type MachineDeviceState =
+  | { readonly kind: "absent" }
+  | { readonly kind: "held"; readonly device: { readonly id: string; readonly name: string } }
+  | { readonly kind: "unknown"; readonly reason: string; readonly endpoint?: string }
+
+export type DeviceServiceHandoff = {
+  readonly adopt: (credentials: Credentials) => Promise<void>
+  readonly forget: () => Promise<void>
+  /**
+   * What this machine's device service holds (#6503): `absent` only when no service runs or it holds no device;
+   * `held` includes a parked device (sign_in_required); `unknown` is a service that exists but could not be read.
+   */
+  readonly machineDevice?: () => Promise<MachineDeviceState>
+}
+
+const discardedOf = (
+  credentials: Credentials,
+  cause: "refused" | "forget" | "logout" | "replaced",
+): DiscardedCredential => ({
+  kind: "credential",
+  deviceId: credentials.device.id,
+  accountId: credentials.accountId,
+  owner: credentials.owner,
+  cause,
+})
 
 export function createSession(options: {
   readonly api: string
   readonly store: CredentialStore
   readonly home?: string
   readonly signal?: AbortSignal
+  readonly now?: () => number
+  /** Runs inside the credential lock immediately before a stored principal's keys are discarded. */
+  readonly beforeKeysDiscarded: BeforeKeysDiscarded
+  /** This machine's device service; absent, no device service is told anything. */
+  readonly deviceService?: DeviceServiceHandoff
+  /** The machine a refreshed device binds to and is named after (#13651); this computer unless a test says otherwise. */
+  readonly machine?: MachineIdentity
+  /** Where a post-refresh device fix-up reports a refusal; silent when absent (a TUI host must not write over its screen). */
+  readonly log?: (line: string) => void
 }) {
   const api = serviceOrigin(options.api)
-  const { store, signal } = options
-  const directory = join(options.home ?? homedir(), ".omo", "session-locks")
-  const lockPath = join(directory, `${credentialId(api)}.lock`)
-  async function locked<T>(action: () => Promise<T>): Promise<T> {
-    await mkdir(directory, { recursive: true, mode: 0o700 })
+  const deviceService = options.deviceService
+  const now = options.now ?? Date.now
+  const { store, signal, beforeKeysDiscarded } = options
+  const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
+  // Any approval dialog happens in prepare(), before the lock: no access dialog is ever open while it is held. Inside,
+  // every section first converges an interrupted migration (#11262 design 3.2, 3.4); a nested section reuses the outer one.
+  async function locked<T>(action: (view: LockedStore<Credentials> | null) => Promise<T>): Promise<T> {
     signal?.throwIfAborted()
-    return withLock(lockPath, async () => {
-      signal?.throwIfAborted()
-      return action()
-    }, { ownerTag: "cli-session", staleAfterMs: Number.POSITIVE_INFINITY })
+    if (heldCredentialLease(api, options.home) === undefined) await store.prepare?.()
+    return withCredentialLock(
+      api,
+      async (lease) => {
+        signal?.throwIfAborted()
+        return action((await store.underLock?.(lease)) ?? null)
+      },
+      options.home,
+    )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
-  const uncertain = () => new SignInError(
-    "The refresh outcome is unknown. Saved credentials and keys were retained, but this refresh token will not be sent again. Retry sign-in with omo login.", true)
-  async function refreshedAccess(current: Credentials): Promise<string> {
-    if (current.refreshState === "uncertain") throw uncertain()
-    if (Date.parse(current.accessTokenExpiresAt) > Date.now() + 30_000) return current.accessToken
-    // Journal before sending: a lost response or process crash must never replay a single-use token.
+  /**
+   * The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). `stop`
+   * aborts the read: the session's signal unless a caller with a tighter bound (the post-refresh fix-up) names its own.
+   */
+  const accountOf = async (access: string, stop = signal): Promise<string | undefined> => {
+    const body = await requestApi(api, "/v1/me", { headers: syncRequestHeaders(access) }, stop).catch(() => null)
+    const id =
+      typeof body === "object" &&
+      body !== null &&
+      "account" in body &&
+      typeof body.account === "object" &&
+      body.account !== null &&
+      "id" in body.account
+        ? body.account.id
+        : undefined
+    return typeof id === "string" && id !== "" ? id : undefined
+  }
+  /**
+   * The account of a sign-in that names none, for a pin it earned before `omo sync` stamped the account on it (#12383):
+   * asked of the service with `access` only while a live pin exists. Every discard route reads it the same way.
+   */
+  const unstampedAccount = async (current: Credentials, access: string): Promise<string | undefined> => {
+    if (current.accountId !== undefined || current.owner !== undefined) return undefined
+    if ((await beforeKeysDiscarded.wantsAccount?.()) !== true) return undefined
+    // It runs under the credential lock, so it gets the fix-up's short budget, not the 30 s request timeout: a stalled
+    // service keeps the pin (and the hook reports it) instead of holding up the sign-out.
+    const budget = AbortSignal.timeout(options.machine?.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    return accountOf(access, signal === undefined ? budget : AbortSignal.any([signal, budget]))
+  }
+  /**
+   * Runs the hook for a principal whose keys are about to be discarded, naming its account when the service can. An
+   * expired access token is never sent (the service refuses it, and the call would hold the credential lock): its pin stays.
+   */
+  async function discard(current: Credentials, cause: "refused" | "forget" | "replaced"): Promise<void> {
+    const account =
+      Date.parse(current.accessTokenExpiresAt) > now()
+        ? await unstampedAccount(current, current.accessToken)
+        : undefined
+    await beforeKeysDiscarded(discardedOf(account === undefined ? current : { ...current, accountId: account }, cause))
+  }
+  async function refreshed(current: Credentials): Promise<Credentials> {
+    // Legacy state cannot prove the original key, identity and age. Only protocol-2's owned
+    // transaction can recover; neither a draft key nor a new key authorizes a legacy resend.
+    if (current.refreshState === "uncertain" || current.refreshAttempt !== undefined) {
+      throw new SessionEnded(
+        `Refresh recovery can no longer be proved safe. ${signInHint("again")}`,
+        false,
+        "refresh_recovery_expired",
+      )
+    }
+    if (Date.parse(current.accessTokenExpiresAt) > now() + 30_000) return current
+    refuseIfLocalOnly("service-auth/session.ts refresh")
+    // A legacy credential has no owner, so this fence cannot carry a refreshAttempt. That absence is terminal:
+    // the next token call ends the session, and `omo account show` reports refreshState "expired". An in-progress
+    // protocol-2 journal always includes refreshAttempt; this write is not one.
     await store.write({ ...current, refreshState: "uncertain" })
     try {
-      const tokens = parseReply(tokenSchema, await request("/v1/session/refresh", jsonRequest({ refreshToken: current.refreshToken })))
-      await store.write({ ...current, ...tokens })
-      return tokens.accessToken
+      const tokens = parseReply(
+        tokenSchema,
+        await request("/v1/session/refresh", jsonRequest({ refreshToken: current.refreshToken })),
+      )
+      const successor = { ...current, ...tokens }
+      await store.write(successor)
+      return successor
     } catch (error) {
-      if (error instanceof ApiRefusal && error.status < 500 && ["unauthorized", "account_deleted", "reauth_required", "invalid_grant"].includes(error.code)) {
+      if (error instanceof CredentialStoreError) throw error
+      if (
+        error instanceof ApiRefusal &&
+        error.status < 500 &&
+        ["unauthorized", "account_deleted", "reauth_required", "invalid_grant", "device_revoked"].includes(error.code)
+      ) {
+        await discard(current, "refused")
         await store.clear()
-        throw new SessionEnded(error.code === "reauth_required"
-          ? "This session was ended because its refresh token was reused. Sign in again with omo login."
-          : "Sign in again with omo login.", DEVICE_REVOKING_REFUSALS.has(error.code))
+        await deviceService?.forget()
+        throw new SessionEnded(
+          error.code === "reauth_required"
+            ? `This session was ended because its refresh token was reused. ${signInHint("again")}`
+            : refusalMessage(refusalGuidance(error.code, error.status)),
+          DEVICE_REVOKING_REFUSALS.has(error.code),
+          error.code,
+        )
       }
-      if ((error instanceof RequestFailure && error.notSent) ||
-        (error instanceof ApiRefusal && error.status === 429 && error.code === "rate_limited")) {
+      if (
+        (error instanceof RequestFailure && error.notSent) ||
+        (error instanceof ApiRefusal && error.status === 429 && error.code === "rate_limited")
+      ) {
         await store.write(current)
         throw error
       }
-      throw uncertain()
+      throw new SessionEnded(
+        `The refresh outcome is unknown. Saved credentials and keys were retained. ${signInHint("again")}`,
+        false,
+        "refresh_recovery_expired",
+      )
     }
+  }
+  /**
+   * One refresh point for every caller (login, whoami, token, memory sync): after a rotation, outside the lock, the
+   * device is bound to this machine and a generated label renamed (#13651). Neither ever fails the token.
+   */
+  async function renewed(
+    read: (view: LockedStore<Credentials> | null) => Promise<Credentials | null>,
+  ): Promise<Credentials | null> {
+    const outcome = await locked(async (view) => {
+      const current = await read(view)
+      if (current === null) return null
+      const next = await refreshed(current)
+      return { next, rotated: next !== current }
+    })
+    if (outcome === null) return null
+    if (outcome.rotated) await reconcile(outcome.next)
+    return outcome.next
+  }
+  // The fix-up has one overall budget: its requests abort when it runs out, and the caller gets its token then
+  // whatever is still pending, so a stalled service never holds a refreshed token back.
+  async function reconcile(credentials: Credentials): Promise<void> {
+    const machine = options.machine ?? thisMachine
+    const budget = AbortSignal.timeout(machine.budgetMs ?? DEVICE_FIXUP_BUDGET_MS)
+    const stop = signal === undefined ? budget : AbortSignal.any([signal, budget])
+    const stopped = new Promise<void>((resolve) => {
+      if (stop.aborted) resolve()
+      else stop.addEventListener("abort", () => resolve(), { once: true })
+    })
+    const fixup = reconcileDevice({
+      api,
+      credentials,
+      machine,
+      nowMs: now(),
+      request: (path, init) => requestApi(api, path, init, stop),
+      accountOf: (access) => accountOf(access, stop),
+      signal: stop,
+      refusalPath: machineRefusalPath(options.home ?? homedir(), credentialId(api)),
+      log: options.log ?? (() => undefined),
+      renamed: (name) =>
+        locked(async () => {
+          const stored = await store.readAuthoritative()
+          // The lock may come free only after the budget ran out; the caller has its token by then, so nothing is written.
+          if (!stop.aborted && stored !== null && stored.device.id === credentials.device.id)
+            await store.write({ ...stored, device: { ...stored.device, name } })
+        }),
+    })
+    await Promise.race([fixup, stopped])
+  }
+  async function snapshot(): Promise<Credentials | null> {
+    return renewed(async (view) => {
+      const current = await store.read()
+      if (current === null) return null
+      await view?.settle()
+      return current
+    })
+  }
+  // #13265: the signed-in account's email through the session's own token; undefined when the service does not say.
+  async function emailOf(access: string): Promise<string | undefined> {
+    const body = await request("/v1/me", { headers: syncRequestHeaders(access) }).catch(() => null)
+    const user =
+      typeof body === "object" && body !== null && "user" in body ? (body as { user?: unknown }).user : undefined
+    const email =
+      typeof user === "object" && user !== null && "email" in user ? (user as { email?: unknown }).email : undefined
+    return typeof email === "string" && email !== "" ? email : undefined
+  }
+  async function accessTokenImpl(expect?: (current: Credentials) => boolean): Promise<string> {
+    signal?.throwIfAborted()
+    const snapshot = await store.read()
+    signal?.throwIfAborted()
+    // Only an unjournaled token beyond the refresh path's 30s skew can avoid the writer lock.
+    // Account-bound callers compare their captured keys, account and generation through `expect`.
+    if (
+      snapshot !== null &&
+      snapshot.refreshState !== "uncertain" &&
+      snapshot.refreshAttempt === undefined &&
+      Date.parse(snapshot.accessTokenExpiresAt) > now() + 30_000 &&
+      (expect === undefined || expect(snapshot)) &&
+      // A value the keychain helper does not own yet takes the lock once, so its section can migrate it (3.3).
+      !(await store.migrationPending?.())
+    )
+      return snapshot.accessToken
+    const renewedCredentials = await renewed(async (view) => {
+      const current = await store.readAuthoritative()
+      if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+      if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
+      await view?.settle()
+      return current
+    })
+    if (renewedCredentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+    return renewedCredentials.accessToken
   }
   return {
     request,
     signal,
-    async ready() { await store.read() },
-    async save(value: Credentials) { await locked(() => store.write(value)) },
-    async logout(): Promise<boolean> {
-      return locked(async () => {
+    transaction: locked,
+    async ready() {
+      await store.read()
+    },
+    async save(value: Credentials) {
+      await locked(async () => {
+        let stored: Credentials | null
         try {
-          const current = await store.read()
-          if (current !== null) {
-            if (current.refreshState === "uncertain") return false
-            const access = Date.parse(current.accessTokenExpiresAt) <= Date.now()
-              ? await refreshedAccess(current) : current.accessToken
-            await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
-              method: "DELETE", headers: { authorization: `Bearer ${access}` },
-            })
-          }
-          return true
+          stored = await store.readAuthoritative()
         } catch (error) {
-          if (error instanceof SessionEnded) return error.deviceRevoked
-          if (error instanceof SignInError) return false
-          throw error
-        } finally { await store.clear() }
+          if (!(error instanceof InvalidCredentialState)) throw error
+          await beforeKeysDiscarded({ kind: "unreadable" })
+          stored = null
+        }
+        if (stored !== null && stored.device.id !== value.device.id) await discard(stored, "replaced")
+        // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
+        await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
+        await clearSignedOutMarker(markerPath)
       })
+      // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
+      // in memory, never read back from the store.
+      await deviceService?.adopt(value)
     },
-    async accessToken(): Promise<string> {
+    /** The marker an explicit `omo logout` left, or null; only an empty store makes it meaningful. */
+    signedOutMarker: () => readSignedOutMarker(markerPath),
+    clearSignedOutMarker: () => clearSignedOutMarker(markerPath),
+    async update<T>(
+      action: (current: Credentials | null) => Promise<T>,
+      options: { readonly replaceInvalid?: boolean } = {},
+    ): Promise<T> {
       return locked(async () => {
-        const current = await store.read()
-        if (current === null) throw new SignInError("Not signed in. Run omo login.")
-        return refreshedAccess(current)
+        let current: Credentials | null
+        try {
+          // Under the lock only a read started now is authoritative: a coalesced read may predate another writer.
+          current = await store.readAuthoritative()
+        } catch (error) {
+          if (!options.replaceInvalid || !(error instanceof InvalidCredentialState)) throw error
+          current = null
+        }
+        return action(current)
       })
     },
+    /** The hook for a principal a caller discards inside `update` (`omo account forget --device`, `adopt --replace`). */
+    discard,
+    /**
+     * Every sign-out retires the pin of the account it signs out of (#12308): the item is read first to name it. An item
+     * that cannot be read (corrupt, or a store that fails the read) is still deleted, and once it is gone its pin is
+     * reported left with one line; a delete that fails too (a locked store) discarded nothing and reports only its error.
+     */
+    async forget(): Promise<void> {
+      await locked(async () => {
+        let current: Credentials | null
+        try {
+          current = await store.readAuthoritative()
+        } catch (error) {
+          if (!(error instanceof InvalidCredentialState || error instanceof CredentialStoreError)) throw error
+          await store.clear()
+          await beforeKeysDiscarded({ kind: "unreadable" })
+          return
+        }
+        if (current !== null) await discard(current, "forget")
+        await store.clear()
+      })
+      await deviceService?.forget()
+    },
+    accessSnapshot: snapshot,
+    // #13265: the signed-in account's email. accessTokenImpl, not the sibling property, so the same session reads it.
+    accountEmail: async (): Promise<string | undefined> => emailOf(await accessTokenImpl()),
+    async logout(): Promise<boolean> {
+      // Every path (revoked, uncertain, offline, nothing stored) ends the sign-in locally, so every path forgets.
+      try {
+        return await locked(async () => {
+          let current: Credentials | null = null
+          let account: string | undefined
+          try {
+            current = await store.readAuthoritative()
+            if (current !== null) {
+              if (current.refreshState === "uncertain") return false
+              const access =
+                Date.parse(current.accessTokenExpiresAt) <= now()
+                  ? (await refreshed(current)).accessToken
+                  : current.accessToken
+              // Before the revoke, while `access` still works.
+              account = await unstampedAccount(current, access)
+              await request(`/v1/devices/${encodeURIComponent(current.device.id)}`, {
+                method: "DELETE",
+                headers: syncRequestHeaders(access),
+              })
+            }
+            return true
+          } catch (error) {
+            if (error instanceof SessionEnded) return error.deviceRevoked
+            if (error instanceof SignInError) return false
+            throw error
+          } finally {
+            // Marker first: it only counts once the store is empty, so an unlocked reader never sees an empty store
+            // without it, and a failed marker write leaves the credentials in place instead of half-signing-out.
+            await writeSignedOutMarker(markerPath, current?.device.id ?? null)
+            // A refresh refusal inside this logout already cleared the store (and retired the pin).
+            const stored = current === null ? null : await store.read().catch(() => current)
+            if (stored !== null)
+              await beforeKeysDiscarded(
+                discardedOf(
+                  stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored,
+                  "logout",
+                ),
+              )
+            await store.clear()
+          }
+        })
+      } finally {
+        await deviceService?.forget()
+      }
+    },
+    /** `expect` rejects a stored credential that is no longer the caller's captured identity before any refresh. */
+    accessToken: (expect?: (current: Credentials) => boolean) => accessTokenImpl(expect),
     async removeForLimit(error: unknown, choose: ChooseDevice): Promise<boolean> {
       if (!(error instanceof ApiRefusal) || error.detail === undefined) throw error
-      const headers = { authorization: `Bearer ${error.detail.managementToken}` }
+      const headers = syncRequestHeaders(error.detail.managementToken)
       const listed = parseReply(deviceListSchema, await request("/v1/devices", { headers }))
-      const devices = listed.devices.filter(device => device.revokedAt === null)
+      const devices = listed.devices.filter((device) => device.revokedAt === null)
       const chosen = await choose(devices)
       if (chosen === null) return false
-      if (!devices.some(device => device.id === chosen)) throw new SignInError("No matching device was selected.")
+      if (!devices.some((device) => device.id === chosen)) throw new SignInError("No matching device was selected.")
       await request(`/v1/devices/${encodeURIComponent(chosen)}`, { method: "DELETE", headers })
       return true
     },

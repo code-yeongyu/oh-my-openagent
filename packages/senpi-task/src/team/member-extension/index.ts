@@ -11,10 +11,7 @@ import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
 import { createQaAfterInjectHold } from "./qa-inject-hold"
 import { createMemberTaskSendTool } from "./tools"
 
-export {
-  MemberExtensionConfigError,
-  parseMemberExtensionEnv,
-} from "./parse-env"
+export { MemberExtensionConfigError, parseMemberExtensionEnv } from "./parse-env"
 export type { MemberExtensionConfigErrorCode, ParsedMemberExtensionEnv } from "./parse-env"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,
@@ -83,14 +80,16 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
   }
   activeRuntimes.set(pi, runtime)
 
-  pi.registerTool(createMemberTaskSendTool({
-    teamRunId: parsed.teamRunId,
-    memberName: parsed.memberName,
-    taskId: parsed.taskId,
-    config: parsed.config,
-    members: parsed.members,
-    appendEvent: (taskId, event) => store.appendEvent(taskId, event),
-  }))
+  pi.registerTool(
+    createMemberTaskSendTool({
+      teamRunId: parsed.teamRunId,
+      memberName: parsed.memberName,
+      taskId: parsed.taskId,
+      config: parsed.config,
+      members: parsed.members,
+      appendEvent: (taskId, event) => store.appendEvent(taskId, event),
+    }),
+  )
   pi.on("session_start", () => startRuntime(runtime))
   pi.on("session_shutdown", () => stopRuntime(pi, runtime))
 }
@@ -131,4 +130,3 @@ function runSafely(operation: string, promise: Promise<void>): void {
     log("senpi-task member extension poll failed", { operation, error: String(error) })
   })
 }
-

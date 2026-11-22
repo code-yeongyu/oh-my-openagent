@@ -5,16 +5,8 @@ import { join } from "node:path"
 
 import { afterEach, describe, expect, test } from "bun:test"
 
-import {
-  cleanupTempDirs,
-  initRepo,
-  makeTempDir,
-} from "./fixtures.test-support"
-import {
-  addLocalExcludePaths,
-  isExcluded,
-  removeLocalExcludePaths,
-} from "./git-exclude"
+import { cleanupTempDirs, initRepo, makeTempDir } from "./fixtures.test-support"
+import { addLocalExcludePaths, isExcluded, removeLocalExcludePaths } from "./git-exclude"
 
 afterEach(() => {
   cleanupTempDirs()
@@ -75,12 +67,7 @@ describe("removeLocalExcludePaths", () => {
     // given
     const root = initRepo("omo-git-exclude-")
     const excludePath = join(root, ".git", "info", "exclude")
-    writeFileSync(excludePath, [
-      "user-file.txt",
-      "AGENTS.md",
-      ".omo/init-deep.json",
-      ".env.local",
-    ].join("\n"))
+    writeFileSync(excludePath, ["user-file.txt", "AGENTS.md", ".omo/init-deep.json", ".env.local"].join("\n"))
 
     // when
     removeLocalExcludePaths(root, ["AGENTS.md", ".omo/init-deep.json"])

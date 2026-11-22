@@ -3,11 +3,7 @@ import { readSessionRole } from "@oh-my-opencode/senpi-task"
 import type { EventTelemetryClient, EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import {
-  armingSnapshot,
-  classifyUltraworkInput,
-  type UltraworkClassification,
-} from "../ultrawork/index"
+import { armingSnapshot, classifyUltraworkInput, type UltraworkClassification } from "../ultrawork/index"
 import { hashSessionId, OMO_NATIVE_PROPERTY_ALLOWLISTS } from "./product-identity"
 
 type InputSource = "interactive" | "rpc" | "extension"
@@ -47,7 +43,10 @@ export function createOmoNativePromptComponent(options: OmoNativePromptComponent
 
         const sessionId = extractSessionId(eventCtx) ?? "anonymous"
         const snapshot = armingSnapshot(sessionId)
-        const classification = classifyUltraworkInput({ text: input.text, source: input.source, sessionRole: readSessionRole(pi) }, snapshot)
+        const classification = classifyUltraworkInput(
+          { text: input.text, source: input.source, sessionRole: readSessionRole(pi) },
+          snapshot,
+        )
         const ordinal = nextRealPromptOrdinal(realPromptOrdinals, sessionId, input.source)
         pending.set(input.inputId, {
           classification,
@@ -102,17 +101,20 @@ function properties(prompt: PendingPrompt, disposition: Disposition | undefined)
   } satisfies Record<PromptProperty, string | boolean>
 }
 
-function parseInput(value: unknown): {
-  inputId: string
-  text: string
-  source: InputSource
-  streamingBehavior?: StreamingBehavior
-} | undefined {
+function parseInput(value: unknown):
+  | {
+      inputId: string
+      text: string
+      source: InputSource
+      streamingBehavior?: StreamingBehavior
+    }
+  | undefined {
   if (!isRecord(value) || value["type"] !== "input") return undefined
   const inputId = value["inputId"]
   const text = value["text"]
   const source = value["source"]
-  if (typeof inputId !== "string" || inputId.length === 0 || typeof text !== "string" || !isInputSource(source)) return undefined
+  if (typeof inputId !== "string" || inputId.length === 0 || typeof text !== "string" || !isInputSource(source))
+    return undefined
   const streamingBehavior = value["streamingBehavior"]
   return {
     inputId,

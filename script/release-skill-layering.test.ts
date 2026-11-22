@@ -14,7 +14,9 @@ function readProjectFile(path: string): string {
 }
 
 function normalizedRunbookBody(path: string): string {
-  return readProjectFile(path).replace(/^---\n[\s\S]*?\n---\n+/, "").trim()
+  return readProjectFile(path)
+    .replace(/^---\n[\s\S]*?\n---\n+/, "")
+    .trim()
 }
 
 describe("release skill layering", () => {
@@ -36,9 +38,11 @@ describe("release skill layering", () => {
     // when
     const missingExplicitVersionDispatch = files.filter((file) => {
       const text = readProjectFile(file)
-      return !text.includes('RELEASE_INPUT="${ARGUMENTS}"') ||
-        !text.includes('^([0-9]+\\.){2}[0-9]+(-[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*)?$') ||
+      return (
+        !text.includes('RELEASE_INPUT="${ARGUMENTS}"') ||
+        !text.includes("^([0-9]+\\.){2}[0-9]+(-[0-9A-Za-z]+(\\.[0-9A-Za-z]+)*)?$") ||
         !text.includes('-f "version=${RELEASE_INPUT}"')
+      )
     })
     const missingBumpDispatch = files.filter((file) => {
       const text = readProjectFile(file)
@@ -57,14 +61,15 @@ describe("release skill layering", () => {
     // when
     const missingExactRunOwnership = files.filter((file) => {
       const text = readProjectFile(file)
-      return !text.includes('RUN_URL="$(gh workflow run') ||
+      return (
+        !text.includes('RUN_URL="$(gh workflow run') ||
         !text.includes('RUN_ID="${RUN_URL##*/}"') ||
         !text.includes('gh run view "${RUN_ID}"') ||
         text.includes("gh run list --workflow=publish --limit=1")
+      )
     })
 
     // then
     expect(missingExactRunOwnership).toEqual([])
   })
-
 })

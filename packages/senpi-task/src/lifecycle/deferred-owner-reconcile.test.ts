@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { cleanupProjects, FakeRegistry, readEvents, seedRecord, settings, tempStore } from "./__fixtures__/lifecycle-fakes"
+import {
+  cleanupProjects,
+  FakeRegistry,
+  readEvents,
+  seedRecord,
+  settings,
+  tempStore,
+} from "./__fixtures__/lifecycle-fakes"
 import { createTaskLifecycle } from "./create"
 import { DEFAULT_HOST_SESSION_RETRY_POLICY, NO_HOST_ENDPOINT } from "./host-session"
 import type { TaskRecordStore } from "../store"
@@ -30,16 +37,28 @@ function fixture(startupBackoffMs: readonly number[] = []) {
     },
   }
   seedRecord(store, {
-    task_id: taskId, parent_session_id: "old-parent", status: "pending",
-    execution_mode: "process", host_pid: ownerPid, pid: 7102,
+    task_id: taskId,
+    parent_session_id: "old-parent",
+    status: "pending",
+    execution_mode: "process",
+    host_pid: ownerPid,
+    pid: 7102,
   })
   store.transition(taskId, { type: "start", timestamp: new Date().toISOString() })
   const signals: number[] = []
   const lifecycle = createTaskLifecycle({
-    store: observedStore, registry: new FakeRegistry(),
+    store: observedStore,
+    registry: new FakeRegistry(),
     config: settings({ reattach_on_reconcile: false }),
-    hostPid: 7201, hostEndpoint: NO_HOST_ENDPOINT,
-    signaller: { isAlive: (pid) => alive.has(pid), signal: (pid) => { signals.push(pid); alive.delete(pid) } },
+    hostPid: 7201,
+    hostEndpoint: NO_HOST_ENDPOINT,
+    signaller: {
+      isAlive: (pid) => alive.has(pid),
+      signal: (pid) => {
+        signals.push(pid)
+        alive.delete(pid)
+      },
+    },
     hostRetry: {
       ...DEFAULT_HOST_SESSION_RETRY_POLICY,
       daemonLossBackoffMs: startupBackoffMs,
@@ -53,8 +72,18 @@ function fixture(startupBackoffMs: readonly number[] = []) {
     },
   })
   return {
-    store, taskId, ownerPid, alive, waits, entered, destroyed, signals, lifecycle,
-    beforeClaim: (callback: () => void) => { beforeClaim = callback },
+    store,
+    taskId,
+    ownerPid,
+    alive,
+    waits,
+    entered,
+    destroyed,
+    signals,
+    lifecycle,
+    beforeClaim: (callback: () => void) => {
+      beforeClaim = callback
+    },
   }
 }
 
@@ -63,7 +92,9 @@ async function bounded<T>(promise: Promise<T>): Promise<T> {
   try {
     return await Promise.race([
       promise,
-      new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("reconcile event missing")), 1_000) }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("reconcile event missing")), 1_000)
+      }),
     ])
   } finally {
     clearTimeout(timer)
@@ -75,7 +106,9 @@ describe("deferred foreign owner reconciliation (omo#9715)", () => {
     // Given a dead child whose owner is still visible during startup.
     const f = fixture([1, 2])
     const order: string[] = []
-    const destroyed = f.destroyed.promise.then(() => { order.push("destroyed") })
+    const destroyed = f.destroyed.promise.then(() => {
+      order.push("destroyed")
+    })
     try {
       const startup = f.lifecycle.reconcileOnSessionStart("new-parent").then((result) => {
         order.push("startup_returned")
@@ -203,9 +236,13 @@ describe("deferred foreign owner reconciliation (omo#9715)", () => {
       await f.lifecycle.reconcileOnSessionStart("new-parent")
       expect(f.waits).toHaveLength(1)
       f.alive.delete(f.ownerPid)
-      f.beforeClaim(() => f.store.transition(f.taskId, {
-        type: "fail", timestamp: "2030-01-01T00:00:00.000Z", error_message: "independent crash",
-      }))
+      f.beforeClaim(() =>
+        f.store.transition(f.taskId, {
+          type: "fail",
+          timestamp: "2030-01-01T00:00:00.000Z",
+          error_message: "independent crash",
+        }),
+      )
       // When the locked claim re-reads the now-terminal record, its old snapshot loses.
       f.waits[0]?.resolve()
       await bounded(f.entered[1].promise)

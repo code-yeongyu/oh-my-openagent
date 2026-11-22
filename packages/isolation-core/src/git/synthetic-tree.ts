@@ -3,13 +3,18 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runGit } from "./command"
 
-export async function writeSyntheticTree(objectRepoDir: string, headCommit: string, patches: readonly string[]): Promise<string> {
+export async function writeSyntheticTree(
+  objectRepoDir: string,
+  headCommit: string,
+  patches: readonly string[],
+): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "isolation-index-"))
   const options = { cwd: objectRepoDir, env: { GIT_INDEX_FILE: join(dir, "index") } }
   try {
     await runGit(["read-tree", headCommit || "--empty"], options)
     for (const patch of patches) {
-      if (patch.trim()) await runGit(["apply", "--cached", "--binary", "--whitespace=nowarn", "-"], { ...options, input: patch })
+      if (patch.trim())
+        await runGit(["apply", "--cached", "--binary", "--whitespace=nowarn", "-"], { ...options, input: patch })
     }
     return (await runGit(["write-tree"], options)).stdout.toString().trim()
   } finally {
@@ -27,11 +32,17 @@ export function unquoteGitDiffPath(rawPath: string): string {
     for (let i = 0; i < body.length;) {
       if (body[i] === "\\") {
         const octal = body.slice(i + 1).match(/^[0-7]{1,3}/)?.[0]
-        if (octal) { bytes.push(parseInt(octal, 8)); i += octal.length + 1 }
-        else { bytes.push(escapes[body[i + 1]!] ?? body.charCodeAt(i + 1)); i += 2 }
+        if (octal) {
+          bytes.push(parseInt(octal, 8))
+          i += octal.length + 1
+        } else {
+          bytes.push(escapes[body[i + 1]!] ?? body.charCodeAt(i + 1))
+          i += 2
+        }
       } else {
         const char = String.fromCodePoint(body.codePointAt(i)!)
-        bytes.push(...Buffer.from(char)); i += char.length
+        bytes.push(...Buffer.from(char))
+        i += char.length
       }
     }
     value = Buffer.from(bytes).toString()
@@ -45,5 +56,5 @@ export function parseDiffGitLinePaths(line: string): string[] {
   const quoted = '"(?:\\\\.|[^"\\\\])*"'
   const match = rest.match(new RegExp(`^(${quoted}|a/.*?) (${quoted}|b/.*)$`))
   if (!match) return []
-  return [...new Set([match[1]!, match[2]!].map(unquoteGitDiffPath).filter(path => path && path !== "/dev/null"))]
+  return [...new Set([match[1]!, match[2]!].map(unquoteGitDiffPath).filter((path) => path && path !== "/dev/null"))]
 }

@@ -23,13 +23,15 @@ describe("bun runtime re-exec decision", () => {
     const bunPath = posix.join(POSIX_HOME, ".bun", "bin", "bun")
     const treeScript = bunTreePackage(posix.join(POSIX_HOME, ".bun"))
 
-    function decide(overrides: {
-      scriptPath?: string
-      env?: Record<string, string | undefined>
-      versions?: Record<string, string | undefined>
-      exists?: (path: string) => boolean
-      bunVersion?: (bunPath: string) => Promise<string | undefined>
-    } = {}) {
+    function decide(
+      overrides: {
+        scriptPath?: string
+        env?: Record<string, string | undefined>
+        versions?: Record<string, string | undefined>
+        exists?: (path: string) => boolean
+        bunVersion?: (bunPath: string) => Promise<string | undefined>
+      } = {},
+    ) {
       return resolveBunReexec({
         scriptPath: overrides.scriptPath ?? plainScript,
         env: overrides.env ?? {},
@@ -205,12 +207,25 @@ describe("bun runtime re-exec decision", () => {
       const propagated: unknown[] = []
       // when
       const consumed = await maybeReexecUnderBun({
-        scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
-        env, versions: {}, homedir: () => POSIX_HOME, platform: "linux",
-        exists: existsOnly(bunPath), realpath: identityRealpath, bunVersion: async () => "1.4.0",
-        execve: (...args: unknown[]) => { execs.push(args) },
-        spawn: (...args: unknown[]) => { spawns.push(args); return { status: 37, signal: null } },
-        propagate: (result: unknown) => { propagated.push(result) },
+        scriptPath: treeScript,
+        argv: ["node", treeScript, "say", "hi"],
+        env,
+        versions: {},
+        homedir: () => POSIX_HOME,
+        platform: "linux",
+        exists: existsOnly(bunPath),
+        realpath: identityRealpath,
+        bunVersion: async () => "1.4.0",
+        execve: (...args: unknown[]) => {
+          execs.push(args)
+        },
+        spawn: (...args: unknown[]) => {
+          spawns.push(args)
+          return { status: 37, signal: null }
+        },
+        propagate: (result: unknown) => {
+          propagated.push(result)
+        },
       })
       // then
       expect(consumed).toBe(true)
@@ -230,12 +245,29 @@ describe("bun runtime re-exec decision", () => {
         let execs = 0
         // when
         const consumed = await maybeReexecUnderBun({
-          scriptPath: treeScript, argv: ["node", treeScript, "say", "hi"],
-          env, versions: {}, homedir: () => POSIX_HOME, platform: mode === "win32" ? "win32" : "linux",
-          exists: () => true, realpath: identityRealpath, bunVersion: async () => "1.4.0",
-          execve: mode === "absent" ? null : () => { execs += 1; throw new Error("injected unavailable") },
-          spawn: (...args: unknown[]) => { calls.push(args); return { status: 37, signal: null } },
-          propagate: (result: unknown) => { propagated.push(result) },
+          scriptPath: treeScript,
+          argv: ["node", treeScript, "say", "hi"],
+          env,
+          versions: {},
+          homedir: () => POSIX_HOME,
+          platform: mode === "win32" ? "win32" : "linux",
+          exists: () => true,
+          realpath: identityRealpath,
+          bunVersion: async () => "1.4.0",
+          execve:
+            mode === "absent"
+              ? null
+              : () => {
+                  execs += 1
+                  throw new Error("injected unavailable")
+                },
+          spawn: (...args: unknown[]) => {
+            calls.push(args)
+            return { status: 37, signal: null }
+          },
+          propagate: (result: unknown) => {
+            propagated.push(result)
+          },
         })
         // then
         expect(consumed).toBe(true)
@@ -351,8 +383,12 @@ describe("bun runtime re-exec decision", () => {
         platform: "linux",
         exists: overrides.exists ?? existsOnly(bunPath, nodePath),
         realpath: overrides.realpath ?? identityRealpath,
-        execve: (...args: unknown[]) => { execs.push(args) },
-        spawn: () => { throw new Error("the POSIX path must replace the process") },
+        execve: (...args: unknown[]) => {
+          execs.push(args)
+        },
+        spawn: () => {
+          throw new Error("the POSIX path must replace the process")
+        },
         propagate: () => {},
       })
       return { consumed, execs }

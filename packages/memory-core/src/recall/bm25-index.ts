@@ -85,7 +85,10 @@ function currentTerms(document: RecallDocument): DocumentTerms | undefined {
   return cached !== undefined && cached.generation === generation ? cached : undefined
 }
 
-function build(documents: readonly RecallDocument[], read: (document: RecallDocument) => DocumentTermsInput): RecallBm25Index {
+function build(
+  documents: readonly RecallDocument[],
+  read: (document: RecallDocument) => DocumentTermsInput,
+): RecallBm25Index {
   let fresh = 0
   const encoded = documents.map((document) => {
     const cached = currentTerms(document)
@@ -142,6 +145,19 @@ export function recallBm25IndexFor(
   const index = build(documents, read)
   INDEXES.set(documents, index)
   return index
+}
+
+/** What the memory report reads for these documents: their cached term arrays and the process dictionary. */
+export function recallTermFigures(documents: Iterable<RecallDocument>): {
+  readonly termArrayBytes: number
+  readonly vocabularyTerms: number
+} {
+  let termArrayBytes = 0
+  for (const document of documents) {
+    const terms = currentTerms(document)
+    if (terms !== undefined) termArrayBytes += terms.ids.byteLength + terms.counts.byteLength
+  }
+  return { termArrayBytes, vocabularyTerms: vocabulary.length }
 }
 
 export function termCount(terms: DocumentTerms, id: number): number {

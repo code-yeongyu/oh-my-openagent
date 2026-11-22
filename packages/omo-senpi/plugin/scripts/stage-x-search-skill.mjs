@@ -15,6 +15,7 @@ const defaultSourceSkill = join(packageRoot, "src", "components", "x-search", "s
  * plugin root so the payload allowlist can ship it; otherwise the source plugin dir is the target.
  */
 export function resolveTargetSkill(env = process.env) {
+  if (env.OMO_X_SEARCH_SKILL_TARGET !== undefined) return env.OMO_X_SEARCH_SKILL_TARGET
   const targetPluginRoot = env.OMO_SENPI_PLUGIN_OUTPUT === undefined ? pluginRoot : env.OMO_SENPI_PLUGIN_OUTPUT
   return join(targetPluginRoot, "skills-conditional", "x-search", "SKILL.md")
 }
@@ -54,10 +55,7 @@ export async function checkXSearchSkillStaged(options = {}) {
     throw new Error(`x-search conditional skill stale: staged SKILL.md is not a file: ${targetSkill}`)
   }
 
-  const [sourceBody, stagedBody] = await Promise.all([
-    readFile(sourceSkill, "utf8"),
-    readFile(targetSkill, "utf8"),
-  ])
+  const [sourceBody, stagedBody] = await Promise.all([readFile(sourceSkill, "utf8"), readFile(targetSkill, "utf8")])
   if (sourceBody !== stagedBody) {
     throw new Error(`x-search conditional skill stale: staged SKILL.md does not match the source: ${targetSkill}`)
   }

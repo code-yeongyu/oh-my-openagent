@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto"
 import { isAbsolute, join } from "node:path"
 import { readFile, rename, rm, writeFile } from "../fs/resilient"
 import type { GitRevisionRunner } from "./repo-revision-reads"
+import { STABLE_LOG_OUTPUT } from "./stable-log-output"
 
 const CACHE_SIZE = 4
 const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/
@@ -72,10 +73,23 @@ export class PathCommitTimes {
     return { all, live: liveTimes(present, all) }
   }
 
-  private async reachableTimes(oid: string, bases: ReadonlyArray<readonly [string, Promise<Computed>]>): Promise<Times> {
+  private async reachableTimes(
+    oid: string,
+    bases: ReadonlyArray<readonly [string, Promise<Computed>]>,
+  ): Promise<Times> {
     const stored = await this.readStore()
     const candidates: Array<readonly [string, () => Promise<Times | null>]> = [
-      ...bases.map(([base, computed]) => [base, () => computed.then((value) => value.all, () => null)] as const),
+      ...bases.map(
+        ([base, computed]) =>
+          [
+            base,
+            () =>
+              computed.then(
+                (value) => value.all,
+                () => null,
+              ),
+          ] as const,
+      ),
       ...(stored === null ? [] : [[stored.revision, async () => stored.times] as const]),
     ]
     for (const [base, load] of candidates) {
@@ -97,10 +111,21 @@ export class PathCommitTimes {
   }
 
   private log(range: readonly string[], timeoutMs?: number): ReturnType<GitRevisionRunner["run"]> {
-    return this.git.run([
-      "log", "--format=%x01%ct", "--name-only", "-z", "--no-renames", "--diff-merges=first-parent",
-      "--diff-filter=d", ...range, "--",
-    ], timeoutMs)
+    return this.git.run(
+      [
+        ...STABLE_LOG_OUTPUT,
+        "log",
+        "--format=%x01%ct",
+        "--name-only",
+        "-z",
+        "--no-renames",
+        "--diff-merges=first-parent",
+        "--diff-filter=d",
+        ...range,
+        "--",
+      ],
+      timeoutMs,
+    )
   }
 
   private async isAncestor(ancestor: string, descendant: string): Promise<boolean> {
@@ -135,7 +160,11 @@ export class PathCommitTimes {
     try {
       const path = await this.storePath()
       temp = `${path}.${process.pid}.${randomUUID()}.tmp`
-      await writeFile(temp, `${JSON.stringify({ version: STORE_VERSION, revision, times: Object.fromEntries(times) })}\n`, "utf8")
+      await writeFile(
+        temp,
+        `${JSON.stringify({ version: STORE_VERSION, revision, times: Object.fromEntries(times) })}\n`,
+        "utf8",
+      )
       await rename(temp, path)
     } catch {
       if (temp !== undefined) await rm(temp, { force: true }).catch(() => undefined)

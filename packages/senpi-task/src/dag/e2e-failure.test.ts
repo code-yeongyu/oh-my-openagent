@@ -6,11 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import {
-  createReadToolDefinition,
-  type CreateAgentSessionOptions,
-  type ToolDefinition,
-} from "@code-yeongyu/senpi"
+import { createReadToolDefinition, type CreateAgentSessionOptions, type ToolDefinition } from "@code-yeongyu/senpi"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 
 import { createTaskManager } from "../manager/manager"
@@ -27,19 +23,13 @@ import type {
 import { InProcessRunner, type ChildSession } from "../runners/in-process"
 import { buildChildArgs } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecordStore } from "../store"
+import { createTaskRecordStore, resolveStateDir } from "../store"
 import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
 import { createDagWaitSurface, type DagRunResult } from "./handle"
 import { createDagJournal } from "./journal"
-import {
-  createDagManager,
-  DagManagerError,
-  type DagManager,
-  type DagRunRecordV1,
-  type DagStartResult,
-} from "./manager"
+import { createDagManager, DagManagerError, type DagManager, type DagRunRecordV1, type DagStartResult } from "./manager"
 import { createDagRecovery } from "./recovery"
 import { persistDagNodeResult } from "./results"
 import {
@@ -49,9 +39,11 @@ import {
   type DagRunReentry,
   type DagScheduler,
 } from "./scheduler"
+import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-memory-store"
 import { createDagSkillMaterializer } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState, ownedTaskStateDir } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -65,7 +57,17 @@ const parentSessionId = "session-e2e-failure-parent"
 const rootSessionId = "session-e2e-failure-root"
 const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 
+const memoryStores: DagFileStore[] = []
+
+function memoryStore(project: string): DagFileStore {
+  const store = createInMemoryDagStore(resolveStateDir(ownedTaskState(project)))
+  memoryStores.push(store)
+  return store
+}
+
 afterEach(() => {
+  const journaled = memoryStores.splice(0).flatMap(journalFilesOnDisk)
+  expect(journaled).toEqual([])
   for (const root of cleanupRoots.splice(0)) {
     fs.rmSync(root, { recursive: true, force: true })
     expect(fs.existsSync(root)).toBe(false)
@@ -262,6 +264,9 @@ type E2eFixtureOptions = {
   readonly defaultConcurrency?: number
   readonly materializeSkills?: ReturnType<typeof createDagSkillMaterializer>
   readonly maxRunsPerSession?: number
+  // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
+  // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
+  readonly store?: DagFileStore
 }
 
 type E2eFixture = {
@@ -284,23 +289,33 @@ type E2eFixture = {
 
 function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
   const project = options.project ?? tempProject()
-  const store = createDagFileStore({
-    project_dir: project,
-    ...(options.maxRunsPerSession === undefined ? {} : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
-  })
-  const taskStore = createTaskRecordStore({ project_dir: project })
+  const store =
+    options.store ??
+    createDagFileStore({
+      project_dir: project,
+      task: {
+        state_dir: ownedTaskStateDir(project),
+        ...(options.maxRunsPerSession === undefined
+          ? {}
+          : { dag: { max_runs_per_session: options.maxRunsPerSession } }),
+      },
+    })
+  const taskStore = createTaskRecordStore(ownedTaskState(project))
   const runner = options.runner ?? new ImmediateRunner()
-  const taskManager = resultPersistingManager(createTaskManager({
-    store: taskStore,
-    runners: { "in-process": runner, process: options.processRunner ?? runner },
-    planner: options.childPlanner ?? planner,
-    config: OmoTaskSettingsSchema.parse({
-      default_concurrency: options.defaultConcurrency ?? 16,
-      max_depth: 1,
+  const taskManager = resultPersistingManager(
+    createTaskManager({
+      store: taskStore,
+      runners: { "in-process": runner, process: options.processRunner ?? runner },
+      planner: options.childPlanner ?? planner,
+      config: OmoTaskSettingsSchema.parse({
+        default_concurrency: options.defaultConcurrency ?? 16,
+        max_depth: 1,
+      }),
+      cwd: project,
+      ...(options.admit === undefined ? {} : { admit: options.admit }),
     }),
-    cwd: project,
-    ...(options.admit === undefined ? {} : { admit: options.admit }),
-  }), store)
+    store,
+  )
   let nextRun = 0
   const manager = createDagManager({
     store,
@@ -447,10 +462,11 @@ function rpcHandle(taskId: string): RpcChildHandle {
     dispose: () => Promise.resolve(),
     terminate: () => Promise.resolve(),
     exitOutcome: () => undefined,
-    waitForExit: () => Promise.resolve({
-      kind: "clean",
-      facts: { pid: 4242, code: 0, signal: null, stderrTail: "" },
-    }),
+    waitForExit: () =>
+      Promise.resolve({
+        kind: "clean",
+        facts: { pid: 4242, code: 0, signal: null, stderrTail: "" },
+      }),
     lastSeen: () => undefined,
   }
 }
@@ -483,49 +499,54 @@ async function readLine(stream: ReadableStream<Uint8Array>): Promise<string> {
 describe("DAG failure, crash, and policy end to end", () => {
   const DAG_FAILURE_E2E_TIMEOUT_MS = process.platform === "win32" ? 90_000 : 15_000
 
-  test("#given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure", async () => {
-    // given
-    const runner = new ControlledRunner()
-    const fixture = e2eFixture({ runner })
-    const input = definition("failure-order", [
-      categoryNode("graph-first-failure"),
-      categoryNode("wall-clock-first-failure"),
-      categoryNode("sibling-success"),
-      categoryNode("independent-root"),
-      categoryNode("skipped-dependent", ["graph-first-failure"]),
-      categoryNode("sibling-dependent", ["sibling-success"]),
-      categoryNode("independent-dependent", ["independent-root"]),
-    ])
+  test(
+    "#given two failures whose completion order opposes graph order #when the real engine runs #then siblings and independent branches finish, dependents skip, and graph order selects the primary failure",
+    async () => {
+      // given
+      const runner = new ControlledRunner()
+      const project = tempProject()
+      const fixture = e2eFixture({ runner, project, store: memoryStore(project) })
+      const input = definition("failure-order", [
+        categoryNode("graph-first-failure"),
+        categoryNode("wall-clock-first-failure"),
+        categoryNode("sibling-success"),
+        categoryNode("independent-root"),
+        categoryNode("skipped-dependent", ["graph-first-failure"]),
+        categoryNode("sibling-dependent", ["sibling-success"]),
+        categoryNode("independent-dependent", ["independent-root"]),
+      ])
 
-    // when
-    const started = await fixture.start(input)
-    await runner.whenStarted(4)
-    runner.settle("wall-clock-first-failure", failed("wall-clock-first-failure"))
-    runner.settle("sibling-success", completed("sibling-success"))
-    runner.settle("independent-root", completed("independent-root"))
-    runner.settle("graph-first-failure", failed("graph-first-failure"))
-    await runner.whenStarted(6)
-    runner.settle("sibling-dependent", completed("sibling-dependent"))
-    runner.settle("independent-dependent", completed("independent-dependent"))
-    const result = await fixture.wait(started.snapshot.runId)
+      // when
+      const started = await fixture.start(input)
+      await runner.whenStarted(4)
+      runner.settle("wall-clock-first-failure", failed("wall-clock-first-failure"))
+      runner.settle("sibling-success", completed("sibling-success"))
+      runner.settle("independent-root", completed("independent-root"))
+      runner.settle("graph-first-failure", failed("graph-first-failure"))
+      await runner.whenStarted(6)
+      runner.settle("sibling-dependent", completed("sibling-dependent"))
+      runner.settle("independent-dependent", completed("independent-dependent"))
+      const result = await fixture.wait(started.snapshot.runId)
 
-    // then
-    expect(result.status).toBe("failed")
-    expect(Object.fromEntries(Object.entries(result.nodes).map(([id, node]) => [id, node.state]))).toEqual({
-      "graph-first-failure": "failed",
-      "wall-clock-first-failure": "failed",
-      "sibling-success": "completed",
-      "independent-root": "completed",
-      "skipped-dependent": "skipped",
-      "sibling-dependent": "completed",
-      "independent-dependent": "completed",
-    })
-    const terminal = fixture.events(result.runId).find((event) => event.type === "dag.run.failed")
-    expect(terminal).toMatchObject({
-      type: "dag.run.failed",
-      error: { nodeId: "graph-first-failure", message: "failure:graph-first-failure" },
-    })
-  }, { timeout: DAG_FAILURE_E2E_TIMEOUT_MS })
+      // then
+      expect(result.status).toBe("failed")
+      expect(Object.fromEntries(Object.entries(result.nodes).map(([id, node]) => [id, node.state]))).toEqual({
+        "graph-first-failure": "failed",
+        "wall-clock-first-failure": "failed",
+        "sibling-success": "completed",
+        "independent-root": "completed",
+        "skipped-dependent": "skipped",
+        "sibling-dependent": "completed",
+        "independent-dependent": "completed",
+      })
+      const terminal = fixture.events(result.runId).find((event) => event.type === "dag.run.failed")
+      expect(terminal).toMatchObject({
+        type: "dag.run.failed",
+        error: { nodeId: "graph-first-failure", message: "failure:graph-first-failure" },
+      })
+    },
+    { timeout: DAG_FAILURE_E2E_TIMEOUT_MS },
+  )
 
   test("#given a crash after an owned task spawns but before task attachment #when a fresh manager resumes #then startOwned recovers the existing task and spawn count remains exactly one", async () => {
     // given
@@ -542,32 +563,41 @@ describe("DAG failure, crash, and policy end to end", () => {
       previousLeaseHolderPid: 99_001,
       nodes: initial.nodes.map((node) => ({ ...node, state: "scheduled" as const })),
     })
-    const owned = await first.taskManager.startOwned({
-      prompt: "do recover-me",
-      parent_session_id: parentSessionId,
-      root_session_id: rootSessionId,
-      depth: 1,
-      category: "quick",
-      name: "recover-me",
-      run_in_background: true,
-    }, {
-      kind: "dag",
-      runId,
-      nodeId: initial.nodes[0]?.id ?? "recover-me",
-      fingerprint: dagFingerprint({ definitionFingerprint: initial.definitionFingerprint, nodeId: initial.nodes[0]?.id ?? "recover-me" }),
-    })
+    const owned = await first.taskManager.startOwned(
+      {
+        prompt: "do recover-me",
+        parent_session_id: parentSessionId,
+        root_session_id: rootSessionId,
+        depth: 1,
+        category: "quick",
+        name: "recover-me",
+        run_in_background: true,
+      },
+      {
+        kind: "dag",
+        runId,
+        nodeId: initial.nodes[0]?.id ?? "recover-me",
+        fingerprint: dagFingerprint({
+          definitionFingerprint: initial.definitionFingerprint,
+          nodeId: initial.nodes[0]?.id ?? "recover-me",
+        }),
+      },
+    )
     if (owned.kind !== "started") throw new Error("owned task did not start")
     firstRunner.settle("recover-me", completed("recover-me"))
     await first.taskManager.waitFor(owned.task_id)
     const recoveredRunner = new ImmediateRunner()
-    const recoveredTaskManager = resultPersistingManager(createTaskManager({
-      store: createTaskRecordStore({ project_dir: project }),
-      runners: { "in-process": recoveredRunner, process: recoveredRunner },
-      planner,
-      config: OmoTaskSettingsSchema.parse({ default_concurrency: 16, max_depth: 1 }),
-      cwd: project,
-      hostPid: 202,
-    }), first.store)
+    const recoveredTaskManager = resultPersistingManager(
+      createTaskManager({
+        store: createTaskRecordStore(ownedTaskState(project)),
+        runners: { "in-process": recoveredRunner, process: recoveredRunner },
+        planner,
+        config: OmoTaskSettingsSchema.parse({ default_concurrency: 16, max_depth: 1 }),
+        cwd: project,
+        hostPid: 202,
+      }),
+      first.store,
+    )
 
     // when
     const outcomes = await createDagRecovery({
@@ -682,28 +712,30 @@ describe("DAG failure, crash, and policy end to end", () => {
   test("#given a missing requested skill #when the real run starts #then a missing_skill diagnostic is retained and the node still completes", async () => {
     // given
     const project = tempProject()
-    const store = createDagFileStore({ project_dir: project })
+    const store = memoryStore(project)
     const materializeSkills = createDagSkillMaterializer({
       store,
       cwd: project,
       loadSkills: (names) => ({ prepend: "", resolved: [], missing: [...names] }),
     })
-    const fixture = e2eFixture({ project, materializeSkills })
+    const fixture = e2eFixture({ project, materializeSkills, store })
 
     // when
-    const started = await fixture.start(definition("missing-skill", [
-      categoryNode("build", [], { load_skills: ["not-installed"] }),
-    ]))
+    const started = await fixture.start(
+      definition("missing-skill", [categoryNode("build", [], { load_skills: ["not-installed"] })]),
+    )
     const result = await fixture.wait(started.snapshot.runId)
 
     // then
     expect(result.status).toBe("completed")
     expect(result.nodes.build?.state).toBe("completed")
-    expect(result.snapshot.diagnostics).toContainEqual(expect.objectContaining({
-      kind: "missing_skill",
-      nodeId: "build",
-      skill: "not-installed",
-    }))
+    expect(result.snapshot.diagnostics).toContainEqual(
+      expect.objectContaining({
+        kind: "missing_skill",
+        nodeId: "build",
+        skill: "not-installed",
+      }),
+    )
   })
 
   test("#given a corrupt trailing JSONL fragment #when the store reopens #then the tail is discarded, diagnosed, and earlier events remain authoritative", async () => {
@@ -716,15 +748,17 @@ describe("DAG failure, crash, and policy end to end", () => {
     fs.appendFileSync(fixture.store.paths.event(started.snapshot.runId), '{"schemaVersion":1,"seq":999')
 
     // when
-    const reopened = createDagFileStore({ project_dir: project })
+    const reopened = createDagFileStore(ownedTaskState(project))
     const recovered = reopened.readEvents(started.snapshot.runId, 0, { limit: 256 })
 
     // then
     expect(recovered.events).toEqual(authoritative)
-    expect(reopened.diagnostics()).toContainEqual(expect.objectContaining({
-      kind: "event_log_recovered",
-      runId: started.snapshot.runId,
-    }))
+    expect(reopened.diagnostics()).toContainEqual(
+      expect.objectContaining({
+        kind: "event_log_recovered",
+        runId: started.snapshot.runId,
+      }),
+    )
     expect(fs.readFileSync(reopened.paths.event(started.snapshot.runId), "utf8")).toEndWith("\n")
   })
 
@@ -735,12 +769,14 @@ describe("DAG failure, crash, and policy end to end", () => {
     const script = join(project, "kill-mid-mutation.ts")
     const storeModule = pathToFileURL(join(import.meta.dir, "store.ts")).href
     const runId = "dag-kill-mid-mutation"
-    fs.writeFileSync(script, `
+    fs.writeFileSync(
+      script,
+      `
 import { createDagFileStore } from ${JSON.stringify(storeModule)}
 const project = process.argv[2]
 const stopAt = Number(process.argv[3])
 const runId = ${JSON.stringify(runId)}
-const store = createDagFileStore({ project_dir: project })
+const store = createDagFileStore(${JSON.stringify(ownedTaskState(project))})
 store.writeCheckpoint(runId, { schemaVersion: 1, checkpointSeq: 0, runId, applied: [] })
 for (let seq = 1; seq <= stopAt; seq += 1) {
   store.appendEvent({ schemaVersion: 1, runId, seq, at: new Date(seq).toISOString(), lane: "boundary", type: "dag.diagnostic.added", diagnostic: { kind: "run_flag", message: String(seq), at: new Date(seq).toISOString() } })
@@ -750,7 +786,8 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
   }
   store.writeCheckpoint(runId, { schemaVersion: 1, checkpointSeq: seq, runId, applied: Array.from({ length: seq }, (_, index) => index + 1) })
 }
-`)
+`,
+    )
     const child = Bun.spawn([process.execPath, script, project, String(stopAt)], {
       stdin: "pipe",
       stdout: "pipe",
@@ -763,8 +800,11 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     // when
     child.kill("SIGKILL")
     await child.exited
-    const reopened = createDagFileStore({ project_dir: project })
-    const beforeReplay = reopened.readCheckpoint<{ readonly checkpointSeq: number; readonly applied: readonly number[] }>(runId as DagRunId)
+    const reopened = createDagFileStore(ownedTaskState(project))
+    const beforeReplay = reopened.readCheckpoint<{
+      readonly checkpointSeq: number
+      readonly applied: readonly number[]
+    }>(runId as DagRunId)
     const journal = createDagJournal({
       store: reopened,
       runId: runId as DagRunId,
@@ -782,40 +822,47 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     expect(fs.readdirSync(reopened.paths.runs).some((name) => name.endsWith(".tmp"))).toBe(false)
   })
 
-  test("#given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure", async () => {
-    // given
-    const cap = 2
-    let residents = 0
-    let peakResidents = 0
-    const admit: AdmitResident = () => {
-      if (residents >= cap) return Promise.resolve({ kind: "rejected", message: "resident cap reached" })
-      residents += 1
-      peakResidents = Math.max(peakResidents, residents)
-      return Promise.resolve({ kind: "admitted" })
-    }
-    const runner = new ControlledRunner(() => {
-      residents -= 1
-    })
-    const fixture = e2eFixture({ runner, admit })
-    const input = definition("batched-wave", Array.from({ length: 7 }, (_, index) => categoryNode(`wide-${index}`)))
+  test(
+    "#given a wave wider than residency_max_children #when admission frees slots in batches #then every node completes without a residency failure",
+    async () => {
+      // given
+      const cap = 2
+      let residents = 0
+      let peakResidents = 0
+      const admit: AdmitResident = () => {
+        if (residents >= cap) return Promise.resolve({ kind: "rejected", message: "resident cap reached" })
+        residents += 1
+        peakResidents = Math.max(peakResidents, residents)
+        return Promise.resolve({ kind: "admitted" })
+      }
+      const runner = new ControlledRunner(() => {
+        residents -= 1
+      })
+      const fixture = e2eFixture({ runner, admit })
+      const input = definition(
+        "batched-wave",
+        Array.from({ length: 7 }, (_, index) => categoryNode(`wide-${index}`)),
+      )
 
-    // when
-    const started = await fixture.start(input)
-    for (let completedCount = 0; completedCount < input.nodes.length; completedCount += 1) {
-      await runner.whenStarted(completedCount + 1)
-      runner.settle(`wide-${completedCount}`, completed(`wide-${completedCount}`))
-    }
-    const result = await fixture.wait(started.snapshot.runId)
+      // when
+      const started = await fixture.start(input)
+      for (let completedCount = 0; completedCount < input.nodes.length; completedCount += 1) {
+        await runner.whenStarted(completedCount + 1)
+        runner.settle(`wide-${completedCount}`, completed(`wide-${completedCount}`))
+      }
+      const result = await fixture.wait(started.snapshot.runId)
 
-    // then
-    expect(result.status).toBe("completed")
-    expect(result.snapshot.counts).toEqual(expect.objectContaining({ total: 7, completed: 7, failed: 0 }))
-    expect(peakResidents).toBe(cap)
-    expect(runner.startedSpecs).toHaveLength(7)
-    expect(fixture.events(result.runId).filter((event) =>
-      event.type === "dag.node.transitioned" && event.to === "failed",
-    )).toHaveLength(0)
-  }, process.platform === "win32" ? 30_000 : 5_000)
+      // then
+      expect(result.status).toBe("completed")
+      expect(result.snapshot.counts).toEqual(expect.objectContaining({ total: 7, completed: 7, failed: 0 }))
+      expect(peakResidents).toBe(cap)
+      expect(runner.startedSpecs).toHaveLength(7)
+      expect(
+        fixture.events(result.runId).filter((event) => event.type === "dag.node.transitioned" && event.to === "failed"),
+      ).toHaveLength(0)
+    },
+    process.platform === "win32" ? 30_000 : 5_000,
+  )
 
   test("#given expired terminal artifacts and equally old live artifacts #when retention runs #then events, results, and skills are pruned only for the terminal run", () => {
     // given
@@ -824,7 +871,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     const old = "2026-08-01T00:00:00.000Z"
     const store = createDagFileStore({
       project_dir: project,
-      task: { dag: { retention_days: 7 } },
+      task: { state_dir: ownedTaskStateDir(project), dag: { retention_days: 7 } },
     })
     const terminalRun = "dag-terminal-expired" as DagRunId
     const liveRun = "dag-live-old" as DagRunId
@@ -867,13 +914,15 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
       store.paths.event(terminalRun),
       join(store.paths.results, terminalRun),
       join(store.paths.root, "skills", `${terminalRun}.json`),
-    ]) expect(fs.existsSync(path)).toBe(false)
+    ])
+      expect(fs.existsSync(path)).toBe(false)
     for (const path of [
       store.paths.run(liveRun),
       store.paths.event(liveRun),
       join(store.paths.results, liveRun),
       join(store.paths.root, "skills", `${liveRun}.json`),
-    ]) expect(fs.existsSync(path)).toBe(true)
+    ])
+      expect(fs.existsSync(path)).toBe(true)
   })
 })
 
@@ -989,9 +1038,10 @@ describe("DAG retry, amend, and revive end to end", () => {
     // given - admission denies while the cap is full and no sibling can free a slot, minting residency_denied
     let capOpen = false
     const runner = new ControlledRunner()
-    const admit: AdmitResident = () => capOpen
-      ? Promise.resolve({ kind: "admitted" })
-      : Promise.resolve({ kind: "rejected", message: "resident child cap reached" })
+    const admit: AdmitResident = () =>
+      capOpen
+        ? Promise.resolve({ kind: "admitted" })
+        : Promise.resolve({ kind: "rejected", message: "resident child cap reached" })
     const fixture = e2eFixture({ runner, admit })
     const started = await fixture.start(definition("residency-rescue", [categoryNode("stormy")]))
     const runId = started.snapshot.runId
@@ -1029,7 +1079,9 @@ describe("DAG retry, amend, and revive end to end", () => {
     await runner.whenStarted(2)
     runner.settle("wrong", failed("wrong"))
     await fixture.wait(runId)
-    const stableTaskId = fixture.manager.record(runId, parentSessionId).nodes.find((entry) => entry.id === "stable")?.taskId
+    const stableTaskId = fixture.manager
+      .record(runId, parentSessionId)
+      .nodes.find((entry) => entry.id === "stable")?.taskId
 
     // when
     const amended = definition("amend-after-failure", [
@@ -1090,23 +1142,23 @@ describe("DAG retry, amend, and revive end to end", () => {
     // given - mirrors dag_2d12c2f7: A and B share wave 0; C depends on both.
     const runner = new ControlledRunner()
     const fixture = e2eFixture({ runner })
-    const started = await fixture.start(definition("revive-inside-live-wave", [
-      categoryNode("A"),
-      categoryNode("B"),
-      categoryNode("C", ["A", "B"]),
-    ]))
+    const started = await fixture.start(
+      definition("revive-inside-live-wave", [categoryNode("A"), categoryNode("B"), categoryNode("C", ["A", "B"])]),
+    )
     const runId = started.snapshot.runId
     await runner.whenStarted(2)
-    const bFailed = fixture.whenEvent(runId, (event) =>
-      event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "failed",
+    const bFailed = fixture.whenEvent(
+      runId,
+      (event) => event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "failed",
     )
     runner.settle("B", failed("B"))
     await bFailed
     const sent = await fixture.send(runId, "B" as DagNodeId, "continue after the transient abort")
 
     // when - A is the last settlement still known to the original wave await set.
-    const aCompleted = fixture.whenEvent(runId, (event) =>
-      event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
+    const aCompleted = fixture.whenEvent(
+      runId,
+      (event) => event.type === "dag.node.transitioned" && event.nodeId === "A" && event.to === "completed",
     )
     runner.settle("A", completed("A"))
     await aCompleted
@@ -1115,12 +1167,13 @@ describe("DAG retry, amend, and revive end to end", () => {
     // then - B's revived turn remains part of the live barrier, so no terminal event can land yet.
     expect(sent.delivery).toBe("revive")
     expect(fixture.manager.record(runId, parentSessionId).status).toBe("running")
-    expect(fixture.events(runId).some((event) =>
-      event.type === "dag.run.completed" || event.type === "dag.run.failed",
-    )).toBe(false)
+    expect(
+      fixture.events(runId).some((event) => event.type === "dag.run.completed" || event.type === "dag.run.failed"),
+    ).toBe(false)
 
-    const bCompleted = fixture.whenEvent(runId, (event) =>
-      event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "completed",
+    const bCompleted = fixture.whenEvent(
+      runId,
+      (event) => event.type === "dag.node.transitioned" && event.nodeId === "B" && event.to === "completed",
     )
     runner.settle("B", completed("B-revived"))
     await bCompleted
@@ -1136,9 +1189,9 @@ describe("DAG retry, amend, and revive end to end", () => {
       "B:completed",
       "C:completed",
     ])
-    const terminal = fixture.events(runId).filter((event) =>
-      event.type === "dag.run.completed" || event.type === "dag.run.failed",
-    )
+    const terminal = fixture
+      .events(runId)
+      .filter((event) => event.type === "dag.run.completed" || event.type === "dag.run.failed")
     expect(terminal).toHaveLength(1)
     expect(terminal[0]?.type).toBe("dag.run.completed")
   })
@@ -1166,14 +1219,20 @@ describe("DAG retry, amend, and revive end to end", () => {
     expect(record.nodes[0]).toMatchObject({ state: "completed", taskId })
     expect(record.nodes[0]?.error).toBeUndefined()
     expect(runner.startedSpecs).toHaveLength(1)
-    expect(fixture.events(runId).filter((event) =>
-      event.type === "dag.node.transitioned" && event.nodeId === "stuck" && event.to === "completed",
-    )).toHaveLength(1)
-    expect(fixture.events(runId)).toContainEqual(expect.objectContaining({
-      type: "dag.node.steered",
-      nodeId: "stuck",
-      delivery: "revive",
-    }))
+    expect(
+      fixture
+        .events(runId)
+        .filter(
+          (event) => event.type === "dag.node.transitioned" && event.nodeId === "stuck" && event.to === "completed",
+        ),
+    ).toHaveLength(1)
+    expect(fixture.events(runId)).toContainEqual(
+      expect.objectContaining({
+        type: "dag.node.steered",
+        nodeId: "stuck",
+        delivery: "revive",
+      }),
+    )
     expect(fs.readFileSync(fixture.store.paths.result(runId, "stuck"), "utf8")).toBe("output:stuck-revived")
   })
 })

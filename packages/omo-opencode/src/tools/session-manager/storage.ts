@@ -1,8 +1,28 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { isSqliteBackend } from "../../shared/opencode-storage-detection"
 import { log } from "../../shared"
-import { getFileAllSessions, getFileMainSessions, fileSessionExists, getFileSessionInfo, getFileSessionMessages, getFileSessionTodos, getFileSessionTranscript } from "./file-storage"
-import { getSdkAllSessions, getSdkMainSessions, getSdkSessionMessages, getSdkSessionTodos, sdkSessionExists, shouldFallbackFromSdkError, type GlobalSessionClient } from "./sdk-storage"
+import {
+  forEachFileSessionMessagePage,
+  getFileAllSessions,
+  getFileMainSessions,
+  fileSessionExists,
+  getFileSessionInfo,
+  getFileSessionMessages,
+  getFileSessionTodos,
+  getFileSessionTranscript,
+} from "./file-storage"
+import {
+  forEachSdkSessionMessagePage,
+  getSdkAllSessions,
+  getSdkMainSessions,
+  getSdkSessionMessages,
+  getSdkSessionMessageWindow,
+  getSdkSessionTodos,
+  sdkSessionExists,
+  SDK_MESSAGE_PAGE_SIZE,
+  shouldFallbackFromSdkError,
+  type GlobalSessionClient,
+} from "./sdk-storage"
 import type { SessionInfo, SessionMessage, SessionMetadata, TodoItem } from "./types"
 import { describeSessionError } from "./session-error"
 
@@ -30,10 +50,7 @@ function normalizeProjectFilter(directory?: string): string | undefined {
   return directory
 }
 
-function mergeSessionMetadataLists(
-  sdkSessions: SessionMetadata[],
-  fileSessions: SessionMetadata[],
-): SessionMetadata[] {
+function mergeSessionMetadataLists(sdkSessions: SessionMetadata[], fileSessions: SessionMetadata[]): SessionMetadata[] {
   const merged = new Map<string, SessionMetadata>()
 
   for (const session of fileSessions) {
@@ -69,12 +86,19 @@ export async function getMainSessions(options: GetMainSessionsOptions): Promise<
   const directory = normalizeProjectFilter(options.directory)
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkSessions = await getSdkMainSessions(sdkClient, directory, globalSessionClient ?? undefined, options.limit)
+      const sdkSessions = await getSdkMainSessions(
+        sdkClient,
+        directory,
+        globalSessionClient ?? undefined,
+        options.limit,
+      )
       const fileSessions = await getFileMainSessions(directory)
       return mergeSessionMetadataLists(sdkSessions, fileSessions)
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session list after SDK unavailable error", { error: describeSessionError(error) })
+      log("[session-manager] falling back to file session list after SDK unavailable error", {
+        error: describeSessionError(error),
+      })
     }
   }
 
@@ -89,7 +113,9 @@ export async function getAllSessions(limit?: number): Promise<string[]> {
       return mergeSessionIds(sdkSessionIds, fileSessionIds)
     } catch (error) {
       if (!shouldFallbackFromSdkError(error)) throw error
-      log("[session-manager] falling back to file session ids after SDK unavailable error", { error: describeSessionError(error) })
+      log("[session-manager] falling back to file session ids after SDK unavailable error", {
+        error: describeSessionError(error),
+      })
     }
   }
 
@@ -105,24 +131,79 @@ export async function sessionExists(sessionID: string): Promise<boolean> {
       if (existsInSdk) return true
     } catch (error) {
       if (!shouldReadFileSession(error)) throw error
-      log("[session-manager] reading file sessionExists after SDK error", { error: describeSessionError(error), sessionID })
+      log("[session-manager] reading file sessionExists after SDK error", {
+        error: describeSessionError(error),
+        sessionID,
+      })
     }
   }
   return fileSessionExists(sessionID)
 }
 
-export async function readSessionMessages(sessionID: string): Promise<SessionMessage[]> {
+export type ReadSessionMessagesOptions = {
+  // With a limit, only that many messages (the newest when fromEnd, else the oldest) are ever held.
+  limit?: number
+  fromEnd?: boolean
+  signal?: AbortSignal
+}
+
+export async function readSessionMessages(
+  sessionID: string,
+  options: ReadSessionMessagesOptions = {},
+): Promise<SessionMessage[]> {
+  const window =
+    options.limit && options.limit > 0 ? { limit: options.limit, fromEnd: options.fromEnd === true } : undefined
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkMessages = await getSdkSessionMessages(sdkClient, sessionID)
+      const sdkMessages = window
+        ? await getSdkSessionMessageWindow(sdkClient, sessionID, window, options.signal)
+        : await getSdkSessionMessages(sdkClient, sessionID, options.signal)
       if (sdkMessages.length > 0) return sdkMessages
     } catch (error) {
+      options.signal?.throwIfAborted()
       if (!shouldReadFileSession(error)) throw error
-      log("[session-manager] reading file session messages after SDK error", { error: describeSessionError(error), sessionID })
+      log("[session-manager] reading file session messages after SDK error", {
+        error: describeSessionError(error),
+        sessionID,
+      })
     }
   }
 
-  return getFileSessionMessages(sessionID)
+  return getFileSessionMessages(sessionID, window, options.signal)
+}
+
+// Walks a session newest page first (each page ascending) without holding more than one page.
+// `visit` returns false to stop early; an aborted signal stops the walk by throwing its reason.
+export async function forEachSessionMessagePage(
+  sessionID: string,
+  visit: (messages: SessionMessage[]) => boolean | void,
+  signal?: AbortSignal,
+): Promise<void> {
+  if (isSqliteBackend() && sdkClient) {
+    let visitedPages = 0
+    try {
+      await forEachSdkSessionMessagePage(
+        sdkClient,
+        sessionID,
+        (messages) => {
+          visitedPages++
+          return visit(messages)
+        },
+        { signal },
+      )
+      if (visitedPages > 0) return
+    } catch (error) {
+      signal?.throwIfAborted()
+      // Pages already visited cannot be replayed from file storage without double-counting them.
+      if (visitedPages > 0 || !shouldReadFileSession(error)) throw error
+      log("[session-manager] reading file session pages after SDK error", {
+        error: describeSessionError(error),
+        sessionID,
+      })
+    }
+  }
+
+  await forEachFileSessionMessagePage(sessionID, visit, { pageSize: SDK_MESSAGE_PAGE_SIZE, signal })
 }
 
 export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
@@ -132,7 +213,10 @@ export async function readSessionTodos(sessionID: string): Promise<TodoItem[]> {
       if (sdkTodos.length > 0) return sdkTodos
     } catch (error) {
       if (!shouldReadFileSession(error)) throw error
-      log("[session-manager] reading file session todos after SDK error", { error: describeSessionError(error), sessionID })
+      log("[session-manager] reading file session todos after SDK error", {
+        error: describeSessionError(error),
+        sessionID,
+      })
     }
   }
 
@@ -143,30 +227,37 @@ export async function readSessionTranscript(sessionID: string): Promise<number> 
   return getFileSessionTranscript(sessionID)
 }
 
-export async function getSessionInfo(sessionID: string): Promise<SessionInfo | null> {
+export async function getSessionInfo(sessionID: string, signal?: AbortSignal): Promise<SessionInfo | null> {
   if (isSqliteBackend() && sdkClient) {
     try {
-      const sdkMessages = await getSdkSessionMessages(sdkClient, sessionID)
-      if (sdkMessages.length > 0) {
-        const agentsUsed = new Set<string>()
-        let firstMessage: Date | undefined
-        let lastMessage: Date | undefined
-
-        for (const msg of sdkMessages) {
-          if (msg.agent) agentsUsed.add(msg.agent)
-          if (msg.time?.created) {
-            const date = new Date(msg.time.created)
-            if (!firstMessage || date < firstMessage) firstMessage = date
-            if (!lastMessage || date > lastMessage) lastMessage = date
+      // Counted page by page so the session is never held whole.
+      let messageCount = 0
+      const agentsUsed = new Set<string>()
+      let firstMessage: Date | undefined
+      let lastMessage: Date | undefined
+      await forEachSdkSessionMessagePage(
+        sdkClient,
+        sessionID,
+        (messages) => {
+          messageCount += messages.length
+          for (const msg of messages) {
+            if (msg.agent) agentsUsed.add(msg.agent)
+            if (msg.time?.created) {
+              const date = new Date(msg.time.created)
+              if (!firstMessage || date < firstMessage) firstMessage = date
+              if (!lastMessage || date > lastMessage) lastMessage = date
+            }
           }
-        }
-
+        },
+        { signal },
+      )
+      if (messageCount > 0) {
         const todos = await readSessionTodos(sessionID)
         const transcriptEntries = await readSessionTranscript(sessionID)
 
         return {
           id: sessionID,
-          message_count: sdkMessages.length,
+          message_count: messageCount,
           first_message: firstMessage,
           last_message: lastMessage,
           agents_used: Array.from(agentsUsed),
@@ -177,10 +268,14 @@ export async function getSessionInfo(sessionID: string): Promise<SessionInfo | n
         }
       }
     } catch (error) {
+      signal?.throwIfAborted()
       if (!shouldReadFileSession(error)) throw error
-      log("[session-manager] reading file session info after SDK error", { error: describeSessionError(error), sessionID })
+      log("[session-manager] reading file session info after SDK error", {
+        error: describeSessionError(error),
+        sessionID,
+      })
     }
   }
 
-  return getFileSessionInfo(sessionID)
+  return getFileSessionInfo(sessionID, signal)
 }

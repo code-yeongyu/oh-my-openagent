@@ -13,7 +13,7 @@ describe("parseSyncConflictName (hub worktree-merge keepSideCopy shape)", () => 
     ["x.sync-conflict-20261015-host", "x"],
     ["archive.tar.sync-conflict-20261015-mac.gz", "archive.tar.gz"],
     ["a.sync-conflict-20261015-.md", "a.md"],
-    ["people/hojin/card.sync-conflict-20260101-jobdori2.md", "people/hojin/card.md"],
+    ["people/hojin/card.sync-conflict-20260101-worker2.md", "people/hojin/card.md"],
   ]
   for (const [input, target] of hits) {
     test(`${input} targets ${target}`, () => {
@@ -77,7 +77,8 @@ describe("stripT2Blocks (hub md-merge-driver pickFrontmatter shape)", () => {
   })
 
   test("QA failure case: a malformed T2 block stays untouched", () => {
-    const bad = "\n<!-- memory-sync 2026-10-15: the other machine had different frontmatter for n.md; kept here so no fact is lost:\n---\n: [unclosed\n---\n-->\n"
+    const bad =
+      "\n<!-- memory-sync 2026-10-15: the other machine had different frontmatter for n.md; kept here so no fact is lost:\n---\n: [unclosed\n---\n-->\n"
     const r = stripT2Blocks(`keep me\n${bad}after\n`)
     expect(r.entries).toEqual([])
     expect(r.malformed).toEqual([bad])
@@ -109,7 +110,7 @@ describe("stripT2Blocks (hub md-merge-driver pickFrontmatter shape)", () => {
 
 describe("hub-trace folding end to end (fixture shaped like real hub output)", () => {
   const mainText =
-    "---\ntitle: Daily log\nauthor: Dori\n---\nwoke up, built the thing\n" +
+    "---\ntitle: Daily log\nauthor: Demo\n---\nwoke up, built the thing\n" +
     t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n")
   const sideText = "---\ntitle: Daily log\nreviewed: true\n---\nshipped the cutover; reviewed the queue\n"
 
@@ -122,7 +123,12 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
 
   test("T1 folds the side file in insert-only and schedules its removal; T2 lands as frontmatter", async () => {
     const doc = await newDoc("1")
-    const plan = planAdoption(files(), { currentText: null, tombstoned: false, lastMaterialised: null, registers: soleRegisters(null) })
+    const plan = planAdoption(files(), {
+      currentText: null,
+      tombstoned: false,
+      lastMaterialised: null,
+      registers: soleRegisters(null),
+    })
     expect(plan.action).toBe("capture")
     if (plan.action !== "capture") return
     expect(plan.removalCandidates).toEqual(["notes/daily.sync-conflict-20261015-mini.md"])
@@ -131,28 +137,36 @@ describe("hub-trace folding end to end (fixture shaped like real hub output)", (
     expect(rendered).toBe(plan.rendered)
     const parsed = splitItem(rendered)
 
-    const preBody = splitItem(mainText).body.replace(t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n"), "")
+    const preBody = splitItem(mainText).body.replace(
+      t2Block("2026-10-15", "notes/daily.md", "---\nreviewed: true\n---\n"),
+      "",
+    )
     expect(isOrderedSubsequence(preBody, parsed.body)).toBe(true)
     expect(isOrderedSubsequence(splitItem(sideText).body, parsed.body)).toBe(true)
     expect(parsed.body).not.toContain("<!-- memory-sync")
 
     const values = fmValuesByKey(parsed.fm ?? [])
     expect(values.get("title")).toEqual({ kind: "reg", value: "Daily log" })
-    expect(values.get("author")).toEqual({ kind: "reg", value: "Dori" })
+    expect(values.get("author")).toEqual({ kind: "reg", value: "Demo" })
     expect(values.get("reviewed")).toEqual({ kind: "reg", value: "true" })
     doc.free()
   })
 
   test("the fold is idempotent against the adopted state", async () => {
     const doc = await newDoc("1")
-    const first = planAdoption(files(), { currentText: null, tombstoned: false, lastMaterialised: null, registers: soleRegisters(null) })
+    const first = planAdoption(files(), {
+      currentText: null,
+      tombstoned: false,
+      lastMaterialised: null,
+      registers: soleRegisters(null),
+    })
     if (first.action !== "capture") throw new Error("expected capture")
     applyPlan(doc, "", first)
     const second = planAdoption(files(), {
       currentText: renderDocContent(doc),
       tombstoned: false,
       lastMaterialised: null,
-      registers: activeRegisters(doc)
+      registers: activeRegisters(doc),
     })
     expect(second.action).toBe("none")
     doc.free()

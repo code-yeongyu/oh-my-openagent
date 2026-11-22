@@ -1,6 +1,7 @@
 use objc2_application_services::AXUIElement;
 use objc2_core_foundation::CFRetained;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
+use senpi_desktop_core::intervention::check_press;
 
 use super::super::{actions, element};
 use super::{choose_in, PopupControl, Waits};
@@ -27,6 +28,7 @@ impl PopupControl for AXUIElement {
     }
 
     fn perform(&self, action: &str) -> CoreResult<()> {
+        check_press()?;
         actions::perform(self, action)
     }
 
@@ -62,6 +64,7 @@ impl PopupControl for AXUIElement {
     }
 
     fn press_item(&self, item: &Self::Item) -> CoreResult<()> {
+        check_press()?;
         actions::perform(item, "AXPress")
     }
 }

@@ -195,10 +195,7 @@ describe("loadOmoConfig surgical pruning", () => {
   test("#given a prototype-pollution payload nested under agents.evil beside a prunable invalid leaf #when loading #then the pollution guard rejects the layer fail-closed instead of pruning and accepting", () => {
     // given
     const fixture = makeFixture()
-    writeProjectConfig(
-      fixture.homeDir,
-      `{"agents":{"evil":{"__proto__":{"x":1},"model":123}}}`,
-    )
+    writeProjectConfig(fixture.homeDir, `{"agents":{"evil":{"__proto__":{"x":1},"model":123}}}`)
 
     try {
       // when

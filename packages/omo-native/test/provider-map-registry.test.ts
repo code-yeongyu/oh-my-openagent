@@ -4,29 +4,32 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { engineDependencyDir } from "../bin/lib/engine-dependency.js"
+import { sameVersion } from "../bin/lib/same-version.js"
 import providerMap from "../bin/lib/provider-map.json"
 import omoNativeManifest from "../package.json"
 
 const senpiEntryPath = fileURLToPath(import.meta.resolve("@code-yeongyu/senpi"))
 const senpiPackageRoot = dirname(dirname(senpiEntryPath))
-const senpiManifest = JSON.parse(
-  await readFile(join(senpiPackageRoot, "package.json"), "utf8"),
-) as { version: string }
+const senpiManifest = JSON.parse(await readFile(join(senpiPackageRoot, "package.json"), "utf8")) as { version: string }
 const piAiRoot = engineDependencyDir(senpiPackageRoot, "@earendil-works/pi-ai")
 if (piAiRoot === undefined) throw new Error(`@earendil-works/pi-ai is not resolvable from ${senpiPackageRoot}`)
 const providerRegistryUrl = pathToFileURL(join(piAiRoot, "dist", "providers", "all.js")).href
-const { builtinProviders } = await import(providerRegistryUrl) as {
-  builtinProviders(): Array<{ id: string, auth?: { oauth?: unknown } }>
+const { builtinProviders } = (await import(providerRegistryUrl)) as {
+  builtinProviders(): Array<{ id: string; auth?: { oauth?: unknown } }>
 }
 
-const { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID } = await import(pathToFileURL(join(
-  senpiPackageRoot, "dist", "core", "extensions", "builtin", "anthropic-subscription", "account-management.js",
-)).href) as { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID: string }
+const { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID } = (await import(
+  pathToFileURL(
+    join(senpiPackageRoot, "dist", "core", "extensions", "builtin", "anthropic-subscription", "account-management.js"),
+  ).href
+)) as { ANTHROPIC_SUBSCRIPTION_PROVIDER_ID: string }
 
 test("#given the installed Senpi pin #when builtin providers are derived #then the provider map is exact", () => {
-  expect(senpiManifest.version).toBe(omoNativeManifest.dependencies["@code-yeongyu/senpi"])
+  expect(sameVersion(senpiManifest.version, omoNativeManifest.dependencies["@code-yeongyu/senpi"])).toBe(true)
 
-  const expectedProviderIds = builtinProviders().map(({ id }) => id).sort()
+  const expectedProviderIds = builtinProviders()
+    .map(({ id }) => id)
+    .sort()
 
   expect(providerMap.builtinProviderIds).toEqual(expectedProviderIds)
 })

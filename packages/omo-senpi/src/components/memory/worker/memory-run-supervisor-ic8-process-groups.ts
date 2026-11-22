@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { windowsTreeKillArgs } from "../../../../../memory-core/src/concurrency/windows-process-tree.mjs"
 
 interface TaskkillResult {
   status: number | null
@@ -16,8 +17,10 @@ export interface ProcessGroupRuntime {
 const defaultRuntime: ProcessGroupRuntime = {
   platform: process.platform,
   runTaskkill: async (pid) => {
+    const args = windowsTreeKillArgs(pid)
+    if (args.length === 0) return { status: 0 }
     return await new Promise<TaskkillResult>((resolve) => {
-      const child = spawn("taskkill", ["/pid", String(pid), "/T", "/F"], {
+      const child = spawn("taskkill", args, {
         stdio: "ignore",
         windowsHide: true,
       })
@@ -37,8 +40,7 @@ const defaultRuntime: ProcessGroupRuntime = {
     })
   },
   killGroup: (pid) => process.kill(-pid, "SIGKILL"),
-  probeGroup: (pid) =>
-    process.kill(process.platform === "win32" ? pid : -pid, 0),
+  probeGroup: (pid) => process.kill(process.platform === "win32" ? pid : -pid, 0),
 }
 
 export function validateProcessGroupPid(pid: number): number {
@@ -48,10 +50,7 @@ export function validateProcessGroupPid(pid: number): number {
   return pid
 }
 
-export async function terminateProcessGroup(
-  pid: number,
-  runtime: ProcessGroupRuntime = defaultRuntime,
-): Promise<void> {
+export async function terminateProcessGroup(pid: number, runtime: ProcessGroupRuntime = defaultRuntime): Promise<void> {
   const validatedPid = validateProcessGroupPid(pid)
   if (runtime.platform !== "win32") {
     runtime.killGroup(validatedPid)
@@ -60,17 +59,12 @@ export async function terminateProcessGroup(
   const result = await runtime.runTaskkill(validatedPid)
   if (result.error) throw result.error
   if (result.status !== 0) {
-    const detail = result.signal
-      ? `signal ${result.signal}`
-      : `exit code ${String(result.status)}`
+    const detail = result.signal ? `signal ${result.signal}` : `exit code ${String(result.status)}`
     throw new Error(`taskkill failed with ${detail}`)
   }
 }
 
-export function processGroupIsAlive(
-  pid: number,
-  runtime: ProcessGroupRuntime = defaultRuntime,
-): boolean {
+export function processGroupIsAlive(pid: number, runtime: ProcessGroupRuntime = defaultRuntime): boolean {
   const validatedPid = validateProcessGroupPid(pid)
   try {
     runtime.probeGroup(validatedPid)

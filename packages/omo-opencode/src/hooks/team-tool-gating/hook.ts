@@ -3,10 +3,7 @@ import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import { lookupTeamSession } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
-import {
-  listActiveTeams,
-  loadRuntimeState,
-} from "../../features/team-mode/team-state-store"
+import { listActiveTeams, loadRuntimeState } from "../../features/team-mode/team-state-store"
 
 const ACTIVE_RUNTIME_STATUSES = new Set<RuntimeState["status"]>(["creating", "active", "shutdown_requested"])
 const UNIVERSAL_TOOL_NAMES = new Set([
@@ -19,9 +16,7 @@ const UNIVERSAL_TOOL_NAMES = new Set([
 ])
 
 type TeamParticipant =
-  | { role: "neither" }
-  | { role: "lead"; teamRunId: string }
-  | { role: "member"; teamRunId: string; memberName: string }
+  { role: "neither" } | { role: "lead"; teamRunId: string } | { role: "member"; teamRunId: string; memberName: string }
 
 function getStringArg(args: Record<string, unknown>, key: string): string | undefined {
   const value = args[key]
@@ -72,10 +67,12 @@ function isLeadOfTargetTeam(participant: TeamParticipant, teamRunId: string | un
   return participant.role === "lead" && participant.teamRunId === teamRunId
 }
 
-function isTargetMember(participant: TeamParticipant, teamRunId: string | undefined, memberName: string | undefined): boolean {
-  return participant.role === "member"
-    && participant.teamRunId === teamRunId
-    && participant.memberName === memberName
+function isTargetMember(
+  participant: TeamParticipant,
+  teamRunId: string | undefined,
+  memberName: string | undefined,
+): boolean {
+  return participant.role === "member" && participant.teamRunId === teamRunId && participant.memberName === memberName
 }
 
 export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig | undefined): Hooks {
@@ -131,10 +128,7 @@ export function createTeamToolGating(_ctx: PluginInput, config: TeamModeConfig |
       }
 
       if (UNIVERSAL_TOOL_NAMES.has(toolName)) {
-        if (
-          (participant.role === "lead" || participant.role === "member")
-          && participant.teamRunId === teamRunId
-        ) {
+        if ((participant.role === "lead" || participant.role === "member") && participant.teamRunId === teamRunId) {
           return
         }
 

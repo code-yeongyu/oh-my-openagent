@@ -12,12 +12,15 @@ mod fake_listener;
 mod mcp;
 mod oneshot;
 mod outbox;
+#[cfg(unix)]
+mod peer;
 mod route;
 mod rpc;
 mod selftest;
 mod serve;
 mod settle;
 mod stop_path;
+mod trace;
 #[cfg(any(test, target_os = "macos"))]
 mod sessions;
 #[cfg(target_os = "macos")]
@@ -58,6 +61,16 @@ fn main() -> ExitCode {
     // starts. It is not a desktop RPC method and creates no input backend.
     if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--cursor-overlay")) {
         return cursor_overlay();
+    }
+    // The private release helper (#11466): an input request's copy of this
+    // engine that releases its held input if the engine dies.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--release-helper")) {
+        return release_helper();
+    }
+    // The private keyboard-layout helper (#11466): reads the current layout on
+    // its main thread for typing into a remote screen.
+    if std::env::args_os().nth(1).as_deref() == Some(std::ffi::OsStr::new("--keymap-helper")) {
+        return keymap_helper();
     }
     match Cli::parse().mode() {
         Mode::XpcAgent { .. } => fail("--xpc-agent must be the first argument"),
@@ -118,10 +131,13 @@ fn main() -> ExitCode {
             idle,
             daemon,
         } => with_engine(|engine| async move {
-            daemon::open_daemon_session(&engine, &daemon, &client::token_file(&endpoint)).await?;
-            serve::run_serve(engine, &endpoint, idle)
-                .await
-                .map_err(|error| format!("--serve {endpoint}: {error}"))
+            let failed = |error: std::io::Error| format!("--serve {endpoint}: {error}");
+            let mut bound = serve::bind(&endpoint).map_err(failed)?;
+            daemon::open_daemon_session(&engine, &daemon).await?;
+            bound
+                .write_token(engine.stop_paths().resume_token())
+                .map_err(|error| format!("--serve {endpoint}: cannot write the resume token: {error}"))?;
+            serve::run_serve(engine, bound, idle).await.map_err(failed)
         }),
     }
 }
@@ -138,7 +154,10 @@ fn run_xpc(_: &str) -> ExitCode {
 
 #[cfg(target_os = "macos")]
 fn check_launch() -> Result<(), String> {
-    senpi_desktop_backend_macos::check_launch()
+    senpi_desktop_backend_macos::check_launch().map_err(|refusal| {
+        eprintln!("{}", refusal.record());
+        refusal.to_string()
+    })
 }
 
 #[cfg(not(target_os = "macos"))]
@@ -157,6 +176,35 @@ fn cursor_overlay() -> ExitCode {
 #[cfg(not(target_os = "macos"))]
 fn cursor_overlay() -> ExitCode {
     fail("cursor overlay is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn release_helper() -> ExitCode {
+    match senpi_desktop_backend_macos::run_release_helper() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => fail(&format!("release helper: {error}")),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn release_helper() -> ExitCode {
+    fail("the input release helper is unavailable on this platform")
+}
+
+#[cfg(target_os = "macos")]
+fn keymap_helper() -> ExitCode {
+    let Some(path) = std::env::args_os().nth(2) else {
+        return ExitCode::from(64);
+    };
+    match senpi_desktop_backend_macos::run_keymap_helper(std::path::Path::new(&path)) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(status) => ExitCode::from(u8::try_from(status).unwrap_or(1)),
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn keymap_helper() -> ExitCode {
+    fail("the keyboard layout helper is unavailable on this platform")
 }
 
 fn print_schema() -> ExitCode {

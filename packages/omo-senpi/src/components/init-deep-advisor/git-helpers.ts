@@ -4,11 +4,7 @@ import { extname, join, resolve } from "node:path"
 
 import { SOURCE_EXTENSIONS } from "./constants"
 
-const DRIFT_EXCLUDES = [
-  ":(exclude)AGENTS.md",
-  ":(exclude,glob)**/AGENTS.md",
-  ":(exclude).omo/init-deep.json",
-]
+const DRIFT_EXCLUDES = [":(exclude)AGENTS.md", ":(exclude,glob)**/AGENTS.md", ":(exclude).omo/init-deep.json"]
 
 export function run(root: string, args: readonly string[]): string {
   return execFileSync("git", [...args], {
@@ -62,32 +58,12 @@ export function gitTrackedFileCount(root: string): number {
 }
 
 export function gitTouchedFilesSince(root: string, sha: string): string[] {
-  const output = run(root, [
-    "diff",
-    "--name-only",
-    "-z",
-    "--find-renames",
-    sha,
-    "HEAD",
-    "--",
-    ".",
-    ...DRIFT_EXCLUDES,
-  ])
+  const output = run(root, ["diff", "--name-only", "-z", "--find-renames", sha, "HEAD", "--", ".", ...DRIFT_EXCLUDES])
   return output.split("\0").filter((entry) => entry.length > 0)
 }
 
 export function gitChurnLoc(root: string, sha: string): number {
-  const output = run(root, [
-    "diff",
-    "--numstat",
-    "-z",
-    "--find-renames",
-    sha,
-    "HEAD",
-    "--",
-    ".",
-    ...DRIFT_EXCLUDES,
-  ])
+  const output = run(root, ["diff", "--numstat", "-z", "--find-renames", sha, "HEAD", "--", ".", ...DRIFT_EXCLUDES])
   const tokens = output.split("\0")
   let churn = 0
   for (let index = 0; index < tokens.length; index += 1) {

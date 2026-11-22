@@ -1,11 +1,6 @@
 import * as p from "@clack/prompts"
 import type { Option } from "@clack/prompts"
-import type {
-  ClaudeSubscription,
-  DetectedConfig,
-  InstallConfig,
-  InstallPlatform,
-} from "./types"
+import type { ClaudeSubscription, DetectedConfig, InstallConfig, InstallPlatform } from "./types"
 import { detectedToInitialValues } from "./install-validators"
 import { ULTIMATE_FALLBACK } from "./model-fallback"
 import { isNativeDevPlatformEnabled } from "./native-dev-platform-flag"
@@ -156,7 +151,7 @@ export async function promptInstallConfig(
     message: "Do you have a Kimi For Coding subscription?",
     options: [
       { value: "no", label: "No", hint: "Will use other configured providers" },
-      { value: "yes", label: "Yes", hint: "Kimi K3 for Sisyphus/Prometheus fallback" },
+      { value: "yes", label: "Yes", hint: "Kimi K3.1 Pro for Sisyphus/Prometheus fallback" },
     ],
     initialValue: initial.kimiForCoding,
   })
@@ -235,10 +230,7 @@ export async function promptInstallConfig(
   }
 }
 
-async function resolveCodexAutonomous(
-  hasCodex: boolean,
-  override: boolean | undefined,
-): Promise<boolean | null> {
+async function resolveCodexAutonomous(hasCodex: boolean, override: boolean | undefined): Promise<boolean | null> {
   if (!hasCodex) return false
   if (override !== undefined) return override
   return true

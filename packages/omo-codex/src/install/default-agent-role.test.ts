@@ -6,7 +6,9 @@ import { linkCachedPluginAgents } from "./link-cached-plugin-agents"
 import { ensureAgentConfig } from "./codex-config-agents"
 
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
+})
 
 async function fixture() {
   const root = await mkdtemp(join(tmpdir(), "lazycodex-default-"))
@@ -17,7 +19,10 @@ async function fixture() {
   await mkdir(agents, { recursive: true })
   await mkdir(join(codexHome, "agents"), { recursive: true })
   const worker = join(agents, "lazycodex-worker-medium.toml")
-  await writeFile(worker, 'name = "lazycodex-worker-medium"\nmodel = "test-model"\nmodel_reasoning_effort = "high"\ndeveloper_instructions = "worker instructions"\n')
+  await writeFile(
+    worker,
+    'name = "lazycodex-worker-medium"\nmodel = "test-model"\nmodel_reasoning_effort = "high"\ndeveloper_instructions = "worker instructions"\n',
+  )
   return { codexHome, pluginRoot, worker, target: join(codexHome, "agents", "default.toml") }
 }
 
@@ -26,7 +31,12 @@ describe("#given a bundled medium worker #when installing the fallback role", ()
     const input = await fixture()
     const links = await linkCachedPluginAgents(input)
     const role = Bun.TOML.parse(await readFile(input.target, "utf8"))
-    expect(role).toEqual({ name: "default", model: "test-model", model_reasoning_effort: "high", developer_instructions: "worker instructions" })
+    expect(role).toEqual({
+      name: "default",
+      model: "test-model",
+      model_reasoning_effort: "high",
+      developer_instructions: "worker instructions",
+    })
     const fallback = links.find((link) => link.name === "default.toml")
     expect(fallback?.path).toBe(input.target)
     const config = ensureAgentConfig("", { name: "default", configFile: "./agents/default.toml" })
@@ -61,10 +71,15 @@ describe("#given a bundled medium worker #when installing the fallback role", ()
     await linkCachedPluginAgents({ ...input, defaultRoleEnabled: false })
     expect(await Bun.file(input.target).exists()).toBe(false)
     await linkCachedPluginAgents(input)
-    await writeFile(join(input.codexHome, "config.toml"), '[agents.default]\nconfig_file = "./agents/default.toml"\n\n[agents.custom]\nconfig_file = "custom.toml"\n')
+    await writeFile(
+      join(input.codexHome, "config.toml"),
+      '[agents.default]\nconfig_file = "./agents/default.toml"\n\n[agents.custom]\nconfig_file = "custom.toml"\n',
+    )
     await linkCachedPluginAgents({ ...input, defaultRoleEnabled: false })
     expect(await Bun.file(input.target).exists()).toBe(false)
-    expect(Bun.TOML.parse(await readFile(join(input.codexHome, "config.toml"), "utf8"))).toEqual({ agents: { custom: { config_file: "custom.toml" } } })
+    expect(Bun.TOML.parse(await readFile(join(input.codexHome, "config.toml"), "utf8"))).toEqual({
+      agents: { custom: { config_file: "custom.toml" } },
+    })
     await writeFile(input.target, 'name = "default"\nmodel = "custom"\n')
     await linkCachedPluginAgents({ ...input, defaultRoleEnabled: false })
     expect(Bun.TOML.parse(await readFile(input.target, "utf8"))).toHaveProperty("model", "custom")

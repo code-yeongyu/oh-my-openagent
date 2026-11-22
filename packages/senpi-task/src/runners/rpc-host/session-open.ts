@@ -36,34 +36,24 @@ export interface HostSessionOpenerInput {
 
 export interface HostSessionOpener {
   openChild(spec: RpcRunnerSpec, socket: string, sessionPath: string): Promise<RpcChildHandle>
+  settleTeardowns(): Promise<void>
 }
 
 /** Open a daemon session, wire its recoverable handle, and deliver only a fresh child's first turn. */
 export function createHostSessionOpener(input: HostSessionOpenerInput): HostSessionOpener {
-  let fallbackProfileUnsupportedNoticed = false
-  const noticeFallbackProfileUnsupported = (opened: OpenedHostSession): void => {
-    if (opened.retryFallbackDropped !== true || fallbackProfileUnsupportedNoticed) return
-    fallbackProfileUnsupportedNoticed = true
-    input.onWarning(
-      `the task host (engine ${opened.engineVersion}) does not advertise retry_fallback_profile, so daemon-hosted ` +
-        "children switch to their fallback models only when a turn fails before any tool call until the host is upgraded",
-    )
-  }
-  const openAdmitted = async (
+  const pendingTeardowns = new Set<Promise<void>>()
+  const openAdmitted = (
     client: ReturnType<CreateHostSessionChannel>,
     spec: RpcRunnerSpec,
     sessionPath: string,
-  ): Promise<OpenedHostSession> => {
-    const opened = await openHostSessionWithAdmission({
+  ): Promise<OpenedHostSession> =>
+    openHostSessionWithAdmission({
       open: () => openTaskHostSession({ client, spec, sessionPath }),
       now: input.now,
       sleep: input.sleep,
       admissionWaitMs: input.admissionWaitMs,
       onWarning: input.onWarning,
     })
-    noticeFallbackProfileUnsupported(opened)
-    return opened
-  }
 
   const startTurn = async (handle: ReturnType<typeof createHostSessionHandle>, spec: RpcRunnerSpec): Promise<void> => {
     try {
@@ -71,11 +61,12 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
     } catch (error) {
       if (error instanceof InputUncertainError) error = error.cause
       const exitOutcome = handle.exitOutcome()
-      try {
-        await discardUnstartedRpcHandle(handle)
-      } catch (cleanupError) {
-        log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
-      }
+      void discardUnstartedRpcHandle(handle, {
+        pending: pendingTeardowns,
+        onFailure: (cleanupError) => {
+          log("senpi-task host session start cleanup failed", { taskId: spec.task_id, error: String(cleanupError) })
+        },
+      })
       throw new RunnerError({
         kind: "child-prompt-failed",
         message: error instanceof Error ? error.message : String(error),
@@ -89,16 +80,22 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
   }
 
   return {
+    settleTeardowns: async () => {
+      await Promise.all(pendingTeardowns)
+    },
     openChild: async (spec, socket, sessionPath) => {
-      const client = input.createClient(socket)
+      const client = input.createClient(socket, spec.task_id)
       if (spec.resumeSessionPath === undefined) await mkdir(dirname(sessionPath), { recursive: true })
       const opened = await openAdmitted(client, spec, sessionPath)
       const handle = createHostSessionHandle({
-        ...(spec.taskStoreDir === undefined ? {} : {
-          inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
-        }),
+        ...(spec.taskStoreDir === undefined
+          ? {}
+          : {
+              inputStore: createTaskRecordStore({ project_dir: spec.cwd, task: { state_dir: spec.taskStoreDir } }),
+            }),
         client,
         session: { routingId: opened.sessionId, sessionPath, instanceId: opened.instanceId },
+        ...(opened.durableSessionId === undefined ? {} : { durableSessionId: opened.durableSessionId }),
         taskId: spec.task_id,
         heartbeatIntervalMs: input.heartbeatIntervalMs ?? DEFAULT_HEARTBEAT_INTERVAL_MS,
         now: input.now,
@@ -111,7 +108,7 @@ export function createHostSessionOpener(input: HostSessionOpenerInput): HostSess
           spec,
           delaysMs: input.reattachDelaysMs,
           sleep: input.sleep,
-          createClient: input.createClient,
+          createClient: (port) => input.createClient(port, spec.task_id),
           open: (port, path) => openAdmitted(port, spec, path),
         }),
       })

@@ -6,7 +6,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { clearBoulderState, readBoulderState, writeBoulderState } from "../../features/boulder-state"
 import type { BoulderState } from "../../features/boulder-state"
-import { _resetForTesting, registerAgentName, setSessionAgent, subagentSessions } from "../../features/claude-code-session-state"
+import {
+  _resetForTesting,
+  registerAgentName,
+  setSessionAgent,
+  subagentSessions,
+} from "../../features/claude-code-session-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
 const { createAtlasHook } = await import("./index")
@@ -33,27 +38,29 @@ describe("atlas hook idle-event session lineage", () => {
   }
 
   function createHook(parentSessionIDs?: Record<string, string | undefined>) {
-    return createAtlasHook(unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
-      directory: testDirectory,
-      client: {
-        session: {
-          get: async (input: { path: { id: string } }) => ({
-            data: {
-              parentID: parentSessionIDs?.[input.path.id],
+    return createAtlasHook(
+      unsafeTestValue<Parameters<typeof createAtlasHook>[0]>({
+        directory: testDirectory,
+        client: {
+          session: {
+            get: async (input: { path: { id: string } }) => ({
+              data: {
+                parentID: parentSessionIDs?.[input.path.id],
+              },
+            }),
+            messages: async () => ({ data: [] }),
+            prompt: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
             },
-          }),
-          messages: async () => ({ data: [] }),
-          prompt: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
-          },
-          promptAsync: async (input: unknown) => {
-            promptCalls.push(input)
-            return { data: {} }
+            promptAsync: async (input: unknown) => {
+              promptCalls.push(input)
+              return { data: {} }
+            },
           },
         },
-      },
-    }))
+      }),
+    )
   }
 
   beforeEach(() => {

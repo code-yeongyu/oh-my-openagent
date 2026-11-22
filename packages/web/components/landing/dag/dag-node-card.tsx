@@ -50,24 +50,26 @@ export function DagNodeCard({
 }: DagNodeCardProps): JSX.Element {
   const status = dagStatus(node.state)
   const elapsed = nodeElapsedSeconds(node, clockMs)
+  // A node off the focused dependency path recedes by colour, never by opacity: its text drops
+  // to --text-lo (5.5:1 or better on every ink) so it still reads, and the state dot fades.
+  const ink = (presentClass: string): string => (dimmed ? "text-text-lo" : presentClass)
   return (
     <button
       type="button"
       data-dag-node={node.id}
       data-node-state={node.state}
+      data-dimmed={dimmed ? "true" : undefined}
       aria-label={`${node.label}: ${node.state}, ${node.category} on ${node.model}`}
       className={cn(
         "border-line bg-ink-1 ease-standard absolute flex cursor-pointer flex-col gap-0.5 overflow-hidden border px-2.5 py-2 text-left transition-[border-color,background-color] duration-[var(--dur-micro)]",
-        "focus-visible:outline-accent focus-visible:outline-2 focus-visible:outline-offset-2",
+        "focus-ring-inset",
         status.cardToneClass,
         connected && status.cardConnectedClass,
         status.cardHoverClass,
         enterIndex !== undefined && "dag-node-enter",
         motionOK && popping && "dag-node-pop",
         motionOK && shaking && "dag-node-shake",
-        // Content-level, never element-level: the card sits on the edge canvas and an
-        // element-level opacity would let the strokes bleed through an opaque surface.
-        dimmed && "[&>*]:opacity-20",
+        dimmed && "border-line",
       )}
       style={{
         ...position,
@@ -89,18 +91,23 @@ export function DagNodeCard({
             "size-1.5 shrink-0 rounded-full",
             status.dotClass,
             status.dotPulses && motionOK && "pulse-dot",
+            dimmed && "opacity-40",
           )}
         />
-        <span className="text-text-hi truncate text-sm font-medium">{node.label}</span>
+        <span className={cn(ink("text-text-hi"), "truncate text-sm font-medium")}>
+          {node.label}
+        </span>
       </span>
       <span className="text-text-lo truncate text-xs">
-        <span className={status.textClass}>{node.state}</span>
+        <span className={ink(status.textClass)}>{node.state}</span>
         {elapsed === undefined ? "" : ` · ${elapsed}s`}
       </span>
       <span className="truncate text-xs">
         <span className="text-text-lo">{node.category}</span>
-        <span className="text-text-faint"> · </span>
-        <span className="text-text-hi font-mono">{node.model}</span>
+        <span aria-hidden="true" className="text-text-faint">
+          {" · "}
+        </span>
+        <span className={cn(ink("text-text-hi"), "font-mono")}>{node.model}</span>
       </span>
       {node.activity === undefined ? null : (
         <span className="text-text-lo truncate text-xs">{node.activity}</span>

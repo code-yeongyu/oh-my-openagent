@@ -22,9 +22,12 @@ import type { PendingTaskRef, SessionState, ToolExecuteAfterInput, ToolExecuteAf
 import { buildStandaloneVerificationReminder } from "./verification-reminders"
 
 function isBackgroundLaunchOutput(output: string): boolean {
-  return output.includes("Background task launched") || output.includes("Background task continued")
-    || output.includes("Background delegate launched")
-    || output.includes("Background agent task launched")
+  return (
+    output.includes("Background task launched") ||
+    output.includes("Background task continued") ||
+    output.includes("Background delegate launched") ||
+    output.includes("Background agent task launched")
+  )
 }
 
 function isBackgroundOutputIncompleteReport(toolName: string, output: string): boolean {
@@ -34,13 +37,18 @@ function isBackgroundOutputIncompleteReport(toolName: string, output: string): b
   const taskStatusTable = new RegExp(
     `^# Task Status\\b[\\s\\S]*\\|\\s*Status\\s*\\|\\s*\\*\\*${incompleteStatus}\\*\\*\\s*\\|`,
   )
-  const fullSessionStatusReport = new RegExp(`^# Full Session Output\\b[\\s\\S]*^Status:\\s*${incompleteStatus}\\s*$`, "m")
+  const fullSessionStatusReport = new RegExp(
+    `^# Full Session Output\\b[\\s\\S]*^Status:\\s*${incompleteStatus}\\s*$`,
+    "m",
+  )
   const bareStatusReport = new RegExp(`^Status:\\s*${incompleteStatus}\\s*$`)
 
-  return taskStatusTable.test(trimmedOutput)
-    || fullSessionStatusReport.test(trimmedOutput)
-    || bareStatusReport.test(trimmedOutput)
-    || trimmedOutput.startsWith("Error fetching messages:")
+  return (
+    taskStatusTable.test(trimmedOutput) ||
+    fullSessionStatusReport.test(trimmedOutput) ||
+    bareStatusReport.test(trimmedOutput) ||
+    trimmedOutput.startsWith("Error fetching messages:")
+  )
 }
 
 export async function handleSubagentCompletionAfter(input: {
@@ -104,9 +112,7 @@ export async function handleSubagentCompletionAfter(input: {
       sessionID: extractedSessionId,
       lineageSessionIDs,
     })
-    const preferredSessionId = pendingTaskRef?.kind === "skip"
-      ? undefined
-      : subagentSessionId
+    const preferredSessionId = pendingTaskRef?.kind === "skip" ? undefined : subagentSessionId
     toolOutput.output += `\n<system-reminder>\n${buildStandaloneVerificationReminder(
       resolvePreferredSessionId(preferredSessionId),
     )}\n</system-reminder>`
@@ -118,9 +124,7 @@ export async function handleSubagentCompletionAfter(input: {
     return
   }
 
-  const sessionWork = toolInput.sessionID
-    ? getWorkForSession(ctx.directory, toolInput.sessionID)
-    : null
+  const sessionWork = toolInput.sessionID ? getWorkForSession(ctx.directory, toolInput.sessionID) : null
   const planPath = sessionWork
     ? resolveBoulderPlanPathForWork(ctx.directory, sessionWork)
     : resolveBoulderPlanPath(ctx.directory, boulderState)
@@ -142,14 +146,11 @@ export async function handleSubagentCompletionAfter(input: {
       }
     : boulderState
   const progress = getPlanProgress(planPath)
-  const {
-    currentTask,
-    shouldSkipTaskSessionUpdate,
-    shouldIgnoreCurrentSessionId,
-  } = resolveTaskContext(pendingTaskRef, planPath)
-  const trackedTaskSession = currentTask
-    ? getTaskSessionState(ctx.directory, currentTask.key)
-    : null
+  const { currentTask, shouldSkipTaskSessionUpdate, shouldIgnoreCurrentSessionId } = resolveTaskContext(
+    pendingTaskRef,
+    planPath,
+  )
+  const trackedTaskSession = currentTask ? getTaskSessionState(ctx.directory, currentTask.key) : null
   const sessionState = toolInput.sessionID ? getState(toolInput.sessionID) : undefined
 
   const lineageSessionIDs = sessionWork?.session_ids ?? boulderState.session_ids
@@ -191,14 +192,12 @@ export async function handleSubagentCompletionAfter(input: {
 
   const originalResponse = toolOutput.output
   if (sessionState) {
-    if (sessionState.activeContinuationPlanPath !== undefined
-      && sessionState.activeContinuationPlanPath !== planPath) {
+    if (sessionState.activeContinuationPlanPath !== undefined && sessionState.activeContinuationPlanPath !== planPath) {
       sessionState.verifiedTaskKeys = undefined
     }
   }
   const isAlreadyVerified = currentTask
-    ? isTrackedTaskChecked(planPath, currentTask.key)
-      || sessionState?.verifiedTaskKeys?.has(currentTask.key) === true
+    ? isTrackedTaskChecked(planPath, currentTask.key) || sessionState?.verifiedTaskKeys?.has(currentTask.key) === true
     : false
   const reminderDecision = await buildSubagentCompletionReminder({
     ctx,

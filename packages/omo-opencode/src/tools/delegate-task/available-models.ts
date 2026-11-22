@@ -23,7 +23,7 @@ function extractModelRows(result: unknown): Array<{ provider: string; id: string
 function addFromProviderModels(
   out: Set<string>,
   providerID: string,
-  models: Array<string | { id?: string }> | undefined
+  models: Array<string | { id?: string }> | undefined,
 ): void {
   if (!models) return
   for (const item of models) {

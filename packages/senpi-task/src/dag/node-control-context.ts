@@ -16,6 +16,9 @@ export const DAG_NODE_CONTROL_ERROR_CODES = [
   "node_not_retryable",
   "node_has_no_task",
   "node_not_continuable",
+  "node_unresponsive",
+  "run_paused_by_user",
+  "run_not_user_paused",
 ] as const
 
 export type DagNodeControlErrorCode = (typeof DAG_NODE_CONTROL_ERROR_CODES)[number]
@@ -95,11 +98,12 @@ export function controlJournal(
     store: options.store,
     runId: record.runId,
     initialCheckpoint: record,
-    applyEvent: (checkpoint, event) => applyDagSchedulerEvent(checkpoint, event, pendingErrors, {
-      store: options.store,
-      pendingTerminalResults: new Map(),
-      now,
-    }),
+    applyEvent: (checkpoint, event) =>
+      applyDagSchedulerEvent(checkpoint, event, pendingErrors, {
+        store: options.store,
+        pendingTerminalResults: new Map(),
+        now,
+      }),
     ...(options.subscriberRing === undefined ? {} : { subscriberRing: options.subscriberRing }),
     now,
     skipDuplicate: skipDuplicateTerminalTransition,

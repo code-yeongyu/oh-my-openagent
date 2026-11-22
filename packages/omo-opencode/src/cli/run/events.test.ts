@@ -108,9 +108,7 @@ describe("event handling", () => {
 
       // then
       const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
-      const hasEventTrace = newCalls.some((call) =>
-        String(call?.[0] ?? "").includes("custom.event"),
-      )
+      const hasEventTrace = newCalls.some((call) => String(call?.[0] ?? "").includes("custom.event"))
       expect(hasEventTrace).toBe(false)
     } finally {
       errorSpy.mockRestore()
@@ -138,9 +136,7 @@ describe("event handling", () => {
 
       // then
       const newCalls = errorSpy.mock.calls.slice(baselineCallCount)
-      const hasEventTrace = newCalls.some((call) =>
-        String(call?.[0] ?? "").includes("custom.event"),
-      )
+      const hasEventTrace = newCalls.some((call) => String(call?.[0] ?? "").includes("custom.event"))
       expect(hasEventTrace).toBe(true)
     } finally {
       errorSpy.mockRestore()

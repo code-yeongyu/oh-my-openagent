@@ -25,7 +25,7 @@ for (const locale of ["en", "ko"]) {
               (block) =>
                 Number.parseFloat(getComputedStyle(block).getPropertyValue("--lit-p")) === 1,
             ),
-            allTextHi: words.every((word) => getComputedStyle(word).color === "rgb(245, 245, 247)"),
+            allTextHi: words.every((word) => getComputedStyle(word).color === "rgb(238, 238, 239)"),
             noneBlurred: words.every((word) => {
               const filter = getComputedStyle(word).filter
               return filter === "none" || filter === "blur(0px)"
@@ -51,9 +51,8 @@ for (const locale of ["en", "ko"]) {
       })
 
       // Without JavaScript the page reads in full: reveal blocks render `pending` (lit) so text is
-      // never stuck at the dim floor if the driver never runs. Page scripts are disabled outright: a
-      // URL route misses CI's chunk URLs, which carry `?dpl=<GITHUB_SHA>` (next.config deploymentId),
-      // so the driver could flip blocks to `observer` before the read (#10411).
+      // never stuck at the dim floor if the driver never runs. Page scripts are disabled outright, so
+      // the driver can never flip blocks to `observer` before the read (#10411).
       test.describe("without page scripts", () => {
         test.use({ javaScriptEnabled: false })
 

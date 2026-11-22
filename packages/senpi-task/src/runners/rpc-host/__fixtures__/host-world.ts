@@ -9,6 +9,7 @@ import { createManagerResidencyRegistry } from "../../../../../omo-senpi/src/com
 import { createTaskLifecycle, createHostSessionProbe, type TaskLifecycle } from "../../../lifecycle"
 import { defaultHostSessionProbe } from "../../../lifecycle/host-session-default"
 import { createTaskManager } from "../../../manager/manager"
+import { launchSettled } from "../../../manager/__fixtures__/manager-fakes"
 import { createRpcManagedRunner } from "../../../manager/runner"
 import type { StartResult } from "../../../manager/types"
 import type { TaskRecord } from "../../../state"
@@ -24,6 +25,7 @@ import type { ManualRecoveryClock } from "./manual-recovery-clock"
 import type { HostShardEvents } from "../handle-reattach"
 import { NO_HOST_ENDPOINT } from "../../../lifecycle/host-session"
 import type { hostWorldRecovery } from "./host-world-recovery"
+import { ownedTaskState } from "../../../store/__fixtures__/owned-task-state"
 
 /**
  * A daemon and the parent sessions that share it: one fake host on a private socket, one project
@@ -143,7 +145,7 @@ interface ConnectParentInput {
 
 function connectParent(input: ConnectParentInput): ParentSession {
   const { sessionId, projectDir, socketPath } = input
-  const backing = createTaskRecordStore({ project_dir: projectDir })
+  const backing = createTaskRecordStore(ownedTaskState(projectDir))
   const recovery = input.options.liveRecovery?.attach(backing, sessionId)
   const store = recovery?.store ?? backing
   const config = hostSuiteSettings(input.options.settings)
@@ -200,7 +202,12 @@ function connectParent(input: ConnectParentInput): ParentSession {
     ...(recovery === undefined ? {} : { now: recovery.now }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     planner: () => ({ kind: "resolved", plan: { model: HOST_CHILD_MODEL } }),
-    destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
+    destruction: {
+      destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause),
+      get hostSessionCancel() {
+        return lifecycle.hostSessionCancel
+      },
+    },
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
   })
   const lifecycle = createTaskLifecycle({
@@ -209,16 +216,20 @@ function connectParent(input: ConnectParentInput): ParentSession {
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
     config,
-    registry: createManagerResidencyRegistry(() => manager, () => recovery === undefined ? undefined : sessionId),
+    registry: createManagerResidencyRegistry(
+      () => manager,
+      () => (recovery === undefined ? undefined : sessionId),
+    ),
     ...(recovery === undefined ? {} : { now: recovery.now, onStoreMutation: recovery.onStoreMutation }),
     ...(input.options.now === undefined ? {} : { now: input.options.now }),
     ...(input.options.hostPid === undefined ? {} : { hostPid: input.options.hostPid }),
-    hostSessionProbe: input.options.productionProbe === true
-      ? defaultHostSessionProbe()
-      : createHostSessionProbe({
-        daemonReachable: async (socket) => (await probeFakeHost(socket)) !== undefined,
-        liveSessionPaths: (socket) => listFakeHostSessions(socket, { includeWorkers: true }),
-      }),
+    hostSessionProbe:
+      input.options.productionProbe === true
+        ? defaultHostSessionProbe()
+        : createHostSessionProbe({
+            daemonReachable: async (socket) => (await probeFakeHost(socket)) !== undefined,
+            liveSessionPaths: (socket) => listFakeHostSessions(socket, { includeWorkers: true }),
+          }),
     hostSessionClose: async (request) => {
       await closeHostSession(request, { createChannel: fakeCloseChannel })
     },
@@ -233,7 +244,10 @@ function connectParent(input: ConnectParentInput): ParentSession {
       },
     },
     // A suite drives every sweep itself; an unref'd interval would fire inside another test.
-    idleReclaimerScheduler: recovery?.idleReclaimerScheduler ?? { setInterval: () => ({ unref: () => undefined }), clearInterval: () => undefined },
+    idleReclaimerScheduler: recovery?.idleReclaimerScheduler ?? {
+      setInterval: () => ({ unref: () => undefined }),
+      clearInterval: () => undefined,
+    },
   })
   const records = (): readonly TaskRecord[] =>
     store.list().records.filter((record) => record.parent_session_id === sessionId)
@@ -256,14 +270,14 @@ function connectParent(input: ConnectParentInput): ParentSession {
           model: HOST_CHILD_MODEL,
         })
         // A slow host returns `starting` (#10042); these scenarios need the child admitted first.
-        if (result.kind === "started" && result.starting === true) await manager.whenLaunched?.(result.task_id)
+        await launchSettled(manager, result)
         started.push(result)
       }
       return started
     },
     records,
     taskIds: () => records().map((record) => record.task_id),
-    sessionPaths: () => records().flatMap((record) => (record.host_session === undefined ? [] : [record.host_session.session_path])),
+    sessionPaths: () =>
+      records().flatMap((record) => (record.host_session === undefined ? [] : [record.host_session.session_path])),
   }
 }
-

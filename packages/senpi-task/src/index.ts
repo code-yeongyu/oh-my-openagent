@@ -1,5 +1,9 @@
 // allow: SIZE_OK - package-root public API barrel contains re-exports only and intentionally preserves one stable root import surface.
-export { CHILD_PERMISSION_EVENT, TASK_CHILD_EXTENSION_EVENT, parseChildExtensionEvent } from "./runners/child-extension-events"
+export {
+  CHILD_PERMISSION_EVENT,
+  TASK_CHILD_EXTENSION_EVENT,
+  parseChildExtensionEvent,
+} from "./runners/child-extension-events"
 export type { ChildExtensionEvent, ChildExtensionListener } from "./runners/child-extension-events"
 export { createWorkpoolTool, createWorkpoolWorkerTool, buildWorkpoolExecute } from "./tools/workpool"
 export { WorkpoolParams, WorkpoolYieldParams } from "./tools/workpool-schema"
@@ -26,7 +30,15 @@ export {
   type KernelToolInvokeScope,
   type KernelToolsCapability,
 } from "./kernel-tools"
-export type { PoolId, ItemId, WorkpoolRecord, WorkpoolCaller, WorkpoolCreate, WorkpoolEvent, WorkpoolErrorCode } from "./workpool/types"
+export type {
+  PoolId,
+  ItemId,
+  WorkpoolRecord,
+  WorkpoolCaller,
+  WorkpoolCreate,
+  WorkpoolEvent,
+  WorkpoolErrorCode,
+} from "./workpool/types"
 export {
   BACKGROUND_MODES,
   COST_REPORT_STATUSES,
@@ -37,6 +49,8 @@ export {
   TASK_STATUSES,
   TOKEN_COVERAGE_STATUSES,
   createTaskRecord,
+  currentRunStartEpoch,
+  LEGACY_RUN_START_EPOCH,
   markRecordLostForReconciliation,
   messageability,
   transitionTaskRecord,
@@ -64,6 +78,7 @@ export type {
   TaskRecord,
   TaskRecordInput,
   TaskRunStats,
+  LiveRunStats,
   TaskSpawnSpec,
   TaskStatus,
   TaskTransition,
@@ -71,13 +86,21 @@ export type {
   TaskTransitionResult,
   TokenCoverageStatus,
 } from "./state"
-export { TaskRecordCollisionError, createTaskRecordStore, projectStateKey, resolveProjectStateDirectory, resolveStateDir } from "./store"
+export {
+  TaskRecordCollisionError,
+  createTaskRecordStore,
+  projectStateKey,
+  resolveProjectStateDirectory,
+  resolveStateDir,
+} from "./store"
 export type {
   ListTaskRecordsResult,
   PersistedTaskEvent,
   StateDirConfig,
+  ResidentTaskRecordStore,
   TaskRecordDiagnostic,
   TaskRecordStore,
+  TaskRecordStoreResidentFigures,
 } from "./store"
 export {
   buildLiveStatsTokens,
@@ -90,7 +113,13 @@ export {
   taskIdentityLabel,
   toolCountSuffix,
 } from "./status-line"
-export type { LiveStatsTokens, StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export type {
+  LiveStatsTokens,
+  StatusLineInput,
+  StatusLineStats,
+  StatusTargetInput,
+  TaskIdentityInput,
+} from "./status-line"
 export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export {
   assistantLastLine,
@@ -143,10 +172,14 @@ export {
   resolveAvailableCategoryNames,
   resolveCategory,
 } from "./category"
+export { withoutExcludedFallbacks, withoutExcludedSelectors } from "./manager/exclude-fallbacks"
+export { withoutExcludedModels } from "./model-exclusion"
+export { resolveTaskAgents } from "./agents/task-agents"
 export type {
   BuiltinCategoryDefinition,
   CategoryModelSelection,
   CategoryResolutionResult,
+  ModelSelectionSource,
   ResolvedChildSpec,
   SenpiModelPort,
   SenpiModelRegistryPort,
@@ -206,6 +239,7 @@ export {
   readSessionAncestry,
   readSessionContext,
   readSessionRole,
+  readSessionTraceparent,
   HOST_WARMUP_CONTEXT,
   HOST_WARMUP_TASK_ID,
   isHostWarmupSession,
@@ -218,6 +252,16 @@ export {
   RpcProtocolClient,
   createLiveHostChildren,
   buildAutoUiResponse,
+  CANCELLED_CHILD_DIALOG,
+  createForegroundDialogOrigins,
+  sharedForegroundDialogOrigins,
+  type ChildDialogForwarder,
+  type ForegroundDialogOrigins,
+  type ForwardableDialog,
+  type ForwardedAnswer,
+  type ForwardedChild,
+  type ParentPermissionMode,
+  type RunInOrigin,
   buildChildArgs,
   buildRpcSpawn,
   OMO_SENPI_TASK_RPC_CHILD,
@@ -234,6 +278,7 @@ export {
   terminateRpcChild,
 } from "./runners"
 export { resolveInheritedExtensionList, selectPackageExtensionPaths } from "./runners/rpc/parent-extensions"
+export { createHostGenerationView } from "./runners/rpc-host/generation-view"
 export type { InheritedExtensions } from "./runners/rpc/parent-extensions"
 export type {
   ChildEventListener,
@@ -471,7 +516,8 @@ export {
   linesComponent,
   listTaskAgents,
   listTaskCategories,
-  normalizeRendererText, recordSummary,
+  normalizeRendererText,
+  recordSummary,
   rendererVisibleWidth,
   statusThemeColor,
   taskCallLines,
@@ -665,4 +711,4 @@ export type {
 
 export * from "./tools/team"
 export { createEvalHandleHost, type EvalHandleHostDeps } from "./eval-handles"
-export { isPriorityAliasOf } from "./runners/pinned-model-equivalence"
+export { isPriorityAliasOf, type PriorityPairingRegistry } from "./runners/pinned-model-equivalence"

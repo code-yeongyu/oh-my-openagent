@@ -1,27 +1,24 @@
-import { createBuiltinAgents } from "../agents";
-import { collectDisabledSkillAliases } from "../plugin/skill-context";
-import { isTaskSystemEnabled } from "../shared";
-import { migrateDisabledAgents } from "../shared/disabled-agents";
-import { assembleAgentConfig } from "./agent-config-assembly";
-import { finalizeAgentConfig } from "./agent-config-finalizer";
-import { discoverAgentSkills } from "./agent-skill-discovery";
-import { loadAgentSources } from "./agent-source-loader";
-import type { ApplyAgentConfigParams } from "./agent-config-types";
+import { createBuiltinAgents } from "../agents"
+import { collectDisabledSkillAliases } from "../plugin/skill-context"
+import { isTaskSystemEnabled } from "../shared"
+import { migrateDisabledAgents } from "../shared/disabled-agents"
+import { assembleAgentConfig } from "./agent-config-assembly"
+import { finalizeAgentConfig } from "./agent-config-finalizer"
+import { discoverAgentSkills } from "./agent-skill-discovery"
+import { loadAgentSources } from "./agent-source-loader"
+import type { ApplyAgentConfigParams } from "./agent-config-types"
 
-export async function applyAgentConfig(
-  params: ApplyAgentConfigParams,
-): Promise<Record<string, unknown>> {
+export async function applyAgentConfig(params: ApplyAgentConfigParams): Promise<Record<string, unknown>> {
   const migratedDisabledAgents = migrateDisabledAgents(
     params.pluginConfig.disabled_agents,
-  ) as typeof params.pluginConfig.disabled_agents;
-  const allDiscoveredSkills = await discoverAgentSkills(params);
-  const sources = loadAgentSources(params);
-  const browserProvider =
-    params.pluginConfig.browser_automation_engine?.provider ?? "playwright";
-  const currentModel = params.config.model as string | undefined;
-  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig);
-  const useTaskSystem = isTaskSystemEnabled(params.pluginConfig);
-  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false;
+  ) as typeof params.pluginConfig.disabled_agents
+  const allDiscoveredSkills = await discoverAgentSkills(params)
+  const sources = loadAgentSources(params)
+  const browserProvider = params.pluginConfig.browser_automation_engine?.provider ?? "playwright"
+  const currentModel = params.config.model as string | undefined
+  const disabledSkills = collectDisabledSkillAliases(params.pluginConfig)
+  const useTaskSystem = isTaskSystemEnabled(params.pluginConfig)
+  const disableOmoEnv = params.pluginConfig.experimental?.disable_omo_env ?? false
   const builtinAgents = await createBuiltinAgents(
     migratedDisabledAgents,
     params.pluginConfig.agents,
@@ -37,10 +34,8 @@ export async function applyAgentConfig(
     useTaskSystem,
     disableOmoEnv,
     params.pluginConfig.team_mode?.enabled ?? false,
-  );
-  const disabledAgentNames = new Set(
-    (migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase()),
-  );
+  )
+  const disabledAgentNames = new Set((migratedDisabledAgents ?? []).map((agent: string) => agent.toLowerCase()))
   const { configuredDefaultAgent } = await assembleAgentConfig({
     config: params.config,
     pluginConfig: params.pluginConfig,
@@ -49,11 +44,11 @@ export async function applyAgentConfig(
     currentModel,
     useTaskSystem,
     disabledAgentNames,
-  });
+  })
 
   return finalizeAgentConfig({
     config: params.config,
     pluginConfig: params.pluginConfig,
     configuredDefaultAgent,
-  });
+  })
 }
