@@ -34,6 +34,7 @@ export interface MemoryReflectionLiveWiring {
     applyFacts?: MemoryFactsApplier,
   ): void
   attach(sessionId: string): void
+  retire(sessionId: string): boolean
   bind(
     pi: SenpiExtensionAPI,
     sessionId: string,
@@ -86,6 +87,8 @@ export function createMemoryReflectionLiveWiring(
   const activeRuns = createActiveReflectionRuns()
   const healthAlertOnce = createOncePerSessionGuard()
   const liveSession: { current?: ReflectionLiveSession } = {}
+  // Print mode can rebind the same id before the previous bind's shutdown arrives.
+  const outstandingBinds = new Map<string, number>()
   const rpcBridge: { current?: MemoryRpcBridge } = {}
   const statusRefreshes = new Set<Promise<unknown>>()
   const track = (refresh: Promise<unknown>): void => {
@@ -125,7 +128,19 @@ export function createMemoryReflectionLiveWiring(
       })
     },
     attach(sessionId): void {
+      outstandingBinds.set(sessionId, (outstandingBinds.get(sessionId) ?? 0) + 1)
       rpcBridge.current?.attach(sessionId)
+    },
+    retire(sessionId): boolean {
+      const count = outstandingBinds.get(sessionId) ?? 0
+      if (count > 1) {
+        outstandingBinds.set(sessionId, count - 1)
+        return false
+      }
+      outstandingBinds.delete(sessionId)
+      if (activeSession.current !== sessionId) return false
+      liveSession.current = undefined
+      return true
     },
     async bind(pi, sessionId, identity, eventCtx, requestPressureDream): Promise<void> {
       const ui = readUi(eventCtx)
@@ -193,6 +208,7 @@ export function createMemoryReflectionLiveWiring(
       if (activeSession.current === sessionId) await rpcBridge.current?.syncJournal(entries)
     },
     shutdown(identity): void {
+      if (liveSession.current !== undefined) return
       if (identity !== undefined) activeRuns.clear(identity)
       footerLive.dispose()
       rpcBridge.current?.detach()
