@@ -8,5 +8,8 @@ import { windowsTreeKillArgs } from "../../memory-core/src/concurrency/windows-p
  */
 export function windowsTaskkillArgs(pid: number, force: boolean): string[] {
   const args = windowsTreeKillArgs(pid)
+  // The shared planner falls back to recursive termination when enumeration fails.
+  // These callers cannot establish descendant ownership without the process table.
+  if (args.includes("/T")) return []
   return force ? args : args.filter((arg) => arg !== "/F")
 }
