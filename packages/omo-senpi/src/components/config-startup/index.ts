@@ -161,7 +161,8 @@ export function createConfigStartupComponent(options: ConfigStartupComponentOpti
       if (isMetadataOnlyLaunch(argv)) return
       const cwd = resolveCwd()
       const migration = runMigration({ cwd })
-      if (migration.peerMigrating === true) ctx.logger.debug?.("OmO Native: configuration migration skipped; another host holds the migration lock")
+      if (migration.peerMigrating === true)
+        ctx.logger.debug?.("OmO Native: configuration migration skipped; another host holds the migration lock")
       const config = loadConfig({ cwd })
       const notices = notificationMessages(migration, config)
       let reported = false
