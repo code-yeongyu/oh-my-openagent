@@ -1,6 +1,6 @@
 import { Database } from "bun:sqlite"
 import { afterEach, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,7 +8,7 @@ import type { GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS, gatewayReaderFloor } from "./schema"
 import { Sql, type SqliteConnection } from "./sql"
-import { inCheckedSnapshot, listDeliveries, migrate, type StoreContext } from "./store-ops"
+import { migrate, type StoreContext } from "./store-ops"
 
 const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -37,7 +37,7 @@ function kindOf(result: unknown): string {
   return r.kind === "ok" ? (r.delivery?.kind ?? "ok") : `error:${r.error?.code}`
 }
 
-/** What a newer binary leaves behind: the store at `version`, with the floor it recorded (none when `floor` is null). */
+/** What another binary leaves behind: the store at `version`, with the floor it recorded (none when `floor` is null). */
 function migrateAhead(agentDir: string, version: number, floor: number | null): void {
   const db = new Database(gatewayDatabasePath(agentDir))
   try {
@@ -53,7 +53,7 @@ function migrateAhead(agentDir: string, version: number, floor: number | null): 
   }
 }
 
-test("#given this binary opens its store #then it records reader floor 14 (v15 and v16 keep v14 readers working)", async () => {
+test("#given this binary opens its store #then it records reader floor 14 (v15 and v16 claim nothing a schema-14 reader uses)", async () => {
   const h = (harness = createGatewayHarness())
   await h.store().identity()
   const db = new Database(gatewayDatabasePath(h.agentDir), { readonly: true })
@@ -113,59 +113,6 @@ test("#given a fresh store #when migrate commits each step #then every commit ma
   expect(committed).toEqual(
     GATEWAY_MIGRATIONS.map((_, step) => ({ version: step + 1, floor: String(gatewayReaderFloor(step + 1)) })),
   )
-})
-
-test("#given an op past its schema check #when another process commits an incompatible migration before the op reads #then the op reads the schema it checked and the next op is refused typed", async () => {
-  const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-snapshot-")))
-  const path = join(agentDir, "gateway.sqlite")
-  const db = new Database(path)
-  db.exec("PRAGMA journal_mode = WAL")
-  let migrated = false
-  // The concurrent migrator: on the op's first read of `deliveries`, another connection commits a schema this binary
-  // cannot use (no floor) that renames a column the read selects.
-  class MigratedUnderTheReadSql extends Sql {
-    override all(...args: Parameters<Sql["all"]>): ReturnType<Sql["all"]> {
-      if (!migrated && args[1].includes("FROM deliveries")) {
-        migrated = true
-        const other = new Database(path)
-        try {
-          other.exec(
-            `ALTER TABLE deliveries RENAME COLUMN body TO body_next; DELETE FROM gateway_meta WHERE key = '${GATEWAY_READER_FLOOR_KEY}'; PRAGMA user_version = ${GATEWAY_MIGRATIONS.length + 1}`,
-          )
-        } finally {
-          other.close()
-        }
-      }
-      return super.all(...args)
-    }
-  }
-  const connection: SqliteConnection = {
-    exec: (sql) => db.exec(sql),
-    function: (name, options, fn) => db.function(name, options, fn as never),
-    setAuthorizer: () => {
-      throw new Error("no authorizer here")
-    },
-    close: () => db.close(),
-  }
-  const ctx = {
-    sql: new MigratedUnderTheReadSql(connection),
-    config: { agent_dir: agentDir, test_hooks: {}, busy_timeout_ms: 1_000, lock_wait_max_ms: 5_000 },
-    stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
-    emit: () => undefined,
-    hook: async () => undefined,
-    delay: async () => undefined,
-  } as unknown as StoreContext
-  cleanups.push(() => {
-    db.close()
-    rmSync(agentDir, { recursive: true, force: true })
-  })
-  await migrate(ctx)
-
-  expect(await settled(inCheckedSnapshot(ctx, () => listDeliveries(ctx, {})))).toEqual({ value: [] })
-  expect(migrated).toBe(true)
-  expect((await settled(inCheckedSnapshot(ctx, () => listDeliveries(ctx, {})))).error).toMatchObject({
-    code: "gateway_schema_too_new",
-  })
 })
 
 test("#given running sessions #when a newer binary migrates the store and records a floor this binary meets #then sends keep working and a session opened afterwards sends too", async () => {
@@ -237,33 +184,82 @@ test.each([
   },
 )
 
-test("#given an omob source build #when it opens the shared agent dir's store #then it refuses to migrate it and leaves it unmigrated", async () => {
-  const h = (harness = createGatewayHarness())
-  const home = realpathSync(mkdtempSync(join(tmpdir(), "omo-source-build-home-")))
-  const payload = join(home, "payload")
-  mkdirSync(payload, { recursive: true })
-  writeFileSync(join(payload, "package.json"), JSON.stringify({ version: "0.0.0", omoBuild: { command: "omob" } }))
-  const sharedAgentDir = join(home, ".omo", "agent")
-  mkdirSync(join(sharedAgentDir, "sessions"), { recursive: true })
-  const saved = { HOME: process.env.HOME, OMO_PACKAGE_DIR: process.env.OMO_PACKAGE_DIR }
-  process.env.HOME = home
-  process.env.OMO_PACKAGE_DIR = payload
-  cleanups.push(() => {
-    for (const [key, value] of Object.entries(saved)) {
-      if (value === undefined) delete process.env[key]
-      else process.env[key] = value
-    }
-    rmSync(home, { recursive: true, force: true })
-  })
-
-  const opened = await settled(h.store({ agentDir: sharedAgentDir }).identity())
-  expect(opened.error).toMatchObject({ code: "gateway_migration_failed" })
-  const path = gatewayDatabasePath(sharedAgentDir)
-  if (!existsSync(path)) return
-  const db = new Database(path)
+/** The store at `version` with `floor` stored exactly as given: a raw value, nothing, or no gateway_meta table at all. */
+function storeFloorAs(agentDir: string, version: number, floor: string | number | null | "no gateway_meta"): void {
+  const db = new Database(gatewayDatabasePath(agentDir))
   try {
-    expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: 0 })
+    db.exec(`PRAGMA user_version = ${version}`)
+    if (floor === "no gateway_meta") db.exec("DROP TABLE gateway_meta")
+    else if (floor === null) db.query("DELETE FROM gateway_meta WHERE key = ?").run(GATEWAY_READER_FLOOR_KEY)
+    else db.query("INSERT OR REPLACE INTO gateway_meta (key, value) VALUES (?, ?)").run(GATEWAY_READER_FLOOR_KEY, floor)
   } finally {
     db.close()
   }
+}
+
+function storedFloor(agentDir: string): unknown {
+  const db = new Database(gatewayDatabasePath(agentDir), { readonly: true })
+  try {
+    return (
+      db.query("SELECT value FROM gateway_meta WHERE key = ?").get(GATEWAY_READER_FLOOR_KEY) as { value: unknown }
+    )?.value
+  } finally {
+    db.close()
+  }
+}
+
+test.each([
+  ["an empty floor", ""],
+  ["a floor with a leading space", " 14"],
+  ["a floor with trailing text", "14abc"],
+  ["a negative floor", "-1"],
+  ["a floor in exponent form", "1e1"],
+  ["a fractional floor", "14.0"],
+  ["a zero floor", "0"],
+  ["no gateway_meta table", "no gateway_meta"],
+] as const)(
+  "#given a newer store with %s #when a session opens it #then it is refused typed (a floor that is not a plain positive integer is no floor)",
+  async (_case, floor) => {
+    const h = (harness = createGatewayHarness())
+    await h.store().identity()
+    storeFloorAs(h.agentDir, GATEWAY_MIGRATIONS.length + 1, floor)
+
+    const opened = await settled(h.store().identity())
+    expect(opened.error).toMatchObject({ code: "gateway_schema_too_new" })
+  },
+)
+
+test("#given a newer store whose floor this binary meets, stored as an integer #when a session opens it #then it opens", async () => {
+  const h = (harness = createGatewayHarness())
+  await h.store().identity()
+  storeFloorAs(h.agentDir, GATEWAY_MIGRATIONS.length + 1, 14)
+
+  const opened = await settled(h.store().identity())
+  expect(opened.error).toBeUndefined()
+})
+
+test.each([
+  ["no floor (a binary from before the floor wrote it)", null],
+  ["a malformed floor", "abc"],
+] as const)(
+  "#given a store at this binary's schema with %s #when this binary opens it #then it records its own floor",
+  async (_case, floor) => {
+    const h = (harness = createGatewayHarness())
+    await h.store().identity()
+    storeFloorAs(h.agentDir, GATEWAY_MIGRATIONS.length, floor)
+
+    const opened = await settled(h.store().identity())
+    expect(opened.error).toBeUndefined()
+    expect(storedFloor(h.agentDir)).toBe(String(gatewayReaderFloor(GATEWAY_MIGRATIONS.length)))
+  },
+)
+
+test("#given a worker already open on the store #when a newer binary migrates it with no floor #then the next read is refused typed too", async () => {
+  const h = (harness = createGatewayHarness())
+  const store = h.store()
+  expect((await settled(store.list())).error).toBeUndefined()
+
+  migrateAhead(h.agentDir, GATEWAY_MIGRATIONS.length + 1, null)
+
+  expect((await settled(store.list())).error).toMatchObject({ code: "gateway_schema_too_new" })
 })

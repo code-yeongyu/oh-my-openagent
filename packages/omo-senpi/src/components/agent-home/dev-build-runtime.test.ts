@@ -1,21 +1,37 @@
 import { expect, test } from "bun:test"
-import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { isSharedAgentDir } from "./dev-build-runtime"
+import type { PlatformFacts } from "@oh-my-opencode/omo-opencode/account-home"
+
+import { isDevBuildRuntime, isSharedAgentDir } from "./dev-build-runtime"
+
+// Edge cases of the source-build guard (#14382, #14622 reviews M2-M4, M8): which agent dirs count as the account's shared
+// store, which runtimes count as a source build, and how the OS account home is read without trusting the environment.
+
+const temp = (prefix: string) => realpathSync(mkdtempSync(join(tmpdir(), prefix)))
 
 test("#given HOME and USERPROFILE name different roots #when the agent dir is the USERPROFILE store #then it is shared", () => {
   const shellHome = join("/", "shell-home")
   const profileHome = join("/", "profile-home")
-  expect(isSharedAgentDir(join(profileHome, ".omo", "agent"), [shellHome, profileHome])).toBe(true)
-  expect(isSharedAgentDir(join(shellHome, ".senpi", "agent"), [shellHome, profileHome])).toBe(true)
+  expect(isSharedAgentDir(join(profileHome, ".omo", "agent"), { homes: [shellHome, profileHome] })).toBe(true)
+})
+
+test.each([
+  ["~/.omo/agent", [".omo", "agent"]],
+  ["the flat ~/.omo", [".omo"]],
+  ["~/.senpi/agent", [".senpi", "agent"]],
+])("#given the agent dir is %s #then it is shared", (_name, segments) => {
+  const home = join("/", "account-home")
+  expect(isSharedAgentDir(join(home, ...segments), { homes: [home] })).toBe(true)
 })
 
 test("#given several home roots #when the agent dir is an isolated dir #then it is not shared", () => {
   expect(
-    isSharedAgentDir(join("/", "tmp", "isolated-agent"), [join("/", "shell-home"), join("/", "profile-home")]),
+    isSharedAgentDir(join("/", "tmp", "isolated-agent"), {
+      homes: [join("/", "shell-home"), join("/", "profile-home")],
+    }),
   ).toBe(false)
 })
 
@@ -33,34 +49,48 @@ test("#given the process env #when USERPROFILE differs from HOME #then the USERP
   }
 })
 
-// The engine runs on Node or Bun, and each runtime is started fresh with HOME at a temp dir and USERPROFILE unset:
-// os.homedir() reads HOME at startup, and Bun's userInfo().homedir follows HOME too (#14622 review M4). The account's
-// real home comes from Node's userInfo(), which reads the passwd entry.
-const runtimes = [
-  ["node", "node"],
-  ["bun", process.versions.bun === undefined ? "bun" : process.execPath],
-] as const
-
-test.skipIf(process.platform === "win32").each(runtimes)(
-  "#given %s started with HOME at a temp dir and no USERPROFILE #when the agent dir is the account home's store #then it is shared",
-  (_runtime, executable) => {
-    const alternate = mkdtempSync(join(tmpdir(), "agent-home-alt-"))
+test.skipIf(process.platform === "win32")(
+  "#given an agent dir that is a symlink to the shared store #then it is shared",
+  () => {
+    const home = temp("agent-home-link-")
     try {
-      const env: NodeJS.ProcessEnv = { ...process.env, HOME: alternate }
-      delete env.USERPROFILE
-      const run = (command: string, args: string[]) => {
-        const probe = spawnSync(command, args, { env, encoding: "utf8", windowsHide: true })
-        expect(probe.stderr).toBe("")
-        return probe.stdout.trim()
-      }
-      const accountHome = run("node", ["-e", `console.log(require("node:os").userInfo().homedir)`])
-      expect(accountHome).not.toBe(alternate)
-      const module = JSON.stringify(join(import.meta.dirname, "dev-build-runtime.ts"))
-      const store = JSON.stringify(join(accountHome, ".omo", "agent"))
-      const args = ["-e", `import { isSharedAgentDir } from ${module}; console.log(isSharedAgentDir(${store}))`]
-      expect(run(executable, executable === "node" ? ["--input-type=module", ...args] : args)).toBe("true")
+      mkdirSync(join(home, ".omo", "agent"), { recursive: true })
+      symlinkSync(join(home, ".omo", "agent"), join(home, "linked-agent"))
+      expect(isSharedAgentDir(join(home, "linked-agent"), { homes: [home] })).toBe(true)
     } finally {
-      rmSync(alternate, { recursive: true, force: true })
+      rmSync(home, { recursive: true, force: true })
+    }
+  },
+)
+
+test.skipIf(process.platform === "win32")(
+  "#given a separate agent dir whose gateway/ links to the shared store's #when the store is compared #then it is shared (#14622 review M8)",
+  () => {
+    const home = temp("agent-home-store-link-")
+    try {
+      mkdirSync(join(home, ".omo", "agent", "gateway"), { recursive: true })
+      mkdirSync(join(home, "isolated"), { recursive: true })
+      symlinkSync(join(home, ".omo", "agent", "gateway"), join(home, "isolated", "gateway"))
+      const gateway = (agentDir: string) => join(agentDir, "gateway")
+      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home] })).toBe(false)
+      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], store: gateway })).toBe(true)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
+  },
+)
+
+test.skipIf(process.platform === "win32")(
+  "#given a gateway/ link to the shared store's gateway dir that does not exist yet #when the store is compared #then it is shared",
+  () => {
+    const home = temp("agent-home-dangling-")
+    try {
+      mkdirSync(join(home, "isolated"), { recursive: true })
+      symlinkSync(join(home, ".omo", "agent", "gateway"), join(home, "isolated", "gateway"))
+      const gateway = (agentDir: string) => join(agentDir, "gateway")
+      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], store: gateway })).toBe(true)
+    } finally {
+      rmSync(home, { recursive: true, force: true })
     }
   },
 )
@@ -76,7 +106,7 @@ test("#given an existing shared store #when the agent dir spells it with differe
       mkdirSync(join(home, ".omo", "probe"))
       caseInsensitive = false
     } catch {}
-    expect(isSharedAgentDir(upper, [home])).toBe(caseInsensitive)
+    expect(isSharedAgentDir(upper, { homes: [home] })).toBe(caseInsensitive)
   } finally {
     rmSync(home, { recursive: true, force: true })
   }
@@ -85,5 +115,69 @@ test("#given an existing shared store #when the agent dir spells it with differe
 test("#given a shared store not created yet #when the agent dir spells it with different case #then it is shared where the platform's volumes ignore case", () => {
   const home = join(tmpdir(), "agent-home-absent-case")
   const caseInsensitivePlatform = process.platform === "win32" || process.platform === "darwin"
-  expect(isSharedAgentDir(join(home, ".OMO", "Agent"), [home])).toBe(caseInsensitivePlatform)
+  expect(isSharedAgentDir(join(home, ".OMO", "Agent"), { homes: [home] })).toBe(caseInsensitivePlatform)
 })
+
+test.each([
+  ["no OMO_PACKAGE_DIR", undefined, false],
+  ["a blank OMO_PACKAGE_DIR", "blank", false],
+  ["no package.json", "missing", false],
+  ["a package.json that is not JSON", "{", false],
+  ["a release manifest (no omoBuild stamp)", JSON.stringify({ version: "5.2.0" }), false],
+  ["an omoBuild stamp without a command", JSON.stringify({ omoBuild: {} }), false],
+  ["an omoBuild stamp with an empty command", JSON.stringify({ omoBuild: { command: "" } }), false],
+  ["an omoBuild stamp naming its command", JSON.stringify({ omoBuild: { command: "omob" } }), true],
+] as const)("#given %s #then isDevBuildRuntime is %p", (_case, manifest, expected) => {
+  const payload = temp("dev-build-payload-")
+  try {
+    if (manifest !== undefined && manifest !== "blank" && manifest !== "missing")
+      writeFileSync(join(payload, "package.json"), manifest)
+    const env: NodeJS.ProcessEnv =
+      manifest === undefined ? {} : { OMO_PACKAGE_DIR: manifest === "blank" ? "  " : payload }
+    expect(isDevBuildRuntime(env)).toBe(expected)
+  } finally {
+    rmSync(payload, { recursive: true, force: true })
+  }
+})
+
+const facts = (passwd: () => string): PlatformFacts => ({
+  platform: "linux",
+  uid: 1000,
+  env: {},
+  readFile: passwd,
+  isFile: () => false,
+  run: () => {
+    throw new Error("no tool")
+  },
+})
+
+test("#given HOME and USERPROFILE elsewhere #when the agent dir is the OS user record's store #then it is shared", () => {
+  const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE }
+  try {
+    process.env.HOME = join("/", "alternate-home")
+    delete process.env.USERPROFILE
+    const record = facts(() => "me:x:1000:1000::/home/me:/bin/sh\n")
+    expect(isSharedAgentDir(join("/", "home", "me", ".omo", "agent"), { facts: record })).toBe(true)
+    expect(isSharedAgentDir(join("/", "tmp", "isolated-agent"), { facts: record })).toBe(false)
+  } finally {
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+})
+
+test.each([
+  [
+    "the user record cannot be read",
+    (): string => {
+      throw new Error("no passwd")
+    },
+  ],
+  ["no user record names this uid", (): string => "root:x:0:0::/root:/bin/sh\n"],
+] as const)(
+  "#given %s #when an isolated agent dir is checked #then it counts as shared (fail closed, #14622 review M4)",
+  (_case, passwd) => {
+    expect(isSharedAgentDir(join("/", "tmp", "isolated-agent"), { facts: facts(passwd) })).toBe(true)
+  },
+)

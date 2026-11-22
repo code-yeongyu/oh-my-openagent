@@ -1,7 +1,8 @@
-import { spawnSync } from "node:child_process"
-import { readFileSync, realpathSync, statSync } from "node:fs"
-import { homedir, userInfo } from "node:os"
-import { join, resolve } from "node:path"
+import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "node:fs"
+import { homedir } from "node:os"
+import { basename, dirname, join, resolve } from "node:path"
+
+import { type PlatformFacts, systemPlatformFacts, userRecordHome } from "@oh-my-opencode/omo-opencode/account-home"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
@@ -26,76 +27,64 @@ export function isDevBuildRuntime(env: NodeJS.ProcessEnv = process.env): boolean
   return isRecord(stamp) && typeof stamp["command"] === "string" && stamp["command"].length > 0
 }
 
-function canonical(path: string): string {
+/** The canonical spelling of a path, symlinks resolved even where their target does not exist yet. */
+function canonical(path: string, depth = 0): string {
   try {
     return realpathSync(path)
   } catch {
-    return resolve(path)
+    const absolute = resolve(path)
+    if (depth > 40) return absolute
+    try {
+      if (lstatSync(absolute).isSymbolicLink()) {
+        return canonical(resolve(dirname(absolute), readlinkSync(absolute)), depth + 1)
+      }
+    } catch {
+      // Nothing at this path: its parent decides where it would be created.
+    }
+    const parent = dirname(absolute)
+    return parent === absolute ? absolute : join(canonical(parent, depth + 1), basename(absolute))
   }
 }
 
 /**
- * Every home a released omo on this account may resolve its agent dir under: HOME, USERPROFILE and the OS account home
- * can differ (a Windows session launched without HOME uses %USERPROFILE%), so each one counts (#14622 review M2).
- * `os.homedir()` follows HOME on POSIX, so the account record's home is read too: an omob run under an alternate HOME
- * still sees the real account's store (#14622 review M4). It is read only when a source build is about to migrate.
+ * Every home a released omo on this account may resolve its agent dir under: HOME, USERPROFILE and the OS user record's
+ * home can differ (a Windows session launched without HOME uses %USERPROFILE%), so each one counts (#14622 review M2).
+ * The record's home is read from the OS account database, never from the environment (Bun's homedir() and userInfo()
+ * follow HOME and USERPROFILE, review M4): the shared `userRecordHome` reads /etc/passwd by uid on Linux, Open Directory
+ * through `id -P` on macOS (network directories included), and the SID's profile on Windows with System32 tools only.
+ * Null when the record cannot be read: then no agent dir can be proven isolated. Read only when a source build is about
+ * to migrate.
  */
-function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
-  return [env.HOME, env.USERPROFILE, homedir(), passwdHome()].filter(
+function accountHomes(env: NodeJS.ProcessEnv, facts: PlatformFacts): readonly string[] | null {
+  const record = userRecordHome(facts)
+  if (record === undefined) return null
+  return [env.HOME, env.USERPROFILE, homedir(), record].filter(
     (home): home is string => home !== undefined && home.length > 0,
   )
 }
 
-function passwdHome(): string | undefined {
-  if (process.platform === "win32") return undefined
-  // Node's userInfo() reads the passwd entry; Bun's follows HOME (and USER), so under Bun the record is asked for by uid.
-  if (process.versions.bun === undefined) {
-    try {
-      return userInfo().homedir
-    } catch {
-      // No passwd entry for this uid (a container user): HOME and USERPROFILE still count.
-      return undefined
-    }
-  }
-  return process.platform === "darwin" ? directoryServicesHome() : getentHome()
-}
-
-function run(command: string, args: readonly string[]): string | undefined {
-  const result = spawnSync(command, args, { encoding: "utf8", windowsHide: true, timeout: 5_000 })
-  return result.status === 0 ? result.stdout.trim() : undefined
-}
-
-function getentHome(): string | undefined {
-  const uid = process.getuid?.()
-  if (uid === undefined) return undefined
-  // name:password:uid:gid:gecos:home:shell
-  return (
-    run("getent", ["passwd", String(uid)])
-      ?.split("\n")[0]
-      ?.split(":")[5] || undefined
-  )
-}
-
-function directoryServicesHome(): string | undefined {
-  const name = run("id", ["-un"])
-  if (name === undefined || name.length === 0) return undefined
-  // "NFSHomeDirectory: /Users/name"
-  return (
-    run("dscl", [".", "-read", `/Users/${name}`, "NFSHomeDirectory"])
-      ?.split(": ")[1]
-      ?.trim() || undefined
-  )
-}
-
 /**
- * True when `agentDir` is one of the agent homes every released omo on this account shares (`resolveAgentHome`'s
- * defaults: `~/.omo/agent`, the flat `~/.omo`, `~/.senpi/agent`) under any of the account's home roots. An explicit
- * isolated dir is never shared.
+ * True when `agentDir` may be one of the agent homes every released omo on this account shares (`resolveAgentHome`'s
+ * defaults: `~/.omo/agent`, the flat `~/.omo`, `~/.senpi/agent`) under any of the account's home roots, or when
+ * `store` maps it to the same store one of them uses (a `gateway/` linked into the release's, #14622 review M8). With
+ * the account's homes unknown (`null`) it answers true: a store that cannot be proven isolated is treated as shared.
  */
-export function isSharedAgentDir(agentDir: string, homes: readonly string[] = accountHomes(process.env)): boolean {
+export function isSharedAgentDir(
+  agentDir: string,
+  options: {
+    readonly homes?: readonly string[] | null
+    readonly store?: (agentDir: string) => string
+    readonly facts?: PlatformFacts
+  } = {},
+): boolean {
+  const homes =
+    options.homes === undefined ? accountHomes(process.env, options.facts ?? systemPlatformFacts) : options.homes
+  if (homes === null) return true
+  const store = options.store
   return homes.some((home) =>
-    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some((candidate) =>
-      sameLocation(candidate, agentDir),
+    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
+      (candidate) =>
+        sameLocation(candidate, agentDir) || (store !== undefined && sameLocation(store(candidate), store(agentDir))),
     ),
   )
 }
@@ -103,7 +92,8 @@ export function isSharedAgentDir(agentDir: string, homes: readonly string[] = ac
 /**
  * Two spellings name one store when the filesystem says so (#14622 review M3): an existing path is compared by its
  * device and inode, so a case-insensitive volume's `.OMO\agent` and `.omo\agent` match. A path that does not
- * exist yet falls back to its canonical spelling, case-folded where the platform's default volumes ignore case.
+ * exist yet falls back to its canonical spelling (symlinks resolved), case-folded where the platform's default volumes
+ * ignore case.
  */
 function sameLocation(left: string, right: string): boolean {
   const a = identity(left)

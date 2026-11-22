@@ -31,7 +31,7 @@ import {
 import { pairLoopGuardMessage } from "../errors"
 import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
-import { gatewayInboxDirectory } from "./paths"
+import { gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
@@ -411,8 +411,10 @@ function storedReaderFloor(ctx: StoreContext): number | undefined {
   )
   if (Number(tables?.n ?? 0) === 0) return undefined
   const found = ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [GATEWAY_READER_FLOOR_KEY])
-  const floor = Number(found?.value)
-  return found !== undefined && Number.isInteger(floor) ? floor : undefined
+  // Fail closed on anything but a plain positive integer: "", " 14", "-1" or "1e1" is no floor (#14622 edge cases).
+  const value = found?.value
+  if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : undefined
+  return typeof value === "string" && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined
 }
 
 /**
@@ -458,10 +460,10 @@ async function recordReaderFloor(ctx: StoreContext): Promise<void> {
  * reads that store, and a schema only an unreleased build knows would lock them out.
  */
 function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
-  if (!isDevBuildRuntime() || !isSharedAgentDir(ctx.config.agent_dir)) return undefined
+  if (!isDevBuildRuntime() || !isSharedAgentDir(ctx.config.agent_dir, { store: gatewayRootDirectory })) return undefined
   return new GatewayMigrationError(
     version + 1,
-    `a source build does not migrate the shared gateway store from v${version} to v${GATEWAY_MIGRATIONS.length}; run it with OMO_CODING_AGENT_DIR set to an isolated agent dir`,
+    `a source build does not migrate a gateway store released sessions may share (the account's agent dir or its gateway store, or one whose account home cannot be read) from v${version} to v${GATEWAY_MIGRATIONS.length}; run it with OMO_CODING_AGENT_DIR set to an isolated agent dir`,
   )
 }
 

@@ -138,6 +138,14 @@ const SPAWN_CALL_SITES = [
   "packages/utils/src/runtime/spawn.ts: bun.spawnSync(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawn(bin; args)",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawnSync(bin; args)",
+  // #14622 review M4: a source build about to migrate the gateway store reads the OS user record's home through the
+  // pinned account-home helper (/etc/passwd, `/usr/bin/id -P`, System32 whoami/reg), never a tool found on PATH.
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: accountHomes(process.env; options.facts ?? systemPlatformFacts)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: packages/omo-opencode/src/cli/service-auth/account-home.ts#userRecordHome(facts; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedAgentDir(ctx.config.agent_dir; {store})",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: sourceBuildMigrationRefusal(ctx; opened)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchOp(ctx; op)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/store-ops.ts#migrate(context; -)",
 ]
 const CONNECT_CALLS = [
   'createConnection({ host: "127.0.0.1", port })',

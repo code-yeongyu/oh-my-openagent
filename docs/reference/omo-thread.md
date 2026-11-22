@@ -323,9 +323,11 @@ store methods reject with an error carrying that code. Use a compatible binary t
 database.
 
 An omob source build never migrates the store in a shared agent dir (`~/.omo/agent`, `~/.omo`,
-`~/.senpi/agent`): released sessions on the device read that store. It answers
-`gateway_migration_failed` instead; run source builds with `OMO_CODING_AGENT_DIR` set to an
-isolated agent dir.
+`~/.senpi/agent` under HOME, USERPROFILE or the account's home from the OS account database), nor
+a store reached through a link into one (a `gateway/` symlinked to a shared agent dir's): released
+sessions on the device read that store. When the account's home cannot be read, every store counts
+as shared. It answers `gateway_migration_failed` instead; run source builds with
+`OMO_CODING_AGENT_DIR` set to an isolated agent dir.
 
 The same `gateway_schema_too_new` refusal applies when an extension's stored
 `extension_schema.version` exceeds the caller's `migrations.length`. Registration and
