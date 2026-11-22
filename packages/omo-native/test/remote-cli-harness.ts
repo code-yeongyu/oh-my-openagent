@@ -90,6 +90,7 @@ export async function run(
     readonly linkDevice?: DeviceLink
     readonly client?: () => RemoteClient
     readonly optOut?: RemoteOptOut
+    readonly readStdin?: () => Promise<string>
   } = {},
 ) {
   let dir = stateDir
