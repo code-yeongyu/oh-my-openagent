@@ -1,9 +1,10 @@
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { appendFile, copyFile, mkdir, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "vitest";
-import { ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
+import { ulwLoopAttemptEvidenceDir, ulwLoopDir, ulwLoopGoalsPath, ulwLoopLedgerPath } from "../src/paths.js";
 import {
 	appendLedger,
 	findAcceptedSteeringLedgerEntry,
@@ -542,5 +543,33 @@ describe("withUlwLoopMutationLock", () => {
 
 		// then
 		expect(events).toEqual(["scoped-1:start", "root-scope", "scoped-1:end", "scoped-2"]);
+	});
+});
+
+describe("evidence in the user's repository (#10799)", () => {
+	function git(repoRoot: string, ...args: string[]): string {
+		return execFileSync("git", ["-C", repoRoot, ...args], { encoding: "utf8", windowsHide: true });
+	}
+
+	it("keeps evidence written after the first plan write out of git status, and leaves tracked .omo files tracked", async () => {
+		// given
+		const repoRoot = await makeRepo();
+		git(repoRoot, "init", "-q");
+		await mkdir(join(repoRoot, ".omo", "rules"), { recursive: true });
+		await writeFile(join(repoRoot, ".omo", "rules", "team.md"), "rule\n", "utf8");
+		git(repoRoot, "add", ".omo/rules/team.md");
+
+		// when
+		await withUlwLoopMutationLock(repoRoot, { sessionId: "s1" }, () =>
+			writePlan(repoRoot, makePlan(), { sessionId: "s1" }),
+		);
+		const attemptDir = join(repoRoot, ulwLoopAttemptEvidenceDir("G001", 1, { sessionId: "s1" }));
+		await mkdir(attemptDir, { recursive: true });
+		await writeFile(join(attemptDir, "screenshot.png"), "png", "utf8");
+
+		// then
+		const status = git(repoRoot, "status", "--porcelain", "--untracked-files=all").split("\n");
+		expect(status.filter((line) => line.includes(".omo/evidence"))).toEqual([]);
+		expect(git(repoRoot, "ls-files", ".omo/rules")).toBe(".omo/rules/team.md\n");
 	});
 });

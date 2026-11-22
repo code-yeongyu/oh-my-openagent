@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { linkSync, mkdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { ensureEvidenceIgnored } from "./evidence-ignore.js";
 import { readLedgerAt } from "./ledger.js";
 import { type UlwLoopScope, ulwLoopDir, ulwLoopStateLockPath } from "./paths.js";
 import { assertStateLockOwned, migrationEntries } from "./plan-io.js";
@@ -65,6 +66,7 @@ export async function commit(
 	};
 	mkdirSync(join(dir, "revisions"), { recursive: true });
 	mkdirSync(join(dir, "tmp"), { recursive: true });
+	ensureEvidenceIgnored(repoRoot);
 	const temp = join(dir, "tmp", `${process.pid}-${randomUUID()}.json`);
 	try {
 		writeFileSync(temp, `${JSON.stringify(record)}\n`, { flag: "wx" });

@@ -395,6 +395,8 @@ Commands are slash-triggered workflows that execute predefined templates.
 
 The `/ulw-loop` slash command has been removed; continuous goal pursuit is now handled by `/goal`. The `omo-agent-toolkit ulw-loop` CLI subcommand remains as a passthrough to the Codex LazyCodex ulw-loop CLI.
 
+QA artifacts from a loop (screenshots, logs, transcripts) go under `.omo/evidence/` in your project. The first loop state write puts a `.gitignore` containing `*` in that directory, so git never shows or commits them, while anything else under `.omo/` you track (such as `.omo/rules/` or `.omo/omo.json`) stays tracked. To reclaim the space, delete `.omo/evidence/` or the session folders under it. If evidence was committed before this change, run `git rm -r --cached .omo/evidence` and commit; if it was pushed, the files stay in history until it is rewritten.
+
 ### /refactor
 
 **Purpose**: Intelligent refactoring with full toolchain
