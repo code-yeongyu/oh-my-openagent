@@ -104,14 +104,14 @@ export function shippedName(pluginRoot, path, paths = { relative, sep }) {
 
 // Every file under the plugin root ships (extensions/*.js, scripts/install-local.mjs, runtime/, ...),
 // so each one is read; only vendored node_modules are skipped.
-function shippedHelperReferences(pluginRoot) {
+function shippedHelperReferences(pluginRoot, paths = { relative, sep }) {
   const shipped = readdirSync(pluginRoot, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile() && !join(entry.parentPath, entry.name).includes("node_modules"))
     .map((entry) => join(entry.parentPath, entry.name))
   const leaking = shipped.filter((path) =>
     /telemetry-opt-out-env|withTelemetryOptOut|telemetryLocalSinkEnv/u.test(readFileSync(path, "latin1")),
   )
-  return { scanned: shipped.length, leaking: leaking.map((path) => shippedName(pluginRoot, path)).sort() }
+  return { scanned: shipped.length, leaking: leaking.map((path) => shippedName(pluginRoot, path, paths)).sort() }
 }
 
 describe("the QA helper never ships", () => {
@@ -126,6 +126,21 @@ describe("the QA helper never ships", () => {
     ["posix", posix, "/a/plugin", "/a/plugin/scripts/install-local.mjs"],
   ])("#given a %s shipped path #when it is reported #then it uses forward slashes", (_label, paths, root, path) => {
     expect(shippedName(root, path, paths)).toBe("scripts/install-local.mjs")
+  })
+
+  test("#given a win32 path api #when a leaking shipped file has a backslash in its name #then it is reported with forward slashes", () => {
+    const root = mkdtempSync(join(tmpdir(), "qa-helper-ship-win32-"))
+    try {
+      mkdirSync(join(root, "extensions"))
+      writeFileSync(join(root, "extensions", "clean.js"), "export const clean = true\n")
+      writeFileSync(join(root, "extensions", "side\\car.js"), "const env = withTelemetryOptOut(process.env)\n")
+      expect(shippedHelperReferences(root, { relative: win32.relative, sep: win32.sep })).toEqual({
+        scanned: 2,
+        leaking: ["extensions/side/car.js"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 
   test("#given a plugin tree whose bundle and installer name the helper #when it is scanned #then both files are reported", () => {
