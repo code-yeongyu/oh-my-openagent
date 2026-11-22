@@ -18,6 +18,7 @@ import type { ManagedStartSpec } from "./types"
 import { createTaskManager } from "./manager"
 import { createParentRegistrySessionContext } from "./parent-registry-context"
 import { createInProcessManagedRunner } from "./runner"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -73,7 +74,7 @@ describe.each(cleanupStages)("TaskManager respawn %s cleanup", (cleanupStage) =>
       switchSession: () => Promise.resolve({ cancelled: true }),
     } satisfies RpcChildHandle
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -136,7 +137,7 @@ describe("TaskManager respawn launch trust boundary", () => {
     let extensions: readonly string[] | undefined
     let memberEnv: Readonly<Record<string, string>> | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -208,7 +209,7 @@ describe("TaskManager team-member respawn", () => {
     } satisfies RpcChildHandle
     let startedSpec: RpcRunnerSpec | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const options = {
       store,
@@ -273,7 +274,7 @@ describe("TaskManager respawn variant", () => {
     } satisfies RpcChildHandle
     let startedSpec: RpcRunnerSpec | undefined
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,
@@ -304,7 +305,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given a claimed in-process record #when respawned #then resume receives the rebuilt persisted spec", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -367,7 +368,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given resolveResumeContext cannot find the persisted model #when respawned #then failure is retryable and no child is spawned", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record: TaskRecord = {
       ...respawnRecord(),
       execution_mode: "in-process",
@@ -418,7 +419,7 @@ describe("TaskManager in-process respawn", () => {
   test("#given an in-process record without v1 rebuild facts #when respawned #then it fails unrecoverably without spawning", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record: TaskRecord = { ...respawnRecord(), execution_mode: "in-process" }
     let resumeCalls = 0
     const runner = {
@@ -454,7 +455,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given no prior host ownership claim #when reattached #then the handle is rejected", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const { host_pid: _hostPid, ...record } = respawnRecord()
     store.replace(record)
@@ -477,7 +478,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given a claimed non-terminal record with stale output #when reattached #then output clears and run_epoch bumps exactly once", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -514,7 +515,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given a pid-less record revived onto a daemon session #when reattached #then the record names that session", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const { pid: _pid, ...withoutPid } = respawnRecord()
     const record: TaskRecord = { ...withoutPid, host_pid: 7001 }
@@ -554,7 +555,7 @@ describe("TaskManager guarded reattach", () => {
   test("#given a claimed terminal record #when reattached #then run_epoch is unchanged", async () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const record: TaskRecord = {
       ...respawnRecord(),
@@ -614,7 +615,7 @@ describe("TaskManager respawn continuation", () => {
       switchSession: () => Promise.resolve({ cancelled: switchCancelled }),
     } satisfies RpcChildHandle
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runner = new FakeRunner()
     const manager = createTaskManager({
       store,

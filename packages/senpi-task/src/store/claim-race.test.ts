@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { resolveStateDir } from "./state-dir"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const claimRaceChildFixturePath = resolve(import.meta.dir, "__fixtures__", "claim-race-child.ts")
@@ -105,7 +106,7 @@ describe("claimTaskRecord cross-process race", () => {
     const ids = results.flatMap((result) => result.ids)
     expect(ids).toHaveLength(100)
     expect(new Set(ids).size).toBe(100)
-    expect(readdirSync(join(resolveStateDir({ project_dir: project }), "tasks"))).toHaveLength(100)
+    expect(readdirSync(join(resolveStateDir(ownedTaskState(project)), "tasks"))).toHaveLength(100)
     expect(results.reduce((total, result) => total + result.retries, 0)).toBeGreaterThanOrEqual(1)
     for (const output of stderrOutput) expect(output).not.toContain("already exists")
   })

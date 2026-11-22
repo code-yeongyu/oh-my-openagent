@@ -7,6 +7,7 @@ import type { ResolvedChildPlan } from "../types"
 import { settings, tempProject } from "./manager-fakes"
 import { chainIds } from "./model-chain-ids"
 import { createModelChainWorld, type ModelChainWorld, type RunnerKind, type Step } from "./model-chain-world"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 // The parent session runs on a working, logged-in model of another provider. No child may ever call it.
 export const PARENT = chainIds("in-process").parent
@@ -69,7 +70,7 @@ export async function runCategoryChildren(
   const kind = first.runner ?? "in-process"
   const [parentProvider = "", parentId = ""] = chainIds(kind).parent.split("/")
   const manager = createTaskManager({
-    store: createTaskRecordStore({ project_dir: project }),
+    store: createTaskRecordStore(ownedTaskState(project)),
     runners: {
       "in-process": inProcess,
       process:
