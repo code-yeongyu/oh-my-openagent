@@ -1,4 +1,5 @@
 import { homedir } from "node:os"
+import { findOnPath } from "../omo-senpi/src/components/claude-code/find-on-path"
 
 import {
   type ColdWakeOutcome,
@@ -59,11 +60,14 @@ function deviceColdWake(options: ColdWakeOptions) {
   if (host === undefined) return undefined
   const launchOf = (): SessionHostLaunch | ColdWakeOutcome => {
     try {
+      const env = options.env ?? process.env
       return SessionHostLaunch.from({
         omoBin: options.binaryPath,
         execPath: process.execPath,
         agentDir: options.agentDir,
-        path: (options.env ?? process.env).PATH,
+        path: env.PATH,
+        preferredRuntime: env.SENPI_RUNTIME,
+        findRuntime: (name) => findOnPath(name, env),
       })
     } catch (error) {
       if (error instanceof ColdWakeUnitError) return { kind: "failed", step: "unit", detail: error.message }

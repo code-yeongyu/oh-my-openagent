@@ -1,4 +1,4 @@
-import { isAbsolute } from "node:path"
+import { basename, isAbsolute } from "node:path"
 
 // omo#13594: the ONE session host unit, always on beside the device service and its only cold-wake unit: the device
 // service starts it only by the fixed name its launch-time table carries (OMO_RELAYD_SERVICES entry "omo"), and it runs
@@ -46,15 +46,29 @@ export class SessionHostLaunch {
     return ["/usr/bin/env", ...this.env.map(([key, value]) => `${key}=${value}`), ...this.program, ...args]
   }
 
-  /** An npm launcher script (`bin/omo.js`) runs under the runtime that ran it; a compiled omo runs directly. */
+  /** Only a JS runtime can interpret an npm launcher; a compiled omo target runs directly. */
   static from(options: {
     readonly omoBin: string
     readonly execPath: string
     readonly agentDir: string
     readonly path?: string | undefined
+    readonly preferredRuntime?: string | undefined
+    readonly findRuntime?: (name: "bun" | "node") => string | null
   }): SessionHostLaunch {
     const program = checked("omo binary", options.omoBin, true)
-    const omo = program.endsWith(".js") ? [checked("runtime", options.execPath, true), program] : [program]
+    const omo = [program]
+    if (program.endsWith(".js")) {
+      const current = checked("runtime", options.execPath, true)
+      const name = basename(current)
+      if (name === "bun" || name === "node") omo.unshift(current)
+      else {
+        const first = options.preferredRuntime === "node" ? "node" : "bun"
+        const runtime = options.findRuntime?.(first) ?? options.findRuntime?.(first === "bun" ? "node" : "bun")
+        if (!runtime)
+          throw new ColdWakeUnitError("Cannot start the omo JavaScript launcher: no bun or node runtime on PATH")
+        omo.unshift(checked("runtime", runtime, true))
+      }
+    }
     const env: (readonly [string, string])[] = [["OMO_CODING_AGENT_DIR", checked("agent dir", options.agentDir, true)]]
     if (options.path !== undefined && options.path !== "") env.push(["PATH", checked("PATH", options.path, false)])
     return new SessionHostLaunch(omo, env)
