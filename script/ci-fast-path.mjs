@@ -3,6 +3,8 @@
 import { readFileSync } from "node:fs"
 import { pathToFileURL } from "node:url"
 
+import { isReleaseStatePath } from "./release-state-paths.mjs"
+
 const generatedReleaseMerge =
   /^Merge pull request #[0-9]+ from code-yeongyu\/release\/v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?-source-state$/
 const releaseStateHeadRef = /^release\/v.+-source-state$/
@@ -140,6 +142,7 @@ export function classifyCiMode({
   labels = [],
   body = "",
   changedFiles = 0,
+  basePlatformGreen = false,
 }) {
   // Queue commits never use generated-release push policy.
   const classificationEvent = eventName === "merge_group" ? "pull_request" : eventName
@@ -160,11 +163,25 @@ export function classifyCiMode({
       labelHonoredOverFileCap ||
       changedPaths.some(isPlatformSensitivePath) ||
       platformReasonLine.test(body))
+  // A release-state pull request is the release's platform validation, unless its base already is: the base's dev push
+  // run ran its macOS/Windows legs green (basePlatformGreen) and the pull request changes only what the release stamp
+  // writes. Then the macOS/Windows legs would retest the base's code with a new version number, so it stays on Linux.
+  const releaseStateOnGreenBase =
+    eventName === "pull_request" &&
+    releaseStateHeadRef.test(headRef) &&
+    basePlatformGreen &&
+    diffAvailable &&
+    changedPaths.length > 0 &&
+    changedPaths.every(isReleaseStatePath)
   const fullMatrix =
-    eventName === "merge_group" || classificationEvent === "push" || releaseStateHeadRef.test(headRef) || labelHonored
+    eventName === "merge_group" ||
+    classificationEvent === "push" ||
+    (releaseStateHeadRef.test(headRef) && !releaseStateOnGreenBase) ||
+    labelHonored
 
   return {
     generatedReleasePush,
+    releaseStateOnGreenBase,
     webOnly,
     runHeavy: eventName === "merge_group" || !(generatedReleasePush || webOnly),
     fullMatrix,
@@ -199,6 +216,7 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     labels: parseLabels(args.get("labels") ?? "[]"),
     body: args.has("body-file") ? readFileSync(args.get("body-file"), "utf8") : "",
     changedFiles: Number(args.get("changed-files") ?? "0"),
+    basePlatformGreen: parseBoolean(args.get("base-platform-green") ?? "false"),
   })
   process.stdout.write(`${JSON.stringify(mode)}\n`)
 }
