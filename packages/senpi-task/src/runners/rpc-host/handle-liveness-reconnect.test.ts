@@ -8,6 +8,43 @@ import type { HostSessionLiveness } from "./handle-port"
 let clock: ReturnType<typeof fakeClock>
 afterEach(() => clock?.restore())
 
+/**
+ * Awaits one of this test's gate promises and names it when it can provably never settle. Every
+ * handle timer rides the fake clock, so a gate still unsettled after the microtask queue is
+ * drained can only settle through a fake timer: the drain runs every such timer this handle could
+ * still react to (bounded fake time, far past this test's last assertion). A gate unsettled after
+ * that can never settle, and the wait fails with the event's name and the observed liveness states
+ * instead of hanging until the suite timeout. No wall-clock deadline is involved, so the test's
+ * own budget is unchanged, and the healthy path settles before the drain and never runs it.
+ */
+async function awaitNamed(
+  event: string,
+  gate: Promise<void>,
+  observedStates: readonly string[],
+  drainFakeClock: () => Promise<void>,
+): Promise<void> {
+  let settled = false
+  void gate.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    },
+  )
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  if (settled) {
+    await gate
+    return
+  }
+  await drainFakeClock()
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  if (!settled) {
+    throw new Error(`${event} never arrived; observed liveness states: ${observedStates.join(" -> ") || "none"}`)
+  }
+  await gate
+}
+
 test("a connection lost while unresponsive reattaches the same session before the deadline", async () => {
   clock = fakeClock()
   const first = fakeSessionPort()
@@ -37,18 +74,23 @@ test("a connection lost while unresponsive reattaches the same session before th
     await clock.advance(45_000)
     expect(handle.liveness().state).toBe("unresponsive")
     const running = Promise.withResolvers<void>()
+    const observedStates: string[] = []
     const unsubscribe = handle.onLiveness((status) => {
+      observedStates.push(status.state)
       if (status.state === "running") running.resolve()
     })
     first.loseTransport()
     state.reject(Object.assign(new Error("transport lost"), { code: "rpc_transport_gone" }))
     await clock.advance(0)
     await clock.advance(30_000)
-    await reattachStarted.promise
+    const drainFakeClock = async () => {
+      for (let step = 0; step < 60; step += 1) await clock.advance(10_000)
+    }
+    await awaitNamed("reattach start", reattachStarted.promise, observedStates, drainFakeClock)
     // Advancing the clock starts the retry; it does not acknowledge an async reattach.
     expect(handle.liveness().state).toBe("unresponsive")
     releaseReattach.resolve()
-    await running.promise
+    await awaitNamed("liveness recovery to running", running.promise, observedStates, drainFakeClock)
     unsubscribe()
     // Cross the original unresponsive deadline only after the recovered probe cleared it.
     await clock.advance(120_000)
