@@ -1,9 +1,7 @@
-import { existsSync, statSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
-
-import { contextCwd, isPathInside } from "../request-context.js"
-import { getDisabledServerIds, getMergedServers, type ServerWithSource } from "./config-loader.js"
+import { contextCwd } from "../request-context.js"
+import { getDisabledServerIds, getMergedServers } from "./config-loader.js"
 import { withHostJsRuntime } from "./host-js-runtime.js"
+import { nativeTypescriptCommand, nativeTypescriptSearchDirectory } from "./native-typescript.js"
 import { BUILTIN_SERVERS, LSP_INSTALL_HINTS } from "./server-definitions.js"
 import { isServerInstalled, resolveServerBinary } from "./server-installation.js"
 import type { ServerLookupResult } from "./types.js"
@@ -26,33 +24,6 @@ function usesBuiltinCommand(id: string, command: string[]): boolean {
 }
 
 /**
- * TypeScript 7 serves LSP itself (`tsc --lsp --stdio`) and no longer ships the
- * `lib/tsserver.js` that typescript-language-server wraps. Only the project's own
- * `node_modules/.bin/tsc` decides, so a global compiler never changes the server.
- * A command a config file named is never replaced, even one equal to the default.
- */
-function nativeTypescriptCommand(server: ServerWithSource, projectDirectory: string): string[] | null {
-  if (server.id !== "typescript" || !server.inheritsBuiltinCommand) return null
-  const tsc = resolveServerBinary(["tsc"], projectDirectory, { localOnly: true })
-  if (tsc === null) return null
-  const packageDir = join(dirname(tsc), "..", "typescript")
-  const speaksLsp = existsSync(join(packageDir, "package.json")) && !existsSync(join(packageDir, "lib", "tsserver.js"))
-  return speaksLsp ? [tsc, "--lsp", "--stdio"] : null
-}
-
-/**
- * The directory whose project owns `targetPath`: the target itself when it is a directory, else
- * its parent. A target outside the request cwd keeps the cwd, so a compiler is only taken from
- * inside the session root (the repo-local walk then stops at the `.git` boundary as usual).
- */
-function projectDirectoryFor(targetPath: string | undefined, workingDirectory: string): string {
-  if (targetPath === undefined) return workingDirectory
-  const absolute = resolve(workingDirectory, targetPath)
-  if (!isPathInside(workingDirectory, absolute)) return workingDirectory
-  return statSync(absolute, { throwIfNoEntry: false })?.isDirectory() === true ? absolute : dirname(absolute)
-}
-
-/**
  * Picks the server for `ext`. `targetPath` is the file or directory being served; when given, a
  * TypeScript 7 compiler is looked up from that target's project instead of the request cwd, so a
  * monorepo package on TypeScript 7 is served by its own `tsc` while the session sits at the root.
@@ -60,11 +31,11 @@ function projectDirectoryFor(targetPath: string | undefined, workingDirectory: s
 export function findServerForExtension(ext: string, targetPath?: string): ServerLookupResult {
   const servers = getMergedServers()
   const workingDirectory = contextCwd()
-  const projectDirectory = projectDirectoryFor(targetPath, workingDirectory)
+  const searchDirectory = nativeTypescriptSearchDirectory(targetPath, workingDirectory)
 
   for (const server of servers) {
     if (!server.extensions.includes(ext)) continue
-    const nativeTypescript = nativeTypescriptCommand(server, projectDirectory)
+    const nativeTypescript = nativeTypescriptCommand(server, searchDirectory)
     if (nativeTypescript !== null) {
       // The builtin initialization is typescript-language-server's option set; tsc gets only
       // what a config file supplied.
@@ -146,6 +117,7 @@ export function getAllServers(): ServerStatus[] {
   const servers = getMergedServers()
   const disabled = getDisabledServerIds()
   const workingDirectory = contextCwd()
+  const nativeSearchDirectory = nativeTypescriptSearchDirectory(undefined, workingDirectory)
 
   const result: ServerStatus[] = []
   const seen = new Set<string>()
@@ -156,7 +128,7 @@ export function getAllServers(): ServerStatus[] {
       id: server.id,
       installed:
         isServerInstalled(server.command, workingDirectory) ||
-        nativeTypescriptCommand(server, workingDirectory) !== null,
+        nativeTypescriptCommand(server, nativeSearchDirectory) !== null,
       extensions: server.extensions,
       disabled: false,
       source: server.source,

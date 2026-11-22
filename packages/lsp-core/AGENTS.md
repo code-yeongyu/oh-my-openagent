@@ -19,7 +19,7 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 | `src/lsp/server-definitions.ts` | `BUILTIN_SERVERS` (51 languages), `LSP_INSTALL_HINTS`, `AUTO_INSTALLABLE_SERVERS` |
 | `src/lsp/server-resolution.ts` | `findServerForExtension()`: map extension to installed server; substitutes the resolved absolute binary path into `command[0]` |
 | `src/lsp/server-installation.ts` | `resolveServerBinary()`: marker-gated repo-local lookup then PATH, with Windows extension handling; `isServerInstalled()` retained for existing consumers |
-| `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()`: walk directory, cap files + diagnostics; `AbortSignal` cancels acquisition and per-file scans |
+| `src/lsp/directory-diagnostics.ts` | `aggregateDiagnosticsForDirectory()`: walk directory, cap files + diagnostics, one client per resolved server group (`directory-server-groups.ts`); `AbortSignal` cancels acquisition and per-file scans |
 | `src/lsp/formatters.ts` | Format locations, symbols, diagnostics, rename results, workspace edits |
 | `src/lsp/workspace-edit.ts` + `workspace-edit-*.ts` | `applyWorkspaceEdit()` / `applyWorkspaceEditDetailed()`: parse → fingerprint/snapshot → simulate → commit pipeline |
 | `src/lsp/workspace-mutation-controller.ts` | Lease/concurrency validation for workspace filesystem mutations |
