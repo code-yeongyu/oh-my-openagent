@@ -1,4 +1,5 @@
 import { setTimeout } from "node:timers/promises"
+import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { generateDeviceKeys } from "./device-keys"
 import {
   ApiRefusal,
@@ -92,6 +93,32 @@ async function replaceEarlierDevice(
   }
 }
 
+/**
+ * #14190: the service links the device when it grants the token, before anything is stored here. A grant this computer
+ * cannot store would otherwise leave a device nobody can use, and the next sign-in would meet `machine_exists`.
+ */
+async function saveOrUnlink(session: Session, credentials: Parameters<Session["save"]>[0]): Promise<void> {
+  try {
+    await session.save(credentials)
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : String(error)
+    const unlinked = await session
+      .request(`/v1/devices/${encodeURIComponent(credentials.device.id)}`, {
+        method: "DELETE",
+        headers: syncRequestHeaders(credentials.accessToken),
+      })
+      .then(
+        () => true,
+        () => false,
+      )
+    throw new SignInError(
+      unlinked
+        ? `The sign-in could not be stored on this computer (${reason}). The new device was unlinked, so nothing is left linked; fix the credential store and run omo login again.`
+        : `The sign-in could not be stored on this computer (${reason}), and unlinking the new device "${credentials.device.name}" failed. Remove it on the Devices page of your OmO account, then run omo login again.`,
+    )
+  }
+}
+
 async function authorizeDevice(
   session: Session,
   options: DeviceLoginOptions,
@@ -138,7 +165,7 @@ async function authorizeDevice(
           }),
         ),
       )
-      await session.save({ ...grant, ...keys.private })
+      await saveOrUnlink(session, { ...grant, ...keys.private })
       return replacedDeviceId === undefined ? {} : { replacedDeviceId }
     } catch (error) {
       if (!(error instanceof ApiRefusal)) throw error

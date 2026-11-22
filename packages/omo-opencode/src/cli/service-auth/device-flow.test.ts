@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { loginDevice } from "./device-flow"
+import { createCredentialStore } from "./keystore"
 import { createSession } from "./session"
 import { clock, fakeApi, grant, limitDetail, memorySecrets, minted, refusal, temporaryHome } from "./test-support"
 
@@ -224,5 +225,40 @@ describe("device authorization", () => {
     await expect(login).rejects.toThrow("This computer already has an OmO device")
     expect(seen).toEqual(["POST /v1/device/code", "POST /v1/device/token"])
     expect(secrets.writes).toHaveLength(0)
+  })
+})
+
+describe("an approved device whose credential cannot be stored (#14190)", () => {
+  test("unlinks the device it just created and says nothing was left linked", async () => {
+    const removed: { path: string; authorization: string | null }[] = []
+    const api = fakeApi((request) => {
+      const path = new URL(request.url).pathname
+      if (path === "/v1/device/code") return Response.json(minted)
+      if (path === "/v1/device/token") return Response.json(grant)
+      if (request.method === "DELETE") {
+        removed.push({ path, authorization: request.headers.get("authorization") })
+        return new Response(null, { status: 204 })
+      }
+      return refusal("unexpected_request")
+    })
+    const store = createCredentialStore(api, {
+      secrets: {
+        get: async () => null,
+        set: async () => {
+          throw new Error("macOS Keychain is locked")
+        },
+        delete: async () => false,
+      },
+      platform: process.platform,
+      lockProbe: async () => "unlocked",
+    })
+
+    const login = loginDevice(
+      createSession({ beforeKeysDiscarded: async () => undefined, api, store, home: await temporaryHome() }),
+      { name: "Test", platform: "linux", ...clock(), show: () => {}, chooseDevice: async () => null },
+    )
+
+    await expect(login).rejects.toThrow(/could not be stored on this computer.*nothing is left linked/s)
+    expect(removed).toEqual([{ path: `/v1/devices/${grant.device.id}`, authorization: `Bearer ${grant.accessToken}` }])
   })
 })
