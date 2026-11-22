@@ -6,7 +6,21 @@ import { copyRepo, runKnip, unusedExports } from "./knip-run.ts"
 // Next.js route-segment config exports are read by the framework from the app directory's special files, so knip must
 // not report them, while a genuinely unused export of the same file must still be reported. The recognition is scoped
 // (script/knip-next-route-segment-exports.ts, configured in knip.base.jsonc preprocessorOptions.nextRouteSegmentExports), so
-// these probes are NEW files added to a repo copy rather than files named in any ignore list.
+// these probes are NEW files rather than files named in any ignore list.
+
+// Use the real config and Next.js workspace, but give Knip only the two pages it needs to analyze.
+const FIXTURE_FILES = [
+  "package.json",
+  "knip.ts",
+  "knip.base.jsonc",
+  "script/knip-config.ts",
+  "script/knip-preexisting-exports.ts",
+  "script/knip-next-route-segment-exports.ts",
+  "packages/web/package.json",
+  "packages/web/knip.workspace.jsonc",
+  "packages/web/next.config.ts",
+  "packages/web/lib/build-id.mjs",
+] as const
 
 const KNIP_TIMEOUT_MS = 600_000
 const SOURCE = [
@@ -30,7 +44,7 @@ describe("knip recognises Next.js route-segment config exports", () => {
   test(
     "a routed page's revalidate is not reported; an unrelated export, and a private folder's page, still are",
     async () => {
-      const copy = await copyRepo()
+      const copy = await copyRepo(FIXTURE_FILES)
       try {
         for (const { file } of PROBES) {
           mkdirSync(dirname(join(copy, file)), { recursive: true })

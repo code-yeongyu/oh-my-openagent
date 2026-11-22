@@ -4,6 +4,7 @@ import { EventEmitter, once } from "node:events"
 import { createTaskRecordStore } from "../store"
 import { coldReviveHarness } from "../lifecycle/__fixtures__/cold-revive-harness"
 import { FakeRunner, baseSpec, cleanupProjects, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -36,7 +37,7 @@ describe("TaskManager revive concurrency slot", () => {
     const inProcess = new FakeRunner()
     const events = new EventEmitter()
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     const observed = {
       ...backing,
       transition: (...args: Parameters<typeof backing.transition>) => {

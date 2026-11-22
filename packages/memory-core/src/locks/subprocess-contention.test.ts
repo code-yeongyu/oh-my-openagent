@@ -88,7 +88,7 @@ async function createFixture(): Promise<{ directory: string; lockPath: string; c
   return { directory, lockPath: path.join(directory, "writer.lock"), counterPath, logPath }
 }
 
-afterEach(async () => {
+async function tearDownFixtures(): Promise<void> {
   // Temp directories die only after every tracked child is confirmed exited: rm under a live
   // holder strands it, and a fire-and-forget SIGKILL is not a confirmation.
   const tracked = [...children]
@@ -108,7 +108,9 @@ afterEach(async () => {
       await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
     }),
   )
-})
+}
+
+afterEach(tearDownFixtures)
 
 describe("real subprocess lock contention", () => {
   test("#given two Bun subprocess writers #when they contend on one counter #then critical-section log entries never interleave", async () => {
@@ -295,38 +297,21 @@ process.stdin.resume()
     }
   }, 30_000)
 
-  // The two tests below run back to back on purpose: the first leaves a live holder for the
-  // file-level afterEach to tear down, the second observes what that teardown left behind.
-  let teardownProbe: ChildProcessWithoutNullStreams | null = null
-
-  test("#given a hold-mode worker still holding the lock when its test ends #when the test returns #then it is handed to afterEach", async () => {
+  test("#given a tracked live lock holder #when fixture teardown runs #then it awaits exit and stops tracking the holder", async () => {
     // #given
     const fixture = await createFixture()
     const holder = spawnWorker(["hold", fixture.lockPath, fixture.counterPath, fixture.logPath, "teardown"])
     await waitForOutput(holder, "entered\n")
 
-    // #when: the test returns without killing the holder.
-    teardownProbe = holder
-
-    // #then
+    expect(children.has(holder)).toBe(true)
     expect(holder.exitCode).toBeNull()
     expect(holder.signalCode).toBeNull()
-  }, 30_000)
 
-  test("#given the holder handed to afterEach #when afterEach has run #then no tracked child remains alive", async () => {
-    const holder = teardownProbe
-    teardownProbe = null
-    try {
-      // #given
-      expect(holder).not.toBeNull()
-      if (holder === null) throw new Error("unreachable")
+    // #when
+    await tearDownFixtures()
 
-      // #then: teardown awaited the exit (exitCode or signalCode is set) and untracked the child
-      // before this test started, so a subsequent rm can never strand a live holder.
-      expect(holder.exitCode !== null || holder.signalCode !== null).toBe(true)
-      expect(children.has(holder)).toBe(false)
-    } finally {
-      if (holder !== null) await killAndAwait(holder)
-    }
+    // #then
+    expect(holder.exitCode !== null || holder.signalCode !== null).toBe(true)
+    expect(children.has(holder)).toBe(false)
   }, 30_000)
 })
