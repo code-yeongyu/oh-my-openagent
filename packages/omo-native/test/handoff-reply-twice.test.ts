@@ -237,8 +237,6 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
       expect(result.printed).toBe("pong\n")
       expect(result.code).toBe(0)
     }
-    // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
-    if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)
-    else test(name, row)
+    test(name, row)
   }
 })
