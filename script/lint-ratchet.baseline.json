@@ -239,7 +239,7 @@
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/locks/subprocess-contention.test.ts": {
-    "omo-testing/no-flake-masking": 4
+    "omo-testing/no-flake-masking": 3
   },
   "packages/memory-core/src/memfs/hooks-secret.test.ts": {
     "omo-testing/no-flake-masking": 3
@@ -564,9 +564,6 @@
   "packages/omo-native/test/computer-use-doctor.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/omo-native/test/daemon-observe-idle.test.ts": {
-    "omo-testing/no-flake-masking": 1
-  },
   "packages/omo-native/test/device-service-pin-served.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
@@ -832,13 +829,13 @@
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler-retry.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-after-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-before-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/comment-checker/__fixtures__/download-probe.fixture.ts": {
     "omo-testing/no-module-mock": 1
@@ -995,9 +992,6 @@
   "packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
-  "packages/omo-opencode/src/shared/opencode-message-dir.test.ts": {
-    "omo-testing/no-module-mock": 2
-  },
   "packages/omo-opencode/src/shared/project-discovery-dirs.test.ts": {
     "omo-testing/no-module-mock": 1
   },
@@ -1103,14 +1097,11 @@
   "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": {
     "typescript/no-non-null-assertion": 7
   },
-  "packages/omo-opencode/src/tools/session-manager/session-paging.test.ts": {
-    "omo-testing/no-module-mock": 3
-  },
   "packages/omo-opencode/src/tools/session-manager/storage-fallback.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/session-manager/storage.test.ts": {
-    "omo-testing/no-module-mock": 12
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/skill/zauc-mocks-skill-tools/short-name-resolution.test.ts": {
     "typescript/no-non-null-assertion": 1

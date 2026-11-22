@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as logger from "../../shared/logger"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const storageMaps = new Map<string, Set<string>>()
 
@@ -15,6 +16,7 @@ mock.module("./storage", () => ({
     storageMaps.set(sessionID, paths)
   },
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
