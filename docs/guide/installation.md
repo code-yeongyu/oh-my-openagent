@@ -582,7 +582,7 @@ Copilot acts as a proxy provider, routing requests to underlying models based on
 
 ##### Z.ai Coding Plan
 
-Z.ai Coding Plan now mainly contributes `glm-5.2` / `glm-4.6v` fallback entries. It is no longer the universal fallback for every agent.
+Z.ai Coding Plan now mainly contributes `glm-5.3` / `glm-4.6v` fallback entries. It is no longer the universal fallback for every agent.
 
 When Z.ai is the primary provider, the most important fallbacks are:
 
