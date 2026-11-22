@@ -262,6 +262,8 @@ class OtlpSender {
     // The cap is measured from this call: the deadline is armed before the flush runs, so the
     // flush's synchronous seal and claim work counts against the cap instead of delaying its start,
     // and it fires early enough to leave room for releasing the in-flight claim and closing files.
+    // These two delays must stay the first timers armed after shutdown() and in this order (flush
+    // deadline, then cap): otlp-spool-recovery.test.ts identifies them by arm position.
     const cap = this.#input.shutdownTimeoutMs ?? 2_000
     const flushEnds = delay(Math.max(0, cap - Math.min(SHUTDOWN_CLEANUP_RESERVE_MS, cap / 10)))
     const capEnds = delay(cap)
