@@ -300,7 +300,33 @@ export async function createThread(
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context, unregistered)
   if ("not_started" in prompt) return { kind: "error", error: prompt.not_started }
   const stands = { ...made, prompt } as ThreadToolResult
-  return deferredAlias === undefined ? stands : await deferredAlias(stands)
+  if (deferredAlias === undefined) return stands
+  const aliased = await deferredAlias(stands)
+  return aliased.kind === "error" && !("error" in prompt)
+    ? aliasFailedAfterPrompt(aliased.error, thread, prompt)
+    : aliased
+}
+
+/**
+ * #14648 review M1: the alias of a local create is claimed after its first prompt was delivered, so an alias failure
+ * there (a registry outage, a lost race) must not hide that delivery: the failure carries the prompt's delivery and its
+ * receipt (`delivery_id`), and says not to send it again, so a caller recovering from it never runs the work twice.
+ */
+function aliasFailedAfterPrompt(
+  failure: ThreadToolFailure,
+  thread: HostedThread,
+  prompt: Exclude<ThreadCreatePrompt, { readonly error: ThreadToolFailure }>,
+): ThreadToolResult {
+  const receipt = prompt.delivery_id === undefined ? "" : ` (delivery ${prompt.delivery_id})`
+  return {
+    kind: "error",
+    error: {
+      ...failure,
+      message: `${failure.message} Thread ${thread.thread_id} exists and its first prompt was already delivered${receipt}: ${prompt.delivery.kind}.`,
+      next_action: `Do not send the first prompt again. Set the alias with thread_rename (tool.thread_rename({ thread: "${thread.thread_id}", alias })) once the cause above is fixed. ${failure.next_action}`,
+      details: { ...failure.details, thread: thread.thread_id, prompt },
+    },
+  }
 }
 
 /**

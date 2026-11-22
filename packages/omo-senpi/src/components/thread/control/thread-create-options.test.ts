@@ -379,6 +379,27 @@ describe("thread_create whose first prompt does not start", () => {
     expect(a.registryCalls.includes("claim")).toBe(false)
   })
 
+  test("#given a create with an alias whose first prompt starts but whose alias claim fails #when it is created and retried under its key #then the failure carries the started delivery and its receipt, and the prompt is delivered once (#14648 review M1)", async () => {
+    const a = account({ failClaim: true })
+    const { run, enqueuedRequests } = surface(a.remote)
+    const args = { alias: "lane-flaky", prompt: "build it", idempotency_key: "alias-after-prompt" }
+    const result = await run("thread_create", args)
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "host_unavailable",
+        details: {
+          reason: "claim_failed",
+          thread: "dur-created-here",
+          prompt: { delivery: { kind: "started" }, delivery_id: expect.any(String) },
+        },
+      },
+    })
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+    expect(await run("thread_create", args)).toEqual(result)
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+  })
+
   test("#given a create with an alias whose first prompt starts here #when it is created #then the alias is claimed after the prompt and names the new thread (#14648 review M2)", async () => {
     const a = account()
     const { run } = surface(a.remote)
