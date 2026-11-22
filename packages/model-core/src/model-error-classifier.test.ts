@@ -30,8 +30,7 @@ describe("model-error-classifier", () => {
   test("treats cooling-down auto-retry messages as retryable", () => {
     //#given
     const error = {
-      message:
-        "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
+      message: "All credentials for model claude-opus-4-7-thinking are cooling down [retrying in ~5 days attempt #1]",
     }
 
     //#when
@@ -119,11 +118,7 @@ describe("model-error-classifier", () => {
 
   test("treats localized transient provider messages as retryable", () => {
     //#given
-    const errors = [
-      { message: "请求过于频繁，请稍后重试" },
-      { message: "服务暂时不可用" },
-      { message: "触发频率限制" },
-    ]
+    const errors = [{ message: "请求过于频繁，请稍后重试" }, { message: "服务暂时不可用" }, { message: "触发频率限制" }]
 
     //#when
     const results = errors.map((error) => shouldRetryError(error))
@@ -257,7 +252,7 @@ describe("model-error-classifier", () => {
     //#given: OpenAI surfaces its mid-stream error with type 'server_error'
     const error = {
       name: undefined,
-      message: "{\"error\":{\"type\":\"server_error\",\"message\":\"server_error\"}}",
+      message: '{"error":{"type":"server_error","message":"server_error"}}',
     }
 
     //#when

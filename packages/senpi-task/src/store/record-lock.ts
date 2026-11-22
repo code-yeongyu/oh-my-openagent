@@ -106,7 +106,9 @@ function holderWait(lockPath: string, holderWaitMs: number): (holder: string) =>
       return
     }
     if (now - since >= holderWaitMs) {
-      throw new Error(`Timed out acquiring task record lock: ${lockPath} (${describeHolder(holder)} for ${now - since}ms)`)
+      throw new Error(
+        `Timed out acquiring task record lock: ${lockPath} (${describeHolder(holder)} for ${now - since}ms)`,
+      )
     }
   }
 }

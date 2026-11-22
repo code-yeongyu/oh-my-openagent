@@ -8,6 +8,7 @@ import { createTaskRecordStore } from "../store"
 import { normalizeSenpiTeamSpec } from "./normalize"
 import type { TeamRuntimeManagerPort } from "./runtime-types"
 import { spawnTeamMembers } from "./spawn-members"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -29,7 +30,11 @@ describe("spawnTeamMembers task_summary", () => {
   test("#given a member with a task_summary #when spawned #then the manager start spec carries the summary", async () => {
     // given
     const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "category", category: "quick", prompt: "work", task_summary: "Investigate the failing test" }] },
+      {
+        members: [
+          { kind: "category", category: "quick", prompt: "work", task_summary: "Investigate the failing test" },
+        ],
+      },
       "demo",
     )
     const captured: ManagerStartSpec[] = []
@@ -53,10 +58,7 @@ describe("spawnTeamMembers task_summary", () => {
 
   test("#given a team member #when the team spawn path writes its task record #then the record carries team linkage", async () => {
     // given
-    const spec = normalizeSenpiTeamSpec(
-      { members: [{ kind: "category", category: "quick", prompt: "work" }] },
-      "demo",
-    )
+    const spec = normalizeSenpiTeamSpec({ members: [{ kind: "category", category: "quick", prompt: "work" }] }, "demo")
     const { manager, store, project } = makeManager({})
 
     // when
@@ -83,6 +85,6 @@ describe("spawnTeamMembers task_summary", () => {
     }
     const persisted = JSON.parse(readFileSync(join(store.stateDir, "tasks", `${taskId}.json`), "utf8"))
     expect(persisted).toMatchObject(expected)
-    expect(createTaskRecordStore({ project_dir: project }).load(taskId!)).toMatchObject(expected)
+    expect(createTaskRecordStore(ownedTaskState(project)).load(taskId!)).toMatchObject(expected)
   })
 })

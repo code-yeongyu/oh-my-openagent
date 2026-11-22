@@ -5,14 +5,13 @@ import { createSkillTool, mockContext } from "./test-support"
 
 describe("skill tool - bundled security skills", () => {
   it("loads security-research and security-review when the plugin skill context pre-seeds them", async () => {
-    const { builtinToLoadedSkill } = await import("../../../features/opencode-skill-loader/merger/builtin-skill-converter")
-    const { securityResearchSkill, securityReviewSkill } = await import("@oh-my-opencode/skills-loader-core/builtin-skills/skills/index")
+    const { builtinToLoadedSkill } =
+      await import("../../../features/opencode-skill-loader/merger/builtin-skill-converter")
+    const { securityResearchSkill, securityReviewSkill } =
+      await import("@oh-my-opencode/skills-loader-core/builtin-skills/skills/index")
     const tool = createSkillTool({
       directory: "/test",
-      skills: [
-        builtinToLoadedSkill(securityResearchSkill),
-        builtinToLoadedSkill(securityReviewSkill),
-      ],
+      skills: [builtinToLoadedSkill(securityResearchSkill), builtinToLoadedSkill(securityReviewSkill)],
     })
 
     const researchResult = await tool.execute({ name: "security-research" }, mockContext)

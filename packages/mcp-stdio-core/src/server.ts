@@ -114,7 +114,8 @@ async function handleParseError<HandlerOptions>(
   log: McpLifecycleLog,
 ): Promise<boolean> {
   log("parse_error", { message: message.message })
-  const response = config.parseErrorResponse?.(message.message) ?? errorResponse(null, -32700, "Parse error", message.message)
+  const response =
+    config.parseErrorResponse?.(message.message) ?? errorResponse(null, -32700, "Parse error", message.message)
   if (response === undefined) return true
   return writeResponse(response, {
     output: config.output,
@@ -147,15 +148,13 @@ async function handleRequest<HandlerOptions>(
       responseMode: message.responseMode,
       log,
     }))
-  ) return false
+  )
+    return false
   log("response", { id: String(response.id), method, is_error: response.error !== undefined })
   return true
 }
 
-async function writeResponse(
-  response: JsonRpcResponse,
-  context: ResponseWriteContext,
-): Promise<boolean> {
+async function writeResponse(response: JsonRpcResponse, context: ResponseWriteContext): Promise<boolean> {
   try {
     await writeStdioJsonRpcResponse(context.output, response, context.responseMode)
     return true
@@ -214,11 +213,7 @@ export function createParentWatchdog(
   }
 }
 
-function createIdleTimer(
-  idleTimeoutMs: number,
-  log: McpLifecycleLog,
-  onTimeout: () => void,
-) {
+function createIdleTimer(idleTimeoutMs: number, log: McpLifecycleLog, onTimeout: () => void) {
   let timer: ReturnType<typeof setTimeout> | null = null
 
   return {

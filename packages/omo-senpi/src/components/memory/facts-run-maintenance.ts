@@ -1,8 +1,6 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
-import {
-  GitMemoryRepo, createLockRecord, runFinalizationLockPath, withLock,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, createLockRecord, runFinalizationLockPath, withLock } from "@oh-my-opencode/memory-core"
 import { loadOnboardingScanRuntime } from "../onboarding/scan-component"
 import { appliedFactsDir, withFactsWriterLock } from "./facts-batch-apply"
 import { ledgerTargets } from "./facts-failure-recording"
@@ -11,7 +9,12 @@ import { reconcileFactsRuns } from "./facts-run-reconcile"
 import { sweepTerminalFactsRuns } from "./facts-run-cleanup"
 import { pruneTerminalFactsRuns } from "./facts-run-prune"
 import { describe, finalResult } from "./facts-run-storage"
-import type { FactsExtractorRunnerOptions, FactsFinalRecord, FactsLaunchResult, FactsRunLedger } from "./facts-runner-types"
+import type {
+  FactsExtractorRunnerOptions,
+  FactsFinalRecord,
+  FactsLaunchResult,
+  FactsRunLedger,
+} from "./facts-runner-types"
 import type { FactsTerminalWrites } from "./facts-terminal-writes"
 import { readRunJson } from "./worker/run-artifacts"
 
@@ -29,7 +32,8 @@ export function createFactsRunMaintenance(
   async function prune(): Promise<void> {
     try {
       await pruneTerminalFactsRuns({
-        factsDir: options.identity.paths.facts, locksDir: options.identity.paths.locks,
+        factsDir: options.identity.paths.facts,
+        locksDir: options.identity.paths.locks,
         warn: (message, fields) => options.logger?.warn(message, fields),
       })
     } catch (error) {
@@ -41,16 +45,24 @@ export function createFactsRunMaintenance(
     const ledger = await readRunJson<FactsRunLedger>(join(runDir, "ledger.json"))
     const record = await createLockRecord("facts-finalize", { runId: ledger.runId })
     const result = await withLock<FactsLaunchResult>(
-      runFinalizationLockPath(options.identity.paths.locks, ledger.runId), record, async () => {
+      runFinalizationLockPath(options.identity.paths.locks, ledger.runId),
+      record,
+      async () => {
         const finalPath = join(runDir, "final.json")
         if (existsSync(finalPath)) return finalResult(await readRunJson<FactsFinalRecord>(finalPath))
         if (existsSync(join(runDir, "abandoned.json"))) return { status: "failed", runId: ledger.runId }
         return finalizeClaimedFactsRun({
-          runDir, repo, ledger, identity: options.identity, terminal, options,
+          runDir,
+          repo,
+          ledger,
+          identity: options.identity,
+          terminal,
+          options,
           ...(options.logger === undefined ? {} : { logger: options.logger }),
           withWriterLock,
         })
-      }, { waitTimeoutMs: 2_000 },
+      },
+      { waitTimeoutMs: 2_000 },
     )
     await prune()
     return result
@@ -63,15 +75,21 @@ export function createFactsRunMaintenance(
       ...(options.logger === undefined ? {} : { warn: (message, fields) => options.logger?.warn(message, fields) }),
     })
     const active = await reconcileFactsRuns({
-      factsDir: options.identity.paths.facts, now,
+      factsDir: options.identity.paths.facts,
+      now,
       finalize: async (runDir) => {
         const repo = new GitMemoryRepo({ dir: options.identity.paths.repo, agentId: options.identity.id })
         await finalize(runDir, repo)
       },
-      fail: (runDir, ledger, detail) => terminal.fail({
-        runDir, runId: ledger.runId, batchId: ledger.batchId,
-        targets: ledgerTargets(ledger.queued), reason: "child_exit", detail,
-      }),
+      fail: (runDir, ledger, detail) =>
+        terminal.fail({
+          runDir,
+          runId: ledger.runId,
+          batchId: ledger.batchId,
+          targets: ledgerTargets(ledger.queued),
+          reason: "child_exit",
+          detail,
+        }),
       abandon: (runDir, ledger, reason) => terminal.abandon(runDir, ledger, reason),
       warn: (message, fields) => options.logger?.warn(message, fields),
       receiptsDir: options.identity.paths.runtime,
@@ -80,8 +98,11 @@ export function createFactsRunMaintenance(
     // Onboarding apply envelopes are rare: their reconcile ships in the onboarding-scan sidecar.
     if (existsSync(appliedFactsDir(options.identity.paths.facts))) {
       try {
-        appliedActive = await (await loadOnboardingScanRuntime()).reconcileAppliedFactsBatches({
-          identity: options.identity, withWriterLock,
+        appliedActive = await (
+          await loadOnboardingScanRuntime()
+        ).reconcileAppliedFactsBatches({
+          identity: options.identity,
+          withWriterLock,
           ...(options.logger === undefined ? {} : { logger: options.logger }),
         })
       } catch (error) {

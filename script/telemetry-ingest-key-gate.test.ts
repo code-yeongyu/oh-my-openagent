@@ -49,7 +49,10 @@ describe("telemetry ingest key gate", () => {
 
   test("#given the plugin build #then no ingest key define is supplied", async () => {
     const text = await readFile(join(REPOSITORY_ROOT, BUILD_DEFINE_FILE), "utf8")
-    const keyLines = text.split("\n").filter((line) => line.includes(KEY)).map((line) => line.trim())
+    const keyLines = text
+      .split("\n")
+      .filter((line) => line.includes(KEY))
+      .map((line) => line.trim())
     expect(keyLines).toEqual([])
   })
 })

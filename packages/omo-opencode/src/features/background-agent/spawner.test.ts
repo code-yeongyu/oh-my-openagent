@@ -1,8 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test"
-import {
-  clearSessionPromptParams,
-  getSessionPromptParams,
-} from "../../shared/session-prompt-params-state"
+import { clearSessionPromptParams, getSessionPromptParams } from "../../shared/session-prompt-params-state"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
 import { buildFallbackBody, createTask, isAgentNotFoundError, resumeTask, startTask } from "./spawner"
 import type { BackgroundTask } from "./types"
@@ -25,11 +22,7 @@ type PromptRequest = {
  * Replaces fixed `setTimeout(resolve, 50)` waits that cause flaky CI failures
  * when the fire-and-forget prompt chain hasn't settled in time.
  */
-async function waitForCondition(
-  fn: () => boolean,
-  timeoutMs = 2000,
-  intervalMs = 10,
-): Promise<void> {
+async function waitForCondition(fn: () => boolean, timeoutMs = 2000, intervalMs = 10): Promise<void> {
   const start = Date.now()
   while (!fn()) {
     if (Date.now() - start > timeoutMs) {
@@ -65,14 +58,14 @@ describe("background-agent spawner resume guard", () => {
     }
 
     //#when
-    await expect(resumeTask(task, input, {
-      client: { session: { promptAsync } },
-      concurrencyManager: { acquire, release: () => {} },
-      directory: "/tmp/test",
-      onTaskError: () => {},
-    } as never)).rejects.toThrow(
-      "Task task-running-resume is currently running and cannot accept a continuation prompt",
-    )
+    await expect(
+      resumeTask(task, input, {
+        client: { session: { promptAsync } },
+        concurrencyManager: { acquire, release: () => {} },
+        directory: "/tmp/test",
+        onTaskError: () => {},
+      } as never),
+    ).rejects.toThrow("Task task-running-resume is currently running and cannot accept a continuation prompt")
 
     //#then
     expect(acquire).not.toHaveBeenCalled()

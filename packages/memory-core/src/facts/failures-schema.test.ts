@@ -135,7 +135,9 @@ describe("facts failures file parsing", () => {
 
     // then
     expect(rendered.endsWith("\n")).toBe(true)
-    expect(parseFailuresFile(rendered).entries.map((row) => [row.conversationId, row.end_snapshot_line, row.end_message_id])).toEqual([
+    expect(
+      parseFailuresFile(rendered).entries.map((row) => [row.conversationId, row.end_snapshot_line, row.end_message_id]),
+    ).toEqual([
       ["a-conversation", 4, "m2"],
       ["a-conversation", 4, "m5"],
       ["a-conversation", 9, "m9"],

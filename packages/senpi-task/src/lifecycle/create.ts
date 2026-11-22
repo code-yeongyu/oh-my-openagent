@@ -2,8 +2,19 @@ import { resolveContext } from "./context"
 import { disposeScopedRetries, resumeScopedRetries, stopScopedRetries } from "./deferred-revival"
 import { reconcileDeferredDeadChildren, retryDeferredLegacyOwners } from "./deferred-owner-reconcile"
 import { destroyResidentTask } from "./destroy"
-import { parkHostSessionOnDaemonLoss, retryDeferredHostSessions, type HostSessionParkOptions } from "./host-session-revive"
-import { registerLifecycleDetachedRevival, registerLifecycleDetachedRevivalRollback, type DestroyCause, type LifecycleDeps } from "./port"
+import { driveHostSessionCancel } from "./host-session-cancel-driver"
+import { endHostSessionChild } from "./host-session-end"
+import {
+  parkHostSessionOnDaemonLoss,
+  retryDeferredHostSessions,
+  type HostSessionParkOptions,
+} from "./host-session-revive"
+import {
+  registerLifecycleDetachedRevival,
+  registerLifecycleDetachedRevivalRollback,
+  type DestroyCause,
+  type LifecycleDeps,
+} from "./port"
 import { parkTerminalResident } from "./park-terminal-resident"
 import { admitResident, reclaimIdleResidents, startIdleResidentReclaimer } from "./residency"
 import { reconcileOnSessionStart } from "./reconcile"
@@ -36,6 +47,10 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     rollbackDetachedRevival: (prior) => rollbackDetachedRevival(context, prior),
     reclaimIdleResidents: () => reclaimIdleResidents(context),
     parkTerminalResident: (taskId: string) => parkTerminalResident(context, taskId, "cancel"),
+    hostSessionCancel: {
+      end: (record) => endHostSessionChild(context, record),
+      drive: (record, sink) => driveHostSessionCancel(context, record, sink),
+    },
     // Parent shutdown: the kernel that owns every granted closure dies with this engine, so the
     // whole runtime binding map goes too - no strong reference to a disposed kernel survives.
     dispose: () => {

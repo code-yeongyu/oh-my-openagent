@@ -5,7 +5,8 @@ const INLINE_CODE = /(?<!`)(`+)(?!`)[\s\S]*?(?<!`)\1(?!`)/g
 // The arrow form is a leading header naming one sender (optionally relayed "via" others) and any recipient list
 // ("[lead via coordinator -> lane, PR#1]", "[lane -> coordinator + ledger-lane]"): a stricter `name -> name` shape let
 // such relays arm sessions (#10822). A bracketed prose arrow ("[step 1 -> step 2]") names no sender and is not a header.
-const RELAY_HEADER = /^\s*(?:\[(?:[A-Z][A-Z0-9_-]{2,}|[\w.:@#-]+(?: via [\w.:@#-]+)* -> [\w.:@#-]+[^\]\n]{0,160})\]|[A-Z][\w.-]{0,30} \([^()\s]{1,40}\)(?:, | to )[\w.-]{1,40}:)/
+const RELAY_HEADER =
+  /^\s*(?:\[(?:[A-Z][A-Z0-9_-]{2,}|[\w.:@#-]+(?: via [\w.:@#-]+)* -> [\w.:@#-]+[^\]\n]{0,160})\]|[A-Z][\w.-]{0,30} \([^()\s]{1,40}\)(?:, | to )[\w.-]{1,40}:)/
 const BLOCK_QUOTE_LINE = /^ {0,3}>[^\n]*/gm
 const DOUBLE_QUOTED = /"[^"\n]*"|\u201C[^\u201D\n]*\u201D/g
 // A single-quoted span opens after a non-word character and closes before one, so the apostrophes in
@@ -18,6 +19,17 @@ const URL_SPAN = /(?<![a-z0-9+.-])[a-z][a-z0-9+.-]*:\/\/[^\s<>"'`]+/gi
 // does, because what follows is the request ("Do not use tmux, but ulw the fix").
 const NEGATED_INVOCATION =
   /\b(?:do\s+not|don['\u2019]t|dont|never)\s+(?:load|use|run|invoke|start|trigger|arm|enable)\b[^.;:!?\n]*?(?=[.;:!?\n]|\s(?:but|then|instead|however)\b|\s[\u2014\u2013-]\s|$)/gi
+
+// Advice that forbids the mode without a "do not use" verb ("avoid ulw", "no ultrawork", "skip ulw-loop",
+// "don't ulw this", a pasted rule list) is not a request either (#14389). Only the keyword list the prohibition
+// names is masked: "ulw or mass-ulw", "ulw, ulw-loop and ultrawork". A comma that is not part of such a list ends it,
+// so "No ulw-loop, just ulw this" and "avoid regressions, ulw the fix" still arm.
+const PROHIBITED_ITEM = String.raw`(?:mass[-\s]?)?(?:ultrawork|ulw)(?:[-_](?:loop|plan|research|execute|mass))?\b`
+const PROHIBITED_KEYWORD = new RegExp(
+  String.raw`\b(?:avoid(?:ing)?|skip(?:ping)?|without|no|never|do\s+not|don['\u2019]t|dont)\s+(?:(?:using|use\s+of|the)\s+)?` +
+    String.raw`${PROHIBITED_ITEM}(?:(?:\s*,\s*${PROHIBITED_ITEM})*\s*,?\s*(?:or|and|nor|\/)\s*${PROHIBITED_ITEM})?`,
+  "gi",
+)
 
 // A keyword glued to a preceding identifier segment (`mass-ulw`, `senpi-ulw-loop`, `.omo/ulw/`, `v1.ulw`)
 // names something else; so does one that opens a path (`ulw-execute/ledger.jsonl`).
@@ -50,11 +62,16 @@ export function stripQuotedSpans(text: string): string {
     visible = visible.slice(0, opening.index) + mask(visible.slice(opening.index, end)) + visible.slice(end)
     fenceStart.lastIndex = end
   }
-  return visible.replace(INLINE_CODE, mask).replace(BLOCK_QUOTE_LINE, mask).replace(DOUBLE_QUOTED, mask).replace(SINGLE_QUOTED, mask).replace(URL_SPAN, mask)
+  return visible
+    .replace(INLINE_CODE, mask)
+    .replace(BLOCK_QUOTE_LINE, mask)
+    .replace(DOUBLE_QUOTED, mask)
+    .replace(SINGLE_QUOTED, mask)
+    .replace(URL_SPAN, mask)
 }
 
 export function maskNegatedInvocations(text: string): string {
-  return text.replace(NEGATED_INVOCATION, mask)
+  return text.replace(NEGATED_INVOCATION, mask).replace(PROHIBITED_KEYWORD, mask)
 }
 
 export function stripQuotedRegions(text: string): string {

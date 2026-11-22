@@ -27,9 +27,7 @@ describe("transcript entry projection", () => {
     expect(stored).toContain(`\n…[truncated ${dropped} chars]…\n`)
     expect(stored.startsWith("h".repeat(100))).toBe(true)
     expect(stored.endsWith("t".repeat(100))).toBe(true)
-    expect(stored.replace(`\n…[truncated ${dropped} chars]…\n`, "").length).toBe(
-      TOOL_RESULT_TRUNCATE_LIMIT,
-    )
+    expect(stored.replace(`\n…[truncated ${dropped} chars]…\n`, "").length).toBe(TOOL_RESULT_TRUNCATE_LIMIT)
   })
 
   it("#given a tool result at or below the limit #when projected #then it is byte-identical", () => {

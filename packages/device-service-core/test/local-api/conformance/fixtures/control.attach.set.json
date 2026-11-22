@@ -1,0 +1,99 @@
+{
+  "request": "control.attach.set",
+  "cases": [
+    {
+      "name": "control.attach.set answers the attach state",
+      "outcome": "ok",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.attach.set",
+            "attached": false
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attached": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "control.attach.set with a stray field is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.attach.set",
+            "attached": false,
+            "scope": "all"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "control.attach.set with a non-boolean attached is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.attach.set",
+            "attached": "no"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "control.attach.set",
+            "attached": false
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

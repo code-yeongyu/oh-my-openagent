@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
+import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun:test"
 import { isolateTelemetryEnv } from "../../../../../test-support/telemetry-env.test-helpers"
 import type { TelemetryCaptureMessage, TelemetryTransportFactory } from "@oh-my-opencode/telemetry-core"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import * as posthogModule from "../../shared/posthog"
 import type * as runnerModuleType from "./runner"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 async function* createEmptyEventStream(): AsyncIterable<unknown> {}
 
@@ -65,6 +66,11 @@ mock.module("./timestamp-output", () => ({
     restore: mock(() => {}),
   })),
 }))
+preserveModuleMocksForTestFile(import.meta.url)
+
+afterAll(() => {
+  mock.restore()
+})
 
 const runnerModulePath = ["./runner?telemetry", "isolation"].join("-")
 const runnerModule: typeof runnerModuleType = await import(runnerModulePath)
@@ -106,10 +112,7 @@ function createRunConfigFixture(telemetry: boolean): string {
   const directory = mkdtempSync(join(tmpdir(), "omo-run-telemetry-"))
   const configDirectory = join(directory, ".omo")
   mkdirSync(configDirectory, { recursive: true })
-  writeFileSync(
-    join(configDirectory, "omo.jsonc"),
-    JSON.stringify({ "[opencode]": { telemetry } }),
-  )
+  writeFileSync(join(configDirectory, "omo.jsonc"), JSON.stringify({ "[opencode]": { telemetry } }))
   return directory
 }
 

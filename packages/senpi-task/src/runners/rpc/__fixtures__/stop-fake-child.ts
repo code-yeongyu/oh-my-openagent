@@ -13,14 +13,16 @@ export async function stopFakeChild(child: ChildProcess): Promise<void> {
     try {
       child.kill("SIGTERM")
     } catch (error) {
-      if (!(error instanceof Error) || !("code" in error) || (error.code !== "EPERM" && error.code !== "ESRCH")) throw error
+      if (!(error instanceof Error) || !("code" in error) || (error.code !== "EPERM" && error.code !== "ESRCH"))
+        throw error
     }
     await Promise.race([
       exited.promise,
       new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error(
-          `fake RPC child ${child.pid} did not exit within ${FIXTURE_EXIT_BOUND_MS} ms`,
-        )), FIXTURE_EXIT_BOUND_MS)
+        timer = setTimeout(
+          () => reject(new Error(`fake RPC child ${child.pid} did not exit within ${FIXTURE_EXIT_BOUND_MS} ms`)),
+          FIXTURE_EXIT_BOUND_MS,
+        )
       }),
     ])
   } finally {

@@ -14,10 +14,7 @@ import {
   readOptionalSuspensionReason,
   validateHostSessionConsistency,
 } from "./record-blocks-parse"
-import {
-  readOptionalTaskStartFailureKind,
-  readOptionalTaskStartFailureReason,
-} from "./start-failure-parse"
+import { readOptionalTaskStartFailureKind, readOptionalTaskStartFailureReason } from "./start-failure-parse"
 import { parseRunStats } from "./run-stats-parse"
 import {
   parseOptionalAwaitingInput,
@@ -31,7 +28,7 @@ import {
 import { parseOptionalProvisionalExit } from "./provisional-exit-parse"
 import { parseUncertainInputs } from "./input-effects-parse"
 import { parseOptionalRunPause } from "./run-pause-parse"
-import { parseOptionalParentModelFallback } from "./parent-model-fallback-parse"
+import { parseOptionalModelRefusals } from "./model-refusals-parse"
 import {
   isRecord,
   readNumber,
@@ -80,11 +77,14 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const fallbackModels = parseOptionalResolvedModelArray(value, "fallback_models")
   const fallbackAttempts = parseOptionalResolvedModelArray(value, "fallback_attempts")
   const resolvedModel = parseOptionalResolvedModel(value, "resolved_model")
-  const resolvedTier = isRecord(value["resolved_model"]) ? readOptionalString(value["resolved_model"], "service_tier") : undefined
+  const resolvedTier = isRecord(value["resolved_model"])
+    ? readOptionalString(value["resolved_model"], "service_tier")
+    : undefined
   const effectiveModel = parseOptionalEffectiveModel(value)
-  const parentModel = readOptionalString(value, "parent_model")
-  const parentModelFallback = parseOptionalParentModelFallback(value)
-  const effectiveTier = isRecord(value["effective_model"]) ? readOptionalString(value["effective_model"], "service_tier") : undefined
+  const modelRefusals = parseOptionalModelRefusals(value)
+  const effectiveTier = isRecord(value["effective_model"])
+    ? readOptionalString(value["effective_model"], "service_tier")
+    : undefined
   const spawnSpec = parseOptionalSpawnSpec(value)
   const owner = parseOptionalOwner(value)
   const pendingSteering = parseOptionalPendingSteering(value, path, warnings)
@@ -133,9 +133,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     updated_at: updatedAt,
     notification: parseNotification(value),
     ...(startedAt === undefined ? {} : { started_at: startedAt }),
-    ...(terminalAt === undefined && !TERMINAL_STATUSES.has(status)
-      ? {}
-      : { terminal_at: terminalAt ?? updatedAt }),
+    ...(terminalAt === undefined && !TERMINAL_STATUSES.has(status) ? {} : { terminal_at: terminalAt ?? updatedAt }),
     ...(name === undefined ? {} : { name }),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
     ...(description === undefined ? {} : { description }),
@@ -150,14 +148,20 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(requestedModel === undefined ? {} : { requested_model: requestedModel }),
     ...(fallbackModels === undefined ? {} : { fallback_models: fallbackModels }),
     ...(fallbackAttempts === undefined ? {} : { fallback_attempts: fallbackAttempts }),
-    ...(resolvedModel === undefined ? {} : {
-      resolved_model: { ...resolvedModel, ...(resolvedTier === undefined ? {} : { service_tier: resolvedTier }) },
-    }),
-    ...(effectiveModel === undefined ? {} : {
-      effective_model: { ...effectiveModel, ...(effectiveTier === undefined ? {} : { service_tier: effectiveTier }) },
-    }),
-    ...(parentModel === undefined ? {} : { parent_model: parentModel }),
-    ...(parentModelFallback === undefined ? {} : { parent_model_fallback: parentModelFallback }),
+    ...(resolvedModel === undefined
+      ? {}
+      : {
+          resolved_model: { ...resolvedModel, ...(resolvedTier === undefined ? {} : { service_tier: resolvedTier }) },
+        }),
+    ...(effectiveModel === undefined
+      ? {}
+      : {
+          effective_model: {
+            ...effectiveModel,
+            ...(effectiveTier === undefined ? {} : { service_tier: effectiveTier }),
+          },
+        }),
+    ...(modelRefusals === undefined ? {} : { model_refusals: modelRefusals }),
     ...(spawnSpec === undefined ? {} : { spawn_spec: spawnSpec }),
     ...(owner === undefined ? {} : { owner }),
     ...(pendingSteering !== undefined && pendingSteering.length > 0 ? { pending_steering: pendingSteering } : {}),

@@ -31,7 +31,7 @@ const installConfig: InstallConfig = {
 }
 
 function record(value: unknown): Record<string, unknown> {
-  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {}
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
 }
 
 describe("writeOmoConfig", () => {
@@ -56,12 +56,19 @@ describe("writeOmoConfig", () => {
   it("#given existing user settings #when writing install defaults #then user settings win within the unified block", () => {
     const path = join(homeDirectory, ".omo", "omo.jsonc")
     mkdirSync(join(path, ".."), { recursive: true })
-    writeFileSync(path, JSON.stringify({
-      "[opencode]": {
-        agents: { sisyphus: { model: "custom/provider-model" } },
-        disabled_hooks: ["comment-checker"],
-      },
-    }, null, 2) + "\n")
+    writeFileSync(
+      path,
+      JSON.stringify(
+        {
+          "[opencode]": {
+            agents: { sisyphus: { model: "custom/provider-model" } },
+            disabled_hooks: ["comment-checker"],
+          },
+        },
+        null,
+        2,
+      ) + "\n",
+    )
 
     const result = writeOmoConfig(installConfig)
     const document = parseJsonc<Record<string, unknown>>(readFileSync(path, "utf-8"))

@@ -35,10 +35,7 @@ export async function createIterationSession(
   }
 }
 
-export async function selectSessionInTui(
-  client: PluginInput["client"],
-  sessionID: string,
-): Promise<boolean> {
+export async function selectSessionInTui(client: PluginInput["client"], sessionID: string): Promise<boolean> {
   const selectSession = getSelectSessionApi(client)
   if (!selectSession) {
     return false

@@ -34,8 +34,11 @@ describe("open_session when the host dies mid-open", () => {
     const host = await fakeHost()
     host.withholdReply("open_session")
     const client = hostClient(host)
-    const starting = openTaskHostSession({ client, spec: childSpec(), sessionPath: "/tmp/sessions/mid-start.jsonl" })
-      .catch((error: unknown) => error)
+    const starting = openTaskHostSession({
+      client,
+      spec: childSpec(),
+      sessionPath: "/tmp/sessions/mid-start.jsonl",
+    }).catch((error: unknown) => error)
     await host.waitForCommand("open_session")
 
     // when

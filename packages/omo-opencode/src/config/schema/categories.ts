@@ -8,6 +8,7 @@ export const CategoryConfigSchema = z.object({
   model: z.string().optional(),
   /** Ordered model chain; the first entry is the primary model and the rest are fallbacks. */
   models: z.array(z.union([z.string(), FallbackModelObjectSchema])).optional(),
+  models_distribution: z.enum(["sequential", "round_robin"]).optional(),
   /** @deprecated Use `models` instead. */
   fallback_models: FallbackModelsSchema.optional(),
   reasoning: OmoReasoningSchema.optional(),

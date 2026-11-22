@@ -61,7 +61,7 @@ is a regression, not an upgrade:
 - **Module split of the fetch chain** — `curl_probe` / `referers` / `url_transforms` /
   `waf_detector` / `validators` / `executor` / `summary` as separate modules rather than
   one monolith.
-- **The Python test suite** under `engine/tests/` with its HTML/JSON fixtures.
+- **The Python test suite** under `engine/tests/` with its HTML/JSON fixtures (source checkout only: the skill copy filter drops `engine/tests/` from every shipped edition).
 - **De-personalization** — no personal absolute paths, no personal auth token literals,
   no personal browser choice; enforced by `depersonalization-gate.test.ts`.
 - **Skill-level layering** — the engine is Tier 1 under a router that also owns Tier 1.5
@@ -115,7 +115,7 @@ Any future upstream sync preserves BOTH sides. Concretely:
 
 ## OVERVIEW
 
-A 17-module Python package embedded in the `ultimate-browsing` skill: a site-agnostic fetch chain that escalates from a cheap curl probe to a real browser, with declarative WAF and surrogate registries. Not "optional scripts" — it has its own CLI entry (`python3 -B -m engine URL`; `-B` keeps bytecode caches out of a signed app bundle, #11373), two YAML config schemas, a 4-file test suite, and a standalone CI guard. Package exports (`__init__.py`): `fetch`, `FetchResult`, `Attempt`, `Verdict`, `ValidationResult`, `validate`, `CHALLENGE_MARKERS`, `detect`, `TRANSFORMS`, `apply_transform`.
+A 13-file Python package (`__init__.py`, `__main__.py` and 11 modules) embedded in the `ultimate-browsing` skill: a site-agnostic fetch chain that escalates from a cheap curl probe to a real browser, with declarative WAF and surrogate registries. Not "optional scripts" — it has its own CLI entry (`python3 -B -m engine URL`; `-B` keeps bytecode caches out of a signed app bundle, #11373), two YAML config schemas, a 6-file test suite (source checkout only), and a standalone CI guard. Package exports (`__init__.py`): `fetch`, `FetchResult`, `Attempt`, `Verdict`, `ValidationResult`, `validate`, `CHALLENGE_MARKERS`, `detect`, `TRANSFORMS`, `apply_transform`.
 
 ## THE NO-SITE-NAME RULE (enforced in CI)
 
@@ -170,11 +170,11 @@ python3 -B -m engine URL [--selector S] [--device auto|desktop|mobile]
 
 ## TESTS
 
-`tests/` — `test_surrogate.py` (staleness, proxy gating, short-circuit), `test_surrogate_validators.py`, `test_fetch_chain.py`, `test_playwright_templates.py`, plus HTML/JSON fixtures under `tests/fixtures/`.
+`tests/` (source checkout only; not shipped with the skill) — `test_surrogate.py` (staleness, proxy gating, short-circuit), `test_surrogate_validators.py`, `test_fetch_chain.py`, `test_playwright_templates.py`, `test_playwright_stealth.py`, `test_executor_timeout.py`, plus HTML/JSON fixtures under `tests/fixtures/`.
 
 ## NOTES
 
 - `summary.py` emits an **R7 API-first hint** after >=3 challenge verdicts against a known WAF profile: look for `/api/`, `/graphql`, or `.json` endpoints, which usually carry weaker WAF protection than the HTML surface.
 - `templates/` holds the Playwright JS templates (`playwright_real_chrome.js`, `playwright_mobile_chrome.js`) the executor drives.
 - `url_transforms.py` transforms stay domain-agnostic (`mobile_subdomain`, `am_prefix`, `drop_www`).
-- Parent: [`packages/shared-skills/AGENTS.md`](../../../AGENTS.md).
+- Parent (source checkout only; not shipped with the skill): `packages/shared-skills/AGENTS.md`.

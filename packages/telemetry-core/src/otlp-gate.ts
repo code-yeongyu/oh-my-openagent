@@ -6,20 +6,29 @@ import type { CreateOtlpTelemetryTransportInput } from "./otlp-transport-types"
  * product opt-out) and `consent()` is true. A consent callback that throws counts as no consent.
  * Node built-ins and otlp-config only, so the check loads no OpenTelemetry or protobuf code.
  */
-export function isOtlpTransportAllowed(input: Pick<CreateOtlpTelemetryTransportInput, "env" | "productEnvPrefix" | "consent" | "diagnostics" | "source">): boolean {
+export function isOtlpTransportAllowed(
+  input: Pick<CreateOtlpTelemetryTransportInput, "env" | "productEnvPrefix" | "consent" | "diagnostics" | "source">,
+): boolean {
   if (!isOtlpTelemetryEnabled({ env: input.env ?? process.env, productEnvPrefix: input.productEnvPrefix })) return false
   return safeConsent(input)()
 }
 
 /** `consent()` with the gate's rule applied on every call: a callback that throws counts as no consent. */
-export function safeConsent(input: Pick<CreateOtlpTelemetryTransportInput, "consent" | "diagnostics" | "source">): () => boolean {
+export function safeConsent(
+  input: Pick<CreateOtlpTelemetryTransportInput, "consent" | "diagnostics" | "source">,
+): () => boolean {
   const consent = input.consent
   if (consent === undefined) return () => true
   return () => {
     try {
       return consent()
     } catch (error) {
-      input.diagnostics?.({ event: "telemetry_consent_failed", source: input.source ?? "otlp", error, errorKind: error instanceof Error ? "error" : "non_error" })
+      input.diagnostics?.({
+        event: "telemetry_consent_failed",
+        source: input.source ?? "otlp",
+        error,
+        errorKind: error instanceof Error ? "error" : "non_error",
+      })
       return false
     }
   }

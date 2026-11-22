@@ -30,9 +30,7 @@ describe("getPaneDimensions runner integration", () => {
 
     // then
     expect(result).toEqual({ paneWidth: 80, windowWidth: 160 })
-    expect(calls).toEqual([
-      ["sh", ["display", "-p", "-t", "%42", "#{pane_width},#{window_width}"]],
-    ])
+    expect(calls).toEqual([["sh", ["display", "-p", "-t", "%42", "#{pane_width},#{window_width}"]]])
   })
 
   it("#given no tmux path #when getPaneDimensions called #then returns null without invoking runner", async () => {

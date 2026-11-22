@@ -1,4 +1,3 @@
-import { activeParentModelFallback } from "../../manager/parent-model-rung"
 import { isolationDetails } from "../../isolation/details"
 import { isTerminalRecord } from "../../manager/manager-helpers"
 import type { AwaitingInputReason, TaskRecord } from "../../state"
@@ -11,7 +10,8 @@ const LOST_EXPLANATION =
 
 const AWAITING_INPUT_CAUSES: Readonly<Record<AwaitingInputReason, string>> = {
   resumed_turn_aborted: "its resumed session's last turn ended on an abort",
-  resumed_turn_unfinished: "its resumed session's last turn stopped before finishing (an error, a pending tool call, or an unanswered prompt)",
+  resumed_turn_unfinished:
+    "its resumed session's last turn stopped before finishing (an error, a pending tool call, or an unanswered prompt)",
 }
 
 // The user-facing flag text (senpi#3266): why the child cannot continue on its own, and the two
@@ -46,8 +46,6 @@ export function buildTaskSnapshot(record: TaskRecord, stateDir: string, now: num
     model: record.model,
     ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
     ...(record.effective_model !== undefined ? { effective_model: record.effective_model } : {}),
-    ...(record.parent_model !== undefined ? { parent_model: record.parent_model } : {}),
-    ...(activeParentModelFallback(record) === undefined ? {} : { parent_model_fallback: activeParentModelFallback(record) }),
     parent_session_id: record.parent_session_id,
     root_session_id: record.root_session_id,
     age_ms: ageMs(record, now),

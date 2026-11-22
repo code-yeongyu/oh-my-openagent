@@ -1,12 +1,7 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import * as fs from "node:fs"
 
-import {
-  cleanupRoots,
-  PARENT_SESSION_ID,
-  startHeldRun,
-  type ProjectionFixture,
-} from "./node-projection.test-harness"
+import { cleanupRoots, PARENT_SESSION_ID, startHeldRun, type ProjectionFixture } from "./node-projection.test-harness"
 import { DAG_NODE_OUTPUT_PREVIEW_CHARS } from "./types"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)

@@ -32,8 +32,7 @@ export interface OnboardingUnderstandingStarted {
 }
 
 export type OnboardingUnderstandingStartResult =
-  | OnboardingUnderstandingStarted
-  | { readonly kind: "unavailable" | "invalid"; readonly reason: string }
+  OnboardingUnderstandingStarted | { readonly kind: "unavailable" | "invalid"; readonly reason: string }
 
 /**
  * The understanding pass behind `omo.onboarding.understand`, shipped in the lazy onboarding-scan sidecar:
@@ -56,21 +55,32 @@ export async function startOnboardingUnderstanding(
     emit(event)
   }
   const finished = new Promise((resolve) => setTimeout(resolve, 0))
-    .then(() => runOnboardingUnderstanding({
-      understandId,
-      scanId,
-      model,
-      digests,
-      projectRoots,
-      modelRegistry,
-      control,
-      ...(input.env === undefined ? {} : { env: { ...input.env } }),
-      ...input.seams,
-    }, tracked))
+    .then(() =>
+      runOnboardingUnderstanding(
+        {
+          understandId,
+          scanId,
+          model,
+          digests,
+          projectRoots,
+          modelRegistry,
+          control,
+          ...(input.env === undefined ? {} : { env: { ...input.env } }),
+          ...input.seams,
+        },
+        tracked,
+      ),
+    )
     .catch((error: unknown): OnboardingUnderstandEvent => {
       const done: OnboardingUnderstandEvent = {
-        understandId, scanId, kind: "done", ...usage, elapsedMs: Math.round(performance.now() - startedAt),
-        candidates: [], fallback: "scan_only", reason: error instanceof Error ? error.message : String(error),
+        understandId,
+        scanId,
+        kind: "done",
+        ...usage,
+        elapsedMs: Math.round(performance.now() - startedAt),
+        candidates: [],
+        fallback: "scan_only",
+        reason: error instanceof Error ? error.message : String(error),
       }
       emit(done)
       return done

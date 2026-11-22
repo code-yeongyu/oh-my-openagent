@@ -38,8 +38,7 @@ const daemonPids = new Set<number>()
 
 let spawnImplementation: SpawnImplementation = () => ({
   pid: 0,
-  unref() {
-  },
+  unref() {},
 })
 
 let replyListenerModule: typeof import("../reply-listener")
@@ -79,10 +78,8 @@ function resetStateDir(): void {
   daemonPids.clear()
 }
 
-beforeAll(async () => {
-  process.env.HOME = tempHome
-  process.env.USERPROFILE = tempHome
-
+// The test setup restores module mocks after every test, so each test installs its own.
+function mockReplyListenerDependencies(): void {
   mock.module("../reply-listener-spawn", () => ({
     spawnReplyListenerDaemon: (...args: unknown[]) => spawnImplementation(...args),
   }))
@@ -98,12 +95,20 @@ beforeAll(async () => {
     analyzePaneContent: () => ({ confidence: 1 }),
     sendToPane: async () => true,
   }))
+}
+
+beforeAll(async () => {
+  process.env.HOME = tempHome
+  process.env.USERPROFILE = tempHome
+
+  mockReplyListenerDependencies()
 
   replyListenerModule = await import("../reply-listener")
   replyListenerStartModule = await import("../reply-listener-start")
 })
 
 beforeEach(() => {
+  mockReplyListenerDependencies()
   resetStateDir()
 })
 
@@ -142,13 +147,17 @@ describe("startReplyListener", () => {
     )
     writeFileSync(
       configFilePath,
-      JSON.stringify({
-        ...createConfig(),
-        replyListener: {
-          ...createConfig().replyListener,
-          discordChannelId: "stale-channel",
+      JSON.stringify(
+        {
+          ...createConfig(),
+          replyListener: {
+            ...createConfig().replyListener,
+            discordChannelId: "stale-channel",
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     )
 
     let spawnCalls = 0
@@ -156,8 +165,7 @@ describe("startReplyListener", () => {
       spawnCalls += 1
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
     const killSpy = spyOn(process, "kill").mockImplementation(() => true)
@@ -188,13 +196,17 @@ describe("startReplyListener", () => {
     )
     writeFileSync(
       configFilePath,
-      JSON.stringify({
-        ...createConfig(),
-        replyListener: {
-          ...createConfig().replyListener,
-          discordChannelId: "stale-channel",
+      JSON.stringify(
+        {
+          ...createConfig(),
+          replyListener: {
+            ...createConfig().replyListener,
+            discordChannelId: "stale-channel",
+          },
         },
-      }, null, 2),
+        null,
+        2,
+      ),
     )
 
     let spawnCalls = 0
@@ -202,8 +214,7 @@ describe("startReplyListener", () => {
       spawnCalls += 1
       return {
         pid: 4321,
-        unref() {
-        },
+        unref() {},
       }
     }
     const killSpy = spyOn(process, "kill").mockImplementation((pid: number | string) => {
@@ -226,5 +237,4 @@ describe("startReplyListener", () => {
       killSpy.mockRestore()
     }
   })
-
 })

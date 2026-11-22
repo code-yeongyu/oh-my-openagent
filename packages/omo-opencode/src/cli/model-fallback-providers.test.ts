@@ -353,7 +353,7 @@ describe("generateModelConfig provider routes", () => {
 
     // then it uses the canonical schema URL
     expect(result.$schema).toBe(
-      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json"
+      "https://raw.githubusercontent.com/code-yeongyu/oh-my-openagent/dev/assets/omo.schema.json",
     )
   })
 })

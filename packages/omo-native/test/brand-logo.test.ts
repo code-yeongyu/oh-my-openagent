@@ -42,7 +42,10 @@ describe("OmO brand logo", () => {
     test("#then SENPI_BRAND carries the OmO name and the OmO icon as its logo", () => {
       const execDir = mkdtempSync(join(tmpdir(), "omo-brand-logo-"))
       roots.push(execDir)
-      const brand = JSON.parse(remapSenpiEnvironment({}, execDir).SENPI_BRAND ?? "{}") as { name?: string; logo?: unknown }
+      const brand = JSON.parse(remapSenpiEnvironment({}, execDir).SENPI_BRAND ?? "{}") as {
+        name?: string
+        logo?: unknown
+      }
       expect(brand.name).toBe("OmO")
       expect(decodeLogo(brand.logo)).toBe(ICON)
     })

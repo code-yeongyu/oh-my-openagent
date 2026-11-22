@@ -7,6 +7,7 @@ import { cleanupProjects, tempProject } from "../manager/__fixtures__/manager-fa
 import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps } from "./__fixtures__/host-session-fakes"
 import { seedRecord } from "./__fixtures__/lifecycle-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The failed rung's child named in `fallback_closing_child` is an obligation of whoever owns the record
 // next. These cases run on the production daemon probe and closer over a real socket, so a refused
@@ -23,22 +24,52 @@ let sequence = 0
 
 async function crashedHandoff(status: TaskStatus, options: { readonly terminalAt?: string } = {}) {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const host = await harness.fakeHost({ transcripts: true })
   const rpc = harness.runnerOver(host)
   sequence += 1
   const taskId = `st_${(0xeeee0000 + sequence).toString(16)}`
-  const old = await rpc.start({ task_id: taskId, cwd: project, state_dir: store.stateDir, prompt: "original work", model: "test/first" })
+  const old = await rpc.start({
+    task_id: taskId,
+    cwd: project,
+    state_dir: store.stateDir,
+    prompt: "original work",
+    model: "test/first",
+  })
   const [original] = host.sessions()
   if (original === undefined) throw new Error("expected the failed rung's session")
   const disconnected = host.waitForConnections(0)
   await old.dispose()
   await disconnected
-  seedRecord(store, { task_id: taskId, status, execution_mode: "process", host_pid: 11_001, run_epoch: 1, spawn_spec: { version: 1, cwd: project, prompt: "original work" } })
-  const closing = { host_session: { socket: host.socketPath, routing_id: original.routingId, session_path: original.sessionPath, instance_id: host.instanceId } }
-  store.mutate(taskId, (record) => ({ ...record, model: "test/next", fallback_handoff_epoch: 1, fallback_closing_child: closing, ...(options.terminalAt === undefined ? {} : { terminal_at: options.terminalAt, updated_at: options.terminalAt }) }))
+  seedRecord(store, {
+    task_id: taskId,
+    status,
+    execution_mode: "process",
+    host_pid: 11_001,
+    run_epoch: 1,
+    spawn_spec: { version: 1, cwd: project, prompt: "original work" },
+  })
+  const closing = {
+    host_session: {
+      socket: host.socketPath,
+      routing_id: original.routingId,
+      session_path: original.sessionPath,
+      instance_id: host.instanceId,
+    },
+  }
+  store.mutate(taskId, (record) => ({
+    ...record,
+    model: "test/next",
+    fallback_handoff_epoch: 1,
+    fallback_closing_child: closing,
+    ...(options.terminalAt === undefined ? {} : { terminal_at: options.terminalAt, updated_at: options.terminalAt }),
+  }))
   const launched: string[] = []
-  const { hostSessionProbe: _fakeProbe, hostSessionClose: _fakeClose, ...deps } = hostLifecycleDeps({
+  const {
+    hostSessionProbe: _fakeProbe,
+    hostSessionClose: _fakeClose,
+    ...deps
+  } = hostLifecycleDeps({
     store,
     hostPid: 22_002,
     isAlive: (pid) => pid === 22_002,
@@ -120,14 +151,24 @@ describe("the failed rung's child as an obligation of the record", () => {
     const f = await crashedHandoff("cancelled", { terminalAt: "2000-01-01T00:00:00.000Z" })
     f.store.mutate(f.taskId, (record) => {
       const { fallback_closing_child: _moved, fallback_handoff_epoch: _ended, ...rest } = record
-      return { ...rest, residency_state: "rpc_detached", runner_kind: "host-session", host_session: f.closing.host_session }
+      return {
+        ...rest,
+        residency_state: "rpc_detached",
+        runner_kind: "host-session",
+        host_session: f.closing.host_session,
+      }
     })
     const closing = Promise.withResolvers<void>()
     const refuse = Promise.withResolvers<void>()
     const lifecycle = createTaskLifecycle({
       ...f.deps,
       config: { ...f.deps.config, ttl_ms: 1_000 },
-      hostSessionProbe: { daemonAlive: async () => true, sessionLive: async () => true, sessionLiveness: async () => "live", refresh: () => undefined },
+      hostSessionProbe: {
+        daemonAlive: async () => true,
+        sessionLive: async () => true,
+        sessionLiveness: async () => "live",
+        refresh: () => undefined,
+      },
       hostSessionClose: async () => {
         closing.resolve()
         await refuse.promise
@@ -145,7 +186,10 @@ describe("the failed rung's child as an obligation of the record", () => {
     // then
     expect(duringClose).toBeNull()
     expect(result.retained).toContain(f.taskId)
-    expect(f.store.load(f.taskId)).toMatchObject({ residency_state: "rpc_detached", host_session: f.closing.host_session })
+    expect(f.store.load(f.taskId)).toMatchObject({
+      residency_state: "rpc_detached",
+      host_session: f.closing.host_session,
+    })
     lifecycle.dispose?.()
   })
 

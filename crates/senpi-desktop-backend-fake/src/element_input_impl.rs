@@ -30,7 +30,16 @@ pub(crate) fn ax_type_text(
         return Ok(ElementDelivery::Delivered(AxInputMethod::Inserted));
     }
     let native_role = backend.ax_tree.props(node)?.native_role;
-    let inserts = matches!(native_role.as_str(), "AXTextField" | "AXTextArea" | "AXComboBox");
+    // A window that shows a remote screen takes no insertion: its text is
+    // admitted in full, then typed as keys once the element holds focus.
+    let remote = match backend.ax_tree.window_of(node)? {
+        Some(window_id) => backend.remote_window(&senpi_desktop_core::types::Target::Window(window_id)),
+        None => None,
+    };
+    if let Some((window, remote)) = &remote {
+        crate::remote_impl::admit_remote_text(window, *remote, text, mode)?;
+    }
+    let inserts = remote.is_none() && matches!(native_role.as_str(), "AXTextField" | "AXTextArea" | "AXComboBox");
     if inserts {
         let reply = backend.begin_write(AxWrite::AxTypeText)?;
         backend.ax_tree.append_value(node, text)?;

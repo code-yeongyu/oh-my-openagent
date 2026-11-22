@@ -147,9 +147,10 @@ function insertMember(content: string, root: Node, edit: OmoConfigEdit): string 
   const unit = indentUnit(content, memberIndent, objectIndent)
   const trailingComma = commaAfter(content, lastEnd)
   const member = renderMember(key, value, memberIndent, unit)
-  const head = trailingComma === undefined
-    ? `${content.slice(0, lastEnd)},${content.slice(lastEnd, insertAt)}`
-    : content.slice(0, insertAt)
+  const head =
+    trailingComma === undefined
+      ? `${content.slice(0, lastEnd)},${content.slice(lastEnd, insertAt)}`
+      : content.slice(0, insertAt)
   return `${head}\n${memberIndent}${member}${trailingComma === undefined ? "" : ","}${content.slice(insertAt)}`
 }
 

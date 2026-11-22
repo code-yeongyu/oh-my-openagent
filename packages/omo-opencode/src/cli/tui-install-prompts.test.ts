@@ -63,12 +63,7 @@ describe("promptInstallPlatform", () => {
     expect(selectSpy).toHaveBeenCalledTimes(1)
     expect(selectSpy.mock.calls[0]?.[0]).toMatchObject({
       initialValue: "opencode",
-      options: [
-        { value: "opencode" },
-        { value: "codex" },
-        { value: "both" },
-        { value: "native", label: "OmO Native" },
-      ],
+      options: [{ value: "opencode" }, { value: "codex" }, { value: "both" }, { value: "native", label: "OmO Native" }],
     })
   })
 
@@ -112,12 +107,7 @@ describe("promptInstallPlatform", () => {
     expect(selectSpy).toHaveBeenCalledTimes(1)
     expect(selectSpy.mock.calls[0]?.[0]).toMatchObject({
       initialValue: "codex",
-      options: [
-        { value: "opencode" },
-        { value: "codex" },
-        { value: "both" },
-        { value: "native", label: "OmO Native" },
-      ],
+      options: [{ value: "opencode" }, { value: "codex" }, { value: "both" }, { value: "native", label: "OmO Native" }],
     })
   })
 })

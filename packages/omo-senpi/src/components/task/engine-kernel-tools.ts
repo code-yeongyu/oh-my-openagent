@@ -26,8 +26,11 @@ export type EngineKernelTools = {
 export function createEngineKernelTools(sharedParentTools: () => readonly ToolDefinition[]): EngineKernelTools {
   return {
     bindings: createKernelToolBindings(),
-    childToolNames: () => childStructuralToolNames(
-      mergeChildCustomTools(sharedParentTools(), undefined, { uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES }).map((tool) => tool.name),
-    ),
+    childToolNames: () =>
+      childStructuralToolNames(
+        mergeChildCustomTools(sharedParentTools(), undefined, { uiOnlyToolNames: TASK_CHILD_UI_ONLY_TOOL_NAMES }).map(
+          (tool) => tool.name,
+        ),
+      ),
   }
 }

@@ -34,7 +34,8 @@ export function createLiveHostChildren(observer: HostShardEvents): LiveHostChild
     },
     ensure: (port) => async (input) => {
       const daemon = await port(input)
-      if (daemon.instanceId !== undefined) supervisors.set(daemon.socket, { pid: daemon.pid, instanceId: daemon.instanceId })
+      if (daemon.instanceId !== undefined)
+        supervisors.set(daemon.socket, { pid: daemon.pid, instanceId: daemon.instanceId })
       return daemon
     },
     events: {

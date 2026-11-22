@@ -41,10 +41,7 @@ export interface SpawnSyncResult {
   readonly pid: number
 }
 
-type BunSpawnedProcess = Omit<
-  SpawnedProcess,
-  "exited" | "stdout" | "stderr" | "stdin" | "kill" | "ref" | "unref"
-> & {
+type BunSpawnedProcess = Omit<SpawnedProcess, "exited" | "stdout" | "stderr" | "stdin" | "kill" | "ref" | "unref"> & {
   readonly exited: Promise<number | null | undefined | void>
   readonly stdout?: ReadableStream<Uint8Array> | null
   readonly stderr?: ReadableStream<Uint8Array> | null

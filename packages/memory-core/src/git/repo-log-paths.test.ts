@@ -9,7 +9,13 @@ import { removeTree } from "../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
 const git = createNodeGitExec()
-const env = { ...process.env, GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t" }
+const env = {
+  ...process.env,
+  GIT_AUTHOR_NAME: "t",
+  GIT_AUTHOR_EMAIL: "t@t",
+  GIT_COMMITTER_NAME: "t",
+  GIT_COMMITTER_EMAIL: "t@t",
+}
 
 afterEach(async () => {
   for (const dir of tempDirs.splice(0)) {
@@ -45,14 +51,20 @@ async function commitFiles(dir: string, files: Record<string, string>, message: 
   await run(dir, ["commit", "-q", "-m", message])
 }
 
-async function repoWithRootSpacedRenameAndMerge(exec: GitExec): Promise<{ readonly dir: string; readonly repo: GitMemoryRepo }> {
+async function repoWithRootSpacedRenameAndMerge(
+  exec: GitExec,
+): Promise<{ readonly dir: string; readonly repo: GitMemoryRepo }> {
   const dir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-log-paths-")))
   tempDirs.push(dir)
   await run(dir, ["init", "-q", "-b", "main"])
   disableFixtureAutoMaintenance(dir)
   await commitFiles(dir, { "system/persona.md": "p\n" }, "root")
   for (let index = 0; index < 8; index += 1) {
-    await commitFiles(dir, { [`reference/note ${index}.md`]: `${index}\n` }, `note ${index}\n\nOmo-Session: s${index % 2}`)
+    await commitFiles(
+      dir,
+      { [`reference/note ${index}.md`]: `${index}\n` },
+      `note ${index}\n\nOmo-Session: s${index % 2}`,
+    )
   }
   await run(dir, ["checkout", "-q", "-b", "side"])
   await commitFiles(dir, { "reference/side.md": "side\n", "system/persona.md": "side\n" }, "side edit")
@@ -74,8 +86,16 @@ async function commitSigned(dir: string, files: Record<string, string>, message:
   const tree = (await run(dir, ["write-tree"])).trim()
   const parent = (await run(dir, ["rev-parse", "HEAD"])).trim()
   const object = [
-    `tree ${tree}`, `parent ${parent}`, `author t <t@t> ${at} +0000`, `committer t <t@t> ${at} +0000`,
-    "gpgsig -----BEGIN SSH SIGNATURE-----", " U1NIU0lH", " -----END SSH SIGNATURE-----", "", message, "",
+    `tree ${tree}`,
+    `parent ${parent}`,
+    `author t <t@t> ${at} +0000`,
+    `committer t <t@t> ${at} +0000`,
+    "gpgsig -----BEGIN SSH SIGNATURE-----",
+    " U1NIU0lH",
+    " -----END SSH SIGNATURE-----",
+    "",
+    message,
+    "",
   ].join("\n")
   const objectPath = join(dir, ".git", "signed-commit")
   await writeFile(objectPath, object)
@@ -93,7 +113,10 @@ describe("GitMemoryRepo.log includePaths", () => {
     const counting = countingExec()
     const { dir, repo } = await repoWithRootSpacedRenameAndMerge(counting.exec)
     const expected = await Promise.all(
-      (await run(dir, ["rev-list", "HEAD"])).trim().split("\n").map(async (sha): Promise<[string, string[]]> => [sha, await diffTreePaths(dir, sha)]),
+      (await run(dir, ["rev-list", "HEAD"]))
+        .trim()
+        .split("\n")
+        .map(async (sha): Promise<[string, string[]]> => [sha, await diffTreePaths(dir, sha)]),
     )
     const before = counting.calls()
 
@@ -104,7 +127,10 @@ describe("GitMemoryRepo.log includePaths", () => {
     expect(counting.calls() - before).toBe(1)
     expect(commits.map((commit) => [commit.sha, commit.paths])).toEqual(expected)
     expect(commits.find((commit) => commit.subject === "note 3")?.trailers).toEqual({ "Omo-Session": "s1" })
-    expect(commits.find((commit) => commit.subject === "rename")?.paths).toEqual(["reference/note 0.md", "reference/renamed.md"])
+    expect(commits.find((commit) => commit.subject === "rename")?.paths).toEqual([
+      "reference/note 0.md",
+      "reference/renamed.md",
+    ])
   })
 
   it("#given a pathspec-filtered log #when it reads paths #then each selected commit lists all of its paths like diff-tree", async () => {

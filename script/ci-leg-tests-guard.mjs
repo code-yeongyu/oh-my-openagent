@@ -24,17 +24,17 @@ export function judgeLeg({ outcomes, os, runHeavy, fullMatrix, jobStatus }) {
   // run_heavy=false is the classifier's deliberate skip (web-only change or a
   // generated release merge, whose version bumps still touch runtime paths).
   // Outside the full matrix a pull request proves macOS and Windows on the
-  // post-merge push instead (#10856), so only ubuntu is required here.
+  // post-merge push instead (#10856, #13802), so only ubuntu is required here.
   const required = runHeavy && (os === "ubuntu-latest" || fullMatrix)
   if (required) {
     return {
       exitCode: 1,
       level: "error",
-      message: `tests not run: this change needs the tests on ${os}, but every test step of this leg was skipped. Add run-full-ci or ci:full-matrix for a separate diagnostic run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to rerun required checks.`,
+      message: `tests not run: this change needs the tests on ${os}, but every test step of this leg was skipped. Add the ci:full-matrix label for a separate diagnostic run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to rerun required checks.`,
     }
   }
   const message = runHeavy
-    ? `tests intentionally not run on ${os}: no platform-specific path changed, so this pull request runs the tests on ubuntu only and the post-merge push runs every OS. Add run-full-ci or ci:full-matrix for a separate run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks.`
+    ? `tests intentionally not run on ${os}: pull requests run the tests on Linux only and the post-merge push to dev runs every OS. Add the ci:full-matrix label for a separate run with optional full-matrix / ... checks that do not gate merge. Keep the label and push a commit or reopen the PR to run the full matrix in required checks.`
     : `tests intentionally not run on ${os}: the change is web or docs only, or a generated release merge, so no leg runs the heavy tests.`
   return { exitCode: 0, level: "notice", message }
 }
@@ -73,7 +73,9 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     return value === "" ? true : parseBoolean(name, value)
   }
   const verdict = judgeLeg({
-    outcomes: required(values, "outcomes").split(/\s+/).filter((outcome) => outcome.length > 0),
+    outcomes: required(values, "outcomes")
+      .split(/\s+/)
+      .filter((outcome) => outcome.length > 0),
     os: required(values, "os"),
     runHeavy: flag("run-heavy"),
     fullMatrix: flag("full-matrix"),

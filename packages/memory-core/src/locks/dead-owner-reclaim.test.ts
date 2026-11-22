@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { randomUUID } from "node:crypto"
-import { mkdtemp, readdir, rm, unlink, utimes, writeFile } from "node:fs/promises"
+import { mkdtemp, readFile, readdir, rm, unlink, utimes, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 
 import * as resilientFs from "../fs/resilient"
 import { sweepStaleLockCandidates } from "./candidate-sweep"
-import { LOCK_DIRECTORY_SWEEP_INTERVAL_MS } from "./acquire"
+import { LOCK_DIRECTORY_SWEEP_INTERVAL_MS, acquireWithoutDirectorySweep } from "./acquire"
 import { sweepDeadOwnerLocks } from "./dead-owner-sweep"
 import {
   LockContentionError,
@@ -59,6 +59,61 @@ function countPublishAttempts(): { readonly names: () => readonly string[]; read
 }
 
 describe("dead-owner lock reclaim", () => {
+  test("#given a dead primary owner whose lock vanishes between the recovery fence and the unlink #when a contender recovers it #then the contender takes the lock", async () => {
+    // #given
+    const lockPath = memoryWriterLockPath(await createLocksDirectory())
+    await writeRecord(lockPath, await deadOwnerRecord("memory-write"))
+    const contender = await createLockRecord("memory-write")
+    const realUnlink = resilientFs.unlink
+    let vanished = false
+    const vanishFirst = spyOn(resilientFs, "unlink").mockImplementation((async (target: string) => {
+      if (target === lockPath && !vanished) {
+        vanished = true
+        await unlink(lockPath)
+      }
+      return realUnlink(target)
+    }) as typeof resilientFs.unlink)
+
+    // #when
+    try {
+      await acquireWithoutDirectorySweep(lockPath, contender, { waitTimeoutMs: 0 })
+    } finally {
+      vanishFirst.mockRestore()
+    }
+
+    // #then
+    // Windows CI (#11644): the fenced unlink met ENOENT and the supervisor failed admission.
+    expect(vanished).toBe(true)
+    const owner = JSON.parse(await readFile(lockPath, "utf8")) as LockRecord
+    expect(owner.nonce).toBe(contender.nonce)
+    expect(await readdir(path.dirname(lockPath))).toEqual([path.basename(lockPath)])
+  })
+
+  test("#given the fenced unlink of a dead primary fails with an error other than ENOENT #when a contender recovers it #then the error surfaces and the recovery lock is released", async () => {
+    // #given
+    const lockPath = memoryWriterLockPath(await createLocksDirectory())
+    await writeRecord(lockPath, await deadOwnerRecord("memory-write"))
+    const realUnlink = resilientFs.unlink
+    const failPrimary = spyOn(resilientFs, "unlink").mockImplementation((async (target: string) => {
+      if (target === lockPath) throw Object.assign(new Error("simulated EIO"), { code: "EIO" })
+      return realUnlink(target)
+    }) as typeof resilientFs.unlink)
+
+    // #when
+    let failure: unknown
+    try {
+      await acquireWithoutDirectorySweep(lockPath, await createLockRecord("memory-write"), { waitTimeoutMs: 0 })
+    } catch (error) {
+      failure = error
+    } finally {
+      failPrimary.mockRestore()
+    }
+
+    // #then
+    expect(failure).toMatchObject({ code: "EIO" })
+    expect(await readdir(path.dirname(lockPath))).toEqual([path.basename(lockPath)])
+  })
+
   test("#given a dead primary owner and a live recovery holder #when six contenders wait #then none publishes a candidate", async () => {
     // #given
     const lockPath = memoryWriterLockPath(await createLocksDirectory())
@@ -71,14 +126,19 @@ describe("dead-owner lock reclaim", () => {
     try {
       const contenders = await Promise.allSettled(
         Array.from({ length: 6 }, async (_, index) =>
-          acquireLock(lockPath, await createLockRecord("memory-write", { runId: `c${index}` }), { waitTimeoutMs: 300, retryDelayMs: 10 }),
+          acquireLock(lockPath, await createLockRecord("memory-write", { runId: `c${index}` }), {
+            waitTimeoutMs: 300,
+            retryDelayMs: 10,
+          }),
         ),
       )
 
       // #then
       // Every tick used to run create+write+fsync+link+unlink on the recovery path while a live
       // owner visibly held it: about 40 publishes per second per waiter.
-      expect(contenders.every((result) => result.status === "rejected" && result.reason instanceof LockContentionError)).toBe(true)
+      expect(
+        contenders.every((result) => result.status === "rejected" && result.reason instanceof LockContentionError),
+      ).toBe(true)
       expect(publishes.names()).toEqual([])
     } finally {
       publishes.restore()
@@ -97,7 +157,7 @@ describe("dead-owner lock reclaim", () => {
     await writeRecord(`${crashedWithRecovery}.recovery`, await deadOwnerRecord("notice:recovery"))
     const liveOwner = await createLockRecord("memory-write")
     await writeRecord(live, liveOwner)
-    await writeFile(unparsable, "{\"pid\":", { mode: 0o600 })
+    await writeFile(unparsable, '{"pid":', { mode: 0o600 })
 
     // #when
     const reclaimed = await sweepDeadOwnerLocks(locksDirectory)
@@ -155,7 +215,8 @@ describe("dead-owner lock reclaim", () => {
     await writeRecord(crashed, await deadOwnerRecord("crashed"))
     const realReadFile = resilientFs.readFile
     const readFailure = spyOn(resilientFs, "readFile").mockImplementation(((filePath: string, ...rest: unknown[]) => {
-      if (String(filePath) === unreadable) return Promise.reject(Object.assign(new Error("permission denied"), { code: "EACCES" }))
+      if (String(filePath) === unreadable)
+        return Promise.reject(Object.assign(new Error("permission denied"), { code: "EACCES" }))
       return (realReadFile as (...args: unknown[]) => unknown)(filePath, ...rest)
     }) as typeof resilientFs.readFile)
     const failures: string[] = []
@@ -163,7 +224,9 @@ describe("dead-owner lock reclaim", () => {
     // #when
     let reclaimed: number
     try {
-      reclaimed = await sweepDeadOwnerLocks(locksDirectory, { onFailure: (lockPath) => failures.push(path.basename(lockPath)) })
+      reclaimed = await sweepDeadOwnerLocks(locksDirectory, {
+        onFailure: (lockPath) => failures.push(path.basename(lockPath)),
+      })
     } finally {
       readFailure.mockRestore()
     }

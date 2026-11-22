@@ -41,11 +41,17 @@ describe("repairLeakedArguments", () => {
     expect(output.old_string).toBe("old")
     expect(output.new_string).toBe("new")
     expect(output.insert_text).toBe("tail")
-    expect(repairs).toEqual([{ from: "old_string", to: "new_string" }, { from: "new_string", to: "insert_text" }])
+    expect(repairs).toEqual([
+      { from: "old_string", to: "new_string" },
+      { from: "new_string", to: "insert_text" },
+    ])
   })
 
   it.each([
-    ["the leaked argument was also sent", { description: 'S</description><parameter name="file_text">x', file_text: "y" }],
+    [
+      "the leaked argument was also sent",
+      { description: 'S</description><parameter name="file_text">x', file_text: "y" },
+    ],
     ["the leaked argument is unknown", { description: 'S</description><parameter name="body">x' }],
     ["the closing tag names another argument", { description: 'S</file_text><parameter name="file_text">x' }],
     ["the leak names its own argument", { description: 'S</description><parameter name="description">x' }],

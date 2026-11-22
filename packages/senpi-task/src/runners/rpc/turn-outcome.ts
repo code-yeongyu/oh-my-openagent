@@ -75,15 +75,15 @@ function replacementCause(event: unknown): RunnerOutcome | undefined {
   return {
     status: "interrupted",
     cause: "session_replaced",
-    message:
-      `The child's session was replaced${by === undefined ? "" : ` (${by})`}${target === undefined ? "" : ` by ${target}`}, which stopped its running turn. Use task_send to continue it in the new session.`,
+    message: `The child's session was replaced${by === undefined ? "" : ` (${by})`}${target === undefined ? "" : ` by ${target}`}, which stopped its running turn. Use task_send to continue it in the new session.`,
   }
 }
 
 export function exitTurnOutcome(exit: ChildExitOutcome, finalText: string | undefined): RunnerOutcome {
-  const processExit = exit.facts.pid !== undefined && exit.kind !== "spawn_error"
-    ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
-    : {}
+  const processExit =
+    exit.facts.pid !== undefined && exit.kind !== "spawn_error"
+      ? { exit: { kind: exit.kind, code: exit.facts.code, signal: exit.facts.signal } }
+      : {}
   if (exit.kind === "clean" && finalText !== undefined && finalText.length > 0) {
     return { status: "completed", finalResponse: finalText }
   }
@@ -96,7 +96,11 @@ export function exitTurnOutcome(exit: ChildExitOutcome, finalText: string | unde
   const facts = mapExitOutcomeToError(exit, { alreadyTerminal: false })
   return {
     status: "error",
-    failure: { kind: "child-prompt-failed", message: facts?.error_message ?? "RPC child terminated abnormally", ...processExit },
+    failure: {
+      kind: "child-prompt-failed",
+      message: facts?.error_message ?? "RPC child terminated abnormally",
+      ...processExit,
+    },
     ...(facts?.killed === true ? { killed: true } : {}),
   }
 }

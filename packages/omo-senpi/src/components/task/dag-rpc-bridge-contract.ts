@@ -64,12 +64,16 @@ export interface DagRpcBridgeDeps {
 }
 
 export interface DagRpcBridge {
-  // session_start: subscribe every owned run and arm the heartbeat when one is nonterminal.
+  // session_start: subscribe every owned run, arm the heartbeat when one is nonterminal, and emit
+  // the current snapshot before returning.
   attach(): void
   // Re-read the owned runs: picks up a run started mid-session and rearms the heartbeat for it.
   sync(): void
   // session_before_switch: drop every subscription and timer so nothing leaks into the next session.
   detach(): void
+  // session_resumed: a client reattached to the retained session, so restate the current snapshot
+  // even when nothing changed since the last emission.
+  resend(): void
   publishActivity(event: DagBridgeActivityEvent): void
   // Every dag store mutation calls this; the snapshot flush is debounced and fingerprint-deduped.
   notifyStoreMutation(): void

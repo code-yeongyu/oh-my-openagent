@@ -2,6 +2,7 @@ const KEYWORD_PATTERN = /\b(ultrawork|ulw)\b/gi
 const WORKTREE_FLAG_PATTERN = /--worktree(?:\s+(\S+))?/
 const MAKE_PR_FLAG_PATTERN = /--make-pr\b/
 const SHIP_FLAG_PATTERN = /--ship\b/
+const LIGHT_FLAG_PATTERN = /--light(?![\w-])/
 const WRAPPING_QUOTES_PATTERN = /^(["'`])([\s\S]*)\1$/
 
 export interface ParsedUserRequest {
@@ -9,6 +10,7 @@ export interface ParsedUserRequest {
   explicitWorktreePath: string | null
   makePr: boolean
   ship: boolean
+  light: boolean
 }
 
 const EMPTY_REQUEST: ParsedUserRequest = {
@@ -16,6 +18,7 @@ const EMPTY_REQUEST: ParsedUserRequest = {
   explicitWorktreePath: null,
   makePr: false,
   ship: false,
+  light: false,
 }
 
 export function parseUserRequest(promptText: string): ParsedUserRequest {
@@ -34,7 +37,12 @@ export function parseUserRequest(promptText: string): ParsedUserRequest {
 
   const makePr = MAKE_PR_FLAG_PATTERN.test(rawArg)
   const ship = SHIP_FLAG_PATTERN.test(rawArg)
-  rawArg = rawArg.replace(MAKE_PR_FLAG_PATTERN, "").replace(SHIP_FLAG_PATTERN, "").trim()
+  const light = LIGHT_FLAG_PATTERN.test(rawArg)
+  rawArg = rawArg
+    .replace(MAKE_PR_FLAG_PATTERN, "")
+    .replace(SHIP_FLAG_PATTERN, "")
+    .replace(LIGHT_FLAG_PATTERN, "")
+    .trim()
 
   const cleanedArg = rawArg.replace(KEYWORD_PATTERN, "").trim()
   const quotedPlanMatch = cleanedArg.match(WRAPPING_QUOTES_PATTERN)
@@ -45,5 +53,6 @@ export function parseUserRequest(promptText: string): ParsedUserRequest {
     explicitWorktreePath,
     makePr,
     ship,
+    light,
   }
 }

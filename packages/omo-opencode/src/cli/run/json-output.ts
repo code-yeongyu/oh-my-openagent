@@ -11,9 +11,7 @@ interface JsonOutputManagerOptions {
   stderr?: NodeJS.WriteStream
 }
 
-export function createJsonOutputManager(
-  options: JsonOutputManagerOptions = {}
-): JsonOutputManager {
+export function createJsonOutputManager(options: JsonOutputManagerOptions = {}): JsonOutputManager {
   const stdout = options.stdout ?? process.stdout
   const stderr = options.stderr ?? process.stderr
 
@@ -23,7 +21,7 @@ export function createJsonOutputManager(
     stdout.write = function (
       chunk: Uint8Array | string,
       encodingOrCallback?: BufferEncoding | ((error?: Error | null) => void),
-      callback?: (error?: Error | null) => void
+      callback?: (error?: Error | null) => void,
     ): boolean {
       if (typeof encodingOrCallback === "function") {
         return stderr.write(chunk, encodingOrCallback)

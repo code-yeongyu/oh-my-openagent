@@ -43,9 +43,11 @@ async function captureError(promise: Promise<unknown>): Promise<unknown> {
 
 afterEach(async () => {
   for (const restore of restoreLockFs.splice(0).reverse()) restore()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directory) => {
-    await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directory) => {
+      await removeTree(directory, { maxRetries: 10, retryDelay: 200 })
+    }),
+  )
 })
 
 function codedError(code: string): Error & { code: string } {
@@ -104,7 +106,13 @@ describe("cross-process lock protocol", () => {
   test("#given link EACCES #when two contenders race the exclusive-create fallback #then exactly one wins", async () => {
     // #given
     const lockPath = await createLockPath()
-    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EACCES") } }))
+    restoreLockFs.push(
+      setLockCandidateFsForTests({
+        link: async () => {
+          throw codedError("EACCES")
+        },
+      }),
+    )
 
     // #when
     const contenders = await Promise.allSettled([
@@ -123,7 +131,13 @@ describe("cross-process lock protocol", () => {
   for (const code of ["EPERM", "ENOTSUP"]) {
     test(`#given link ${code} #when a lock is published #then the exclusive-create fallback succeeds`, async () => {
       const lockPath = await createLockPath()
-      restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError(code) } }))
+      restoreLockFs.push(
+        setLockCandidateFsForTests({
+          link: async () => {
+            throw codedError(code)
+          },
+        }),
+      )
       const record = await createLockRecord("reflection-scheduler")
 
       await acquireLock(lockPath, record)
@@ -137,28 +151,42 @@ describe("cross-process lock protocol", () => {
     const lockPath = await createLockPath()
     let now = Date.now()
     const events: string[] = []
-    restoreLockFs.push(setLockCandidateFsForTests({
-      link: async () => { throw codedError("EACCES") },
-      writeFallback: async () => {
-        events.push("fallback-write")
-        throw new Error("simulated writer crash")
-      },
-      unlink: async (candidatePath) => {
-        events.push("candidate-unlink")
-        await unlink(candidatePath)
-      },
-    }))
+    restoreLockFs.push(
+      setLockCandidateFsForTests({
+        link: async () => {
+          throw codedError("EACCES")
+        },
+        writeFallback: async () => {
+          events.push("fallback-write")
+          throw new Error("simulated writer crash")
+        },
+        unlink: async (candidatePath) => {
+          events.push("candidate-unlink")
+          await unlink(candidatePath)
+        },
+      }),
+    )
     const options = { incompleteLockGraceMs: 100, now: () => now }
-    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toThrow("simulated writer crash")
+    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toThrow(
+      "simulated writer crash",
+    )
     // The candidate is removed only after the fallback settled, so the crash is this call's own
     // rejection and never a promise left pending without a handler while the cleanup runs.
     expect(events).toEqual(["fallback-write", "candidate-unlink"])
     restoreLockFs.pop()?.()
-    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EACCES") } }))
+    restoreLockFs.push(
+      setLockCandidateFsForTests({
+        link: async () => {
+          throw codedError("EACCES")
+        },
+      }),
+    )
     now = (await stat(lockPath)).mtimeMs
 
     // #when / #then: held during grace
-    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toBeInstanceOf(LockContentionError)
+    await expect(acquireLock(lockPath, await createLockRecord("facts-queue"), options)).rejects.toBeInstanceOf(
+      LockContentionError,
+    )
 
     // #when / #then: stale after grace and recoverable
     now += 101
@@ -169,7 +197,13 @@ describe("cross-process lock protocol", () => {
 
   test("#given a non-fallback link error #when a lock is published #then the original error is thrown", async () => {
     const lockPath = await createLockPath()
-    restoreLockFs.push(setLockCandidateFsForTests({ link: async () => { throw codedError("EIO") } }))
+    restoreLockFs.push(
+      setLockCandidateFsForTests({
+        link: async () => {
+          throw codedError("EIO")
+        },
+      }),
+    )
 
     await expect(acquireLock(lockPath, await createLockRecord("memory-write"))).rejects.toMatchObject({ code: "EIO" })
   })
@@ -327,9 +361,11 @@ describe("cross-process lock protocol", () => {
     const record = await createLockRecord("transcript-state")
 
     // #when
-    const error = await captureError(withLock(lockPath, record, async () => {
-      throw new Error("callback failed")
-    }))
+    const error = await captureError(
+      withLock(lockPath, record, async () => {
+        throw new Error("callback failed")
+      }),
+    )
 
     // #then
     expect(String(error)).toContain("callback failed")

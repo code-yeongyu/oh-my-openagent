@@ -321,7 +321,7 @@ let player: WorldPoint  = Point2D::new(3.5, 1.2);
 // let mistake = cursor + player; // compile error: different coordinate spaces
 ```
 
-Generalize the pattern to your own domains (see `references/type-state.md`).
+Generalize the pattern to your own domains (see `references/rust/type-state.md`).
 
 ## Property tests — `proptest`
 
@@ -380,7 +380,7 @@ Run with `cargo bench`. HTML reports under `target/criterion/`. Pair with `cargo
 
 ## Concurrency model — `loom`
 
-For lock-free or atomic-heavy code (channels, refcounts, hazard pointers). See `references/concurrency.md` for the full pattern.
+For lock-free or atomic-heavy code (channels, refcounts, hazard pointers). See `references/rust/concurrency.md` for the full pattern.
 
 ## Arena allocator — `bumpalo`
 

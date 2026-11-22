@@ -53,7 +53,7 @@ export function createJsonErrorRecoveryHook(_ctx: PluginInput) {
   return {
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
-      output: { title: string; output: string; metadata: unknown }
+      output: { title: string; output: string; metadata: unknown },
     ) => {
       if (JSON_ERROR_EXCLUDED_TOOLS.has(input.tool.toLowerCase())) return
       if (typeof output.output !== "string") return

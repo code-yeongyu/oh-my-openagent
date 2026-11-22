@@ -94,9 +94,7 @@ export async function checkDeprecatedReasoningKeys(): Promise<CheckResult> {
   return {
     name: CHECK_NAMES[CHECK_IDS.CONFIG],
     status: issues.length > 0 ? "warn" : "pass",
-    message: issues.length > 0
-      ? `${issues.length} deprecated config key(s) found`
-      : "No deprecated config keys found",
+    message: issues.length > 0 ? `${issues.length} deprecated config key(s) found` : "No deprecated config keys found",
     ...(scanned.length > 0 ? { details: scanned.map((path) => `Scanned: ${path}`) } : {}),
     issues,
   }

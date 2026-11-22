@@ -21,7 +21,11 @@ type HeldAdmissionPorts = {
 
 class HeldAdmissionError extends Error {
   readonly code = "held_admission_unavailable"
-  constructor(readonly taskId: string, readonly reason: "record_missing" | "allocation_missing" | "already_started" | "spawn_spec_unavailable" | "owner_changed") {
+  constructor(
+    readonly taskId: string,
+    readonly reason:
+      "record_missing" | "allocation_missing" | "already_started" | "spawn_spec_unavailable" | "owner_changed",
+  ) {
     super(`held admission ${taskId}: ${reason}`)
   }
 }
@@ -30,20 +34,29 @@ export class HeldAdmissions {
   readonly #contexts = new Map<string, LaunchContext>()
   readonly #ports: HeldAdmissionPorts
 
-  constructor(ports: HeldAdmissionPorts) { this.#ports = ports }
+  constructor(ports: HeldAdmissionPorts) {
+    this.#ports = ports
+  }
 
   enqueue(context: LaunchContext): number {
     this.#contexts.set(context.record.task_id, context)
-    return this.#ports.concurrency.enqueue(context.model, context.record.task_id, context.record.notification.run_epoch,
-      () => this.#ports.launch(context))
+    return this.#ports.concurrency.enqueue(
+      context.model,
+      context.record.task_id,
+      context.record.notification.run_epoch,
+      () => this.#ports.launch(context),
+    )
   }
 
   track(context: LaunchContext, launching: Promise<LaunchOutcome>): void {
     this.#contexts.set(context.record.task_id, context)
-    void launching.then(outcome => {
-      if ("held" in outcome && outcome.held !== undefined) return
-      this.#forgetContext(context)
-    }, () => this.#forgetContext(context))
+    void launching.then(
+      (outcome) => {
+        if ("held" in outcome && outcome.held !== undefined) return
+        this.#forgetContext(context)
+      },
+      () => this.#forgetContext(context),
+    )
   }
 
   withdraw(taskIds: readonly string[]): void {
@@ -70,9 +83,13 @@ export class HeldAdmissions {
     const prepared = warm?.managedSpec ?? (rebuilt?.ok === true ? rebuilt.spec : undefined)
     if (prepared === undefined) throw new HeldAdmissionError(taskId, "spawn_spec_unavailable")
     const entered = enterStartAdmission({
-      barrier: this.#ports.barrier, taskId, runRef: participant.runRef, credential,
+      barrier: this.#ports.barrier,
+      taskId,
+      runRef: participant.runRef,
+      credential,
       spec: {
-        prompt: prepared.prompt, parent_session_id: record.parent_session_id,
+        prompt: prepared.prompt,
+        parent_session_id: record.parent_session_id,
         ...(record.root_session_id === undefined ? {} : { root_session_id: record.root_session_id }),
         depth: record.depth,
       },
@@ -80,23 +97,34 @@ export class HeldAdmissions {
     if (entered.kind === "held") throw new RunPauseAdmissionHeld()
     try {
       let claimed = false
-      const owned = this.#ports.store.mutate(taskId, fresh => {
-        if (fresh.status !== "pending" || fresh.notification.run_epoch !== record.notification.run_epoch ||
-          fresh.host_pid !== record.host_pid) return fresh
+      const owned = this.#ports.store.mutate(taskId, (fresh) => {
+        if (
+          fresh.status !== "pending" ||
+          fresh.notification.run_epoch !== record.notification.run_epoch ||
+          fresh.host_pid !== record.host_pid
+        )
+          return fresh
         claimed = true
         return { ...fresh, host_pid: this.#ports.hostPid }
       })
       if (!claimed || owned === null) throw new HeldAdmissionError(taskId, "owner_changed")
       const context: LaunchContext = {
-        record: owned, managedSpec: { ...prepared, admission: entered.scope },
+        record: owned,
+        managedSpec: { ...prepared, admission: entered.scope },
         runner: warm?.runner ?? this.#ports.runners[owned.execution_mode === "in-process" ? "in-process" : "process"],
         model: allocation.model,
       }
       this.#contexts.set(taskId, context)
-      this.#ports.concurrency.requeue({
-        taskId, runEpoch: owned.notification.run_epoch, model: allocation.model,
-        laneKey: allocation.laneKey, sequence: allocation.sequence,
-      }, () => this.#ports.launch(context))
+      this.#ports.concurrency.requeue(
+        {
+          taskId,
+          runEpoch: owned.notification.run_epoch,
+          model: allocation.model,
+          laneKey: allocation.laneKey,
+          sequence: allocation.sequence,
+        },
+        () => this.#ports.launch(context),
+      )
       entered.scope.transfer()
       this.#ports.concurrency.drain()
       return { kind: "resumed" }
@@ -105,7 +133,9 @@ export class HeldAdmissions {
     }
   }
 
-  forget(taskId: string): void { this.#contexts.delete(taskId) }
+  forget(taskId: string): void {
+    this.#contexts.delete(taskId)
+  }
 
   #forgetContext(context: LaunchContext): void {
     if (this.#contexts.get(context.record.task_id) === context) this.#contexts.delete(context.record.task_id)

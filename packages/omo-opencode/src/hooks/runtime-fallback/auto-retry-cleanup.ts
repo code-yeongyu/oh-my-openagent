@@ -6,10 +6,7 @@ import { clearDelegatedChildSessionBootstrap } from "../../shared/delegated-chil
 
 const SESSION_TTL_MS = 12 * 60 * 60 * 1000
 
-export function createStaleSessionCleanup(
-  deps: HookDeps,
-  clearSessionFallbackTimeout: (sessionID: string) => void,
-) {
+export function createStaleSessionCleanup(deps: HookDeps, clearSessionFallbackTimeout: (sessionID: string) => void) {
   const {
     sessionStates,
     sessionLastAccess,

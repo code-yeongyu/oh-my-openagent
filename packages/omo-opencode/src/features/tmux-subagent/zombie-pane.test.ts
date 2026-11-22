@@ -15,19 +15,17 @@ const mockQueryWindowState = mock<(paneId: string) => Promise<WindowState | null
   agentPanes: [],
 }))
 
-const mockExecuteAction = mock<(
-  action: { type: string },
-  ctx: ExecuteContext,
-) => Promise<ActionResult>>(async () => ({ success: true }))
-
-const mockExecuteActions = mock<(
-  actions: unknown[],
-  ctx: ExecuteContext,
-) => Promise<ExecuteActionsResult>>(async () => ({
+const mockExecuteAction = mock<(action: { type: string }, ctx: ExecuteContext) => Promise<ActionResult>>(async () => ({
   success: true,
-  spawnedPaneId: "%1",
-  results: [],
 }))
+
+const mockExecuteActions = mock<(actions: unknown[], ctx: ExecuteContext) => Promise<ExecuteActionsResult>>(
+  async () => ({
+    success: true,
+    spawnedPaneId: "%1",
+    results: [],
+  }),
+)
 
 const mockSpawnTmuxWindow = mock(async () => ({ success: true, paneId: "%window" }))
 const mockSpawnTmuxSession = mock(async () => ({ success: true, paneId: "%session" }))
@@ -54,7 +52,9 @@ function registerModuleMocks(): void {
   }))
 }
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 afterEach(() => {
   mock.restore()
@@ -224,10 +224,7 @@ describe("TmuxSessionManager zombie pane handling", () => {
     const { TmuxSessionManager } = await import("./manager")
     const manager = createManager(TmuxSessionManager)
     const sessions = getTrackedSessions(manager)
-    sessions.set(
-      "ses_pending",
-      createTrackedSession({ closePending: true, closeRetryCount: 0 }),
-    )
+    sessions.set("ses_pending", createTrackedSession({ closePending: true, closeRetryCount: 0 }))
 
     // when
     await getRetryPendingCloses(manager)()
@@ -242,10 +239,7 @@ describe("TmuxSessionManager zombie pane handling", () => {
     const { TmuxSessionManager } = await import("./manager")
     const manager = createManager(TmuxSessionManager)
     const sessions = getTrackedSessions(manager)
-    sessions.set(
-      "ses_pending",
-      createTrackedSession({ closePending: true, closeRetryCount: 3 }),
-    )
+    sessions.set("ses_pending", createTrackedSession({ closePending: true, closeRetryCount: 3 }))
 
     // when
     await getRetryPendingCloses(manager)()
@@ -261,10 +255,7 @@ describe("TmuxSessionManager zombie pane handling", () => {
     const { TmuxSessionManager } = await import("./manager")
     const manager = createManager(TmuxSessionManager)
     const sessions = getTrackedSessions(manager)
-    sessions.set(
-      "ses_pending",
-      createTrackedSession({ closePending: true, closeRetryCount: 3 }),
-    )
+    sessions.set("ses_pending", createTrackedSession({ closePending: true, closeRetryCount: 3 }))
 
     // when
     await getCloseSessionById(manager)("ses_pending")
@@ -281,17 +272,12 @@ describe("TmuxSessionManager zombie pane handling", () => {
       windowWidth: 220,
       windowHeight: 44,
       mainPane: { paneId: "%0", width: 110, height: 44, left: 0, top: 0, title: "main", isActive: true },
-      agentPanes: [
-        { paneId: "%1", width: 40, height: 44, left: 110, top: 0, title: "Pending pane", isActive: false },
-      ],
+      agentPanes: [{ paneId: "%1", width: 40, height: 44, left: 110, top: 0, title: "Pending pane", isActive: false }],
     }))
     const { TmuxSessionManager } = await import("./manager")
     const manager = createManager(TmuxSessionManager)
     const sessions = getTrackedSessions(manager)
-    sessions.set(
-      "ses_pending",
-      createTrackedSession({ closePending: true, closeRetryCount: 3 }),
-    )
+    sessions.set("ses_pending", createTrackedSession({ closePending: true, closeRetryCount: 3 }))
 
     // when
     await getRetryPendingCloses(manager)()
@@ -307,10 +293,7 @@ describe("TmuxSessionManager zombie pane handling", () => {
     const { TmuxSessionManager } = await import("./manager")
     const manager = createManager(TmuxSessionManager)
     const sessions = getTrackedSessions(manager)
-    sessions.set(
-      "ses_pending",
-      createTrackedSession({ closePending: true, closeRetryCount: 0 }),
-    )
+    sessions.set("ses_pending", createTrackedSession({ closePending: true, closeRetryCount: 0 }))
     let shouldFailClose = true
     mockExecuteAction.mockImplementation(async () => {
       if (shouldFailClose) {

@@ -20,7 +20,9 @@ import {
 import { defaultCommentCheckerCacheDir } from "./resolver"
 import type { SenpiCommentCheckerDownloadOptions } from "./types"
 
-export async function downloadSenpiCommentCheckerBinary(options: SenpiCommentCheckerDownloadOptions): Promise<string | null> {
+export async function downloadSenpiCommentCheckerBinary(
+  options: SenpiCommentCheckerDownloadOptions,
+): Promise<string | null> {
   const platform = options.platform ?? process.platform
   const arch = options.arch ?? process.arch
   const asset = resolveCommentCheckerReleaseAsset(platform, arch)
@@ -35,7 +37,10 @@ export async function downloadSenpiCommentCheckerBinary(options: SenpiCommentChe
 
   const url = options.resolveAssetUrl?.(asset) ?? asset.url
   const archivePath = join(cacheDir, asset.assetName)
-  options.logger.info(`omo-senpi comment-checker: downloading release v${COMMENT_CHECKER_RELEASE_VERSION}`, { url, cacheDir })
+  options.logger.info(`omo-senpi comment-checker: downloading release v${COMMENT_CHECKER_RELEASE_VERSION}`, {
+    url,
+    cacheDir,
+  })
   try {
     ensureCacheDir(cacheDir)
     await downloadArchive(url, archivePath)
@@ -46,7 +51,10 @@ export async function downloadSenpiCommentCheckerBinary(options: SenpiCommentChe
     }
     ensureExecutable(binaryPath)
     if (!existsSync(binaryPath)) {
-      options.logger.warn("omo-senpi comment-checker archive did not contain the expected binary", { archivePath, binaryPath })
+      options.logger.warn("omo-senpi comment-checker archive did not contain the expected binary", {
+        archivePath,
+        binaryPath,
+      })
       return null
     }
     recordCachedCommentCheckerRelease(cacheDir)

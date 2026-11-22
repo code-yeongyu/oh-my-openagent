@@ -8,282 +8,294 @@ import { gitMasterSkill, playwrightSkill } from "../builtin-skills/skills/index"
 import { clearSkillCache, resolveMultipleSkillsAsync } from "./skill-content"
 
 function createNestedSkill(baseDir: string, namespace: string, name: string, content: string): void {
-	const dir = join(baseDir, "skills", namespace, name)
-	mkdirSync(dir, { recursive: true })
-	const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
-	writeFileSync(join(dir, "SKILL.md"), yaml)
+  const dir = join(baseDir, "skills", namespace, name)
+  mkdirSync(dir, { recursive: true })
+  const yaml = `---\nname: ${name}\ndescription: ${namespace}/${name} skill\n---\n${content}`
+  writeFileSync(join(dir, "SKILL.md"), yaml)
 }
 
 let originalEnv: Record<string, string | undefined>
 let testConfigDir: string
 
 beforeEach(() => {
-	clearSkillCache()
-	originalEnv = {
-		CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
-		OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
-	}
-	const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
-	testConfigDir = join(tmpdir(), unique)
-	process.env.CLAUDE_CONFIG_DIR = testConfigDir
-	process.env.OPENCODE_CONFIG_DIR = testConfigDir
+  clearSkillCache()
+  originalEnv = {
+    CLAUDE_CONFIG_DIR: process.env.CLAUDE_CONFIG_DIR,
+    OPENCODE_CONFIG_DIR: process.env.OPENCODE_CONFIG_DIR,
+  }
+  const unique = `skill-content-test-${Date.now()}-${Math.random().toString(16).slice(2)}`
+  testConfigDir = join(tmpdir(), unique)
+  process.env.CLAUDE_CONFIG_DIR = testConfigDir
+  process.env.OPENCODE_CONFIG_DIR = testConfigDir
 })
 
 afterEach(() => {
-	clearSkillCache()
-	for (const [key, value] of Object.entries(originalEnv)) {
-		if (value !== undefined) {
-			process.env[key] = value
-		} else {
-			delete process.env[key]
-		}
-	}
+  clearSkillCache()
+  for (const [key, value] of Object.entries(originalEnv)) {
+    if (value !== undefined) {
+      process.env[key] = value
+    } else {
+      delete process.env[key]
+    }
+  }
 })
 
 describe("resolveMultipleSkillsAsync", () => {
-	it("should resolve builtin skills async", async () => {
-		// given: builtin skill names
-		const skillNames = ["playwright", "git-master"]
+  it("should resolve builtin skills async", async () => {
+    // given: builtin skill names
+    const skillNames = ["playwright", "git-master"]
 
-		// when: resolving multiple skills async without git-master transformations
-		const result = await resolveMultipleSkillsAsync(skillNames, {
-			directory: testConfigDir,
-			gitMasterConfig: {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "",
-			},
-		})
+    // when: resolving multiple skills async without git-master transformations
+    const result = await resolveMultipleSkillsAsync(skillNames, {
+      directory: testConfigDir,
+      gitMasterConfig: {
+        commit_footer: false,
+        include_co_authored_by: false,
+        git_env_prefix: "",
+      },
+    })
 
-		// then: all builtin skills resolve to their source templates in request order
-		expect([...result.resolved.entries()]).toEqual([
-			["playwright", playwrightSkill.template],
-			["git-master", gitMasterSkill.template],
-		])
-		expect(result.notFound).toEqual([])
-	})
+    // then: all builtin skills resolve to their source templates in request order
+    expect([...result.resolved.entries()]).toEqual([
+      ["playwright", playwrightSkill.template],
+      ["git-master", gitMasterSkill.template],
+    ])
+    expect(result.notFound).toEqual([])
+  })
 
-	it("should handle partial success with non-existent skills async", async () => {
-		// given: mix of existing and non-existing skills
-		const skillNames = ["playwright", "nonexistent-skill-12345"]
+  it("should handle partial success with non-existent skills async", async () => {
+    // given: mix of existing and non-existing skills
+    const skillNames = ["playwright", "nonexistent-skill-12345"]
 
-		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+    // when: resolving multiple skills async
+    const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: the existing skill resolves to its source template and the missing skill is reported
-		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
-		expect(result.notFound).toEqual(["nonexistent-skill-12345"])
-	})
+    // then: the existing skill resolves to its source template and the missing skill is reported
+    expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
+    expect(result.notFound).toEqual(["nonexistent-skill-12345"])
+  })
 
-	it("should treat disabled skills as not found async", async () => {
-		// #given: frontend disabled
-		const skillNames = ["frontend", "playwright"]
-		const options = { disabledSkills: new Set(["frontend"]) }
+  it("should treat disabled skills as not found async", async () => {
+    // #given: frontend disabled
+    const skillNames = ["frontend", "playwright"]
+    const options = { disabledSkills: new Set(["frontend"]) }
 
-		// #when: resolving multiple skills async with disabled one
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // #when: resolving multiple skills async with disabled one
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// #then: frontend in notFound, playwright resolves to its source template
-		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
-		expect(result.notFound).toEqual(["frontend"])
-	})
+    // #then: frontend in notFound, playwright resolves to its source template
+    expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
+    expect(result.notFound).toEqual(["frontend"])
+  })
 
-	it("should NOT inject watermark when both options are disabled", async () => {
-		// given: git-master skill with watermark disabled
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: false,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should NOT inject watermark when both options are disabled", async () => {
+    // given: git-master skill with watermark disabled
+    const skillNames = ["git-master"]
+    const options = {
+      gitMasterConfig: {
+        commit_footer: false,
+        include_co_authored_by: false,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with git-master config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: no watermark section injected
-		expect(result.resolved.size).toBe(1)
-		expect(result.notFound).toEqual([])
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).not.toContain("Ultraworked with")
-		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
-	})
+    // then: no watermark section injected
+    expect(result.resolved.size).toBe(1)
+    expect(result.notFound).toEqual([])
+    const gitMasterContent = result.resolved.get("git-master")
+    expect(gitMasterContent).not.toContain("Ultraworked with")
+    expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
+  })
 
-	it("should inject the footer and the co-author trailer when both flags are enabled", async () => {
-		// given: git-master skill with the footer and the co-author on
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: true,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should inject the footer and the co-author trailer when both flags are enabled", async () => {
+    // given: git-master skill with the footer and the co-author on
+    const skillNames = ["git-master"]
+    const options = {
+      gitMasterConfig: {
+        commit_footer: true,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with git-master config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: the footer and exactly one sisyphus-dev-ai trailer are injected
-		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master") ?? ""
-		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
-		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
-	})
+    // then: the footer and exactly one sisyphus-dev-ai trailer are injected
+    expect(result.resolved.size).toBe(1)
+    const gitMasterContent = result.resolved.get("git-master") ?? ""
+    expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
+    expect(
+      gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"')
+        .length - 1,
+    ).toBe(1)
+    expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
+  })
 
-	it("should inject only footer when co-author is disabled", async () => {
-		// given: git-master skill with only footer enabled
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should inject only footer when co-author is disabled", async () => {
+    // given: git-master skill with only footer enabled
+    const skillNames = ["git-master"]
+    const options = {
+      gitMasterConfig: {
+        commit_footer: true,
+        include_co_authored_by: false,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with git-master config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: only footer is injected
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
-	})
+    // then: only footer is injected
+    const gitMasterContent = result.resolved.get("git-master")
+    expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
+    expect(gitMasterContent).not.toContain("Co-authored-by: Sisyphus")
+  })
 
-	it("should inject only the co-author trailer by default when no config provided", async () => {
-		// given: git-master skill with NO config (default behavior)
-		const skillNames = ["git-master"]
+  it("should inject only the co-author trailer by default when no config provided", async () => {
+    // given: git-master skill with NO config (default behavior)
+    const skillNames = ["git-master"]
 
-		// when: resolving without any gitMasterConfig
-		const result = await resolveMultipleSkillsAsync(skillNames)
+    // when: resolving without any gitMasterConfig
+    const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: the footer stays off and the sisyphus-dev-ai trailer is on by default
-		expect(result.resolved.size).toBe(1)
-		const gitMasterContent = result.resolved.get("git-master") ?? ""
-		expect(gitMasterContent).not.toContain("Ultraworked with")
-		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
-		expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
-	})
+    // then: the footer stays off and the sisyphus-dev-ai trailer is on by default
+    expect(result.resolved.size).toBe(1)
+    const gitMasterContent = result.resolved.get("git-master") ?? ""
+    expect(gitMasterContent).not.toContain("Ultraworked with")
+    expect(
+      gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"')
+        .length - 1,
+    ).toBe(1)
+    expect(gitMasterContent).not.toContain("clio-agent@sisyphuslabs.ai")
+  })
 
-	it("should inject only the co-author trailer when the footer is off", async () => {
-		// given: git-master skill with the footer off and the co-author on
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: false,
-				include_co_authored_by: true,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should inject only the co-author trailer when the footer is off", async () => {
+    // given: git-master skill with the footer off and the co-author on
+    const skillNames = ["git-master"]
+    const options = {
+      gitMasterConfig: {
+        commit_footer: false,
+        include_co_authored_by: true,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with git-master config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with git-master config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: only the trailer is injected
-		const gitMasterContent = result.resolved.get("git-master") ?? ""
-		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
-		expect(gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"').length - 1).toBe(1)
-	})
+    // then: only the trailer is injected
+    const gitMasterContent = result.resolved.get("git-master") ?? ""
+    expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
+    expect(
+      gitMasterContent.split('--trailer "Co-authored-by: sisyphus-dev-ai <sisyphus-dev-ai@users.noreply.github.com>"')
+        .length - 1,
+    ).toBe(1)
+  })
 
-	it("should inject custom string footer when commit_footer is a string", async () => {
-		// given: git-master skill with custom string footer
-		const skillNames = ["git-master"]
-		const customFooter = "Custom footer from my team"
-		const options = {
-			gitMasterConfig: {
-				commit_footer: customFooter,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should inject custom string footer when commit_footer is a string", async () => {
+    // given: git-master skill with custom string footer
+    const skillNames = ["git-master"]
+    const customFooter = "Custom footer from my team"
+    const options = {
+      gitMasterConfig: {
+        commit_footer: customFooter,
+        include_co_authored_by: false,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with custom footer config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with custom footer config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: custom footer is injected instead of default
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain(customFooter)
-		expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
-	})
+    // then: custom footer is injected instead of default
+    const gitMasterContent = result.resolved.get("git-master")
+    expect(gitMasterContent).toContain(customFooter)
+    expect(gitMasterContent).not.toContain("Ultraworked with [Sisyphus]")
+  })
 
-	it("should use default Sisyphus footer when commit_footer is boolean true", async () => {
-		// given: git-master skill with boolean true footer
-		const skillNames = ["git-master"]
-		const options = {
-			gitMasterConfig: {
-				commit_footer: true,
-				include_co_authored_by: false,
-				git_env_prefix: "GIT_MASTER=1",
-			},
-		}
+  it("should use default Sisyphus footer when commit_footer is boolean true", async () => {
+    // given: git-master skill with boolean true footer
+    const skillNames = ["git-master"]
+    const options = {
+      gitMasterConfig: {
+        commit_footer: true,
+        include_co_authored_by: false,
+        git_env_prefix: "GIT_MASTER=1",
+      },
+    }
 
-		// when: resolving with boolean true footer config
-		const result = await resolveMultipleSkillsAsync(skillNames, options)
+    // when: resolving with boolean true footer config
+    const result = await resolveMultipleSkillsAsync(skillNames, options)
 
-		// then: default Sisyphus footer is injected
-		const gitMasterContent = result.resolved.get("git-master")
-		expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
-	})
+    // then: default Sisyphus footer is injected
+    const gitMasterContent = result.resolved.get("git-master")
+    expect(gitMasterContent).toContain("Ultraworked with [Sisyphus]")
+  })
 
-	it("should handle empty array", async () => {
-		// given: empty skill names
-		const skillNames: string[] = []
+  it("should handle empty array", async () => {
+    // given: empty skill names
+    const skillNames: string[] = []
 
-		// when: resolving multiple skills async
-		const result = await resolveMultipleSkillsAsync(skillNames)
+    // when: resolving multiple skills async
+    const result = await resolveMultipleSkillsAsync(skillNames)
 
-		// then: empty results
-		expect(result.resolved.size).toBe(0)
-		expect(result.notFound).toEqual([])
-	})
+    // then: empty results
+    expect(result.resolved.size).toBe(0)
+    expect(result.notFound).toEqual([])
+  })
 
-	it("resolves nested skill by unique short name in mixed batch", async () => {
-		// given: nested skill and builtin skill
-		const nestedTemplate = "FIXTURE_SYSTEMATIC_DEBUGGING_TEMPLATE"
-		createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", nestedTemplate)
+  it("resolves nested skill by unique short name in mixed batch", async () => {
+    // given: nested skill and builtin skill
+    const nestedTemplate = "FIXTURE_SYSTEMATIC_DEBUGGING_TEMPLATE"
+    createNestedSkill(testConfigDir, "toolkit", "systematic-debugging", nestedTemplate)
 
-		// when: mixing short name with full builtin name
-		const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
+    // when: mixing short name with full builtin name
+    const result = await resolveMultipleSkillsAsync(["systematic-debugging", "playwright"])
 
-		// then: both resolve exactly and preserve request order
-		expect([...result.resolved.entries()]).toEqual([
-			["systematic-debugging", nestedTemplate],
-			["playwright", playwrightSkill.template],
-		])
-		expect(result.notFound).toEqual([])
-	})
+    // then: both resolve exactly and preserve request order
+    expect([...result.resolved.entries()]).toEqual([
+      ["systematic-debugging", nestedTemplate],
+      ["playwright", playwrightSkill.template],
+    ])
+    expect(result.notFound).toEqual([])
+  })
 
-	it("does not resolve ambiguous short name in batch", async () => {
-		// given: two skills with same short name
-		createNestedSkill(testConfigDir, "toolkit", "nested-debug", "sp content")
-		createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
+  it("does not resolve ambiguous short name in batch", async () => {
+    // given: two skills with same short name
+    createNestedSkill(testConfigDir, "toolkit", "nested-debug", "sp content")
+    createNestedSkill(testConfigDir, "utils", "nested-debug", "utils content")
 
-		// when: resolving ambiguous short name with builtin
-		const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"])
+    // when: resolving ambiguous short name with builtin
+    const result = await resolveMultipleSkillsAsync(["nested-debug", "playwright"])
 
-		// then: ambiguous short name is absent and playwright resolves to its source template
-		expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
-		expect(result.notFound).toEqual(["nested-debug"])
-	})
+    // then: ambiguous short name is absent and playwright resolves to its source template
+    expect([...result.resolved.entries()]).toEqual([["playwright", playwrightSkill.template]])
+    expect(result.notFound).toEqual(["nested-debug"])
+  })
 
-	it("prefers exact match over short name in batch", async () => {
-		// given: an exact skill and a nested skill with same base name
-		const exactDir = join(testConfigDir, "skills", "debugging")
-		mkdirSync(exactDir, { recursive: true })
-		const exactTemplate = "FIXTURE_EXACT_DEBUGGING_TEMPLATE"
-		writeFileSync(join(exactDir, "SKILL.md"), `---\nname: debugging\ndescription: exact debugging\n---\n${exactTemplate}`)
-		createNestedSkill(testConfigDir, "toolkit", "debugging", "FIXTURE_NESTED_DEBUGGING_TEMPLATE")
+  it("prefers exact match over short name in batch", async () => {
+    // given: an exact skill and a nested skill with same base name
+    const exactDir = join(testConfigDir, "skills", "debugging")
+    mkdirSync(exactDir, { recursive: true })
+    const exactTemplate = "FIXTURE_EXACT_DEBUGGING_TEMPLATE"
+    writeFileSync(
+      join(exactDir, "SKILL.md"),
+      `---\nname: debugging\ndescription: exact debugging\n---\n${exactTemplate}`,
+    )
+    createNestedSkill(testConfigDir, "toolkit", "debugging", "FIXTURE_NESTED_DEBUGGING_TEMPLATE")
 
-		// when: resolving "debugging" in batch
-		const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
+    // when: resolving "debugging" in batch
+    const result = await resolveMultipleSkillsAsync(["debugging", "playwright"])
 
-		// then: exact match wins and request order is preserved
-		expect([...result.resolved.entries()]).toEqual([
-			["debugging", exactTemplate],
-			["playwright", playwrightSkill.template],
-		])
-		expect(result.notFound).toEqual([])
-	})
+    // then: exact match wins and request order is preserved
+    expect([...result.resolved.entries()]).toEqual([
+      ["debugging", exactTemplate],
+      ["playwright", playwrightSkill.template],
+    ])
+    expect(result.notFound).toEqual([])
+  })
 })

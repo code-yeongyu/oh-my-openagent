@@ -31,10 +31,7 @@ describe("createToolExecuteAfterHandler metadata recovery", () => {
     const output = { title: "result", output: "read output", metadata: {} }
 
     // when
-    await handler(
-      { tool: "read", sessionID: "ses_parent", callID: "call_read" },
-      output,
-    )
+    await handler({ tool: "read", sessionID: "ses_parent", callID: "call_read" }, output)
 
     // then
     expect(output).toEqual({ title: "result", output: "read output", metadata: {} })
@@ -51,10 +48,7 @@ describe("createToolExecuteAfterHandler metadata recovery", () => {
     const output = { title: "result", output: "agent output", metadata: {} }
 
     // when
-    await handler(
-      { tool: "call_omo_agent", sessionID: "ses_parent", callID: "call_agent" },
-      output,
-    )
+    await handler({ tool: "call_omo_agent", sessionID: "ses_parent", callID: "call_agent" }, output)
 
     // then
     expect(output).toEqual({ title: "result", output: "agent output", metadata: {} })
@@ -84,6 +78,8 @@ describe("createToolExecuteAfterHandler metadata recovery", () => {
 
     // then
     expect(hookRan).toBe(true)
-    expect(hasLogMessageContaining("Unable to recover stored metadata and no native session linkage was present")).toBe(true)
+    expect(hasLogMessageContaining("Unable to recover stored metadata and no native session linkage was present")).toBe(
+      true,
+    )
   })
 })

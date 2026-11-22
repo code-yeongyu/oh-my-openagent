@@ -6,10 +6,7 @@ import {
   fakeExtensionEventHandlerCount,
   FakeExtensionAPI,
 } from "../../../test-support/fake-extension-api"
-import {
-  createParallelTelemetryRegistry,
-  registerOmoNativeParallelTelemetry,
-} from "./omo-native-parallel"
+import { createParallelTelemetryRegistry, registerOmoNativeParallelTelemetry } from "./omo-native-parallel"
 
 function context(sessionId: string): Record<string, unknown> {
   return { sessionManager: { getSessionId: () => sessionId } }

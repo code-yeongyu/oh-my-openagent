@@ -7,7 +7,7 @@ import { SECRET_PATTERN_SOURCES, scanSecretLikeMaterial } from "../sync/redact"
 
 afterEach(removeTempDirs)
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("pre-commit hook secret screening", () => {
   it("#given a staged file carrying a vendor token #when committed #then the hook refuses naming the class, never the token", async () => {
@@ -142,7 +142,9 @@ describe("pre-commit hook secret screening", () => {
     const dir = await createRepo()
 
     // when
-    const result = await commit(dir, { "reference/policy.md": "---\ndescription: Policy\n---\n\npassword policy doc\nthe token budget is 30000 tokens\n" })
+    const result = await commit(dir, {
+      "reference/policy.md": "---\ndescription: Policy\n---\n\npassword policy doc\nthe token budget is 30000 tokens\n",
+    })
 
     // then
     expect(result.code).toBe(0)

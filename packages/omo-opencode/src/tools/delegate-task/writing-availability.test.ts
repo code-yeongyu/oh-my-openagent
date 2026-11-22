@@ -52,7 +52,9 @@ describe("writing category availability", () => {
   test("#given only GPT models #when writing config resolves #then the lane is unavailable", () => {
     stubProviderCache({ openai: ["gpt-6-sol", "gpt-5.6-sol", "gpt-6-astra"] })
 
-    expect(resolveCategoryConfig("writing", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels: GPT_ONLY })).toBeNull()
+    expect(
+      resolveCategoryConfig("writing", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels: GPT_ONLY }),
+    ).toBeNull()
   })
 
   test("#given only GPT models #when writing is spawned #then it errors instead of running on the system default", async () => {
@@ -78,7 +80,9 @@ describe("writing category availability", () => {
   test("#given Copilot's dotted Opus 5.5 id #when writing config resolves #then the lane stays open", () => {
     stubProviderCache({ "github-copilot": ["claude-opus-5.5"] })
 
-    expect(resolveCategoryConfig("writing", { availableModels: new Set(["github-copilot/claude-opus-5.5"]) })).not.toBeNull()
+    expect(
+      resolveCategoryConfig("writing", { availableModels: new Set(["github-copilot/claude-opus-5.5"]) }),
+    ).not.toBeNull()
   })
 
   test("#given an explicit omo.json writing model #when only GPT is available #then the user choice opens the lane", async () => {

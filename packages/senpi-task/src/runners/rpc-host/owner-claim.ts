@@ -13,7 +13,10 @@ const reportedSockets = new Set<string>()
  * another live process owns (the same session open in two terminals). That host keeps its own
  * idle policy, which is the pre-claim behaviour, so the task spawn still gets its endpoint.
  */
-export async function ensureHostClaimingOwner(host: TaskDaemonHostPort, request: EnsureHostInput): Promise<EnsuredHost> {
+export async function ensureHostClaimingOwner(
+  host: TaskDaemonHostPort,
+  request: EnsureHostInput,
+): Promise<EnsuredHost> {
   if (request.owner === undefined) return host.ensureHost(request)
   try {
     return await host.ensureHost(request)

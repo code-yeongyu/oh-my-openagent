@@ -1,0 +1,21 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-computer-carriers": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them) and the test and config files plugins report with
+      // exports unchecked: listing them export-checks them too (script/knip-entry-exports.test.ts probes every knip entry).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "vitest.config.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // computer-use v3 (row 5): the vitest config default export, same shape as packages/senpi-desktop-sdk
+    "packages/omo-computer-carriers/vitest.config.ts": ["default"]
+  }
+}

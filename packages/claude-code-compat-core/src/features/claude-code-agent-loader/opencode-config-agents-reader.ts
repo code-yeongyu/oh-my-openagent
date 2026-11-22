@@ -20,10 +20,7 @@ function getConfigPaths(directory: string): string[] {
   return [
     path.join(directory, ".opencode", "opencode.json"),
     path.join(directory, ".opencode", "opencode.jsonc"),
-    ...globalConfigDirs.flatMap((dir) => [
-      path.join(dir, "opencode.json"),
-      path.join(dir, "opencode.jsonc"),
-    ]),
+    ...globalConfigDirs.flatMap((dir) => [path.join(dir, "opencode.json"), path.join(dir, "opencode.jsonc")]),
   ]
 }
 
@@ -36,18 +33,15 @@ function convertInlineAgent(agentData: unknown): ClaudeCodeAgentConfig | null {
 
   const description = agent.description ? `(opencode-config) ${String(agent.description)}` : "(opencode-config) "
 
-  const mappedModel = mapClaudeModelToOpenCode(
-    agent.model ? String(agent.model) : undefined
-  )
-  const modelString = mappedModel
-    ? `${mappedModel.providerID}/${mappedModel.modelID}`
-    : undefined
+  const mappedModel = mapClaudeModelToOpenCode(agent.model ? String(agent.model) : undefined)
+  const modelString = mappedModel ? `${mappedModel.providerID}/${mappedModel.modelID}` : undefined
 
   const VALID_MODES = ["subagent", "primary", "all"] as const
   const rawMode = typeof agent.mode === "string" ? agent.mode : undefined
-  const mode = rawMode && (VALID_MODES as readonly string[]).includes(rawMode)
-    ? (rawMode as "subagent" | "primary" | "all")
-    : "subagent"
+  const mode =
+    rawMode && (VALID_MODES as readonly string[]).includes(rawMode)
+      ? (rawMode as "subagent" | "primary" | "all")
+      : "subagent"
 
   const config: ClaudeCodeAgentConfig = {
     description,
@@ -119,9 +113,7 @@ function extractDefinitionPaths(definitionPaths: unknown): string[] {
   }
 
   if (Array.isArray(definitionPaths)) {
-    return definitionPaths
-      .filter((p) => typeof p === "string")
-      .map((p) => p as string)
+    return definitionPaths.filter((p) => typeof p === "string").map((p) => p as string)
   }
 
   return []

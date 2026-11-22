@@ -1,86 +1,86 @@
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { describe, expect, test } from "bun:test";
-import { runDepersonalizationGate } from "./depersonalization-gate.mjs";
+import { mkdtemp, rm, writeFile } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
+import { describe, expect, test } from "bun:test"
+import { runDepersonalizationGate } from "./depersonalization-gate.mjs"
 
-const here = dirname(fileURLToPath(import.meta.url));
+const here = dirname(fileURLToPath(import.meta.url))
 
 describe("#given the vendored shared skills #when the de-personalization gate runs", () => {
-	test("#then the cleaned ultimate-browsing + ulw-research tree has zero violations", async () => {
-		// given
-		const scanDirs = [
-			join(here, "skills", "browser"),
-			join(here, "skills", "ultimate-browsing"),
-			join(here, "skills", "data-scientist"),
-			join(here, "skills", "ulw-research"),
-		];
-		// when
-		const violations = await runDepersonalizationGate(scanDirs, here);
-		// then
-		expect(violations).toEqual([]);
-	});
+  test("#then the cleaned ultimate-browsing + ulw-research tree has zero violations", async () => {
+    // given
+    const scanDirs = [
+      join(here, "skills", "browser"),
+      join(here, "skills", "ultimate-browsing"),
+      join(here, "skills", "data-scientist"),
+      join(here, "skills", "ulw-research"),
+    ]
+    // when
+    const violations = await runDepersonalizationGate(scanDirs, here)
+    // then
+    expect(violations).toEqual([])
+  })
 
-	test("#then a planted personal host token is caught case-insensitively", async () => {
-		// given
-		const dir = await mkdtemp(join(tmpdir(), "dp-gate-"));
-		try {
-			const host = String.fromCharCode(106, 111, 98, 100, 111, 114, 105);
-			await writeFile(join(dir, "x.md"), `see ${host} machine for the build\nsee ${host.toUpperCase()} too\n`);
-			// when
-			const violations = await runDepersonalizationGate([dir], dir);
-			// then
-			expect(violations).toHaveLength(2);
-			expect(violations.every((v) => v.label === `personal-host:${host}`)).toBe(true);
-		} finally {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
+  test("#then a planted personal host token is caught case-insensitively", async () => {
+    // given
+    const dir = await mkdtemp(join(tmpdir(), "dp-gate-"))
+    try {
+      const host = String.fromCharCode(106, 111, 98, 100, 111, 114, 105)
+      await writeFile(join(dir, "x.md"), `see ${host} machine for the build\nsee ${host.toUpperCase()} too\n`)
+      // when
+      const violations = await runDepersonalizationGate([dir], dir)
+      // then
+      expect(violations).toHaveLength(2)
+      expect(violations.every((v) => v.label === `personal-host:${host}`)).toBe(true)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
-	test("#then a credential literal and home path are caught but a kept tier name is not", async () => {
-		// given
-		const dir = await mkdtemp(join(tmpdir(), "dp-gate-"));
-		try {
-			await writeFile(
-				join(dir, "y.md"),
-				"export TWITTER_AUTH_TOKEN=abc\nrun ~/.agent-reach/tools/x.sh\nuse agent-reach doctor to check channels\n",
-			);
-			// when
-			const violations = await runDepersonalizationGate([dir], dir);
-			const labels = violations.map((v) => v.label);
-			// then
-			expect(labels).toContain("credential-literal:TWITTER_AUTH_TOKEN");
-			expect(labels.some((l) => l.includes("agent-reach-home"))).toBe(true);
-			expect(labels.some((l) => l === "agent-reach")).toBe(false);
-		} finally {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
+  test("#then a credential literal and home path are caught but a kept tier name is not", async () => {
+    // given
+    const dir = await mkdtemp(join(tmpdir(), "dp-gate-"))
+    try {
+      await writeFile(
+        join(dir, "y.md"),
+        "export TWITTER_AUTH_TOKEN=abc\nrun ~/.agent-reach/tools/x.sh\nuse agent-reach doctor to check channels\n",
+      )
+      // when
+      const violations = await runDepersonalizationGate([dir], dir)
+      const labels = violations.map((v) => v.label)
+      // then
+      expect(labels).toContain("credential-literal:TWITTER_AUTH_TOKEN")
+      expect(labels.some((l) => l.includes("agent-reach-home"))).toBe(true)
+      expect(labels.some((l) => l === "agent-reach")).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
 
-	test("#then a secret-sharing link, a token-bearing url and an operator mail address are caught", async () => {
-		// given
-		const dir = await mkdtemp(join(tmpdir(), "dp-gate-"));
-		try {
-			await writeFile(
-				join(dir, "z.md"),
-				[
-					"open https://share.example.com/s#Zm9vYmFyYmF6cXV4MTIzNDU2",
-					"ping operator@example.com if the vault is locked",
-					"credentials live in ~/.config/example/account.env",
-					"https://example.com/docs#installing-the-cli",
-				].join("\n"),
-			);
-			// when
-			const labels = (await runDepersonalizationGate([dir], dir)).map((v) => v.label);
-			// then
-			expect(labels).toContain("share-link");
-			expect(labels).toContain("url-token-fragment");
-			expect(labels).toContain("email-address");
-			expect(labels).toContain("credential-env-path");
-			expect(labels.filter((l) => l === "url-token-fragment")).toHaveLength(1);
-		} finally {
-			await rm(dir, { recursive: true, force: true });
-		}
-	});
-});
+  test("#then a secret-sharing link, a token-bearing url and an operator mail address are caught", async () => {
+    // given
+    const dir = await mkdtemp(join(tmpdir(), "dp-gate-"))
+    try {
+      await writeFile(
+        join(dir, "z.md"),
+        [
+          "open https://share.example.com/s#Zm9vYmFyYmF6cXV4MTIzNDU2",
+          "ping operator@example.com if the vault is locked",
+          "credentials live in ~/.config/example/account.env",
+          "https://example.com/docs#installing-the-cli",
+        ].join("\n"),
+      )
+      // when
+      const labels = (await runDepersonalizationGate([dir], dir)).map((v) => v.label)
+      // then
+      expect(labels).toContain("share-link")
+      expect(labels).toContain("url-token-fragment")
+      expect(labels).toContain("email-address")
+      expect(labels).toContain("credential-env-path")
+      expect(labels.filter((l) => l === "url-token-fragment")).toHaveLength(1)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+})

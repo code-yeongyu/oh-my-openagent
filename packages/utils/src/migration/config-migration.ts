@@ -6,10 +6,7 @@ import { migrateHookNames } from "./hook-names"
 import { migrateModelVersions } from "./model-versions"
 import { readAppliedMigrations, writeAppliedMigrations } from "./migrations-sidecar"
 
-export function migrateConfigFile(
-  configPath: string,
-  rawConfig: Record<string, unknown>
-): boolean {
+export function migrateConfigFile(configPath: string, rawConfig: Record<string, unknown>): boolean {
   const copy = JSON.parse(JSON.stringify(rawConfig)) as Record<string, unknown>
   let needsWrite = false
 
@@ -27,11 +24,7 @@ export function migrateConfigFile(
   const inlineAppliedMigrations = Array.isArray(copy.appliedMigrations)
     ? new Set(copy.appliedMigrations.filter((migration): migration is string => typeof migration === "string"))
     : new Set<string>()
-  const existingMigrations = new Set<string>([
-    ...sidecarMigrations,
-    ...inConfigMigrations,
-    ...inlineAppliedMigrations,
-  ])
+  const existingMigrations = new Set<string>([...sidecarMigrations, ...inConfigMigrations, ...inlineAppliedMigrations])
   const hadLegacyInConfigMigrations = inConfigMigrations.size > 0
   const hadInlineAppliedMigrations = inlineAppliedMigrations.size > 0
   const allNewMigrations: string[] = []
@@ -48,7 +41,7 @@ export function migrateConfigFile(
   if (copy.agents && typeof copy.agents === "object") {
     const { migrated, changed, newMigrations } = migrateModelVersions(
       copy.agents as Record<string, unknown>,
-      existingMigrations
+      existingMigrations,
     )
     if (changed) {
       copy.agents = migrated
@@ -62,7 +55,7 @@ export function migrateConfigFile(
   if (copy.categories && typeof copy.categories === "object") {
     const { migrated, changed, newMigrations } = migrateModelVersions(
       copy.categories as Record<string, unknown>,
-      existingMigrations
+      existingMigrations,
     )
     if (changed) {
       copy.categories = migrated
@@ -78,12 +71,10 @@ export function migrateConfigFile(
   // think about a field that never should have been in their config in
   // the first place. The in-memory `rawConfig` never re-exposes
   // `_migrations` to downstream schema validation.
-  const newMigrationsToRecord = allNewMigrations.filter(mKey => !existingMigrations.has(mKey))
-  const fullMigrationSet = new Set<string>([
-    ...existingMigrations,
-    ...newMigrationsToRecord,
-  ])
-  const shouldWriteSidecar = newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations || hadInlineAppliedMigrations
+  const newMigrationsToRecord = allNewMigrations.filter((mKey) => !existingMigrations.has(mKey))
+  const fullMigrationSet = new Set<string>([...existingMigrations, ...newMigrationsToRecord])
+  const shouldWriteSidecar =
+    newMigrationsToRecord.length > 0 || hadLegacyInConfigMigrations || hadInlineAppliedMigrations
   if (newMigrationsToRecord.length > 0) {
     needsWrite = true
   }
@@ -114,9 +105,8 @@ export function migrateConfigFile(
   // `lsp` block lingers in the user's config file with no signal that it has
   // stopped doing anything.
   if (copy.lsp !== undefined) {
-    const droppedServers = copy.lsp && typeof copy.lsp === "object"
-      ? Object.keys(copy.lsp as Record<string, unknown>)
-      : []
+    const droppedServers =
+      copy.lsp && typeof copy.lsp === "object" ? Object.keys(copy.lsp as Record<string, unknown>) : []
     log(
       "Removed obsolete 'lsp' config key from oh-my-opencode config. Custom LSP servers are now configured in .opencode/lsp.json at the project root (consumed by the 'lsp' MCP server). Move any server definitions there to restore them.",
       { configPath, droppedServers },
@@ -162,9 +152,7 @@ export function migrateConfigFile(
       needsWrite = true
     }
     if (removed.length > 0) {
-      log(
-        `Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`
-      )
+      log(`Removed obsolete hooks from disabled_hooks: ${removed.join(", ")} (these hooks no longer exist in v3.0.0)`)
     }
   }
 
@@ -172,7 +160,7 @@ export function migrateConfigFile(
     let finalConfig = JSON.parse(JSON.stringify(copy)) as Record<string, unknown>
     const newContent = JSON.stringify(finalConfig, null, 2) + "\n"
 
-    // Compare with existing file content to skip backup when unchanged.
+    // Compare with existing file content to skip the backup and the rewrite when unchanged.
     // The config may still need an in-memory migration even if the file
     // content is identical (e.g. removing a deleted hook from disabled_hooks
     // results in content that was already written by a prior migration).
@@ -190,6 +178,9 @@ export function migrateConfigFile(
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-")
     const backupPath = `${configPath}.bak.${timestamp}`
     let backupSucceeded = false
+    // An unchanged file counts as written: replacing it would only swap its inode and wait on two fsyncs,
+    // which is what made this path load-sensitive (#11839).
+    let writeSucceeded = !contentChanged
     if (contentChanged) {
       try {
         fs.copyFileSync(configPath, backupPath)
@@ -200,17 +191,16 @@ export function migrateConfigFile(
         }
         backupSucceeded = false
       }
-    }
 
-    let writeSucceeded = false
-    try {
-      writeFileAtomically(configPath, newContent)
-      writeSucceeded = true
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error
+      try {
+        writeFileAtomically(configPath, newContent)
+        writeSucceeded = true
+      } catch (error) {
+        if (!(error instanceof Error)) {
+          throw error
+        }
+        log(`Failed to write migrated config to ${configPath}:`, error)
       }
-      log(`Failed to write migrated config to ${configPath}:`, error)
     }
 
     if (writeSucceeded && shouldWriteSidecar) {

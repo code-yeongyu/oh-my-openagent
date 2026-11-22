@@ -41,5 +41,4 @@ describe("EXCLUDED_DIRS", () => {
     // given / when / then
     expect(Object.isFrozen(EXCLUDED_DIRS)).toBe(true)
   })
-
 })
