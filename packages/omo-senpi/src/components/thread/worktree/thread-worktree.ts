@@ -1,3 +1,4 @@
+import { beforeCallDispatch } from "../../call-budget/call-deadline"
 import { execFile } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
 import { mkdir, stat } from "node:fs/promises"
@@ -96,6 +97,7 @@ export async function createThreadWorktree(options: {
     )
   )
     return folderFailure("worktree_path_exists", `${path} already exists.`, { path, branch })
+  beforeCallDispatch()
   let createdFolder: string | undefined
   try {
     createdFolder = await mkdir(dirname(path), { recursive: true })

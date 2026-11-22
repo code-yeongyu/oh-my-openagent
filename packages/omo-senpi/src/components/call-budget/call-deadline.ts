@@ -13,16 +13,32 @@ export const TOOL_CALL_BUDGET_MS = 50_000
 export const READ_RESERVE_MS = 15_000
 
 // omo#13426: the tool call's abort signal rides with its deadline, so a cancelled call leaves nothing to wait for.
-type CallScope = { readonly deadline: number; readonly signal: AbortSignal | undefined }
+type CallScope = { readonly deadline: number; signal: AbortSignal | undefined; readonly onDispatch?: () => void }
 
-const scope = new AsyncLocalStorage<CallScope>()
+// The tools and their lazy thread-client sidecar can carry separate copies of this module.
+const key = Symbol.for("omo.thread.call-scope")
+const shared = globalThis as typeof globalThis & { [key]?: AsyncLocalStorage<CallScope> }
+const scope = (shared[key] ??= new AsyncLocalStorage<CallScope>())
 
 /**
  * Runs `call` with every remote command inside it bounded by `deadlineMs` (epoch ms) and, when `signal` is given, by
  * that signal: once it aborts, every wait left in the call is zero.
  */
-export const withCallDeadline = <T>(deadlineMs: number, call: () => Promise<T>, signal?: AbortSignal): Promise<T> =>
-  scope.run({ deadline: deadlineMs, signal }, call)
+export const withCallDeadline = <T>(
+  deadlineMs: number,
+  call: () => Promise<T>,
+  signal?: AbortSignal,
+  onDispatch?: () => void,
+): Promise<T> => scope.run({ deadline: deadlineMs, signal, onDispatch }, call)
+
+/** At the mutating port, after preparation and before the first write. */
+export const beforeCallDispatch = (): void => scope.getStore()?.onDispatch?.()
+
+/** An acknowledged open owns its remaining work and receipt, still under the original deadline. */
+export function retainOpenOutcome(): void {
+  const current = scope.getStore()
+  if (current?.onDispatch !== undefined) current.signal = undefined
+}
 
 /** The enclosing tool call's abort signal (none outside a call, or for a call that took none). */
 export const callSignal = (): AbortSignal | undefined => scope.getStore()?.signal

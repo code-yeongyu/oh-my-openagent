@@ -1,3 +1,4 @@
+import { beforeCallDispatch } from "../../call-budget/call-deadline"
 import { mergeRows, rowKey, type DeviceListing } from "@oh-my-opencode/thread-address-core"
 import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
@@ -100,6 +101,7 @@ export async function claimCreatedAlias(
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
   try {
     const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
+    beforeCallDispatch()
     claimed = await remote.aliases.claim({
       alias,
       holder: { session_id: result.thread, device: holderDevice },
@@ -143,6 +145,7 @@ export async function renameAlias(
   if (current.kind === "error") return signedOut(current.error) ? { local: "sign_in" } : aliasFailure(current.error)
   const from = current.value.get(threadId)
   const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
+  beforeCallDispatch()
   const changed =
     from === undefined
       ? await remote.aliases.claim({

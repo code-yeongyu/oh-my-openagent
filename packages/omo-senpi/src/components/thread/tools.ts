@@ -1,6 +1,8 @@
 import {
   TOOL_CALL_BUDGET_MS,
+  beforeCallDispatch,
   callSignal,
+  retainOpenOutcome,
   unlessAborted,
   waitWithinCallBudget,
   withCallDeadline,
@@ -143,13 +145,25 @@ function releasedOnAbort(remote: RemoteThreadSurface): RemoteThreadSurface {
       rpc,
       options,
     ) => {
+      if (!String(rpc.type).startsWith("get_")) beforeCallDispatch()
       const sent = port.sessionCommand(device, sessionId, rpc, options)
       const signal = callSignal()
       if (signal === undefined) return await sent
       const settled = await unlessAborted(sent, signal)
       return settled === undefined ? { kind: "uncertain", reason: "cancelled" } : settled.value
     }
-    sessions = { ...port, sessionCommand }
+    sessions = {
+      ...port,
+      sessionCommand,
+      endpointCommand: async (device, rpc, options) => {
+        if (rpc.type !== "open_session") return await port.endpointCommand(device, rpc, options)
+        beforeCallDispatch()
+        // execute races the caller, not the owned connection. Its finally closes only on the actual reply.
+        const opened = await port.endpointCommand(device, rpc, options)
+        if (opened.kind === "ok") retainOpenOutcome()
+        return opened
+      },
+    }
     RELEASED_ON_ABORT.set(port, sessions)
   }
   return { ...remote, sessions }
@@ -274,7 +288,11 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        if (isLockWaitExceeded(error))
+        const locked = isLockWaitExceeded(error)
+        const schema = gatewaySchemaRefusal(error)
+        if (!locked && schema === undefined) unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
+        if (isCancelled(signal)) return output(CANCELLED_BEFORE_START)
+        if (locked)
           return output(
             failure(
               "overloaded",
@@ -282,9 +300,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
               "Wait a few seconds, then retry the call.",
             ),
           )
-        const schema = gatewaySchemaRefusal(error)
         if (schema !== undefined) return output({ kind: "error", error: schema })
-        unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
         return output(
           failure(
             "internal_error",
@@ -298,8 +314,6 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       }
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
         admission = { kind: "accepted" }
-      unanswered.delete(key)
-      if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
       if (admission.kind === "conflict")
         return output(
           failure(
@@ -308,6 +322,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
             "Retry with a new idempotency_key.",
           ),
         )
+      unanswered.delete(key)
+      if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
       if (admission.kind === "in_progress") {
         const note = unsettled.get(receiptKey(scope))
         if (note !== undefined)
@@ -436,12 +452,16 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
               route?.leaves === true ? { ...NO_LOCAL_VIEW } : await view(receipted ? undefined : { offline: true })
             if (route?.read === true) DEVICE_READ.set(current, route.here)
           }
-          // #13426: the last check before anything mutating can leave this device.
+          // Reads own their result once started; mutators claim dispatch at the first write instead.
           if (signal?.aborted === true) throw NOT_STARTED
-          dispatched = true
+          if (name === "thread_read" || name === "thread_list") dispatched = true
           return await sideEffect(current, value, scope.idempotency_key, callerId, retrying)
         },
         signal,
+        () => {
+          if (!dispatched && isCancelled(signal)) throw NOT_STARTED
+          dispatched = true
+        },
       )
       if (signal === undefined) result = await work
       else {

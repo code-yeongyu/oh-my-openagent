@@ -1,3 +1,4 @@
+import { beforeCallDispatch } from "../../call-budget/call-deadline"
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
@@ -178,6 +179,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     )
     const deliveryId = randomUUID()
     const idempotencyKey = request.idempotency_key ?? `auto:${deliveryId}`
+    beforeCallDispatch()
     const outcome = await store.enqueue({
       provenance: facts.provenance,
       now: now(),

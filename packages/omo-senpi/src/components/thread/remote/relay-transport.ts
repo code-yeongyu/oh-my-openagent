@@ -17,7 +17,7 @@ import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
-import { outsideCallDeadline } from "../../call-budget/call-deadline"
+import { beforeCallDispatch, outsideCallDeadline } from "../../call-budget/call-deadline"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -383,6 +383,7 @@ export function createRelayTransport(
           tasks.push(task)
         },
         () => {
+          beforeCallDispatch()
           sent = true
         },
       )

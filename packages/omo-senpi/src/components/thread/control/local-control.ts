@@ -1,3 +1,4 @@
+import { beforeCallDispatch } from "../../call-budget/call-deadline"
 import { threadLink } from "../thread-link"
 import { routingId, sessionPort, summary } from "../tools/internals"
 import { threadRow } from "../tools/thread-row"
@@ -26,7 +27,10 @@ export function createLocalControl(
     thread_id: threadId,
     title,
     visible: async () => visible(),
-    interrupt: (turnId) => interruptOver((request) => port.interrupt(routing, request, threadId), turnId),
+    interrupt: (turnId) => {
+      beforeCallDispatch()
+      return interruptOver((request) => port.interrupt(routing, request, threadId), turnId)
+    },
     close: async (closeOptions) => {
       // A terminal closes its own session only gracefully, and then exits by itself (omo#14313).
       if (session.endpoint_kind === "tui" && closeOptions?.graceful !== true)
@@ -43,18 +47,24 @@ export function createLocalControl(
           "Update omo on this device and restart its host.",
           { command: "close_session" },
         )
+      beforeCallDispatch()
       return await port.closeSession(routing, threadId, closeOptions)
     },
-    setName: (name) => port.setSessionName(routing, name, threadId),
+    setName: (name) => {
+      beforeCallDispatch()
+      return port.setSessionName(routing, name, threadId)
+    },
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
     getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
     setModel: async (provider, id) => {
+      beforeCallDispatch()
       const selected = await port.setModel(routing, provider, id, threadId)
       return { provider: selected.provider, id: selected.id }
     },
     getAvailableThinkingLevels: () => port.getAvailableThinkingLevels(routing),
     setThinkingLevel: async (level) => {
       try {
+        beforeCallDispatch()
         await port.setThinkingLevel(routing, level, SESSION_ONLY_THINKING_SCOPE, threadId)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith(THINKING_LEVEL_UNSUPPORTED)) throw error
@@ -103,6 +113,7 @@ export function createLocalControl(
         )
       if (port.setSessionArchived === undefined) throw unsupported()
       try {
+        beforeCallDispatch()
         await port.setSessionArchived(routing, archived, threadId)
       } catch (error) {
         if (error instanceof Error && error.message === ARCHIVE_UNSUPPORTED) throw unsupported()
