@@ -88,21 +88,22 @@ describe("memory footer status live wiring", () => {
     const context = await contextFixture()
     const timers = fakeTimers()
     const ui = recorder()
+    let now = NOW + 180
     const live = createMemoryFooterStatusLive({
       resolveContext: () => context,
       isActive: () => true,
       timers,
-      now: () => NOW,
+      now: () => now,
       createGitRepo: () => stubRepo(),
     })
 
     live.syncActive("session-1", ui.ui)
+    now += 90
     timers.advance(1)
 
-    // Literal glyphs: expectations built from MEMORY_REFLECTING_FRAMES would survive a corrupted table.
     expect(ui.calls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠋ reflecting" },
-      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠙ reflecting" },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠹ reflecting" },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠸ reflecting" },
     ])
     live.dispose()
   })

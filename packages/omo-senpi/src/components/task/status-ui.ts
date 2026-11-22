@@ -10,15 +10,10 @@ import {
   type TaskRecord,
   type TaskRunStats,
 } from "@oh-my-opencode/senpi-task"
+import { LOADING_SPINNER_FRAME_MS } from "@oh-my-opencode/utils/loading-spinner"
 
 import type { CapturedUi } from "./runtime-context"
-import {
-  backgroundWidgetRows,
-  buildWidgetRows,
-  isSuspended,
-  isTerminal,
-  LIVE_STATUS_REFRESH_MS,
-} from "./status-row-format"
+import { backgroundWidgetRows, buildWidgetRows, isSuspended, isTerminal } from "./status-row-format"
 import { createTreeCostFeed } from "./subagent-cost-feed"
 import type { StoreMutation } from "./store-mutation-observer"
 
@@ -99,7 +94,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
 
   // Render runs from bare timer callbacks; an uncontained throw escapes as an uncaughtException
   // and kills the host process (the beta.20 pi-tui incident). Warn once per distinct fault so the
-  // 250ms/1s timers cannot spam the log.
+  // repaint timers cannot spam the log.
   function containRenderFault(run: () => void): void {
     try {
       run()
@@ -158,7 +153,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       return
     }
     ui.setWidget(UI_KEY, rows, { placement: "belowEditor" })
-    // Only a live child needs the 250 ms repaint; a parked one renders a still row.
+    // Only a live child needs the repaint; a parked one renders a still row.
     if (
       deps.manager.wasBackground !== undefined &&
       background.some((record) => !isTerminal(record.status) && !isSuspended(record))
@@ -171,7 +166,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
     // Store mutations happen synchronously before TaskManager starts the child. Attach here rather
     // than waiting for the debounced paint, otherwise a fast first tool_execution_start is lost.
     const recordsRefreshed = refreshCachedRecords()
-    // A live row already has a bounded 250ms repaint. Reuse it instead of adding a second timer
+    // A live row already has a bounded repaint. Reuse it instead of adding a second timer
     // for child events or store mutations; the next tick reads the latest records, activity, and stats.
     if (liveRefresh !== undefined) return
     if (pending !== undefined) timers.clear(pending)
@@ -218,7 +213,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       if (liveRefresh !== handle) return
       liveRefresh = undefined
       containRenderFault(renderCachedRecords)
-    }, LIVE_STATUS_REFRESH_MS)
+    }, LOADING_SPINNER_FRAME_MS)
     liveRefresh = handle
   }
 

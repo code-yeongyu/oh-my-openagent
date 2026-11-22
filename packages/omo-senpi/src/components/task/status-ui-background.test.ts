@@ -119,18 +119,20 @@ describe("createTaskStatusUi.background progress", () => {
     // when the widget syncs
     statusUi.syncNow()
 
-    // then the row is painted once and nothing schedules a 250 ms repaint
+    // then the row is painted once without scheduling a live repaint
     expect(ui.widgetCalls.at(-1)?.content?.[0]).toContain("parked child")
     expect(active.size).toBe(0)
   })
 
   it("#given an idle parent with a running background task #when time advances quietly #then live status refreshes", () => {
     // given
-    let currentTime = Date.parse("2026-07-07T00:00:00.000Z")
+    let currentTime = 0
     const active = new Map<number, () => void>()
+    const delays: number[] = []
     let nextHandle = 1
     const timers: StatusUiTimers = {
-      set: (callback) => {
+      set: (callback, delay) => {
+        delays.push(delay)
         const handle = nextHandle++
         active.set(handle, callback)
         return handle
@@ -151,7 +153,15 @@ describe("createTaskStatusUi.background progress", () => {
     const manager: StatusUiManager = {
       list: () => {
         listCalls += 1
-        return listed([task])
+        return listed([
+          task,
+          record({
+            task_id: "st_earlier",
+            name: "Earlier child",
+            status: "running",
+            created_at: new Date(-180).toISOString(),
+          }),
+        ])
       },
       wasBackground: () => true,
       subscribeChild: () => () => undefined,
@@ -182,7 +192,10 @@ describe("createTaskStatusUi.background progress", () => {
     expect(second).toContain("turn 2 (3 tools)")
     expect(second).toContain("42 tok/s")
     expect(second).toContain("1s")
-    expect(second[0]).not.toBe(first[0])
+    expect(first).toStartWith("⠋ Idle child")
+    expect(second).toStartWith("⠙ Idle child")
+    expect(ui.widgetCalls.at(-1)?.content?.[1]).toStartWith("⠙ Earlier child")
+    expect(delays).toEqual([90, 90])
     expect(listCalls).toBe(1)
   })
 
@@ -365,8 +378,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investigate the unexpectedly long background child description · category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
-      "⠋ Review tests · agent:explore(chatgpt-subscription/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠹ Investigate the unexpectedly long background child description · category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠹ Review tests · agent:explore(chatgpt-subscription/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)

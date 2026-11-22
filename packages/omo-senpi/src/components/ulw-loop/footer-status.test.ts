@@ -26,18 +26,26 @@ function recordingUi(): {
 
 function fakeTimers(): {
   readonly activeCount: () => number
+  readonly intervals: number[]
+  readonly now: () => number
   readonly fire: () => void
   readonly set: (callback: () => void, intervalMs: number) => number
   readonly clear: (handle: number) => void
 } {
   const callbacks = new Map<number, () => void>()
+  const intervals: number[] = []
   let nextHandle = 1
+  let now = 0
   return {
     activeCount: () => callbacks.size,
+    intervals,
+    now: () => now,
     fire: () => {
+      now += 90
       for (const callback of [...callbacks.values()]) callback()
     },
-    set: (callback, _intervalMs) => {
+    set: (callback, intervalMs) => {
+      intervals.push(intervalMs)
       const handle = nextHandle
       nextHandle += 1
       callbacks.set(handle, callback)
@@ -56,22 +64,16 @@ async function registerFooterScenario(input: {
   readonly logger?: ComponentLogger
 }): Promise<FakeExtensionAPI> {
   const pi = new FakeExtensionAPI()
+  const footerStatus = { isGoalActive: input.goalActive, timers: input.timers, now: input.timers.now }
   await createUlwLoopComponent({
     planExists: () => true,
     readStatus: async () => ({ code: 0, stdout: input.outputs.shift() ?? activeStatus() }),
-    footerStatus: {
-      isGoalActive: input.goalActive,
-      timers: input.timers,
-    },
+    footerStatus,
   }).register(pi, {
     logger: input.logger ?? createLogger(),
     config: { getFlag: () => false },
   })
   return pi
-}
-
-function visibleFrame(text: string | undefined): string | undefined {
-  return text?.replaceAll("\u2800", "")
 }
 
 async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(), activeStatus()]) {
@@ -84,10 +86,11 @@ async function defaultFooterScenario(sessionId: string, outputs = [activeStatus(
   const timers = fakeTimers()
   const ui = recordingUi()
   const pi = new FakeExtensionAPI()
+  const footerStatus = { timers, now: timers.now }
   await createUlwLoopComponent({
     planExists: () => true,
     readStatus: async () => ({ code: 0, stdout: outputs.shift() ?? activeStatus() }),
-    footerStatus: { timers },
+    footerStatus,
   }).register(pi, {
     logger: createLogger(),
     config: { getFlag: () => false },
@@ -115,23 +118,17 @@ function writeGoal(path: string, status: "active" | "complete"): void {
 }
 
 describe("omo-senpi ulw-loop footer status", () => {
-  it("reads the project goal store and publishes all four animation frames", async () => {
+  it("reads the project goal store and publishes the shared animation cycle", async () => {
     const scenario = await defaultFooterScenario("session-project-store")
     try {
       writeGoal(scenario.goalPath, "active")
 
       await scenario.pi.dispatch("session_start", { type: "session_start" }, scenario.context)
-      scenario.timers.fire()
-      scenario.timers.fire()
-      scenario.timers.fire()
+      for (let tick = 0; tick < 10; tick += 1) scenario.timers.fire()
 
       const frames = scenario.ui.calls.filter((call) => call.key === "ulw-loop").map((call) => call.text)
-      expect(frames.map(visibleFrame)).toEqual([
-        "⚡ ultraworking",
-        "⚡ ultraworking.",
-        "⚡ ultraworking..",
-        "⚡ ultraworking...",
-      ])
+      expect(frames).toEqual([..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋"].map((glyph) => `⚡ ${glyph} ultraworking`))
+      expect(scenario.timers.intervals).toEqual([90])
       expect(scenario.timers.activeCount()).toBe(1)
     } finally {
       scenario.cleanup()
@@ -164,26 +161,21 @@ describe("omo-senpi ulw-loop footer status", () => {
   it("publishes animated ultraworking status only when goal and ulw-loop are active", async () => {
     const timers = fakeTimers()
     const ui = recordingUi()
+    const lateUi = recordingUi()
     const pi = await registerFooterScenario({
       goalActive: () => true,
       outputs: [activeStatus()],
       timers,
     })
+    const latePi = await registerFooterScenario({ goalActive: () => true, outputs: [activeStatus()], timers })
 
     await pi.dispatch("session_start", { type: "session_start" }, sessionEventCtx("/repo", { ui }))
     timers.fire()
-    timers.fire()
-    timers.fire()
+    await latePi.dispatch("session_start", { type: "session_start" }, sessionEventCtx("/repo", { ui: lateUi }))
 
-    const frames = ui.calls.filter((call) => call.key === "ulw-loop").map((call) => call.text)
-    expect(frames.map(visibleFrame)).toEqual([
-      "⚡ ultraworking",
-      "⚡ ultraworking.",
-      "⚡ ultraworking..",
-      "⚡ ultraworking...",
-    ])
-    expect(new Set(frames.map((frame) => frame?.length)).size).toBe(1)
-    expect(timers.activeCount()).toBe(1)
+    expect(ui.calls.at(-1)).toEqual({ key: "ulw-loop", text: "⚡ ⠙ ultraworking" })
+    expect(lateUi.calls).toEqual([{ key: "ulw-loop", text: "⚡ ⠙ ultraworking" }])
+    expect(timers.activeCount()).toBe(2)
   })
 
   it("clears the indicator when either activation ends", async () => {
@@ -278,7 +270,7 @@ describe("omo-senpi ulw-loop footer status", () => {
     )
     expect(pi.messages).toHaveLength(1)
     expect(pi.messages[0]?.message["customType"]).toBe("omo-senpi:ulw-continuation")
-    expect(ui.calls.some((call) => call.key === "ulw-loop" && visibleFrame(call.text) === "⚡ ultraworking")).toBe(true)
+    expect(ui.calls).toContainEqual({ key: "ulw-loop", text: "⚡ ⠋ ultraworking" })
 
     const headlessTimers = fakeTimers()
     const headlessPi = await registerFooterScenario({

@@ -3,7 +3,6 @@ import { execFileSync } from "node:child_process"
 import { join } from "node:path"
 
 import { dispatchRunEnd, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { ULW_LOOP_FOOTER_FRAMES } from "./footer-status"
 import { createUlwLoopComponent } from "./index"
 import {
   activeStatus,
@@ -279,19 +278,18 @@ describe("omo-senpi ulw-loop continuation", () => {
       const outputs = [completeStatus(), activeStatus()]
       const calls: Array<{ cwd: string; sessionId: string }> = []
       const footerCalls: Array<{ key: string; text: string | undefined }> = []
+      const footerStatus = {
+        isGoalActive: () => true,
+        now: () => 0,
+        timers: { set: () => 1, clear: () => undefined },
+      }
       await createUlwLoopComponent({
         readStatus: async (cwd, sessionId) => {
           calls.push({ cwd, sessionId })
           return { code: 0, stdout: outputs.shift() ?? activeStatus() }
         },
         planExists: () => true,
-        footerStatus: {
-          isGoalActive: () => true,
-          timers: {
-            set: () => 1,
-            clear: () => undefined,
-          },
-        },
+        footerStatus,
       }).register(pi, { logger: createLogger(), config: { getFlag: () => false } })
       const eventCtx = sessionEventCtx("/repo", {
         ui: {
@@ -309,7 +307,7 @@ describe("omo-senpi ulw-loop continuation", () => {
         { cwd: "/repo", sessionId: TEST_SESSION_ID },
         { cwd: "/repo", sessionId: TEST_SESSION_ID },
       ])
-      expect(footerCalls).toEqual([{ key: "ulw-loop", text: ULW_LOOP_FOOTER_FRAMES[0] }])
+      expect(footerCalls).toEqual([{ key: "ulw-loop", text: "⚡ ⠋ ultraworking" }])
     }
   })
 })

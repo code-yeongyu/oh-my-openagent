@@ -1,16 +1,9 @@
 import { readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-const STATUS_KEY = "ulw-loop"
-const FRAME_INTERVAL_MS = 320
-const BRAILLE_BLANK = "\u2800"
+import { LOADING_SPINNER_FRAME_MS, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 
-export const ULW_LOOP_FOOTER_FRAMES = [
-  `⚡ ultraworking${BRAILLE_BLANK.repeat(3)}`,
-  `⚡ ultraworking.${BRAILLE_BLANK.repeat(2)}`,
-  `⚡ ultraworking..${BRAILLE_BLANK}`,
-  "⚡ ultraworking...",
-] as const
+const STATUS_KEY = "ulw-loop"
 
 type TimerHandle = ReturnType<typeof setInterval> | number
 
@@ -22,6 +15,7 @@ export interface UlwLoopFooterTimers {
 export interface UlwLoopFooterStatusOptions {
   readonly isGoalActive?: (runtime: UlwLoopFooterRuntime) => boolean
   readonly timers?: UlwLoopFooterTimers
+  readonly now?: () => number
 }
 
 export interface UlwLoopFooterUi {
@@ -43,16 +37,15 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
   const isGoalActive =
     options.isGoalActive ?? ((runtime: UlwLoopFooterRuntime) => goalActiveFromContext(runtime, goalCache))
   const timers = options.timers ?? defaultTimers
+  const now = options.now ?? Date.now
   let timer: TimerHandle | undefined
-  let frameIndex = 0
   let runtime: UlwLoopFooterRuntime | undefined
   let published = false
   let ulwActive = false
 
   function publish(): void {
-    const frame = ULW_LOOP_FOOTER_FRAMES[frameIndex]
-    if (runtime === undefined || frame === undefined) return
-    runtime.ui.setStatus(STATUS_KEY, frame)
+    if (runtime === undefined) return
+    runtime.ui.setStatus(STATUS_KEY, `⚡ ${loadingSpinnerFrame(now())} ultraworking`)
     published = true
   }
 
@@ -63,7 +56,6 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
     }
     if (published && runtime !== undefined) runtime.ui.setStatus(STATUS_KEY, undefined)
     published = false
-    frameIndex = 0
   }
 
   function tick(): void {
@@ -71,7 +63,6 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
       stop()
       return
     }
-    frameIndex = (frameIndex + 1) % ULW_LOOP_FOOTER_FRAMES.length
     publish()
   }
 
@@ -86,7 +77,7 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
       }
       if (timer !== undefined) return
       publish()
-      timer = timers.set(tick, FRAME_INTERVAL_MS)
+      timer = timers.set(tick, LOADING_SPINNER_FRAME_MS)
     },
     dispose() {
       ulwActive = false
@@ -140,7 +131,7 @@ type GoalJsonCacheEntry = {
 // unchanged mtime+size is trusted only once it is older than this window (git's racily-clean rule).
 const RACY_MTIME_WINDOW_MS = 2_000
 
-// The footer ticks at 320ms; an idle goal file costs one stat per tick and is parsed only when its bytes change.
+// An unchanged goal file costs one stat per tick once its mtime is outside the racy window.
 export function createGoalJsonCache(): GoalJsonCache {
   const entries = new Map<string, GoalJsonCacheEntry>()
   return {

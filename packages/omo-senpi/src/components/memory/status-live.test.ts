@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
-import { MEMORY_REFLECTING_FRAMES, createMemoryFooterLive, type MemoryFooterTimers } from "./status-live"
+import { createMemoryFooterLive, type MemoryFooterTimers } from "./status-live"
 import { MEMORY_STATUS_KEY } from "./status"
 
 interface FakeTimers extends MemoryFooterTimers {
   readonly live: () => number
+  readonly now: () => number
   readonly advance: (ticks: number) => void
 }
 
@@ -12,6 +13,7 @@ interface FakeTimers extends MemoryFooterTimers {
 function fakeTimers(): FakeTimers {
   const handles = new Map<number, { callback: () => void; intervalMs: number }>()
   let nextHandle = 1
+  let now = 0
   return {
     set(callback, intervalMs) {
       const handle = nextHandle
@@ -23,8 +25,10 @@ function fakeTimers(): FakeTimers {
       handles.delete(handle as number)
     },
     live: () => handles.size,
+    now: () => now,
     advance(ticks) {
       for (let tick = 0; tick < ticks; tick += 1) {
+        now += 90
         for (const entry of [...handles.values()]) entry.callback()
       }
     },
@@ -47,25 +51,26 @@ describe("memory footer live", () => {
   test("#given an active reflection run #when frames tick at the animation cadence #then the memory key cycles reflecting frames", () => {
     const timers = fakeTimers()
     const ui = recorder()
-    const live = createMemoryFooterLive({ timers })
+    const options = { timers, now: timers.now }
+    const live = createMemoryFooterLive(options)
+    const lateUi = recorder()
+    const late = createMemoryFooterLive(options)
 
     live.setActive("agent-test", true, ui.ui)
     timers.advance(3)
+    late.setActive("agent-late", true, lateUi.ui)
+    timers.advance(7)
 
-    expect(ui.calls.map((call) => call.key)).toEqual(Array(4).fill(MEMORY_STATUS_KEY))
-    // Literal glyphs, not `MEMORY_REFLECTING_FRAMES[n]`: deriving the expectation from the constant
-    // the code under test indexes would keep this green even if the glyph table were corrupted.
-    expect(ui.calls.map((call) => call.text)).toEqual([
-      "mem:agent-test ⠋ reflecting",
-      "mem:agent-test ⠙ reflecting",
-      "mem:agent-test ⠹ reflecting",
-      // Derived on purpose: what is under test here is modulo wrap-around, not glyph identity.
-      `mem:agent-test ${MEMORY_REFLECTING_FRAMES[3 % MEMORY_REFLECTING_FRAMES.length]} reflecting`,
-    ])
+    expect(ui.calls).toEqual(
+      [..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋"].map((frame) => ({ key: MEMORY_STATUS_KEY, text: `mem:agent-test ${frame} reflecting` })),
+    )
+    expect(lateUi.calls[0]?.text).toBe("mem:agent-late ⠸ reflecting")
+    expect(lateUi.calls.at(-1)?.text).toBe("mem:agent-late ⠋ reflecting")
+    late.dispose()
     live.dispose()
   })
 
-  test("#given the animation is running #when the interval is inspected #then it uses the 320ms cadence", () => {
+  test("#given the animation is running #when the interval is inspected #then it uses the 90ms cadence", () => {
     const intervals: number[] = []
     const timers: MemoryFooterTimers = {
       set(_callback, intervalMs) {
@@ -79,7 +84,7 @@ describe("memory footer live", () => {
 
     live.setActive("agent-test", true, ui.ui)
 
-    expect(intervals).toEqual([320])
+    expect(intervals).toEqual([90])
     live.dispose()
   })
 
