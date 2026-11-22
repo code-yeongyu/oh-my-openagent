@@ -62,6 +62,10 @@ jobs:
   ci-mode:
     runs-on: ubuntu-26.04
     timeout-minutes: 3
+    # actions: read lets base-platform-green.sh read the base's dev push run.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -83,6 +87,7 @@ jobs:
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -94,6 +99,16 @@ jobs:
              ! git diff --name-only -z "$BASE_SHA" "$GITHUB_SHA" > "$PATHS_FILE"; then
             DIFF_AVAILABLE=false
             : > "$PATHS_FILE"
+          fi
+
+          # A release-state pull request may stay on Linux only when its base's dev push run already ran macOS/Windows green
+          # AND its diff is a release stamp by content; either check failing (or gh failing) leaves the full matrix on.
+          BASE_PLATFORM_GREEN=false
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" =~ ^release/v.+-source-state$ ]] &&
+             [ "$DIFF_AVAILABLE" = true ] &&
+             [ "$(GH_REPO="$GITHUB_REPOSITORY" bash .github/scripts/base-platform-green.sh || true)" = true ] &&
+             node script/release-state-paths.mjs --check-stamp "$BASE_SHA" "$GITHUB_SHA"; then
+            BASE_PLATFORM_GREEN=true
           fi
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
@@ -110,6 +125,7 @@ jobs:
             --labels "${PR_LABELS:-[]}" \
             --body-file "$BODY_FILE" \
             --changed-files "$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")" \
+            --base-platform-green "$BASE_PLATFORM_GREEN" \
             < "$PATHS_FILE")"
 
           jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
