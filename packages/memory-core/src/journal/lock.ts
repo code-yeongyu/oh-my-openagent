@@ -39,7 +39,8 @@ function delay(milliseconds: number, signal?: AbortSignal): Promise<void> {
   })
 }
 
-const ACQUISITION_WAIT_MS = 5_000
+/** How long a contender waits for another process's lock, measured with Date.now() from its own turn. */
+export const ACQUISITION_WAIT_MS = 5_000
 const RETRY_DELAY_MS = 10
 
 type OwnerPayload = { readonly pid: number; readonly startIdentity: string }

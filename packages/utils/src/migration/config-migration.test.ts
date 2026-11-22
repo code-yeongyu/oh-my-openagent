@@ -1,7 +1,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "fs"
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "fs"
 import { tmpdir } from "os"
 import { join } from "path"
 import { migrateConfigFile } from "./config-migration"
@@ -158,6 +158,7 @@ describe("migrateConfigFile backup skipping", () => {
 
     // Write the already-migrated content to disk
     writeFileSync(configPath, JSON.stringify(migratedContent, null, 2) + "\n")
+    const inodeBeforeMigration = statSync(configPath, { bigint: true }).ino
 
     // rawConfig still has the legacy hook that will be removed
     const rawConfig: Record<string, unknown> = {
@@ -165,12 +166,15 @@ describe("migrateConfigFile backup skipping", () => {
     }
 
     // when
-    migrateConfigFile(configPath, rawConfig)
+    const needsWrite = migrateConfigFile(configPath, rawConfig)
 
-    // then - no backup file should be created since file content is unchanged
-    const files = require("fs").readdirSync(workdir) as string[]
-    const backupFiles = files.filter((f: string) => f.includes(".bak."))
-    expect(backupFiles.length).toBe(0)
+    // then - the in-memory config is migrated, and the file that already held that content is left alone:
+    // it is still the same inode (an atomic replace swaps it and costs two fsyncs, #11839) and nothing sits
+    // beside it (no backup, sidecar or temp file)
+    expect(needsWrite).toBe(true)
+    expect(rawConfig.disabled_hooks).toEqual(["comment-checker"])
+    expect(statSync(configPath, { bigint: true }).ino).toBe(inodeBeforeMigration)
+    expect(readdirSync(workdir)).toEqual(["oh-my-opencode.json"])
   })
 
   test("creates backup when file content actually changes", () => {

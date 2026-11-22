@@ -10,13 +10,21 @@ import { startChainWireServer } from "./chain-wire-server.test-support.ts"
 
 export { ACCOUNT }
 
-export const fixture = async (serverOptions: { readonly stream?: boolean } = {}) => {
+export const fixture = async (
+  serverOptions: {
+    readonly stream?: boolean
+    readonly acceptsPhraseKeys?: boolean
+    readonly extraState?: Readonly<Record<string, unknown>>
+  } = {},
+) => {
   const v = await vector()
   const pinDir = await mkdtemp(join(tmpdir(), "genesis-enable-"))
   const entries: SyncEntry[] = []
   const server = startChainWireServer(ACCOUNT, entries, {
     requireConsent: true,
     ...(serverOptions.stream === undefined ? {} : { stream: serverOptions.stream }),
+    ...(serverOptions.acceptsPhraseKeys === undefined ? {} : { acceptsPhraseKeys: serverOptions.acceptsPhraseKeys }),
+    ...(serverOptions.extraState === undefined ? {} : { extraState: serverOptions.extraState }),
   })
   const token = server.tokenFor(v.prepared.body.bootstrap.first_device, "service-first")
   let ceremonies = 0
@@ -32,6 +40,7 @@ export const fixture = async (serverOptions: { readonly stream?: boolean } = {})
     rpId: "recovery.omo.dev",
     userName: "synthetic-user",
     roaming: false,
+    method: "passkey" as const,
     genesis: {
       prfSupported: true,
       createGenesis: async () => {

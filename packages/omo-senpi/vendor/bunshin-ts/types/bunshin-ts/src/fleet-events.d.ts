@@ -16,7 +16,10 @@ export type ParsedFleetEventOptions = {
     readonly machineIds?: readonly string[];
 };
 export type FleetEventSource = {
-    subscribe(listener: (event: FleetEvent) => void): () => void;
+    /** Stream events to `listener` until the returned unsubscribe runs. `onError`, when given, is the channel for a
+     *  failure to reach this source at all (for the lazy default-client adapter, a connect failure): the failure is
+     *  delivered there exactly once instead of surfacing as an unhandled rejection. */
+    subscribe(listener: (event: FleetEvent) => void, onError?: (error: unknown) => void): () => void;
     [Symbol.asyncIterator](): AsyncIterator<FleetEvent>;
 };
 /** Invalid `events()` filter. Rejected before any `hub.subscribe` frame is sent. */

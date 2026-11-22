@@ -9,11 +9,16 @@ export type InstallOutcome =
       readonly ok: false
       readonly state: "update_required" | "service_degraded" | "not_published"
       readonly action: string
+      /**
+       * The service's installer could not confirm this machine's service registration (no reachable service manager, as
+       * in a container or a test) and changed nothing: `install_failed` with reason `suppress_failed`.
+       */
+      readonly suppressed?: true
     }
 
 const INSTALL_TIMEOUT_MS = 120_000
 
-const runCommand: RunCommand = ([command, ...args]) =>
+export const runCommand: RunCommand = ([command, ...args]) =>
   new Promise((resolve) => {
     if (command === undefined) return resolve({ exitCode: 1, output: "no command" })
     const child = spawn(command, args, {
@@ -29,6 +34,9 @@ const runCommand: RunCommand = ([command, ...args]) =>
   })
 
 const firstLine = (text: string): string => text.trim().split(/\r?\n/)[0] ?? ""
+
+// install-service's outcome line when it could not confirm the registration and changed nothing.
+const SUPPRESSED = /"kind"\s*:\s*"install_failed".*"reason"\s*:\s*"suppress_failed"/
 
 /**
  * Acquires the pinned release, then hands it to the service's own installer: `<binary> install-service --from
@@ -53,6 +61,7 @@ export const installDeviceService = async (
   if (result.exitCode === 0) return { ok: true }
   return {
     ok: false,
+    ...(SUPPRESSED.test(firstLine(result.output)) ? { suppressed: true as const } : {}),
     state: "service_degraded",
     action: `The OmO device service could not be installed (${firstLine(result.output) || `exit ${result.exitCode}`}). Try again; if it keeps failing, report it with /bug.`,
   }

@@ -34,7 +34,7 @@ async function fixture(genesis: "supported" | "unsupported") {
   f.runtime.enableSync = async (input) => {
     seen.push(input)
     called.resolve()
-    return { kind: "needs_first_device" }
+    return { kind: "method_required", methods: [] }
   }
   const enabled = () =>
     Promise.race([
@@ -51,7 +51,7 @@ test("#given forged enable fields #when enable is called #then the request is re
 
   const result = await f.call("enable", owner("a").context, forgedRequest)
 
-  expect(result).toEqual({ kind: "refused", reason: "This request takes no parameters." })
+  expect(result).toEqual({ kind: "refused", reason: "Invalid enable request." })
   expect(seen).toEqual([])
   expect(f.counts().begins).toBe(0)
 })

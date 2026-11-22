@@ -6,82 +6,17 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["writing"].requiresAnyModel).toBe(true)
   })
 
-  test("ultrabrain routes GPT-6 Astra max before the existing Sol max fallbacks", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS.ultrabrain.fallbackChain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["github-copilot"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-6-astra", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["github-copilot"], model: "gpt-5.6-sol", variant: "max" },
-      { providers: ["openai", "chatgpt-subscription", "opencode"], model: "gpt-5.6-sol", variant: "max" },
-    ])
-  })
+  // #14155: each GPT deep lane is one exact-model rung with no older, Fast or other-family fallback, and
+  // stays unavailable (requiresAnyModel) when no listed provider serves it.
+  test.each([
+    ["ultrabrain", ["openai", "chatgpt-subscription", "opencode"], "gpt-6.2-astra", "max"],
+    ["deep-high", ["openai", "chatgpt-subscription", "opencode"], "gpt-6.2-astra", "high"],
+    ["deep-low", ["openai", "chatgpt-subscription"], "gpt-6.2-sol", "medium"],
+  ])("%s runs exactly one rung and requires it", (category, providers, model, variant) => {
+    const requirement = CATEGORY_MODEL_REQUIREMENTS[category]
 
-  test("ultrabrain keeps gpt-5.6-sol max on every fallback rung", () => {
-    // given
-    const requirement = CATEGORY_MODEL_REQUIREMENTS["ultrabrain"]
-
-    // when
-    const chain = requirement.fallbackChain.filter(({ model }) => model === "gpt-5.6-sol")
-
-    // then
-    expect(chain).toEqual([
-      {
-        providers: ["openai", "chatgpt-subscription"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      },
-      {
-        providers: ["github-copilot"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      },
-      {
-        providers: ["openai", "chatgpt-subscription", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "max",
-      },
-    ])
-  })
-
-  test("deep-high routes GPT-6 Astra high only", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain).toEqual([
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-6-astra",
-        variant: "high",
-      },
-    ])
-  })
-
-  test("deep-low leads with gpt-6.1-sol then gpt-6.1-sol-fast medium on the OpenAI lanes, keeps the gpt-5.6-sol rungs behind them, and carries no GPT-6 Sol rung", () => {
-    // given
-    const requirement = CATEGORY_MODEL_REQUIREMENTS["deep-low"]
-
-    // when
-    const chain = requirement.fallbackChain
-
-    // then
-    expect(chain).toEqual([
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol", variant: "medium" },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-6.1-sol-fast", variant: "medium" },
-      {
-        providers: ["openai", "chatgpt-subscription", "github-copilot", "opencode"],
-        model: "gpt-5.6-sol",
-        variant: "medium",
-      },
-      { providers: ["openai", "chatgpt-subscription"], model: "gpt-5.6-sol-fast", variant: "medium" },
-    ])
-  })
-
-  test("neither deep lane carries the other lane's model, so they never substitute each other", () => {
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-low"].fallbackChain.map(({ model }) => model)).toEqual([
-      "gpt-6.1-sol",
-      "gpt-6.1-sol-fast",
-      "gpt-5.6-sol",
-      "gpt-5.6-sol-fast",
-    ])
-    expect(CATEGORY_MODEL_REQUIREMENTS["deep-high"].fallbackChain.map(({ model }) => model)).toEqual(["gpt-6-astra"])
+    expect(requirement.fallbackChain).toEqual([{ providers, model, variant }])
+    expect(requirement.requiresAnyModel).toBe(true)
   })
 
   test("visual-engineering starts with Argon low (#10187)", () => {
@@ -210,6 +145,11 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
         providers: ["zai-coding-plan", "opencode-go"],
         model: "glm-5.3",
         variant: "high",
+      },
+      {
+        providers: ["openai", "chatgpt-subscription"],
+        model: "gpt-6.2-sol",
+        variant: "medium",
       },
       {
         providers: ["openai", "chatgpt-subscription"],

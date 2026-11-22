@@ -1,5 +1,5 @@
-import type { ApproveOutcome } from "@oh-my-opencode/memory-core/sync-engine"
-import type { SyncEnableResponse, SyncRpcProblem } from "./sync-rpc-contract"
+import type { ApproveOutcome, PhraseVoidNotice } from "@oh-my-opencode/memory-core/sync-engine"
+import type { SyncEnableMethod, SyncEnableResponse, SyncRpcProblem, SyncUnavailableCode } from "./sync-rpc-contract"
 import type {
   SyncRpcAccount,
   SyncRpcAuthority,
@@ -9,9 +9,10 @@ import type {
   SyncRpcOptions,
 } from "./sync-rpc-ports"
 
-export const unavailable = (): SyncRpcProblem => ({
+export const unavailable = (code?: SyncUnavailableCode): SyncRpcProblem => ({
   kind: "unavailable",
   reason: "Memory sync authority is unavailable.",
+  ...(code === undefined ? {} : { code }),
 })
 export const refused = (): SyncRpcProblem => ({
   kind: "refused",
@@ -25,10 +26,32 @@ export function serviceProblem(error: unknown): SyncRpcProblem {
     error.status >= 400 &&
     error.status < 500
     ? { kind: "refused", reason: "The service refused this sync request." }
-    : unavailable()
+    : unavailable(error instanceof RetiredSyncOperation ? error.code : "operation_failed")
 }
 
-export class RetiredSyncOperation extends Error {}
+/** The shape of a code that is safe to log: an identifier, never free text. */
+export const LOGGABLE_CODE = /^[A-Z0-9_]{1,32}$/i
+
+/**
+ * Log fields for the error behind an unavailable problem; a RetiredSyncOperation says all it knows in its code.
+ * Only an AccountHttpError's message is logged (service code and HTTP status). Other messages can quote memory
+ * content (an invalid canonical source, an outbox item), so they log as the error name plus a `code` shaped like an identifier.
+ */
+export function syncErrorFields(error: unknown): { readonly error?: string } {
+  if (error instanceof RetiredSyncOperation) return {}
+  if (!(error instanceof Error)) return { error: typeof error }
+  if (error.name === "AccountHttpError") return { error: `${error.name}: ${error.message}` }
+  // Only an identifier-shaped code is logged (Node errno, memory-core codes); a free-text code could quote memory content.
+  const code =
+    "code" in error && typeof error.code === "string" && LOGGABLE_CODE.test(error.code) ? ` (${error.code})` : ""
+  return { error: `${error.name}${code}` }
+}
+
+export class RetiredSyncOperation extends Error {
+  constructor(readonly code: SyncUnavailableCode = "retired") {
+    super(code)
+  }
+}
 
 /** A record that runs a ceremony and takes a claim; a "read" record never does. */
 export type CeremonyOperation = Operation & { readonly kind: "enable" | "approve" }
@@ -40,6 +63,8 @@ export interface Operation {
   readonly ready: PromiseWithResolvers<void>
   readonly confirmation: PromiseWithResolvers<boolean>
   readonly pendingId: string | undefined
+  /** The genesis method this enable asked for; absent means join or resume only (D1). */
+  method?: SyncEnableMethod
   readonly disposeListeners: (() => void)[]
   account: SyncRpcAccount | undefined
   identity: string | undefined
@@ -117,7 +142,17 @@ export async function runSyncRpcOperation(
       ...(captured.genesis === "supported" && captured.rpId !== null && captured.userName !== null
         ? { rpId: captured.rpId, userName: captured.userName }
         : {}),
-      ...(captured.genesis === "supported" && ports.genesis !== undefined ? { genesis: ports.genesis } : {}),
+      // The account source builds the bridge from the same descriptor flags; only the phrase flag admits phrase genesis.
+      ...((captured.genesis === "supported" || captured.phraseGenesis === "supported") && ports.genesis !== undefined
+        ? { genesis: ports.genesis }
+        : {}),
+      ...(record.method !== undefined ? { method: record.method } : {}),
+      ...(options.phraseGate !== undefined ? { phraseGate: options.phraseGate } : {}),
+      onCeremony: (method: SyncEnableMethod) => {
+        auth.admit(() => undefined)
+        record.enable = { kind: "in_progress", method }
+        record.ready.resolve()
+      },
       keyring: ports.keyring,
       chain: ports.chain,
       pairing: ports.pairing,
@@ -125,6 +160,7 @@ export async function runSyncRpcOperation(
       authority: auth,
       signal: auth.signal,
     }
+    let joinNotice: PhraseVoidNotice | undefined
     const observe = (row: { readonly id: string; readonly expires_at: number }): void => {
       auth.admit(() => undefined)
       if (record.kind === "approve" && row.id !== record.pendingId) throw new RetiredSyncOperation()
@@ -146,7 +182,11 @@ export async function runSyncRpcOperation(
       }
       expire()
       if (record.kind === "enable")
-        record.enable = { kind: "join_required", pairing: { pendingId: row.id, expiresAt: row.expires_at, code: null } }
+        record.enable = {
+          kind: "join_required",
+          pairing: { pendingId: row.id, expiresAt: row.expires_at, code: null },
+          ...(joinNotice !== undefined ? { phraseVoid: joinNotice } : {}),
+        }
       observed = acquired
         .expiresAt(row.expires_at)
         .then(() => {
@@ -182,17 +222,32 @@ export async function runSyncRpcOperation(
       const result = await options.runtime.enableSync(input)
       auth.admit(() => undefined)
       switch (result.kind) {
-        case "joined":
-          record.enable = {
-            kind: result.created === true ? "first_device_created" : "joined",
-            ...(result.rootChanged && { rootChanged: true }),
+        case "joined": {
+          const rootNotice = {
+            ...(result.rootChanged && { rootChanged: true as const }),
+            ...(result.rootCheck && { rootCheck: result.rootCheck }),
           }
+          record.enable =
+            result.created === true
+              ? { kind: "first_device_created", ...rootNotice }
+              : {
+                  kind: "joined",
+                  ...rootNotice,
+                  ...(result.phraseVoid !== undefined ? { phraseVoid: result.phraseVoid } : {}),
+                }
           break
-        case "needs_first_device":
+        }
+        case "method_required":
+        case "acknowledge_required":
+        case "passkey_unavailable":
+        case "phrase_unavailable":
+        case "cancelled":
+        case "in_progress":
           record.enable = result
           break
-        case "join_required":
-          record.enable = await options.runtime.joinAccount({
+        case "join_required": {
+          joinNotice = result.phraseVoid
+          const joined = await options.runtime.joinAccount({
             ...input,
             clock,
             onPending: observe,
@@ -204,9 +259,15 @@ export async function runSyncRpcOperation(
                 record.enable = { ...previous, pairing: { ...previous.pairing, code } }
             },
           })
+          record.enable =
+            joined.kind === "joined" && joinNotice !== undefined ? { ...joined, phraseVoid: joinNotice } : joined
           auth.admit(() => undefined)
           break
+        }
       }
+      const notice = record.enable
+      if (notice !== null && "rootCheck" in notice && notice.rootCheck !== undefined)
+        options.warn?.("memory sync root-change check skipped", { path: "enable", code: notice.rootCheck.reason })
     } else {
       record.approval = await options.runtime.approveDevice({
         ...input,
@@ -230,6 +291,12 @@ export async function runSyncRpcOperation(
         : refused()
       : serviceProblem(error)
     record.problem = record.controller.signal.aborted ? refused() : serviceProblem(error)
+    if (record.problem.kind === "unavailable")
+      options.warn?.(`memory sync ${record.kind} unavailable`, {
+        path: record.kind,
+        code: record.problem.code,
+        ...syncErrorFields(error),
+      })
     record.approval = record.expired
       ? { kind: "expired" }
       : {
@@ -244,16 +311,20 @@ export async function runSyncRpcOperation(
     if (record.enable?.kind === "join_required")
       record.enable = record.controller.signal.aborted ? refused() : record.enable
     await observed
+    const failed = (code: "close_failed" | "release_failed", error: unknown): void => {
+      record.enable = unavailable(code)
+      options.warn?.(`memory sync ${record.kind} unavailable`, { path: record.kind, code, ...syncErrorFields(error) })
+    }
     try {
       await ports?.close()
-    } catch {
-      record.enable = unavailable()
+    } catch (error) {
+      failed("close_failed", error)
       record.approval = { kind: "refused", reason: "The sync operation could not be closed." }
     } finally {
       try {
         await claim?.release()
-      } catch {
-        record.enable = unavailable()
+      } catch (error) {
+        failed("release_failed", error)
         record.approval = { kind: "refused", reason: "The sync claim could not be released." }
       } finally {
         record.active = false
@@ -262,4 +333,7 @@ export async function runSyncRpcOperation(
       }
     }
   }
+  // Sync is on for this device again (after a Turn off, or for the first time): engines this process parked for its
+  // repos start now instead of waiting for every session to release and rebind (#14093).
+  if (record.enable?.kind === "joined" || record.enable?.kind === "first_device_created") await options.resumeSync?.()
 }

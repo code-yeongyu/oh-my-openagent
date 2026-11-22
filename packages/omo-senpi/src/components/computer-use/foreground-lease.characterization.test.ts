@@ -6,22 +6,18 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { fileURLToPath } from "node:url"
 
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { CONTROL_CONFIRM_TITLE, controlConfirmBody } from "./control-confirm"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../senpi-desktop-service/test/fake-engine.mjs",
-)
 const RECEIVED = "recv "
 const GRANTED_AT = "2026-10-11T00:00:00.000Z"
 const NON_MACOS_DEFAULT_STOP_CHORD = "ctrl+alt+shift+escape"
@@ -83,7 +79,7 @@ function received(line: string): Received | undefined {
 function fakeEngine(env: Record<string, string>): { readonly factory: ChildFactory; readonly wire: Received[] } {
   const wire: Received[] = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+    const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
       env: { ...process.env, FAKE_ENGINE_DESKTOP: "1", ...env },
       stdio: "pipe",
     })
