@@ -53,7 +53,7 @@ export function parseArgs(args, { booleans = [], values = [], repeatable = [] } 
 }
 
 /** The thread states `list --state` takes (omo-senpi `THREAD_STATES`). */
-export const THREAD_STATES = ["running", "idle", "inactive", "archived"]
+export const THREAD_STATES = ["opening", "running", "idle", "inactive", "archived"]
 
 /** Every `--state` value, comma-separated or repeated, in order and each once; undefined when the flag is absent. */
 export function stateOption(options) {
