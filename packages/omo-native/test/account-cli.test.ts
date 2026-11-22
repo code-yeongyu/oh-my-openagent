@@ -677,32 +677,36 @@ describe("omo account on Linux, where a locked Secret Service read looks empty (
   // install, a slow bus) falls back to libsecret as before, with one notice; #7185b: no Secret Service at all keeps the
   // sign-in in the private state file, and show says which one holds it.
   // The notice itself is once per process; account-cli-entry.test.ts counts it through the real `omo account`.
-  test("a probe that cannot answer or finds no Secret Service never blocks login, show or logout", async () => {
-    for (const [lock, storage] of [
-      ["absent", "file"],
-      ["unknown", "keyring"],
-    ] as const) {
-      expect({ lock, steps: await loginShowLogout(linuxStore(lock, memorySecretApi())) }).toEqual({
-        lock,
-        steps: [
-          ACCOUNT_EXIT.ok,
-          { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage },
-          ACCOUNT_EXIT.ok,
-          { signedIn: false, storage },
-        ],
-      })
-    }
+  const signedInThenOut = (storage: "file" | "keyring") => [
+    ACCOUNT_EXIT.ok,
+    { signedIn: true, device: { id: "dev_f", name: "device dev_f" }, refreshState: "ok", storage },
+    ACCOUNT_EXIT.ok,
+    { signedIn: false, storage },
+  ]
+  // The state file is real: it proves it is private with the host's POSIX owner uid and mode bits, which a Windows
+  // host does not have (its own suite, state-file-store.test.ts, is gated the same way).
+  const stateFileTest = test.skipIf(process.platform === "win32")
+
+  test("a probe that cannot answer never blocks login, show or logout", async () => {
+    expect(await loginShowLogout(linuxStore("unknown", memorySecretApi()))).toEqual(signedInThenOut("keyring"))
   })
 
-  test("adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)", async () => {
-    const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
-      stdin: JSON.stringify(credential("dev_s", 60_000)),
-    })
-    expect({ code: result.code, out: result.out }).toEqual({
-      code: ACCOUNT_EXIT.ok,
-      out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
-    })
+  stateFileTest("no Secret Service never blocks login, show or logout: the state file holds the sign-in", async () => {
+    expect(await loginShowLogout(linuxStore("absent", memorySecretApi()))).toEqual(signedInThenOut("file"))
   })
+
+  stateFileTest(
+    "adopt with no Secret Service answers ok and says the sign-in is kept in the file (#7185b)",
+    async () => {
+      const result = await run(linuxStore("absent", memorySecretApi()), ["adopt"], {
+        stdin: JSON.stringify(credential("dev_s", 60_000)),
+      })
+      expect({ code: result.code, out: result.out }).toEqual({
+        code: ACCOUNT_EXIT.ok,
+        out: [{ adopted: true, device: { id: "dev_s", name: "device dev_s" }, storage: "file" }],
+      })
+    },
+  )
 
   test("login and logout on Linux with no gdbus on PATH still succeed through the real probe", async () => {
     const path = process.env.PATH
