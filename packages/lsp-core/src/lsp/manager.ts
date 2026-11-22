@@ -39,6 +39,7 @@ export interface ClientSnapshot {
 }
 
 export interface LspManagerOptions {
+  diagnosticsFreshnessTimeoutMs?: number
   idleTimeoutMs?: number
   initTimeoutMs?: number
   maxResidentClients?: number
@@ -107,7 +108,11 @@ export class LspManager {
     this.initTimeoutMs = options.initTimeoutMs ?? INIT_TIMEOUT_MS
     this.maxResidentClients = options.maxResidentClients ?? MAX_RESIDENT_CLIENTS
     this.reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS
-    this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server))
+    const clientOptions =
+      options.diagnosticsFreshnessTimeoutMs === undefined
+        ? {}
+        : { diagnosticsFreshnessTimeoutMs: options.diagnosticsFreshnessTimeoutMs }
+    this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server, clientOptions))
     this.now = options.now ?? (() => Date.now())
 
     this.startReaper()
@@ -481,7 +486,12 @@ let _defaultInstance: LspManager | null = null
 
 export function getLspManager(): LspManager {
   if (!_defaultInstance) {
-    _defaultInstance = new LspManager()
+    const budget = Number(process.env["OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS"])
+    _defaultInstance = new LspManager(
+      Number.isInteger(budget) && budget > 0 && budget <= 2_147_483_647
+        ? { diagnosticsFreshnessTimeoutMs: budget }
+        : {},
+    )
   }
   return _defaultInstance
 }

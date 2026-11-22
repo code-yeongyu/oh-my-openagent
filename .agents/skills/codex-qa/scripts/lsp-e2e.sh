@@ -928,10 +928,12 @@ lookupCount += 0;
 
 const assertions = {
   openCodeMcpEnvInputs: JSON.stringify(Object.keys(openCodeMcpConfig.environment ?? {}).sort()) === JSON.stringify([
+    "LSP_TOOLS_MCP_CWD",
     "LSP_TOOLS_MCP_INSTALL_DECISIONS",
     "LSP_TOOLS_MCP_PROJECT_CONFIG",
     "LSP_TOOLS_MCP_USER_CONFIG",
   ])
+    && openCodeMcpConfig.environment?.LSP_TOOLS_MCP_CWD === projectDir
     && JSON.stringify((openCodeMcpConfig.environment?.LSP_TOOLS_MCP_PROJECT_CONFIG ?? "").split(delimiter)) === JSON.stringify([
       join(projectDir, ".opencode", "lsp.json"),
       join(projectDir, ".omo", "lsp.json"),
@@ -956,16 +958,16 @@ const assertions = {
     && directContext.installDecisionsPath === join(homeDir, ".codex", "lsp-install-decisions.json"),
   maxConcurrencyFour: maxActive === 4,
   orderedBlocks: JSON.stringify(first.blocks) === JSON.stringify([
-    { filePath: "a.ts", diagnostics: "diagnostic for a.ts" },
-    { filePath: "c.ts", diagnostics: "diagnostic failure for c.ts" },
-    { filePath: "d.foo", diagnostics: "No LSP server configured for extension: .foo\n\nAvailable servers: typescript" },
-    { filePath: "e.ts", diagnostics: "diagnostic for e.ts" },
-    { filePath: "f.ts", diagnostics: "diagnostic for f.ts" },
+    { filePath: "a.ts", diagnostics: "diagnostic for a.ts", blocking: true },
+    { filePath: "c.ts", diagnostics: "diagnostic failure for c.ts", blocking: true },
+    { filePath: "d.foo", diagnostics: "No LSP server configured for extension: .foo\n\nAvailable servers: typescript", blocking: true },
+    { filePath: "e.ts", diagnostics: "diagnostic for e.ts", blocking: true },
+    { filePath: "f.ts", diagnostics: "diagnostic for f.ts", blocking: true },
   ]),
   duplicatesRunOnce: JSON.stringify(calls) === JSON.stringify(["a.ts", "b.ts", "c.ts", "d.foo", "e.ts", "f.ts"]),
-  cacheResetRetry: JSON.stringify(cachedFirst.blocks) === JSON.stringify([{ filePath: "skip.foo", diagnostics: "No LSP server configured for extension: .foo" }])
-    && JSON.stringify(cachedSecond.blocks) === JSON.stringify([{ filePath: "retry.foo", diagnostics: "diagnostic after reset" }])
-    && JSON.stringify(cachedAfterReset.blocks) === JSON.stringify([{ filePath: "retry.foo", diagnostics: "diagnostic after reset" }])
+  cacheResetRetry: JSON.stringify(cachedFirst.blocks) === JSON.stringify([{ filePath: "skip.foo", diagnostics: "No LSP server configured for extension: .foo", blocking: true }])
+    && JSON.stringify(cachedSecond.blocks) === JSON.stringify([{ filePath: "retry.foo", diagnostics: "diagnostic after reset", blocking: true }])
+    && JSON.stringify(cachedAfterReset.blocks) === JSON.stringify([{ filePath: "retry.foo", diagnostics: "diagnostic after reset", blocking: true }])
     && JSON.stringify(cacheCalls) === JSON.stringify(["skip.foo", "retry.foo", "retry.foo"]),
   rejectionBeforeLookup: Object.values(rejectionResults).every((entry) => entry.rejected === true && entry.lookupCount === 0),
 };

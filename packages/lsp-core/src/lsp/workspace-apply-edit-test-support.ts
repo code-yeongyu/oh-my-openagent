@@ -70,7 +70,7 @@ export function createWorkspaceEditTestHarness() {
   }
 }
 
-function createFixture(scenario: Record<string, unknown>, tempDirectories: string[]) {
+export function createFixture(scenario: Record<string, unknown>, tempDirectories: string[]) {
   // The fixture server echoes URIs built from the canonical temp path, so the client root must be
   // canonical too. On macOS tmpdir() is a /var -> /private/var symlink; without realpath the
   // publishes target a document the client never opened (#9476).

@@ -75,6 +75,9 @@ function postEditOutcomeFromDaemonResult(result: {
 	readonly details?: unknown;
 }): PostEditDiagnosticsOutcome {
 	const text = result.content.map((block) => block.text).join("\n");
+	if (isRecord(result.details) && result.details["errorKind"] === "freshness_timeout") {
+		return { kind: "freshness_timeout", text };
+	}
 	const availability = availabilityDetails(result.details);
 	if (availability === undefined) return text;
 	if (availability["kind"] === "not_configured") {
