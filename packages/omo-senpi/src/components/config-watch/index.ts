@@ -1,4 +1,5 @@
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
+import { appendConfigApplyGuidance } from "./apply-guidance"
 import {
   resolveOmoConfigWatchTargetResolution,
   type OmoConfigWatchTarget,
@@ -218,6 +219,10 @@ export function createConfigWatchComponent(options: ConfigWatchComponentOptions 
         release(unsubscribes)
       }
       releasePrevious = dispose
+      pi.on("before_agent_start", appendConfigApplyGuidance, {
+        previewSafe: true,
+        hookLabel: "config-watch:apply-guidance",
+      })
       pi.on(SESSION_SHUTDOWN, () => {
         dispose()
         if (releasePrevious === dispose) releasePrevious = undefined
