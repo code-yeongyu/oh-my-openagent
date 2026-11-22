@@ -217,16 +217,12 @@ describe("publish.yml child path release tag", () => {
     expect(tagSteps).toEqual([TAG_JOB])
   })
 
-  test(
-    "#given a stamp on a different parent #when the parent dispatch runs #then no tag or child is created",
-    () => {
-      const result = runStep({ where: DISPATCH_STEP, prepared: "T", pin: "A" })
-      expect(result.status).not.toBe(0)
-      expect(result.originTag(`v${VERSION}`)).toBe("")
-      expect(result.ghCalls).toBe("")
-    },
-    TEST_TIMEOUT_MS,
-  )
+  test("#given a stamp on a different parent #when the parent dispatch runs #then no tag or child is created", () => {
+    const result = runStep({ where: DISPATCH_STEP, prepared: "T", pin: "A" })
+    expect(result.status).not.toBe(0)
+    expect(result.originTag(`v${VERSION}`)).toBe("")
+    expect(result.ghCalls).toBe("")
+  })
 
   test.each([true, false])(
     "#given tag input support=%s #then dispatch passes only supported inputs at the stamp",
@@ -238,7 +234,6 @@ describe("publish.yml child path release tag", () => {
       expect(result.ghCalls.includes(`-f source_sha=${result.sha.B}`)).toBe(pinSupported)
       expect(result.ghCalls).toContain(`-f prepared_release_sha=${result.sha.T}`)
     },
-    TEST_TIMEOUT_MS,
   )
 
   test.each([
