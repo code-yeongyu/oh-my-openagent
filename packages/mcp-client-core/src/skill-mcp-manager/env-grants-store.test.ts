@@ -254,17 +254,51 @@ for (const [os, code] of [
 
 test("watches creation and atomic replacements from before the store exists", async () => {
   const path = resolveGrantsStorePath(join(root, "not-created-yet"))
+  // #11653: the case once timed out waiting for real fs.watch delivery under load. Both wall-clock
+  // delivery paths stay neutralized (the watcher never fires on its own, the fallback interval is
+  // inert); the store's watcher callback is captured and driven by hand after each mutation, so the
+  // case observes exactly the changes it makes, deterministically.
+  const changeListeners: Array<() => void> = []
+  const watchMock = spyOn(fs, "watch").mockImplementation(
+    unsafeTestValue<typeof fs.watch>((...args: unknown[]) => {
+      const listener = args.at(-1)
+      if (typeof listener === "function") changeListeners.push(listener as () => void)
+      return unsafeTestValue<fs.FSWatcher>({
+        close() {},
+        on() {
+          return this
+        },
+      })
+    }),
+  )
+  const interval = spyOn(globalThis, "setInterval").mockImplementation(
+    unsafeTestValue<typeof setInterval>(() => unsafeTestValue<ReturnType<typeof setInterval>>({ unref() {} })),
+  )
+  const clear = spyOn(globalThis, "clearInterval").mockImplementation(() => {})
+  restorers.push(
+    () => watchMock.mockRestore(),
+    () => interval.mockRestore(),
+    () => clear.mockRestore(),
+  )
+  // Fire every registered watcher callback without draining the pool: a real watcher re-fires
+  // for every later change, and the re-armed watcher stays the delivery path for the rest of the case.
+  const deliverChanges = () => {
+    for (const listener of changeListeners) listener()
+  }
   const stream = observationStream()
   stop = await observe(path, stream.listener)
   const created = stream.next((event) => event.snapshot.generation === 1)
   await addGrant(path, identity, label, ["ODD_DSN"])
+  deliverChanges()
   expect((await created).snapshot.grants[identity]?.names).toEqual(["ODD_DSN"])
   const revoked = stream.next((event) => event.snapshot.generation === 2)
   await revoke(path, identity)
+  deliverChanges()
   expect((await revoked).snapshot.grants[identity]).toBeUndefined()
   const latest = stream.next((event) => event.snapshot.generation >= 4)
   await addGrant(path, identity, label, ["ODD_DSN"])
   await revoke(path, identity)
+  deliverChanges()
   expect((await latest).snapshot.grants[identity]).toBeUndefined()
 }, 15_000)
 
