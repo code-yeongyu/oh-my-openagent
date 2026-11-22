@@ -42,7 +42,8 @@ const GH_STUB = [
   '      local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
   '      printf "none\\n" ;;',
   '    *"actions/workflows/ci.yml/runs"*)',
-  '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$PREPARED_RELEASE_SHA" "$CI_CONCLUSION" ;;',
+  '      local sha conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) conclusion="$PUSH_CONCLUSION" ;; esac; done',
+  '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$sha" "$conclusion" ;;',
   "  esac",
   "}",
   "sleep() { :; }",
@@ -58,6 +59,8 @@ beforeAll(() => {
 afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }))
 
 interface Dispatch {
+  readonly pin?: string
+  readonly pushConclusion?: string
   readonly prepared?: string
   readonly receipt?: string
   readonly head?: string
@@ -87,6 +90,15 @@ function dispatch(input: Dispatch): Outcome {
   scratch.push(root)
   const checkout = join(root, "checkout")
   fixture.initCheckout(checkout)
+  const prepared = input.prepared ?? fixture.sha.B
+  if (input.pin) {
+    const git = (args: string[]) => {
+      const result = spawnSync("git", args, { cwd: checkout, env: fixture.gitEnv, encoding: "utf8" })
+      if (result.status !== 0) throw new Error(result.stderr)
+    }
+    git(["fetch", "origin"])
+    git(["checkout", "--detach", prepared || "origin/dev"])
+  }
   const script = join(root, "step.sh")
   const summary = join(root, "summary.md")
   const ghCalls = join(root, "gh-calls")
@@ -106,7 +118,11 @@ function dispatch(input: Dispatch): Outcome {
       ...fixture.gitEnv,
       GH_CALLS: ghCalls,
       GITHUB_STEP_SUMMARY: summary,
-      PREPARED_RELEASE_SHA: input.prepared ?? fixture.sha.B,
+      SOURCE_SHA: input.pin ?? "",
+      GITHUB_SHA: prepared,
+      LAZYCODEX_ONLY: "false",
+      PUSH_CONCLUSION: input.pushConclusion ?? "success",
+      PREPARED_RELEASE_SHA: prepared,
       CI_BASIS_RECEIPT: input.receipt ?? "",
       CI_BASIS_HEAD: input.head ?? "",
       ACTOR: input.actor ?? "maint",
@@ -127,6 +143,46 @@ function dispatch(input: Dispatch): Outcome {
 }
 
 const RECEIPT = "ci-basis-20261116-01"
+
+describe("#given a pinned release", () => {
+  test("#when the source is malformed or outside dev #then it cannot start preparation", () => {
+    for (const pin of ["dev", fixture.sha.B.slice(0, 12), fixture.sha.D]) {
+      const result = dispatch({ pin, prepared: "" })
+      expect(result.status).not.toBe(0)
+      expect(result.ghCalls).toBe("")
+    }
+  })
+
+  test("#when only non-push CI is green #then neither dispatch can proceed", () => {
+    for (const prepared of ["", fixture.sha.T]) {
+      const result = dispatch({ pin: fixture.sha.B, prepared, pushConclusion: "failure" })
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+      expect(result.status).not.toBe(0)
+    }
+  })
+
+  test("#when the merged stamp is version-only #then only the pinned push run is needed", () => {
+    const result = dispatch({ pin: fixture.sha.B.toUpperCase(), prepared: fixture.sha.T, ciConclusion: "failure" })
+    expect(result.status, result.output).toBe(0)
+    expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+    expect(result.ghCalls).not.toContain(`head_sha=${fixture.sha.T}`)
+  })
+
+  test("#when the delta changes workflow code #then the stamp needs its own successful CI", () => {
+    for (const ciConclusion of ["success", "failure"]) {
+      const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.B, ciConclusion })
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.A} -f event=push`)
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B}`)
+      expect(result.status === 0).toBe(ciConclusion === "success")
+    }
+  })
+
+  test("#when the published SHA is a grandchild of the pin #then green CI cannot authorize it", () => {
+    const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.T })
+    expect(result.status).not.toBe(0)
+    expect(result.ghCalls).toBe("")
+  })
+})
 
 describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
   test.each([

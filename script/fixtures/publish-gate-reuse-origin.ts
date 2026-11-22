@@ -11,16 +11,26 @@ function file(path: string, body: string): string {
 
 /**
  * A: base. B: workflow-only on A. C: source change on B. D: workflow-only sibling of B.
- * E: a non-workflow .github/ change on B. R: A with a source file renamed into .github/workflows/.
+ * E: a non-workflow .github/ change on B. R: A with a source file renamed into .github/workflows/. T: version stamp on B.
  * Built by one fast-import stream: two git processes, so the fixture stays cheap on a loaded runner.
  */
 const COMMITS = [
-  ["A", "main", "", file("src/a.ts", "a\n") + file(".github/workflows/publish.yml", "on: workflow_dispatch\n")],
+  [
+    "A", "main", "",
+    [
+      file("src/a.ts", "a\n"),
+      file(".github/workflows/publish.yml", "on: workflow_dispatch\n"),
+      file("package.json", '{"version":"1"}\n'),
+      file("packages/omo-native/package.json", '{"version":"1"}\n'),
+      file("script/release-state-paths.mjs", readFileSync(new URL("../release-state-paths.mjs", import.meta.url), "utf8")),
+    ].join(""),
+  ],
   ["B", "main", "A", file(".github/workflows/publish.yml", "on: workflow_dispatch\n# waiver\n")],
   ["C", "main", "B", file("src/a.ts", "c\n")],
   ["D", "sibling", "A", file(".github/workflows/ci.yml", "on: push\n")],
   ["E", "scripts", "B", file(".github/scripts/summary.sh", "echo\n")],
   ["R", "rename", "A", `D src/a.ts\n${file(".github/workflows/a.yml", "a\n")}`],
+  ["T", "dev", "B", file("package.json", '{"version":"2"}\n')],
 ] as const
 
 export type CommitName = (typeof COMMITS)[number][0]
@@ -56,7 +66,7 @@ export function createGitOrigin(root: string): GitOrigin {
   const marks = join(root, "marks")
   git(origin, ["fast-import", "--quiet", `--export-marks=${marks}`], stream)
 
-  const sha: Record<CommitName, string> = { A: "", B: "", C: "", D: "", E: "", R: "" }
+  const sha: Record<CommitName, string> = { A: "", B: "", C: "", D: "", E: "", R: "", T: "" }
   for (const line of readFileSync(marks, "utf8").trim().split("\n")) {
     const [mark, id] = line.split(" ")
     const entry = COMMITS[Number(mark?.slice(1)) - 1]

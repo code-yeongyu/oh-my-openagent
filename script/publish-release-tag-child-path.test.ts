@@ -27,6 +27,10 @@ import {
 
 const TAG_JOB = "tag-prepared-source"
 const TAG_STEP = { job: TAG_JOB, name: "Tag prepared release source" } as const
+const DISPATCH_STEP = {
+  job: "dispatch-provenance-safe-publish",
+  name: "Tag prepared source and dispatch provenance-safe publish",
+} as const
 const RELEASE_STEP = { job: "release", name: "Create GitHub release" } as const
 const VERSION = "9.9.9"
 const TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
@@ -54,6 +58,7 @@ const STUBS = [
   "  esac",
   "}",
   'bun() { cat >/dev/null; printf "%s\\n" "--latest=false"; }',
+  'yq() { printf "%s\\n" "$PIN_SUPPORTED"; }',
   "",
 ].join("\n")
 
@@ -74,6 +79,8 @@ interface Run {
   /** Tag name -> commit the origin already carries before the step runs. */
   readonly originTags?: Readonly<Record<string, CommitName>>
   readonly lazycodexOnly?: boolean
+  readonly pin?: CommitName
+  readonly pinSupported?: boolean
 }
 
 interface Outcome {
@@ -120,6 +127,11 @@ function runStep(input: Run): Outcome {
       VERSION,
       DIST_TAG: "",
       RELEASE_SHA: prepared,
+      SOURCE_SHA: input.pin ? fixture.sha[input.pin] : "",
+      PIN_SUPPORTED: String(input.pinSupported ?? true),
+      BUMP: "patch",
+      SKIP_PLATFORM: "false",
+      PUBLISH_LAZYCODEX: "true",
       LAZYCODEX_ONLY: input.lazycodexOnly ? "true" : "false",
     },
   })
@@ -204,6 +216,30 @@ describe("publish.yml child path release tag", () => {
     )
     expect(tagSteps).toEqual([TAG_JOB])
   })
+
+  test(
+    "#given a stamp on a different parent #when the parent dispatch runs #then no tag or child is created",
+    () => {
+      const result = runStep({ where: DISPATCH_STEP, prepared: "T", pin: "A" })
+      expect(result.status).not.toBe(0)
+      expect(result.originTag(`v${VERSION}`)).toBe("")
+      expect(result.ghCalls).toBe("")
+    },
+    TEST_TIMEOUT_MS,
+  )
+
+  test.each([true, false])(
+    "#given tag input support=%s #then dispatch passes only supported inputs at the stamp",
+    (pinSupported) => {
+      const result = runStep({ where: DISPATCH_STEP, prepared: "T", pin: "B", pinSupported })
+      expect(result.status, result.output).toBe(0)
+      expect(result.originTag(`v${VERSION}`)).toBe(result.sha.T)
+      expect(result.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
+      expect(result.ghCalls.includes(`-f source_sha=${result.sha.B}`)).toBe(pinSupported)
+      expect(result.ghCalls).toContain(`-f prepared_release_sha=${result.sha.T}`)
+    },
+    TEST_TIMEOUT_MS,
+  )
 
   test.each([
     ["an omo release", false, `v${VERSION}`],

@@ -17,6 +17,10 @@ on:
         description: "Override version (e.g., 3.0.0-beta.6). Takes precedence over bump."
         required: false
         type: string
+      source_sha:
+        description: "Stamp this full commit SHA instead of the dispatch branch head. Requires an ancestor of dev with green push CI."
+        required: false
+        type: string
       skip_platform:
         description: "Skip platform binary packages"
         required: false
@@ -74,6 +78,8 @@ jobs:
       issues: read
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: ${{ inputs.source_sha && '0' || '1' }}
 
       # Operator-built darwin artifacts (#13921) replace the hosted macOS legs only for a maintainer on the
       # prepared-source run. An empty input never enters the block.
@@ -155,6 +161,8 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           CI_BASIS_RECEIPT: ${{ inputs.ci_basis_receipt }}
           CI_BASIS_HEAD: ${{ inputs.ci_basis_head }}
@@ -163,6 +171,27 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         run: |
           set -euo pipefail
+
+          if [ -n "$SOURCE_SHA" ]; then
+            if ! [[ "$SOURCE_SHA" =~ ^[0-9a-fA-F]{40}$ ]] ||
+              [ "$LAZYCODEX_ONLY" = true ] || [ -n "$CI_BASIS_RECEIPT" ]; then
+              echo "::error::source_sha requires a full commit SHA, a version stamp, and hosted push CI."
+              exit 1
+            fi
+            SOURCE_SHA="$(git rev-parse --verify "$SOURCE_SHA")"
+            if [ "$(git cat-file -t "$SOURCE_SHA")" != commit ] || ! git merge-base --is-ancestor "$SOURCE_SHA" origin/dev; then
+              echo "::error::source_sha ${SOURCE_SHA} is not on dev."
+              exit 1
+            fi
+            if [ -n "$PREPARED_RELEASE_SHA" ] && {
+              [ "$PREPARED_RELEASE_SHA" != "$GITHUB_SHA" ] ||
+              [ "$(git rev-parse HEAD^1)" != "$SOURCE_SHA" ] ||
+              ! git merge-base --is-ancestor "$PREPARED_RELEASE_SHA" origin/dev;
+            }; then
+              echo "::error::The prepared source must be a merged stamp whose first parent is ${SOURCE_SHA}."
+              exit 1
+            fi
+          fi
 
           # Explicit, logged waiver of the hosted CI wait. An empty receipt keeps the default path below.
           if [ -n "$CI_BASIS_RECEIPT" ]; then
@@ -231,7 +260,7 @@ jobs:
             exit 0
           fi
 
-          if [ -z "$PREPARED_RELEASE_SHA" ]; then
+          if [ -z "$PREPARED_RELEASE_SHA" ] && [ -z "$SOURCE_SHA" ]; then
             echo "Skipping duplicate gates on the release preparation dispatch."
             exit 0
           fi
@@ -257,55 +286,56 @@ jobs:
           # by the release-state PR's own pull_request run at the exact SHA
           # (the grep/tag short-circuits return the stamp commit, which only
           # ever has a pull_request run). Both are full ci.yml executions.
-          for attempt in $(seq 1 120); do
-            RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
-              "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
-              -f head_sha="$PREPARED_RELEASE_SHA" \
-              -f per_page=100)"
+          wait_for_ci() {
+            local sha="$1"
+            shift
+            for attempt in $(seq 1 120); do
+              RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
+                "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
+                -f head_sha="$sha" "$@" -f per_page=100)"
 
-            SUCCESS_ID="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
-              [
-                .workflow_runs[]
-                | select(
-                    .head_sha == $sha
-                    and .status == "completed"
-                    and .conclusion == "success"
-                  )
-              ]
-              | sort_by(.created_at)
-              | last
-              | .id // empty
-            ' <<< "$RUNS")"
-            if [ -n "$SUCCESS_ID" ]; then
-              echo "CI workflow run ${SUCCESS_ID} succeeded for ${PREPARED_RELEASE_SHA}."
+              SUCCESS_ID="$(jq -r --arg sha "$sha" '
+                [.workflow_runs[] | select(.head_sha == $sha and .status == "completed" and .conclusion == "success")]
+                | sort_by(.created_at) | last | .id // empty
+              ' <<< "$RUNS")"
+              if [ -n "$SUCCESS_ID" ]; then
+                echo "CI workflow run ${SUCCESS_ID} succeeded for ${sha}."
+                return 0
+              fi
+
+              ACTIVE_COUNT="$(jq -r --arg sha "$sha" '
+                [.workflow_runs[] | select(.head_sha == $sha and .status != "completed")] | length
+              ' <<< "$RUNS")"
+              COMPLETED_COUNT="$(jq -r --arg sha "$sha" '
+                [.workflow_runs[] | select(.head_sha == $sha and .status == "completed")] | length
+              ' <<< "$RUNS")"
+              if [ "$ACTIVE_COUNT" = "0" ] && [ "$COMPLETED_COUNT" != "0" ]; then
+                jq -r --arg sha "$sha" '
+                  .workflow_runs[] | select(.head_sha == $sha)
+                  | "CI run \(.id): status=\(.status), conclusion=\(.conclusion), url=\(.html_url)"
+                ' <<< "$RUNS"
+                echo "::error::CI completed without a successful run for ${sha}."
+                return 1
+              fi
+              echo "Waiting for successful CI on ${sha} (attempt ${attempt}/120)."
+              sleep 15
+            done
+
+            echo "::error::Timed out waiting for successful CI on ${sha}."
+            return 1
+          }
+
+          if [ -n "$SOURCE_SHA" ]; then
+            wait_for_ci "$SOURCE_SHA" -f "event=push"
+            if [ -z "$PREPARED_RELEASE_SHA" ]; then exit 0; fi
+            # Read the checker from the green basis, not from the delta it is judging.
+            git checkout --detach "$SOURCE_SHA"
+            if node script/release-state-paths.mjs --check-stamp "$SOURCE_SHA" "$PREPARED_RELEASE_SHA"; then
+              echo "Reusing push CI at ${SOURCE_SHA} for release stamp ${PREPARED_RELEASE_SHA}." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
-
-            ACTIVE_COUNT="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
-              [.workflow_runs[] | select(.head_sha == $sha and .status != "completed")]
-              | length
-            ' <<< "$RUNS")"
-            COMPLETED_COUNT="$(jq -r --arg sha "$PREPARED_RELEASE_SHA" '
-              [.workflow_runs[] | select(.head_sha == $sha and .status == "completed")]
-              | length
-            ' <<< "$RUNS")"
-
-            if [ "$ACTIVE_COUNT" = "0" ] && [ "$COMPLETED_COUNT" != "0" ]; then
-              jq -r --arg sha "$PREPARED_RELEASE_SHA" '
-                .workflow_runs[]
-                | select(.head_sha == $sha)
-                | "CI run \(.id): status=\(.status), conclusion=\(.conclusion), url=\(.html_url)"
-              ' <<< "$RUNS"
-              echo "::error::CI completed without a successful run for ${PREPARED_RELEASE_SHA}."
-              exit 1
-            fi
-
-            echo "Waiting for successful CI on ${PREPARED_RELEASE_SHA} (attempt ${attempt}/120)."
-            sleep 15
-          done
-
-          echo "::error::Timed out waiting for successful CI on ${PREPARED_RELEASE_SHA}."
-          exit 1
+          fi
+          wait_for_ci "$PREPARED_RELEASE_SHA"
 
       - name: Write job summary
         if: always()
@@ -314,8 +344,8 @@ jobs:
           JOB_SUMMARY_TITLE: Release gate reuse decision
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Skips release validation on the preparation dispatch, which cannot publish.
-            - Waits for a successful CI push workflow run on the exact prepared SHA.
+            - A pinned source requires successful push CI before stamping. Only a verified release stamp can reuse it.
+            - Otherwise checks CI at the exact prepared SHA, skipping the wait on unpinned preparation.
             - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
           JOB_SUMMARY_NEXT: Rerun CI on the prepared SHA or fix its failed workflow before publishing.
@@ -520,6 +550,9 @@ jobs:
       pull-requests: write
     outputs:
       release_sha: ${{ steps.publish_state.outputs.release_sha || steps.prepare.outputs.release_sha }}
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_REF: ${{ inputs.source_sha && 'dev' || github.ref_name }}
     steps:
       # The PAT checks out with persist-credentials disabled: repo-controlled
       # generation below must never be able to read the release credential from
@@ -528,6 +561,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          ref: ${{ !inputs.prepared_release_sha && inputs.source_sha || '' }}
           token: ${{ secrets.GH_PAT }}
           persist-credentials: false
 
@@ -555,7 +589,6 @@ jobs:
         env:
           VERSION: ${{ needs.release-metadata.outputs.version }}
           OMO_AI_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
-          RELEASE_REF: ${{ github.ref_name }}
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
         run: |
@@ -611,16 +644,20 @@ jobs:
             exit 1
           fi
 
-          # A merged stamping commit remains reusable only while its tree equals the current
-          # base. The merge wrapper must not replace its maintainer attribution, and later
-          # content must never be silently omitted by reusing an abandoned stamp (#7779).
+          # An unpinned retry must include the current base's tree (#7779). For a pin
+          # it is the original parent, not the moving dev tree, that must match.
           reuse_or_refuse() {
             local candidate="$1" origin_desc="$2"
+            local rev='^{tree}' expected="${BASE_HEAD}^{tree}"
+            if [ -n "$SOURCE_SHA" ]; then
+              rev='^1'
+              expected="$SOURCE_SHA"
+            fi
             if git merge-base --is-ancestor "$candidate" "$BASE_HEAD" &&
-              [ "$(git rev-parse "${candidate}^{tree}")" = "$(git rev-parse "${BASE_HEAD}^{tree}")" ]; then
+              [ "$(git rev-parse "${candidate}${rev}")" = "$(git rev-parse "$expected")" ]; then
               echo "release_sha=${candidate}" >> "$GITHUB_OUTPUT"
               echo "needs_push=false" >> "$GITHUB_OUTPUT"
-              echo "${origin_desc} matches the current origin/${BASE_REF} tree: ${candidate}"
+              echo "Reusing ${origin_desc} at ${candidate}."
               exit 0
             fi
             echo "::error::${origin_desc} (${candidate}) is stale or unrelated to origin/${BASE_REF} (${BASE_HEAD}). Bump to an unused version so a fresh release commit is stamped on the current head."
@@ -636,10 +673,14 @@ jobs:
             reuse_or_refuse "$RELEASE_SHA" "Release commit for v${VERSION}"
           fi
 
-          git checkout -B "$RELEASE_BRANCH" "origin/${BASE_REF}"
+          git checkout -B "$RELEASE_BRANCH" "${SOURCE_SHA:-$BASE_HEAD}"
 
           CURRENT_VERSION="$(node -p "require('./package.json').version")"
           if [ "$CURRENT_VERSION" = "$VERSION" ]; then
+            if [ -n "$SOURCE_SHA" ]; then
+              echo "::error::The pinned source already carries ${VERSION}; choose an unused version to stamp."
+              exit 1
+            fi
             RELEASE_SHA="$(git rev-parse HEAD)"
             echo "release_sha=${RELEASE_SHA}" >> "$GITHUB_OUTPUT"
             echo "needs_push=false" >> "$GITHUB_OUTPUT"
@@ -694,6 +735,11 @@ jobs:
           git add -u packages/omo-senpi/plugin/runtime
           git add packages/omo-codex/scripts/install-dist/install-local.mjs
           git add -u packages/omo-native/bin/lib
+          if [ -n "$SOURCE_SHA" ]; then
+            # A historical pin may predate the path checker. Use the dispatch workflow's
+            # checker without staging it in the stamp or changing the published tree.
+            git restore --source="$GITHUB_SHA" --worktree -- script/release-state-paths.mjs
+          fi
           # The stamp may change only RELEASE_STATE_PATHS: ci-fast-path.mjs keeps a release-state pull request on Linux
           # when its base is platform-green and its diff is inside that list, so a stamp outside it must stop here.
           git diff --cached --no-renames --name-only -z | node script/release-state-paths.mjs --check
@@ -713,7 +759,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_PAT }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
           RELEASE_BRANCH: ${{ steps.prepare.outputs.release_branch }}
-          RELEASE_REF: ${{ github.ref_name }}
         run: |
           set -euo pipefail
 
@@ -795,7 +840,13 @@ jobs:
               MERGE_SHA="$(retry_gh "Read release-state PR merge SHA" gh pr view "$PR_NUMBER" --json mergeCommit --jq '.mergeCommit.oid')"
               RELEASE_SHA="$(retry_gh "Read release-state PR source SHA" gh pr view "$PR_NUMBER" --json headRefOid --jq '.headRefOid')"
               git fetch origin "$MERGE_SHA" "$RELEASE_SHA"
-              if ! git merge-base --is-ancestor "$RELEASE_SHA" "$MERGE_SHA" ||
+              if [ -n "$SOURCE_SHA" ]; then
+                if [ "$RELEASE_SHA" != "$(git rev-parse HEAD)" ] ||
+                  [ "$RELEASE_SHA" != "$(git rev-parse "${MERGE_SHA}^2")" ]; then
+                  echo "::error::The release-state PR did not merge the generated stamp."
+                  exit 1
+                fi
+              elif ! git merge-base --is-ancestor "$RELEASE_SHA" "$MERGE_SHA" ||
                 [ "$(git rev-parse "${RELEASE_SHA}^{tree}")" != "$(git rev-parse "${MERGE_SHA}^{tree}")" ]; then
                 echo "::error::Merged release tree differs from its prepared source; refusing publication."
                 exit 1
@@ -855,6 +906,7 @@ jobs:
 
       - name: Tag prepared source and dispatch provenance-safe publish
         env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
           RELEASE_SHA: ${{ needs.prepare-release-state.outputs.release_sha }}
           BUMP: ${{ inputs.bump }}
@@ -868,6 +920,18 @@ jobs:
           if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
             echo "::error::Checked-out source does not match prepared release SHA ${RELEASE_SHA}."
             exit 1
+          fi
+
+          source_args=(-f "prepared_release_sha=${RELEASE_SHA}")
+          if [ -n "$SOURCE_SHA" ]; then
+            if [ "$(git rev-parse HEAD^1)" != "$(git rev-parse "$SOURCE_SHA")" ]; then
+              echo "::error::Refusing to tag ${RELEASE_SHA}: its first parent is not ${SOURCE_SHA}."
+              exit 1
+            fi
+            # The tag owns the child workflow. Older pins can still publish via
+            # their existing exact-stamp CI gate, but cannot accept a new input.
+            accepts_pin="$(yq '.on.workflow_dispatch.inputs | has("source_sha")' ".github/workflows/publish.yml")"
+            if [ "$accepts_pin" = true ]; then source_args+=(-f "source_sha=${SOURCE_SHA}"); fi
           fi
 
           # LazyCodex-only releases tag the source under their own namespace so the omo release
@@ -895,7 +959,7 @@ jobs:
             -f "skip_platform=${SKIP_PLATFORM}" \
             -f "publish_lazycodex=${PUBLISH_LAZYCODEX}" \
             -f "lazycodex_only=${LAZYCODEX_ONLY}" \
-            -f "prepared_release_sha=${RELEASE_SHA}"
+            "${source_args[@]}"
 
       - name: Write job summary
         if: always()
