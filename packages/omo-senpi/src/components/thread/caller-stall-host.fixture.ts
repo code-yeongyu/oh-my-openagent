@@ -1,6 +1,8 @@
 import { createServer } from "node:net"
 import { readFileSync } from "node:fs"
 
+import { resolveRpcSocketTransport } from "@oh-my-opencode/senpi-task/rpc-socket-client"
+
 // A terminal control endpoint in its own process, as senpi's `session-control-server.ts` serves it: a connection whose
 // 32-byte secret has not arrived within the handshake window (`SOCKET_HANDSHAKE_TIMEOUT_MS`, 2 s) is dropped, then
 // each JSONL request is answered at once. Its own process keeps it running while the caller's event loop is blocked.
@@ -38,5 +40,8 @@ const server = createServer((socket) => {
     }
   })
 })
-server.listen(socketPath, () => process.stdout.write("READY\n"))
+// The address the client dials for this endpoint: the socket path itself, or on Windows the named pipe derived from it.
+const transport = await resolveRpcSocketTransport(socketPath)
+if (transport === undefined) throw new Error(`no transport for ${socketPath}`)
+server.listen(transport.address, () => process.stdout.write("READY\n"))
 process.on("SIGTERM", () => server.close(() => process.exit(0)))

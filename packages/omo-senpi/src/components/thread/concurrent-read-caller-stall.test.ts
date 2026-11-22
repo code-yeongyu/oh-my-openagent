@@ -1,9 +1,10 @@
 import { afterEach, expect, test } from "bun:test"
 import { spawn, type ChildProcess } from "node:child_process"
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { rmSync, writeFileSync } from "node:fs"
 import { createConnection } from "node:net"
 import { join } from "node:path"
 
+import { shortSocketDir } from "../../../../senpi-task/src/runners/rpc-host/short-socket-dir.test-support"
 import { createLiveThreadSurface } from "./live-surface"
 
 // #14444: concurrent thread_read calls of local terminals failed together (`thread RPC request timed out`, EPIPE,
@@ -52,9 +53,9 @@ function blockEventLoop(ms: number): void {
 }
 
 test("concurrent terminal reads all answer when another call blocks the caller past the handshake window", async () => {
-  const dir = mkdtempSync(join("/tmp", "cstall-"))
+  // The platform temp dir (a short /tmp parent only where a long one would not bind a unix socket); Windows dials a pipe.
+  const { dir, socket } = shortSocketDir("caller-stall", "t-0123456789abcdef.sock")
   cleanups.push(() => rmSync(dir, { recursive: true, force: true }))
-  const socket = join(dir, "t-0123456789abcdef.sock")
   writeFileSync(`${socket}.secret`, Buffer.alloc(32, 9), { mode: 0o600 })
   await startTerminal(socket)
 
