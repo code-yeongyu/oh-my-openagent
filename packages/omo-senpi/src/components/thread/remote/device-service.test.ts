@@ -1583,7 +1583,7 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
 
   // #14623 review M2: the real port's typed transport refusals for a receipt query (the peer cannot be reached) leave a
   // retained confirmed outcome standing; an authorization denial from the peer still wins over it.
-  const receiptService = (fail: () => never | Promise<CommandResult>) => () =>
+  const receiptService = (fail: () => CommandResult | Promise<CommandResult>) => () =>
     ({
       status: async () => ({ state: "connected" }),
       carriesWakeMark: true,
