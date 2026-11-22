@@ -66,7 +66,6 @@ export async function commit(
 	};
 	mkdirSync(join(dir, "revisions"), { recursive: true });
 	mkdirSync(join(dir, "tmp"), { recursive: true });
-	ensureEvidenceIgnored(repoRoot);
 	const temp = join(dir, "tmp", `${process.pid}-${randomUUID()}.json`);
 	try {
 		writeFileSync(temp, `${JSON.stringify(record)}\n`, { flag: "wx" });
@@ -94,6 +93,7 @@ export async function commit(
 		Object.assign(entry, entries[index + entries.length - mutation.entries.length]);
 	await hooks.getStore()?.afterCommit?.();
 	await materialize(dir);
+	ensureEvidenceIgnored(repoRoot);
 }
 
 function viewContents(dir: string): [string, string][] {
