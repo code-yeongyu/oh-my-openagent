@@ -18,8 +18,6 @@ afterEach(disposeCodexInstallSandboxes)
 test("#given stale project-local Codex config #when Node installer runs #then repairs the local conflict", async () => {
   const repoRoot = await makeTempDir()
   const sandbox = createCodexInstallSandbox("project-cleanup")
-  const codexHome = sandbox.codexHome
-  const binDir = sandbox.binDir
   const projectRoot = sandbox.dir("project-root")
   const projectDirectory = join(projectRoot, "nested")
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
@@ -281,7 +279,6 @@ test("#given project cleanup hits a filesystem edge #when Node installer runs #t
   const repoRoot = await makeTempDir()
   const sandbox = createCodexInstallSandbox("project-cleanup")
   const codexHome = sandbox.codexHome
-  const binDir = sandbox.binDir
   const projectRoot = sandbox.dir("project-root")
   const projectDirectory = join(projectRoot, "not-a-directory")
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")

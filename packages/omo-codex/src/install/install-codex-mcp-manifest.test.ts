@@ -2,8 +2,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtemp, readFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
@@ -27,8 +26,6 @@ describe("install-codex MCP manifest", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("mcp-manifest")
-      const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
 
       // when
       const result = await runCodexInstaller(

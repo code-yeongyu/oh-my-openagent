@@ -142,7 +142,6 @@ test("#given Windows env override resolves Git Bash #when installing local marke
 
 test("#given Windows env override in installer options #when no custom resolver is provided #then default resolver uses it", async () => {
   const sandbox = createCodexInstallSandbox("git-bash-preflight")
-  const codexHome = sandbox.codexHome
   const gitBashPath = join(await mkdtemp(join(tmpdir(), "omo-codex-script-git-bash-env-")), "bash.exe")
   await writeFile(gitBashPath, "")
 

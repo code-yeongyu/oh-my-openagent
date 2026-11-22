@@ -19,7 +19,6 @@ test("#given packaged lazycodex adapter #when installing locally #then uses bund
   const repoRoot = await makeTempDir()
   const sandbox = createCodexInstallSandbox("packaged-local")
   const codexHome = sandbox.codexHome
-  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const lspRuntimeRoot = join(repoRoot, "packages", "lsp-tools-mcp")

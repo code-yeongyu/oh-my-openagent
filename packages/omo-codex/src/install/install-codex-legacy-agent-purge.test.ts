@@ -2,8 +2,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { lstat, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
@@ -44,7 +43,6 @@ describe("install-codex legacy agent purge", () => {
       // given
       const sandbox = createCodexInstallSandbox("legacy-purge")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const agentsDir = join(codexHome, "agents")
       await mkdir(agentsDir, { recursive: true })
       await writeFile(
@@ -88,7 +86,6 @@ describe("install-codex legacy agent purge", () => {
       // given
       const sandbox = createCodexInstallSandbox("legacy-purge")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const agentsDir = join(codexHome, "agents")
       const customReviewer = 'name = "codex-ultrawork-reviewer"\ndescription = "My local reviewer override"\n'
       await mkdir(agentsDir, { recursive: true })

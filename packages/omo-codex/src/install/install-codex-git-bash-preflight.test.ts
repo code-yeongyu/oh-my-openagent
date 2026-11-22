@@ -93,7 +93,6 @@ describe("install-codex Git Bash preflight", () => {
       // given
       const sandbox = createCodexInstallSandbox("git-bash-preflight")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const runCalls: string[] = []
       const missingResolution = {
         found: false,
@@ -139,8 +138,6 @@ describe("install-codex Git Bash preflight", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("git-bash-preflight")
-      const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const runCalls: string[] = []
 
       // when
@@ -171,7 +168,6 @@ describe("install-codex Git Bash preflight", () => {
       // given
       const sandbox = createCodexInstallSandbox("git-bash-preflight")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
 
       // when
       const result = await withBundledLspRuntimeForTest(async () =>
@@ -198,8 +194,6 @@ describe("install-codex Git Bash preflight", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("git-bash-preflight")
-      const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const gitBashPath = join(await mkdtemp(join(tmpdir(), "omo-codex-git-bash-env-")), "bash.exe")
       await writeFile(gitBashPath, "")
 
@@ -228,7 +222,6 @@ describe("install-codex Git Bash preflight", () => {
       // given
       const sandbox = createCodexInstallSandbox("git-bash-preflight")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
 
       // when
       const result = await withBundledLspRuntimeForTest(async () =>

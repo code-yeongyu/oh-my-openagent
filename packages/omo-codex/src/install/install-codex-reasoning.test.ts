@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, readlink, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
@@ -15,7 +15,6 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-"))
   const sandbox = createCodexInstallSandbox("reasoning")
   const codexHome = sandbox.codexHome
-  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
@@ -57,7 +56,7 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
             hooks: [
               {
                 type: "command",
-                command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+                command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
                 statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
               },
             ],
@@ -76,7 +75,7 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
             hooks: [
               {
                 type: "command",
-                command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+                command: `node "\${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use`,
                 statusMessage: "LazyCodex(0.1.0): Checking Comments",
               },
             ],
@@ -96,7 +95,7 @@ test("#given a canonical reasoning level #when the Codex installer runs #then co
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
   // when
-  const result = await runCodexInstaller(
+  await runCodexInstaller(
     sandbox.options({
       repoRoot,
       platform: "linux",

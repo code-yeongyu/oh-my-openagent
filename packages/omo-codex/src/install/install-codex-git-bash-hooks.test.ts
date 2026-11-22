@@ -26,7 +26,6 @@ describe("install-codex Git Bash hooks", () => {
     const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
     const sandbox = createCodexInstallSandbox("git-bash-hooks")
     const codexHome = sandbox.codexHome
-    const binDir = sandbox.binDir
 
     try {
       // when
@@ -72,7 +71,6 @@ describe("install-codex Git Bash hooks", () => {
     const repoRoot = await createRepoWithGitBashHooksFixture(process.cwd())
     const sandbox = createCodexInstallSandbox("git-bash-hooks")
     const codexHome = sandbox.codexHome
-    const binDir = sandbox.binDir
 
     try {
       // when

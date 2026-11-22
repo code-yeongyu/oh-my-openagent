@@ -18,7 +18,6 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
   const repoRoot = await makeTempDir()
   const sandbox = createCodexInstallSandbox("version-stamp")
   const codexHome = sandbox.codexHome
-  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
 
@@ -39,7 +38,7 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
           hooks: [
             {
               type: "command",
-              command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+              command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
               statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
             },
           ],
@@ -54,7 +53,7 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
           hooks: [
             {
               type: "command",
-              command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+              command: `node "\${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use`,
               statusMessage: "LazyCodex(0.1.0): Checking Comments",
             },
           ],

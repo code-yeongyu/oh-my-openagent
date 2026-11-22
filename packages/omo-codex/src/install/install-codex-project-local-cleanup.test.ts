@@ -2,7 +2,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readFile, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
@@ -47,8 +47,6 @@ describe("install-codex project-local cleanup", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("project-cleanup")
-      const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const projectRoot = sandbox.dir("omo-codex-project-cleanup-install-")
       const projectDirectory = join(projectRoot, "nested")
       const projectConfigPath = join(projectRoot, ".codex", "config.toml")
@@ -97,7 +95,6 @@ describe("install-codex project-local cleanup", () => {
       const sandbox = createCodexInstallSandbox("project-cleanup")
       const homeRoot = sandbox.dir("home-root")
       const codexHome = join(homeRoot, ".codex")
-      const binDir = sandbox.binDir
       const projectDirectory = join(homeRoot, "workspace", "nested")
       const globalConfigPath = join(codexHome, "config.toml")
       const repoRoot = await createPackagedCodexRepoRoot()
@@ -150,7 +147,6 @@ describe("install-codex project-local cleanup", () => {
       // given
       const sandbox = createCodexInstallSandbox("project-cleanup")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const projectRoot = sandbox.dir("omo-codex-project-edge-")
       const projectDirectory = join(projectRoot, "not-a-directory")
       const logs: string[] = []

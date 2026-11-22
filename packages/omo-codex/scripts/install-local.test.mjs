@@ -186,8 +186,8 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
           hooks: [
             {
               type: "command",
-              command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
-              commandWindows: 'powershell -File "${PLUGIN_ROOT}\\dist\\cli.ps1" hook user-prompt-submit',
+              command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
+              commandWindows: `powershell -File "\${PLUGIN_ROOT}\\dist\\cli.ps1" hook user-prompt-submit`,
               timeout: 10,
               statusMessage: "checking alpha",
             },
@@ -215,7 +215,6 @@ test("#given plugin hooks #when installing #then records trusted hook hashes", a
 test("#given bad plugin source path #when installing #then rejects traversal", async () => {
   const repoRoot = await makeTempDir()
   const sandbox = createCodexInstallSandbox("install-local")
-  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
 
   await writeJson(join(codexPackageRoot, "marketplace.json"), {

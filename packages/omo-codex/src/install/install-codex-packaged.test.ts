@@ -59,7 +59,7 @@ test(
               hooks: [
                 {
                   type: "command",
-                  command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+                  command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
                   statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
                 },
               ],
@@ -78,7 +78,7 @@ test(
               hooks: [
                 {
                   type: "command",
-                  command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+                  command: `node "\${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use`,
                   statusMessage: "LazyCodex(0.1.0): Checking Comments",
                 },
               ],
@@ -167,7 +167,6 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
   // given
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-win-"))
   const sandbox = createCodexInstallSandbox("packaged")
-  const codexHome = sandbox.codexHome
   const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")

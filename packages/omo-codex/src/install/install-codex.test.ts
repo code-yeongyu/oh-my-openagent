@@ -139,7 +139,6 @@ describe("install-codex", () => {
       // given
       const sandbox = createCodexInstallSandbox("install-codex")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const repoRoot = process.cwd()
       const legacyCacheRoot = join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0")
       await mkdir(legacyCacheRoot, { recursive: true })
@@ -259,8 +258,6 @@ describe("install-codex", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("install-codex")
-      const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
       const repoRoot = process.cwd()
       const invocations: Array<{
@@ -293,7 +290,6 @@ describe("install-codex", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("install-codex")
-      const codexHome = sandbox.codexHome
       const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ includeRootCliDist: false })
       const logs: string[] = []
@@ -327,7 +323,6 @@ describe("install-codex", () => {
       // The legacy daemon's unix socket lives under this codexHome, so the sandbox root keeps the path short enough.
       const sandbox = createCodexInstallSandbox("legacy-daemon")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const home = sandbox.home
       const endpoint = liveLegacyEndpointFor({ codexHome, version: "0.1.0" })
       const daemon = startLegacyDaemonProcess({ endpoint })
@@ -374,7 +369,6 @@ describe("install-codex", () => {
       // given
       const sandbox = createCodexInstallSandbox("install-codex")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const repoRoot = process.cwd()
 
       // when

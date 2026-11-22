@@ -2,8 +2,7 @@
 /// <reference types="bun-types" />
 
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdir, mkdtemp, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { mkdir, readdir, readFile, readlink, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
 import {
@@ -44,7 +43,6 @@ describe("lazycodex install surface", () => {
       // given
       const sandbox = createCodexInstallSandbox("install-surface")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
       // when
@@ -74,7 +72,6 @@ describe("lazycodex install surface", () => {
     async () => {
       // given
       const sandbox = createCodexInstallSandbox("install-surface")
-      const codexHome = sandbox.codexHome
       const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins()
 
@@ -151,7 +148,6 @@ describe("lazycodex install surface", () => {
       // given
       const sandbox = createCodexInstallSandbox("install-surface")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const marketplaceRoot = join(codexHome, ".tmp", "marketplaces", "sisyphuslabs")
       await mkdir(join(marketplaceRoot, ".git"), { recursive: true })
       await writeFile(join(marketplaceRoot, ".git", "config"), '[remote "origin"]\n')
@@ -201,7 +197,6 @@ describe("lazycodex install surface", () => {
       // given
       const sandbox = createCodexInstallSandbox("install-surface")
       const codexHome = sandbox.codexHome
-      const binDir = sandbox.binDir
       const repoRoot = await createRepoWithBuiltComponentBins({ agentNames: LAZYCODEX_AGENT_ROLE_NAMES })
 
       // when
