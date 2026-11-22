@@ -2,6 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import { runLifecycleProbe, runLifecycleMutationProbe } from "./chaos-drive"
 import type { InvariantId } from "./chaos-invariants"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 const LIFECYCLE_INVARIANTS = [6, 7, 8, 9, 10, 11, 12, 13] as const satisfies readonly InvariantId[]
 

@@ -18,6 +18,7 @@ import type { DagTaskOwner, OwnedStartResult } from "./owner"
 import { createDagRecovery } from "./recovery"
 import { createDagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "session-parent"
@@ -254,7 +255,7 @@ describe("DAG resume liveness gate on running nodes", () => {
     // given - the dag_5cf0bec7 checkpoint: two running nodes, one parked daemon child, one
     // foreign-resident child, and a dependent gate behind them
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = {
       key: "orphaned-resume",
@@ -317,7 +318,7 @@ describe("DAG resume liveness gate on running nodes", () => {
   test("#given a running node whose child this host holds #when the session resumes #then it is reattached and folds when the child settles", async () => {
     // given - control: the same record shape as the foreign case, but this host holds the handle
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = { key: "held-resume", name: "held resume", nodes: [node("held")] }
     store.writeCheckpoint(runId, pausedRecord(input, { held: { state: "running", taskId: "task-held", attempt: 1 } }))
@@ -347,7 +348,7 @@ describe("DAG resume liveness gate on running nodes", () => {
     // given - a scheduled node with no task: recovery starts it, and admission queues it (pending,
     // no resident handle yet) until a lease frees
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new HoldingTaskManager()
     const input: DagDefinition = { key: "queued-resume", name: "queued resume", nodes: [node("fresh")] }
     store.writeCheckpoint(runId, pausedRecord(input, { fresh: { state: "scheduled" } }))

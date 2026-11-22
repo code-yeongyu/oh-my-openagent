@@ -8,6 +8,7 @@ import { TaskIdSpaceExhaustedError } from "../state/id"
 import { claimTaskRecord } from "./claim"
 import { TaskRecordCollisionError, createTaskRecordStore } from "./record-store"
 import { resolveStateDir } from "./state-dir"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const claimFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "claim-floor-child.ts")
@@ -44,7 +45,7 @@ describe("claimTaskRecord", () => {
   test("#given consecutive persisted records #when a colliding draft is claimed #then it saves the next available record", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000010"))
     store.save(baseRecord("st_00000011"))
 
@@ -53,13 +54,13 @@ describe("claimTaskRecord", () => {
 
     // then
     expect(claimed.task_id).toBe("st_00000012")
-    expect(existsSync(join(resolveStateDir({ project_dir: project }), "tasks", "st_00000012.json"))).toBe(true)
+    expect(existsSync(join(resolveStateDir(ownedTaskState(project)), "tasks", "st_00000012.json"))).toBe(true)
   })
 
   test("#given more collisions than the attempt limit #when a draft is claimed #then the final collision propagates", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000010"))
     store.save(baseRecord("st_00000011"))
     store.save(baseRecord("st_00000012"))
@@ -74,7 +75,7 @@ describe("claimTaskRecord", () => {
   test("#given a name derived from its id #when the draft is bumped with nameFollowsId #then its name follows the claimed id", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000010"))
 
     // when
@@ -87,7 +88,7 @@ describe("claimTaskRecord", () => {
   test("#given an unavailable id-derived name #when a draft is claimed #then it skips to the next available id and name", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
 
     // when
     const claimed = claimTaskRecord(store, baseRecord("st_00000010"), {
@@ -103,7 +104,7 @@ describe("claimTaskRecord", () => {
   test("#given unavailable id-derived names exhaust the attempt budget #when a draft is claimed #then it throws task-id space exhaustion", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
 
     // when
     const claim = () =>
@@ -120,7 +121,7 @@ describe("claimTaskRecord", () => {
   test("#given a task-id-shaped requested name #when the draft is bumped without nameFollowsId #then its name is preserved verbatim", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000010"))
 
     // when
@@ -134,7 +135,7 @@ describe("claimTaskRecord", () => {
   test("#given a store that raises a non-collision error #when a draft is claimed #then the error propagates unwrapped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const expected = new TypeError("store unavailable")
     const failingStore = {
       ...store,
