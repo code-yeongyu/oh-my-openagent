@@ -112,8 +112,12 @@ export function DocsShell({
         className="focus-ring-inset min-h-0 min-w-0 lg:overflow-auto"
       >
         <div className="mx-auto w-full max-w-3xl px-4 pt-10 pb-24 sm:px-5 lg:px-8 lg:pt-12">
-          {locale !== "en" && <p role="note">{t("englishFallback")}</p>}
-          {children}
+          {locale !== "en" && (
+            <p role="note" className="text-text-mid mb-6 text-sm leading-relaxed">
+              {t("englishFallback")}
+            </p>
+          )}
+          <div>{children}</div>
         </div>
       </div>
     </div>
