@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
+import type { SameDeviceWake } from "../gateway/same-device-wake"
 import { createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 
 // omo#13409 / omo#13410: thread_create takes the new thread's model, reasoning level, approval mode and first prompt in
@@ -223,9 +224,57 @@ describe("thread_create with a first prompt (#13410)", () => {
 // The held-thread report: thread_create({ prompt }) answered ok while its first prompt never ran (no client attached, the
 // new session's control endpoint never drained the row). A create with a prompt either runs it or fails, typed.
 describe("thread_create whose first prompt does not start", () => {
-  test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+  // #14648: a thread host running another omo opens the session but its gateway refuses this machine's store, so it never
+  // registers the session: the send answers queued offline, and with this process's carrier, queued waiting on a wake
+  // that can never admit it (the session is live in that same host). Either way the prompt never runs.
+  const wakeThatNeverAdmits: SameDeviceWake = {
+    afterSend: async (result) =>
+      result.kind === "ok" && result.delivery.kind === "queued_offline"
+        ? {
+            ...result,
+            delivery: { kind: "queued", queue_position: result.delivery.queue_position, waiting_on: { kind: "wake" } },
+          }
+        : result,
+  }
+  test.each([
+    ["no carrier", undefined],
+    ["a carrier that answers waiting on the wake", wakeThatNeverAdmits],
+  ] as const)(
+    "#given a new session here its host never registers with the gateway, with %s #when created with a prompt #then host_unavailable, the prompt taken back and the session ended, nothing left (#14648)",
+    async (_, sameDeviceWake) => {
+      const a = account()
+      const { run, store, forcedCloses } = surface(a.remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        ...(sameDeviceWake === undefined ? {} : { sameDeviceWake }),
+      })
+      const result = await run("thread_create", { name: "never-registered", prompt: "build it" })
+      const rows = await store.list({ target_durable_id: "dur-created-here" })
+      expect(rows.map((row) => [row.state, row.reason])).toEqual([["refused", "target_closed"]])
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "host_unavailable",
+          details: {
+            reason: "control_endpoint_unregistered",
+            created: false,
+            thread: "dur-created-here",
+            delivery_id: rows[0]?.delivery_id,
+            dropped_deliveries: [rows[0]?.delivery_id],
+          },
+        },
+      })
+      expect(forcedCloses).toEqual(["route-created"])
+    },
+  )
+
+  test("#given a new session here its host registered but whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
     const a = account()
-    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const { run, enqueuedRequests } = surface(a.remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      createdRegisters: true,
+    })
     const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
     expect(result).toMatchObject({
       kind: "error",

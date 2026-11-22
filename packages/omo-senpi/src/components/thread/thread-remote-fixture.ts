@@ -5,6 +5,7 @@ import { join } from "node:path"
 import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { RuntimePhase } from "./gateway/adapter"
+import type { SameDeviceWake } from "./gateway/same-device-wake"
 import { createInboxDrain } from "./gateway/drain"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { FakeSessionRuntime } from "./gateway/testing/fake-runtime"
@@ -941,8 +942,12 @@ export function createRemoteThreadFixture() {
        * registered); with this set it never does, so a delivery to it stays queued (the held-thread report).
        */
       createdNeverDrains?: boolean
+      /** With `createdNeverDrains`: the host still registers the session with the gateway (an endpoint that never drains). */
+      createdRegisters?: boolean
       /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
       localDrainsIn?: RuntimePhase
+      /** This process's same-device wake (its carrier), which answers a send to a session no endpoint drains. */
+      sameDeviceWake?: SameDeviceWake
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -1098,6 +1103,11 @@ export function createRemoteThreadFixture() {
           ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
               enqueued.push(request)
               const outcome = await target.enqueue(request)
+              if (createdIds.has(request.target_durable_id) && extra.createdRegisters === true)
+                await target.registerIncarnation({
+                  durable_id: request.target_durable_id,
+                  incarnation: "runtime-created",
+                })
               if (
                 outcome.kind === "inserted" &&
                 createdIds.has(request.target_durable_id) &&
@@ -1130,6 +1140,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
       firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
+      ...(extra.sameDeviceWake === undefined ? {} : { sameDeviceWake: extra.sameDeviceWake }),
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
