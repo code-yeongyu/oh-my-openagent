@@ -266,7 +266,11 @@ export class FactsExtractorRunner {
         },
       })
       if (cancelled) {
-        return await this.abandonCancelledRun(runDir, runId)
+        try {
+          return await this.abandonCancelledRun(runDir, runId)
+        } finally {
+          await this.queue.releaseClaim(batch, claimId)
+        }
       }
     } catch (error) {
       const reason: FactsFailureReason = "child_exit"
