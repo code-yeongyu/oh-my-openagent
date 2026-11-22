@@ -624,8 +624,8 @@
     "packages/omo-senpi/src/components/fallback-architect/detection.ts": ["FABLE_FIVE_ID_PREFIX", "isDemotedEmptyToolUse"],
     // pre-existing at origin dev 4686e425b5: unused export(s) TRANSCRIPT_MESSAGE_LIMIT, LOG_WINDOW_MS
     "packages/omo-senpi/src/components/feedback/collect.ts": ["TRANSCRIPT_MESSAGE_LIMIT", "LOG_WINDOW_MS"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_RETENTION_DAYS, byteLength
-    "packages/omo-senpi/src/components/feedback/draft.ts": ["REPORT_RETENTION_DAYS", "byteLength"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_RETENTION_DAYS
+    "packages/omo-senpi/src/components/feedback/draft.ts": ["REPORT_RETENTION_DAYS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) REPORT_SECTION_IDS, REPORT_KINDS, REPORT_MAX_BYTES, ANONYMOUS_REPORT_MAX_BYTES, REPORT_IDEMPOTENCY_HEADER, REPORT_IDEMPOTENCY_KEY, REPORT_DELETE_TOKEN_HEADER, readCreateReportRequest, createReportResponseSchema, reportListSchema and 1 more
     "packages/omo-senpi/src/components/feedback/fixtures/service-contract/reports.ts": ["REPORT_SECTION_IDS", "REPORT_KINDS", "REPORT_MAX_BYTES", "ANONYMOUS_REPORT_MAX_BYTES", "REPORT_IDEMPOTENCY_HEADER", "REPORT_IDEMPOTENCY_KEY", "REPORT_DELETE_TOKEN_HEADER", "readCreateReportRequest", "createReportResponseSchema", "reportListSchema", "compareReportVersions"],
     // pre-existing at origin dev 4686e425b5: unused export(s) ContractError, isRecord, readBoolean, readTrue, readNullable, HTTP_URL, HOSTNAME, ENVIRONMENT_NAME
