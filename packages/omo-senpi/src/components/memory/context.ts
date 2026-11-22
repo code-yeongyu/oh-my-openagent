@@ -26,6 +26,8 @@ export interface MemoryIdentityContext {
   readonly repoAccess: MemoryRepoAccess
   readonly binding: MemorySessionBinding
   readonly ledger: MemoryPendingLedger
+  /** This binding belongs to one session, even when multiple bindings share its repository. */
+  readonly observedVersions?: Map<string, string>
   readonly projectScope?: { readonly memoryRoot: string; readonly autoIdentity: AutoIdentityMode }
 }
 
@@ -43,6 +45,7 @@ export function createMemoryIdentityContext(input: {
     durableRoot: input.durableRoot ?? input.identityPaths.root,
     binding: input.binding,
     ledger: { pendingCompaction: false, configRestartNotified: false },
+    observedVersions: new Map(),
     ...(input.projectScope === undefined ? {} : { projectScope: input.projectScope }),
     get repoAccess(): MemoryRepoAccess {
       repoAccess ??= {

@@ -14,7 +14,8 @@ import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import type { ClaimReceipt } from "../provenance"
 import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
-import { commitMemoryWrite, type MemoryWriteLock } from "./commit-write"
+import { commitMemoryWrite, type MemoryWriteLock, type MemoryWriteNoop } from "./commit-write"
+import { staleRead, type MemoryObservedVersions } from "./observed-versions"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
 import { MemoryToolError } from "./tool-errors"
 
@@ -60,6 +61,7 @@ export interface MemoryToolResult {
 export type MemoryToolLock = MemoryWriteLock
 
 export interface RunMemoryToolOptions {
+  readonly expectedVersions?: MemoryObservedVersions
   repo: GitMemoryRepo
   lock: MemoryToolLock
   params: MemoryToolParams
@@ -80,11 +82,13 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       ...(params.provenance === undefined ? {} : { provenance: params.provenance }),
       successLabel: `Memory ${params.command}`,
       noChangesMessage: `${params.command} made no changes`,
-      apply: async () => applyCommand(repo.dir, params),
+      apply: async () => applyCommand(repo.dir, params, options.expectedVersions),
     })
     return {
       message: `${result.message}${describeRepairs(repairs)}`,
-      commit: { sha: result.sha, subject: result.subject, affectedPaths: result.affectedPaths },
+      ...("noop" in result
+        ? {}
+        : { commit: { sha: result.sha, subject: result.subject, affectedPaths: result.affectedPaths } }),
     }
   } catch (error) {
     if (error instanceof MemoryPatchParseError || error instanceof MemoryPatchHunkError) {
@@ -95,14 +99,18 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
   }
 }
 
-async function applyCommand(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function applyCommand(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand | MemoryWriteNoop> {
   switch (params.command) {
     case "create":
       return create(root, params)
     case "str_replace":
-      return strReplace(root, params)
+      return strReplace(root, params, versions)
     case "insert":
-      return insert(root, params)
+      return insert(root, params, versions)
     case "delete":
       return remove(root, params)
     case "rename":
@@ -111,7 +119,7 @@ async function applyCommand(root: string, params: MemoryToolParams): Promise<App
       return updateDescription(root, params)
     case "apply_patch": {
       const input = required(params.input, "input", "apply_patch")
-      return applyMemoryPatch(root, input, params.provenance?.claim)
+      return applyMemoryPatch(root, input, params.provenance?.claim, versions)
     }
   }
 }
@@ -133,11 +141,17 @@ async function create(root: string, params: MemoryToolParams): Promise<AppliedCo
   return affected(root, path)
 }
 
-async function strReplace(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function strReplace(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "str_replace")
   const oldString = required(params.old_string, "old_string", "str_replace")
   const newString = required(params.new_string, "new_string", "str_replace")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const conflict = await staleRead(path, versions)
+  if (conflict) throw conflict
   const file = await loadEditable(path, source)
   const index = file.body.indexOf(oldString)
   if (index < 0) throw toolError("str_replace: old_string was not found in the target memory block")
@@ -150,14 +164,25 @@ async function strReplace(root: string, params: MemoryToolParams): Promise<Appli
   return affected(root, path, file)
 }
 
-async function insert(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function insert(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand | MemoryWriteNoop> {
   const source = required(params.file_path, "file_path", "insert")
   const text = required(params.insert_text, "insert_text", "insert")
   if (typeof params.insert_line !== "number" || Number.isNaN(params.insert_line)) {
     throw toolError("insert: 'insert_line' must be a number")
   }
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
-  const file = await loadEditable(path, source)
+  const conflict = await staleRead(path, versions)
+  const file = await loadEditable(path, source).catch((error: unknown) => {
+    throw conflict ?? error
+  })
+  if (`\n${file.body}\n`.includes(`\n${text}\n`)) {
+    return { noop: true, message: `Memory insert: identical block already present in ${source}; nothing committed.` }
+  }
+  if (conflict) throw conflict
   const lines = file.body.length > 0 ? file.body.split("\n") : []
   const line = Math.max(1, Math.floor(params.insert_line))
   lines.splice(Math.min(line - 1, lines.length), 0, ...text.split("\n"))

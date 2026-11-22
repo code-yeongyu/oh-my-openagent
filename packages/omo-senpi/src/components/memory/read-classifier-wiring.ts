@@ -23,22 +23,26 @@ export function registerMemoryReadClassifier(
   return pi.registerReadClassifier(({ absolutePath, cwd }) => {
     const path = resolve(cwd, absolutePath)
     for (const repo of options.resolveRepos()) {
-      const root = resolve(repo)
-      const lexical = repoRelative(root, path)
-      if (isGitMetadata(lexical)) continue
-      const realRoot = realPath(root)
-      const realFile = realPath(path)
-      const canonical = realRoot === undefined || realFile === undefined ? undefined : repoRelative(realRoot, realFile)
-      if (isGitMetadata(canonical)) continue
-      // Existing symlinks must not make a file outside the repo look like memory.
-      if (realRoot !== undefined && realFile !== undefined && canonical === undefined) continue
-      const label = lexical ?? canonical
-      if (label === undefined) continue
+      const location = memoryReadLocation(repo, path)
+      if (location === undefined) continue
       // One extension-wide sequence, shared by every currently bound identity.
-      return { kind: "memory", label, headline: picker.pick("memory-read") }
+      return { kind: "memory", label: location.label, headline: picker.pick("memory-read") }
     }
     return undefined
   })
+}
+
+export function memoryReadLocation(repo: string, path: string): { label: string; canonicalPath: string } | undefined {
+  const root = resolve(repo)
+  const lexical = repoRelative(root, path)
+  if (isGitMetadata(lexical)) return
+  const realRoot = realPath(root)
+  const realFile = realPath(path)
+  const canonical = realRoot === undefined || realFile === undefined ? undefined : repoRelative(realRoot, realFile)
+  // Existing symlinks must not make a file outside the repo look like memory.
+  if (isGitMetadata(canonical) || (realRoot !== undefined && realFile !== undefined && canonical === undefined)) return
+  const label = lexical ?? canonical
+  return label === undefined ? undefined : { label, canonicalPath: realFile ?? path }
 }
 
 function repoRelative(repo: string, path: string): string | undefined {

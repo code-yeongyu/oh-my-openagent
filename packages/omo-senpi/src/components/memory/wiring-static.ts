@@ -206,24 +206,20 @@ export function registerMemoryStatic(input: {
     { hookLabel: "onSettled" },
   )
   registerMemoryWriteListener(pi, options, onMemoryWrite)
-  registerMemoryToolSurface(
-    pi,
-    () => (activeSession.current === undefined ? undefined : resolveContext(activeSession.current)),
-    {
-      onCommit: (commit) => {
-        const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
-        if (context !== undefined) noticeWiring.onCommit(context, commit)
-      },
-      // Read per call rather than latched at registration: the gate is presentation-only, so a
-      // config edit takes effect on the next write instead of at the next restart.
-      writeNotice: {
-        get enabled(): boolean {
-          return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
-        },
-        resolveSessionId: () => activeSession.current,
-      },
+  registerMemoryToolSurface(pi, (id = activeSession.current) => (id === undefined ? undefined : resolveContext(id)), {
+    onCommit: (commit) => {
+      const context = activeSession.current === undefined ? undefined : resolveContext(activeSession.current)
+      if (context !== undefined) noticeWiring.onCommit(context, commit)
     },
-  )
+    // Read per call rather than latched at registration: the gate is presentation-only, so a
+    // config edit takes effect on the next write instead of at the next restart.
+    writeNotice: {
+      get enabled(): boolean {
+        return resolveWriteNoticeEnabled(loadCommandSettings, activeSession, resolveContext)
+      },
+      resolveSessionId: () => activeSession.current,
+    },
+  })
   registerMemoryGuard(pi, ctx, {
     getContext: (eventContext) => {
       const sessionId = sessionIdFrom(eventContext)

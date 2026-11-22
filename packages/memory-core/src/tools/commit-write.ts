@@ -41,12 +41,24 @@ export interface MemoryWriteCommit {
   readonly affectedPaths: readonly string[]
 }
 
-export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Promise<MemoryWriteCommit> {
+export interface MemoryWriteNoop {
+  readonly noop: true
+  readonly message: string
+}
+
+type MaybeNoopOptions = Omit<CommitMemoryWriteOptions, "apply"> & {
+  readonly apply: () => Promise<AppliedWrite | MemoryWriteNoop>
+}
+
+export function commitMemoryWrite(options: CommitMemoryWriteOptions): Promise<MemoryWriteCommit>
+export function commitMemoryWrite(options: MaybeNoopOptions): Promise<MemoryWriteCommit | MemoryWriteNoop>
+export async function commitMemoryWrite(options: MaybeNoopOptions): Promise<MemoryWriteCommit | MemoryWriteNoop> {
   const { repo, lock, reason, author, provenance, successLabel, noChangesMessage } = options
   const writer = options.writer ?? "memory-tool"
   return lock("memory-write", async () => {
     await repo.cleanCheck()
     const applied = await options.apply()
+    if ("noop" in applied) return applied
     const paths = applied.affectedPaths
     if (paths.length === 0) throw new MemoryToolError(noChangesMessage ?? "made no changes")
     const violation = writer === "memory-tool" ? await refuseAgreementsViolation(repo, paths) : undefined

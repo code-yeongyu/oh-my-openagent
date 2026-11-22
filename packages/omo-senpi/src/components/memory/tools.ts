@@ -1,6 +1,7 @@
 import type { AgentToolResult, ToolDefinition } from "@code-yeongyu/senpi"
 import {
   MemoryToolError,
+  MemoryStaleReadError,
   createNodeGitExec,
   parseClaimReceipt,
   runMemoryTool,
@@ -19,6 +20,8 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 
 import { MEMORY_TOOL_DESCRIPTION, MEMORY_TOOL_NAME } from "./tool-metadata"
+import { registerMemoryReadVersions } from "./read-versions"
+import { sessionIdFrom } from "./wiring-context"
 
 export { MEMORY_TOOL_NAME }
 
@@ -101,6 +104,7 @@ export interface MemoryWriteNotice {
 
 export interface MemoryToolResultDetails {
   readonly message: string
+  readonly errorCode?: "stale_read"
   /** Present only after a successful commit while the write-notice gate is on. */
   readonly writeNotice?: MemoryWriteNotice
 }
@@ -113,7 +117,13 @@ export type MemoryToolDefinition<TParams extends TSchema> = Omit<
   ToolDefinition<TParams, MemoryToolResultDetails>,
   "execute"
 > & {
-  readonly execute: (toolCallId: string, params: Static<TParams>) => Promise<MemoryToolExecutionResult>
+  readonly execute: (
+    toolCallId: string,
+    params: Static<TParams>,
+    signal?: AbortSignal,
+    onUpdate?: unknown,
+    ctx?: unknown,
+  ) => Promise<MemoryToolExecutionResult>
 }
 
 export interface MemoryToolWriteNoticeOptions {
@@ -134,7 +144,7 @@ export interface MemoryToolsOptions {
   readonly writeNotice?: MemoryToolWriteNoticeOptions
 }
 
-export type MemoryContextResolver = () => MemoryIdentityContext | undefined
+export type MemoryContextResolver = (sessionId?: string) => MemoryIdentityContext | undefined
 
 export function createMemoryTools(
   resolveContext: MemoryContextResolver,
@@ -151,6 +161,7 @@ export function registerMemoryTools(
   resolveContext: MemoryContextResolver,
   options: MemoryToolsOptions = {},
 ): void {
+  registerMemoryReadVersions(pi, resolveContext)
   for (const tool of createMemoryTools(resolveContext, options)) pi.registerTool({ ...tool })
 }
 
@@ -181,20 +192,23 @@ function createMemoryTool(
     parameters: MemoryToolParams,
     executionMode: "sequential",
     renderShell: "self",
-    execute: async (_toolCallId, params) => {
-      const context = resolveContext()
+    execute: async (_toolCallId, params, _signal, _onUpdate, ctx) => {
+      const context = resolveContext(sessionIdFrom(ctx))
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
       try {
+        const expectedVersions = context.observedVersions && new Map(context.observedVersions)
         const { repo, lock, author } = await prepareEngine(context, options)
         const provenance = readToolProvenance(params)
         const result = await runMemoryTool({
           repo,
           lock,
+          ...(expectedVersions === undefined ? {} : { expectedVersions }),
           params: { ...params, author, ...(provenance === undefined ? {} : { provenance }) },
         })
         if (result.commit !== undefined) options.onCommit?.(result.commit)
         return okResult(result.message, await writeNoticeFor(context, result.commit, options))
       } catch (error) {
+        if (error instanceof MemoryStaleReadError) return errorResult(error.message, "stale_read")
         if (error instanceof MemoryToolError) return errorResult(error.message)
         throw error
       }
@@ -383,6 +397,10 @@ function okResult(message: string, writeNotice?: MemoryWriteNotice): MemoryToolE
   }
 }
 
-function errorResult(message: string): MemoryToolExecutionResult {
-  return { content: [{ type: "text", text: message }], details: { message }, isError: true }
+function errorResult(message: string, errorCode?: "stale_read"): MemoryToolExecutionResult {
+  return {
+    content: [{ type: "text", text: message }],
+    details: { message, ...(errorCode === undefined ? {} : { errorCode }) },
+    isError: true,
+  }
 }
