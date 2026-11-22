@@ -318,9 +318,8 @@ const cases = [
     spec: () => ({
       settings: SETTINGS,
       turns: [
-        // The first write starts the TypeScript server and carries a type error of its own. The checked write's turn is
-        // held at the fake model server until drive() has seen the warm write's result carry that error: the event
-        // that proves the server answers inside the plugin's diagnostics freshness window (lsp-core client.ts:26).
+        // The first write carries a type error of its own. The fake model server holds the second write until drive()
+        // sees that error in the first write's result, proving post-edit diagnostics ran on the warm server.
         {
           toolCalls: [
             {
@@ -351,13 +350,26 @@ const cases = [
         throw new Error("E24 needs the pinned typescript-language-server: pass --lsp-dir <dir> (or EQ_LSP_DIR)")
       prepareCaseSandbox(run, {})
       run.env.OMO_COMMENT_CHECKER_BIN = await options.commentChecker()
+      // Warm the same sandbox/daemon before opening the recorded session. The probe never enters the model script
+      // and removes its separate fixture before Senpi starts, so the two writes and O1-O7 stay unchanged.
+      const warmup = spawnSync("bun", [join(scriptDir, "fused-equivalence-lsp-warmup.mjs")], {
+        cwd: run.box.cwd,
+        env: run.env,
+        encoding: "utf8",
+        timeout: 65_000,
+        killSignal: "SIGKILL",
+      })
+      if (warmup.error || warmup.status !== 0)
+        throw new Error(
+          `E24: TypeScript preflight failed: ${warmup.error?.message ?? (warmup.stderr.trim() || warmup.signal)}`,
+        )
       await openSettled(run)
       answerUiRequests(run)
       const warmEnd = run.nextEvent((event) => event.type === "tool_execution_end" && event.toolCallId === "call_warm")
       const settled = run.prompt("write eq-sample.ts")
       settled.catch(() => {})
       const warm = await warmEnd
-      // A freshness timeout is rendered under the same "LSP errors detected" header, so the proof is the diagnostic itself.
+      // The probe only establishes server readiness; the recorded result must still prove the hook ran.
       const warmText = JSON.stringify(warm.result?.content ?? [])
       if (!warmText.includes("error[typescript] (2322)"))
         throw new Error(
