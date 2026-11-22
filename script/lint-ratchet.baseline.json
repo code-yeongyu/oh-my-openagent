@@ -1110,13 +1110,13 @@
     "typescript/no-explicit-any": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts": {
-    "omo-testing/no-module-mock": 2
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-claude-code-agents-toggle.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver.test.ts": {
-    "omo-testing/no-module-mock": 8
+    "omo-testing/no-module-mock": 6
   },
   "packages/omo-opencode/src/tools/hashline-edit/formatter-trigger.test.ts": {
     "typescript/no-non-null-assertion": 4
