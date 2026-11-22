@@ -139,7 +139,25 @@ afterAll(() => {
   mock.restore()
 })
 
-afterEach(() => {
+const trackedManagers = new Set<TmuxSessionManagerType>()
+
+function trackedManager(manager: TmuxSessionManagerType): TmuxSessionManagerType {
+  trackedManagers.add(manager)
+  return manager
+}
+
+// Every manager is cleaned up before the mocks are restored (#11436): a test that arms the
+// deferred-attach interval and simply ends otherwise leaks a live 2 s timer into whichever test
+// runs next, which is how the runner cmux case captured a stray respawn-pane.
+afterEach(async () => {
+  for (const manager of trackedManagers) {
+    try {
+      await manager.cleanup()
+    } catch {
+      // A mocked-cleanup failure must not mask the test's own result.
+    }
+  }
+  trackedManagers.clear()
   mock.restore()
   mock.module("../../shared/tmux", () => sharedTmuxSnapshot)
 })
@@ -336,7 +354,7 @@ describe("TmuxSessionManager", () => {
       })
 
       // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // then
       expect(manager).toBeDefined()
@@ -362,7 +380,7 @@ describe("TmuxSessionManager", () => {
       })
 
       // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // then
       expect(manager).toBeDefined()
@@ -382,7 +400,7 @@ describe("TmuxSessionManager", () => {
       })
 
       // when
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // then
       expect(manager).toBeDefined()
@@ -409,7 +427,7 @@ describe("TmuxSessionManager", () => {
         })
 
         // when
-        manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       } finally {
         if (previousOpenCodePort === undefined) {
           delete process.env.OPENCODE_PORT
@@ -443,7 +461,7 @@ describe("TmuxSessionManager", () => {
         })
 
         // when
-        manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       } finally {
         if (previousOpenCodePort === undefined) {
           delete process.env.OPENCODE_PORT
@@ -477,7 +495,7 @@ describe("TmuxSessionManager", () => {
         })
 
         // when
-        manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       } finally {
         if (previousOpenCodePort === undefined) {
           delete process.env.OPENCODE_PORT
@@ -511,7 +529,7 @@ describe("TmuxSessionManager", () => {
         const config = createTmuxConfig({ enabled: true })
 
         // when
-        const manager = new TmuxSessionManager(ctx, config, trackingDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, trackingDeps))
 
         // then
         const warning = logCalls.find((entry) => entry.message.includes("ctx.serverUrl has port 0"))
@@ -549,7 +567,7 @@ describe("TmuxSessionManager", () => {
       const config = createTmuxConfig({ enabled: true })
 
       // when
-      const manager = new TmuxSessionManager(ctx, config, trackingDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, trackingDeps))
 
       // then
       const warning = logCalls.find((entry) => entry.message.includes("ctx.serverUrl has port 0"))
@@ -568,7 +586,7 @@ describe("TmuxSessionManager", () => {
         serverUrl: new URL("http://127.0.0.1:12345/"),
       }
       const config = createTmuxConfig({ enabled: true })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when
       const serverUrl = manager.getServerUrl()
@@ -588,7 +606,7 @@ describe("TmuxSessionManager", () => {
         serverUrl: new URL("http://127.0.0.1:0/"),
       }
       const config = createTmuxConfig({ enabled: true })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when
       const serverUrl = manager.getServerUrl()
@@ -617,7 +635,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       const event = createSessionCreatedEvent("ses_child", "ses_parent", "Background: Test Task")
 
       // when
@@ -657,12 +675,14 @@ describe("TmuxSessionManager", () => {
         agent_pane_min_width: 40,
       })
       const skippedSessionIds: string[] = []
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps, {
-        shouldSkipSession: (sessionId) => {
-          skippedSessionIds.push(sessionId)
-          return sessionId === "ses_team_member"
-        },
-      })
+      const manager = trackedManager(
+        new TmuxSessionManager(ctx, config, mockTmuxDeps, {
+          shouldSkipSession: (sessionId) => {
+            skippedSessionIds.push(sessionId)
+            return sessionId === "ses_team_member"
+          },
+        }),
+      )
 
       // when - a team-member session.created fires
       await manager.onSessionCreated(createSessionCreatedEvent("ses_team_member", "ses_parent", "team member task"))
@@ -686,16 +706,18 @@ describe("TmuxSessionManager", () => {
       mockIsInsideTmux.mockReturnValue(true)
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "inline",
-        }),
-        mockTmuxDeps,
-        {
-          shouldSkipSession: (sessionId) => sessionId.startsWith("ses_team_member"),
-        },
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "inline",
+          }),
+          mockTmuxDeps,
+          {
+            shouldSkipSession: (sessionId) => sessionId.startsWith("ses_team_member"),
+          },
+        ),
       )
 
       // when
@@ -745,7 +767,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when - first agent
       await manager.onSessionCreated(createSessionCreatedEvent("ses_1", "ses_parent", "Task 1"))
@@ -794,7 +816,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
 
@@ -855,7 +877,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
 
@@ -897,7 +919,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       const event = createSessionCreatedEvent("ses_root", undefined, "Root Session")
 
       // when
@@ -919,7 +941,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       const event = createSessionCreatedEvent("ses_child", "ses_parent", "Background: Test Task")
 
       // when
@@ -941,7 +963,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       const event = {
         type: "session.deleted",
         properties: {
@@ -986,7 +1008,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when
       await manager.onSessionCreated(createSessionCreatedEvent("ses_new", "ses_parent", "New Task"))
@@ -1026,7 +1048,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when
       await manager.onSessionCreated(createSessionCreatedEvent("ses_dup", "ses_parent", "Duplicate Task"))
@@ -1082,7 +1104,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_1", "ses_parent", "Task 1"))
       await manager.onSessionCreated(createSessionCreatedEvent("ses_2", "ses_parent", "Task 2"))
@@ -1139,7 +1161,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 120,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         await manager.onSessionCreated(createSessionCreatedEvent("ses_cmux", "ses_parent", "Task cmux"))
         // sanity: it was deferred
@@ -1199,7 +1221,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 120,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         await manager.onSessionCreated(createSessionCreatedEvent("ses_std", "ses_parent", "Task std"))
         expect(getManagerInternals(manager).deferredQueue).toContain("ses_std")
@@ -1259,7 +1281,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 120,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         // when — session created with the selected inline eligibility predicate
         await manager.onSessionCreated(createSessionCreatedEvent("ses_headless", "ses_parent", "Task headless"))
@@ -1322,7 +1344,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_once", "ses_parent", "Task Once"))
 
@@ -1358,7 +1380,9 @@ describe("TmuxSessionManager", () => {
       )
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_pending_race", "ses_parent", "Pending Race Task"))
       expect(getManagerInternals(manager).deferredQueue).toEqual(["ses_pending_race"])
@@ -1396,7 +1420,9 @@ describe("TmuxSessionManager", () => {
       )
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_bounce", "ses_parent", "Bounce Task"))
       expect(getManagerInternals(manager).deferredQueue).toEqual(["ses_bounce"])
@@ -1442,7 +1468,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 120,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_pending", "ses_parent", "Pending Task"))
       expect(getManagerInternals(manager).deferredQueue).toEqual(["ses_pending"])
@@ -1474,7 +1500,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         // when
         await manager.onSessionCreated(
@@ -1506,7 +1532,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         await manager.onSessionCreated(
           createSessionCreatedEvent("ses_isolated_retry", "ses_parent", "Isolated Retry Task"),
@@ -1538,13 +1564,23 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         // when
         await manager.onSessionCreated(createSessionCreatedEvent("ses_null_state", "ses_parent", "Null State Task"))
 
         // then
         expect(getManagerInternals(manager).deferredQueue).toEqual(["ses_null_state"])
+
+        // and: the armed deferred-attach interval is released again, so no 2 s timer outlives the
+        // test and leaks its respawn-pane into whichever test runs next (#11436)
+        expect(logSpy.mock.calls.some(([message]) => String(message).includes("deferred attach polling started"))).toBe(
+          true,
+        )
+        await manager.cleanup()
+        expect(logSpy.mock.calls.some(([message]) => String(message).includes("deferred attach polling stopped"))).toBe(
+          true,
+        )
 
         logSpy.mockRestore()
       })
@@ -1588,7 +1624,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
 
@@ -1628,7 +1664,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         // when
         await manager.onSessionCreated(
@@ -1676,7 +1712,7 @@ describe("TmuxSessionManager", () => {
           main_pane_min_width: 80,
           agent_pane_min_width: 40,
         })
-        const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+        const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
         // when
         await manager.onSessionCreated(
@@ -1706,7 +1742,7 @@ describe("TmuxSessionManager", () => {
       const { TmuxSessionManager } = await import("./manager")
       const ctx = createMockContext()
       const config = createTmuxConfig({ enabled: true })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
       const event = createSessionCreatedEvent("ses_wait", "ses_parent", "Wait For Ready")
 
       // when
@@ -1739,7 +1775,9 @@ describe("TmuxSessionManager", () => {
       const logSpy = spyOn(sharedModule, "log").mockImplementation(() => {})
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       // when
       await manager.onSessionCreated(createSessionCreatedEvent("ses_timeout", "ses_parent", "Timeout Task"))
@@ -1771,10 +1809,12 @@ describe("TmuxSessionManager", () => {
       }
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext({ sessionStatusResult }),
+          createTmuxConfig({ enabled: true }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -1811,10 +1851,12 @@ describe("TmuxSessionManager", () => {
       }
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext({ sessionStatusResult }),
+          createTmuxConfig({ enabled: true }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -1850,10 +1892,12 @@ describe("TmuxSessionManager", () => {
       }
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext({ sessionStatusResult }),
+          createTmuxConfig({ enabled: true }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -1883,10 +1927,12 @@ describe("TmuxSessionManager", () => {
       })
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult: { data: { ses_expired: { type: "idle" } } } }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext({ sessionStatusResult: { data: { ses_expired: { type: "idle" } } } }),
+          createTmuxConfig({ enabled: true }),
+          mockTmuxDeps,
+        ),
       )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_expired", "ses_parent", "Expired Retry Session"))
@@ -1909,10 +1955,12 @@ describe("TmuxSessionManager", () => {
       mockIsInsideTmux.mockReturnValue(true)
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext({ sessionStatusResult: { data: { ses_bounce: { type: "idle" } } } }),
-        createTmuxConfig({ enabled: true }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext({ sessionStatusResult: { data: { ses_bounce: { type: "idle" } } } }),
+          createTmuxConfig({ enabled: true }),
+          mockTmuxDeps,
+        ),
       )
 
       getFailedReadinessSessions(manager).set("ses_bounce", {
@@ -1944,7 +1992,9 @@ describe("TmuxSessionManager", () => {
       })
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
       const event = createSessionCreatedEvent("ses_dup_pending", "ses_parent", "Duplicate Pending")
 
       // when
@@ -1986,7 +2036,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_timeout", "ses_parent", "Timeout Task"))
       mockExecuteAction.mockClear()
@@ -2032,7 +2082,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_child", "ses_parent", "Background: Test Task"))
       mockExecuteAction.mockClear()
@@ -2100,7 +2150,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
       mockExecuteAction.mockClear()
@@ -2168,7 +2218,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
       mockExecuteAction.mockClear()
@@ -2254,7 +2304,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
       await manager.onSessionCreated(createSessionCreatedEvent("ses_second", "ses_parent", "Second Task"))
@@ -2355,7 +2405,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
       await manager.onSessionCreated(createSessionCreatedEvent("ses_second", "ses_parent", "Second Task"))
@@ -2401,7 +2451,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       // when
       await manager.onSessionDeleted({ sessionID: "ses_unknown" })
@@ -2470,13 +2520,15 @@ describe("TmuxSessionManager", () => {
       })
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
@@ -2574,13 +2626,15 @@ describe("TmuxSessionManager", () => {
       })
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
@@ -2656,13 +2710,15 @@ describe("TmuxSessionManager", () => {
       })
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_first", "ses_parent", "First Task"))
@@ -2726,7 +2782,7 @@ describe("TmuxSessionManager", () => {
         main_pane_min_width: 80,
         agent_pane_min_width: 40,
       })
-      const manager = new TmuxSessionManager(ctx, config, mockTmuxDeps)
+      const manager = trackedManager(new TmuxSessionManager(ctx, config, mockTmuxDeps))
 
       await manager.onSessionCreated(createSessionCreatedEvent("ses_1", "ses_parent", "Task 1"))
       await manager.onSessionCreated(createSessionCreatedEvent("ses_2", "ses_parent", "Task 2"))
@@ -2744,13 +2800,15 @@ describe("TmuxSessionManager", () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2765,21 +2823,25 @@ describe("TmuxSessionManager", () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()
       const { TmuxSessionManager } = await import("./manager")
-      const managerA = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const managerA = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
-      const managerB = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const managerB = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2798,13 +2860,15 @@ describe("TmuxSessionManager", () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "inline",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "inline",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2818,13 +2882,15 @@ describe("TmuxSessionManager", () => {
       // given
       mockKillTmuxSessionIfExists.mockClear()
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "window",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "window",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2841,13 +2907,15 @@ describe("TmuxSessionManager", () => {
       mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "inline",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "inline",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2866,13 +2934,15 @@ describe("TmuxSessionManager", () => {
       mockSweepStaleOmoAttachPanes.mockImplementation(async () => 0)
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "window",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "window",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2892,13 +2962,15 @@ describe("TmuxSessionManager", () => {
       })
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2916,13 +2988,15 @@ describe("TmuxSessionManager", () => {
       mockSweepStaleOmoAttachPanes.mockClear()
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2941,13 +3015,15 @@ describe("TmuxSessionManager", () => {
       mockSweepStaleOmoAttachPanes.mockImplementation(async () => 1)
       mockIsInsideTmux.mockReturnValue(true)
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "inline",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "inline",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -2966,13 +3042,15 @@ describe("TmuxSessionManager", () => {
         throw new Error("simulated teardown failure")
       })
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(
-        createMockContext(),
-        createTmuxConfig({
-          enabled: true,
-          isolation: "session",
-        }),
-        mockTmuxDeps,
+      const manager = trackedManager(
+        new TmuxSessionManager(
+          createMockContext(),
+          createTmuxConfig({
+            enabled: true,
+            isolation: "session",
+          }),
+          mockTmuxDeps,
+        ),
       )
 
       // when
@@ -3017,7 +3095,9 @@ describe("TmuxSessionManager", () => {
       )
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       const internalSessions = Reflect.get(manager, "sessions") as Map<string, Record<string, unknown>>
       internalSessions.set("ses_zombie", {
@@ -3064,7 +3144,9 @@ describe("TmuxSessionManager", () => {
       )
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       const internalSessions = Reflect.get(manager, "sessions") as Map<string, Record<string, unknown>>
       internalSessions.set("ses_zombie", {
@@ -3112,7 +3194,9 @@ describe("TmuxSessionManager", () => {
       )
 
       const { TmuxSessionManager } = await import("./manager")
-      const manager = new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps)
+      const manager = trackedManager(
+        new TmuxSessionManager(createMockContext(), createTmuxConfig({ enabled: true }), mockTmuxDeps),
+      )
 
       const futureCooldown = new Date(Date.now() + 10 * 60 * 1000)
       const internalSessions = Reflect.get(manager, "sessions") as Map<string, Record<string, unknown>>
