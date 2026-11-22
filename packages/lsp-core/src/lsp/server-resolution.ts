@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs"
+import { dirname, join } from "node:path"
+
 import { contextCwd } from "../request-context.js"
-import { getDisabledServerIds, getMergedServers } from "./config-loader.js"
+import { getDisabledServerIds, getMergedServers, type ServerWithSource } from "./config-loader.js"
 import { withHostJsRuntime } from "./host-js-runtime.js"
 import { BUILTIN_SERVERS, LSP_INSTALL_HINTS } from "./server-definitions.js"
 import { isServerInstalled, resolveServerBinary } from "./server-installation.js"
@@ -22,12 +25,40 @@ function usesBuiltinCommand(id: string, command: string[]): boolean {
   )
 }
 
+/**
+ * TypeScript 7 serves LSP itself (`tsc --lsp --stdio`) and no longer ships the
+ * `lib/tsserver.js` that typescript-language-server wraps. Only the project's own
+ * `node_modules/.bin/tsc` decides, so a global compiler never changes the server.
+ */
+function nativeTypescriptCommand(server: ServerWithSource, workingDirectory: string): string[] | null {
+  if (server.id !== "typescript" || !usesBuiltinCommand(server.id, server.command)) return null
+  const tsc = resolveServerBinary(["tsc"], workingDirectory, { localOnly: true })
+  if (tsc === null) return null
+  const packageDir = join(dirname(tsc), "..", "typescript")
+  const speaksLsp = existsSync(join(packageDir, "package.json")) && !existsSync(join(packageDir, "lib", "tsserver.js"))
+  return speaksLsp ? [tsc, "--lsp", "--stdio"] : null
+}
+
 export function findServerForExtension(ext: string): ServerLookupResult {
   const servers = getMergedServers()
   const workingDirectory = contextCwd()
 
   for (const server of servers) {
     if (!server.extensions.includes(ext)) continue
+    const nativeTypescript = nativeTypescriptCommand(server, workingDirectory)
+    if (nativeTypescript !== null) {
+      // The builtin initialization is typescript-language-server's option set; tsc gets none.
+      return {
+        status: "found",
+        server: {
+          id: server.id,
+          command: withHostJsRuntime(server.id, nativeTypescript),
+          extensions: server.extensions,
+          priority: server.priority,
+          ...(server.env === undefined ? {} : { env: server.env }),
+        },
+      }
+    }
     const binaryPath = resolveServerBinary(server.command, workingDirectory)
     if (binaryPath !== null) {
       const resolvedServer = {
@@ -102,7 +133,9 @@ export function getAllServers(): ServerStatus[] {
     if (seen.has(server.id)) continue
     result.push({
       id: server.id,
-      installed: isServerInstalled(server.command, workingDirectory),
+      installed:
+        isServerInstalled(server.command, workingDirectory) ||
+        nativeTypescriptCommand(server, workingDirectory) !== null,
       extensions: server.extensions,
       disabled: false,
       source: server.source,

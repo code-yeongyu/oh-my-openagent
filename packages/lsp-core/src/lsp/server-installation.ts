@@ -55,6 +55,8 @@ export interface ResolveServerBinaryOptions {
    * confine resolution to a trusted request cwd.
    */
   readonly stopAt?: string
+  /** Only marker-gated repo-local bin directories count; `PATH` is not searched. */
+  readonly localOnly?: boolean
   readonly platform?: NodeJS.Platform
   readonly pathExt?: string
   readonly pathEnv?: string
@@ -180,6 +182,7 @@ export function resolveServerBinary(
     cmd,
     platform,
     options.stopAt ?? "",
+    options.localOnly === true,
     options.pathExt ?? "",
     options.pathEnv ?? process.env["PATH"] ?? "",
   ])
@@ -189,6 +192,10 @@ export function resolveServerBinary(
   let resolved: string | null = null
   if (workingDirectory !== undefined && workingDirectory.length > 0) {
     resolved = resolveLocal(cmd, workingDirectory, suffixes, options.stopAt)
+  }
+  if (options.localOnly === true) {
+    resolutionCache.set(cacheKey, resolved)
+    return resolved
   }
   resolved ??= resolveFromPath(cmd, suffixes, platform, options.pathEnv)
   // A configured server may be launched through the interpreter itself, e.g.
