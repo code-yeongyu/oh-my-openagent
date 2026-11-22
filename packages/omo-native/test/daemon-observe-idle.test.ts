@@ -76,6 +76,9 @@ if (process.platform !== "win32") {
         const supervisorPid = await ensureShard(socket, {
           ...env,
           SENPI_RPC_HOST_IDLE_EXIT_MS: String(OBSERVED_IDLE_EXIT_MS),
+          // This test waits for the reaped child. Do not extend its ordinary 5 s
+          // TERM window to 60 s when the fixture's child reports loop lag.
+          SENPI_RPC_CHILD_STALLED_STOP_MAX_MS: "5000",
         })
 
         const reachableReads = await observeUntilReleased(agentDir, socket)
