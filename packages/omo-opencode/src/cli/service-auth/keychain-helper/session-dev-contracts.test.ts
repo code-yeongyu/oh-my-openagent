@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { heldCredentialLease, withCredentialLock } from "../credential-lock"
 import { credentialId, InvalidCredentialState, KeychainApprovalPendingError } from "../keystore"
-import { fakeApi, grant, temporaryHome } from "../test-support"
+import { fakeApi, noOwnDevice, grant, temporaryHome } from "../test-support"
 import { A, API, credentials, fakeKeychain, helperSession } from "./fake-keychain.test-support"
 
 const stored = JSON.stringify(credentials)
@@ -64,7 +64,9 @@ describe("the keychain helper path under dev's credential contracts", () => {
 
   test("#given an expired helper-owned sign-in #when a token is needed #then the journal and the rotated tokens go through the helper under the lease", async () => {
     let refreshes = 0
-    const api = fakeApi(async () => {
+    const api = fakeApi(async (request) => {
+      const listed = noOwnDevice(request)
+      if (listed !== undefined) return listed
       refreshes++
       return Response.json({ ...grant, accessToken: "new-access", refreshToken: "new-refresh" })
     })

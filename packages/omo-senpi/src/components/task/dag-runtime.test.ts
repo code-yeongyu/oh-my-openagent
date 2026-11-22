@@ -3,7 +3,7 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { loadOmoConfig, OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
+import { loadOmoConfig, OmoTaskSettingsSchema, type OmoConfig } from "@oh-my-opencode/omo-config-core"
 import {
   type ManagedChildEvent,
   type ManagedChildHandle,
@@ -28,6 +28,13 @@ import { composeTaskEngine, type TaskEngine, type TaskRunnerFactories } from "./
 import type { CapturedUi } from "./runtime-context"
 import { createTeamServiceTestModelRegistry } from "./team-service-test-model-registry"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+
+// These fixtures route nodes by agent with a mock call-site model. A builtin agent refuses a
+// call-site model (#14367), so they name this custom agent instead.
+function dagTestConfig(cwd: string): OmoConfig {
+  const config = loadOmoConfig({ cwd }).config
+  return { ...config, agents: { ...config.agents, "dag-worker": { description: "dag test worker" } } }
+}
 
 const cleanupRoots: string[] = []
 // Every engine a test composes starts an idle reclaimer timer; its lifecycle is disposed when the
@@ -187,7 +194,7 @@ async function seedPendingRun(cwd: string, runId: DagRunId, sessionId: string): 
     definition: {
       key: `recovery-${runId}`,
       name: "adapter recovery",
-      nodes: [{ id: "resume", prompt: "resume", subagent_type: "explore", model: "omo-mock/mock-1" }],
+      nodes: [{ id: "resume", prompt: "resume", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
     },
   })
 }
@@ -243,7 +250,7 @@ describe("assembled DAG runtime", () => {
       })
       const engine = trackedEngine({
         pi,
-        omoConfig: loadOmoConfig({ cwd }).config,
+        omoConfig: dagTestConfig(cwd),
         cwd,
         sharedParentTools: () => [],
         runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -267,7 +274,7 @@ describe("assembled DAG runtime", () => {
         definition: {
           key: "assembled-activity",
           name: "assembled activity",
-          nodes: [{ id: "active", prompt: "work", subagent_type: "explore", model: "omo-mock/mock-1" }],
+          nodes: [{ id: "active", prompt: "work", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
         },
       })
       await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
@@ -320,7 +327,7 @@ describe("assembled DAG runtime", () => {
     const pi = new FakeExtensionAPI()
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -344,7 +351,7 @@ describe("assembled DAG runtime", () => {
             id: "missing",
             prompt: "original prompt",
             load_skills: ["definitely-not-a-real-skill-f3"],
-            subagent_type: "explore",
+            subagent_type: "dag-worker",
             model: "omo-mock/mock-1",
           },
         ],
@@ -386,7 +393,7 @@ describe("assembled DAG runtime", () => {
       const pi = new FakeExtensionAPI()
       const engine = trackedEngine({
         pi,
-        omoConfig: loadOmoConfig({ cwd }).config,
+        omoConfig: dagTestConfig(cwd),
         cwd,
         sharedParentTools: () => [],
         runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -406,7 +413,7 @@ describe("assembled DAG runtime", () => {
         definition: {
           key: "assembled-wake-redelivery",
           name: "assembled wake redelivery",
-          nodes: [{ id: "complete", prompt: "complete", subagent_type: "explore", model: "omo-mock/mock-1" }],
+          nodes: [{ id: "complete", prompt: "complete", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
         },
       })
       await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
@@ -448,7 +455,7 @@ describe("assembled DAG runtime", () => {
     const coordinator = new IdleInjectionCoordinator(() => undefined)
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories,
@@ -482,7 +489,7 @@ describe("assembled DAG runtime", () => {
         definition: {
           key: "run-completed",
           name: "run completed",
-          nodes: [{ id: "only", prompt: "only", subagent_type: "explore", model: "omo-mock/mock-1" }],
+          nodes: [{ id: "only", prompt: "only", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
         },
       },
     )
@@ -531,7 +538,7 @@ describe("assembled DAG runtime", () => {
       })
       const engine = trackedEngine({
         pi,
-        omoConfig: loadOmoConfig({ cwd }).config,
+        omoConfig: dagTestConfig(cwd),
         cwd,
         sharedParentTools: () => [],
         runnerFactories,
@@ -564,8 +571,14 @@ describe("assembled DAG runtime", () => {
             key: "assembled-two-node",
             name: "assembled two node",
             nodes: [
-              { id: "plan", prompt: "plan", subagent_type: "explore", model: "omo-mock/mock-1" },
-              { id: "build", prompt: "build", subagent_type: "explore", model: "omo-mock/mock-1", dependsOn: ["plan"] },
+              { id: "plan", prompt: "plan", subagent_type: "dag-worker", model: "omo-mock/mock-1" },
+              {
+                id: "build",
+                prompt: "build",
+                subagent_type: "dag-worker",
+                model: "omo-mock/mock-1",
+                dependsOn: ["plan"],
+              },
             ],
           },
         },
@@ -616,8 +629,14 @@ describe("assembled DAG runtime", () => {
             key: "assembled-cancel",
             name: "assembled cancel",
             nodes: [
-              { id: "hold", prompt: "hold", subagent_type: "explore", model: "omo-mock/mock-1" },
-              { id: "never", prompt: "never", subagent_type: "explore", model: "omo-mock/mock-1", dependsOn: ["hold"] },
+              { id: "hold", prompt: "hold", subagent_type: "dag-worker", model: "omo-mock/mock-1" },
+              {
+                id: "never",
+                prompt: "never",
+                subagent_type: "dag-worker",
+                model: "omo-mock/mock-1",
+                dependsOn: ["hold"],
+              },
             ],
           },
         },
@@ -652,7 +671,7 @@ describe("assembled DAG runtime", () => {
           definition: {
             key: "assembled-copy-failure",
             name: "assembled copy failure",
-            nodes: [{ id: "copy", prompt: "copy", subagent_type: "explore", model: "omo-mock/mock-1" }],
+            nodes: [{ id: "copy", prompt: "copy", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
           },
         },
       )
@@ -732,7 +751,7 @@ describe("assembled DAG runtime", () => {
         })
         const engine = trackedEngine({
           pi,
-          omoConfig: loadOmoConfig({ cwd }).config,
+          omoConfig: dagTestConfig(cwd),
           cwd,
           sharedParentTools: () => [],
           runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -750,7 +769,7 @@ describe("assembled DAG runtime", () => {
           definition: {
             key: "abort-boundary",
             name: "abort boundary",
-            nodes: [{ id: "active", prompt: "active", subagent_type: "explore", model: "omo-mock/mock-1" }],
+            nodes: [{ id: "active", prompt: "active", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
           },
         })
         await within(runner.whenStarted(1), remainingTestTime(), "runner.whenStarted(1)")
@@ -771,7 +790,7 @@ describe("assembled DAG runtime", () => {
             definition: {
               key: "after-abort-boundary",
               name: "after abort boundary",
-              nodes: [{ id: "survivor", prompt: "survive", subagent_type: "explore", model: "omo-mock/mock-1" }],
+              nodes: [{ id: "survivor", prompt: "survive", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
             },
           })
           await within(runner.whenStarted(2), remainingTestTime(), "runner.whenStarted(2)")
@@ -821,7 +840,7 @@ describe("assembled DAG runtime", () => {
     const pi = new FakeExtensionAPI()
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -843,7 +862,7 @@ describe("assembled DAG runtime", () => {
       definition: {
         key: "detach-running",
         name: "detach running",
-        nodes: [{ id: "active", prompt: "active", subagent_type: "explore", model: "omo-mock/mock-1" }],
+        nodes: [{ id: "active", prompt: "active", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
       },
     })
     const runId = started.snapshot.runId
@@ -881,7 +900,7 @@ describe("assembled DAG runtime", () => {
     })
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -900,7 +919,7 @@ describe("assembled DAG runtime", () => {
       definition: {
         key: "throwing-subscriber",
         name: "throwing subscriber",
-        nodes: [{ id: "survivor", prompt: "survive", subagent_type: "explore", model: "omo-mock/mock-1" }],
+        nodes: [{ id: "survivor", prompt: "survive", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
       },
     })
     const runId = started.snapshot.runId
@@ -925,7 +944,7 @@ describe("assembled DAG runtime", () => {
     const firstPi = new FakeExtensionAPI()
     const firstEngine = trackedEngine({
       pi: firstPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => new ScriptedRunner(), process: () => new ScriptedRunner() },
@@ -958,7 +977,7 @@ describe("assembled DAG runtime", () => {
     const resumedPi = new FakeExtensionAPI()
     const resumedEngine = trackedEngine({
       pi: resumedPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => resumedRunner, process: () => resumedRunner },
@@ -993,7 +1012,7 @@ describe("assembled DAG runtime", () => {
     const firstPi = new FakeExtensionAPI()
     const firstEngine = trackedEngine({
       pi: firstPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => new ScriptedRunner(), process: () => new ScriptedRunner() },
@@ -1029,7 +1048,7 @@ describe("assembled DAG runtime", () => {
     })
     const resumedEngine = trackedEngine({
       pi: resumedPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => resumedRunner, process: () => resumedRunner },
@@ -1087,7 +1106,7 @@ describe("assembled DAG runtime", () => {
         handle: () => undefined,
       },
     })
-    const baseConfig = loadOmoConfig({ cwd }).config
+    const baseConfig = dagTestConfig(cwd)
     const engine = trackedEngine({
       pi,
       omoConfig: {
@@ -1134,7 +1153,7 @@ describe("assembled DAG runtime", () => {
     const firstPi = new FakeExtensionAPI()
     const firstEngine = trackedEngine({
       pi: firstPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
     })
@@ -1154,7 +1173,7 @@ describe("assembled DAG runtime", () => {
     const secondPi = new FakeExtensionAPI()
     const secondEngine = trackedEngine({
       pi: secondPi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
     })
@@ -1192,7 +1211,7 @@ describe("dag runtime node spawn policy", () => {
     const pi = new FakeExtensionAPI()
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories,
@@ -1225,9 +1244,7 @@ describe("dag runtime node spawn policy", () => {
         definition: {
           key: "policy-denied",
           name: "policy denied",
-          nodes: [
-            { id: "review", prompt: "review the plan", subagent_type: "plan-reviewer", model: "omo-mock/mock-1" },
-          ],
+          nodes: [{ id: "review", prompt: "review the plan", subagent_type: "dag-worker", model: "omo-mock/mock-1" }],
         },
       },
     )
@@ -1294,7 +1311,7 @@ describe("assembled DAG runtime control verbs", () => {
     const sessionId = `session-${name}`
     const engine = trackedEngine({
       pi,
-      omoConfig: loadOmoConfig({ cwd }).config,
+      omoConfig: dagTestConfig(cwd),
       cwd,
       sharedParentTools: () => [],
       runnerFactories: { inProcess: () => runner, process: () => runner },
@@ -1323,7 +1340,7 @@ describe("assembled DAG runtime control verbs", () => {
         nodes: nodes.map((node) => ({
           id: node.id,
           prompt: `do ${node.id}`,
-          subagent_type: "explore",
+          subagent_type: "dag-worker",
           model: "omo-mock/mock-1",
           ...(node.dependsOn === undefined ? {} : { dependsOn: [...node.dependsOn] }),
         })),
@@ -1525,11 +1542,11 @@ describe("assembled DAG runtime control verbs", () => {
           key: "amend-reentry",
           name: "amend-reentry",
           nodes: [
-            { id: "plan", prompt: "do plan", subagent_type: "explore", model: "omo-mock/mock-1" },
+            { id: "plan", prompt: "do plan", subagent_type: "dag-worker", model: "omo-mock/mock-1" },
             {
               id: "build",
               prompt: "do build CAREFULLY",
-              subagent_type: "explore",
+              subagent_type: "dag-worker",
               model: "omo-mock/mock-1",
               dependsOn: ["plan"],
             },

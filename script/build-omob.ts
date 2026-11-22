@@ -27,6 +27,7 @@ import { writeProvenanceMarker } from "./omob-provenance"
 import { pruneOmobRuntimes } from "./omob-runtime-prune"
 import { resetSenpiWorkspaceInstalls } from "./omob-senpi-workspace-reset"
 import { installSenpiTarball } from "./omob-senpi-install"
+import { placeBuiltSenpi } from "./omob-senpi-swap"
 export { installOmobLauncher, isCurrentOmobBuild } from "./omob-launcher"
 
 export interface OmobOptions {
@@ -511,10 +512,7 @@ function materializeNestedLockDeps(senpiRoot: string): void {
 }
 
 function swapSenpi(omoDir: string, builtSenpiRoot: string): void {
-  const target = join(omoDir, "node_modules", "@code-yeongyu", "senpi")
-  if (existsSync(target)) rmSync(target, { recursive: true, force: true })
-  mkdirSync(dirname(target), { recursive: true })
-  cpSync(builtSenpiRoot, target, { recursive: true })
+  const target = placeBuiltSenpi(omoDir, builtSenpiRoot)
   // Re-apply the launcher's claude-code version floor patch on the swapped engine.
   run("bun", [join("packages", "omo-native", "bin", "senpi-patch.mjs")], omoDir, {
     ...process.env,

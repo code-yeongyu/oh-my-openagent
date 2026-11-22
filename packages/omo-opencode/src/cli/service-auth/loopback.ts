@@ -1,7 +1,8 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
 import { createServer } from "node:http"
-import { type MachineSignIn, prepareMachineSignIn } from "./machine-binding"
+import { generateDeviceKeys } from "./device-keys"
 import {
+  ApiRefusal,
   type ChooseDevice,
   grantSchema,
   jsonRequest,
@@ -109,41 +110,36 @@ export async function loginLoopback(
     readonly platform: Platform
     readonly open: (url: string) => Promise<boolean>
     readonly chooseDevice: ChooseDevice
-    /** The machine binding (omo-service#1016); absent, the sign-in registers unbound as before. */
-    readonly machine?: (session: Session) => Promise<MachineSignIn>
+    /** This machine's hardware digest (#6503), sent only when the service advertises machine identity. */
+    readonly machineDigest?: string
   },
 ): Promise<void> {
   await session.ready()
-  const machine = await (
-    options.machine ?? (() => prepareMachineSignIn({ stored: null, local: undefined, deviceService: undefined }))
-  )(session)
-  const keys = machine.keys
+  const keys = generateDeviceKeys()
   for (;;) {
     const authorization = await authorize({ accounts: options.accounts, open: options.open, signal: session.signal })
-    // A machine_hash_required refusal leaves the code unconsumed, so the same verifier retries once with the hash.
-    for (;;) {
-      try {
-        const grant = parseReply(
-          grantSchema,
-          await session.request(
-            "/v1/session/exchange",
-            jsonRequest({
-              ...authorization,
-              kind: "cli",
-              deviceName: options.name,
-              platform: options.platform,
-              ...keys.public,
-              ...machine.fields(),
-            }),
-          ),
-        )
-        await session.save({ ...grant, ...keys.private }, { adopt: machine.adopt() })
-        return
-      } catch (error) {
-        if (await machine.retry(error)) continue
-        if (await session.removeForLimit(error, options.chooseDevice)) break
-        throw new SignInError("Sign-in cancelled. No device was removed.")
-      }
+    try {
+      const grant = parseReply(
+        grantSchema,
+        await session.request(
+          "/v1/session/exchange",
+          jsonRequest({
+            ...authorization,
+            kind: "cli",
+            deviceName: options.name,
+            platform: options.platform,
+            ...keys.public,
+            ...(options.machineDigest === undefined ? {} : { machineDigest: options.machineDigest }),
+          }),
+        ),
+      )
+      await session.save({ ...grant, ...keys.private })
+      return
+    } catch (error) {
+      // #6503: this machine already has its device. Terminal: never retried, never a reason to remove or inherit that device.
+      if (error instanceof ApiRefusal && error.code === "machine_exists") throw error
+      if (await session.removeForLimit(error, options.chooseDevice)) continue
+      throw new SignInError("Sign-in cancelled. No device was removed.")
     }
   }
 }

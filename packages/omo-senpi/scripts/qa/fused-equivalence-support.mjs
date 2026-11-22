@@ -3,6 +3,7 @@
 // Kept apart from fused-equivalence-e2e.mjs so each rule has its own unit test (fused-equivalence-support.test.mjs).
 import { spawnSync } from "node:child_process"
 import { cpSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 
 /**
@@ -227,4 +228,17 @@ export function stopSandboxProcesses(
     survivors = matching()
   }
   return { signalled: pids.length, survivors, errors }
+}
+
+/**
+ * Points TMPDIR at the physical directory behind it. The driver and the harness make every sandbox under
+ * `os.tmpdir()`, and a CLI child reports its cwd by physical path. Where the temp dir is a symlink (macOS `/tmp` and
+ * `/var/folders/...` point into `/private`) the two spellings differ: the normalizer then leaves `/private` in front
+ * of `<sandbox>`, and the project is no longer the path the case trusted, so `projectTrusted` records false. A
+ * recording must not depend on how its host spells the temp dir.
+ */
+export function resolveTmpdirSymlinks(env = process.env) {
+  const physical = realpathSync(env.TMPDIR || tmpdir())
+  env.TMPDIR = physical
+  return physical
 }

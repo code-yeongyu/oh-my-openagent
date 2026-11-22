@@ -32,7 +32,13 @@ const roots: string[] = []
 const stores: GatewayStore[] = []
 const sessions: Session[] = []
 afterEach(async () => {
-  for (const session of sessions.splice(0)) session.dispose()
+  // senpi's fallback logger finishes its first-start removal asynchronously; removing the agent dir before it settles leaks it (#9766).
+  await Promise.all(
+    sessions.splice(0).map((session) => {
+      session.dispose()
+      return session.whenToolChildClosed()
+    }),
+  )
   await Promise.all(stores.splice(0).map((store) => store.dispose()))
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
@@ -176,8 +182,8 @@ describe("thread tools are eval-only, like bash", () => {
 
     // then: the call reached the tool and listed the fixture peer
     expect(listed).toMatchObject({ kind: "ok", scope: "all" })
-    const threads = (listed as unknown as { threads: Array<{ thread_id: string; cwd: string }> }).threads
-    expect(threads.map((thread) => thread.thread_id)).toEqual(["dur-peer"])
+    const threads = (listed as unknown as { threads: Array<{ thread: string; cwd: string }> }).threads
+    expect(threads.map((thread) => thread.thread)).toEqual(["dur-peer"])
     expect(threads[0]?.cwd).toBe(root)
     // then: the eval path did not activate the tool
     expect(session.getActiveToolNames().filter((name) => THREAD_TOOL_NAMES.includes(name))).toEqual([])

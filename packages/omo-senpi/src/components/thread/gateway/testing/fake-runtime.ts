@@ -23,6 +23,8 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   phaseValue: RuntimePhase = "idle"
   epoch = 0
   editorHold: "draft" | undefined = undefined
+  /** senpi#7014: an idle session under these holds keeps a delivery as a held notice and answers `held`. */
+  sessionHolds: readonly string[] = []
   editorRevision = 0
   closedReason: string | undefined
   readonly enqueueCalls: { readonly lane: Lane; readonly delivery_id: string }[] = []
@@ -66,6 +68,10 @@ export class FakeSessionRuntime implements SessionRuntimePort {
       return { kind: "turn_conflict", turn_epoch: turnEpoch }
     this.texts.set(id, input.text)
     this.inputs.set(id, input)
+    if (!this.isBusy() && this.sessionHolds.length > 0) {
+      this.pending.set(id, "followUp")
+      return { kind: "held", turn_epoch: turnEpoch }
+    }
     if (!this.isBusy()) {
       this.pending.set(id, "start")
       this.enqueueCalls.push({ lane: "start", delivery_id: id })

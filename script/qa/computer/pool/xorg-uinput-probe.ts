@@ -5,6 +5,7 @@
 // but a GitHub-hosted runner.
 //
 //   bun script/qa/computer/pool/xorg-uinput-probe.ts [--runs <n>] [--ledger <file.tsv>] [--workdir <dir>]
+//   bun script/qa/computer/pool/xorg-uinput-probe.ts --teardown-check   (read-only: the job's teardown receipts)
 
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -19,6 +20,7 @@ import {
   type Reading,
   summaryLines,
 } from "./xorg-uinput-ledger.ts"
+import { collectTeardownFacts, judgeTeardown } from "./teardown-check.ts"
 import { run } from "./xorg-session.ts"
 import { measureOnce } from "./xorg-uinput-run.ts"
 
@@ -59,6 +61,11 @@ async function hostBuild(): Promise<string> {
 }
 
 async function main(argv: readonly string[]): Promise<number> {
+  if (argv.length === 1 && argv[0] === "--teardown-check") {
+    const { lines, ok } = judgeTeardown(await collectTeardownFacts())
+    for (const line of lines) console.log(line)
+    return ok ? 0 : 1
+  }
   let args: Args
   try {
     args = parseArgs(argv)

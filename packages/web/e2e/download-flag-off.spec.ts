@@ -1,15 +1,28 @@
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
 import { test, expect } from "@playwright/test"
+
+import { defaultLocale, locales } from "../i18n/config"
+
+/** The hero's download label in one locale, from that locale's own message file. */
+const heroDownloadLabel = (locale: string): string =>
+  JSON.parse(readFileSync(resolve(__dirname, `../messages/${locale}.json`), "utf8")).home.hero
+    .download
 
 // Production builds leave OMO_WEB_DESKTOP_DOWNLOAD unset: until the desktop app launches, nothing
 // on the site may lead to the download page. This spec runs against such a build
 // (playwright.flag-off.config.ts); a gate removed from any entry point fails it.
 test.describe("Download page while the launch flag is off", () => {
-  test("/download goes to the public beta download page in any language", async ({ request }) => {
+  test("/download goes to the public stable download page in any language", async ({ request }) => {
     // Shipped desktop builds link /download; this site's own page stays off, so it must not 404.
-    for (const path of ["/download", "/ko/download", "/download?channel=beta"]) {
+    for (const [path, location] of [
+      ["/download", "https://get.omo.dev/desktop/stable/"],
+      ["/ko/download", "https://get.omo.dev/desktop/stable/"],
+      ["/download?channel=beta", "https://get.omo.dev/desktop/beta/"],
+    ] as const) {
       const response = await request.get(path, { maxRedirects: 0 })
       expect(response.status(), path).toBe(307)
-      expect(response.headers()["location"], path).toBe("https://get.omo.dev/desktop/beta/")
+      expect(response.headers()["location"], path).toBe(location)
     }
   })
 
@@ -18,14 +31,21 @@ test.describe("Download page while the launch flag is off", () => {
     expect(response.status()).toBe(404)
   })
 
-  test("the hero links the public desktop beta, not this site's own page", async ({ page }) => {
-    await page.goto("/")
-    await expect(page.getByTestId("hero-desktop-cta")).toHaveCount(0)
-    await expect(page.locator('a[href$="/download"]')).toHaveCount(0)
-    await expect(page.getByTestId("hero-desktop-beta-cta")).toHaveAttribute(
-      "href",
-      "https://get.omo.dev/desktop/beta/",
-    )
+  test("the hero links the public stable desktop page in every language, not this site's own page", async ({
+    page,
+  }) => {
+    // Every locale the site serves, from the registry: the default at "/", the rest under their prefix.
+    expect(locales).toHaveLength(9)
+    for (const locale of locales) {
+      const path = locale === defaultLocale ? "/" : `/${locale}`
+      await page.goto(path)
+      await expect(page.getByTestId("hero-desktop-cta"), path).toHaveCount(0)
+      await expect(page.locator('a[href$="/download"]'), path).toHaveCount(0)
+      const cta = page.getByTestId("hero-desktop-stable-cta")
+      await expect(cta, path).toHaveAttribute("href", "https://get.omo.dev/desktop/stable/")
+      await expect(cta, path).toHaveText(heroDownloadLabel(locale))
+      await expect(cta, path).not.toContainText(/beta|bêta|ベータ|베타|测试版/i)
+    }
   })
 
   test("the sitemap leaves the download page out", async ({ request }) => {

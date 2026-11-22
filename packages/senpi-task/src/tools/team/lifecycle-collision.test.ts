@@ -15,6 +15,7 @@ import { stateDirConfig, taskSettings } from "../../team/__fixtures__/runtime-fa
 import { createTaskRecordStore } from "../../store"
 import { createFakeTeamService } from "./__fixtures__/team-tool-fakes"
 import { createTeamCreateTool } from "./lifecycle"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -22,7 +23,7 @@ describe("team_create collision handling", () => {
   test("#given a first-save collision #when the real team_create tool creates a team #then the team activates without a member rejection or raw collision", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const manager = createTaskManager({
       store: collisionStore(inner).store,
       runners: { "in-process": new FakeRunner(), process: new FakeRunner() },

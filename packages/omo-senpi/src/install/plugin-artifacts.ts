@@ -26,6 +26,8 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("extensions", "loro_wasm_bg.wasm"),
   join("extensions", "CaseFolding.txt"),
   join("extensions", "omo-thread-client.js"),
+  // The wake runtime sidecar: the thread component's wake shells load it lazily (#13511).
+  join("extensions", "omo-wake.js"),
   join("extensions", "omo-telemetry-recovery.js"),
   join("extensions", "omo-feedback.js"),
   join("extensions", "omo-desktop-toolkit.js"),
@@ -68,6 +70,7 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   join("skills-conditional", "x-search", "SKILL.md"),
   join("runtime", "agent-toolkit-sdk", "sdk.js"),
   join("runtime", "bunshin-ts", "sdk.js"),
+  join("runtime", "omo-sdk", "sdk.js"),
   join("runtime", "thread-sdk", "sdk.js"),
   join("runtime", "ast-grep-mcp", "cli.js"),
   join("runtime", "lsp-daemon", "dist", "cli.js"),

@@ -1,0 +1,485 @@
+{
+  "comment": "synthetic fixture material only; the entropy is fill bytes, never a real phrase",
+  "account": "encoding-account",
+  "derivation": {
+    "salt_label": "omo-sync/v1/recovery-phrase-salt",
+    "seal_info": "omo-sync/v1/recovery-phrase-seal",
+    "sign_info": "omo-sync/v1/recovery-phrase-sign",
+    "keys": {
+      "phrase1": {
+        "entropy": "ZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWVlZWU",
+        "salt": "JG-9DMWHc-TWMZYbTytWZ4EyfRkhUgpz-m0Kl2J-HNA",
+        "credential_id": "Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+        "rp_id": "omo-sync/v1/recovery-phrase",
+        "enrollment_nonce": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
+        "sealing_public_key": "Ulom3__G0of2xahXBSfH7Qt9mT-HjTQclr_TT5pk_2c",
+        "signing_public_key": "NhnK1Q91ctNZP7TlxCW1ht6A79jkWS-fnu8JUNdsvhg",
+        "survivable": "phrase"
+      },
+      "phrase2": {
+        "entropy": "aGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGhoaGg",
+        "salt": "LHoyGVhh4B8sMH3sfDgszomgOPeZdQNQDlZuvUgc4tU",
+        "credential_id": "ampqampqampqampqampqag",
+        "rp_id": "omo-sync/v1/recovery-phrase",
+        "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+        "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+        "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+        "survivable": "phrase"
+      }
+    }
+  },
+  "main": ["phrase_genesis", "phrase_recovery_key"],
+  "branches": {
+    "fork": ["phrase_rotation_a", "phrase_fork_resolution"]
+  },
+  "records": {
+    "phrase_genesis": {
+      "seq": 1,
+      "base_seq": 0,
+      "kind": "keyring",
+      "account": "encoding-account",
+      "epoch": 1,
+      "author": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+      },
+      "body": {
+        "kind": "genesis",
+        "account": "encoding-account",
+        "epoch": 1,
+        "bootstrap": {
+          "account": "encoding-account",
+          "custody_nonce": "a2tra2tra2tra2tra2traw",
+          "first_device": {
+            "kind": "device",
+            "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+            "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+            "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+          },
+          "recovery_key": {
+            "credential_id": "Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+            "rp_id": "omo-sync/v1/recovery-phrase",
+            "enrollment_nonce": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
+            "sealing_public_key": "Ulom3__G0of2xahXBSfH7Qt9mT-HjTQclr_TT5pk_2c",
+            "signing_public_key": "NhnK1Q91ctNZP7TlxCW1ht6A79jkWS-fnu8JUNdsvhg",
+            "survivable": "phrase"
+          }
+        },
+        "custody_root": "jntUSQXk9ShuAhg0Yy6njSslay3ia2zobd3Wz1iTt4g",
+        "countersign": "M5nny1_lACt3FPb66t-qQW5hRztQwgYe3oEGdHekLu-jLvfsHl2lgT8T7xZs3oTF9320CeOQVrGJ0vK-om0JBg",
+        "wraps_digest": "Cdku-j4qXVEJ4gMeFUHabuoacbK616Xoa7btVede1vs"
+      },
+      "digest": "EVKCr0g2RLzpNJRjoHEY3sEy9-qZVKVCXs_KMu6Jc_k",
+      "link": "1ZuFhpapl0jbywAsuTLbW8nw4XzhwBD7bX6X1iYAhug",
+      "keyring_link": "1ZuFhpapl0jbywAsuTLbW8nw4XzhwBD7bX6X1iYAhug",
+      "record_sig": "RZIjSw7IjtqEgz0al67sIkRG0AVUwQspqqZW9L3ry5yxmzFUd28vH5S7b7L5I0DE_jsRdpyIYS9UpdKXF1VmBg"
+    },
+    "phrase_recovery_key": {
+      "seq": 2,
+      "base_seq": 1,
+      "kind": "keyring",
+      "account": "encoding-account",
+      "epoch": 1,
+      "author": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+      },
+      "body": {
+        "kind": "recovery-key",
+        "account": "encoding-account",
+        "epoch": 1,
+        "credential_id": "ampqampqampqampqampqag",
+        "rp_id": "omo-sync/v1/recovery-phrase",
+        "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+        "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+        "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+        "survivable": "phrase",
+        "countersign": "ekIfWMHxYGJTPUrFlej1pGluop9UEzXzxdMwgoZVhtfSiLn8rSkUt62IpAWbx3AsMvht9Hj4_oQcZAr53J0QDQ",
+        "wraps_digest": "6MM67hWRsAqCmA0u3p7EnJq5icDR5-KRSunm2k-oSJc"
+      },
+      "digest": "5gi8okBO6m_al8-3mMYefPANJWTZCZxFokqxn4WeNwY",
+      "link": "v4K4mR9YQ8VCKSdWzICVKhrUT-eKtnQdZ4wcl4EiprE",
+      "keyring_link": "v4K4mR9YQ8VCKSdWzICVKhrUT-eKtnQdZ4wcl4EiprE",
+      "record_sig": "YQ1JDDSBvJSJtCyrTXhG8UxdjXgdW4igfPXQAqJgNkWmE_mnYOO2JkA4e-_35AF9YS-XCnhoy9QDM1jM85JRDA"
+    },
+    "phrase_rotation_a": {
+      "seq": 3,
+      "base_seq": 2,
+      "kind": "keyring",
+      "account": "encoding-account",
+      "epoch": 2,
+      "author": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+      },
+      "body": {
+        "kind": "rotation",
+        "account": "encoding-account",
+        "epoch": 2,
+        "members": [
+          {
+            "kind": "device",
+            "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+            "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+            "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+          }
+        ],
+        "wraps_digest": "-t3z-fl3Ymv8s0aSMqweAVcRkdSBTKAy0Po6G-owA1g",
+        "fork_resolution": null
+      },
+      "digest": "tjodQLICq4anAE6kt1fOG80K2eCk3BiWpAwS6o5flcE",
+      "link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564",
+      "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564",
+      "record_sig": "z8dfGQjdlJcGj7GiJ5z7Rbdvv0CxQH6okAYGY-acxIEMZkloD2I_csLDclkCQ00qydu5kWg3RlpzKZuBdmBhBA"
+    },
+    "phrase_rotation_b": {
+      "seq": 3,
+      "base_seq": 2,
+      "kind": "keyring",
+      "account": "encoding-account",
+      "epoch": 2,
+      "author": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+      },
+      "body": {
+        "kind": "rotation",
+        "account": "encoding-account",
+        "epoch": 2,
+        "members": [
+          {
+            "kind": "device",
+            "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+            "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+            "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+          }
+        ],
+        "wraps_digest": "VJPsXSaqqkTNPQBAsO6oOUvyHNC5oZpq9-CRFDlWZ-g",
+        "fork_resolution": null
+      },
+      "digest": "HDfNhN7hCc-zTW_CyK4jS3Ec9Hd6j1i-Rj254Ny6N_0",
+      "link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI",
+      "keyring_link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI",
+      "record_sig": "MO9S3WPDzlKiniD-jj36Mow6U_Ag71CAIVzt5PvkOSGueY3QBAW5kGPtLOKEWUcwO0r9O-FFSFut9yk81776DA"
+    },
+    "phrase_fork_resolution": {
+      "seq": 4,
+      "base_seq": 3,
+      "kind": "keyring",
+      "account": "encoding-account",
+      "epoch": 2,
+      "author": {
+        "kind": "device",
+        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+      },
+      "body": {
+        "kind": "fork-resolution",
+        "account": "encoding-account",
+        "epoch": 2,
+        "fork_set": [
+          {
+            "seq": 3,
+            "digest": "HDfNhN7hCc-zTW_CyK4jS3Ec9Hd6j1i-Rj254Ny6N_0",
+            "keyring_link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI"
+          },
+          {
+            "seq": 3,
+            "digest": "tjodQLICq4anAE6kt1fOG80K2eCk3BiWpAwS6o5flcE",
+            "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564"
+          }
+        ],
+        "evidence": {
+          "common": {
+            "seq": 2,
+            "digest": "5gi8okBO6m_al8-3mMYefPANJWTZCZxFokqxn4WeNwY",
+            "keyring_link": "v4K4mR9YQ8VCKSdWzICVKhrUT-eKtnQdZ4wcl4EiprE"
+          },
+          "branches": [
+            {
+              "tip": {
+                "seq": 3,
+                "digest": "HDfNhN7hCc-zTW_CyK4jS3Ec9Hd6j1i-Rj254Ny6N_0",
+                "keyring_link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI"
+              },
+              "records": [
+                {
+                  "seq": 3,
+                  "base_seq": 2,
+                  "kind": "keyring",
+                  "account": "encoding-account",
+                  "epoch": 2,
+                  "author": {
+                    "kind": "device",
+                    "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+                    "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+                    "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+                  },
+                  "body": {
+                    "kind": "rotation",
+                    "account": "encoding-account",
+                    "epoch": 2,
+                    "members": [
+                      {
+                        "kind": "device",
+                        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+                        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+                        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+                      }
+                    ],
+                    "wraps_digest": "VJPsXSaqqkTNPQBAsO6oOUvyHNC5oZpq9-CRFDlWZ-g",
+                    "fork_resolution": null
+                  },
+                  "digest": "HDfNhN7hCc-zTW_CyK4jS3Ec9Hd6j1i-Rj254Ny6N_0",
+                  "link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI",
+                  "keyring_link": "zzZ-H9KjmFNz0_Pi59AhEc-LEc1ijgBOVTm533cKgAI",
+                  "record_sig": "MO9S3WPDzlKiniD-jj36Mow6U_Ag71CAIVzt5PvkOSGueY3QBAW5kGPtLOKEWUcwO0r9O-FFSFut9yk81776DA"
+                }
+              ]
+            },
+            {
+              "tip": {
+                "seq": 3,
+                "digest": "tjodQLICq4anAE6kt1fOG80K2eCk3BiWpAwS6o5flcE",
+                "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564"
+              },
+              "records": [
+                {
+                  "seq": 3,
+                  "base_seq": 2,
+                  "kind": "keyring",
+                  "account": "encoding-account",
+                  "epoch": 2,
+                  "author": {
+                    "kind": "device",
+                    "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+                    "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+                    "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+                  },
+                  "body": {
+                    "kind": "rotation",
+                    "account": "encoding-account",
+                    "epoch": 2,
+                    "members": [
+                      {
+                        "kind": "device",
+                        "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+                        "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+                        "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+                      }
+                    ],
+                    "wraps_digest": "-t3z-fl3Ymv8s0aSMqweAVcRkdSBTKAy0Po6G-owA1g",
+                    "fork_resolution": null
+                  },
+                  "digest": "tjodQLICq4anAE6kt1fOG80K2eCk3BiWpAwS6o5flcE",
+                  "link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564",
+                  "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564",
+                  "record_sig": "z8dfGQjdlJcGj7GiJ5z7Rbdvv0CxQH6okAYGY-acxIEMZkloD2I_csLDclkCQ00qydu5kWg3RlpzKZuBdmBhBA"
+                }
+              ]
+            }
+          ]
+        },
+        "continuation": {
+          "tip": {
+            "seq": 3,
+            "digest": "tjodQLICq4anAE6kt1fOG80K2eCk3BiWpAwS6o5flcE",
+            "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564"
+          },
+          "head": {
+            "seq": 3,
+            "link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564",
+            "keyring_link": "kEzQVRF6sfpucawfEYMywIrMQLZkJfrnr7zdw00y564"
+          }
+        },
+        "state": {
+          "members": [
+            {
+              "kind": "device",
+              "id": "HcahOcBrYYAu1Uf5BVu8YQ",
+              "sealing_public_key": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+              "signing_public_key": "iojj3XQJ8ZX9UtstPLpdcspnCb8dlBIb83SIAbQPb1w"
+            }
+          ],
+          "recovery_keys": [
+            {
+              "credential_id": "Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+              "rp_id": "omo-sync/v1/recovery-phrase",
+              "enrollment_nonce": "ZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmY",
+              "sealing_public_key": "Ulom3__G0of2xahXBSfH7Qt9mT-HjTQclr_TT5pk_2c",
+              "signing_public_key": "NhnK1Q91ctNZP7TlxCW1ht6A79jkWS-fnu8JUNdsvhg",
+              "survivable": "phrase"
+            },
+            {
+              "credential_id": "ampqampqampqampqampqag",
+              "rp_id": "omo-sync/v1/recovery-phrase",
+              "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+              "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+              "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+              "survivable": "phrase"
+            }
+          ],
+          "epoch": 2
+        },
+        "merged_digest": "LZvLWib5t8JnR9lfsUu47iaReD7df0l9rGwkvRR7L-8"
+      },
+      "digest": "WSqIwFXgvZV6uDotSfhTyO1MnEgMsj_1-ij4tJA8fnw",
+      "link": "nCYfSLRhoShR0s39oTLb9vRTeJ6kx_8ulcCd2CXVnwE",
+      "keyring_link": "nCYfSLRhoShR0s39oTLb9vRTeJ6kx_8ulcCd2CXVnwE",
+      "record_sig": "kyK1lyxlTRFMd2wUakektP8RNPqD9FClhRG0ZAGT9WB9qwXveof2cz5YisEwEsVrfnjFZ2D2GqLs147JxFknCw"
+    }
+  },
+  "wraps": {
+    "phrase_genesis_wraps": [
+      {
+        "epoch": 1,
+        "id": "device:HcahOcBrYYAu1Uf5BVu8YQ",
+        "wrap": "bGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbGxsbA"
+      },
+      {
+        "epoch": 1,
+        "id": "recovery:Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+        "wrap": "bW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbW1tbQ"
+      }
+    ],
+    "phrase_recovery_key_wraps": [
+      {
+        "epoch": 1,
+        "id": "recovery:ampqampqampqampqampqag",
+        "wrap": "bm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubm5ubg"
+      }
+    ],
+    "phrase_rotation_a_wraps": [
+      {
+        "epoch": 2,
+        "id": "device:HcahOcBrYYAu1Uf5BVu8YQ",
+        "wrap": "b29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vb29vbw"
+      },
+      {
+        "epoch": 2,
+        "id": "recovery:Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+        "wrap": "cHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcA"
+      },
+      {
+        "epoch": 2,
+        "id": "recovery:ampqampqampqampqampqag",
+        "wrap": "cXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcXFxcQ"
+      }
+    ],
+    "phrase_rotation_b_wraps": [
+      {
+        "epoch": 2,
+        "id": "device:HcahOcBrYYAu1Uf5BVu8YQ",
+        "wrap": "cnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycnJycg"
+      },
+      {
+        "epoch": 2,
+        "id": "recovery:Z2dnZ2dnZ2dnZ2dnZ2dnZw",
+        "wrap": "c3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzc3Nzcw"
+      },
+      {
+        "epoch": 2,
+        "id": "recovery:ampqampqampqampqampqag",
+        "wrap": "dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dHR0dA"
+      }
+    ]
+  },
+  "refused": {
+    "refused_phrase_label_on_passkey_rp": {
+      "reason": "survivable \"phrase\" does not match its rp_id",
+      "request": {
+        "record": {
+          "kind": "recovery-key",
+          "account": "encoding-account",
+          "epoch": 1,
+          "credential_id": "ampqampqampqampqampqag",
+          "rp_id": "sync.example",
+          "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+          "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+          "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+          "survivable": "phrase",
+          "countersign": "cg8wXBFzQv9tny_7puNjQscVqH51GTwqFiKnxIF4aCY25GEnWVkwn93wh1c7hSLSR0scMgYAc_rUkUvyvHvHCQ",
+          "wraps_digest": "DE6ZSrQ8ScpGTedBfaHebREVv28RLvkj2NGtNNeWeww"
+        },
+        "base_seq": 1,
+        "link": "n4FZnYKBgvZJ9DyP5UR_dEUyLOzGv8k2NGBv-9OfN_8",
+        "keyring_link": "n4FZnYKBgvZJ9DyP5UR_dEUyLOzGv8k2NGBv-9OfN_8",
+        "record_sig": "N5rQ5Yrbb0kpYwjNezt-rGDlL7XMCELmNS4Z-tsLmJUrAVeo_KqJTo2AI6c2u-NrQfyMpXT6yO7PL4O-yFRAAQ",
+        "wraps": [
+          {
+            "epoch": 1,
+            "id": "recovery:ampqampqampqampqampqag",
+            "wrap": "eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eA"
+          }
+        ]
+      }
+    },
+    "refused_passkey_label_on_phrase_rp": {
+      "reason": "survivable \"synced\" does not match its rp_id",
+      "request": {
+        "record": {
+          "kind": "recovery-key",
+          "account": "encoding-account",
+          "epoch": 1,
+          "credential_id": "ampqampqampqampqampqag",
+          "rp_id": "omo-sync/v1/recovery-phrase",
+          "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+          "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+          "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+          "survivable": "synced",
+          "countersign": "Sci0OxSAtj5LARborgUf7nvRF7x0TFaIp8yVB8cxQ6oQK3zj_HYh7IUIT37GK5OV44PdH7FMtDWhyOUsn6mfDg",
+          "wraps_digest": "aVx6qLIW4M-erfTmPgYhGAohRfOeW4w05QrnqXl5i9Y"
+        },
+        "base_seq": 1,
+        "link": "MMy_3HCFUZUhWImuB5ICWByUNn2aeLLj8fXmisaQYPM",
+        "keyring_link": "MMy_3HCFUZUhWImuB5ICWByUNn2aeLLj8fXmisaQYPM",
+        "record_sig": "I0OHiuI0GaGlczni09pLm4Acr1eHpAp7zKlzTz5t4EkekUbcf2eCHFQPeBcQO-gAo0Sr5ec9KztWZ_yoLDN9Cg",
+        "wraps": [
+          {
+            "epoch": 1,
+            "id": "recovery:ampqampqampqampqampqag",
+            "wrap": "eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eXl5eQ"
+          }
+        ]
+      }
+    },
+    "refused_phrase_credential_id_15_bytes": {
+      "reason": "credential_id does not decode to 16 bytes",
+      "request": {
+        "record": {
+          "kind": "recovery-key",
+          "account": "encoding-account",
+          "epoch": 1,
+          "credential_id": "ampqampqampqampqampq",
+          "rp_id": "omo-sync/v1/recovery-phrase",
+          "enrollment_nonce": "aWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWlpaWk",
+          "sealing_public_key": "7MPlzK3cU1P6BsyXRUbNJJAzg9zqDEMMPcX5qpH3qhw",
+          "signing_public_key": "kObT99qpiORMHusJjXVbU6aCiEPfRk6SvGhjFMYVAWM",
+          "survivable": "phrase",
+          "countersign": "XAUJMW7P-utV_Z4U4Q9JHKZp0fozp3Xn5L-cmWzaiYQutHmfTA6f8N1-8v96CC8skwbPdOExWzUMTREByVcpBg",
+          "wraps_digest": "VioScunsqKUrJA7dd6k4nUQw99JMHpizp03U3CiRwvY"
+        },
+        "base_seq": 1,
+        "link": "tKGWBuesKAUmwzM0taN7NmUW9wBJjr1k4KNllTPg2fM",
+        "keyring_link": "tKGWBuesKAUmwzM0taN7NmUW9wBJjr1k4KNllTPg2fM",
+        "record_sig": "kk7CDde_eFel7ulQGrUTlgEm-4kug-exzfwYtnIQ4d4xDq7atpfTRS9PV0pr3cp9jTnMXio4_TAdYEwcNfI2BQ",
+        "wraps": [
+          {
+            "epoch": 1,
+            "id": "recovery:ampqampqampqampqampq",
+            "wrap": "enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6enp6eg"
+          }
+        ]
+      }
+    }
+  }
+}

@@ -41,7 +41,8 @@ function script(name: string): string {
 const parts = [
   ["lsp", "lsp-daemon-tests"],
   ["shard1", "root-tests-posix-1"],
-  ["shard2", "root-tests-posix-2"],
+  ["shard2a", "root-tests-posix-2a"],
+  ["shard2b", "root-tests-posix-2b"],
   ["codex", "codex-platform-tests"],
   ["senpi", "senpi-tests-posix"],
 ] as const
@@ -52,7 +53,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
     expect(combined.needs).toEqual(["ci-mode"])
     expect(combined["runs-on"]).toBe("macos-latest")
     expect(combined.if).toBe("needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'")
-    expect(combined["timeout-minutes"]).toBe(90)
+    expect(combined["timeout-minutes"]).toBe(110)
     const install = combined.steps.find((step) => step.id === "install")
     expect(install?.run).toBe("bun install --frozen-lockfile\nbun run script/remove-stale-self-package-tests.ts\n")
     expect(combined.steps.filter((step) => step.run?.includes("bun install"))).toHaveLength(1)
@@ -85,9 +86,18 @@ describe("combined macOS CI execution contract (#9974)", () => {
       "working-directory": "packages/lsp-daemon",
     })
     expect(steps.find((step) => step.id === "root-tests-posix-1")?.run).toBe(
-      "bun test --timeout 20000 packages/omo-opencode packages/memory-core",
+      'mkdir -p "$CI_JUNIT_DIR"\nbun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"\n',
     )
-    expect(steps.find((step) => step.id === "root-tests-posix-2")?.run).toBe("bash .github/scripts/ci-root-shard-2.sh")
+    expect(steps.find((step) => step.id === "root-tests-posix-2a")?.run).toBe(
+      "bash .github/scripts/ci-root-shard-2.sh heavy",
+    )
+    expect(steps.find((step) => step.id === "root-tests-posix-2b")?.run).toBe(
+      "bash .github/scripts/ci-root-shard-2.sh light",
+    )
+    expect(script("ci-root-shard-2.sh")).toContain(
+      "bun --config=bunfig.win2.parallel.toml test --timeout 20000 ./script",
+    )
+    expect(script("ci-root-shard-2.sh")).not.toContain("test --timeout 20000 script ")
     expect(steps.find((step) => step.id === "codex-platform-tests")?.run).toBe(
       "bash .github/scripts/ci-codex-platform-build.sh\nbash .github/scripts/ci-codex-platform-node.sh\nbun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts\n",
     )
@@ -114,7 +124,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
 
   test.each([
     ["macos-test-1-status", "test", "lsp", "shard1"],
-    ["macos-test-2-status", "test", "lsp", "shard2"],
+    ["macos-test-2-status", "test", "lsp", "shard2a", "shard2b"],
     ["macos-codex-status", "codex-compatibility", "codex"],
     ["macos-senpi-status", "senpi-compatibility", "senpi"],
   ])(

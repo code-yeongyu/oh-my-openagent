@@ -15,10 +15,11 @@ export const THREAD_EXIT = {
 
 /**
  * Splits argv into positionals, boolean flags and value flags. An unknown `--flag`, a value flag
- * without its value, or a repeated value flag is a usage error; `--` ends flag parsing, so a text
- * that starts with `-` can still be sent.
+ * without its value, or a repeated value flag is a usage error, except a flag in `repeatable`, whose
+ * values are collected in order as an array; `--` ends flag parsing, so a text that starts with `-`
+ * can still be sent.
  */
-export function parseArgs(args, { booleans = [], values = [] } = {}) {
+export function parseArgs(args, { booleans = [], values = [], repeatable = [] } = {}) {
   const flags = new Set()
   const options = {}
   const positionals = []
@@ -39,11 +40,26 @@ export function parseArgs(args, { booleans = [], values = [] } = {}) {
     if (!values.includes(argument)) return { error: `unknown option '${argument}'` }
     const value = args[index + 1]
     if (value === undefined) return { error: `${argument} needs a value` }
+    if (repeatable.includes(argument)) {
+      options[argument] = [...(options[argument] ?? []), value]
+      index += 1
+      continue
+    }
     if (Object.hasOwn(options, argument)) return { error: `${argument} was given twice` }
     options[argument] = value
     index += 1
   }
   return { flags, options, positionals }
+}
+
+/** The thread states `list --state` takes (omo-senpi `THREAD_STATES`). */
+export const THREAD_STATES = ["running", "idle", "inactive", "archived"]
+
+/** Every `--state` value, comma-separated or repeated, in order and each once; undefined when the flag is absent. */
+export function stateOption(options) {
+  const raw = options["--state"]
+  if (raw === undefined) return undefined
+  return [...new Set(raw.flatMap((value) => value.split(",").map((state) => state.trim())))]
 }
 
 /** A non-negative integer flag value, or undefined when the flag is absent; NaN marks a bad value. */
