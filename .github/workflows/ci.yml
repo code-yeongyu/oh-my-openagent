@@ -22,12 +22,14 @@ permissions:
   contents: read
 
 jobs:
+  # Job timeouts are about twice each job's measured p95 (25 green PR runs + 12 green dev pushes, 2026-11-22),
+  # with a 3-minute floor for setup noise, so a regression fails loudly instead of creeping (#14573).
   # A stable, unconditional context that dev's required checks can enforce even
   # when the rest of CI takes a docs/web/release fast path.
   lint-ratchet:
     name: Lint ratchet
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +61,7 @@ jobs:
 
   ci-mode:
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -429,7 +432,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -800,6 +803,7 @@ jobs:
   typecheck:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -1091,7 +1095,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v7
 
@@ -1143,7 +1147,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@v7
 
@@ -1170,7 +1174,7 @@ jobs:
       # linux-x64 B0 goldens. The collectors, normalizer and fake model server are the senpi EQ harness at a pinned commit.
       - name: Run omo fused-path equivalence (EQ.omo E21-E24)
         shell: bash
-        timeout-minutes: 45
+        timeout-minutes: 10
         env:
           SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
         run: |
@@ -1203,7 +1207,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
@@ -1347,6 +1351,7 @@ jobs:
   lazycodex-published-smoke:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -1436,6 +1441,7 @@ jobs:
   build:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 4
     permissions:
       contents: read
     steps:
@@ -1501,6 +1507,7 @@ jobs:
   omo-ai-payload-check:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v7
 
