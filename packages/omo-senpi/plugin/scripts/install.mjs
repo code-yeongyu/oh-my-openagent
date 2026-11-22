@@ -59,7 +59,7 @@ function readPrefix(path, length) {
     closeSync(fd);
   }
 }
-function classify(path, isOwned, prefixBytes) {
+function classify(path, isOwned, prefixBytes, io) {
   let stat;
   try {
     stat = lstatSync(path);
@@ -76,18 +76,18 @@ function classify(path, isOwned, prefixBytes) {
     return { kind: "foreign", reason: `it is ${stat.size} bytes, larger than any launcher this installer writes` };
   let prefix;
   try {
-    prefix = readPrefix(path, prefixBytes);
+    prefix = io.readPrefix(path, prefixBytes);
   } catch (error) {
     return { kind: "foreign", reason: `it cannot be read (${error.code ?? "error"})` };
   }
   return isOwned(prefix, stat.size) ? { kind: "owned" } : { kind: "foreign", reason: "it does not start with this installer's launcher header" };
 }
 var HEADER_BYTES = Math.max(...OWNED_HEADERS.map((header) => header.length));
-function launcherOwnership(path) {
-  return classify(path, (prefix) => OWNED_HEADERS.some((header) => prefix.subarray(0, header.length).equals(header)), HEADER_BYTES);
+function launcherOwnership(path, io = { readPrefix }) {
+  return classify(path, (prefix) => OWNED_HEADERS.some((header) => prefix.subarray(0, header.length).equals(header)), HEADER_BYTES, io);
 }
-function launcherCmdOwnership(path) {
-  return classify(path, (prefix, size) => size === OWNED_CMD.length && prefix.equals(OWNED_CMD), OWNED_CMD.length);
+function launcherCmdOwnership(path, io = { readPrefix }) {
+  return classify(path, (prefix, size) => size === OWNED_CMD.length && prefix.equals(OWNED_CMD), OWNED_CMD.length, io);
 }
 
 // packages/omo-senpi/src/install/local-launcher.ts
@@ -514,12 +514,13 @@ async function runSenpiInstaller(options = {}) {
   const launcherPath = installLocalLauncher({
     pluginPath: context.pluginPath,
     senpiCliPath: join5(context.repoRoot, "packages", "coding-agent", "dist", "cli.js"),
-    homeDir: context.homeDir
+    homeDir: context.homeDir,
+    platform: context.platform
   });
   return {
     ok: true,
     action: "install",
-    ...leftAloneReport(context.homeDir, launcherPath === undefined),
+    ...leftAloneReport(context.homeDir, context.platform),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -536,11 +537,11 @@ async function runSenpiUninstaller(options = {}) {
   const nextPackages = packages.filter((entry) => entry !== context.pluginPath);
   settings.packages = nextPackages;
   const backupPath = await writeSettingsAtomically(context.settingsPath, settings);
-  const launcherRemoved = uninstallLocalLauncher(context.homeDir);
+  uninstallLocalLauncher(context.homeDir);
   return {
     ok: true,
     action: "uninstall",
-    ...leftAloneReport(context.homeDir, !launcherRemoved),
+    ...leftAloneReport(context.homeDir, context.platform),
     agentDir: context.agentDir,
     settingsPath: context.settingsPath,
     pluginPath: context.pluginPath,
@@ -588,12 +589,29 @@ function findRepoRoot(importerDir) {
 function fileExistsSync(path) {
   return existsSync2(path);
 }
-function leftAloneReport(homeDir, untouched) {
-  if (!untouched)
-    return {};
-  const path = localLauncherPath(homeDir);
-  const ownership = launcherOwnership(path);
-  return ownership.kind === "foreign" ? { launcherLeftAlone: { path, reason: `${path} was left alone: it is not a launcher this installer wrote (${ownership.reason})` } } : {};
+function leftAloneReport(homeDir, platform) {
+  const candidates = [
+    {
+      file: "omo",
+      path: localLauncherPath(homeDir),
+      ownership: launcherOwnership(localLauncherPath(homeDir))
+    },
+    ...platform === "win32" ? [
+      {
+        file: "omo.cmd",
+        path: localLauncherCmdPath(homeDir),
+        ownership: launcherCmdOwnership(localLauncherCmdPath(homeDir))
+      }
+    ] : []
+  ];
+  const leftAlone = candidates.flatMap(({ file, path, ownership }) => ownership.kind === "foreign" ? [
+    {
+      file,
+      path,
+      reason: file === "omo.cmd" ? `${path} was left alone: it is not a wrapper this installer wrote (${ownership.reason}); the command omo still resolves to it` : `${path} was left alone: it is not a launcher this installer wrote (${ownership.reason})`
+    }
+  ] : []);
+  return leftAlone.length === 0 ? {} : { launchersLeftAlone: leftAlone };
 }
 
 // packages/omo-senpi/src/install/cli-local.ts
