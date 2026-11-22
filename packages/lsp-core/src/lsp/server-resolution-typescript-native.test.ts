@@ -245,6 +245,26 @@ describe("TypeScript server selection judged by real location", () => {
     expect(result.server.command).toEqual([tsc, "--lsp", "--stdio"])
   })
 
+  test("#given a nearer bin/tsc in a Go package and a hoisted TypeScript 7 #when looking up a file of that package #then the hoisted compiler serves it", () => {
+    // given: packages/svc is marked only by go.mod and carries an unrelated bin/tsc
+    const { session } = sessionWithLanguageServer()
+    const hoisted = installTypescript(join(session, "node_modules"), 7)
+    const goPackage = join(session, "packages", "svc")
+    mkdirSync(goPackage, { recursive: true })
+    writeFileSync(join(goPackage, "go.mod"), "module svc\n")
+    const unrelated = writeExecutable(join(goPackage, "bin", "tsc"))
+
+    // when
+    const result = runWithRequestContext(contextFor(session), () =>
+      findServerForExtension(".ts", join(goPackage, "a.ts")),
+    )
+
+    // then
+    if (result.status !== "found") throw new Error(`expected a found server, got ${result.status}`)
+    expect(result.server.command).toEqual([hoisted, "--lsp", "--stdio"])
+    expect(result.server.command).not.toContain(unrelated)
+  })
+
   test("#given node_modules/.bin itself linked to an external TypeScript 7 project #when looking up #then the external tsc is not used", () => {
     // given
     const { session, languageServer } = sessionWithLanguageServer()

@@ -1,14 +1,15 @@
 import { existsSync, lstatSync, readdirSync, type Stats } from "node:fs"
 import { join, resolve } from "node:path"
 import { contextCwd } from "../request-context.js"
-import type { LspClient } from "./client.js"
 import { formatServerLookupError } from "./client-wrapper.js"
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constants.js"
-import { groupFilesByClient, type ServedFileGroup } from "./directory-server-groups.js"
+import { scanServedGroups } from "./directory-group-scan.js"
+import { groupFilesByClient } from "./directory-server-groups.js"
 import { effectiveExtension } from "./effective-extension.js"
 import { LspInvalidPathError, LspServerLookupError } from "./errors.js"
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./formatters.js"
 import { getLspManager, type LspManager } from "./manager.js"
+import type { TimerProvider } from "./timer-provider.js"
 import type { Diagnostic, ResolvedServer, SeverityFilter } from "./types.js"
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"])
@@ -37,6 +38,7 @@ export interface DirectoryDiagnosticsOptions {
   readonly workspaceRoot?: string
   readonly server?: ResolvedServer
   readonly signal?: AbortSignal
+  readonly timers?: TimerProvider
 }
 
 export function collectFilesWithExtension(dir: string, extension: string, maxFiles: number): string[] {
@@ -133,41 +135,25 @@ export async function aggregateDiagnosticsForDirectory(
   }
 
   options.signal?.throwIfAborted()
-  const acquired = await acquireGroupClients(manager, groups.served, options.signal)
-  for (const { group, error } of acquired.failed) {
-    fileErrors.push(...group.files.map((file) => ({ file, error })))
-  }
-  const work = acquired.clients.flatMap(({ group, client }) => group.files.map((file) => ({ file, client })))
-  try {
-    let nextIndex = 0
-    const workers = Array.from({ length: Math.min(maxConcurrency, work.length) }, async () => {
-      for (;;) {
-        if (options.signal?.aborted) return
-        const item = work[nextIndex]
-        nextIndex += 1
-        if (item === undefined) return
-        const { file, client } = item
-        try {
-          const result = await client.diagnostics(file, options.signal)
-          const filtered = filterDiagnosticsBySeverity(result.items, severity)
-          allDiagnostics.push(
-            ...filtered.map((diagnostic) => ({
-              filePath: file,
-              diagnostic,
-            })),
-          )
-        } catch (e) {
-          fileErrors.push({
-            file,
-            error: e instanceof Error ? e.message : String(e),
-          })
-        }
+  await scanServedGroups({
+    manager,
+    groups: groups.served,
+    maxConcurrency,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.timers === undefined ? {} : { timers: options.timers }),
+    onGroupUnavailable: (group, error) => {
+      fileErrors.push(...group.files.map((file) => ({ file, error })))
+    },
+    checkFile: async (client, file) => {
+      try {
+        const result = await client.diagnostics(file, options.signal)
+        const filtered = filterDiagnosticsBySeverity(result.items, severity)
+        allDiagnostics.push(...filtered.map((diagnostic) => ({ filePath: file, diagnostic })))
+      } catch (e) {
+        fileErrors.push({ file, error: e instanceof Error ? e.message : String(e) })
       }
-    })
-    await Promise.all(workers)
-  } finally {
-    for (const { group } of acquired.clients) manager.releaseClient(group.root, group.server)
-  }
+    },
+  })
 
   const displayDiagnostics = allDiagnostics.slice(0, DEFAULT_MAX_DIAGNOSTICS)
   const wasDiagCapped = allDiagnostics.length > DEFAULT_MAX_DIAGNOSTICS
@@ -198,38 +184,4 @@ export async function aggregateDiagnosticsForDirectory(
   }
 
   return { output: lines.join("\n"), totalDiagnostics: allDiagnostics.length, fileFailures: fileErrors }
-}
-
-interface AcquiredGroupClients {
-  readonly clients: readonly { readonly group: ServedFileGroup; readonly client: LspClient }[]
-  readonly failed: readonly { readonly group: ServedFileGroup; readonly error: string }[]
-}
-
-/**
- * Acquires one client per group, in order. A group whose client cannot start reports that for its own
- * files; the scan fails as before only when no group gets a client. An abort releases what was acquired
- * and rethrows.
- */
-async function acquireGroupClients(
-  manager: LspManager,
-  groups: readonly ServedFileGroup[],
-  signal: AbortSignal | undefined,
-): Promise<AcquiredGroupClients> {
-  const clients: { group: ServedFileGroup; client: LspClient }[] = []
-  const failed: { group: ServedFileGroup; error: string }[] = []
-  let firstError: unknown
-  for (const group of groups) {
-    try {
-      clients.push({ group, client: await manager.getClient(group.root, group.server, signal) })
-    } catch (error) {
-      if (signal?.aborted) {
-        for (const acquired of clients) manager.releaseClient(acquired.group.root, acquired.group.server)
-        throw error
-      }
-      firstError ??= error
-      failed.push({ group, error: error instanceof Error ? error.message : String(error) })
-    }
-  }
-  if (clients.length === 0 && firstError !== undefined) throw firstError
-  return { clients, failed }
 }

@@ -3,7 +3,13 @@ import { dirname, join, resolve } from "node:path"
 
 import { canonicalizeExistingOrNearestAncestor, isPathInside } from "../request-context.js"
 import type { ServerWithSource } from "./config-loader.js"
-import { resolveServerBinary } from "./server-installation.js"
+import {
+  executableSuffixes,
+  NODE_LOCAL_BIN_DIR,
+  NODE_PROJECT_MARKERS,
+  probe,
+  probeWithSuffixes,
+} from "./server-installation.js"
 
 /**
  * Where the search for a project's TypeScript 7 compiler starts, as a real path. A target is judged by
@@ -32,11 +38,34 @@ export function nativeTypescriptSearchDirectory(targetPath: string | undefined, 
  */
 export function nativeTypescriptCommand(server: ServerWithSource, searchDirectory: string): string[] | null {
   if (server.id !== "typescript" || !server.inheritsBuiltinCommand) return null
-  const tsc = resolveServerBinary(["tsc"], searchDirectory, { localOnly: true })
-  if (tsc === null || !isRealDirectory(dirname(tsc))) return null
+  const tsc = findProjectTsc(searchDirectory)
+  if (tsc === null) return null
   const packageDir = join(dirname(tsc), "..", "typescript")
   const speaksLsp = existsSync(join(packageDir, "package.json")) && !existsSync(join(packageDir, "lib", "tsserver.js"))
   return speaksLsp ? [tsc, "--lsp", "--stdio"] : null
+}
+
+/**
+ * Walks up from `searchDirectory` to the repository root (`.git`) and returns the nearest eligible
+ * `tsc`: one in the `node_modules/.bin` of a directory with a Node project marker, where that bin
+ * directory is real (see isRealDirectory). Unlike the generic local-bin walk, no `bin` or virtualenv
+ * directory is probed, so a `bin/tsc` of another ecosystem never shadows a hoisted compiler, and an
+ * ineligible candidate is passed over instead of ending the walk.
+ */
+function findProjectTsc(searchDirectory: string): string | null {
+  const suffixes = executableSuffixes(process.platform, undefined)
+  let current = searchDirectory
+  for (;;) {
+    if (NODE_PROJECT_MARKERS.some((marker) => probe(join(current, marker)))) {
+      const binDir = join(current, NODE_LOCAL_BIN_DIR)
+      const tsc = probeWithSuffixes(binDir, "tsc", suffixes)
+      if (tsc !== null && isRealDirectory(binDir)) return tsc
+    }
+    if (probe(join(current, ".git"))) return null
+    const parent = dirname(current)
+    if (parent === current) return null
+    current = parent
+  }
 }
 
 /**
@@ -44,7 +73,7 @@ export function nativeTypescriptCommand(server: ServerWithSource, searchDirector
  * inside `node_modules`: `.bin/tsc` is a symlink or a shell shim, and `node_modules/typescript` may link
  * into `.bun`, `.pnpm` or a store. None of them links `node_modules` or `node_modules/.bin` itself. So
  * the bin directory the walk found must be a real directory at that place; when either level is a
- * symlink, the compiler belongs to whatever the link points at and the lookup fails closed.
+ * symlink, the compiler belongs to whatever the link points at and that candidate is not used.
  */
 function isRealDirectory(directory: string): boolean {
   try {
