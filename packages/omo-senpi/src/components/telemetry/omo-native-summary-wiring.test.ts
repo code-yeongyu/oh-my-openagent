@@ -191,9 +191,15 @@ describe("session_summary acknowledgment through the native transport", () => {
 // The real PostHog transport against a fake HTTP server: only a 2xx answer retires the pending file.
 describe("session_summary delivery through the real PostHog transport", () => {
   const realTransport =
-    (host: string): TelemetryTransportFactory =>
-    (apiKey, options) =>
-      createDefaultPostHogTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
+    (
+      host: string,
+      createTransport: typeof createDefaultPostHogTransport = createDefaultPostHogTransport,
+    ): TelemetryTransportFactory =>
+    (apiKey, options) => {
+      // The legacy ping is fire-and-forget and is not part of summary delivery.
+      if (options.flushAt !== 20) return { capture: () => undefined, shutdown: async () => undefined }
+      return createTransport(apiKey, { ...options, host, fetchRetryCount: 0 })
+    }
 
   const withServer = async (status: number, run: (host: string) => Promise<void>): Promise<void> => {
     const server = Bun.serve({ port: 0, fetch: () => new Response("{}", { status }) })
@@ -221,9 +227,39 @@ describe("session_summary delivery through the real PostHog transport", () => {
     })
   })
 
-  test("#given a server answering 200 #when the session quits #then the pending file is deleted", async () => {
+  test("#given a server answering 200 #when the session quits #then the summary is retired without a live daily-active client", async () => {
     await withTempAgentDir(async (agentDir) => {
-      await withServer(200, (host) => runSession(agentDir, realTransport(host), true))
+      await withServer(200, async (host) => {
+        const releaseFlush = Promise.withResolvers<undefined>()
+        const legacyClosed = Promise.withResolvers<undefined>()
+        let legacyFlushPending = false
+        const factory = realTransport(host, (apiKey, options) => {
+          const transport = createDefaultPostHogTransport(apiKey, options)
+          if (options.flushAt !== 1) return transport
+          const shutdown = transport.shutdown.bind(transport)
+          return Object.assign(transport, {
+            flush: () => {
+              legacyFlushPending = true
+              return releaseFlush.promise
+            },
+            shutdown: async () => {
+              try {
+                await shutdown()
+              } finally {
+                legacyFlushPending = false
+                legacyClosed.resolve(undefined)
+              }
+            },
+          })
+        })
+        try {
+          await runSession(agentDir, factory, true)
+          expect(legacyFlushPending).toBe(false)
+        } finally {
+          releaseFlush.resolve(undefined)
+          if (legacyFlushPending) await legacyClosed.promise
+        }
+      })
       expect(pendingOf(agentDir)).toEqual([])
     })
   })
