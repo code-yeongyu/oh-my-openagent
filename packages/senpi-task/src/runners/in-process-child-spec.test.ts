@@ -5,6 +5,9 @@ import { InProcessRunner, RunnerError } from "./in-process"
 import { baseSpec, createFakeSession, makeTool, tmpSessionDirs } from "./in-process-child-spec.test-support"
 import type { CreateAgentSessionOptions } from "./in-process-child-spec.test-support"
 import type { ChildSession } from "./in-process"
+import { useOwnedAgentDir } from "../store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 const unhandled: unknown[] = []
 const onUnhandled = (reason: unknown): void => {

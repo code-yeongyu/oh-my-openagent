@@ -3,6 +3,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import type { StateDirConfig } from "../../../store"
+import { ownedTaskState } from "../../../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -17,5 +18,5 @@ export function tempProjectDir(): string {
 }
 
 export function stateDirConfig(projectDir: string): StateDirConfig {
-  return { project_dir: projectDir }
+  return ownedTaskState(projectDir)
 }

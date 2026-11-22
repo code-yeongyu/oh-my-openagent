@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { createTaskId, type TaskRecord } from "../../state"
 import { claimTaskRecord } from "../claim"
 import { createTaskRecordStore } from "../record-store"
+import { ownedTaskState } from "./owned-task-state"
 
 function baseRecord(taskId: string): TaskRecord {
   return {
@@ -28,7 +29,7 @@ function baseRecord(taskId: string): TaskRecord {
 const project = mkdtempSync(join(tmpdir(), "senpi-task-claim-floor-"))
 
 try {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   store.save(baseRecord("st_00000030"))
   const claimed = claimTaskRecord(store, baseRecord("st_00000030"), { nameFollowsId: true })
   assert.equal(claimed.task_id, "st_00000031")
