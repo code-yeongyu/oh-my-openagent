@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { GitNotFoundError, GitTimeoutError } from "./errors"
 import { createNodeGitExec, type GitExecResult, type NodeGitExecRuntime } from "./exec"
+import { resolveHooksDir } from "./git-dir"
 
 type CommandRunner = NonNullable<NodeGitExecRuntime["runCommand"]>
 
@@ -297,7 +298,7 @@ describe("createNodeGitExec", () => {
       execOptions({ ProgramFiles: "C:\\Program Files" }),
     )
 
-    const expected = ["-c", "core.fsmonitor=false", "-c", "user.name=fixture-writer", "status", "--porcelain"]
+    const expected = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${resolveHooksDir(process.cwd())}`, "-c", "user.name=fixture-writer", "status", "--porcelain"]
     expect(argvs).toEqual([expected, expected])
   })
 

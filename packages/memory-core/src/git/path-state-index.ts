@@ -35,7 +35,7 @@ export async function writeIndexIfIdentity(options: {
       options.next === null
         ? ["update-index", "--force-remove", "--", options.path]
         : ["update-index", "--add", "--cacheinfo", options.next.mode, options.next.oid, options.path]
-    await git(options, argv, { GIT_INDEX_FILE: temporary })
+    await git(options, argv, temporary)
     await writeHandleAll(lock, await readFile(temporary))
     await lock.sync()
     await lock.close()
@@ -52,12 +52,13 @@ export async function writeIndexIfIdentity(options: {
 async function git(
   options: { readonly dir: string; readonly exec: GitExec },
   argv: readonly string[],
-  env: Readonly<Record<string, string>> = {},
+  indexFile?: string,
 ): Promise<GitExecResult> {
   const result = await options.exec.run(argv, {
     cwd: options.dir,
     timeoutMs: GIT_TIMEOUT_MS,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...env },
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    ...(indexFile === undefined ? {} : { indexFile }),
   })
   if (result.code !== 0) throw commandError(argv, result)
   return result
