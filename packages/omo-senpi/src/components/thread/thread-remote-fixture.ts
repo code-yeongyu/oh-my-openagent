@@ -320,6 +320,16 @@ export function createRemoteThreadFixture() {
        * then each is refused `unlistedReason` (`route_unlisted`), though the session is live and reachable after.
        */
       routeLag?: number
+      /**
+       * The first N creates b's engine takes make the session (under the open's durableSessionId, as an engine with that
+       * capability does) and their reply is lost: the device service answers uncertain reply_lost. b lists the session
+       * it made, unnamed, from then on.
+       */
+      openLosesReply?: number
+      /** With openLosesReply: b's engine makes the session under its own id, not the one the open asked for. */
+      ignoresDurableSessionId?: boolean
+      /** With openLosesReply: the next listing of b after a lost reply fails too, so the create cannot recover on the spot. */
+      listFailsAfterLostReply?: boolean
       /** The device service throws on b's admit_external_message (a lost connection mid-delivery). */
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
@@ -383,6 +393,17 @@ export function createRemoteThreadFixture() {
     // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
     // The sessions b's engine holds that b's route does not list (openUnrouted), by the engine's routing id.
     const unrouted = new Set<string>()
+    // The sessions b's engine made for opens whose reply was lost (openLosesReply), as b lists them.
+    const made: RemoteSessionRow[] = []
+    let lostReplies = options.openLosesReply ?? 0
+    let failNextList = false
+    const listed = (): readonly RemoteSessionRow[] => {
+      if (failNextList) {
+        failNextList = false
+        throw new Error("account list failed")
+      }
+      return [...(options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]), ...made]
+    }
     // The session commands b's route still refuses for the session it opened last (routeLag).
     let lagging = 0
     let lagged: string | undefined
@@ -486,6 +507,16 @@ export function createRemoteThreadFixture() {
         const open =
           live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
+      }
+      if (rpc["type"] === "open_session" && rpc["sessionPath"] === undefined && lostReplies > 0) {
+        lostReplies -= 1
+        const asked = rpc["durableSessionId"]
+        const id = options.ignoresDurableSessionId !== true && typeof asked === "string" ? asked : "dur-made-on-b"
+        made.push({ ...B_ROW, session_id: `rk-${id}`, durable_id: id, title: "" })
+        live.add(`rk-${id}`)
+        live.add(id)
+        failNextList = options.listFailsAfterLostReply === true
+        return { kind: "uncertain", reason: "reply_lost" }
       }
       if (rpc["type"] === "open_session") {
         // A reopened file resumes under the id it carries, as senpi's does.
@@ -710,14 +741,14 @@ export function createRemoteThreadFixture() {
           if (filter?.device === undefined) listings.all += 1
           else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const rows = listed()
           return filter?.device === undefined ? rows : rows.filter((row) => row.device === filter.device)
         },
         listing: async (filter) => {
           if (filter?.device === undefined) listings.all += 1
           else listings.device += 1
           if (options.failSessionsList === true) throw new Error("account list failed")
-          const rows = options.rows ?? [{ ...B_ROW, state: options.rowState ?? B_ROW.state }]
+          const rows = listed()
           const incomplete = options.incomplete ?? []
           return filter?.device === undefined
             ? { rows, incomplete }
@@ -771,7 +802,7 @@ export function createRemoteThreadFixture() {
           // A device's relay connector keys each session it lists by a relay key, kept beside the durable id (relayKeys).
           // Without relay keys, the key the engine holds the session under now: a listed key it runs, else the id itself.
           if (options.relayKeys === undefined) {
-            const listedKeys = [B_ROW, ...(options.rows ?? [])]
+            const listedKeys = [B_ROW, ...(options.rows ?? []), ...made]
               .filter((row) => row.durable_id === engineId)
               .map((row) => row.session_id)
             return { kind: "ok", sessionId: listedKeys.find((key) => live.has(key)) ?? engineId }

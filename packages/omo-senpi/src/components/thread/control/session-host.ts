@@ -93,4 +93,13 @@ export type SessionHost = {
     request: SessionOpenRequest,
     options?: { readonly confirmReach?: boolean },
   ) => Promise<SessionOpenOutcome>
+  /**
+   * Another device's host only: the session that device lists under the id a create derived from its idempotency key,
+   * which an earlier run under that key made though its reply was lost, finished as its open would have been (named,
+   * its reach checked). Undefined when the device lists no such session: nothing proves the earlier open ran there.
+   */
+  readonly adopt?: (
+    request: { readonly durableSessionId: string; readonly name?: string },
+    options?: { readonly confirmReach?: boolean },
+  ) => Promise<SessionOpenOutcome | undefined>
 }

@@ -133,6 +133,159 @@ export function createRelaySessionHost(
       },
     )
   }
+  type Finish = {
+    readonly name?: string
+    readonly reopens: boolean
+    readonly confirmReach: boolean
+    /** The listing key the open's reply (or b's listing row) names for the session. */
+    readonly located?: string
+    readonly cwd?: string
+    readonly worktree?: ThreadWorktree
+  }
+  /** The steps once b holds the session: its listing key, its name or one reach check, and the thread as reported. */
+  const finish = async (data: JsonObject, step: Finish): Promise<SessionOpenOutcome> => {
+    const state = recordOf(data["state"])
+    let threadId: string
+    const warnings: ThreadToolFailure[] = []
+    if (step.reopens) {
+      // #14170: a reopened session is addressed by the key its device lists it by NOW, never the cached row's key (a
+      // closed session's key is gone, and every later op there answers not_resumable). It is answered ok only once
+      // that key resolves; an open whose session cannot be reached is no resumed thread.
+      const engineId = openedEngineId(data, state) ?? listed?.durable_id
+      const located =
+        engineId === undefined
+          ? ({ kind: "refused", reason: "unnamed_session" } as const)
+          : await remote.sessions.locate(device, engineId, step.located)
+      if (located.kind !== "ok")
+        return fail(
+          "not_resumable",
+          `Device ${device} opened the thread's file, but the reopened session cannot be reached there (${escapeForDisplay(located.reason)}).`,
+          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell), then open the thread by the id it lists.",
+          { device, reason: escapeForDisplay(located.reason) },
+        )
+      threadId = located.sessionId
+      if (listed !== undefined) remote.sessions.reopened?.(listed, located.sessionId)
+    } else {
+      const engineId = openedEngineId(data, state)
+      if (engineId === undefined)
+        return fail(
+          "internal_error",
+          `Device ${device} opened a session but did not name it.`,
+          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the new thread.",
+          { device },
+        )
+      // The session exists on b from here on: a later step that fails is a warning on the created thread, never an
+      // error, so a retry under the same key replays the thread and a new key cannot make a second session.
+      const located = await remote.sessions.locate(device, engineId, step.located)
+      // This device's own missing sign-in is no reason to update omo on b (#14015 review L1).
+      if (located.kind !== "ok")
+        warnings.push(
+          notSignedInFailure(located.reason, device)?.error ??
+            threadToolFailure(
+              "unsupported",
+              `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
+              "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
+              { device, reason: escapeForDisplay(located.reason) },
+            ),
+        )
+      threadId = located.kind === "ok" ? located.sessionId : engineId
+    }
+    let applied = step.name
+    // The first command a create sends the new session through b's route: its name, else (a create that goes on to
+    // use the session) the state read its first prompt would make anyway.
+    const firstStep = (key: string) =>
+      step.name !== undefined
+        ? remote.sessions.sessionCommand(
+            device,
+            key,
+            { type: "set_session_name", sessionId: key, name: step.name },
+            { direct: true },
+          )
+        : !step.reopens && step.confirmReach
+          ? remote.sessions.sessionCommand(device, key, { type: "get_state", sessionId: key }, { direct: true })
+          : undefined
+    let reached = await firstStep(threadId)
+    // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route. A
+    // route that does not list it (a host the service does not route, such as the Desktop app's) leaves an orphan
+    // nothing can address: the create ends it where it was opened and refuses, before anything records the thread.
+    // Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict. A session b
+    // opened a moment ago may not be routed yet (#14397 review L3), so one such refusal is not the verdict: b is asked
+    // again where the session is, and only a second route_unlisted ends it.
+    if (!step.reopens && reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED) {
+      const engineId = openedEngineId(data, state)
+      const relocated = engineId === undefined ? undefined : await remote.sessions.locate(device, engineId)
+      if (relocated?.kind === "ok") {
+        threadId = relocated.sessionId
+        reached = await firstStep(threadId)
+      }
+      if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
+        return await unreachable(
+          reached.reason,
+          nonEmpty(data["sessionId"]),
+          nonEmpty(state["durableSessionId"]) ?? threadId,
+          step.worktree,
+        )
+    }
+    const named = step.name === undefined ? undefined : reached
+    if (named !== undefined) {
+      if (named.kind !== "ok") {
+        applied = undefined
+        const failed = outcomeFailure(named, device).error
+        warnings.push({
+          ...failed,
+          details: { ...failed.details, reason: "name_not_applied", cause: failed.details?.["reason"] },
+        })
+      }
+    }
+    // The reply's state keyed by the id the device lists the session under; the far engine's own routing id and
+    // endpoint facts name nothing on this device.
+    const {
+      sessionId: _engineId,
+      durableSessionId: _durable,
+      socket: _socket,
+      endpoint_kind: _endpointKind,
+      controls: _controls,
+      ...facts
+    } = state
+    // D2: the id the caller gets back is the durable id, never the listing key, which stays in sessionId for the relay
+    // transport. The engine's open reply names it as state.sessionId (data.sessionId is its routing id); a listed row
+    // carries it too. Without it the caller would get the listing key, which no thread tool resolves.
+    const durable =
+      nonEmpty(state["durableSessionId"]) ??
+      nonEmpty(data["durableSessionId"]) ??
+      nonEmpty(state["sessionId"]) ??
+      listed?.durable_id
+    const session: ThreadHostSession = {
+      ...facts,
+      sessionId: threadId,
+      ...(durable === undefined ? {} : { durableSessionId: durable }),
+      cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? step.cwd ?? (listed === undefined ? "" : rowFolder(listed))),
+      name: applied ?? remoteName(nonEmpty(state["sessionName"]) ?? listed?.title),
+    }
+    const extras = {
+      ...(step.worktree === undefined ? {} : { worktree: step.worktree }),
+      ...(warnings.length === 0 ? {} : { warnings }),
+    }
+    return { kind: "ok", thread: { ...openedThread(session), device, ...extras } }
+  }
+  /**
+   * A create whose open b may have run though its reply was lost: the session b lists under the id the create derived
+   * from its idempotency key is that create's own (no other open asks for that id), finished as its open would have
+   * been. Undefined when b lists no such session, or cannot be listed now: nothing proves the open ran there.
+   */
+  const adopted = async (
+    durableId: string,
+    step: Pick<Finish, "name" | "confirmReach" | "worktree">,
+  ): Promise<SessionOpenOutcome | undefined> => {
+    const rows = await remote.sessions.sessions({ device }).catch(() => undefined)
+    const row = rows?.find(
+      (candidate) => candidate.device === device && candidate.durable_id === durableId && candidate.state !== "ended",
+    )
+    if (row === undefined) return undefined
+    const cwd = rowFolder(row)
+    const state = { durableSessionId: durableId, cwd, ...(row.title === "" ? {} : { sessionName: row.title }) }
+    return await finish({ state }, { ...step, reopens: false, located: row.session_id, cwd })
+  }
   return {
     device,
     visible: async (): Promise<readonly ThreadSummary[]> =>
@@ -169,6 +322,16 @@ export function createRelaySessionHost(
       const reopens = request.sessionPath !== undefined
       const outcome = await remote.sessions.endpointCommand(device, frame, { locate: true })
       if (outcome.kind !== "ok") {
+        // A create's open b may have run though its reply was lost: the session b lists under the id the create asked
+        // for is answered as the create's own, never uncertain once b lists it.
+        if (outcome.kind === "uncertain" && !reopens && asked.durableSessionId !== undefined) {
+          const found = await adopted(asked.durableSessionId, {
+            confirmReach: options?.confirmReach === true,
+            ...(name === undefined ? {} : { name }),
+            ...(made === undefined ? {} : { worktree: made.worktree }),
+          })
+          if (found !== undefined) return found
+        }
         const model = request.provider === undefined ? undefined : `${request.provider}/${request.modelId ?? ""}`
         const refused = openRefusal(outcome, device, open.cwd, model)
         // A refused open ran nothing on b: undo the worktree this call made there. An uncertain one may have opened in
@@ -181,130 +344,19 @@ export function createRelaySessionHost(
             : { worktree: made.worktree, ...(left === undefined ? {} : { cleanup: left.error }) }
         return { ...refused, error: { ...refused.error, details: { ...refused.error.details, ...keep } } }
       }
-      const data = replyData(outcome.response)
-      const state = recordOf(data["state"])
-      let threadId: string
-      const warnings: ThreadToolFailure[] = []
-      if (reopens) {
-        // #14170: a reopened session is addressed by the key its device lists it by NOW, never the cached row's key (a
-        // closed session's key is gone, and every later op there answers not_resumable). It is answered ok only once
-        // that key resolves; an open whose session cannot be reached is no resumed thread.
-        const engineId = openedEngineId(data, state) ?? listed?.durable_id
-        const located =
-          engineId === undefined
-            ? ({ kind: "refused", reason: "unnamed_session" } as const)
-            : await remote.sessions.locate(device, engineId, outcome.located)
-        if (located.kind !== "ok")
-          return fail(
-            "not_resumable",
-            `Device ${device} opened the thread's file, but the reopened session cannot be reached there (${escapeForDisplay(located.reason)}).`,
-            "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell), then open the thread by the id it lists.",
-            { device, reason: escapeForDisplay(located.reason) },
-          )
-        threadId = located.sessionId
-        if (listed !== undefined) remote.sessions.reopened?.(listed, located.sessionId)
-      } else {
-        const engineId = openedEngineId(data, state)
-        if (engineId === undefined)
-          return fail(
-            "internal_error",
-            `Device ${device} opened a session but did not name it.`,
-            "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the new thread.",
-            { device },
-          )
-        // The session exists on b from here on: a later step that fails is a warning on the created thread, never an
-        // error, so a retry under the same key replays the thread and a new key cannot make a second session.
-        const located = await remote.sessions.locate(device, engineId, outcome.located)
-        // This device's own missing sign-in is no reason to update omo on b (#14015 review L1).
-        if (located.kind !== "ok")
-          warnings.push(
-            notSignedInFailure(located.reason, device)?.error ??
-              threadToolFailure(
-                "unsupported",
-                `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
-                "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
-                { device, reason: escapeForDisplay(located.reason) },
-              ),
-          )
-        threadId = located.kind === "ok" ? located.sessionId : engineId
-      }
-      let applied = name
-      // The first command a create sends the new session through b's route: its name, else (a create that goes on to
-      // use the session) the state read its first prompt would make anyway.
-      const firstStep = (key: string) =>
-        name !== undefined
-          ? remote.sessions.sessionCommand(
-              device,
-              key,
-              { type: "set_session_name", sessionId: key, name },
-              { direct: true },
-            )
-          : !reopens && options?.confirmReach === true
-            ? remote.sessions.sessionCommand(device, key, { type: "get_state", sessionId: key }, { direct: true })
-            : undefined
-      let reached = await firstStep(threadId)
-      // #14394: every later step (its name, its first prompt, every tool) reaches the new session through b's route. A
-      // route that does not list it (a host the service does not route, such as the Desktop app's) leaves an orphan
-      // nothing can address: the create ends it where it was opened and refuses, before anything records the thread.
-      // Only the service's own route_unlisted counts: an engine's answer about the key is no route verdict. A session b
-      // opened a moment ago may not be routed yet (#14397 review L3), so one such refusal is not the verdict: b is asked
-      // again where the session is, and only a second route_unlisted ends it.
-      if (!reopens && reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED) {
-        const engineId = openedEngineId(data, state)
-        const relocated = engineId === undefined ? undefined : await remote.sessions.locate(device, engineId)
-        if (relocated?.kind === "ok") {
-          threadId = relocated.sessionId
-          reached = await firstStep(threadId)
-        }
-        if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
-          return await unreachable(
-            reached.reason,
-            nonEmpty(data["sessionId"]),
-            nonEmpty(state["durableSessionId"]) ?? threadId,
-            made?.worktree,
-          )
-      }
-      const named = name === undefined ? undefined : reached
-      if (named !== undefined) {
-        if (named.kind !== "ok") {
-          applied = undefined
-          const failed = outcomeFailure(named, device).error
-          warnings.push({
-            ...failed,
-            details: { ...failed.details, reason: "name_not_applied", cause: failed.details?.["reason"] },
-          })
-        }
-      }
-      // The reply's state keyed by the id the device lists the session under; the far engine's own routing id and
-      // endpoint facts name nothing on this device.
-      const {
-        sessionId: _engineId,
-        durableSessionId: _durable,
-        socket: _socket,
-        endpoint_kind: _endpointKind,
-        controls: _controls,
-        ...facts
-      } = state
-      // D2: the id the caller gets back is the durable id, never the listing key, which stays in sessionId for the relay
-      // transport. The engine's open reply names it as state.sessionId (data.sessionId is its routing id); a listed row
-      // carries it too. Without it the caller would get the listing key, which no thread tool resolves.
-      const durable =
-        nonEmpty(state["durableSessionId"]) ??
-        nonEmpty(data["durableSessionId"]) ??
-        nonEmpty(state["sessionId"]) ??
-        listed?.durable_id
-      const session: ThreadHostSession = {
-        ...facts,
-        sessionId: threadId,
-        ...(durable === undefined ? {} : { durableSessionId: durable }),
-        cwd: escapeForDisplay(nonEmpty(state["cwd"]) ?? open.cwd ?? (listed === undefined ? "" : rowFolder(listed))),
-        name: applied ?? remoteName(nonEmpty(state["sessionName"]) ?? listed?.title),
-      }
-      const extras = {
+      const step = { confirmReach: options?.confirmReach === true, ...(name === undefined ? {} : { name }) }
+      return await finish(replyData(outcome.response), {
+        ...step,
+        reopens,
+        ...(outcome.located === undefined ? {} : { located: outcome.located }),
+        ...(open.cwd === undefined ? {} : { cwd: open.cwd }),
         ...(made === undefined ? {} : { worktree: made.worktree }),
-        ...(warnings.length === 0 ? {} : { warnings }),
-      }
-      return { kind: "ok", thread: { ...openedThread(session), device, ...extras } }
+      })
     },
+    adopt: async (request, options) =>
+      await adopted(request.durableSessionId, {
+        confirmReach: options?.confirmReach === true,
+        ...(request.name === undefined ? {} : { name: request.name }),
+      }),
   }
 }
