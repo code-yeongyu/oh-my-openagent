@@ -8,6 +8,8 @@
 // LOSSLESS: nothing here truncates an entry, drops one silently, or advances a watermark. An
 // entry that does not fit stays in the queue, byte-identical, for the next launch.
 
+import type { TranscriptEntry } from "../journal/entries"
+import { redactSecretLikeMaterial } from "../sync/redact"
 import type { FactsPayload } from "./extraction"
 import type { FactsQueueEntry } from "./schema"
 
@@ -37,12 +39,28 @@ export interface CappedFactsBatch {
   readonly envelopeOversized: boolean
 }
 
+function redactTranscriptEntry(entry: TranscriptEntry): TranscriptEntry {
+  if (entry.kind !== "tool_call") return { ...entry, text: redactSecretLikeMaterial(entry.text) }
+  return {
+    ...entry,
+    ...(entry.argsText === undefined ? {} : { argsText: redactSecretLikeMaterial(entry.argsText) }),
+    ...(entry.resultText === undefined ? {} : { resultText: redactSecretLikeMaterial(entry.resultText) }),
+  }
+}
+
 /**
  * THE serializer. Both the payload writer and the cap measurement call exactly this. A queue entry's `lead` (the
  * previous, already-extracted turn kept only for consent binding) never reaches the facts model.
+ *
+ * Secret-like spans are masked here, so the facts model never sees one and cannot quote one into a record: the commit
+ * gate refuses a whole batch on any secret-like blob, which let one such span park every endpoint of the batch
+ * (#10116). The queue keeps the original text; only what the extractor reads is masked.
  */
 export function serializeFactsPayload(payload: FactsPayload): string {
-  const entries = payload.entries.map(({ lead: _lead, ...entry }) => entry)
+  const entries = payload.entries.map(({ lead: _lead, ...entry }) => ({
+    ...entry,
+    entries: entry.entries.map(redactTranscriptEntry),
+  }))
   return `${JSON.stringify({ ...payload, entries }, null, 2)}\n`
 }
 
