@@ -3,7 +3,12 @@ import type { PostEditDiagnosticsOutcome } from "@oh-my-opencode/lsp-core/post-e
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import type { ComponentContext } from "../../extension/types"
-import { createLspComponent, createLspPostEditSessionState, handlePostEditDiagnosticsToolResult } from "./index"
+import {
+  createLspComponent,
+  createLspDiagnosticsRunner,
+  createLspPostEditSessionState,
+  handlePostEditDiagnosticsToolResult,
+} from "./index"
 
 interface WidgetCall {
   readonly key: string
@@ -46,6 +51,18 @@ function setup(): TestContext {
 }
 
 describe("omo-senpi lsp post-edit diagnostics", () => {
+  it("reports a freshness timeout without asking the model to fix the edited file (#9271)", async () => {
+    const message = "The server has not published diagnostics for this edit."
+    const run = createLspDiagnosticsRunner("/session/project", async () => ({
+      content: [{ type: "text", text: message }],
+      details: { errorKind: "freshness_timeout" },
+    }))
+    const result = await handlePostEditDiagnosticsToolResult(mutationEvent("src/file.ts"), sessionContext("s"), run)
+    const feedback = result?.content?.at(-1)?.text
+    expect(feedback).toContain(message)
+    expect(feedback).not.toContain("please fix")
+  })
+
   it("#given a session pi cwd #when the real LSP component handles a mutation #then default post-edit diagnostics use that cwd", async () => {
     const sessionCwd = "/session/project"
     const calls: Array<{ name: string; cwd?: string }> = []

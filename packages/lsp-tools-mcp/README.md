@@ -65,7 +65,9 @@ When an MCP host omits the variables, the standalone default remains the Codex-c
 - User config: `<opencode config dir>/lsp.json`
 - Install decisions: `<opencode config dir>/lsp-install-decisions.json`
 
-The shared daemon runtime itself is configured only through `OMO_LSP_DAEMON_DIR`, or the paired `OMO_LSP_DAEMON_CLI` plus `OMO_LSP_DAEMON_VERSION` override. OpenCode source mode uses the paired override to run `packages/lsp-daemon/src/cli.ts` with Bun; dist mode resolves the daemon package `./cli` export.
+The shared daemon runtime location is configured through `OMO_LSP_DAEMON_DIR`, or the paired `OMO_LSP_DAEMON_CLI` plus `OMO_LSP_DAEMON_VERSION` override. OpenCode source mode uses the paired override to run `packages/lsp-daemon/src/cli.ts` with Bun; dist mode resolves the daemon package `./cli` export.
+
+Set `OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS` before starting the daemon to change how long it waits for diagnostics from a language server. For example, `6000` allows six seconds. The default is 3000 milliseconds; invalid values or values outside the integer range 1–2147483647 leave it unchanged. Restart an existing daemon for the setting to take effect. This is a process-wide setting, not a project setting.
 
 Examples:
 

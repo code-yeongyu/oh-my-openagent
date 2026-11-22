@@ -40,7 +40,18 @@ afterEach(() => {
 	for (const tempDir of tempDirs.splice(0)) rmSync(tempDir, { recursive: true, force: true });
 });
 
-describe("codex PostToolUse hook with a language server that is not installed", () => {
+describe("codex PostToolUse hook when diagnostics are unavailable", () => {
+	it("reports a freshness timeout as context without blocking the edit (#9271)", async () => {
+		const message = "No fresh diagnostics arrived for this edit.";
+		daemonAnswering({
+			"src/value.ts": { content: [{ type: "text", text: message }], details: { errorKind: "freshness_timeout" } },
+		});
+		const output = await withPluginData(() => runLspPostToolUseHook(editOf("s-timeout", "src/value.ts")));
+		const parsed = parseHookOutput(output);
+		expect(parsed["decision"]).toBeUndefined();
+		expect(additionalContext(parsed)).toContain(message);
+	});
+
 	it("#given biome is not installed and the user has not decided #when a .json file is edited #then the install guidance is a note, not a block", async () => {
 		// given
 		daemonAnswering({ "config.json": biomeNotInstalled(null, UNDECIDED_TEXT) });

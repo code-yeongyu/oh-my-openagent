@@ -49,6 +49,7 @@ describe("plugin package metadata", () => {
 					args: ["../../../../lsp-daemon/dist/cli.js", "mcp"],
 					cwd: ".",
 					startup_timeout_sec: 10,
+			env_vars: ["OMO_LSP_DIAGNOSTICS_FRESHNESS_TIMEOUT_MS"],
 				},
 			},
 		});

@@ -8,6 +8,7 @@ const CLEAN_DIAGNOSTICS_TEXT = "No diagnostics found"
 
 export type PostEditDiagnosticsOutcome =
   | string
+  | { readonly kind: "freshness_timeout"; readonly text: string }
   | {
       readonly kind: "not_configured"
       readonly extension: string
@@ -19,7 +20,7 @@ export type DiagnosticsRunner = (filePath: string) => Promise<PostEditDiagnostic
 export interface PostEditDiagnosticsBlock {
   readonly filePath: string
   readonly diagnostics: string
-  /** False for missing-server guidance: it is feedback for the model, not a defect in the edit. */
+  /** False for notes about diagnostics availability rather than defects in the edit. */
   readonly blocking: boolean
 }
 
@@ -189,9 +190,11 @@ function classifyDiagnostics(
   outcome: Exclude<PostEditDiagnosticsOutcome, PostEditNotInstalledOutcome>,
 ):
   | { readonly kind: "clean" }
+  | { readonly kind: "guidance"; readonly text: string }
   | { readonly kind: "not_configured"; readonly extension: string }
   | { readonly kind: "block"; readonly diagnostics: string } {
   if (typeof outcome !== "string") {
+    if (outcome.kind === "freshness_timeout") return { kind: "guidance", text: outcome.text }
     return { kind: "not_configured", extension: outcome.extension }
   }
   const diagnostics = outcome
