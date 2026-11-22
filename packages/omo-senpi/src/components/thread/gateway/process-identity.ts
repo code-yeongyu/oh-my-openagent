@@ -28,23 +28,19 @@ export function parseLstart(text: string): number | null {
 export function processStartTime(pid: number): Promise<string | null> {
   return new Promise((resolve) => {
     try {
-      startPs(pid, resolve)
+      execFile(
+        "ps",
+        ["-o", "lstart=", "-p", String(pid)],
+        { env: { ...process.env, LC_ALL: "C", LANG: "C", TZ: "UTC" }, windowsHide: true, timeout: 5_000 },
+        (error, stdout) => {
+          const seconds = error === null ? parseLstart(stdout) : null
+          resolve(seconds === null ? null : `${EPOCH_PREFIX}${seconds}`)
+        },
+      )
     } catch {
       resolve(null)
     }
   })
-}
-
-function startPs(pid: number, resolve: (startTime: string | null) => void): void {
-  execFile(
-      "ps",
-      ["-o", "lstart=", "-p", String(pid)],
-      { env: { ...process.env, LC_ALL: "C", LANG: "C", TZ: "UTC" }, windowsHide: true, timeout: 5_000 },
-      (error, stdout) => {
-        const seconds = error === null ? parseLstart(stdout) : null
-        resolve(seconds === null ? null : `${EPOCH_PREFIX}${seconds}`)
-      },
-    )
 }
 
 function pidExists(pid: number): boolean {
