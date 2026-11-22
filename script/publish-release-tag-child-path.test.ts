@@ -54,7 +54,10 @@ function step(where: { readonly job: string; readonly name: string }): Step & { 
 function runThroughReleaseBranchPush(): string {
   const job = stepsOf(PRE_PUSH.job)
   const push = step(PRE_PUSH).run
-  const beforePush = job.slice(0, job.findIndex((candidate) => candidate.name === PRE_PUSH.name))
+  const beforePush = job.slice(
+    0,
+    job.findIndex((candidate) => candidate.name === PRE_PUSH.name),
+  )
   const proof = beforePush.find((candidate) => candidate.name === VERIFY_STAMP)?.run ?? ":"
   const end = push.indexOf("\nretry_gh()")
   if (end < 0) throw new Error("missing boundary after the release-state branch push")
@@ -166,26 +169,28 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
     sha: fixture.sha,
     originTag: (tag) => git(fixture, checkout, ["ls-remote", "origin", `refs/tags/${tag}`]).split(/\s+/)[0] ?? "",
     get releaseBranch() {
-      return git(fixture, checkout, ["ls-remote", "origin", "refs/heads/release/test-source-state"]).split(/\s+/)[0] ?? ""
+      return (
+        git(fixture, checkout, ["ls-remote", "origin", "refs/heads/release/test-source-state"]).split(/\s+/)[0] ?? ""
+      )
     },
   }
 }
 
 describe("publish.yml child path release tag", () => {
-  test.each([["H", "HT"], ["O", "OT"]] as const)(
-    "a legitimate historical pin %s is pushed and dispatched without exact stamp CI",
-    (pin, prepared) => {
-      const input = { prepared, pin, pinSupported: false }
-      const prePush = runStep({ where: PRE_PUSH, ...input })
-      const dispatched = runStep({ where: DISPATCH_STEP, ...input })
-      expect(dispatched.status, dispatched.output).toBe(0)
-      expect(dispatched.originTag(`v${VERSION}`)).toBe(dispatched.sha[prepared])
-      expect(dispatched.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
-      expect(dispatched.ghCalls).not.toContain("api --method")
-      expect(prePush.status, prePush.output).toBe(0)
-      expect(prePush.releaseBranch).toBe(prePush.sha[prepared])
-    },
-  )
+  test.each([
+    ["H", "HT"],
+    ["O", "OT"],
+  ] as const)("a legitimate historical pin %s is pushed and dispatched without exact stamp CI", (pin, prepared) => {
+    const input = { prepared, pin, pinSupported: false }
+    const prePush = runStep({ where: PRE_PUSH, ...input })
+    const dispatched = runStep({ where: DISPATCH_STEP, ...input })
+    expect(dispatched.status, dispatched.output).toBe(0)
+    expect(dispatched.originTag(`v${VERSION}`)).toBe(dispatched.sha[prepared])
+    expect(dispatched.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
+    expect(dispatched.ghCalls).not.toContain("api --method")
+    expect(prePush.status, prePush.output).toBe(0)
+    expect(prePush.releaseBranch).toBe(prePush.sha[prepared])
+  })
 
   test("an unproved historical stamp cannot push the release branch or supply its own checker", () => {
     const input = { prepared: "HX", pin: "H", pinSupported: false } as const
