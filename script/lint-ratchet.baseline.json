@@ -239,7 +239,7 @@
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/locks/subprocess-contention.test.ts": {
-    "omo-testing/no-flake-masking": 4
+    "omo-testing/no-flake-masking": 3
   },
   "packages/memory-core/src/memfs/hooks-secret.test.ts": {
     "omo-testing/no-flake-masking": 3
