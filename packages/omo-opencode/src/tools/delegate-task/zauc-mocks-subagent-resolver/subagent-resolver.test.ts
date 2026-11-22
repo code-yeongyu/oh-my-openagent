@@ -3,6 +3,7 @@
 // allow: SIZE_OK - legacy fixture-heavy resolver matrix; add new resolver behavior in focused sibling tests instead.
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
 import * as agentLoader from "../../../features/claude-code-agent-loader"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
@@ -76,13 +77,14 @@ describe("resolveSubagentExecution", () => {
     mock.module("../../../shared/logger", () => ({
       log: logMock,
     }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
     spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
     spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
@@ -1299,13 +1301,14 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     mock.module("../../../shared/logger", () => ({
       log: logMock,
     }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
     spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
     spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())

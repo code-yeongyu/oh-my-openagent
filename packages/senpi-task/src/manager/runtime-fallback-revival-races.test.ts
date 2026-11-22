@@ -14,6 +14,7 @@ import { baseSpec, cleanupProjects, FakeRunner, settings, tempProject } from "./
 import { createTaskManager } from "./manager"
 import type { ManagedStartSpec } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Two revivals race the runtime-fallback close from the lifecycle side, where steering's closing fence
 // does not reach: a session reload that revives the task, and a cancel that lands while a dead owner's
@@ -58,7 +59,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
     test(`#given a reload revives the task while its failed rung is closing #when that close later ${close} #then the revived run keeps its handle and finishes`, async () => {
       // given
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const runner = new FirstCloseHeld()
       if (close === "rejects") runner.closeFailure = new Error("late close rejected")
       const config = settings({ default_concurrency: 2, global_concurrency: 2 })
@@ -127,7 +128,7 @@ describe("lifecycle revivals racing the runtime-fallback close", () => {
     test(`#given a dead owner's handoff is being recovered by ${scope === undefined ? "the global" : "the parent's"} reconcile #when the task is cancelled while the failed rung closes #then no replacement prompt is sent`, async () => {
       // given
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const host = await harness.fakeHost({ transcripts: true })
       const rpc = harness.runnerOver(host)
       const taskId = scope === undefined ? "st_0000d001" : "st_0000d002"
