@@ -60,6 +60,22 @@ To grant them:
 
 OmO checks grants without a permission prompt. A denied action opens the matching System Settings pane at most once per permission per engine process, names the launching app when known, and tells you to fully quit and relaunch that app after enabling the grant. The error also includes the engine's executable identity for diagnosis. A missing Accessibility grant refuses input as `PermissionDenied`, including when it prevents the global stop chord from starting; capture still works if Screen Recording is granted. The agent must stop and wait until you confirm the grant and relaunch rather than retrying. If you launch OmO from a different app later, that app needs its own grants.
 
+#### When the launching app is not the window you see
+
+macOS charges a grant to the *responsible* app of the whole process tree OmO runs in, which is not always the terminal window in front of you:
+
+- **A multiplexer started over SSH** (tmux, screen, zellij launched from an SSH login): every pane descends from the SSH session, so macOS charges the request to the SSH login (for example `sshd-keygen-wrapper`), not to the terminal you later attach from. Granting the engine binary or your terminal does not help. Start the multiplexer server from a local GUI terminal that holds the grants instead.
+- **A terminal or multiplexer GUI app** (herdr, for example): the request is charged to that app. Add it under both Accessibility and Screen Recording, then quit and reopen it.
+- **A launchd job, a disclaimed spawn, or a host that execs the engine through a shell**: the engine refuses to start ("refusing to run as its own responsible process"), because no app would hold its grants. Run OmO as an ordinary child of an app that has them.
+
+To see which app macOS actually checked, reproduce the denied action and then read the TCC log:
+
+```sh
+log show --last 5m --predicate 'subsystem == "com.apple.TCC"' | grep AUTHREQ_ATTRIBUTION
+```
+
+In the matching line, `responsible={... identifier=<bundle id>, ... responsible_path=<path>}` is the app that needs the grant; `binary_path` is the engine itself. Grant the app named by `responsible_path`, quit and reopen it, and start a new session.
+
 By default, the first background input of a session on macOS runs a short delivery check: a small dialog reading "senpi desktop canary" appears for a moment, receives a marked keystroke, and is dismissed automatically (it closes on its own after five seconds at most). Leave it alone while it is up. It proves background keyboard delivery works before OmO relies on it. If the check fails, background window input is reported as unavailable (`stopReason=skylight-canary-failed`) and `/computer resume` re-arms it. Setting `computer.macos_canary` to `"off"` skips this check and its dialog.
 
 ### Linux
