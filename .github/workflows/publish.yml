@@ -1828,18 +1828,36 @@ jobs:
           echo "::warning::Release announcement $RELEASE_TAG was skipped or cancelled. Fix the release assets, verification, and installer mirror, then confirm the post is missing before recovery: $recovery"
           printf 'Release announcement `%s` was skipped or cancelled. Once assets, verification, and the installer mirror are ready and no post exists, recover with `%s`.\n' "$RELEASE_TAG" "$recovery" >> "$GITHUB_STEP_SUMMARY"
 
+  installer-mirror-assets:
+    needs: [release-metadata, release]
+    # Mirror the published assets into R2 behind get.omo.dev as soon as the GitHub release exists, moving no channel,
+    # so the upload runs beside post-publish-verify instead of after it. The channel jobs below then find every object
+    # already mirrored and only re-verify it before moving their pointer.
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      inputs.lazycodex_only != true &&
+      inputs.skip_platform != true &&
+      needs.release.result == 'success'
+    uses: ./.github/workflows/installer-mirror.yml
+    with:
+      tag: v${{ needs.release-metadata.outputs.version }}
+      channel: none
+      dry_run: false
+    secrets: inherit
+
   installer-mirror:
-    needs: [release-metadata, release, post-publish-verify]
-    # Last release step: mirror the published assets into R2 behind get.omo.dev, then move the installer
-    # channel. It waits for post-publish-verify so the channel only follows an npm dist-tag that is already
-    # live. A failure leaves the GitHub release and npm untouched and keeps get.omo.dev on the previous
-    # version; re-run installer-mirror.yml for this tag to finish it.
+    needs: [release-metadata, release, installer-mirror-assets, post-publish-verify]
+    # Last release step: move the installer channel to the mirrored release. It waits for post-publish-verify so the
+    # channel only follows an npm dist-tag that is already live. A failure leaves the GitHub release and npm untouched
+    # and keeps get.omo.dev on the previous version; re-run installer-mirror.yml for this tag to finish it.
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
       inputs.lazycodex_only != true &&
       inputs.skip_platform != true &&
       needs.release.result == 'success' &&
+      needs.installer-mirror-assets.result == 'success' &&
       needs.post-publish-verify.result == 'success'
     uses: ./.github/workflows/installer-mirror.yml
     with:
@@ -1849,13 +1867,18 @@ jobs:
     secrets: inherit
 
   installer-mirror-beta:
-    needs: [release-metadata, installer-mirror]
-    # beta is the newer of the latest stable release and the newest prerelease (#12987): after a stable release moves
-    # channels/latest, this moves channels/beta to the same version. The mirror never moves a channel backwards, so a
-    # newer beta prerelease is kept. The assets are already mirrored; this run re-verifies them and moves the pointer.
+    needs: [release-metadata, installer-mirror-assets, post-publish-verify]
+    # beta is the newer of the latest stable release and the newest prerelease (#12987): a stable release moves
+    # channels/beta to the same version, beside the channels/latest move (each channel has its own concurrency group, and
+    # beta may lead latest but never trail it). The mirror never moves a channel backwards, so a newer beta prerelease
+    # is kept. The assets are already mirrored; this run re-verifies them and moves the pointer.
     if: >-
       always() &&
-      needs.installer-mirror.result == 'success' &&
+      inputs.prepared_release_sha != '' &&
+      inputs.lazycodex_only != true &&
+      inputs.skip_platform != true &&
+      needs.installer-mirror-assets.result == 'success' &&
+      needs.post-publish-verify.result == 'success' &&
       needs.release-metadata.outputs.omo_ai_dist_tag == 'latest'
     uses: ./.github/workflows/installer-mirror.yml
     with:
@@ -1864,27 +1887,22 @@ jobs:
       dry_run: false
     secrets: inherit
 
-  post-publish-verify:
+  registry-wait:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
     runs-on: ubuntu-24.04
-    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
-    # probe can't hold a runner for GitHub's 6 h default (#9492).
-    timeout-minutes: 120
-    needs: [release-metadata, prepare-release-state, publish-main, release]
-    # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
-    # already public by this point, so blocking the release job on them could only produce the worst
-    # outcome: packages on npm with no GitHub release and no marketplace sync. A failure here is still a
-    # red job that must be investigated - it just cannot strand a published release.
+    # The wait below has one 60-minute deadline; the margin covers checkout and setup.
+    timeout-minutes: 75
+    needs: [release-metadata, prepare-release-state, publish-main]
+    # A pure registry read that needs only publish-main, so it runs beside the release job instead of after it.
+    # Nothing waits on it except post-publish-verify, so it cannot hold back the GitHub release either.
     if: >-
       always() &&
       inputs.prepared_release_sha != '' &&
       needs.release-metadata.result == 'success' &&
-      needs.publish-main.result == 'success' &&
-      needs.release.result == 'success'
+      needs.publish-main.result == 'success'
     steps:
       - uses: actions/checkout@v7
         with:
-          fetch-depth: 0
           ref: ${{ needs.prepare-release-state.outputs.release_sha }}
 
       - uses: actions/setup-node@v7
@@ -1920,6 +1938,47 @@ jobs:
             fi
             node script/wait-registry-versions.mjs --platform-packages "$VERSION" "${SPECS[@]}"
           fi
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Registry wait
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Reads every main and platform package of this release back from the registry at its exact version.
+            - Runs beside the release job; post-publish-verify starts once both are done.
+          JOB_SUMMARY_NEXT: Check the named package on npm; the publish already succeeded, so this is registry propagation.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  post-publish-verify:
+    # Pin until this release/deploy path is proven on Ubuntu 26.04: #9940.
+    runs-on: ubuntu-24.04
+    # The readiness loop below is 240 x (15 s sleep + two npm views + a curl HEAD); bound the job so a stuck
+    # probe can't hold a runner for GitHub's 6 h default (#9492).
+    timeout-minutes: 120
+    needs: [release-metadata, prepare-release-state, publish-main, release, registry-wait]
+    # Post-publish verification runs AFTER the release exists. These probes assert registry state that is
+    # already public by this point, so blocking the release job on them could only produce the worst
+    # outcome: packages on npm with no GitHub release and no marketplace sync. A failure here is still a
+    # red job that must be investigated - it just cannot strand a published release.
+    if: >-
+      always() &&
+      inputs.prepared_release_sha != '' &&
+      needs.release-metadata.result == 'success' &&
+      needs.publish-main.result == 'success' &&
+      needs.release.result == 'success' &&
+      needs.registry-wait.result == 'success'
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Wait for omo-ai registry readiness
         if: inputs.lazycodex_only != true

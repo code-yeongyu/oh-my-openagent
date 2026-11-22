@@ -42,10 +42,14 @@ export default async function GuideDocsPage({ params }: { params: Params }): Pro
       sectionsLabel={t("sectionsLabel")}
       sections={page.sections.map(({ id, title }) => ({ id, title }))}
     >
-      <article className="docs-content" dangerouslySetInnerHTML={{ __html: page.lead }} />
+      <article lang="en" className="docs-content" dangerouslySetInnerHTML={{ __html: page.lead }} />
       {page.sections.map((section) => (
         <section key={section.id} id={section.id} className="scroll-mt-20 lg:scroll-mt-12">
-          <article className="docs-content" dangerouslySetInnerHTML={{ __html: section.html }} />
+          <article
+            lang="en"
+            className="docs-content"
+            dangerouslySetInnerHTML={{ __html: section.html }}
+          />
         </section>
       ))}
     </DocsShell>
