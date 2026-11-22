@@ -183,7 +183,9 @@ describe("whole-run pause custody", () => {
   test("#given a lost participant its engine no longer holds #when the resume observes it #then the participant leaves the run instead of being re-observed forever (#10864)", async () => {
     const h = harness({
       snapshot: () => [participant],
-      pause: async () => ({ kind: "lost", reason: "propagation failed" }),
+      pause: async () => {
+        throw new Error("propagation failed")
+      },
       observeHold: async () => ({ held: false, childSeq: 0 }),
     })
     await h.controller.pause("root", 1)
