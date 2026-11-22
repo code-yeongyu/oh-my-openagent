@@ -140,6 +140,22 @@ export function engineNotReady(outcome: RemoteCommandOutcome): string | undefine
     : undefined
 }
 
+/**
+ * An answer that says nothing about the other device because it was not reached: the relay or this device could not
+ * carry the command there, or no answer came back. Such an answer proves neither a refusal nor a live session there
+ * (#14623 review M2, M4); an authorization denial (`remote_control_off`, `capability_missing`, ...) is not one.
+ */
+export function unreached(outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>): boolean {
+  if (outcome.kind === "uncertain") return true
+  return (
+    UNANSWERED.has(outcome.reason) ||
+    NOT_SIGNED_IN.has(outcome.reason) ||
+    outcome.reason === "host_detached" ||
+    outcome.reason === "not_attached" ||
+    engineNotReady(outcome) !== undefined
+  )
+}
+
 export function outcomeFailure(
   outcome: Exclude<RemoteCommandOutcome, { readonly kind: "ok" }>,
   device: string,

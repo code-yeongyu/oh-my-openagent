@@ -120,7 +120,11 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
-/** The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. */
+/**
+ * The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. The hash
+ * keeps the `binding: null` every send carried before the binding removal (#14312), so a receipt written by an older
+ * build still replays its unchanged retry instead of answering idempotency_conflict (#14623 review M1).
+ */
 function deliveryArgsHash(fields: {
   readonly target: string
   readonly text: string
@@ -133,6 +137,7 @@ function deliveryArgsHash(fields: {
     text: fields.text,
     mode: fields.mode,
     expected_turn_id: fields.expected_turn_id,
+    binding: null,
     ...(fields.collapse_key === undefined ? {} : { collapse_key: fields.collapse_key }),
   })
 }

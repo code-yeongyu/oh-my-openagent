@@ -35,6 +35,26 @@ const withFarWorktrees = (a: ReturnType<typeof account>, farRoot: string): Remot
   },
 })
 
+// #14623 review M4: b's listing serves only its cached snapshot (b did not answer this round), and every command to a
+// session there is refused because b cannot be reached.
+const cachedAndUnreachable = (
+  a: ReturnType<typeof account>,
+  options: { readonly cached: boolean; readonly unreachable: boolean },
+): RemoteThreadSurface => ({
+  ...a.remote,
+  sessions: {
+    ...a.remote.sessions,
+    sessions: async (query) =>
+      (await a.remote.sessions.sessions(query)).map((row) =>
+        options.cached ? { ...row, source: "cache" as const, as_of: 0 } : row,
+      ),
+    sessionCommand: async (device, session, rpc, commandOptions) =>
+      options.unreachable
+        ? { kind: "refused", reason: "peer_not_found" }
+        : a.remote.sessions.sessionCommand(device, session, rpc, commandOptions),
+  },
+})
+
 const opens = (sent: readonly { rpc?: Record<string, unknown> }[]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "open_session")
 const toSession = (
@@ -67,6 +87,64 @@ describe("thread_create on another device survives a lost open reply", () => {
 
     expect(retry).toMatchObject({ kind: "ok", thread: id, device: "b", name: "lost-twice" })
     expect(opens(a.sent)).toHaveLength(1)
+    expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
+  })
+
+  // #14623 review H1: the recovered answer is recorded, so the next same-key call replays it and runs nothing.
+  test("#given a lost-open create recovered by a same-key retry #when the key is called a third time #then it replays the recovered thread without listing, opening or prompting again", async () => {
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "lost-replay", prompt: "build it", idempotency_key: "remote-lost-replay" }
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    const recovered = await run("thread_create", args)
+    expect(recovered).toMatchObject({ kind: "ok" })
+    const sentBefore = a.sent.length
+
+    expect(await run("thread_create", args)).toEqual(recovered)
+    expect(a.sent.length).toBe(sentBefore)
+  })
+
+  test.each([
+    ["b's listing is only its cached snapshot", { cached: true, unreachable: false }, { name: "lost-cached" }],
+    ["b lists the session but cannot be reached", { cached: false, unreachable: true }, { name: "lost-offline" }],
+    ["b's cached row names it and b cannot be reached", { cached: true, unreachable: true }, { name: "lost-stale" }],
+  ] as const)(
+    "#given a lost-open create #when it is retried while %s #then the retry stays idempotency_uncertain instead of adopting",
+    async (_label, options, named) => {
+      const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+      const { run } = surface(cachedAndUnreachable(a, options))
+      const args = {
+        device: "studio",
+        ...named,
+        idempotency_key: `remote-lost-m4-${options.cached}-${options.unreachable}`,
+      }
+
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain" },
+      })
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain" },
+      })
+      expect(opens(a.sent)).toHaveLength(1)
+    },
+  )
+
+  test("#given an uncertain create #when two same-key retries overlap #then one runs the recovery and the other is idempotency_in_progress", async () => {
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "lost-overlap", prompt: "build it", idempotency_key: "remote-lost-overlap" }
+    const id = createdThreadId("dur-caller", "remote-lost-overlap")
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    const answers = await Promise.all([run("thread_create", args), run("thread_create", args)])
+
+    expect(answers.map((answer) => (answer.kind === "ok" ? "ok" : answer.error.code)).sort()).toEqual([
+      "idempotency_in_progress",
+      "ok",
+    ])
     expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
   })
 

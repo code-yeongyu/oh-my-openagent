@@ -95,7 +95,7 @@ export type GatewayStore = ExtensionFacade & {
   readonly stats: () => Promise<GatewayStoreStats>
   readonly legacyMigrated: () => Promise<number>
   readonly toolReceiptBegin: (
-    request: ReceiptScope & { readonly now: number; readonly args_hash: string },
+    request: ReceiptScope & { readonly now: number; readonly args_hash: string; readonly retry_uncertain?: boolean },
   ) => Promise<ToolReceiptBegin>
   readonly toolReceiptSettle: (
     request: ReceiptScope & { readonly now: number } & ({ readonly result: unknown } | { readonly error_note: string }),
@@ -104,7 +104,7 @@ export type GatewayStore = ExtensionFacade & {
   readonly toolReceiptRevise: (
     request: ReceiptScope & { readonly now: number; readonly result: unknown },
   ) => Promise<boolean>
-  /** Drops this instance's `prepared` receipt for a call that wrote nothing, so the same key runs again; true when one was dropped. */
+  /** Drops this instance's `prepared` receipt for a call that wrote nothing, so the same key runs again; true when one was dropped. A reserved retry of an uncertain call is never dropped. */
   readonly toolReceiptRelease: (request: ReceiptScope) => Promise<boolean>
   readonly registerIncarnation: (request: RegisterIncarnationRequest) => Promise<void>
   readonly clearEndpoint: (request: ClearEndpointRequest) => Promise<void>

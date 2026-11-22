@@ -47,6 +47,8 @@ export type ToolReceiptBegin =
   | { readonly kind: "conflict" }
   | { readonly kind: "in_progress" }
   | { readonly kind: "uncertain"; readonly error_note: string | null }
+  /** The uncertain receipt is now this call's to recover (`retry_uncertain`): settle it like a new one. */
+  | { readonly kind: "retry"; readonly error_note: string | null }
 
 /**
  * `prepared` before the side effect, `completed` with its result after, `uncertain` when it threw.
@@ -54,10 +56,15 @@ export type ToolReceiptBegin =
  * landed, so the receipt becomes `uncertain` and is never retried (the mailbox-era file receipts'
  * semantics, now in the gateway's `receipts` table). The admission also runs the bounded retention
  * sweep when one is due, so traffic made only of peer tool calls still drains expired receipts.
+ *
+ * A caller that may recover an uncertain call (`retry_uncertain`, thread_create, #14060) takes it back to `prepared`
+ * under its own instance in the same transaction (`retry`), so one retry runs at a time and an overlapping one is
+ * `in_progress`; its success settles the receipt as completed, and its failure settles it uncertain again. The first
+ * cause (`error_note`) is kept through every later settle or takeover.
  */
 export async function toolReceiptBegin(
   ctx: StoreContext,
-  request: ReceiptKey & { readonly now: number },
+  request: ReceiptKey & { readonly now: number; readonly retry_uncertain?: boolean },
 ): Promise<ToolReceiptBegin> {
   return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
     const cleared = deleteExpiredReceipt(ctx, request, request.now)
@@ -68,7 +75,10 @@ export async function toolReceiptBegin(
   })
 }
 
-function admitToolReceipt(ctx: StoreContext, request: ReceiptKey & { readonly now: number }): ToolReceiptBegin {
+function admitToolReceipt(
+  ctx: StoreContext,
+  request: ReceiptKey & { readonly now: number; readonly retry_uncertain?: boolean },
+): ToolReceiptBegin {
   const receipt = selectReceipt(ctx, request)
   if (receipt === undefined) {
     write(
@@ -94,7 +104,7 @@ function admitToolReceipt(ctx: StoreContext, request: ReceiptKey & { readonly no
   if (receipt.status === "prepared") {
     write(
       ctx,
-      "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+      "UPDATE receipts SET status = 'uncertain', error_note = COALESCE(error_note, ?), updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?",
       [
         "the process that began this call ended before recording its outcome",
         request.now,
@@ -109,7 +119,14 @@ function admitToolReceipt(ctx: StoreContext, request: ReceiptKey & { readonly no
     "SELECT error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
     [request.principal, request.operation, request.idempotency_key],
   )
-  return { kind: "uncertain", error_note: nullableString(note?.error_note) }
+  const errorNote = nullableString(note?.error_note)
+  if (request.retry_uncertain !== true) return { kind: "uncertain", error_note: errorNote }
+  write(
+    ctx,
+    "UPDATE receipts SET status = 'prepared', owner_instance = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'uncertain'",
+    [ctx.config.instance_id, request.now, request.principal, request.operation, request.idempotency_key],
+  )
+  return { kind: "retry", error_note: errorNote }
 }
 
 export async function toolReceiptSettle(
@@ -123,7 +140,7 @@ export async function toolReceiptSettle(
     return (
       write(
         ctx,
-        `UPDATE receipts SET status = ?, ${completed ? "result" : "error_note"} = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?`,
+        `UPDATE receipts SET status = ?, ${completed ? "result = ?" : "error_note = COALESCE(error_note, ?)"}, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?`,
         [
           completed ? "completed" : "uncertain",
           completed ? JSON.stringify(request.result) : request.error_note,
@@ -178,7 +195,7 @@ export async function toolReceiptRelease(ctx: StoreContext, request: Omit<Receip
     () =>
       write(
         ctx,
-        "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ?",
+        "DELETE FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ? AND status = 'prepared' AND owner_instance = ? AND error_note IS NULL",
         [request.principal, request.operation, request.idempotency_key, ctx.config.instance_id],
       ) === 1,
   )

@@ -4,7 +4,7 @@ import type { RelayDeliverySuccess } from "../gateway/transport"
 import type { RemoteThreadSurface } from "./ports"
 import type { ThreadDataError, ThreadReceiptResult } from "../contracts/results"
 import { replyData } from "./remote-ops"
-import { outcomeFailure } from "./outcome"
+import { outcomeFailure, unreached } from "./outcome"
 
 export async function readReceipt(
   store: Pick<GatewayStore, "now" | "remoteReceipt" | "receiptOutcome" | "reconcileRemoteReceipt">,
@@ -55,6 +55,9 @@ export function receiptOutcomeOf(value: unknown): ReceiptOutcome {
   return { kind: "outcome_unavailable" }
 }
 
+// Refusals that say the peer does not know the receipt query (an older engine or service): nothing to report either.
+const PEER_LACKS_RECEIPTS = ["unsupported", "invalid_request", "engine_capability_missing", "method_unclassified"]
+
 export async function reconcileRemoteReceipt(
   store: Pick<GatewayStore, "now" | "reconcileRemoteReceipt">,
   remote: RemoteThreadSurface | undefined,
@@ -63,14 +66,12 @@ export async function reconcileRemoteReceipt(
   first: RelayDeliverySuccess,
 ) {
   if (first.delivery_id === undefined) return { ...first, outcome: { kind: "outcome_unavailable" as const } }
-  // A retained terminal fact survives a disconnect. Revocation denials still win over that cached fact.
+  // A retained terminal fact survives a disconnect: a peer that cannot be reached (`peer_not_found`, `request_timeout`,
+  // ...) answers nothing, so the retained outcome stands (#14623 review M2). Revocation denials still win over it.
   const answer = await remote?.sessions
     .receipt?.(first.device, first.thread_id, first.delivery_id)
     .catch(() => ({ kind: "unavailable" as const }))
-  if (
-    answer?.kind === "refused" &&
-    !["unsupported", "invalid_request", "engine_capability_missing", "method_unclassified"].includes(answer.reason)
-  )
+  if (answer?.kind === "refused" && !unreached(answer) && !PEER_LACKS_RECEIPTS.includes(answer.reason))
     return outcomeFailure(answer, first.device)
   const data = answer?.kind === "ok" ? replyData(answer.response) : undefined
   if (data?.["kind"] === "refused" && data["reason"] === "sender_not_admitted")

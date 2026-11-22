@@ -227,7 +227,12 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
       admitting.set(key, (admitting.get(key) ?? 0) + 1)
       try {
-        admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
+        admission = await store.toolReceiptBegin({
+          ...scope,
+          now: at,
+          args_hash: hashArgs(value),
+          retry_uncertain: name === "thread_create",
+        })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         if (isLockWaitExceeded(error))
@@ -284,11 +289,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       }
       // #14060: a thread_create that failed after the host made its thread may recover by re-running it; the create
-      // itself refuses unless it finds that thread (see thread_create).
-      if (admission.kind === "uncertain") {
-        if (name !== "thread_create") return output(uncertainFailure(admission.error_note))
-        retrying = { error_note: admission.error_note }
-      }
+      // itself refuses unless it finds that thread (see thread_create). The store reserved the receipt for this retry
+      // alone (#14623 H1), so its answer settles it like a new call's.
+      if (admission.kind === "uncertain") return output(uncertainFailure(admission.error_note))
+      if (admission.kind === "retry") retrying = { error_note: admission.error_note }
     }
     const unrecorded = (what: string) => (settleError: unknown) => {
       unsettled.set(
@@ -374,7 +378,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           now: now(),
           ...(undecided === undefined ? { result } : { error_note: undecided }),
         })
-        .catch(unrecorded("the call ran"))
+        .then((settled) => {
+          if (!settled) unrecorded("the call ran")(new Error("this call no longer held its receipt"))
+        }, unrecorded("the call ran"))
     running.delete(receiptKey(scope))
     return output(result)
   }

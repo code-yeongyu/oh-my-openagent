@@ -297,17 +297,23 @@ export function createDeliveryConsumer(options: DeliveryConsumerOptions): Delive
       return "serving"
     },
     reportDrained: async () => {
-      if (port.notice !== undefined) {
-        for (const notice of await store.refusalNotices(store.now())) {
-          if (!(await port.peerAdmitted(notice.device))) {
-            await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
-            continue
-          }
-          if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
-          if (!(await port.peerAdmitted(notice.device))) continue
-          await port.notice(notice).catch((error: unknown) => options.onError?.(error))
-        }
-      }
+      // The refusal notices are best-effort and each may wait on a slow peer, so they run beside the drained report,
+      // never ahead of it: startup and the service's marks do not wait on another device (#14623 review M3).
+      const send = port.notice
+      if (send !== undefined)
+        track(
+          (async () => {
+            for (const notice of await store.refusalNotices(store.now())) {
+              if (!(await port.peerAdmitted(notice.device))) {
+                await store.claimRefusalNotice({ now: store.now(), notice, suppress: true })
+                continue
+              }
+              if (!(await store.claimRefusalNotice({ now: store.now(), notice }))) continue
+              if (!(await port.peerAdmitted(notice.device))) continue
+              await send(notice).catch((error: unknown) => options.onError?.(error))
+            }
+          })(),
+        )
       if (!marksKept) return
       for (const pair of await store.intakeMarks.marked()) {
         const result = await store.intakeMarks.drained(pair)

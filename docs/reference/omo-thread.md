@@ -95,7 +95,7 @@ only one that saw it running. An unknown target is `not_found`; a name two sessi
 A terminal session is never prompted directly; the message lands in its inbox and its own
 extension admits it (a held draft in the editor is never overwritten).
 
-The SDK's `send` takes exactly `{ thread, text, mode?, expected_turn_id?, all_scope?, idempotency_key? }`; any other
+The SDK's `send` takes exactly `{ thread, text, mode?, expected_turn_id?, all_scope?, idempotency_key?, collapse_key? }`; any other
 key (a misspelt `allScope`, say) is `invalid_arguments` naming it, and so is an unknown key on `list`, `read` and
 `locate`.
 

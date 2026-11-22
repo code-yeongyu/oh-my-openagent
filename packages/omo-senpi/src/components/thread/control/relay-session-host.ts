@@ -289,6 +289,11 @@ export function createRelaySessionHost(
    * A create whose open b may have run though its reply was lost: the session b lists under the id the create derived
    * from its idempotency key is that create's own (no other open asks for that id), finished as its open would have
    * been. Undefined when b lists no such session, or cannot be listed now: nothing proves the open ran there.
+   *
+   * Only fresh evidence adopts it (#14623 review M4): a `cache` row is b's last snapshot, served because b did not
+   * answer this round, so it proves nothing now; and the live row must answer one observing read through b's route.
+   * A read that does not reach b leaves the create uncertain; `route_unlisted` goes on to `finish`, which ends the
+   * orphan where b's engine holds it.
    */
   const adopted = async (
     durableId: string,
@@ -296,9 +301,20 @@ export function createRelaySessionHost(
   ): Promise<SessionOpenOutcome | undefined> => {
     const rows = await remote.sessions.sessions({ device }).catch(() => undefined)
     const row = rows?.find(
-      (candidate) => candidate.device === device && candidate.durable_id === durableId && candidate.state !== "ended",
+      (candidate) =>
+        candidate.device === device &&
+        candidate.durable_id === durableId &&
+        candidate.state !== "ended" &&
+        candidate.source !== "cache",
     )
     if (row === undefined) return undefined
+    const probe = await remote.sessions.sessionCommand(
+      device,
+      row.session_id,
+      { type: "get_state", sessionId: row.session_id },
+      { direct: true },
+    )
+    if (probe.kind !== "ok" && !(probe.kind === "refused" && probe.reason === ROUTE_UNLISTED)) return undefined
     const cwd = rowFolder(row)
     const state = { durableSessionId: durableId, cwd, ...(row.title === "" ? {} : { sessionName: row.title }) }
     return await finish({ state }, { ...step, reopens: false, located: row.session_id, cwd })
