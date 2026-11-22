@@ -334,6 +334,10 @@ jobs:
               echo "Reusing push CI at ${SOURCE_SHA} for release stamp ${PREPARED_RELEASE_SHA}." >> "$GITHUB_STEP_SUMMARY"
               exit 0
             fi
+            # PR CI can be indexed by the stamp SHA while testing its merge tree.
+            # A push run at the stamp tests the source we actually publish.
+            wait_for_ci "$PREPARED_RELEASE_SHA" -f "event=push"
+            exit 0
           fi
           wait_for_ci "$PREPARED_RELEASE_SHA"
 

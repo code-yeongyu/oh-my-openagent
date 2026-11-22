@@ -42,7 +42,7 @@ const GH_STUB = [
   '      local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
   '      printf "none\\n" ;;',
   '    *"actions/workflows/ci.yml/runs"*)',
-  '      local sha conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) conclusion="$PUSH_CONCLUSION" ;; esac; done',
+  '      local sha conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; fi ;; esac; done',
   '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$sha" "$conclusion" ;;',
   "  esac",
   "}",
@@ -61,6 +61,7 @@ afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }))
 interface Dispatch {
   readonly pin?: string
   readonly pushConclusion?: string
+  readonly stampPushConclusion?: string
   readonly prepared?: string
   readonly receipt?: string
   readonly head?: string
@@ -122,6 +123,7 @@ function dispatch(input: Dispatch): Outcome {
       GITHUB_SHA: prepared,
       LAZYCODEX_ONLY: "false",
       PUSH_CONCLUSION: input.pushConclusion ?? "success",
+      STAMP_PUSH_CONCLUSION: input.stampPushConclusion ?? "success",
       PREPARED_RELEASE_SHA: prepared,
       CI_BASIS_RECEIPT: input.receipt ?? "",
       CI_BASIS_HEAD: input.head ?? "",
@@ -168,12 +170,17 @@ describe("#given a pinned release", () => {
     expect(result.ghCalls).not.toContain(`head_sha=${fixture.sha.T}`)
   })
 
-  test("#when the delta changes workflow code #then the stamp needs its own successful CI", () => {
-    for (const ciConclusion of ["success", "failure"]) {
-      const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.B, ciConclusion })
+  test("#when the delta changes workflow code #then green PR CI cannot substitute for push CI on the stamp", () => {
+    for (const stampPushConclusion of ["success", "failure"]) {
+      const result = dispatch({
+        pin: fixture.sha.A,
+        prepared: fixture.sha.B,
+        ciConclusion: "success",
+        stampPushConclusion,
+      })
       expect(result.ghCalls).toContain(`head_sha=${fixture.sha.A} -f event=push`)
-      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B}`)
-      expect(result.status === 0).toBe(ciConclusion === "success")
+      expect(result.status === 0).toBe(stampPushConclusion === "success")
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
     }
   })
 
