@@ -2,13 +2,15 @@ const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = requir
 const { mkdtempSync, rmSync } = require("node:fs")
 const { tmpdir } = require("node:os")
 const { join } = require("node:path")
-const { restoreModuleMocksForTestFile } = await import("../testing/module-mock-lifecycle")
+const { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } =
+  await import("../testing/module-mock-lifecycle")
 
 const mockSetPluginHooksConfigs = mock(() => {})
 
 mock.module("../hooks/claude-code-hooks/config", () => ({
   setPluginHooksConfigs: mockSetPluginHooksConfigs,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const { applyHookConfig } = await import("./hook-config-handler")
 
