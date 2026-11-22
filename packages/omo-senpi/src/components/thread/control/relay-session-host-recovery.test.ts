@@ -25,7 +25,7 @@ describe("a create on another device that opened the session is never lost to a 
       device: "b",
       warnings: [{ code: "unsupported", details: { reason: "session_not_found" } }],
     })
-    expect(replay).toEqual(first)
+    expect(replay).toEqual({ ...first, deduplicated: true })
     expect(opens(a.sent)).toBe(1)
   })
 
