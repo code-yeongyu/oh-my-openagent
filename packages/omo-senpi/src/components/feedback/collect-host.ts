@@ -37,7 +37,10 @@ const locale = (): string => Intl.DateTimeFormat().resolvedOptions().locale
 /** What the identity-hash gate reads: the env and the session's cwd (its omo config scope). */
 export type IdentityHashConsentFacts = Pick<HostFacts, "env"> & { readonly session?: Pick<HostSessionView, "cwd"> }
 
-const telemetryAllowed = (facts: IdentityHashConsentFacts, config: Parameters<typeof isOmoTelemetryEnabled>[0]): boolean =>
+const telemetryAllowed = (
+  facts: IdentityHashConsentFacts,
+  config: Parameters<typeof isOmoTelemetryEnabled>[0],
+): boolean =>
   !shouldDisableTelemetry({ env: { ...facts.env }, productEnvPrefix: "OMO_NATIVE" }) &&
   isOmoNativeTelemetryEnabled({ isConfigEnabled: () => isOmoTelemetryEnabled(config) }, facts.session, { ...facts.env })
 
@@ -63,7 +66,9 @@ export function collectHostSections(facts: HostFacts): HostCollection {
   const hashesAllowed = hashesAllowedFor(facts, loaded)
   const installHash = hashesAllowed ? getOmoNativeAttribution({ env: { ...facts.env } }).install_hash : undefined
   const sessionHash =
-    hashesAllowed && facts.session?.sessionId !== undefined ? hashSessionId(facts.session.sessionId, facts.env) : undefined
+    hashesAllowed && facts.session?.sessionId !== undefined
+      ? hashSessionId(facts.session.sessionId, facts.env)
+      : undefined
 
   const identity = [
     `device    ${hostname()}`,

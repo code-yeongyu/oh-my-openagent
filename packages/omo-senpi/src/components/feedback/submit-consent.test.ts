@@ -68,7 +68,9 @@ const writeTelemetrySetting = (enabled: boolean): void => {
 async function prepareThenSubmit(between: (env: Record<string, string | undefined>) => void) {
   const { env, bodies, core, sessionCtx } = setup()
   const draft = core.prepare(sessionCtx, {}, redact)
-  const sessionHash = /session {3}([0-9a-f]{64})/.exec(draft.sections.find((section) => section.id === "identity")?.text ?? "")?.[1]
+  const sessionHash = /session {3}([0-9a-f]{64})/.exec(
+    draft.sections.find((section) => section.id === "identity")?.text ?? "",
+  )?.[1]
   between(env)
   const result = await core.submit({ draftId: draft.draftId, kind: "bug", description: "it broke" }, redact)
   return { result, bodies, sessionHash }
@@ -96,7 +98,9 @@ test("#given consent at prepare #when an env opt-out is set before submit #then 
   const body = JSON.parse(raw)
   expect(body.installHash).toBeUndefined()
   expect(body.sessionHash).toBeUndefined()
-  expect(body.sections.map((section: { id: string }) => section.id)).toEqual(expect.arrayContaining(["description", "identity", "environment", "config", "session"]))
+  expect(body.sections.map((section: { id: string }) => section.id)).toEqual(
+    expect.arrayContaining(["description", "identity", "environment", "config", "session"]),
+  )
   expect(body.sections.find((section: { id: string }) => section.id === "description")?.text).toBe("it broke")
 })
 
@@ -125,13 +129,23 @@ test("#given an injected env naming its own agent dir #when a session id is hash
 
 test("#given an injected env whose agent dir has no salt yet #when feedback is collected #then the salt is created there, never under process.env's dir", () => {
   const result = collectHostSections({
-    env: { HOME: root, USERPROFILE: root, OMO_CODING_AGENT_DIR: join(root, "agent"), OMO_NATIVE_INSTALL_ID: installId, OMO_TELEMETRY_ALLOW_AUTOMATION: "1" },
-    omoVersion: "synthetic", senpiVersion: "synthetic", channel: "test",
+    env: {
+      HOME: root,
+      USERPROFILE: root,
+      OMO_CODING_AGENT_DIR: join(root, "agent"),
+      OMO_NATIVE_INSTALL_ID: installId,
+      OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+    },
+    omoVersion: "synthetic",
+    senpiVersion: "synthetic",
+    channel: "test",
     now: new Date("2026-10-28T00:00:00.000Z"),
     session: { sessionId: "synthetic-session", entries: [] },
   })
   const saltPath = join(root, "agent", "omo-senpi", "omo-native", "session-id-salt")
   expect(existsSync(saltPath)).toBe(true)
-  expect(result.sessionHash).toBe(createHash("sha256").update(readFileSync(saltPath)).update("synthetic-session").digest("hex"))
+  expect(result.sessionHash).toBe(
+    createHash("sha256").update(readFileSync(saltPath)).update("synthetic-session").digest("hex"),
+  )
   expect(existsSync(join(root, "process-agent", "omo-senpi", "omo-native", "session-id-salt"))).toBe(false)
 })

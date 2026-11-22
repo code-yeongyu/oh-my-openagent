@@ -12,7 +12,14 @@ import {
 import type { ComponentLogger } from "../../extension/types"
 
 import { collectHostSections, identityHashesAllowed, type HostSessionView } from "./collect-host"
-import { buildDraft, byteLength, type CollectedSection, type FeedbackDraft, type FeedbackKind, type UploadRedactor } from "./draft"
+import {
+  buildDraft,
+  byteLength,
+  type CollectedSection,
+  type FeedbackDraft,
+  type FeedbackKind,
+  type UploadRedactor,
+} from "./draft"
 import {
   feedbackUploadsDisabled,
   submitReport,
@@ -84,7 +91,10 @@ interface StoredDraft {
 const withoutIdentityHashes = (draft: FeedbackDraft, hashes: readonly string[]): FeedbackDraft => {
   const sections = draft.sections.map((section) => {
     if (section.id !== "identity") return section
-    const text = section.text.split("\n").filter((line) => !hashes.some((hash) => line.includes(hash))).join("\n")
+    const text = section.text
+      .split("\n")
+      .filter((line) => !hashes.some((hash) => line.includes(hash)))
+      .join("\n")
     return { ...section, text, bytes: byteLength(text) }
   })
   return { ...draft, sections, totalBytes: sections.reduce((sum, section) => sum + section.bytes, 0) }
@@ -241,7 +251,9 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
     // Consent is read again at send time, fresh, through the gate prepare used: a withdrawal after the draft was
     // prepared drops the hashes (and their identity lines) and the rest of the report is still sent (#11638).
     const captured = [stored.installHash, stored.sessionHash].filter((hash): hash is string => hash !== undefined)
-    const keepHashes = captured.length > 0 && identityHashesAllowed({ env, ...(stored.cwd === undefined ? {} : { session: { cwd: stored.cwd } }) })
+    const keepHashes =
+      captured.length > 0 &&
+      identityHashesAllowed({ env, ...(stored.cwd === undefined ? {} : { session: { cwd: stored.cwd } }) })
     const result = await submitReport({
       draft: keepHashes || captured.length === 0 ? stored.draft : withoutIdentityHashes(stored.draft, captured),
       kind: kind === "feedback" || kind === "other" ? kind : "bug",

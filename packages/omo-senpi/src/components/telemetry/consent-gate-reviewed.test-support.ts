@@ -388,7 +388,7 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     file: "product-identity.ts",
     fn: "readOrCreateSalt",
     guard: "unless(persisted !== undefined)",
-    call: "mkdirSync(getOmoNativeStateDir())",
+    call: "mkdirSync(dirname(path))",
     reason: IDENTITY_FILES,
   },
   {
