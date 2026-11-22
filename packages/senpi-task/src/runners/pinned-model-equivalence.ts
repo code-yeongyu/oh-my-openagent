@@ -1,6 +1,7 @@
 export interface ModelIdentity {
   readonly provider: string
   readonly id: string
+  readonly api?: string
 }
 
 export type CatalogModelIdentity = ModelIdentity & {
@@ -50,31 +51,46 @@ function aliasPairing(entry: ModelIdentity & object, registry: PriorityPairingRe
   }
 }
 
-function isModelIdentity(entry: unknown): entry is ModelIdentity & object {
+function isModelIdentity(entry: unknown): entry is ModelIdentity {
   return (
     typeof entry === "object" &&
     entry !== null &&
     "provider" in entry &&
     typeof entry.provider === "string" &&
     "id" in entry &&
-    typeof entry.id === "string"
+    typeof entry.id === "string" &&
+    (!("api" in entry) || entry.api === undefined || typeof entry.api === "string")
+  )
+}
+
+/** The RPC catalog already carries the values returned by the host's registry accessors. */
+export function findCatalogModel(catalog: readonly unknown[], model: ModelIdentity): ModelIdentity | undefined {
+  return catalog.find(
+    (entry): entry is ModelIdentity =>
+      isModelIdentity(entry) && entry.provider === model.provider && entry.id === model.id,
   )
 }
 
 /**
  * A catalog priority alias, not a different SKU that happens to end in `-fast`. With a registry in
  * scope the pairing is read the way senpi reads it; without one, from the entry's own fields.
- * senpi pairs the alias when its upstream id equals the BASE'S upstream id, falling back to the
- * base's own id (#11104): a base carrying its own `upstreamModelId` mapping must not be a wrong
- * refusal.
+ * Like senpi's fast-model-pair, require the same API and compare both upstream IDs, falling back
+ * to each model's catalog ID when it lacks a mapping (#11104).
  */
-export function isPriorityAliasOf(entry: unknown, base: ModelIdentity, registry?: PriorityPairingRegistry): boolean {
-  if (!isModelIdentity(entry) || entry.provider !== base.provider || priorityAliasBaseId(entry.id) !== base.id)
+export function isPriorityAliasOf(entry: unknown, base: unknown, registry?: PriorityPairingRegistry): boolean {
+  if (
+    !isModelIdentity(entry) ||
+    !isModelIdentity(base) ||
+    entry.provider !== base.provider ||
+    entry.api === undefined ||
+    entry.api !== base.api ||
+    priorityAliasBaseId(entry.id) !== base.id
+  )
     return false
   const pairing = aliasPairing(entry, registry)
   if (pairing.serviceTier !== "priority") return false
   const baseUpstream = aliasPairing(base, registry).upstreamModelId
-  return pairing.upstreamModelId === (baseUpstream ?? base.id)
+  return (pairing.upstreamModelId ?? entry.id) === (baseUpstream ?? base.id)
 }
 
 /** The alias entry is the pairing proof in whichever direction the engine started. */
@@ -86,7 +102,9 @@ export function startedOnPinnedModel(
 ): boolean {
   if (started.provider !== pinned.provider) return false
   if (started.id === pinned.id) return true
-  return isPriorityAliasOf(started, pinned, registry) || isPriorityAliasOf(pinnedEntry, started, registry)
+  if (!isModelIdentity(pinnedEntry) || pinnedEntry.provider !== pinned.provider || pinnedEntry.id !== pinned.id)
+    return false
+  return isPriorityAliasOf(started, pinnedEntry, registry) || isPriorityAliasOf(pinnedEntry, started, registry)
 }
 
 /** The effective tier comes from the session, never the catalog's requested tier. */

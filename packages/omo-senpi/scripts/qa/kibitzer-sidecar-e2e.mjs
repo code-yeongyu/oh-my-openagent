@@ -107,7 +107,7 @@ export const SCENARIOS = [
  * service-tier extension starts such an alias on its base model at session_start, before any request,
  * so the post-start pin check is exercised without the mock speaking that API.
  */
-const FAST_ALIAS = { provider: "omo-codex-mock", base: "luna", alias: "luna-fast" }
+const FAST_ALIAS = { provider: "omo-codex-mock", base: "luna", alias: "luna-fast", upstream: "wire-luna" }
 /** The pinned model the refused-pinned-model provider refuses, and the builtin quick rung it falls back to. */
 const REFUSED_MODEL = "refused-1"
 const BUILTIN_RUNG = { provider: "deepseek", id: "deepseek-flash" }
@@ -171,6 +171,26 @@ const ROUTER_LANES = {
     { name: "refused", matches: (body) => body?.model === REFUSED_MODEL, step: () => PERMISSION_DENIED_STEP },
   ],
 }
+
+function fastAliasProvider(template, baseUrl) {
+  return {
+    name: "mock codex responses provider",
+    api: "openai-codex-responses",
+    baseUrl,
+    apiKey: "mock",
+    models: [
+      { ...template, id: FAST_ALIAS.base, name: "Mock Luna", upstreamModelId: FAST_ALIAS.upstream },
+      {
+        ...template,
+        id: FAST_ALIAS.alias,
+        name: "Mock Luna Fast",
+        serviceTier: "priority",
+        upstreamModelId: FAST_ALIAS.upstream,
+      },
+    ],
+  }
+}
+
 /** Scenario-specific provider wiring on top of the lane's `omo-mock/mock-1`, every provider served by the mock. */
 const SANDBOX = {
   "refused-pinned-model": (sandbox, baseUrl) => {
@@ -195,22 +215,7 @@ const SANDBOX = {
     const modelsFile = join(sandbox.agentDir, "models.json")
     const models = JSON.parse(readFileSync(modelsFile, "utf8"))
     const template = { ...models.providers["omo-mock"].models[0], contextWindow: 400_000 }
-    models.providers[FAST_ALIAS.provider] = {
-      name: "mock codex responses provider",
-      api: "openai-codex-responses",
-      baseUrl,
-      apiKey: "mock",
-      models: [
-        { ...template, id: FAST_ALIAS.base, name: "Mock Luna" },
-        {
-          ...template,
-          id: FAST_ALIAS.alias,
-          name: "Mock Luna Fast",
-          serviceTier: "priority",
-          upstreamModelId: FAST_ALIAS.base,
-        },
-      ],
-    }
+    models.providers[FAST_ALIAS.provider] = fastAliasProvider(template, baseUrl)
     writeFileSync(modelsFile, `${JSON.stringify(models, null, 2)}\n`)
   },
 }
@@ -888,7 +893,21 @@ async function runRefusedPinnedModel({ session, state, identity, router, facts, 
 
 // ---- fast-alias-config ---------------------------------------------------------------------------------------
 
-async function runFastAliasConfig({ session, state, identity, router, facts, parentTurns, record }) {
+function startedFastAliasOnBase(wake, children) {
+  if (wake === undefined || wake.cause === "start_failed" || children.length !== 1) return false
+  const { entries } = children[0]
+  const inputIndex = entries.findIndex(
+    (entry) =>
+      entry.type === "message" &&
+      entry.message?.role === "user" &&
+      /^<kibitzer-(?:seed|wake)\b/u.test(messageText(entry.message)),
+  )
+  if (inputIndex === -1) return false
+  const started = entries.slice(0, inputIndex).findLast((entry) => entry.type === "model_change")
+  return started?.provider === FAST_ALIAS.provider && started.modelId === FAST_ALIAS.base
+}
+
+async function runFastAliasConfig({ session, identity, router, facts, parentTurns, record }) {
   const recallDir = join(identity, "runtime", "recall")
   router.setParentSteps([
     { type: "text", text: "Checking." },
@@ -906,21 +925,14 @@ async function runFastAliasConfig({ session, state, identity, router, facts, par
     { timeoutMs: WAKE_TIMEOUT_MS, description: "fast-alias-config wake 1: the wake settled" },
   )
   const wake = settled.records[0]
-  const refusedAsSubstitution =
-    wake?.cause === "start_failed" && String(wake?.reason ?? "").includes("refusing the substitution")
   const children = childTranscripts(settled.lineage.dir)
   const childModels = children
     .flatMap((transcript) => transcript.entries)
     .filter((entry) => entry.type === "model_change")
     .map((entry) => `${entry.provider}/${entry.modelId}`)
-  // The pin can only pair on the mock's own luna pair (#11104): a ladder step to an unrelated
-  // fallback candidate would else satisfy a weaker "at least one child" check.
-  const pairedOnMockLuna =
-    childModels.includes(`${FAST_ALIAS.provider}/${FAST_ALIAS.base}`) ||
-    childModels.includes(`${FAST_ALIAS.provider}/${FAST_ALIAS.alias}`)
   record(
     "pin-accepted-alias-on-base",
-    !refusedAsSubstitution && children.length >= 1 && pairedOnMockLuna,
+    startedFastAliasOnBase(wake, children),
     `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`,
   )
   facts.result = {
@@ -1110,7 +1122,47 @@ async function main() {
   process.exit(summary.ok ? 0 : 1)
 }
 
-function runSelfTest() {
+async function verifyFastAliasRpcFixture() {
+  // The live driver exercises in-process startup. Use the same config at the RPC boundary to
+  // verify both a registry-only mapping and a wire-protocol mismatch without a provider turn.
+  const { openTaskHostSession } = await import("../../../senpi-task/src/runners/rpc-host/open-session.ts")
+  const fixture = fastAliasProvider({}, "file://fast-alias-config")
+  const [base, alias] = fixture.models.map((entry) => ({
+    ...entry,
+    provider: FAST_ALIAS.provider,
+    api: fixture.api,
+  }))
+  const { upstreamModelId: _registryOnly, ...rawBase } = base
+  const results = []
+  for (const [started, pinned] of [
+    [rawBase, alias],
+    [base, { ...alias, api: "openai-completions" }],
+  ]) {
+    const result = await openTaskHostSession({
+      client: {
+        open: async () => ({ sessionId: "route", attached: false, instanceId: "host", engineVersion: "test" }),
+        getState: async () => ({ sessionId: "synthetic", model: started }),
+        getAvailableModels: async () => [base, pinned],
+      },
+      spec: {
+        task_id: "st_fast_alias",
+        cwd: process.cwd(),
+        state_dir: process.cwd(),
+        prompt: "not sent during verification",
+        model: `${pinned.provider}/${pinned.id}`,
+      },
+      sessionPath: "unused.jsonl",
+    }).then(
+      (opened) => opened.reportedModel?.id,
+      (error) => error?.failure?.kind,
+    )
+    results.push(result)
+  }
+  if (!isDeepStrictEqual(results, [FAST_ALIAS.base, "model_unavailable"]))
+    throw new Error(`self-test: expected mapped base then API refusal, got ${JSON.stringify(results)}`)
+}
+
+async function runSelfTest() {
   const sidecarBody = {
     tools: SIDECAR_TOOL_NAMES.map((name) => ({ type: "function", function: { name } })),
     messages: [{ role: "system", content: "# Kibitzer — resident memory advisor" }],
@@ -1176,6 +1228,20 @@ function runSelfTest() {
   if (settledAfter(transcript, (text) => text.startsWith("<kibitzer-seed ")) !== undefined)
     throw new Error("self-test: settledAfter without the user message is undefined")
 
+  const aliasChange = { type: "model_change", provider: FAST_ALIAS.provider, modelId: FAST_ALIAS.alias }
+  const baseChange = { ...aliasChange, modelId: FAST_ALIAS.base }
+  const input = transcript.entries[0]
+  for (const [wake, entries, expected] of [
+    [{ status: "completed" }, [aliasChange, baseChange, input], true],
+    [{ status: "completed" }, [aliasChange, input], false],
+    [{ status: "completed" }, [aliasChange, input, baseChange], false],
+    [{ cause: "start_failed" }, [aliasChange, baseChange], false],
+  ]) {
+    if (startedFastAliasOnBase(wake, [{ entries }]) !== expected)
+      throw new Error(`self-test: require a Kibitzer input on the mapped base: ${JSON.stringify({ wake, entries })}`)
+  }
+  await verifyFastAliasRpcFixture()
+
   const sandbox = { root: "/tmp/x", agentDir: "/tmp/x/agent", memoryHome: "/tmp/x/memory", homeDir: "/tmp/x/home" }
   const lanes = {
     OMO_CODING_AGENT_DIR: "/tmp/x/agent",
@@ -1204,6 +1270,6 @@ function runSelfTest() {
 }
 
 if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  if (process.argv.includes("--self-test")) runSelfTest()
+  if (process.argv.includes("--self-test")) await runSelfTest()
   else await main()
 }

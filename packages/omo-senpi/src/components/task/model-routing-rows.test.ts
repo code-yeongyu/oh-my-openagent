@@ -256,10 +256,11 @@ describe("omo.modelRouting.resolve rows answer from the planner's own inputs", (
 })
 
 const FAST_CATALOG = [
-  { provider: "chatgpt-subscription", id: "gpt-5.6-luna" },
+  { provider: "chatgpt-subscription", id: "gpt-5.6-luna", api: "openai-codex-responses" },
   {
     provider: "chatgpt-subscription",
     id: "gpt-5.6-luna-fast",
+    api: "openai-codex-responses",
     upstreamModelId: "gpt-5.6-luna",
     serviceTier: "priority" as const,
   },

@@ -104,11 +104,14 @@ describe("InProcessRunner", () => {
     expect(failure instanceof Error ? failure.message : "").toContain("shutting down its session failed")
   })
 
-  test("#given a pinned base that carries its own upstream mapping #when the session starts on its -fast alias #then senpi's upstream pairing rule accepts the start (#11104)", async () => {
+  test.each([
+    ["luna", "luna-fast"],
+    ["luna-fast", "luna"],
+  ])("a mapped %s pin accepts a raw %s session model (#11104)", async (pinned, started) => {
     // given: senpi pairs the alias when its upstream id equals the BASE's upstream id (falling back
     // to the base's own id); this base maps upstream to luna-upstream, not to its literal id
     const fake = createFakeSession()
-    fake.session = { ...fake.session, model: { provider: "vendor-a", id: "luna-fast" } }
+    fake.session = { ...fake.session, model: { provider: "vendor-a", id: started, api: "openai-completions" } }
     const registry = {
       getServiceTier: (entry: { id: string }) => (entry.id === "luna-fast" ? "priority" : undefined),
       getUpstreamModelId: (entry: { id: string }) =>
@@ -119,19 +122,25 @@ describe("InProcessRunner", () => {
     // when / then: the alias start is accepted instead of being a wrong refusal
     const handle = await runner.start(
       baseSpec({
-        model: realModel("vendor-a", "luna"),
-        selectedModel: "vendor-a/luna",
+        model: realModel("vendor-a", pinned),
+        selectedModel: `vendor-a/${pinned}`,
         resolvedModel: {
           provider: "vendor-a",
-          model_id: "luna",
-          display: "vendor-a/luna",
+          model_id: pinned,
+          display: `vendor-a/${pinned}`,
           source: "explicit",
         },
         modelRegistry: registry as unknown as ChildSpec["modelRegistry"],
       }),
     )
-    expect(handle).toBeDefined()
-    expect(fake.disposeCount).toBe(0)
+    try {
+      expect(handle.effectiveModel()).toEqual({ provider: "vendor-a", id: started })
+      expect(fake.promptCalls).toBe(1)
+    } finally {
+      fake.resolvePrompt()
+      await handle.waitForIdle()
+      await handle.dispose()
+    }
   })
 
   test("#given a session on exactly the model the spec resolved #when start runs #then the child is accepted (#9722)", async () => {
@@ -172,7 +181,13 @@ describe("InProcessRunner", () => {
       fake.session = {
         ...fake.session,
         ...{ effectiveServiceTier: "priority" },
-        model: { provider: "vendor-a", id: startedId, serviceTier: "priority", upstreamModelId: "pinned" },
+        model: {
+          provider: "vendor-a",
+          id: startedId,
+          api: "openai-completions",
+          serviceTier: "priority",
+          upstreamModelId: "pinned",
+        },
       }
       const runner = new InProcessRunner({ createSession: async () => fake.session })
 

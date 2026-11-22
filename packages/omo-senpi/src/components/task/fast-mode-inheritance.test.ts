@@ -5,6 +5,7 @@ import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { createTaskChildPlanner, type TaskModelRegistry } from "./planner"
 
 type CatalogModel = SenpiModelPort & {
+  readonly api?: string
   readonly upstreamModelId?: string
   readonly serviceTier?: "auto" | "flex" | "priority"
 }
@@ -12,9 +13,10 @@ type CatalogModel = SenpiModelPort & {
 const CODEX = "chatgpt-subscription"
 const LUNA = "gpt-5.6-luna"
 const LUNA_FAST = `${LUNA}-fast`
+const BASE = { provider: CODEX, id: LUNA, api: "openai-codex-responses" }
 
 function fastVariant(provider: string, baseId: string): CatalogModel {
-  return { provider, id: `${baseId}-fast`, upstreamModelId: baseId, serviceTier: "priority" }
+  return { provider, id: `${baseId}-fast`, api: BASE.api, upstreamModelId: baseId, serviceTier: "priority" }
 }
 
 function registry(models: readonly CatalogModel[]): TaskModelRegistry {
@@ -42,7 +44,7 @@ function expectResolved(plan: ReturnType<ReturnType<typeof createTaskChildPlanne
 describe("delegated task inherits the parent's fast mode", () => {
   test("#given a fast parent and an explicit base Codex model #when planned #then the child runs the -fast sibling", () => {
     // given
-    const planner = plannerFor([{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)], "priority")
+    const planner = plannerFor([BASE, fastVariant(CODEX, LUNA)], "priority")
 
     // when
     const plan = expectResolved(
@@ -64,7 +66,7 @@ describe("delegated task inherits the parent's fast mode", () => {
     const planner = createTaskChildPlanner(
       { categories: { quick: { model: `${CODEX}/${LUNA}`, variant: "low" } } },
       {},
-      () => registry([{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)]),
+      () => registry([BASE, fastVariant(CODEX, LUNA)]),
       () => "priority",
     )
 
@@ -81,10 +83,7 @@ describe("delegated task inherits the parent's fast mode", () => {
 
   test("#given a -fast alias whose pairing only the registry accessors report (models.json) #when a fast parent plans #then the child runs the alias (#10536)", () => {
     // given: senpi's ModelRegistry resolves serviceTier/upstreamModelId from provider config, not the entry
-    const models: readonly CatalogModel[] = [
-      { provider: CODEX, id: LUNA },
-      { provider: CODEX, id: LUNA_FAST },
-    ]
+    const models: readonly CatalogModel[] = [BASE, { ...BASE, id: LUNA_FAST }]
     const configured: TaskModelRegistry & {
       getServiceTier(model: SenpiModelPort): string | undefined
       getUpstreamModelId(model: SenpiModelPort): string | undefined
@@ -109,7 +108,7 @@ describe("delegated task inherits the parent's fast mode", () => {
 
   test("#given a parent that is not fast #when planned #then the child keeps the planned model", () => {
     // given
-    const models = [{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)]
+    const models = [BASE, fastVariant(CODEX, LUNA)]
 
     // when
     const standard = expectResolved(
@@ -141,8 +140,8 @@ describe("delegated task inherits the parent's fast mode", () => {
       [
         { provider: "cursor", id: "composer-2.5" },
         { provider: "cursor", id: "composer-2.5-fast" },
-        { provider: CODEX, id: "custom" },
-        { provider: CODEX, id: "custom-fast", upstreamModelId: "custom-upstream", serviceTier: "priority" },
+        { ...BASE, id: "custom" },
+        { ...BASE, id: "custom-fast", upstreamModelId: "custom-upstream", serviceTier: "priority" },
       ],
       "priority",
     )
@@ -160,7 +159,7 @@ describe("delegated task inherits the parent's fast mode", () => {
 
   test("#given a fast parent and a model already on -fast #when planned #then it is left untouched", () => {
     // given
-    const planner = plannerFor([{ provider: CODEX, id: LUNA }, fastVariant(CODEX, LUNA)], "priority")
+    const planner = plannerFor([BASE, fastVariant(CODEX, LUNA)], "priority")
 
     // when
     const plan = expectResolved(
