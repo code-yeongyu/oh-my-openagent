@@ -31,7 +31,6 @@ import {
 } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { openedResult } from "../tools/thread-row"
-import { withdrawQueued } from "../wake/closed-intake"
 import { createLaunch } from "./create-launch"
 import { createLocalSessionHost, workspaceNote } from "./local-session-host"
 import { locateControl } from "./locate"
@@ -112,8 +111,8 @@ export async function createThread(
   }
   // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
   let opened: HostedThread | undefined
-  // #14648: this call opened the session on this device (`created`: as a new thread), so it answers for what is left.
-  let openedHere: { readonly created: boolean } | undefined
+  // #14648: this call opened the session on this device (`madeNew`: its session file too), so it answers for what is left.
+  let openedHere: { readonly madeNew: boolean; readonly priorIncarnation: string | null } | undefined
   const made = await (async (): Promise<ThreadToolResult> => {
     const skills =
       value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
@@ -187,6 +186,15 @@ export async function createThread(
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
       return found.kind === "file" ? await plan.host.open(fileOpen(found)) : undefined
     }
+    // #14648: the registration this open's session makes is told from one an earlier life of it left (the endpoint is
+    // cleared at exit, the incarnation stays), so the incarnation before the open is kept.
+    const knownId = createdId ?? plan.reopenedId
+    const priorIncarnation =
+      plan.host.device === undefined && knownId !== undefined
+        ? ((await options.store.sessionOwner(knownId))?.incarnation ?? null)
+        : null
+    // Only a session file this open made new is this call's to remove; a file an earlier run made, found again, is kept.
+    let madeNew = false
     let outcome: SessionOpenOutcome
     if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
@@ -204,6 +212,7 @@ export async function createThread(
           // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
           { confirmReach: plan.creates },
         )
+        madeNew = plan.creates
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error
@@ -211,7 +220,7 @@ export async function createThread(
       }
     if (outcome.kind === "error") return outcome
     opened = outcome.thread
-    if (earlier?.kind !== "live" && plan.host.device === undefined) openedHere = { created: plan.creates }
+    if (earlier?.kind !== "live" && plan.host.device === undefined) openedHere = { madeNew, priorIncarnation }
     const created: ThreadToolResult = {
       ...openedResult(outcome.thread, deduplicated),
       ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
@@ -257,13 +266,22 @@ export async function createThread(
   if (value.prompt === undefined) return made.kind === "ok" ? ({ ...made, prompt: null } as ThreadToolResult) : made
   if (made.kind !== "ok" || opened === undefined) return made
   const thread = opened
+  const here = openedHere
+  // An alias this call claimed names the thread across the account: a refused create releases it with the thread.
+  const claimedAlias =
+    value.alias !== undefined && "alias" in made && typeof made.alias === "string" && !("alias_scope" in made)
+      ? made.alias
+      : undefined
   const unregistered =
-    openedHere === undefined
+    here === undefined
       ? undefined
       : {
-          check: async () => (await options.store.sessionOwner(thread.thread_id)) === null,
+          check: async () => {
+            const owner = await options.store.sessionOwner(thread.thread_id)
+            return owner?.endpoint == null || owner.incarnation === here.priorIncarnation
+          },
           refuse: (deliveryId: string) =>
-            refuseUnregistered(options, context, thread, deliveryId, openedHere?.created === true),
+            refuseUnregistered(options, context, thread, deliveryId, here.madeNew, claimedAlias),
         }
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context, unregistered)
   return "not_started" in prompt
@@ -369,9 +387,12 @@ async function refuseUnregistered(
   thread: HostedThread,
   deliveryId: string,
   madeNew: boolean,
+  claimedAlias: string | undefined,
 ): Promise<ThreadToolFailure | undefined> {
-  const withdrawn = await withdrawQueued(options.store, thread.thread_id)
-  if (!withdrawn.includes(deliveryId)) return undefined
+  // Only this create's own prompt is taken back: other messages a reopened thread holds stay queued for it.
+  const store = options.store
+  if (!(await store.refuseQueued({ now: store.now(), delivery_id: deliveryId, reason: "target_closed" })))
+    return undefined
   const failures: string[] = []
   const located = await locateControl(options, await context.view(), thread.thread_id, true, context.callerId)
   let ended = located.kind === "not_live"
@@ -397,10 +418,24 @@ async function refuseUnregistered(
         failures.push(`removing its session file failed: ${error instanceof Error ? error.message : String(error)}`)
       }
   }
+  let aliasReleased = false
+  if (claimedAlias !== undefined) {
+    const released = await options.remote?.aliases
+      ?.release({ session_id: thread.thread_id, alias: claimedAlias })
+      .catch((error: unknown) => ({
+        kind: "error" as const,
+        error: { code: error instanceof Error ? error.message : String(error) },
+      }))
+    aliasReleased = released?.kind === "ok"
+    if (!aliasReleased)
+      failures.push(
+        `releasing its alias ${claimedAlias} failed: ${released?.kind === "error" ? released.error.code : "no alias registry"}`,
+      )
+  }
   const engine = thread.engine_version === undefined ? "" : ` (it runs engine ${thread.engine_version})`
   return threadToolFailure(
     "host_unavailable",
-    left
+    left || failures.length > 0
       ? `Thread ${thread.thread_id} was opened on this device, but the thread host running it${engine} never registered it with this omo's gateway, so its first prompt could not start; the prompt was taken back, but ${failures.join("; ")}.`
       : `The thread host on this device${engine} never registered the session this create opened with this omo's gateway, so its first prompt could not start. The prompt was taken back and the session ended${madeNew ? "; nothing was left behind" : ""}.`,
     "That host most likely runs a different omo release than this session. Hand it over to this omo with `omo host handoff` (or quit and reopen the OmO Desktop app that runs it), then create the thread again.",
@@ -409,7 +444,8 @@ async function refuseUnregistered(
       created: madeNew && left,
       thread: thread.thread_id,
       delivery_id: deliveryId,
-      dropped_deliveries: withdrawn,
+      dropped_deliveries: [deliveryId],
+      ...(claimedAlias === undefined ? {} : { alias: claimedAlias, alias_released: aliasReleased }),
       ...(thread.engine_version === undefined ? {} : { engine_version: thread.engine_version }),
       ...(failures.length === 0 ? {} : { failures }),
     },

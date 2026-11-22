@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
+import { existsSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 import type { SameDeviceWake } from "../gateway/same-device-wake"
+import { createdThreadId } from "./session-host"
 import { createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 
 // omo#13409 / omo#13410: thread_create takes the new thread's model, reasoning level, approval mode and first prompt in
@@ -267,6 +270,67 @@ describe("thread_create whose first prompt does not start", () => {
       expect(forcedCloses).toEqual(["route-created"])
     },
   )
+
+  // A session file on disk, so this device's engine resumes it under that id (as senpi does) and the book lists it.
+  const writeSession = (agentDir: string, id: string) => {
+    const path = join(agentDir, `${id}.jsonl`)
+    writeFileSync(path, `${JSON.stringify({ type: "session", version: 3, id, cwd: process.cwd() })}\n`)
+    return path
+  }
+
+  test("#given an earlier run under the same key left its thread's session file #when the create reopens it and its host never registers it #then the refusal keeps that file (#14648 review B1)", async () => {
+    const id = createdThreadId("dur-caller", "retry-14648")
+    const { run, agentDir } = surface(account().remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      closeUnlists: true,
+      diskSessions: [id],
+    })
+    const file = writeSession(agentDir, id)
+    const result = await run("thread_create", { name: "retried", prompt: "build it", idempotency_key: "retry-14648" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: id } },
+    })
+    expect(existsSync(file)).toBe(true)
+  })
+
+  test("#given a thread with a message held for its wake and a registration an earlier life left #when it is reopened with a prompt and its host never registers it #then only the prompt is taken back and the create is refused (#14648 review B2 B3)", async () => {
+    const { run, store, agentDir } = surface(account().remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      diskSessions: ["dur-saved"],
+      sameDeviceWake: wakeThatNeverAdmits,
+    })
+    writeSession(agentDir, "dur-saved")
+    // An earlier life registered it; its exit cleared the endpoint and kept the incarnation.
+    await store.registerIncarnation({ durable_id: "dur-saved", incarnation: "earlier-life" })
+    expect(await run("thread_send", { thread: "dur-saved", message: "held for the wake" })).toMatchObject({
+      kind: "ok",
+    })
+    const [held] = await store.list({ target_durable_id: "dur-saved" })
+    const result = await run("thread_create", { thread: "dur-saved", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: "dur-saved" } },
+    })
+    const rows = await store.list({ target_durable_id: "dur-saved" })
+    const prompt = rows.find((row) => row.delivery_id !== held?.delivery_id)
+    expect(rows.find((row) => row.delivery_id === held?.delivery_id)?.state).toBe("queued")
+    expect([prompt?.state, prompt?.reason]).toEqual(["refused", "target_closed"])
+    expect(result).toMatchObject({ error: { details: { dropped_deliveries: [prompt?.delivery_id] } } })
+  })
+
+  test("#given a create with an alias whose new session its host never registers #when it is refused #then the alias it claimed is released (#14648 review B4)", async () => {
+    const a = account()
+    const { run } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const result = await run("thread_create", { alias: "lane-14648", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { alias: "lane-14648", alias_released: true, created: false } },
+    })
+    expect(a.aliases.has("lane-14648")).toBe(false)
+  })
 
   test("#given a new session here its host registered but whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
     const a = account()

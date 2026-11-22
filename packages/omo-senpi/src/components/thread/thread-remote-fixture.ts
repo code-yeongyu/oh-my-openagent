@@ -946,6 +946,8 @@ export function createRemoteThreadFixture() {
       createdRegisters?: boolean
       /** The live session here (`dur-local`) drains each delivery at once, in this phase (a busy turn, a question). */
       localDrainsIn?: RuntimePhase
+      /** A session this device's host closes leaves its listing, as a real host's unloaded session does. */
+      closeUnlists?: boolean
       /** This process's same-device wake (its carrier), which answers a send to a session no endpoint drains. */
       sameDeviceWake?: SameDeviceWake
     } = {},
@@ -1047,6 +1049,10 @@ export function createRemoteThreadFixture() {
         closed.push([sessionId, durableId])
         if (options?.force === true) forcedCloses.push(sessionId)
         closeRequests.push(options ?? {})
+        if (extra.closeUnlists === true && (extra.closeOutcome ?? "closed") === "closed") {
+          const index = sessions.findIndex((session) => session.sessionId === sessionId)
+          if (index !== -1) sessions.splice(index, 1)
+        }
         return { outcome: extra.closeOutcome ?? "closed", dropped_deliveries: extra.closeDropped ?? [] }
       },
       ...(extra.archive === "absent" ? {} : { setSessionArchived }),
@@ -1107,6 +1113,7 @@ export function createRemoteThreadFixture() {
                 await target.registerIncarnation({
                   durable_id: request.target_durable_id,
                   incarnation: "runtime-created",
+                  endpoint: { socket: join(agentDir, "created-endpoint.sock"), kind: "rpc_host" },
                 })
               if (
                 outcome.kind === "inserted" &&
