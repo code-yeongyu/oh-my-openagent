@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test"
 import { SkillMcpManager } from "./manager"
+import { protocolHttpFetch } from "./protocol-http-fetch"
 
 test("default skill HTTP client sends modern routing headers and terminates input-required operations", async () => {
   const requests: { method: string; headers: Headers; params?: Record<string, unknown> }[] = []
@@ -105,6 +106,29 @@ test("HTTP 400 UnsupportedProtocolVersion falls back to legacy initialization", 
     expect(methods).toEqual(["server/discover", "tools/list", "initialize", "notifications/initialized", "tools/list"])
   } finally {
     await manager.disconnectAll()
+    await server.stop(true)
+  }
+})
+
+// omo#11406: a body this layer cannot parse stays the server's HTTP answer instead of a thrown parse error.
+test("unparseable request and error bodies pass through as the server's answer", async () => {
+  const server = Bun.serve({
+    port: 0,
+    fetch: () => new Response("{not json", { status: 400, headers: { "Content-Type": "application/json" } }),
+  })
+  const modern = JSON.stringify({
+    jsonrpc: "2.0",
+    id: 1,
+    method: "tools/list",
+    params: { _meta: { "io.modelcontextprotocol/protocolVersion": "2026-07-28" } },
+  })
+  try {
+    for (const body of ["not json", "null", modern]) {
+      const response = await protocolHttpFetch(server.url, { method: "POST", body })
+      expect(response.status).toBe(400)
+      expect(await response.text()).toBe("{not json")
+    }
+  } finally {
     await server.stop(true)
   }
 })

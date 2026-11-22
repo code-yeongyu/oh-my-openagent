@@ -19,6 +19,7 @@ async function fixture(
     | "unknown"
     | "fallback-error"
     | "fallback-version",
+  copyingGetters = false,
 ) {
   const sent: JSONRPCMessage[] = []
   const transport: Transport = {
@@ -94,7 +95,14 @@ async function fixture(
     },
   }
   const client = new Client(identity, { capabilities: {}, enforceStrictCapabilities: true })
-  await client.connect(createProtocolTransport(transport, client))
+  // A client whose getters hand out copies stands in for an SDK that stops exposing its live objects.
+  const getters = copyingGetters
+    ? {
+        getServerCapabilities: () => structuredClone(client.getServerCapabilities()),
+        getServerVersion: () => structuredClone(client.getServerVersion()),
+      }
+    : client
+  await client.connect(createProtocolTransport(transport, getters))
   return { client, sent }
 }
 
@@ -190,6 +198,58 @@ describe("skill MCP protocol eras", () => {
     }
   })
 
+  // omo#11406: rewriting copies would silently keep the discovered capabilities; the fallback fails instead.
+  test("legacy fallback fails closed when SDK getters stop returning live objects", async () => {
+    const { client } = await fixture("operation-unsupported", true)
+    try {
+      await expect(client.listTools()).rejects.toThrow("no longer exposes live server state")
+    } finally {
+      await client.close()
+    }
+  })
+
+  // omo#11406: a request the SDK cancelled leaves the pending map, so a late -32022 cannot replay it.
+  test("a cancelled modern request is not replayed when its late UnsupportedProtocolVersion arrives", async () => {
+    const methods: string[] = []
+    const listed = Promise.withResolvers<string | number>()
+    const transport: Transport = {
+      async start() {},
+      async close() {
+        transport.onclose?.()
+      },
+      async send(message) {
+        if (!("method" in message)) return
+        methods.push(message.method)
+        if (!("id" in message)) return
+        if (message.method === "server/discover") {
+          queueMicrotask(() =>
+            transport.onmessage?.({
+              jsonrpc: "2.0",
+              id: message.id,
+              result: { resultType: "complete", supportedVersions: [version], capabilities: { tools: {} } },
+            }),
+          )
+        }
+        if (message.method === "tools/list") listed.resolve(message.id)
+      },
+    }
+    const client = new Client(identity, { capabilities: {} })
+    await client.connect(createProtocolTransport(transport, client))
+    try {
+      const controller = new AbortController()
+      const call = client.listTools(undefined, { signal: controller.signal })
+      const id = await listed.promise
+      controller.abort()
+      await expect(call).rejects.toThrow()
+      transport.onmessage?.({ jsonrpc: "2.0", id, error: { code: -32022, message: "unsupported" } })
+      await Promise.resolve()
+      await Promise.resolve()
+      expect(methods).toEqual(["server/discover", "tools/list", "notifications/cancelled"])
+    } finally {
+      await client.close()
+    }
+  })
+
   for (const mode of ["fallback-error", "fallback-version"] as const) {
     test(`${mode} fails later requests without repeating legacy initialization`, async () => {
       const { client, sent } = await fixture(mode)
@@ -277,7 +337,7 @@ describe("skill MCP protocol eras", () => {
   }
 
   describe("per-server era memory", () => {
-    function legacyServer(initializeError = false) {
+    function legacyServer(onInitialize: "result" | "error" | "silent" | "close" = "result") {
       const methods: string[] = []
       const probed = Promise.withResolvers<void>()
       const first = Promise.withResolvers<string>()
@@ -292,10 +352,11 @@ describe("skill MCP protocol eras", () => {
           methods.push(message.method)
           if (!("id" in message)) return
           if (message.method === "server/discover") probed.resolve()
-          if (message.method === "initialize") {
+          if (message.method === "initialize" && onInitialize === "close") queueMicrotask(() => transport.onclose?.())
+          if (message.method === "initialize" && (onInitialize === "result" || onInitialize === "error")) {
             queueMicrotask(() =>
               transport.onmessage?.(
-                initializeError
+                onInitialize === "error"
                   ? { jsonrpc: "2.0", id: message.id, error: { code: -32603, message: "legacy initialization failed" } }
                   : {
                       jsonrpc: "2.0",
@@ -361,7 +422,7 @@ describe("skill MCP protocol eras", () => {
       forgetSkillMcpEraMemoryForTesting()
       try {
         await connectSilentLegacy("server-c")
-        const failing = legacyServer(true)
+        const failing = legacyServer("error")
         const client = new Client(identity, { capabilities: {} })
         const connected = client.connect(createProtocolTransport(failing.transport, client, "server-c"))
         expect(await failing.first).toBe("initialize")
@@ -378,6 +439,35 @@ describe("skill MCP protocol eras", () => {
         jest.useRealTimers()
       }
     })
+
+    // omo#11406: a remembered connect that never gets its initialize result (the server drops the connection or
+    // never answers) forgets the era, so a server that went modern-only is probed again.
+    for (const outcome of ["silent", "close"] as const) {
+      test(`a remembered connect whose initialize is ${outcome === "silent" ? "never answered" : "dropped"} forgets the era`, async () => {
+        jest.useFakeTimers()
+        forgetSkillMcpEraMemoryForTesting()
+        try {
+          await connectSilentLegacy("server-d")
+          const dropping = legacyServer(outcome)
+          const client = new Client(identity, { capabilities: {} })
+          const connected = client.connect(createProtocolTransport(dropping.transport, client, "server-d"))
+          expect(await dropping.first).toBe("initialize")
+          if (outcome === "silent") jest.advanceTimersByTime(DEFAULT_REQUEST_TIMEOUT_MSEC + 1)
+          await expect(connected).rejects.toThrow()
+          await client.close()
+          const next = legacyServer()
+          const nextClient = new Client(identity, { capabilities: {} })
+          const nextConnected = nextClient.connect(createProtocolTransport(next.transport, nextClient, "server-d"))
+          expect(await next.first).toBe("server/discover")
+          jest.advanceTimersByTime(DEFAULT_REQUEST_TIMEOUT_MSEC / 2)
+          await nextConnected
+          await nextClient.close()
+        } finally {
+          forgetSkillMcpEraMemoryForTesting()
+          jest.useRealTimers()
+        }
+      })
+    }
   })
 
   test("a discovery send that fails after the budget does not send initialize twice", async () => {
