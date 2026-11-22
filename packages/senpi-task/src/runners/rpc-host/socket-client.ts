@@ -63,7 +63,9 @@ export async function withRpcSocket<T>(
         return await converse(endpoint, options, operation, meter, diagnostic, deadline)
       } catch (error) {
         const lost = error instanceof Error ? lostConnections.get(error) : undefined
-        if (redial && attempt === 1 && lost !== undefined && lost.stalledMs > 0) {
+        // A reset handled before an already-due timeout callback must not open a second socket once the budget is gone.
+        const budgetLeft = performance.now() < deadline + meter.total()
+        if (redial && attempt === 1 && lost !== undefined && lost.stalledMs > 0 && budgetLeft) {
           diagnostic?.redialed()
           continue
         }

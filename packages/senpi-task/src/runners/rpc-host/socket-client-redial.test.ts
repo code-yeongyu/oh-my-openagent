@@ -58,6 +58,42 @@ test("#given a read the host dropped (ECONNRESET) after a caller stall #then it 
   for (const socket of sockets) socket.destroy()
 })
 
+test("#given a host drop handled after the whole budget ran #then the read is not redialed (#14624 review M1)", async () => {
+  // A controlled clock: the first conversation reads 1000, then the reset arrives with the clock at 1500. The meter charges
+  // 400 ms of that jump as caller stall (all but its 50 ms period and 50 ms tolerance), so 100 ms of the 100 ms budget ran.
+  let clock = 1_000
+  const now = spyOn(performance, "now").mockImplementation(() => clock)
+  const sockets: Socket[] = []
+  try {
+    const call = withRpcSocket(
+      "endpoint",
+      {
+        timeoutMs: 100,
+        readCommand: "get_messages",
+        connect: () => {
+          const socket = new Socket()
+          socket.write = () => {
+            queueMicrotask(() => {
+              clock += 500
+              socket.emit("error", Object.assign(new Error("dropped ECONNRESET"), { code: "ECONNRESET" }))
+            })
+            return true
+          }
+          queueMicrotask(() => socket.emit("connect"))
+          sockets.push(socket)
+          return socket
+        },
+      },
+      (request) => request({ type: "get_messages" }),
+    )
+    await expect(call).rejects.toThrow("dropped ECONNRESET")
+    expect(sockets.length).toBe(1)
+  } finally {
+    now.mockRestore()
+    for (const socket of sockets) socket.destroy()
+  }
+})
+
 test("#given a redialed read #then the second attempt gets only what is left of the call's budget", async () => {
   const sockets: Socket[] = []
   const started = performance.now()
