@@ -50,6 +50,8 @@ export const REQUIRED_PLUGIN_ARTIFACTS: readonly string[] = [
   // index.js reads page-bundle.js from beside itself when it is imported, so a payload with only
   // index.js fails the same way (#9661).
   join("skills", "browser", "runtime", "omowright", "page-bundle.js"),
+  join("skills", "browser", "runtime", "omowright", "LICENSE"),
+  join("skills", "browser", "runtime", "omowright", "THIRD_PARTY_NOTICES"),
   join("skills", "coding-agent-sessions", "SKILL.md"),
   join("skills", "debugging", "SKILL.md"),
   join("skills", "frontend", "SKILL.md"),

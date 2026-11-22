@@ -43,6 +43,12 @@ async function makeSourceFixture(layouts: readonly Layout[] = ["js"], root?: str
     JSON.stringify({ name: "omowright", version: "0.0.1-fixture", type: "module" }),
   )
   await writeFile(join(sourceRoot, "LICENSE"), "MIT License\n\nfixture notice\n")
+  for (const dep of ["ws", "zod"]) {
+    const dir = join(sourceRoot, "node_modules", dep)
+    await mkdir(dir, { recursive: true })
+    await writeFile(join(dir, "package.json"), JSON.stringify({ name: dep, version: "1.0.0" }))
+    await writeFile(join(dir, "LICENSE"), `MIT License\nCopyright fixture ${dep}\n`)
+  }
   for (const layout of layouts) await writeLayout(sourceRoot, layout)
   return sourceRoot
 }
@@ -60,6 +66,17 @@ afterEach(async () => {
 })
 
 describe("omowright runtime staging", () => {
+  test("ships notices for ws and zod beside the bundled runtime (#12928)", async () => {
+    const source = await makeSourceFixture()
+    const target = await stageInto(source)
+    const notices = await readFile(join(target, "THIRD_PARTY_NOTICES"), "utf8")
+    for (const dep of ["ws", "zod"]) {
+      expect(notices).toContain(await readFile(join(source, "node_modules", dep, "LICENSE"), "utf8"))
+    }
+    await writeFile(join(source, "node_modules", "ws", "LICENSE"), "Updated ws notice\n")
+    await expect(checkOmowrightRuntimeFresh({ sourceRoot: source, targetDir: target })).rejects.toThrow(/sourceDigest/)
+  })
+
   test("#given an omowright source tree #when staged #then one importable bundle, its page bundle and a manifest land in the target", async () => {
     const sourceRoot = await makeSourceFixture()
     const targetParent = await mkdtemp(join(tmpdir(), "omowright-stage-target-"))
@@ -73,7 +90,7 @@ describe("omowright runtime staging", () => {
     expect(loaded.connectBrowserSkill()).toBe("fixture-session")
     expect(loaded.pageBundle).toContain("globalThis.__omowright")
     const manifest = JSON.parse(await readFile(join(targetDir, "manifest.json"), "utf8"))
-    expect(Object.keys(manifest.files).sort()).toEqual(["LICENSE", "index.js", "page-bundle.js"])
+    expect(Object.keys(manifest.files).sort()).toEqual(["LICENSE", "THIRD_PARTY_NOTICES", "index.js", "page-bundle.js"])
     // License contract (omowright#290): omowright's MIT text ships byte-for-byte beside the bundle.
     expect(await readFile(join(targetDir, "LICENSE"), "utf8")).toBe(await readFile(join(sourceRoot, "LICENSE"), "utf8"))
     expect(await checkOmowrightRuntimeFresh({ sourceRoot, targetDir })).toMatchObject({

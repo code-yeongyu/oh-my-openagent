@@ -13,14 +13,14 @@ Both engines this skill documents are provided by **omowright**.
 - License: MIT
 - What ships here: `runtime/omowright/index.js` (the library bundled into one ESM file, including
   its `ws` and `zod` dependencies), `runtime/omowright/page-bundle.js` (the in-page snapshot
-  script it reads at import time) and `runtime/omowright/LICENSE` (omowright's MIT text, copied
-  verbatim), staged at build time by
+  script it reads at import time), `runtime/omowright/LICENSE` (omowright's MIT text), and
+  `runtime/omowright/THIRD_PARTY_NOTICES` (the license texts from `ws` and `zod`), staged at build time by
   `packages/shared-skills/stage-omowright-runtime.mjs` from the pinned root devDependency, with a
-  `manifest.json` recording the version and file digests. Staging fails when omowright has no
-  `LICENSE`. The repository holds no copy; the staged files are gitignored and packed through the
+  `manifest.json` recording the version and file digests. Staging fails if any of these license
+  texts is missing. The repository holds no copy; the staged files are gitignored and packed through the
   sibling `.npmignore`.
 - Once omowright#297 is released, its entry also opens with a `/*!` MIT banner that survives
-  bundling. Until then, and for every version, the staged `LICENSE` is the notice.
+  bundling. The standalone notices ship regardless of whether the bundle retains a banner.
 
 ## BrowserSkill — driven, not vendored
 

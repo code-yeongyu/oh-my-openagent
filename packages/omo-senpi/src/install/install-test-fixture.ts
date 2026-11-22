@@ -76,6 +76,8 @@ export async function createPluginFixture(
   // the fixture mirrors the required set so the installer's integrity check passes.
   await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "index.js"), "export {}\n")
   await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", "page-bundle.js"), "\n")
+  for (const name of ["LICENSE", "THIRD_PARTY_NOTICES"])
+    await writeFixtureFile(join(pluginPath, "skills", "browser", "runtime", "omowright", name), "fixture notice\n")
   // Credential-gated skill: staged outside pi.skills but still a required payload artifact.
   await writeFixtureFile(join(pluginPath, "skills-conditional", "x-search", "SKILL.md"), "# x-search\n")
   await writeFixtureFile(join(pluginPath, "scripts", "install.mjs"), "#!/usr/bin/env node\n")
