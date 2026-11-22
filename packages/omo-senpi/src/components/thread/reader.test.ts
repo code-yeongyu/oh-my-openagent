@@ -12,7 +12,7 @@ import {
   type ThreadReadSourceRef,
   type ThreadTranscriptReadResult,
 } from "./reader"
-import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES } from "./index"
+import { THREAD_READ_MAX_BYTES } from "./index"
 
 // ---------------------------------------------------------------------------
 // Real temp files: every jsonl case below writes actual bytes to disk under a
@@ -112,7 +112,7 @@ describe("readTranscript tail mode", () => {
     ])
 
     const defaulted = expectOk(readTranscript(jsonlSource(path), { mode: "tail" }))
-    expect(defaulted.items.length).toBe(THREAD_TAIL_DEFAULT_ITEMS)
+    expect(defaulted.items.length).toBe(60)
     expect(idOf(defaulted.items[defaulted.items.length - 1])).toBe("e299")
 
     const overCap = readTranscript(jsonlSource(path), { mode: "tail", tail_items: THREAD_TAIL_MAX_ITEMS + 1 })
@@ -121,7 +121,7 @@ describe("readTranscript tail mode", () => {
     expectNextAction(overCap)
 
     const atCap = expectOk(readTranscript(jsonlSource(path), { mode: "tail", tail_items: THREAD_TAIL_MAX_ITEMS }))
-    expect(atCap.items.length).toBe(THREAD_TAIL_MAX_ITEMS)
+    expect(atCap.items.length).toBe(200)
   })
 
   test("a budget smaller than the window returns the newest entries in file order, and next_cursor pages older ones until the window start", () => {
@@ -290,10 +290,10 @@ describe("readTranscript byte budget", () => {
     const path = writeJsonl(dir, "cap.jsonl", [sessionHeader(), messageEntry(0)])
 
     const defaulted = expectOk(readTranscript(jsonlSource(path), { mode: "page" }))
-    expect(defaulted.max_bytes).toBe(THREAD_READ_DEFAULT_BYTES)
+    expect(defaulted.max_bytes).toBe(128 * 1024)
 
     const atCap = expectOk(readTranscript(jsonlSource(path), { mode: "page", max_bytes: THREAD_READ_MAX_BYTES }))
-    expect(atCap.max_bytes).toBe(THREAD_READ_MAX_BYTES)
+    expect(atCap.max_bytes).toBe(1024 * 1024)
 
     const overCap = readTranscript(jsonlSource(path), { mode: "page", max_bytes: THREAD_READ_MAX_BYTES + 1 })
     const failure = expectError(overCap)

@@ -18,7 +18,7 @@
  * window) reads the file backward from its end in fixed-size chunks and stops
  * once it holds the window, so its cost follows the window and never the file
  * (a seat transcript reaches hundreds of MB, #14418). Tail windows scan at most
- * 1 MiB, chosen before opening the file; status only stats it. Forward pages
+ * 1 MiB, chosen before opening the file; status only stats it. Recovery cursors scan forward one bounded window per call. Legacy forward pages
  * retain the whole-file loader. Entries are encoded until the byte budget is spent, and the caller
  * receives ONE payload plus an opaque cursor. Nothing streams into the caller.
  *
@@ -29,11 +29,19 @@
  */
 
 import { createHash } from "node:crypto"
-import { closeSync, fstatSync, openSync, readSync, statSync } from "node:fs"
+import { closeSync, openSync, readSync, statSync, type Stats } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
+import {
+  fileRevision,
+  parseLine,
+  readFileWindow,
+  readRange,
+  readRecoveryPage,
+  type FileScanCursor,
+} from "./reader-file-window"
 import { takeWithinBudget } from "./read-budget"
 
 /** Default number of trailing entries a tail read returns. */
@@ -125,23 +133,6 @@ type LoadedSource = {
 }
 
 /**
- * One JSONL line as an entry. A line that is not a JSON object - malformed syntax, a bare scalar, or a run of non-UTF8
- * bytes decoded to replacement characters - is `skipped`; a blank line is `blank` and not counted.
- */
-function parseLine(line: string): ThreadTranscriptEntry | "skipped" | "blank" {
-  const trimmed = line.trim()
-  if (trimmed.length === 0) return "blank"
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(trimmed)
-  } catch {
-    return "skipped"
-  }
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return "skipped"
-  return parsed as ThreadTranscriptEntry
-}
-
-/**
  * Read the JSONL file and parse it line by line, in bounded chunks, the way
  * the host's own session loader does. The RETURNED payload is bounded by the
  * byte budget at selection time; the entry list itself is the file's content,
@@ -195,6 +186,7 @@ function loadJsonlFile(path: string): LoadedSource | "missing" {
 }
 
 type LoadedTail = LoadedSource & {
+  readonly snapshot: Stats
   /** The file's size when it was read: every append, truncation or rewrite of another length changes it. */
   readonly size: number
   /** File identity and the exact lines examined, including skipped lines. */
@@ -212,25 +204,8 @@ type LoadedTail = LoadedSource & {
  * the read is the next read's.
  */
 function loadJsonlTail(path: string, count: number): LoadedTail | "missing" | "changed" {
-  let snapshot: ReturnType<typeof statSync>
-  try {
-    snapshot = statSync(path)
-  } catch {
-    return "missing"
-  }
-  if (!snapshot.isFile()) return "missing"
-  const size = snapshot.size
-  const floor = Math.max(0, size - THREAD_READ_MAX_BYTES)
-  const hash = createHash("sha256").update(`${snapshot.dev}:${snapshot.ino}:`)
-  let descriptor: number | undefined
-  try {
-    descriptor = openSync(path, "r")
-  } catch {
-    return "missing"
-  }
-  try {
-    const opened = fstatSync(descriptor)
-    if (opened.size !== size || opened.dev !== snapshot.dev || opened.ino !== snapshot.ino) return "changed"
+  return readFileWindow(path, "tail", (descriptor, snapshot, floor, size) => {
+    const hash = createHash("sha256").update(`${snapshot.dev}:${snapshot.ino}:`)
     const newestFirst: ThreadTranscriptEntry[] = []
     let skippedLines = 0
     const take = (line: Buffer): void => {
@@ -245,15 +220,8 @@ function loadJsonlTail(path: string, count: number): LoadedTail | "missing" | "c
     while (newestFirst.length < count && position > floor) {
       const length = Math.min(READ_CHUNK_BYTES, position - floor)
       position -= length
-      const chunk = Buffer.allocUnsafe(length)
-      let read = 0
-      while (read < length) {
-        const got = readSync(descriptor, chunk, read, length - read, position + read)
-        // The file shrank under the read: what was read no longer names a transcript.
-        if (got === 0) throw new Error("session file truncated during the read")
-        read += got
-      }
-      let end = read
+      const chunk = readRange(descriptor, position, length)
+      let end = length
       while (end > 0 && newestFirst.length < count) {
         const newline = chunk.lastIndexOf(NEWLINE, end - 1)
         if (newline === -1) break
@@ -265,12 +233,15 @@ function loadJsonlTail(path: string, count: number): LoadedTail | "missing" | "c
     }
     const whole = position === 0 && newestFirst.length < count
     if (whole) take(Buffer.concat(pending))
-    return { entries: newestFirst.reverse(), skippedLines, size, whole, hash: hash.digest("hex") }
-  } catch {
-    return "changed"
-  } finally {
-    if (descriptor !== undefined) closeSync(descriptor)
-  }
+    return {
+      entries: newestFirst.reverse(),
+      skippedLines,
+      size,
+      whole,
+      hash: hash.digest("hex"),
+      snapshot,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -316,11 +287,14 @@ function tailRevisionOf(tail: LoadedTail): string {
  * that window's first entry (#14418).
  */
 type Cursor =
+  | FileScanCursor
   | { readonly direction: "forward"; readonly revision: string; readonly offset: number }
   | { readonly direction: "older"; readonly revision: string; readonly before: number; readonly floor: number }
   | { readonly direction: "file_tail"; readonly revision: string; readonly before: number; readonly count: number }
 
 function encodeCursor(cursor: Cursor): string {
+  if (cursor.direction === "file_scan")
+    return Buffer.from(`t1s:${cursor.revision}:${cursor.offset}:${Number(cursor.skip)}`).toString("base64url")
   const text =
     cursor.direction === "forward"
       ? `${CURSOR_VERSION}:${cursor.revision}:${cursor.offset}`
@@ -330,7 +304,18 @@ function encodeCursor(cursor: Cursor): string {
   return Buffer.from(text, "utf8").toString("base64url")
 }
 
-function decodeCursor(raw: string): Cursor | null {
+export function invalidReadCursor() {
+  return {
+    kind: "error" as const,
+    error: threadToolFailure(
+      "cursor_invalid",
+      "The cursor is not a cursor this reader issued.",
+      "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
+    ),
+  }
+}
+
+export function decodeTranscriptCursor(raw: string): Cursor | null {
   if (typeof raw !== "string" || raw.length === 0) return null
   let decoded: string
   try {
@@ -338,17 +323,27 @@ function decodeCursor(raw: string): Cursor | null {
   } catch {
     return null
   }
+  if (Buffer.from(decoded).toString("base64url") !== raw) return null
   const [version, revision = "", ...positions] = decoded.split(":")
   if (!/^\d+\.[0-9a-z]+$/.test(revision)) return null
   if (positions.some((position) => !/^\d+$/.test(position))) return null
   const offsets = positions.map(Number)
   if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
   const [first = 0, second = 0] = offsets
+  if (
+    version === "t1s" &&
+    /^\d+\.[0-9a-f]{64}$/.test(revision) &&
+    offsets.length === 2 &&
+    first <= Number(revision.split(".")[0]) &&
+    (second === 0 || second === 1)
+  )
+    return { direction: "file_scan", revision, offset: first, skip: second === 1 }
   if (version === CURSOR_VERSION && offsets.length === 1) return { direction: "forward", revision, offset: first }
   if (version === OLDER_CURSOR_VERSION && offsets.length === 2 && second <= first)
     return { direction: "older", revision, before: first, floor: second }
   if (
     version === FILE_TAIL_CURSOR_VERSION &&
+    /^\d+\.[0-9a-f]{64}$/.test(revision) &&
     offsets.length === 2 &&
     first <= second &&
     second > 0 &&
@@ -420,13 +415,9 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
 
   let cursor: Cursor | null = null
   if (opts.cursor !== undefined) {
-    cursor = decodeCursor(opts.cursor)
+    cursor = decodeTranscriptCursor(opts.cursor)
     if (cursor === null) {
-      return fail(
-        "cursor_invalid",
-        "The cursor is not a cursor this reader issued.",
-        "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
-      )
+      return invalidReadCursor()
     }
   }
 
@@ -470,6 +461,26 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     }
   }
 
+  if (cursor?.direction === "file_scan") {
+    if (source.kind !== "jsonl") return stale()
+    const page = readRecoveryPage(source.path, cursor, tailItems, maxBytes)
+    if (page === "missing") return missing(source.path)
+    if (page === "changed") return stale()
+    return {
+      kind: "ok",
+      source: "session_jsonl",
+      source_incomplete: source.live_host_present !== true,
+      mode,
+      items: page.items,
+      total_items: null,
+      truncated: page.next !== null,
+      next_cursor: page.next === null ? null : encodeCursor(page.next),
+      encoded_bytes: page.encodedBytes,
+      max_bytes: maxBytes,
+      skipped_lines: page.skippedLines,
+    }
+  }
+
   // A session file's tail window, or a page of one, reads only the window from the file's end (#14418).
   const fileTail = cursor?.direction === "file_tail" ? cursor : undefined
   if (source.kind === "jsonl" && (mode === "tail" || fileTail !== undefined)) {
@@ -481,11 +492,22 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     if (fileTail !== undefined && (fileTail.revision !== revision || fileTail.before > tail.entries.length))
       return stale()
     if (!tail.whole && tail.entries.length === 0)
-      return fail(
-        "message_too_large",
-        "No complete entry fits in the 1 MiB tail scan window.",
-        'Read with mode "page" and no cursor to start from the file beginning.',
-      )
+      return {
+        kind: "error",
+        error: threadToolFailure(
+          "message_too_large",
+          "No complete entry fits in the 1 MiB tail scan window.",
+          "In an eval cell, call tool.thread_read({ thread: thread, cursor: error.details.next_cursor }) with the same thread, then follow next_cursor until absent.",
+          {
+            next_cursor: encodeCursor({
+              direction: "file_scan",
+              revision: fileRevision(tail.snapshot),
+              offset: 0,
+              skip: false,
+            }),
+          },
+        ),
+      }
     const end = fileTail?.before ?? tail.entries.length
     const { selected, encodedBytes } = takeWithinBudget(tail.entries.slice(0, end), maxBytes, "end")
     const start = end - selected.length

@@ -47,7 +47,7 @@ export const ThreadReadParams = Type.Object({
   cursor: Type.Optional(
     Type.String({
       description:
-        "Opaque cursor from an earlier thread_read (tool.thread_read() in an eval cell) to page the older messages of a truncated read (a read without one returns the newest messages that fit max_bytes); a transcript revision that moved past it returns cursor_stale.",
+        "Omit for the newest messages; pass next_cursor for another page. After message_too_large on a file tail, pass error.details.next_cursor to scan from the beginning, at most 1 MiB per call. Recovery skips records larger than the scan window or max_bytes; follow next_cursor even on empty pages. A changed transcript returns cursor_stale.",
     }),
   ),
   max_bytes: Type.Optional(

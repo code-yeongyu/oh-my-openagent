@@ -46,18 +46,20 @@ function encodeCursor({ revision, before, floor }: EntryCursor): string {
   return Buffer.from(`${CURSOR_VERSION}\n${revision}\n${before}\n${floor}`, "utf8").toString("base64url")
 }
 
-function decodeCursor(raw: string): EntryCursor | null {
-  const parts = Buffer.from(raw, "base64url").toString("utf8").split("\n")
-  if (parts.length !== 4 || parts[0] !== CURSOR_VERSION) return null
-  const [, revision = "", before = "", floor = ""] = parts
-  return before === "" || floor === "" ? null : { revision, before, floor }
+function decodeCursor(raw: string): EntryCursor | "retired" | null {
+  const text = Buffer.from(raw, "base64url").toString("utf8")
+  if (Buffer.from(text).toString("base64url") !== raw) return null
+  const parts = text.split("\n")
+  const [version = "", revision = "", before = "", floor = ""] = parts
+  if (!revision || !before) return null
+  // A well-formed retired cursor is stale, not invalid (#14180).
+  if (parts.length === 3 && RETIRED_CURSOR_VERSIONS.has(version)) return "retired"
+  return parts.length === 4 && version === CURSOR_VERSION && floor ? { revision, before, floor } : null
 }
 
-/** Whether a cursor came from this reader (the other sources' cursors are answered by their own reader). */
+/** Whether the current or a previous entry reader issued this cursor. */
 export function isEntryCursor(raw: string): boolean {
-  if (decodeCursor(raw) !== null) return true
-  // A retired version is still this reader's cursor: `selectEntryPage` answers it cursor_stale, never cursor_invalid.
-  return RETIRED_CURSOR_VERSIONS.has(Buffer.from(raw, "base64url").toString("utf8").split("\n")[0] ?? "")
+  return decodeCursor(raw) !== null
 }
 
 /** A cursor whose position the transcript no longer has, or that a holder which pages nothing cannot answer. */
@@ -80,7 +82,7 @@ export function selectEntryPage(
   let end = messages.length
   if (read.cursor !== undefined) {
     const cursor = decodeCursor(read.cursor)
-    if (cursor === null || cursor.revision !== revision) return staleEntryCursor()
+    if (cursor === null || cursor === "retired" || cursor.revision !== revision) return staleEntryCursor()
     floor = messages.findIndex((entry) => entry.id === cursor.floor)
     end = messages.findIndex((entry) => entry.id === cursor.before)
     if (floor === -1 || end < floor) return staleEntryCursor()
