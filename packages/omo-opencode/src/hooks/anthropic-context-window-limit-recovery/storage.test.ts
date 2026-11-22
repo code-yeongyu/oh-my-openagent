@@ -1,5 +1,6 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
 import type { ToolResultInfo } from "./tool-part-types"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 type TruncateToolResult = {
   success: boolean
@@ -17,6 +18,7 @@ mock.module("./tool-result-storage", () => ({
   getTotalToolOutputSize: () => 0,
   truncateToolResult,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 async function importFreshStorage(): Promise<typeof import("./storage")> {
   return import(`./storage?test=${Date.now()}-${Math.random()}`)
