@@ -93,7 +93,7 @@ export function captureCommand(file, args, maxBuffer = 1024 * 1024) {
 }
 
 /** Each ps row is cut to this many characters, so enumeration size follows the process count, never argv size (#10269). */
-export const PS_ROW_LIMIT = 200
+const PS_ROW_LIMIT = 200
 
 export async function runProcesses(rootPids, namespace) {
   // ps output can exceed any fixed buffer on a host whose processes carry long argv: the rows are cut to
