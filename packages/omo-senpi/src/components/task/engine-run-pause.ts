@@ -1,4 +1,5 @@
 import type { TaskManager } from "../../../../senpi-task/src/manager/types"
+import { TERMINAL_STATUSES } from "../../../../senpi-task/src/lifecycle/context"
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import type { AdmissionBarrier, ResumeCredential } from "../../../../senpi-task/src/pause/admission-barrier"
@@ -151,22 +152,15 @@ export function createEngineRunPause(ports: {
     async dispatchGuidance(parentSessionId, pauseSeq, resumeId) {
       for (const source of sources) await source.dispatchGuidance?.(parentSessionId, pauseSeq, resumeId)
     },
-    observeHold: async (participant, parentSessionId) => {
-      if (participant.taskId === undefined) return undefined
-      const observed = await ports.manager.observeTaskHold(participant.taskId, parentSessionId)
-      if (observed !== undefined) return observed
-      // No live handle: a TERMINAL task record can never be held again, so it reports not-held and
-      // the controller drops the participant instead of re-observing it every session start (#10864).
-      const record = ports.manager.get(participant.taskId)
-      if (
+    observeHold: async (participant, parentSessionId) =>
+      participant.taskId === undefined ? undefined : ports.manager.observeTaskHold(participant.taskId, parentSessionId),
+    isTerminal(participant) {
+      const record = participant.taskId === undefined ? undefined : ports.manager.get(participant.taskId)
+      return (
         record !== undefined &&
-        record.status !== "pending" &&
-        record.status !== "running" &&
-        record.status !== "paused"
-      ) {
-        return { held: false, childSeq: 0 }
-      }
-      return undefined
+        record.notification.run_epoch === participant.runEpoch &&
+        TERMINAL_STATUSES.has(record.status)
+      )
     },
     async resume(participant, request, credential) {
       if (participant.key.startsWith("run:")) return { kind: "resumed" }

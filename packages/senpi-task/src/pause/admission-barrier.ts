@@ -153,6 +153,18 @@ export class AdmissionBarrier {
     return true
   }
 
+  releasedCredential(id: string, pauseSeq: number, resumeId: string): ResumeCredential | undefined {
+    const root = this.#roots.get(id)
+    if (
+      root?.state.kind === "open" &&
+      root.credential?.pauseSeq === pauseSeq &&
+      root.credential.resumeId === resumeId
+    ) {
+      return root.credential
+    }
+    return undefined
+  }
+
   restore(
     id: string,
     state: AdmissionState,
