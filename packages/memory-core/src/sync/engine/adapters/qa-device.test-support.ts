@@ -14,7 +14,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 
 import { ensureQaRepo } from "./qa-repo.test-support"
-import { FakeSealer, FakeVerifier } from "../fake-crypto.test-support"
+import { FAKE_SPACE, FakeSealer, FakeVerifier } from "../fake-crypto.test-support"
 import { openDeviceSync } from "../open"
 import { createHttpTransport } from "./http-transport"
 
@@ -36,6 +36,7 @@ const sync = await openDeviceSync({
   locksDir: join(base, "locks"),
   machineId: `qa-${device}`,
   session: {
+    space: FAKE_SPACE,
     transport: createHttpTransport({ baseUrl: url, token: () => `qa.${device}` }),
     verifier: new FakeVerifier("qa-account"),
     sealer: new FakeSealer("qa-account"),

@@ -1,17 +1,28 @@
-import { describe, expect, it } from "bun:test"
+import { afterAll, describe, expect, it } from "bun:test"
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
+
+import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
+
 import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
 
 import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bunshin-ts-pick-transport"
 
 const hubTransport = { kind: "hub" } as const satisfies Partial<MachineHubTransport>
 
+const home = mkdtempSync(join(tmpdir(), "pick-transport-"))
+afterAll(() => rmSync(home, { recursive: true, force: true }))
+
 function deps(options: {
   connected: boolean
   hub?: "bundled" | "bundled-without-config"
+  home?: string
 }): PickTransportDeps & { probes: string[] } {
   const probes: string[] = []
   return {
     probes,
+    home: options.home ?? home,
     relayStatus: async (status) => {
       probes.push(status?.stateDir ?? "<default>")
       return { connected: options.connected }
@@ -67,6 +78,24 @@ describe("bunshin-ts pickTransport", () => {
     expect(await errorCode(pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }, deps({ connected: true })))).toBe(
       "hub_not_bundled",
     )
+  })
+
+  it("#given a relative OMO_DEVICE_SERVICE_STATE_DIR #when picked #then the probe asks the default state dir", async () => {
+    const seams = deps({ connected: true })
+    await pickTransport({ OMO_DEVICE_SERVICE_STATE_DIR: "rel/dir" }, seams)
+    expect(seams.probes).toEqual([deviceServiceStateDir(process.platform, {}, home)])
+  })
+
+  it("#given no variable and a discovery file naming a state dir #when picked #then the probe asks that dir", async () => {
+    const own = mkdtempSync(join(home, "h-"))
+    const alt = join(own, "alt")
+    mkdirSync(alt)
+    const serviceHome = dirname(deviceServiceStateDir(process.platform, {}, own))
+    mkdirSync(serviceHome, { recursive: true })
+    writeFileSync(join(serviceHome, "device-service.location.json"), JSON.stringify({ v: 1, state_dir: alt }))
+    const seams = deps({ connected: true, home: own })
+    await pickTransport({}, seams)
+    expect(seams.probes).toEqual([alt])
   })
 
   it("#given an unknown choice #when picked #then bad_choice is thrown", async () => {

@@ -13,12 +13,16 @@ const token = z.string().min(1).max(256)
 export const DesktopSyncRequest = z.union([
   z.object({ op: z.enum(["descriptor", "operationBegin", "capability"]) }),
   z.object({ op: z.enum(["operationCancel", "operationEnd"]), handle: token }),
-  z.object({ op: z.enum(["service", "keyring", "genesisRun"]), handle: token, data: z.unknown() }),
+  z.object({ op: z.enum(["service", "keyring", "genesisRun", "phraseGenesisRun"]), handle: token, data: z.unknown() }),
 ])
 export type DesktopSyncRequest =
   | { readonly op: "descriptor" | "operationBegin" | "capability" }
   | { readonly op: "operationCancel" | "operationEnd"; readonly handle: string }
-  | { readonly op: "service" | "keyring" | "genesisRun"; readonly handle: string; readonly data: unknown }
+  | {
+      readonly op: "service" | "keyring" | "genesisRun" | "phraseGenesisRun"
+      readonly handle: string
+      readonly data: unknown
+    }
 
 export const decodeSyncHandle = (input: unknown): { readonly handle: string } =>
   z.strictObject({ handle: token }).parse(input)

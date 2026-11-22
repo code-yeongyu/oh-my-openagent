@@ -132,9 +132,8 @@ describe("a leg that skipped tests the change needed", () => {
 })
 
 describe("a leg that skipped tests on purpose", () => {
-  // Pull requests run macOS and Windows only when a platform-specific path changed (or a
-  // full-matrix label is set); every other change, runtime code included, is proven there by
-  // the post-merge dev push, which always runs the full matrix.
+  // Pull requests run macOS and Windows only with the ci:full-matrix label (#13802); every other
+  // change is proven there by the post-merge dev push, which always runs the full matrix.
   test("#given a pull request outside the full matrix on a Windows leg #then the leg passes and says tests were intentionally not run", () => {
     const result = runLeg({
       outcomes: ["skipped", "skipped", "skipped"],

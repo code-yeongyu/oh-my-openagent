@@ -23,7 +23,7 @@ import { wireDagVerificationContext } from "./dag-verification-context"
 import { createParentNotifier } from "./parent-notifier"
 import { TaskRuntimeContext } from "./runtime-context"
 import { createSessionArming, createUltraworkComponent } from "../ultrawork"
-import { SENPI_ASTRA_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../ultrawork/generated-directive"
+import { SENPI_GPT_ULTRAWORK_DIRECTIVE, SENPI_ULTRAWORK_DIRECTIVE } from "../ultrawork/generated-directive"
 
 const ASTRA = "chatgpt-subscription/gpt-6-astra"
 const SOL = "openai/gpt-6.1-sol"
@@ -129,7 +129,7 @@ describe("DAG receiving-model routing", () => {
     }
     const contents = [
       buildCompletionMessage(
-        [{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }],
+        [{ ...node, final_response: SENPI_GPT_ULTRAWORK_DIRECTIVE }],
         ASTRA_DAG_VERIFICATION_DIRECTIVE,
       ).content,
       `DAG "release" completed: 1 completed, 0 failed, 0 cancelled, 0 skipped (1 total)\n\n${ASTRA_DAG_RUN_VERIFICATION_DIRECTIVE}`,
@@ -419,7 +419,7 @@ describe("DAG receiving-model routing", () => {
     }
     // then
     const expectedNode = buildCompletionMessage(
-      [{ ...node, final_response: SENPI_ASTRA_ULTRAWORK_DIRECTIVE }],
+      [{ ...node, final_response: SENPI_GPT_ULTRAWORK_DIRECTIVE }],
       ASTRA_DAG_VERIFICATION_DIRECTIVE,
     ).content
     const expected =

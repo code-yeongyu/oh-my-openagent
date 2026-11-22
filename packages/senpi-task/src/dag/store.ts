@@ -25,7 +25,11 @@ import {
 
 const SCHEMA_VERSION = 1
 const LOCK_RETRY_MS = 10
-const LOCK_WAIT_TIMEOUT_MS = 1_000
+// How long ONE live holder may keep a DAG lock before a waiter gives up. Holders run a few fsynced writes, which on a
+// starved host stall for seconds while the holder is still live and progressing; a 1 s bound turned that into a failed
+// dag start ("Timed out acquiring DAG lock") for the losing side of a same-key race (#9306, #14095). A live holder past
+// 30 s is stuck, not slow; a dead one is reclaimed at once regardless of this bound.
+const LOCK_WAIT_TIMEOUT_MS = 30_000
 const WINDOWS_CLEANUP_RETRIES = 8
 const WINDOWS_CLEANUP_RETRY_MS = 5
 const READ_BUFFER_BYTES = 64 * 1024
@@ -160,7 +164,7 @@ export function readDagDirectory(directory: string): readonly fs.Dirent[] {
 
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
-  const paths = createPaths(stateDir)
+  const paths = createDagStorePaths(stateDir)
   const diagnosticLog: DagStoreDiagnostic[] = []
   const recoveredPaths = new Set<string>()
   const now = options.now ?? Date.now
@@ -323,7 +327,9 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
   return store
 }
 
-function createPaths(stateDir: string): DagStorePaths {
+// Exported for the in-memory store (#11621): a test double with its own copy of the layout drifted from
+// this one (no result-path containment, raw task-owner lock names), so both build paths here.
+export function createDagStorePaths(stateDir: string): DagStorePaths {
   const root = join(stateDir, "dag")
   const keys = join(root, "keys")
   const runs = join(root, "runs")
@@ -594,7 +600,14 @@ function readJsonFile(path: string, runId?: DagRunId, now: () => number = Date.n
   }
 }
 
-function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | undefined, now: () => number): void {
+// Exported for the in-memory store the retry tests journal to (#11621): a test double that skips these
+// refusals would pass journal state the file store rejects, so both stores call the SAME validator.
+export function assertSupportedSchema(
+  value: unknown,
+  path: string,
+  runId: DagRunId | undefined,
+  now: () => number,
+): void {
   if (!isRecord(value) || typeof value.schemaVersion !== "number") {
     throw corrupt(path, runId, "missing schemaVersion", now)
   }
@@ -958,7 +971,8 @@ function pruneRunArtifacts(
   fs.rmSync(paths.run(runId), { force: true })
 }
 
-function assertSafeSegment(value: string, label: string): void {
+// Exported with assertSupportedSchema above, for the same reason.
+export function assertSafeSegment(value: string, label: string): void {
   if (!isSafeDagPathSegment(value)) {
     throw new Error(`Invalid ${label}`)
   }

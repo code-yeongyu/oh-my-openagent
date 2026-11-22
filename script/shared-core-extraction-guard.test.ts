@@ -19,10 +19,12 @@ const forbiddenSourcePatterns: readonly ForbiddenSourcePattern[] = [
   { pattern: /plugin\/components/ },
   {
     pattern: /\b(?:SessionStart|UserPromptSubmit|PreToolUse|PostToolUse|PostCompact|Stop|SubagentStop)\b/,
-    // The device-service local API's Windows DACL code runs PowerShell with $ErrorActionPreference = 'Stop'; it names no hook.
+    // The device-service Windows DACL code (the vendored local API's reader and omo's exact-DACL writer) runs PowerShell with
+    // $ErrorActionPreference = 'Stop'; it names no hook.
     allowPackagePaths: [
       "packages/claude-code-compat-core",
       "packages/device-service-core/src/local-api",
+      "packages/device-service-core/src/release/windows-dacl.ts",
       "packages/device-service-core/test/local-api",
     ],
   },
@@ -70,7 +72,9 @@ describe("shared core extraction guardrails", () => {
       const relativeFilePath = toPosixPath(relative(process.cwd(), file))
       for (const forbidden of forbiddenSourcePatterns) {
         const allowedByPackage =
-          forbidden.allowPackagePaths?.some((packagePath) => relativeFilePath.startsWith(`${packagePath}/`)) ?? false
+          forbidden.allowPackagePaths?.some(
+            (packagePath) => relativeFilePath === packagePath || relativeFilePath.startsWith(`${packagePath}/`),
+          ) ?? false
         if (!allowedByPackage && forbidden.pattern.test(source)) {
           offenders.push(`${relativeFilePath} matches ${forbidden.pattern}`)
         }

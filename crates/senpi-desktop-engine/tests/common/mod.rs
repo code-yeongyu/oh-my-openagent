@@ -93,6 +93,13 @@ impl Engine {
         stdin.flush().expect("stdin flushes");
     }
 
+    /// Writes `bytes` as they are, with no framing added.
+    pub fn send_raw(&mut self, bytes: &[u8]) {
+        let stdin = self.stdin.as_mut().expect("stdin is open");
+        stdin.write_all(bytes).expect("engine reads stdin");
+        stdin.flush().expect("stdin flushes");
+    }
+
     pub fn request(&mut self, id: i64, method: &str, params: Value) {
         self.send(&json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}));
     }
@@ -133,6 +140,21 @@ impl Engine {
                 Err(mpsc::RecvTimeoutError::Disconnected) => return rest,
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     panic!("engine did not exit at stdin EOF within the hang guard")
+                }
+            }
+        }
+    }
+
+    /// Every line written until the engine closes its output on its own;
+    /// stdin stays open.
+    pub fn until_closed(&self) -> Vec<Value> {
+        let mut written = Vec::new();
+        loop {
+            match self.lines.recv_timeout(HANG_GUARD) {
+                Ok(message) => written.push(message),
+                Err(mpsc::RecvTimeoutError::Disconnected) => return written,
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    panic!("engine did not close its output within the hang guard")
                 }
             }
         }

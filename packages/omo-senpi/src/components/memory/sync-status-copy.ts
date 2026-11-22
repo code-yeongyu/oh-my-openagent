@@ -2,9 +2,9 @@
 // on revoke, #12280: the engine reports a closed code; the words live here). It ships in the sync
 // sidecar: both statuses exist only while the engine runs, so the eager bundle carries none of it.
 
-import type { EngineStatus } from "@oh-my-opencode/memory-core/sync-engine"
+import type { EngineStatus, SyncFailureCause, SyncFailureKind } from "@oh-my-opencode/memory-core/sync-engine"
 
-import type { MemoryRpcSync } from "./memory-rpc-sync"
+import type { DesktopFailureKind, MemoryRpcSync } from "./memory-rpc-sync"
 
 type Frozen = Extract<EngineStatus, { readonly kind: "frozen" }>
 type Failing = Extract<EngineStatus, { readonly kind: "failing" }>
@@ -47,9 +47,24 @@ export function failureRpcSync(status: Failing | Frozen | Paused): MemoryRpcSync
   return { state: "failing", failure: rpcFailure(status) }
 }
 
+/** Every kind the desktop does not know reaches it as "unknown"; its reason, action and fields say the rest. */
+const desktopKind = (kind: SyncFailureKind): DesktopFailureKind =>
+  kind === "stranded_lock" || kind === "auth_expired" || kind === "offline" ? kind : "unknown"
+
+/** The TUI notice's last sentence for a failure that carries a cause (#13635): its safe fields, quotable in a bug report. */
+export function causeNote(cause: SyncFailureCause): string {
+  const detail = [
+    cause.errorClass,
+    cause.code,
+    cause.httpStatus === undefined ? undefined : `HTTP ${cause.httpStatus}`,
+    cause.exitCode === undefined ? undefined : `exit ${cause.exitCode}`,
+  ].filter((part) => part !== undefined)
+  return `(Cause: ${detail.join(" ")}, during ${cause.stage}.)`
+}
+
 function rpcFailure({ failure, since, attempts }: Omit<Failing, "kind">): NonNullable<MemoryRpcSync["failure"]> {
   return {
-    kind: failure.kind === "oversized_item" ? "unknown" : failure.kind,
+    kind: desktopKind(failure.kind),
     reason: failure.reason,
     action: failure.action,
     sinceISO: new Date(since).toISOString(),
@@ -58,5 +73,6 @@ function rpcFailure({ failure, since, attempts }: Omit<Failing, "kind">): NonNul
     ...(failure.kind === "oversized_item"
       ? { keys: failure.keys, stuckKeys: failure.stuck, limitBytes: failure.limitBytes }
       : {}),
+    ...("cause" in failure ? { cause: failure.cause } : {}),
   }
 }

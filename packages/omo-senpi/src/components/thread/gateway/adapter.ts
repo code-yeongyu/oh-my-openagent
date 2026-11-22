@@ -20,10 +20,11 @@ export type GatewayEndpointRef = {
   readonly durable_session_id: string
 }
 
+/** `held` (senpi#7014): kept under a hold a peer cannot release; it starts once a person releases that hold. */
 export type ExternalAdmissionKind =
-  "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "already_admitted"
+  "started" | "queued" | "steered" | "turn_conflict" | "held_draft" | "held" | "already_admitted"
 
-export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired"
+export type GatewayAdmissionKind = ExternalAdmissionKind | "not_steerable" | "expired" | "sender_not_admitted"
 
 /**
  * `unroutable`: the endpoint names its session only by durable id and its host lists no live session under
@@ -184,7 +185,7 @@ export function toSessionControlDrainResult(result: {
 }): SessionControlDrainResult {
   const admitted: { delivery_id: string; kind: ExternalAdmissionKind }[] = []
   for (const entry of result.admitted) {
-    if (entry.kind === "not_steerable" || entry.kind === "expired") continue
+    if (entry.kind === "not_steerable" || entry.kind === "expired" || entry.kind === "sender_not_admitted") continue
     admitted.push({ delivery_id: entry.delivery_id, kind: entry.kind })
   }
   return { admitted }

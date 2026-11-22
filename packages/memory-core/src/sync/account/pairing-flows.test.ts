@@ -325,6 +325,6 @@ describe("turning sync on", () => {
         chain: createAccountHttp(options),
         pairing: createPairingHttp(options),
       }),
-    ).toEqual({ kind: "needs_first_device" })
+    ).toEqual({ kind: "method_required", methods: [] })
   }, 30_000)
 })

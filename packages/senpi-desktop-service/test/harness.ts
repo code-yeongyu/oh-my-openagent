@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url"
 import { vi } from "vitest"
 import type { ChildFactory } from "../src/service/child"
 
-const fakeEngine = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-engine.mjs")
+/** Absolute path of the scripted engine (`fake-engine.mjs`): spawn it with `--stdio` to get an NDJSON JSON-RPC child. */
+export const FAKE_ENGINE_PATH = path.join(path.dirname(fileURLToPath(import.meta.url)), "fake-engine.mjs")
 const RECEIVED = "recv "
 
 /** A request as the fake engine received it, with the index of the child that received it. */
@@ -64,7 +65,7 @@ export function fakeEngineFactory(env: Readonly<Record<string, string>> = {}): S
   }
   const spawnChild = (): ChildProcessWithoutNullStreams => {
     const index = children.length
-    const child = spawn(process.execPath, [fakeEngine, "--stdio"], {
+    const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
       env: { ...process.env, ...env },
       stdio: "pipe",
     })

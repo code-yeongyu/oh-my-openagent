@@ -80,7 +80,8 @@ describe("OPENAI_CATEGORIES deep lanes", () => {
     //#then
     expect(ultraCat).toBeDefined()
     expect(ultraCat?.resolvePromptAppend).toBe(resolveUltrabrainCategoryPromptAppend)
-    expect(ultraCat?.config).toEqual({ model: "openai/gpt-6-astra", variant: "max" })
+    expect(ultraCat?.config).toEqual({ model: "openai/gpt-6.2-astra", variant: "max" })
+    expect(ultraCat?.requiresModel).toEqual(["gpt-6.2-astra"])
   })
 
   test("each deep lane carries its own model and gates on it alone", () => {
@@ -90,10 +91,10 @@ describe("OPENAI_CATEGORIES deep lanes", () => {
     const highCat = OPENAI_CATEGORIES.find((c) => c.name === "unspecified-high")
 
     //#then
-    expect(low?.config).toEqual({ model: "openai/gpt-6.1-sol", variant: "medium" })
-    expect(low?.requiresModel).toEqual(["gpt-6.1-sol", "gpt-6.1-sol-fast", "gpt-5.6-sol-fast", "gpt-5.6-sol"])
-    expect(high?.config).toEqual({ model: "openai/gpt-6-astra", variant: "high" })
-    expect(high?.requiresModel).toBe("gpt-6-astra")
+    expect(low?.config).toEqual({ model: "openai/gpt-6.2-sol", variant: "medium" })
+    expect(low?.requiresModel).toEqual(["gpt-6.2-sol"])
+    expect(high?.config).toEqual({ model: "openai/gpt-6.2-astra", variant: "high" })
+    expect(high?.requiresModel).toEqual(["gpt-6.2-astra"])
     expect(highCat?.config).toEqual({ model: "anthropic/claude-opus-5-5", variant: "medium" })
     expect(highCat?.resolvePromptAppend).toBe(resolveUnspecifiedHighCategoryPromptAppend)
   })

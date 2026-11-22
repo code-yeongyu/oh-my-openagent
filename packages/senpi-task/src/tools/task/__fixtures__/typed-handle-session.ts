@@ -10,6 +10,7 @@ import { InProcessRunner } from "../../../runners/in-process"
 import { createTaskRecordStore } from "../../../store"
 import { buildTaskExecute } from "../execute"
 import { makeDeps } from "./task-tool-fakes"
+import { ownedTaskState } from "../../../store/__fixtures__/owned-task-state"
 
 // Restored real sessions are deterministic: no prompt, provider, or model network call is made.
 export async function realSessionHandle() {
@@ -17,7 +18,7 @@ export async function realSessionHandle() {
   const project = tempProject()
   const agentDir = join(project, "isolated-agent")
   mkdirSync(agentDir)
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const handles: ManagedChildHandle[] = []
   const transcripts: Array<{ path: string; before: string }> = []
   const runner = new InProcessRunner({

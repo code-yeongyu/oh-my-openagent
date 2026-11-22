@@ -16,7 +16,7 @@ export const PLATFORMS = [
 
 export const MODEL_PROFILES = [
   "Claude Fable 5.1 Max",
-  "GPT 6 Astra High",
+  "GPT 6.2 Astra High",
   "Kimi For Coding Highspeed",
   "Grok 4.6 xHigh",
   "GLM 5.2",
@@ -25,7 +25,7 @@ export const MODEL_PROFILES = [
   "GPT 5.6 Sol Medium",
   "GPT 5.6 Luna Fast",
   "Claude Sonnet 5",
-  "GPT 6 Astra Max",
+  "GPT 6.2 Astra Max",
   "Claude Fable 5.1 Medium",
 ] as const
 

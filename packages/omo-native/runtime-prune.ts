@@ -1,7 +1,7 @@
 import { readdirSync, renameSync, rmSync } from "node:fs"
 import { basename, dirname, join, sep } from "node:path"
-import { listProcesses } from "./bin/lib/doctor.js"
-import { RELEASE_VERSION } from "./compiled-update"
+import { listProcesses } from "./bin/lib/process-list.js"
+import { RELEASE_VERSION } from "./release-version"
 
 // Every release provisions ~/.omo/binary-runtime/<version>/ (~250MB) and nothing removed the old ones,
 // so a standalone install grew by one runtime per update. A launch prunes the versions older than its
