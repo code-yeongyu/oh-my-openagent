@@ -30,8 +30,10 @@
 //                    stays on the engine default; a pool whose sibling account is valid is kept.
 //   geeky-normal-transient-refresh-keeps-subscription  a subscription refresh that fails transiently at
 //                    session start keeps chatgpt-subscription over the openai API lane (#11432).
-// Isolation: SENPI_CODING_AGENT_DIR + XDG_CONFIG_HOME point at a throwaway sandbox; the real
-// ~/.senpi/agent credential files are digest-compared before/after and MUST stay identical.
+// Isolation: HOME/USERPROFILE, SENPI_CODING_AGENT_DIR and the XDG dirs point at a throwaway
+// sandbox, so the omo config user layer (~/.omo/omo.jsonc) resolves inside the sandbox and never
+// merges the operator's real home (#13561); the real ~/.senpi/agent credential files are
+// digest-compared before/after and MUST stay identical.
 // The memory root is sandboxed too (isolatedChildEnv sets OMO_MEMORY_HOME): every scenario checks
 // that its child resolves a memory root inside the sandbox and that no child output names the
 // caller's real memory root, so a sweep over the real ~/.omo/memory fails the run (#9239).
@@ -40,7 +42,7 @@ import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
-import { fileURLToPath } from "node:url"
+import { fileURLToPath, pathToFileURL } from "node:url"
 import { createHash } from "node:crypto"
 
 import { createSandbox } from "./drive.mjs"
@@ -144,6 +146,8 @@ function seedScenario(pluginRoot, scenario) {
   mkdirSync(sandbox.cwd, { recursive: true })
   mkdirSync(sandbox.agentDir, { recursive: true })
   mkdirSync(sandbox.xdgConfigHome, { recursive: true })
+  // The child HOME lands here (spawnEnv), so materialize a clean sandbox home.
+  mkdirSync(sandbox.homeDir, { recursive: true })
   const settingsPath = join(sandbox.agentDir, "settings.json")
   const settings = { defaultProjectTrust: "ask", packages: [pluginRoot] }
   if (scenario.cliThinking !== undefined) settings.defaultThinkingLevel = scenario.cliThinking
@@ -174,7 +178,7 @@ import { isolatedChildEnv } from "./sandbox-child-env.mjs"
 // against that runtime dir instead of the binary on PATH, so they are dropped from the spawn env.
 const INHERITED_RUNTIME_KEYS = ["SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "OMO_BIN", "PI_SESSION_FILE"]
 
-function spawnEnv(sandbox, sessionDir, scenario) {
+export function spawnEnv(sandbox, sessionDir, scenario) {
   const env = { ...process.env }
   for (const key of INHERITED_RUNTIME_KEYS) delete env[key]
   env.OMO_PROFILE_QA_PROVIDERS = (scenario.registerProviders ?? []).join(",")
@@ -182,6 +186,11 @@ function spawnEnv(sandbox, sessionDir, scenario) {
   return {
     ...isolatedChildEnv(env, sandbox.agentDir),
     SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    // The child must not inherit the operator's home: omo-config-core resolves the USER layer
+    // (`~/.omo/omo.jsonc`) from HOME/USERPROFILE, so an inherited home merges the operator's real
+    // model profiles into every scenario (#13561). drive.mjs sandboxes HOME the same way.
+    HOME: sandbox.homeDir,
+    USERPROFILE: sandbox.homeDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
     XDG_DATA_HOME: sandbox.xdgDataHome,
     XDG_CACHE_HOME: sandbox.xdgCacheHome,
@@ -398,4 +407,6 @@ function main() {
   process.exitCode = passed ? 0 : 1
 }
 
-main()
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main()
+}
