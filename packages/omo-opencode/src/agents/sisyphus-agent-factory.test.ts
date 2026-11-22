@@ -117,9 +117,24 @@ describe("createSisyphusAgent", () => {
       }
     })
 
+    test("#when creating agents for Grok 4.7 #then uses the Grok-native prompt with high effort and no thinking", () => {
+      // given - #10171: reported ids fell through to the Claude branch (thinking block, no effort)
+      // because the factory compared the preset name with dashes while the engine preset is "grok-4.7".
+      const models = ["xai/grok-4.7", "cursor/grok-4.7"]
+
+      for (const model of models) {
+        // when
+        const agent = createSisyphusAgent(model)
+
+        expect(agent.prompt).toContain('"preset":"grok-4.7"')
+        expect(agent.reasoningEffort).toBe("high")
+        expect(agent.thinking).toBeUndefined()
+      }
+    })
+
     test("#when creating agents for other grok ids #then keeps the fallback family", () => {
       // given
-      const models = ["x-ai/grok-4.20", "xai/grok-4-1-fast-reasoning", "x-ai/grok-code-fast-1"]
+      const models = ["x-ai/grok-4.20", "xai/grok-4-1-fast-reasoning", "x-ai/grok-code-fast-1", "xai/grok-4.70"]
       const grokPrompt = createSisyphusAgent("xai/grok-4.6").prompt
 
       for (const model of models) {

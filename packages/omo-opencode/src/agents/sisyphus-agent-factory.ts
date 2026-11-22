@@ -40,7 +40,7 @@ export function createSisyphusAgent(
   )
   const prompt = buildNativeAgentPrompt(model, withRefusalRule(role), availableToolNames, undefined, useTaskSystem)
   if (isGlmModel(model)) return buildGlmSisyphusAgentConfig(MODE, model, prompt)
-  if (isGrok45Model(model) || isGrok46Model(model) || getNativePromptSource(model) === "grok-4-7")
+  if (isGrok45Model(model) || isGrok46Model(model) || getNativePromptSource(model) === "grok-4.7")
     return buildGrokSisyphusAgentConfig(MODE, model, prompt)
   if (isGptModel(model) || isKimiK2CodeModel(model) || isKimiK2Model(model) || isKimiK3Model(model))
     return buildGptSisyphusAgentConfig(MODE, model, prompt)
