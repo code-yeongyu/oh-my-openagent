@@ -1,4 +1,4 @@
-import { describe, expect, jest, test } from "bun:test"
+import { describe, expect, jest, setSystemTime, test } from "bun:test"
 import {
   connectDeviceService,
   LocalApiError,
@@ -1659,12 +1659,19 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     const port = sessionsPort({
       version: "0.0.0-test",
       connect: async () => ({ conn: service(), owned: true }),
+      // The dial spends 60 ms of the budget on a controlled clock (the deadline and commandWaitMs read
+      // Date.now()); a real sleep let a loaded runner overrun the whole budget before the open was sent.
       dialEndpoint: async () => {
-        await new Promise((resolve) => setTimeout(resolve, 60))
+        setSystemTime(new Date(Date.now() + 60))
         return { conn: service(), owned: true }
       },
     })
-    await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    setSystemTime(new Date(Date.now()))
+    try {
+      await withCallDeadline(Date.now() + 100, () => port.endpointCommand("b", { type: "open_session" }))
+    } finally {
+      setSystemTime()
+    }
     expect(waits).toHaveLength(1)
     expect(waits[0]).toBeLessThanOrEqual(45)
   })
