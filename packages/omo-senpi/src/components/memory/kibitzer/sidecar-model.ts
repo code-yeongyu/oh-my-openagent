@@ -265,7 +265,7 @@ export function createKibitzerSidecarChildStarter(
       )
     }
     let runtime: StarterTaskRuntime | undefined
-    if (options.createRunner === undefined || options.loadTaskRuntime !== undefined) {
+    if (options.createRunner === undefined) {
       try {
         runtime = await (options.loadTaskRuntime ?? loadKibitzerTaskRuntime)()
       } catch (error) {

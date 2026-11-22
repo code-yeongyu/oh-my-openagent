@@ -98,6 +98,8 @@ describe("Kibitzer start ladder (#10536)", () => {
     // when
     const first = await start(wake(1))
     await first.dispose()
+    expect(sessions.requested).toEqual(["mock-1", "mock-2"])
+
     const second = await start(wake(2))
     await second.dispose()
 
