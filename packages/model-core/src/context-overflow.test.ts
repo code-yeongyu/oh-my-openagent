@@ -15,11 +15,10 @@ describe("isContextOverflowMessage", () => {
     expect(isContextOverflowMessage(message)).toBe(true)
   })
 
-  test.each([
-    "429: too many requests",
-    "400: invalid request",
-    "503: All providers are temporarily cooling down",
-  ])("rejects non-overflow failure: %s", (message) => {
-    expect(isContextOverflowMessage(message)).toBe(false)
-  })
+  test.each(["429: too many requests", "400: invalid request", "503: All providers are temporarily cooling down"])(
+    "rejects non-overflow failure: %s",
+    (message) => {
+      expect(isContextOverflowMessage(message)).toBe(false)
+    },
+  )
 })

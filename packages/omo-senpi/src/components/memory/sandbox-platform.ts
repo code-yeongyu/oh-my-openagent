@@ -1,5 +1,8 @@
 import { existsSync, lstatSync, mkdirSync, realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+
+import { attestUsernsRoots, inheritedTrustPaths, USERNS_ROOTS_ENV } from "../../../../omo-native/trust-userns"
 
 import type { ReflectionSpawnArgs } from "./worker/spawn"
 
@@ -53,15 +56,20 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
   const platform = input.platform ?? process.platform
   const executable = resolveExecutable(platform, input.which ?? defaultWhich)
   if (executable === undefined) {
-    const reason = platform === "darwin" ? "sandbox-exec not found"
-      : platform === "linux" ? "bwrap not found"
-        : "platform is unsupported"
+    const reason =
+      platform === "darwin"
+        ? "sandbox-exec not found"
+        : platform === "linux"
+          ? "bwrap not found"
+          : "platform is unsupported"
     if (input.policy === "required") {
       const error = new SandboxUnavailableError(platform, reason)
       if (input.errorRethrow !== undefined) input.errorRethrow(error)
       throw error
     }
-    return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
+    return identityTransform(
+      `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`,
+    )
   }
 
   // For Linux, check synchronous probes at build time (for tests), but defer async probes to transform time.
@@ -78,7 +86,9 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
       if (input.errorRethrow !== undefined) input.errorRethrow(error)
       throw error
     }
-    return identityTransform(`${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`)
+    return identityTransform(
+      `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`,
+    )
   }
 
   const writableDirs = input.writableDirs.map(canonicalPath)
@@ -133,7 +143,9 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
   // Linux with bwrap: return transform that handles probe (already checked or async)
   const innerCommand = resolveInnerCommand(input.command, input.env)
   if (innerCommand === undefined) {
-    return identityTransform(`${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`)
+    return identityTransform(
+      `${input.surface} sandbox unavailable: inner command "${input.command}" is not absolute and could not be resolved; running unsandboxed`,
+    )
   }
 
   const buildTransform = (spawnArgs: T): T => {
@@ -142,18 +154,54 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     // names that exact directory instead of dying or widening to an existing ancestor. Only here,
     // when bwrap will actually bind it: an off or unavailable sandbox must not create the path.
     for (const writableDir of writableDirs) createPlannedDirNoFollow(writableDir, input.surface)
+    // The child's own TMPDIR is the sandbox's private tmpfs; the parent's would be read-only inside.
+    // The engine trust stage inside the user namespace sees root as the overflow uid, so it trusts
+    // only the root-owned ancestors attested here by inode (senpi#5334).
     return {
       ...spawnArgs,
+      env: {
+        ...spawnArgs.env,
+        TMPDIR: "/tmp",
+        [USERNS_ROOTS_ENV]: attestUsernsRoots([
+          join(spawnArgs.env.HOME ?? homedir(), ".omo", "engine-trust"),
+          ...inheritedTrustPaths(spawnArgs.env.SENPI_ENGINE_TRUST),
+        ]),
+      },
       command: executable,
       args: [
-        "--ro-bind", "/", "/",
-        "--dev-bind", "/dev", "/dev",
-        "--tmpfs", "/tmp",
+        "--ro-bind",
+        "/",
+        "/",
+        "--dev-bind",
+        "/dev",
+        "/dev",
+        "--tmpfs",
+        "/tmp",
         ...writableDirs.flatMap((writableDir) => ["--bind", writableDir, writableDir]),
-        "--chdir", spawnArgs.cwd,
-        "--", innerCommand, ...spawnArgs.args,
+        "--chdir",
+        spawnArgs.cwd,
+        "--",
+        innerCommand,
+        ...spawnArgs.args,
       ],
     }
+  }
+
+  // A deferred probe decides per spawn, so the degradation state describes the latest spawn.
+  let spawnWarning = linuxProbeWarning
+  const applyUsability = (spawnArgs: T, usability: SandboxUsability): T => {
+    if (usability.usable) {
+      spawnWarning = undefined
+      return buildTransform(spawnArgs)
+    }
+    const reason = `bwrap cannot create a sandbox: ${usability.reason}`
+    if (input.policy === "required") {
+      const error = new SandboxUnavailableError(platform, reason)
+      if (input.errorRethrow !== undefined) input.errorRethrow(error)
+      throw error
+    }
+    spawnWarning = `${input.surface} sandbox unavailable on ${platform}: ${reason}; running unsandboxed because policy is auto`
+    return spawnArgs
   }
 
   const linuxTransform = (spawnArgs: T): T | Promise<T> => {
@@ -169,44 +217,18 @@ export function buildPathSandboxTransform<T extends SandboxableSpawnArgs>(
     if (deferAsyncProbe) {
       const probeResult = (input.probe ?? defaultProbe)(executable)
       if (probeResult instanceof Promise) {
-        return probeResult.then((usability) => {
-          if (!usability.usable) {
-            const reason = `bwrap cannot create a sandbox: ${usability.reason}`
-            if (input.policy === "required") {
-              const error = new SandboxUnavailableError(platform, reason)
-              if (input.errorRethrow !== undefined) input.errorRethrow(error)
-              throw error
-            }
-            // Policy is auto - return unsandboxed
-            return spawnArgs
-          }
-          // Sandbox is usable - apply the bwrap transform
-          return buildTransform(spawnArgs)
-        })
-      } else {
-        // Should not happen - we already checked this at build time
-        // But handle it gracefully
-        if (!probeResult.usable) {
-          const reason = `bwrap cannot create a sandbox: ${probeResult.reason}`
-          if (input.policy === "required") {
-            const error = new SandboxUnavailableError(platform, reason)
-            if (input.errorRethrow !== undefined) input.errorRethrow(error)
-            throw error
-          }
-          return spawnArgs
-        }
-        return buildTransform(spawnArgs)
+        return probeResult.then((usability) => applyUsability(spawnArgs, usability))
       }
+      return applyUsability(spawnArgs, probeResult)
     }
     // Synchronous probe already checked and usable
     return buildTransform(spawnArgs)
   }
 
-  const props: { wasSandboxed: boolean; warning?: string } = { wasSandboxed: linuxProbeWarning === undefined }
-  if (linuxProbeWarning !== undefined) {
-    props.warning = linuxProbeWarning
-  }
-  return Object.assign(linuxTransform, props) as GenericSandboxTransform<T>
+  return Object.defineProperties(linuxTransform, {
+    wasSandboxed: { enumerable: true, get: () => spawnWarning === undefined },
+    warning: { enumerable: true, get: () => spawnWarning },
+  }) as GenericSandboxTransform<T>
 }
 
 function buildDarwinProfile(input: {
@@ -222,8 +244,9 @@ function buildDarwinProfile(input: {
     "(allow default)",
     "(deny file-write*)",
     ...writable.map((path) => `(allow file-write* (subpath ${seatbeltString(path)}))`),
-    ...input.lockPaths.map((path) =>
-      `(allow file-write* (literal ${seatbeltString(path)}) (subpath ${seatbeltString(path)}))`),
+    ...input.lockPaths.map(
+      (path) => `(allow file-write* (literal ${seatbeltString(path)}) (subpath ${seatbeltString(path)}))`,
+    ),
     '(allow file-write* (literal "/dev/null"))',
     '(allow file-write* (literal "/dev/tty"))',
     ...input.payloads.map((path) => `(allow file-read* (literal ${seatbeltString(path)}))`),
@@ -253,9 +276,7 @@ function defaultProbe(executable: string): SandboxUsability | Promise<SandboxUsa
   return probeBwrapUsability(executable)
 }
 
-type LockPathsResolution =
-  | { readonly paths: readonly string[] }
-  | { readonly warning: string }
+type LockPathsResolution = { readonly paths: readonly string[] } | { readonly warning: string }
 
 /**
  * Canonicalizes lock paths whose parent exists and fails closed on the rest: a lock path inside a
@@ -307,7 +328,9 @@ function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
 ): GenericSandboxTransform<T> {
   const innerCommand = resolveInnerCommand(command, env)
   if (innerCommand === undefined) {
-    return identityTransform(`${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`)
+    return identityTransform(
+      `${surface} sandbox unavailable: inner command "${command}" is not absolute and could not be resolved; running unsandboxed`,
+    )
   }
   return Object.assign((spawnArgs: T) => transform(spawnArgs, innerCommand), { wasSandboxed: true })
 }
@@ -318,7 +341,9 @@ function guardedSandboxedTransform<T extends SandboxableSpawnArgs>(
 // through it. The final realpath equality also refuses a link anywhere on the path.
 function createPlannedDirNoFollow(dir: string, surface: string): void {
   const refuse = (resolved: string): never => {
-    throw new Error(`${surface} sandbox refused to bind ${dir}: it now resolves to ${resolved} (a symlink appeared on the path after the sandbox was planned); remove the link and run again`)
+    throw new Error(
+      `${surface} sandbox refused to bind ${dir}: it now resolves to ${resolved} (a symlink appeared on the path after the sandbox was planned); remove the link and run again`,
+    )
   }
   const missing: string[] = []
   let cursor = dir

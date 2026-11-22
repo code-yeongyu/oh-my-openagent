@@ -3,7 +3,15 @@ import { rename } from "node:fs/promises"
 import { join } from "node:path"
 
 import { countSpoolRecords, type Signal } from "./otlp-spool-file"
-import { holdsLock, holdsLockSync, isAbandonedLock, throwAfterRollBack, tryLock, tryLockSync, unlock } from "./otlp-spool-lock"
+import {
+  holdsLock,
+  holdsLockSync,
+  isAbandonedLock,
+  throwAfterRollBack,
+  tryLock,
+  tryLockSync,
+  unlock,
+} from "./otlp-spool-lock"
 
 /** Why records were lost before acceptance; `write_failed` = the record never reached the spool. */
 export type DropReason = "evicted" | "expired" | "rejected" | "corrupt" | "write_failed"
@@ -34,7 +42,7 @@ export {
   parseSpoolName,
   type SpoolEntry,
 } from "./otlp-spool-names"
-import { activeName, batchName, parseSpoolName, QUARANTINE_DIR, sendingName, type SpoolEntry } from "./otlp-spool-names"
+import { batchName, ownersDir, parseSpoolName, QUARANTINE_DIR, sendingName, type SpoolEntry } from "./otlp-spool-names"
 
 const HEX = Array.from({ length: 256 }, (_, index) => index.toString(16).padStart(2, "0"))
 
@@ -221,7 +229,6 @@ export function dropFile(ctx: SpoolContext, name: string, reason: DropReason): v
   if (deleteFile(ctx.dir, name)) ctx.onDrop(reason, records)
 }
 
-
 /**
  * Corrupt files are kept for inspection but are bounded like everything else: they count toward the
  * spool cap (and are evicted first, see `enforceSpoolCap`) and expire by the same age limit, measured
@@ -238,10 +245,12 @@ export type QuarantinedFile = { readonly path: string; readonly size: number; re
 /** Quarantined files, oldest first. */
 export function listQuarantine(ctx: SpoolContext): QuarantinedFile[] {
   const dir = join(ctx.dir, QUARANTINE_DIR)
-  return listSpool(dir).flatMap((entry) => {
-    const stat = fileStat(dir, entry.name)
-    return stat === null ? [] : [{ path: join(QUARANTINE_DIR, entry.name), size: stat.size, mtimeMs: stat.mtimeMs }]
-  }).sort((a, b) => a.mtimeMs - b.mtimeMs)
+  return listSpool(dir)
+    .flatMap((entry) => {
+      const stat = fileStat(dir, entry.name)
+      return stat === null ? [] : [{ path: join(QUARANTINE_DIR, entry.name), size: stat.size, mtimeMs: stat.mtimeMs }]
+    })
+    .sort((a, b) => a.mtimeMs - b.mtimeMs)
 }
 
 type FileStat = { readonly size: number; readonly mtimeMs: number; readonly birthMs: number; readonly links: number }
@@ -290,8 +299,13 @@ export function sweepSpool(ctx: SpoolContext): void {
     } else if (entry.kind === "lock") {
       const stat = fileStat(ctx.dir, entry.name)
       const limits = { leaseMs: CLAIM_LEASE_MS, maxAgeMs: ctx.maxAgeMs, isPidAlive: ctx.isPidAlive, self: ctx }
-      if (stat !== null && isAbandonedLock(ctx.dir, entry.name, now - stat.mtimeMs, limits)) deleteFile(ctx.dir, entry.name)
+      if (stat !== null && isAbandonedLock(ctx.dir, entry.name, now - stat.mtimeMs, limits))
+        deleteFile(ctx.dir, entry.name)
     }
+  }
+  // A crashed writer leaves its owner marker behind; it must not keep the spool live for an opt-out purge.
+  for (const entry of listSpool(ownersDir(ctx.dir))) {
+    if (entry.kind === "owner" && isDeadOwner(ctx, entry)) deleteFile(ownersDir(ctx.dir), entry.name)
   }
   for (const entry of listSpool(ctx.dir)) {
     if (entry.kind === "batch" && now - batchCreatedMs(entry.batchId) > ctx.maxAgeMs) {

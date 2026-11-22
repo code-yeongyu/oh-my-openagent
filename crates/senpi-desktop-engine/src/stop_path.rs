@@ -15,7 +15,7 @@ use senpi_desktop_core::protocol_results::{StopPathKind, StopPathStatus};
 use senpi_desktop_core::types::DesktopCapabilities;
 use senpi_desktop_safety::{
     ActiveStopPath, Chord, HostRelay, ResumeToken, StopPathError, StopPathFailure, StopPathListener,
-    StopPolicy, StopSource, Supervisor, SupervisorStatus,
+    StopPathReason, StopPolicy, StopSource, Supervisor, SupervisorStatus,
 };
 use senpi_desktop_session::BackendSelection;
 
@@ -211,6 +211,13 @@ impl StopPaths {
         self.status()
     }
 
+    /// The stop generation: every stop moves it. A request stamps it when it
+    /// starts, so a reply that arrives under a newer one came back across a
+    /// stop and is quarantined (G15).
+    pub fn generation(&self) -> u64 {
+        self.supervisor.stop_epoch()
+    }
+
     /// `stopPath.resume`.
     ///
     /// # Errors
@@ -252,6 +259,11 @@ impl StopPaths {
         let status = self.supervisor.status();
         let stop_reason = match status.stop_path {
             ActiveStopPath::Global => None,
+            ActiveStopPath::HostRelay | ActiveStopPath::None
+                if status.global_failure == Some(StopPathFailure::SecureInput) =>
+            {
+                Some(StopPathReason::SecureInputActive.as_str().to_owned())
+            }
             ActiveStopPath::HostRelay | ActiveStopPath::None => Some(
                 self.state
                     .lock()

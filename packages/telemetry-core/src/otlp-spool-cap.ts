@@ -1,4 +1,13 @@
-import { compareBatchIds, deleteFile, dropFile, fileStat, listQuarantine, listSpool, QUARANTINE_DIR, type SpoolContext } from "./otlp-spool-dir"
+import {
+  compareBatchIds,
+  deleteFile,
+  dropFile,
+  fileStat,
+  listQuarantine,
+  listSpool,
+  QUARANTINE_DIR,
+  type SpoolContext,
+} from "./otlp-spool-dir"
 import type { Signal } from "./otlp-spool-file"
 
 /**
@@ -70,6 +79,11 @@ export class SpoolCap {
       this.#bound += bytes
       return
     }
+    this.enforce()
+  }
+
+  /** A full scan: the periodic sweep calls it so files other processes left behind are capped too. */
+  enforce(): void {
     this.#bound = null
     this.#bound = enforceSpoolCap(this.#ctx, this.#sizes)
   }

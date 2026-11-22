@@ -20,17 +20,38 @@ If the project does not yet have react-scan and react-doctor wired into its dev 
 import { chromium } from "playwright";
 import { playAudit } from "playwright-lighthouse";
 
+declare global {
+  interface Window {
+    __renderEvents: unknown[];
+  }
+}
+
+// Narrow only the fields this gate reads from a react-scan commit event.
+function hasUnnecessaryRender(event: unknown): boolean {
+  if (typeof event !== "object" || event === null || !("tree" in event) || !Array.isArray(event.tree)) return false;
+  return event.tree.some(
+    (node: unknown) =>
+      typeof node === "object" &&
+      node !== null &&
+      "changeDescription" in node &&
+      typeof node.changeDescription === "object" &&
+      node.changeDescription !== null &&
+      "kind" in node.changeDescription &&
+      node.changeDescription.kind === "unnecessary",
+  );
+}
+
 const browser = await chromium.launch({ channel: "chrome" });
 const context = await browser.newContext();
 
 // Inject react-scan/lite BEFORE the app boots
 await context.addInitScript(() => {
-  // @ts-ignore — pulled from the project's node_modules or a self-hosted bundle
+  // react-scan is a dev dependency of the project (see ../design/react-dev-tooling-skill.md), so its types resolve
   import("react-scan/lite").then(({ instrument }) => {
-    (window as any).__renderEvents = [];
+    window.__renderEvents = [];
     instrument({
-      onEvent: (event: any) => {
-        if (event.kind === "commit") (window as any).__renderEvents.push(event);
+      onEvent: (event) => {
+        if (event.kind === "commit") window.__renderEvents.push(event);
       },
       recordChangeDescriptions: true,
       includeFiberSource: true,
@@ -51,10 +72,8 @@ await playAudit({
 });
 
 // Pull render events and assert on render quality
-const events = await page.evaluate(() => (window as any).__renderEvents);
-const unnecessary = events.filter((e: any) =>
-  e.tree?.some((node: any) => node.changeDescription?.kind === "unnecessary"),
-);
+const events = await page.evaluate(() => window.__renderEvents);
+const unnecessary = events.filter(hasUnnecessaryRender);
 
 if (unnecessary.length > 0) {
   console.error(`FAIL: ${unnecessary.length} unnecessary renders detected during audit`);

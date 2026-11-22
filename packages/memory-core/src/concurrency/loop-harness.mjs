@@ -26,11 +26,19 @@ export function run(executable, args, options = {}) {
     let stderr = ""
     child.stdout.setEncoding("utf8")
     child.stderr.setEncoding("utf8")
-    child.stdout.on("data", (chunk) => { stdout += chunk })
-    child.stderr.on("data", (chunk) => { stderr += chunk })
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
     const timer = setTimeout(() => {
       child.kill("SIGKILL")
-      reject(new Error(`stage timed out after ${STAGE_BOUND_MS}ms: ${executable} ${args.join(" ")}\nstdout=${stdout}\nstderr=${stderr}`))
+      reject(
+        new Error(
+          `stage timed out after ${STAGE_BOUND_MS}ms: ${executable} ${args.join(" ")}\nstdout=${stdout}\nstderr=${stderr}`,
+        ),
+      )
     }, options.timeoutMs ?? STAGE_BOUND_MS)
     child.on("error", (error) => {
       clearTimeout(timer)
@@ -69,7 +77,9 @@ export function spawnChild(script, args) {
       }
     }
   })
-  child.stderr.on("data", (chunk) => { stderr += chunk })
+  child.stderr.on("data", (chunk) => {
+    stderr += chunk
+  })
   const exit = new Promise((resolve) => child.once("exit", (code, signal) => resolve({ code, signal })))
   return {
     child,
@@ -80,10 +90,19 @@ export function spawnChild(script, args) {
       const existing = lines.find((line) => line === expected)
       if (existing !== undefined) return Promise.resolve(existing)
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(`never saw "${expected}": stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`)), boundMs)
+        const timer = setTimeout(
+          () =>
+            reject(
+              new Error(`never saw "${expected}": stdout=${JSON.stringify(stdout)} stderr=${JSON.stringify(stderr)}`),
+            ),
+          boundMs,
+        )
         waiters.push({
           predicate: (line) => line === expected,
-          resolve: (line) => { clearTimeout(timer); resolve(line) },
+          resolve: (line) => {
+            clearTimeout(timer)
+            resolve(line)
+          },
         })
       })
     },
@@ -166,9 +185,7 @@ async function waitOrphanGone(pidPath) {
 export async function fsckCheck(repoPath, stage) {
   const result = await run("git", ["-C", repoPath, "fsck", "--full", "--strict"])
   const report = `${result.stdout}\n${result.stderr}`
-  const broken = report
-    .split("\n")
-    .filter((line) => /^(error|fatal):/.test(line) || /missing|corrupt/i.test(line))
+  const broken = report.split("\n").filter((line) => /^(error|fatal):/.test(line) || /missing|corrupt/i.test(line))
   return {
     stage,
     ok: result.code === 0 && broken.length === 0,
@@ -188,7 +205,8 @@ export async function sigkillIteration(fix) {
   await holder.waitFor("kill-ready")
   holder.child.kill("SIGKILL")
   const holderExit = await holder.exit
-  if (holderExit.signal !== "SIGKILL") throw new Error(`holder exit was ${JSON.stringify(holderExit)}, expected SIGKILL: ${holder.output()}`)
+  if (holderExit.signal !== "SIGKILL")
+    throw new Error(`holder exit was ${JSON.stringify(holderExit)}, expected SIGKILL: ${holder.output()}`)
   await waitOwnerDead(join(fix.locks, "memory-write.lock"), holder.child.pid)
   const afterTakeover = await fsckCheck(fix.repo, "after-takeover")
   survivor.send("begin-recovery")

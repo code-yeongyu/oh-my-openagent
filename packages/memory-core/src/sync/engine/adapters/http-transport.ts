@@ -4,8 +4,18 @@
 // history it first reads the snapshot from `GET /v1/sync/state`. Each batch row names its batch id
 // (#463 contract 1.17.0; null on keyring rows); the engine checks it against the sealed header. Refusals arrive as
 // `{ error: { code } }`; `stale_base` is answered with the head read back from the state route.
+// Every request, the event stream included, carries syncRequestHeaders (#13691).
 
-import type { AppendRequest, AppendResult, PulledEntry, PullPage, SnapshotRef, StreamHandlers, Transport } from "../ports"
+import { syncRequestHeaders } from "../../contract-version"
+import type {
+  AppendRequest,
+  AppendResult,
+  PulledEntry,
+  PullPage,
+  SnapshotRef,
+  StreamHandlers,
+  Transport,
+} from "../ports"
 
 export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toString("base64url")
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
@@ -20,6 +30,22 @@ export class SyncHttpError extends Error {
     readonly transient: boolean,
   ) {
     super(`sync request refused: ${code} (${status})`)
+  }
+}
+
+/** The device's bearer token could not be read or refreshed: its sign-in has expired or was refused. */
+export class SyncAuthError extends Error {
+  override readonly name = "SyncAuthError"
+  constructor(cause: unknown) {
+    super("the device's sign-in token could not be read or refreshed", { cause })
+  }
+}
+
+/** The sync service could not be reached at all: no network, DNS, a refused or reset connection. */
+export class SyncNetworkError extends Error {
+  override readonly name = "SyncNetworkError"
+  constructor(cause: unknown) {
+    super("the sync service could not be reached", { cause })
   }
 }
 
@@ -45,12 +71,26 @@ interface WireState {
   readonly snapshot: { readonly covers_seq: number; readonly chunk_object_ids: readonly string[] } | null
 }
 
+async function bearer(options: HttpTransportOptions): Promise<string> {
+  try {
+    return await options.token()
+  } catch (error) {
+    throw new SyncAuthError(error)
+  }
+}
+
 export function createHttpTransport(options: HttpTransportOptions): Transport {
   const doFetch = options.fetch ?? fetch
   const request = async (method: string, path: string, body?: string | Uint8Array, json = true): Promise<Response> => {
-    const headers: Record<string, string> = { authorization: `Bearer ${await options.token()}` }
+    const headers = syncRequestHeaders(await bearer(options))
     if (body !== undefined && json) headers["content-type"] = "application/json"
-    const response = await doFetch(`${options.baseUrl}${path}`, { method, headers, ...(body === undefined ? {} : { body }) })
+    const response = await doFetch(`${options.baseUrl}${path}`, {
+      method,
+      headers,
+      ...(body === undefined ? {} : { body }),
+    }).catch((error: unknown) => {
+      throw new SyncNetworkError(error)
+    })
     if (response.ok) return response
     const code = await response.json().then(
       (b: unknown) => (b as { error?: { code?: string } }).error?.code ?? "unknown",
@@ -58,7 +98,8 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
     )
     throw new SyncHttpError(response.status >= 500 ? "unavailable" : code, response.status, response.status >= 500)
   }
-  const readState = async (): Promise<WireState> => (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
+  const readState = async (): Promise<WireState> =>
+    (await request("GET", "/v1/sync/state")).json() as Promise<WireState>
   const entryOf = (row: WireRow): PulledEntry => ({
     seq: row.seq,
     kind: row.kind,
@@ -72,9 +113,13 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
       const state = await readState()
       const s = state.snapshot
       const snapshot: SnapshotRef | null =
-        s !== null && after < state.oldest_retained_seq - 1 ? { coversSeq: s.covers_seq, objectIds: s.chunk_object_ids, digest: null } : null
+        s !== null && after < state.oldest_retained_seq - 1
+          ? { coversSeq: s.covers_seq, objectIds: s.chunk_object_ids, digest: null }
+          : null
       const from = snapshot === null ? after : Math.max(after, snapshot.coversSeq)
-      const page = (await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as { entries: readonly WireRow[] }
+      const page = (await (await request("GET", `/v1/sync/batches?after=${from}`)).json()) as {
+        entries: readonly WireRow[]
+      }
       const rows = page.entries.slice(0, limit)
       const last = rows.at(-1)?.seq ?? from
       return { snapshot, entries: rows.map(entryOf), head: Math.max(state.head.seq, last), more: last < state.head.seq }
@@ -100,7 +145,10 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
         record_sig: req.recordSig,
       })
       try {
-        return { ok: true, seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq }
+        return {
+          ok: true,
+          seq: ((await (await request("POST", "/v1/sync/batches", body)).json()) as { seq: number }).seq,
+        }
       } catch (error) {
         if (!(error instanceof SyncHttpError && error.code === "stale_base")) throw error
         return { ok: false, error: "stale_base", head: (await readState()).head.seq }
@@ -114,12 +162,17 @@ export function createHttpTransport(options: HttpTransportOptions): Transport {
   }
 }
 
-async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, handlers: StreamHandlers, signal: AbortSignal): Promise<void> {
+async function streamLoop(
+  options: HttpTransportOptions,
+  doFetch: typeof fetch,
+  handlers: StreamHandlers,
+  signal: AbortSignal,
+): Promise<void> {
   while (!signal.aborted) {
     let up = false
     try {
       const response = await doFetch(`${options.baseUrl}/v1/me/events`, {
-        headers: { authorization: `Bearer ${await options.token()}`, accept: "text/event-stream" },
+        headers: { ...syncRequestHeaders(await bearer(options)), accept: "text/event-stream" },
         signal,
       })
       if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)
@@ -131,8 +184,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
         buffer += decoder.decode(chunk, { stream: true })
         let end = buffer.indexOf("\n\n")
         while (end >= 0) {
-          const head = advancedHead(buffer.slice(0, end))
-          if (head !== null) handlers.onAdvanced(head)
+          const event = streamEvent(buffer.slice(0, end))
+          if (event?.kind === "advanced") handlers.onAdvanced(event.head)
+          else if (event?.kind === "state") handlers.onStateChanged()
           buffer = buffer.slice(end + 2)
           end = buffer.indexOf("\n\n")
         }
@@ -147,7 +201,9 @@ async function streamLoop(options: HttpTransportOptions, doFetch: typeof fetch, 
   }
 }
 
-function advancedHead(frame: string): number | null {
+type StreamEvent = { readonly kind: "advanced"; readonly head: number } | { readonly kind: "state" }
+
+function streamEvent(frame: string): StreamEvent | null {
   const data = frame
     .split("\n")
     .filter((line) => line.startsWith("data:"))
@@ -155,6 +211,7 @@ function advancedHead(frame: string): number | null {
     .join("\n")
   if (data === "") return null
   const event = JSON.parse(data) as { type?: string; head?: { seq?: number } }
+  if (event.type === "sync.state.changed") return { kind: "state" }
   if (event.type !== "sync.advanced" && event.type !== "sync.keyring.changed") return null
-  return typeof event.head?.seq === "number" ? event.head.seq : null
+  return typeof event.head?.seq === "number" ? { kind: "advanced", head: event.head.seq } : null
 }

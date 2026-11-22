@@ -1,12 +1,9 @@
 import { z } from "zod"
 
-export const BROWSER_PROVIDER_ERROR = "Unsupported browser provider; supported values: playwright, dev-browser, playwright-cli. Use the built-in browser path: Bun.WebView / playwright-core scripts"
+export const BROWSER_PROVIDER_ERROR =
+  "Unsupported browser provider; supported values: playwright, dev-browser, playwright-cli. Use the built-in browser path: Bun.WebView / playwright-core scripts"
 
-export const BrowserAutomationProviderSchema = z.enum([
-  "playwright",
-  "dev-browser",
-  "playwright-cli",
-], {
+export const BrowserAutomationProviderSchema = z.enum(["playwright", "dev-browser", "playwright-cli"], {
   error: BROWSER_PROVIDER_ERROR,
 })
 
@@ -40,7 +37,5 @@ export const BrowserAutomationConfigSchema = z.object({
   playwright_mcp_args: z.array(z.string()).optional(),
 })
 
-export type BrowserAutomationProvider = z.infer<
-  typeof BrowserAutomationProviderSchema
->
+export type BrowserAutomationProvider = z.infer<typeof BrowserAutomationProviderSchema>
 export type BrowserAutomationConfig = z.infer<typeof BrowserAutomationConfigSchema>

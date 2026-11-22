@@ -147,9 +147,7 @@ describe("createWebFetchRedirectGuardHook", () => {
 
         await hook["tool.execute.after"](input, output)
 
-        expect(output.output).toBe(
-          "Error: WebFetch failed: exceeded maximum redirects (10)",
-        )
+        expect(output.output).toBe("Error: WebFetch failed: exceeded maximum redirects (10)")
       })
     })
 
@@ -161,9 +159,7 @@ describe("createWebFetchRedirectGuardHook", () => {
 
         await hook["tool.execute.after"](input, output)
 
-        expect(output.output).toBe(
-          "This page explains why browsers hit too many redirects in some setups.",
-        )
+        expect(output.output).toBe("This page explains why browsers hit too many redirects in some setups.")
       })
     })
   })

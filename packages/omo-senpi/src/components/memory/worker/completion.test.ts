@@ -20,7 +20,13 @@ import { realpathSync } from "node:fs"
 import { rmEfaultTolerant } from "../teardown.test-support"
 
 const roots: string[] = []
-afterEach(async () => Promise.all(roots.splice(0).map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }))))
+afterEach(async () =>
+  Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  ),
+)
 
 const FIXED_NOW_MS = Date.parse("2026-08-16T12:00:00.000Z")
 const FIXED_RECENT_TIMESTAMP = new Date(FIXED_NOW_MS - 60_000).toISOString()
@@ -124,11 +130,13 @@ describe("reflection completion flow", () => {
     const reflection = await collectReflection(paths, { limit: 5 })
 
     // then
-    expect(reflection.outcomes).toEqual([{
-      runId: "run-offline",
-      outcome: "merged",
-      finishedAt: FIXED_RECENT_TIMESTAMP,
-    }])
+    expect(reflection.outcomes).toEqual([
+      {
+        runId: "run-offline",
+        outcome: "merged",
+        finishedAt: FIXED_RECENT_TIMESTAMP,
+      },
+    ])
   })
 
   test("#given a pending offline completion #when its source session starts #then appendEntry and consumed state happen without a model message or a toast", async () => {
@@ -141,11 +149,16 @@ describe("reflection completion flow", () => {
     registerReflectionCompletionRenderer(api)
 
     // when
-    const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
-      sessionId: "conversation-a",
-      api,
-      ui: { notify: (message, level) => notifications.push({ message, level }) },
-    }, FIXED_NOW_MS)
+    const consumed = await consumePendingReflectionCompletions(
+      root,
+      "agent-test",
+      {
+        sessionId: "conversation-a",
+        api,
+        ui: { notify: (message, level) => notifications.push({ message, level }) },
+      },
+      FIXED_NOW_MS,
+    )
 
     // then
     expect(consumed).toHaveLength(1)
@@ -183,20 +196,35 @@ describe("reflection completion flow", () => {
         const api = new CapturedCompletionApi()
 
         // when
-        await consumePendingReflectionCompletions(root, "agent-test", {
-          sessionId: "target-session",
-          api,
-        }, now)
+        await consumePendingReflectionCompletions(
+          root,
+          "agent-test",
+          {
+            sessionId: "target-session",
+            api,
+          },
+          now,
+        )
 
         // then
         expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(5)
-        expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE).map((entry) => entry.data)).toEqual(
-          expect.arrayContaining(targetRecords.slice(0, 5).map((pending) => expect.objectContaining({ runId: pending.runId, identity: "agent-test" }))),
+        expect(
+          api.entries
+            .filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)
+            .map((entry) => entry.data),
+        ).toEqual(
+          expect.arrayContaining(
+            targetRecords
+              .slice(0, 5)
+              .map((pending) => expect.objectContaining({ runId: pending.runId, identity: "agent-test" })),
+          ),
         )
-        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([{
-          customType: REFLECTION_SUMMARY_ENTRY_TYPE,
-          data: expect.objectContaining({ count: 3 }),
-        }])
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([
+          {
+            customType: REFLECTION_SUMMARY_ENTRY_TYPE,
+            data: expect.objectContaining({ count: 3 }),
+          },
+        ])
         for (const pending of foreignRecords) {
           expect(JSON.parse(await readFile(join(root, `${pending.runId}.json`), "utf8"))).toMatchObject({
             identity: "agent-foreign",
@@ -222,12 +250,21 @@ describe("reflection completion flow", () => {
         const warnings: unknown[] = []
 
         // when
-        const consumed = await consumePendingReflectionCompletions(root, "agent-test", {
-          sessionId: "different-session",
-          api,
-          ui: { notify: () => { throw new Error("ui unavailable") } },
-          logger: { warn: (_message, details) => warnings.push(details) },
-        }, FIXED_NOW_MS)
+        const consumed = await consumePendingReflectionCompletions(
+          root,
+          "agent-test",
+          {
+            sessionId: "different-session",
+            api,
+            ui: {
+              notify: () => {
+                throw new Error("ui unavailable")
+              },
+            },
+            logger: { warn: (_message, details) => warnings.push(details) },
+          },
+          FIXED_NOW_MS,
+        )
 
         // then
         expect(consumed[0]?.delivery.status).toBe("consumed")
@@ -258,7 +295,9 @@ describe("reflection completion flow", () => {
         const live = {
           sessionId: "new-session",
           api,
-          ui: { notify: (message: string, level: "info" | "warning" | "error") => notifications.push({ message, level }) },
+          ui: {
+            notify: (message: string, level: "info" | "warning" | "error") => notifications.push({ message, level }),
+          },
         }
 
         // when
@@ -269,10 +308,12 @@ describe("reflection completion flow", () => {
         expect(first).toHaveLength(8)
         expect(second).toEqual([])
         expect(api.entries.filter((entry) => entry.customType === REFLECTION_COMPLETION_ENTRY_TYPE)).toHaveLength(5)
-        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([{
-          customType: REFLECTION_SUMMARY_ENTRY_TYPE,
-          data: expect.objectContaining({ schemaVersion: 1, count: 1, failedCount: 1 }),
-        }])
+        expect(api.entries.filter((entry) => entry.customType === REFLECTION_SUMMARY_ENTRY_TYPE)).toEqual([
+          {
+            customType: REFLECTION_SUMMARY_ENTRY_TYPE,
+            data: expect.objectContaining({ schemaVersion: 1, count: 1, failedCount: 1 }),
+          },
+        ])
         expect(notifications).toEqual([])
         for (const pending of records) {
           expect(JSON.parse(await readFile(join(root, `${pending.runId}.json`), "utf8"))).toMatchObject({

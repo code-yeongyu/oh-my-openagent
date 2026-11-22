@@ -1,13 +1,12 @@
 // /recompile — bust the compiled memory-block cache so the next agent run
 // recompiles from HEAD (letta recompileAgentSystemPrompt + cache-evict notice).
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
-export function registerRecompileCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerRecompileCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("recompile", {
-    description: "Recompile the memory block into the system prompt on the next agent run.",
-    argumentHint: "",
+    ...LAZY_MEMORY_COMMANDS.recompile,
     handler: async (_args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

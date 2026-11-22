@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import {
+  ACCOUNT_DEFAULT_BINDING,
   createManifestDoc,
   joinDirection,
   joinSpaces,
@@ -14,6 +15,7 @@ import {
   resolveSpaceInRepo,
   SYNC_BINDING_CONFIG_KEY,
   SYNC_SPACE_CONFIG_KEY,
+  spaceIdForBinding,
   type SpaceConfigStore,
 } from "./index"
 import { git } from "./test-support"
@@ -34,9 +36,9 @@ function fakeStore(initial: Record<string, string> = {}) {
 describe("resolveSpace (sync-design §3 binding keys)", () => {
   test("a named agent profile binds as named:", () => {
     const { store } = fakeStore()
-    const r = resolveSpace(store, { profile: "  Dori\n" })
-    expect(r.bindingKey).toBe("named:Dori")
-    expect(r.spaceId).toBe("852b47fac13bd6a2f0d23f5b5d4fa103")
+    const r = resolveSpace(store, { profile: "  Demo\n" })
+    expect(r.bindingKey).toBe("named:Demo")
+    expect(r.spaceId).toBe("6d38310f719ef126e78fa655f5d57d60")
     expect(r.wrote.space).toBe(r.spaceId)
     expect(store.get(SYNC_SPACE_CONFIG_KEY)).toBe(r.spaceId)
   })
@@ -51,29 +53,59 @@ describe("resolveSpace (sync-design §3 binding keys)", () => {
     }
   })
 
-  test("a remote-less project mints a local: binding once and reuses it", () => {
-    const { store, sets } = fakeStore()
-    let mints = 0
-    const randomHex = () => {
-      mints++
-      return "0".repeat(32)
+  // #13720: every memory syncs across the account's devices. With no named profile and no remote (a
+  // remote-less folder, or a session outside any project) every device lands in ONE account space.
+  test("an unset or auto profile with no remote binds every device to the account default space", () => {
+    const ids = new Set<string>()
+    for (const profile of [null, "", "auto"]) {
+      for (const remotes of [undefined, []]) {
+        const { store, sets } = fakeStore()
+        const r = resolveSpace(store, { profile, ...(remotes === undefined ? {} : { remotes }) })
+        expect(r.bindingKey).toBe(ACCOUNT_DEFAULT_BINDING)
+        expect(r.legacySpaceId).toBeNull()
+        expect(sets.filter(([k]) => k === SYNC_BINDING_CONFIG_KEY)).toEqual([])
+        ids.add(r.spaceId)
+      }
     }
-    const first = resolveSpace(store, { randomHex })
-    expect(first.bindingKey).toBe(`local:${"0".repeat(32)}`)
-    expect(first.wrote.binding).toBe(first.bindingKey)
-    const second = resolveSpace(store, { randomHex })
-    expect(second.bindingKey).toBe(first.bindingKey)
-    expect(second.wrote).toEqual({})
-    expect(second.spaceId).toBe(first.spaceId)
-    expect(mints).toBe(1)
-    expect(sets.filter(([k]) => k === SYNC_BINDING_CONFIG_KEY)).toHaveLength(1)
+    expect([...ids]).toEqual([spaceIdForBinding(ACCOUNT_DEFAULT_BINDING)])
   })
 
-  test("a corrupt stored local binding is re-minted", () => {
+  test("a repository that minted a local: space moves to the default space and keeps naming the legacy space", () => {
+    const legacy = `local:${"0".repeat(32)}`
+    const legacyId = spaceIdForBinding(legacy)
+    const { store } = fakeStore({ [SYNC_BINDING_CONFIG_KEY]: legacy, [SYNC_SPACE_CONFIG_KEY]: legacyId })
+    const first = resolveSpace(store, {})
+    expect(first.bindingKey).toBe(ACCOUNT_DEFAULT_BINDING)
+    expect(first.spaceId).toBe(spaceIdForBinding(ACCOUNT_DEFAULT_BINDING))
+    expect(first.legacySpaceId).toBe(legacyId)
+    expect(first.aliasOfStoredSpace).toBe(false)
+    expect(first.wrote).toEqual({ space: first.spaceId })
+    expect(store.get(SYNC_SPACE_CONFIG_KEY)).toBe(first.spaceId)
+    // A crash between this resolve and the engine's journal claim must not lose the legacy space.
+    const again = resolveSpace(store, {})
+    expect(again.spaceId).toBe(first.spaceId)
+    expect(again.legacySpaceId).toBe(legacyId)
+    expect(again.wrote).toEqual({})
+  })
+
+  test("a local: binding left beside another recorded space keeps that sticky space", () => {
+    const repoId = spaceIdForBinding("repo:github.com/a/b")
+    const { store } = fakeStore({
+      [SYNC_BINDING_CONFIG_KEY]: `local:${"0".repeat(32)}`,
+      [SYNC_SPACE_CONFIG_KEY]: repoId,
+    })
+    const r = resolveSpace(store, {})
+    expect(r.spaceId).toBe(repoId)
+    expect(r.aliasOfStoredSpace).toBe(true)
+    expect(r.legacySpaceId).toBeNull()
+    expect(r.wrote).toEqual({})
+  })
+
+  test("a corrupt stored binding is ignored: the default space is used", () => {
     const { store } = fakeStore({ [SYNC_BINDING_CONFIG_KEY]: "garbage" })
-    const r = resolveSpace(store, { randomHex: () => "f".repeat(32) })
-    expect(r.bindingKey).toBe(`local:${"f".repeat(32)}`)
-    expect(store.get(SYNC_BINDING_CONFIG_KEY)).toBe(r.bindingKey)
+    const r = resolveSpace(store, {})
+    expect(r.bindingKey).toBe(ACCOUNT_DEFAULT_BINDING)
+    expect(r.legacySpaceId).toBeNull()
   })
 
   test("omo.sync.space is sticky when the remote URL changes", () => {
@@ -192,21 +224,43 @@ describe("resolveSpaceInRepo / git-backed config", () => {
     expect(second.aliasOfStoredSpace).toBe(true)
   })
 
-  test("a remote-less repo mints and persists a local: binding", () => {
-    const dir = tmpRepo()
-    const first = resolveSpaceInRepo(dir, {})
-    expect(first.bindingKey).toMatch(/^local:[0-9a-f]{32}$/)
-    expect(git(dir, ["config", "--local", "--get", "omo.sync.binding"]).trim()).toBe(first.bindingKey)
-    expect(resolveSpaceInRepo(dir, {}).bindingKey).toBe(first.bindingKey)
+  test("two remote-less repos resolve to one space and write no binding", () => {
+    const a = tmpRepo()
+    const b = tmpRepo()
+    const ra = resolveSpaceInRepo(a, {})
+    expect(ra.bindingKey).toBe(ACCOUNT_DEFAULT_BINDING)
+    expect(resolveSpaceInRepo(b, {}).spaceId).toBe(ra.spaceId)
+    expect(Bun.spawnSync(["git", "-C", a, "config", "--local", "--get", "omo.sync.binding"]).exitCode).toBe(1)
+    expect(git(a, ["config", "--local", "--get", "omo.sync.space"]).trim()).toBe(ra.spaceId)
   })
 
-  test("a malformed remote falls back to a persistent local binding", () => {
+  test("a malformed remote falls back to the default space", () => {
     const dir = tmpRepo()
     git(dir, ["remote", "add", "origin", "https://[bad"])
-    const first = resolveSpaceInRepo(dir, { randomHex: () => "a".repeat(32) })
-    expect(first.bindingKey).toBe(`local:${"a".repeat(32)}`)
-    const second = resolveSpaceInRepo(dir, {})
-    expect(second.bindingKey).toBe(first.bindingKey)
-    expect(second.wrote).toEqual({})
+    expect(resolveSpaceInRepo(dir, {}).bindingKey).toBe(ACCOUNT_DEFAULT_BINDING)
+  })
+
+  test("an inherited GIT_DIR / GIT_WORK_TREE pair cannot point the space read, write or remote list at another repository (#12354)", () => {
+    const foreign = tmpRepo()
+    git(foreign, ["remote", "add", "origin", "git@github.com:foreign/elsewhere.git"])
+    git(foreign, ["config", "--local", "omo.sync.space", "f".repeat(64)])
+    const dir = tmpRepo()
+    git(dir, ["remote", "add", "origin", "git@github.com:a/b.git"])
+    // The pair must be in the environment the process started with: that is what a host exports, and
+    // what a git child inherits when no env is passed.
+    const child = Bun.spawnSync(
+      [
+        process.execPath,
+        "-e",
+        `const { resolveSpaceInRepo } = await import(${JSON.stringify(join(import.meta.dir, "space.ts"))}); console.log(JSON.stringify(resolveSpaceInRepo(${JSON.stringify(dir)}, {})))`,
+      ],
+      { env: { ...process.env, GIT_DIR: join(foreign, ".git"), GIT_WORK_TREE: foreign } },
+    )
+    expect(child.stderr.toString()).toBe("")
+    const resolved: unknown = JSON.parse(child.stdout.toString())
+    expect(resolved).toMatchObject({ bindingKey: "repo:github.com/a/b", wrote: { space: expect.any(String) } })
+    const stored = git(dir, ["config", "--local", "--get", "omo.sync.space"]).trim()
+    expect(resolved).toMatchObject({ spaceId: stored })
+    expect(git(foreign, ["config", "--local", "--get", "omo.sync.space"]).trim()).toBe("f".repeat(64))
   })
 })

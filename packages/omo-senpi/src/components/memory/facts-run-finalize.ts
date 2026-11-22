@@ -9,6 +9,7 @@ import { join } from "node:path"
 import {
   findFactsBatchReceipt,
   parseAgreementRecordsJsonl,
+  validateAgreementSource,
   parseFactsExtractionJsonl,
   type AgreementExtractionRecord,
   MemorySecretError,
@@ -70,6 +71,7 @@ export async function finalizeClaimedFactsRun(input: FinalizeClaimedFactsRunInpu
   try {
     records = parseFactsExtractionJsonl(await readFile(join(runDir, "extraction.jsonl"), "utf8"))
     agreements = parseAgreementRecordsJsonl(await readOptional(join(runDir, FACTS_AGREEMENTS_FILENAME)))
+    for (const [index, record] of agreements.entries()) validateAgreementSource(record, payload, index)
   } catch (error) {
     await fail("invalid_extraction", describe(error))
     return { status: "failed", runId }

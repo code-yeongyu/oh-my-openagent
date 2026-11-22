@@ -17,7 +17,16 @@ import {
 
 function uiSpy() {
   const calls: Array<{ key: string; text: string | undefined }> = []
-  return { calls, ctx: { ui: { setStatus: (key: string, text: string | undefined) => { calls.push({ key, text }) } } } }
+  return {
+    calls,
+    ctx: {
+      ui: {
+        setStatus: (key: string, text: string | undefined) => {
+          calls.push({ key, text })
+        },
+      },
+    },
+  }
 }
 
 const packageDirs: string[] = []
@@ -70,7 +79,10 @@ describe("createNativeBadgeStatus", () => {
 
 describe("resolveNativeBadgeText", () => {
   test("#given an omob runtime whose package.json carries the dev build stamp #then the badge shows the coffee cup", () => {
-    const dir = runtimePackageDir({ version: "0.0.0-omob.412e7fd.abcdc6d", omoBuild: { command: "omob", omo: {}, engine: {} } })
+    const dir = runtimePackageDir({
+      version: "0.0.0-omob.412e7fd.abcdc6d",
+      omoBuild: { command: "omob", omo: {}, engine: {} },
+    })
     expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: dir })).toBe("(☕ OmO Native by Q Kim)")
     expect(NATIVE_BADGE_DEV_BUILD_TEXT).toBe("(☕ OmO Native by Q Kim)")
   })
@@ -82,8 +94,12 @@ describe("resolveNativeBadgeText", () => {
 
   test("#given no runtime package dir, a missing manifest, or a malformed stamp #then the badge falls back to the cat", () => {
     expect(resolveNativeBadgeText({})).toBe(NATIVE_BADGE_TEXT)
-    expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: join(tmpdir(), "omo-native-badge-absent") })).toBe(NATIVE_BADGE_TEXT)
-    expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: runtimePackageDir({ omoBuild: { command: "" } }) })).toBe(NATIVE_BADGE_TEXT)
+    expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: join(tmpdir(), "omo-native-badge-absent") })).toBe(
+      NATIVE_BADGE_TEXT,
+    )
+    expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: runtimePackageDir({ omoBuild: { command: "" } }) })).toBe(
+      NATIVE_BADGE_TEXT,
+    )
     expect(resolveNativeBadgeText({ OMO_PACKAGE_DIR: runtimePackageDir({ omoBuild: "omob" }) })).toBe(NATIVE_BADGE_TEXT)
   })
 })

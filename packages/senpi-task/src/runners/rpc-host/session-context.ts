@@ -30,6 +30,7 @@ export function buildChildContext(spec: ChildContextSpec): ChildSessionContext {
     state_dir: spec.state_dir,
     ...(spec.depth === undefined ? {} : { depth: String(spec.depth) }),
     ...(spec.root_session_id === undefined ? {} : { root_session_id: spec.root_session_id }),
+    ...(spec.traceparent === undefined ? {} : { traceparent: spec.traceparent }),
   }
 
   if (spec.memberEnv !== undefined) {
@@ -108,12 +109,7 @@ function isDagOwnedChild(spec: RpcSpawnSpec): boolean {
  *
  * Format: <stateDir>/sessions/<taskId>/<YYYY-MM-DDTHH-MM-SS.sssZ>_<uuid>.jsonl
  */
-export function resolveChildSessionPath(
-  stateDir: string,
-  taskId: string,
-  now: Date,
-  uuid: string,
-): string {
+export function resolveChildSessionPath(stateDir: string, taskId: string, now: Date, uuid: string): string {
   // Windows has no legal filename containing ":", so the time part uses "-" and the
   // stamp stays lexicographically sortable.
   const stamp = now.toISOString().replaceAll(":", "-")

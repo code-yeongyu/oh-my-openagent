@@ -11,6 +11,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildIdentityPaths, type MemoryIdentity } from "../identity"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 import { exitedWithin, probeUntil } from "../locks/process-liveness.test-support"
 
 export const TEARDOWN_GRACE_MS = 2_000
@@ -45,11 +46,21 @@ export class ChildHarness {
   private stdoutBuffer = ""
   private closed = false
 
-  constructor(liveChildren: Set<ChildProcessWithoutNullStreams>, script: string, args: readonly string[], extraEnv?: Readonly<Record<string, string>>) {
-    this.child = spawn(process.execPath, [script, ...args], { stdio: ["pipe", "pipe", "pipe"], ...(extraEnv === undefined ? {} : { env: { ...process.env, ...extraEnv } }) })
+  constructor(
+    liveChildren: Set<ChildProcessWithoutNullStreams>,
+    script: string,
+    args: readonly string[],
+    extraEnv?: Readonly<Record<string, string>>,
+  ) {
+    this.child = spawn(process.execPath, [script, ...args], {
+      stdio: ["pipe", "pipe", "pipe"],
+      ...(extraEnv === undefined ? {} : { env: { ...process.env, ...extraEnv } }),
+    })
     liveChildren.add(this.child)
     this.child.stderr.setEncoding("utf8")
-    this.child.stderr.on("data", (chunk: string) => { this.stderr += chunk })
+    this.child.stderr.on("data", (chunk: string) => {
+      this.stderr += chunk
+    })
     this.child.stdout.setEncoding("utf8")
     this.child.stdout.on("data", (chunk: string) => this.acceptOutput(chunk))
     this.exit = new Promise((resolve) => {
@@ -156,8 +167,12 @@ export async function assertRepoIntegrity(repoPath: string, allowedDebris: reado
 }
 
 export async function assertLinearCommits(identity: MemoryIdentity, expectedCount: number): Promise<void> {
-  expect(Number.parseInt((await git(identity.paths.repo, ["rev-list", "--count", "HEAD"])).trim(), 10)).toBe(expectedCount)
-  expect(Number.parseInt((await git(identity.paths.repo, ["rev-list", "--count", "--merges", "HEAD"])).trim(), 10)).toBe(0)
+  expect(Number.parseInt((await git(identity.paths.repo, ["rev-list", "--count", "HEAD"])).trim(), 10)).toBe(
+    expectedCount,
+  )
+  expect(
+    Number.parseInt((await git(identity.paths.repo, ["rev-list", "--count", "--merges", "HEAD"])).trim(), 10),
+  ).toBe(0)
   await assertRepoIntegrity(identity.paths.repo)
 }
 
@@ -165,18 +180,25 @@ export async function assertLinearCommits(identity: MemoryIdentity, expectedCoun
 // for Windows to release a just-exited child's handles lives here: bounded, loud when they never go.
 async function removeFixtureRoot(directory: string): Promise<void> {
   let lastError: unknown
-  const removed = await probeUntil(async () => {
-    try {
-      await rm(directory, { recursive: true, force: true })
-      return true
-    } catch (error) {
-      const code = error instanceof Error && "code" in error ? error.code : undefined
-      if (code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") throw error
-      lastError = error
-      return false
-    }
-  }, FIXTURE_REMOVAL_BOUND_MS, 200)
-  if (!removed) throw new Error(`fixture root ${directory} still busy after ${String(FIXTURE_REMOVAL_BOUND_MS)}ms`, { cause: lastError })
+  const removed = await probeUntil(
+    async () => {
+      try {
+        await rm(directory, { recursive: true, force: true })
+        return true
+      } catch (error) {
+        const code = error instanceof Error && "code" in error ? error.code : undefined
+        if (code !== "EBUSY" && code !== "EPERM" && code !== "ENOTEMPTY") throw error
+        lastError = error
+        return false
+      }
+    },
+    FIXTURE_REMOVAL_BOUND_MS,
+    200,
+  )
+  if (!removed)
+    throw new Error(`fixture root ${directory} still busy after ${String(FIXTURE_REMOVAL_BOUND_MS)}ms`, {
+      cause: lastError,
+    })
 }
 
 export function createConcurrencyKit(): ConcurrencyKit {
@@ -193,6 +215,7 @@ export function createConcurrencyKit(): ConcurrencyKit {
     }
     await mkdir(identity.paths.repo, { recursive: true })
     await git(identity.paths.repo, ["init", "-b", "main"])
+    disableFixtureAutoMaintenance(identity.paths.repo)
     await git(identity.paths.repo, ["config", "commit.gpgsign", "false"])
     const contentionPath = join(root, "contention-attempts.log")
     await writeFile(contentionPath, "")

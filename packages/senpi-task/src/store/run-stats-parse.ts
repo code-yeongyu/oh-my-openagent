@@ -69,6 +69,7 @@ function readCostStatus(record: Record<string, unknown>): CostReportStatus | und
   if (status === undefined) return undefined
   switch (status) {
     case "reported":
+    case "partial":
     case "unavailable":
     case "invalid":
       return status
@@ -89,4 +90,3 @@ function readDurationStatus(record: Record<string, unknown>): DurationSourceStat
       throw new Error(`run_stats.duration_status must be one of ${DURATION_SOURCE_STATUSES.join(", ")}`)
   }
 }
-

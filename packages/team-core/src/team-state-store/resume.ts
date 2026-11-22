@@ -13,10 +13,7 @@ export type { ResumeReport } from "./resume-report"
 const CREATING_TIMEOUT_MS = 30 * 60 * 1000
 const STALE_RESERVATION_TTL_MS = 10 * 60 * 1000
 
-export async function resumeAllTeams(
-  ctx: TeamSessionContext,
-  config: TeamModeConfig,
-): Promise<ResumeReport> {
+export async function resumeAllTeams(ctx: TeamSessionContext, config: TeamModeConfig): Promise<ResumeReport> {
   const report: ResumeReport = {
     resumed: 0,
     marked_failed: 0,

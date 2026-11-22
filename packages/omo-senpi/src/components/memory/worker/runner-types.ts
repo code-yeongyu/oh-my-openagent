@@ -29,7 +29,11 @@ export interface ReflectionReservationPort {
     runId: string,
     outcome: ReflectionOutcome,
     options?: ReflectionReservationCompleteOptions,
-  ): Promise<{ readonly outcome: ReflectionOutcome; readonly launch?: ReservedRun; readonly park?: ReflectionParkTransition }>
+  ): Promise<{
+    readonly outcome: ReflectionOutcome
+    readonly launch?: ReservedRun
+    readonly park?: ReflectionParkTransition
+  }>
 }
 
 export interface ReflectionRunResult {
@@ -48,6 +52,7 @@ export interface ReflectionRunner {
 
 export interface SenpiSubprocessRunnerOptions {
   readonly identity: MemoryIdentity
+  readonly memoryRoot?: string
   readonly reservation: ReflectionReservationPort
   readonly logger?: ComponentLogger
   readonly resolveModelRegistry: () => SenpiModelRegistryPort<SenpiModelPort> | undefined

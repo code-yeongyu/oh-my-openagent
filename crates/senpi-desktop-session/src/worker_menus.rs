@@ -43,6 +43,7 @@ impl Worker {
         let delivery = DeliveryMode::parse(params.delivery_mode.as_deref());
         let mutation = Mutation::new(MutatingAction::MenuSelect, params.window_id.clone(), delivery);
         let supervisor = self.safety.supervisor.clone();
+        let policy = self.stop_policy();
         self.mutate(&mutation, cancelled, |worker| {
             validate_path(&params.path, false)?;
             let window = worker.window(&Target::Window(params.window_id.clone()))?;
@@ -54,6 +55,8 @@ impl Worker {
                         ErrorCode::Suspended,
                         "input was suspended during the menu walk",
                     ))
+                } else if let Some(stopped) = crate::mutate::interruption(&supervisor, &policy) {
+                    Err(stopped)
                 } else if is_cancelled {
                     Err(DesktopError::new(
                         ErrorCode::Cancelled,

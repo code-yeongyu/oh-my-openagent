@@ -6,13 +6,20 @@ import { afterEach, expect, test } from "bun:test"
 import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 let harness: GatewayHarness | undefined
-afterEach(async () => { await harness?.dispose(); harness = undefined })
+afterEach(async () => {
+  await harness?.dispose()
+  harness = undefined
+})
 
 const BINDING_ROW = (id: string, platform: string, seq?: number) =>
   `INSERT INTO bindings (${seq === undefined ? "" : "seq, "}binding_id, revision, status, platform, account_id, chat_id, thread_id, session_realm_id, session_durable_id, direction_inbound, direction_outbound, inbound_mode, outbound_events, policy_id, created_at, updated_at, lease_started_at)
    VALUES (${seq === undefined ? "" : `${seq}, `}'${id}', 1, 'active', '${platform}', 'acct', 'c1', 't1', 'realm', 'S-${id}', 1, 1, 'auto', '[]', 'default', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`
+
+/** Schema v6: the version right before the v7 bindings rebuild. Pinned, not `length - 1`, because later migrations append after v7. */
+const V6 = 6
 
 /** A real v6 store: the v1..v6 migrations applied to a fresh DB, with one binding whose newest row is then deleted. */
 function v6Fixture(path: string, extra: readonly string[]): void {
@@ -20,7 +27,7 @@ function v6Fixture(path: string, extra: readonly string[]): void {
   const db = new Database(path)
   db.exec("PRAGMA foreign_keys = ON")
   db.exec("BEGIN")
-  const v6 = GATEWAY_MIGRATIONS.slice(0, -1)
+  const v6 = GATEWAY_MIGRATIONS.slice(0, V6)
   for (const step of v6) for (const statement of step) db.exec(statement)
   db.exec(`PRAGMA user_version = ${v6.length}`)
   db.exec("COMMIT")
@@ -47,12 +54,22 @@ function snapshot(path: string) {
     return {
       version: (db.query("PRAGMA user_version").get() as { user_version: number }).user_version,
       rows: db.query("SELECT binding_id, platform FROM bindings ORDER BY seq").all(),
-      sequence: (db.query("SELECT seq FROM sqlite_sequence WHERE name = 'bindings'").get() as { seq: number } | null)?.seq ?? null,
-      hasWhatsapp: ((db.query("SELECT sql FROM sqlite_schema WHERE name = 'bindings'").get() as { sql: string }).sql ?? "").includes("'whatsapp'"),
-      indexes: db.query("SELECT name FROM sqlite_master WHERE type='index' AND name IN ('bindings_one_active_thread','bindings_session') ORDER BY name").all(),
+      sequence:
+        (db.query("SELECT seq FROM sqlite_sequence WHERE name = 'bindings'").get() as { seq: number } | null)?.seq ??
+        null,
+      hasWhatsapp: (
+        (db.query("SELECT sql FROM sqlite_schema WHERE name = 'bindings'").get() as { sql: string }).sql ?? ""
+      ).includes("'whatsapp'"),
+      indexes: db
+        .query(
+          "SELECT name FROM sqlite_master WHERE type='index' AND name IN ('bindings_one_active_thread','bindings_session') ORDER BY name",
+        )
+        .all(),
       integrity: (db.query("PRAGMA foreign_key_check").all() as unknown[]).length,
     }
-  } finally { db.close() }
+  } finally {
+    db.close()
+  }
 }
 
 test("#given a real v6 store with a deleted newest binding #when migrated to v7 #then rows, indexes and the AUTOINCREMENT high-water survive, and whatsapp binds", async () => {
@@ -82,9 +99,16 @@ test("#given an extension table referencing bindings ON DELETE CASCADE #when mig
   await openAndMigrate(h)
   const db = new Database(path)
   try {
-    expect(db.query("SELECT * FROM alpha_refs ORDER BY id").all()).toEqual([{ id: 1, binding_seq: 1 }, { id: 2, binding_seq: 1 }])
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length)
-  } finally { db.close() }
+    expect(db.query("SELECT * FROM alpha_refs ORDER BY id").all()).toEqual([
+      { id: 1, binding_seq: 1 },
+      { id: 2, binding_seq: 1 },
+    ])
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      GATEWAY_MIGRATIONS.length,
+    )
+  } finally {
+    db.close()
+  }
 })
 
 test("#given an extension table with a plain REFERENCES to bindings #when migrated to v7 #then the store still opens and the rows survive", async () => {
@@ -98,8 +122,12 @@ test("#given an extension table with a plain REFERENCES to bindings #when migrat
   const db = new Database(path)
   try {
     expect(db.query("SELECT * FROM alpha_refs").all()).toEqual([{ id: 1, binding_seq: 1 }])
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length)
-  } finally { db.close() }
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      GATEWAY_MIGRATIONS.length,
+    )
+  } finally {
+    db.close()
+  }
 })
 
 test("#given an extension row orphaned on bindings (a pre-existing violation) #when migrated #then foreign_key_check rolls back to v6 with a clear error", async () => {
@@ -116,9 +144,19 @@ test("#given an extension row orphaned on bindings (a pre-existing violation) #w
   // that close (not just the error) so the reopen below never races the worker's teardown.
   const closed = new Promise<void>((resolve, reject) => {
     const off = store.onEvent((event) => {
-      if (event.kind === "store_closed") { off(); resolve() }
+      if (event.kind === "store_closed") {
+        off()
+        resolve()
+      }
     })
-    setTimeout(() => { off(); reject(new Error("waited for the worker to close the failed migration's database; store_closed never fired")) }, 15000).unref?.()
+    setTimeout(() => {
+      off()
+      reject(
+        new Error(
+          "waited for the worker to close the failed migration's database; store_closed never fired within the test budget",
+        ),
+      )
+    }, remainingTestTime()).unref?.()
   })
   let error: unknown
   try {
@@ -134,9 +172,11 @@ test("#given an extension row orphaned on bindings (a pre-existing violation) #w
   const db = new Database(path)
   db.exec("PRAGMA busy_timeout = 0")
   try {
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length - 1)
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(V6)
     expect(db.query("SELECT * FROM alpha_refs").all()).toEqual([{ id: 1, binding_seq: 99 }])
-  } finally { db.close() }
+  } finally {
+    db.close()
+  }
 })
 
 test("#given a v6 store whose extension already holds an orphaned row not on bindings #when migrated #then the pre-existing orphan does not block the upgrade", async () => {
@@ -153,6 +193,10 @@ test("#given a v6 store whose extension already holds an orphaned row not on bin
   await openAndMigrate(h)
   const db = new Database(path)
   try {
-    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(GATEWAY_MIGRATIONS.length)
-  } finally { db.close() }
+    expect((db.query("PRAGMA user_version").get() as { user_version: number }).user_version).toBe(
+      GATEWAY_MIGRATIONS.length,
+    )
+  } finally {
+    db.close()
+  }
 })

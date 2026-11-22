@@ -9,15 +9,18 @@ import { newestSessionPath } from "./session-path"
 import type { DetachedRevivalResult, DetachedRevivalRollbackResult } from "./port"
 
 /** Roll back only the claim or running epoch owned by this cold revival. */
-export function rollbackDetachedRevival(
-  context: LifecycleContext,
-  prior: TaskRecord,
-): DetachedRevivalRollbackResult {
+export function rollbackDetachedRevival(context: LifecycleContext, prior: TaskRecord): DetachedRevivalRollbackResult {
   let rolledBack = false
   context.store.mutate(prior.task_id, (fresh) => {
     const claimed = fresh.status === prior.status && fresh.notification.run_epoch === prior.notification.run_epoch
     const running = fresh.status === "running" && fresh.notification.run_epoch === nextRunEpoch(prior)
-    if (fresh.host_pid !== context.hostPid || fresh.residency_state !== "resident" || fresh.killed === true || (!claimed && !running)) return fresh
+    if (
+      fresh.host_pid !== context.hostPid ||
+      fresh.residency_state !== "resident" ||
+      fresh.killed === true ||
+      (!claimed && !running)
+    )
+      return fresh
     rolledBack = true
     const {
       host_pid: _hostPid,
@@ -27,6 +30,7 @@ export function rollbackDetachedRevival(
       interrupt_cause: _freshInterruptCause,
       failure_reason: _freshFailureReason,
       run_stats: _freshStats,
+      prior_runs_cost_usd: _freshPriorRunsCost,
       killed: _freshKilled,
       terminal_at: _freshTerminalAt,
       revive_delivery_uncertain: _freshUncertain,
@@ -41,6 +45,8 @@ export function rollbackDetachedRevival(
       ...(prior.failure_kind === undefined ? {} : { failure_kind: prior.failure_kind }),
       ...(prior.failure_reason === undefined ? {} : { failure_reason: prior.failure_reason }),
       ...(prior.run_stats === undefined ? {} : { run_stats: prior.run_stats }),
+      // The undone revive folded prior.run_stats into this figure; the restored run_stats must not count twice.
+      ...(prior.prior_runs_cost_usd === undefined ? {} : { prior_runs_cost_usd: prior.prior_runs_cost_usd }),
       ...(prior.killed === undefined ? {} : { killed: prior.killed }),
       ...(prior.terminal_at === undefined ? {} : { terminal_at: prior.terminal_at }),
       // The epoch and the run it starts move together: restoring one without the other leaves every handle stale.
@@ -60,7 +66,8 @@ export async function reviveDetachedTerminal(
   taskId: string,
 ): Promise<DetachedRevivalResult> {
   const observed = context.store.load(taskId)
-  if (observed === null || !isColdRevivalCandidate(observed)) return { ok: false, reason: "task is not a continuable parked child" }
+  if (observed === null || !isColdRevivalCandidate(observed))
+    return { ok: false, reason: "task is not a continuable parked child" }
   if (observed.isolation !== undefined) return refused("isolated_not_revivable")
   if (observed.host_pid !== undefined && observed.host_pid !== context.hostPid) return refused("foreign_owner")
   const sessionPath = newestSessionPath(context, taskId)
@@ -70,28 +77,46 @@ export async function reviveDetachedTerminal(
     return { ok: false, reason: "persisted spawn spec unavailable" }
   }
   try {
-    if (!statSync(spec.cwd).isDirectory()) return { ok: false, code: "cwd_unavailable", reason: "recorded cwd is not a directory" }
+    if (!statSync(spec.cwd).isDirectory())
+      return { ok: false, code: "cwd_unavailable", reason: "recorded cwd is not a directory" }
     accessSync(spec.cwd, constants.R_OK | constants.X_OK)
   } catch (error) {
     return { ok: false, code: "cwd_unavailable", reason: error instanceof Error ? error.message : String(error) }
   }
   if (!checkReviveGeneration(observed, context.revivePolicy)) {
-    return { ok: false, code: "config_generation_mismatch", reason: "recorded config generation differs from current generation" }
+    return {
+      ok: false,
+      code: "config_generation_mismatch",
+      reason: "recorded config generation differs from current generation",
+    }
   }
   // Try once: callers receive explicit contention rather than a timed retry loop.
-  const acquired = await acquireSessionAdmissionLease(context.store.stateDir, observed.parent_session_id, { acquireTimeoutMs: 0 })
+  const acquired = await acquireSessionAdmissionLease(context.store.stateDir, observed.parent_session_id, {
+    acquireTimeoutMs: 0,
+  })
   if (acquired.kind === "contended") return refused("lock_contended")
   try {
     if (!acquired.lease.isOwner()) return refused("lease_lost")
     const limit = context.config.residency_max_children
-    const residents = context.store.list().records.filter((record) => record.parent_session_id === observed.parent_session_id && record.residency_state === "resident").length
+    const residents = context.store
+      .list()
+      .records.filter(
+        (record) => record.parent_session_id === observed.parent_session_id && record.residency_state === "resident",
+      ).length
     if (limit !== "unlimited" && limit !== 0 && residents >= limit) return refused("residency_capacity")
-    const claimed = claimResidencySlot(context, taskId, (fresh) =>
-      isColdRevivalCandidate(fresh) && fresh.host_pid === observed.host_pid &&
-      fresh.updated_at === observed.updated_at && fresh.notification.run_epoch === observed.notification.run_epoch,
+    const claimed = claimResidencySlot(
+      context,
+      taskId,
+      (fresh) =>
+        isColdRevivalCandidate(fresh) &&
+        fresh.host_pid === observed.host_pid &&
+        fresh.updated_at === observed.updated_at &&
+        fresh.notification.run_epoch === observed.notification.run_epoch,
     )
     if (claimed !== "claimed") return refused("ownership_changed")
-  } finally { acquired.lease.release() }
+  } finally {
+    acquired.lease.release()
+  }
   const fresh = context.store.load(taskId)
   if (fresh === null) return refused("record_disappeared")
   const residency = observed.execution_mode === "in-process" ? "persisted_only" : "rpc_detached"

@@ -14,33 +14,33 @@ One library, two engines. omowright ships inside this skill; choose the engine b
 | A 403/WAF host the attached engine cannot open, a platform with a native reader, an archive snapshot | neither | the `ultimate-browsing` skill |
 
 **Attached is the default,** because it is the only engine carrying the user's logins and the only
-one where a human is a single call away. Never substitute one engine for the other silently: if
+one where a human is a single call away. It works in an Agent Window inside the user's own browser profile, never in
+a copy of that profile, and exists only where the user installed and enabled the BrowserSkill extension. Never substitute one engine for the other silently: if
 the attached engine is not set up, run the onboarding script and tell the user its one remaining
 step.
 
-## Step 0 — which engine this session is allowed to use
+## Step 0 — inside OmO Desktop: everything above, plus the app's built-in browser
 
-When `OMO_BROWSER_ENGINE` is set (the OmO desktop app sets it for every session), it wins over the table above:
+When `OMO_BROWSER_ENGINE` is set (the OmO desktop app sets it for every session), everything above works exactly
+as in the terminal: `connectBrowserSkill()` for the user's own browser, `connectPipe()` / `connectCloakProfile()` /
+`connect()` for a browser of your own, with the same table to choose between them. The app adds one more option:
 
-| Value | What you do |
-|---|---|
-| `connected` | Use `connectBrowserSkill()` only. If the user's browser is not connected you get a "Connect your browser" error: relay it and stop. Never open another browser |
-| `builtin` | Do not call `connectBrowserSkill()`; use the app's in-app browser tools |
-| `none` | Do not do browser work. Say that agent browser access is off for this project |
-| unset | The table above, as before (terminal use) |
+| Option | What it is | Use it when |
+|---|---|---|
+| `connectBuiltinBrowser()` | OmO's built-in browser for this thread: the tab the user sees beside the chat, which they can watch, take over and share | the user should see the page while you work, the task is QA of something in the app, or a sign-in the user should do themselves in a visible tab |
 
-While any engine is set, `loadOmowright()` returns a guarded library. The owned engine (`connectPipe`,
-`connectCloakProfile`, `connect`) and every other export that acts on a browser is refused, so the table above
-does not apply: do not look for a way around it, and tell the user what the session allows. Under `connected`
-the app sees what the browser is doing, and before a click, Enter or script that sends, posts, pays, orders,
-subscribes, deletes or closes an account, and before Enter in a message box, it asks the user first. A "No" fails the action with
-`BrowserActionDeclinedError`: report that, never retry it or go around it (`session.tool()` lets only reads
-through; `evaluate` is guarded too). If the user presses Stop, the next call throws `BrowserUserStoppedError`: tell
-the user browser use was stopped and start no new session this turn.
+```js
+const browser = await omowright.connectBuiltinBrowser()
+const [tab] = await browser.listTargets()
+const page = await browser.attachPage(tab.id)
+await page.goto(url)
+```
 
-The guard prevents mistakes by a cooperating agent. It is not a security boundary: code that imports the raw
-entry (`resolveOmowrightEntry()`) is not guarded, and a host without the `omo_browser_bridge` tool cannot show state or
-honor Stop, though questions are still asked.
+It is an OmOWright connection like `connect()`. Work in few calls: take `page.snapshot()` once, act on its refs,
+and chain several actions in one eval cell (`page.locator(ref).fill()`, `.click()`, `.selectOption(value)`,
+`.setInputFiles(path)`), snapshotting again only after the page changed. It has one tab: navigate it rather than
+opening new ones. `BuiltinBrowserUnavailableError` permits another engine only for `unavailable`, `timeout`, or
+`invalid_grant`. For `user_stopped` or any other app refusal, stop browser work and report it; do not open another browser.
 
 ## Step 1 — load omowright and prove the stack
 
@@ -59,6 +59,7 @@ node "<skill-root>/scripts/browser-doctor.mjs" --json
 | `no-cli` / `no-daemon` / `no-extension` | something is missing | `node "<skill-root>/scripts/browser-install.mjs" [--browser=<id>]` prepares everything it can for **the browser the user uses**, then prints the **single** step only the user can do (relaunch that browser and click **Enable**); relay it verbatim, wait, re-run the doctor |
 | `choose-browser` | the signals do not single out one browser (Safari/Firefox default, an idle default while another browser runs, several in use) | nothing was installed; take the browser from memory or ask the user, then `browser-install.mjs --browser=<id>` |
 | `no-browser-support` | no Chromium-family profile on this machine | say so and stop |
+| `outdated-extension` | the only connected extension is BrowserSkill 0.4.0, which leaves a "BrowserSkill" tab group in the user's browser after every task | start no session; relay the doctor's remedy (update the extension to 0.4.1 or later, delete saved "BrowserSkill" groups by hand), then re-run the doctor |
 
 **Install into the browser the user actually uses, never into whatever happens to be on disk.** Before
 installing, check your memory for the user's browser; otherwise read the doctor's `browser` (picked
@@ -74,14 +75,15 @@ you hit and ask.
 
 ```js
 const session = await omowright.connectBrowserSkill({ name: "<task>", focused: false })
+const sync = async () => (await session.cooperate("sync")).context_id                      // one context per page action
 try {
-  await session.navigate("https://example.com/", { waitUntil: "load" })
-  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true })  // OmOWright tree + refs, no trace in the page
-  await session.click({ selector: css.e3 })                                                 // css[ref] is null inside shadow roots:
+  await session.navigate("https://example.com/", { waitUntil: "load", context: await sync() })
+  const { tree, refs, css } = await omowright.bskSnapshot(session, { interactive: true, context: await sync() })  // OmOWright tree + refs, no trace in the page
+  await session.click({ selector: css.e3 }, { context: await sync() })                      // css[ref] is null inside shadow roots:
   const vom = await session.observe({ maxTokens: 4000 })                                    //   then read the daemon's own tree ...
-  await session.click("@e7")                                                                //   ... and click its @eN ref
-  await session.fill(css.e5, "hello")
-  await session.press("Enter")
+  await session.click("@e7", { context: await sync() })                                     //   ... and click its @eN ref
+  await session.fill(css.e5, "hello", { context: await sync() })
+  await session.press("Enter", { context: await sync() })
   await session.waitForNavigation({ waitUntil: "load" })
   const shot = await session.screenshot()                                                   // { buffer, width, height, captureId }
 } finally {
@@ -96,6 +98,20 @@ try {
 4. **Borrow a user tab explicitly** (`tabList({ scope: "user" })`, `tabBorrow(id)`, `tabReturn(id)`).
    Borrowing prompts the user; never invent tab ids and never repeat a denied borrow.
 5. **Always `stop()` the session,** on success and on failure.
+6. **Sync before every page action.** The person at the keyboard can work in the same tab, so
+   BrowserSkill 0.4 refuses an action (`permission_denied`, `data.reason: "cooperation_sync_required"`)
+   unless it carries `{ context }` from the latest `session.cooperate("sync")`. A context is good
+   for one action: sync, act with `{ context }`, sync again. Navigation, every input method,
+   `evaluate` (and so `bskSnapshot`), `tabClose`, `resize`, `emulate`, `observe({ probeHover })` and
+   `screenshot({ fullPage: true })` need it; plain reads (`observe`, `snapshot`, `getHtml`,
+   `screenshot()`, `console`, `network`, `waitForNavigation`) do not.
+7. **On `cooperation_sync_required`, wait for the person, then replan.** Call
+   `session.cooperate("wait", { timeoutMs: 25_000 })` until it reports `ready`, read the page again
+   and decide afresh; never replay the refused action blindly.
+8. **Pass only the options a method takes.** A gated action throws a `TypeError` on any other key
+   (a misspelt `contextId` would otherwise send no context). `bskSnapshot` and
+   `screenshot({ fullPage: true })` do not throw: they drop the stray key, and the daemon then
+   refuses the call with `cooperation_sync_required`.
 
 Every method, its options, and the failure codes are in [references/commands.md](references/commands.md).
 
@@ -118,9 +134,8 @@ changing the extension's automation settings.
   out everywhere. No flow here needs it.
 - **`focused: false` by default.** The browser belongs to someone who is probably using it.
 - **One short, named session per task,** always stopped.
-- **Bot-scored or WAF targets go to the owned engine** (not while `OMO_BROWSER_ENGINE` is set: then say the site needs a browser the session does not allow). The attached engine's daemon enables console
-  capture on every tab it drives, which is a known automation signal; CloakBrowser through
-  `connectCloakProfile()` is the stealth path.
+- **Bot-scored or WAF targets never go through the attached engine** — route them to the `ultimate-browsing` skill, whose browser tier is the owned engine (`connectCloakProfile()`). The attached engine's daemon enables console
+  capture on every tab it drives, which is a known automation signal.
 
 ## Where the rest lives
 

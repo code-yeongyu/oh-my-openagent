@@ -5,8 +5,8 @@
 // turn at a clean idle boundary. Read-only command output never enters the model
 // context, but this command's whole purpose is to create a model turn.
 
-import type { SenpiExtensionAPI } from "../../../extension/types"
 import { requireIdentity, respond, type MemoryCommandContext, type MemoryCommandDeps } from "./types"
+import { LAZY_MEMORY_COMMANDS, type MemoryCommandPort } from "./metadata"
 
 export const REMEMBER_INSTRUCTION =
   "[MEMORY REQUEST] Persist this as long-term memory if appropriate. Use your memory tools: " +
@@ -14,10 +14,9 @@ export const REMEMBER_INSTRUCTION =
   "duplicates, match the existing formatting of the file, then briefly confirm what you " +
   "remembered and where you stored it."
 
-export function registerRememberCommand(pi: SenpiExtensionAPI, deps: MemoryCommandDeps): void {
+export function registerRememberCommand(pi: MemoryCommandPort, deps: MemoryCommandDeps): void {
   pi.registerCommand("remember", {
-    description: "Persist text to long-term memory via a memory-tool turn.",
-    argumentHint: "<text>",
+    ...LAZY_MEMORY_COMMANDS.remember,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")

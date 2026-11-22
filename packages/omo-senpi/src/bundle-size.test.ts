@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test"
-import { existsSync, statSync } from "node:fs"
+import { existsSync, readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import bundleBudget from "../bundle-budget.json"
 
 const packageRoot = fileURLToPath(new URL("..", import.meta.url))
 const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
@@ -141,7 +142,53 @@ const builtExtensionPath = join(packageRoot, "plugin", "extensions", "omo.js")
 // 1,490,000 is the measured need plus a 4,393-byte margin. #10902 (Fixes #10860) moves the memory slash commands and the
 // memory-sync device account into lazy sidecars: measured on this batch's head, omo.js 1,485,607 -> 1,439,434 B (-46,173),
 // so that PR sets this ceiling back to 1,450,000. The commands sidecar alone (-33,263) would leave it ~2.3 KB over.
-const BUDGET_BYTES = 1_490_000
+// Reset to 1,450,000 by #10860: eleven memory slash commands (/memory, /remember, /init, /recompile,
+// /memory-repository, /sleeptime, /reflect, /dream, /search, /facts, /agreements) keep synchronous registration
+// but load their handlers from the lazy #omo-memory-commands-runtime sidecar on first use, and memory sync's
+// device account (service-auth store and refresh) loads from #omo-device-account-runtime on the first sync
+// resolve. On the batch #2 head (e320d31ab1) build-extension.mjs (bun 1.4.3) measures 1,485,607 -> 1,439,434
+// bytes (-46,173): -33,386 from the commands sidecar, -12,787 from the device account sidecar.
+// Batch #3 (bundle train) adds more cars on top of #10860: measured omo.js on its regen head = 1,456,692 B, so the
+// ceiling is that measurement rounded up to the next 5,000 bytes (never below what is measured).
+// Batch #4 (bundle train, 9 cars: #10948 #10355 #10358 #10951 #10727 #10730 #10985 #10987 #10715) on top of batch #3:
+// dev (dfbeeec9bc) measures 1,457,603 B; the batch #4 regen head measures 1,461,838 B (+4,235) after the canonical
+// regen (two clean linux containers, node 24 + bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to
+// the next 5,000 bytes (never below what is measured).
+// To be reduced for #9915 (LSP slice, #10659): formatter.ts no longer imports the lsp-core root barrel, which
+// pulled lsp-core's whole in-process engine into omo.js although Senpi runs LSP only through the packaged daemon.
+// Measured in the canonical linux/amd64 container (bun 1.4.3) on three successive dev bases: -82,427, -82,471 and
+// -82,481 bytes. Batch #6 measures its regen head and sets the ceiling to that measurement rounded up to the next 5,000 bytes (the lead's standing rule).
+// Batch #6 (bundle train, 8 cars incl. #10659's LSP slice) on dev d127625784: dev measures 1,464,171 B; the batch #6
+// regen head measures 1,400,487 B (-63,684) after the canonical regen (two clean linux containers, node 24 + bun 1.4.3,
+// byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
+// Batch #8 (bundle train, 12 cars: #11111 #11114 #11118 #11115 #11121 #11122 #10533 #10716 #11007 #11086 #10712 #11084)
+// on dev 1a62c298d2: dev measures 1,404,729 B; the batch #8 regen head measures 1,406,000 B (+1,271) after the canonical
+// regen (two clean linux containers, node 24 + bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the
+// next 5,000 bytes (never below what is measured).
+// Batch #10 (bundle train, 4 cars: #11150 #10528 #11161 #11147) on dev bf748ed461: dev measures 1,407,569 B; the
+// batch #10 regen head measures 1,419,994 B (+12,425) after the canonical regen (two clean linux containers, node 24 +
+// bun 1.4.3, byte-identical). Ceiling = that measurement rounded up to the next 5,000 bytes (never below what is measured).
+// Batch #18 measured omo.js at 1,422,712 B with the telemetry lazy chunk; revisit this budget when a trim lands.
+// Batch #19 measured omo.js at 1,426,658 B (11 cars); budget = measured + 4 KiB (lead rule). Revisit when a trim lands.
+// Raised 1,476,000 -> 1,478,000 for the #13037 wake train (#13458): a fresh build at the W1 head 6dfefeea6c measures
+// 1,547,852 B (the committed artifact predates the train); splitting the session wake into the lazy
+// #omo-wake-runtime sidecar brings it to 1,476,860 B, so the ceiling covers the measured need with a
+// 1,140-byte margin instead of failing it by 860 bytes.
+// Train omo-5173 (#13627, 22 members) on dev 71cc3ecf70 (1,481,163 B): the train-top regen measures 1,485,337 B (+4,174);
+// budget = measured + 4 KiB (lead rule) = 1,489,433.
+// Remerged on dev 050c1879cb (dev ceiling 1,493,600): the regenerated train-top omo.js measures 1,497,747 B;
+// budget = measured + 4 KiB (lead rule) = 1,501,843.
+// Release train #14077 (senpi 2026.11.15-4, device-service 0.1.40, thread paging/wait/one-field) on dev fe95296518:
+// the regenerated train-top omo.js measures 1,505,934 B; budget = measured + 4 KiB (lead rule) = 1,510,030.
+// Train omotrain2-20261118 (#14141, 10 thread cars) on dev e79f804ce0 (1,506,330 B): the train-top regen measures
+// 1,515,915 B (+9,585; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,520,011.
+// A4 memory-sync train (#14097, 6 members) remerged on dev 9b94b6f3dd: the train-top regen measures 1,522,653 B
+// (linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,526,749.
+// Thread-sweep train (32 thread members) remerged on dev 5d290d8119 (dev ceiling 1,526,749): the train-top regen
+// measures 1,537,619 B (+10,870; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,541,715.
+// Thread train 4 (8 members) on dev abfb5be796 (dev omo.js 1,540,734 B, ceiling 1,541,715): the train-top regen
+// measures 1,541,622 B (+888; linux/amd64, node 24.22 + bun 1.4.4); budget = measured + 4 KiB (lead rule) = 1,545,718.
+const BUDGET_BYTES = bundleBudget.omoJsBytes
 
 describe("omo-senpi bundle size budget", () => {
   it("#given the built extension #when its byte size is measured #then it stays within the documented byte budget", () => {
@@ -150,5 +197,19 @@ describe("omo-senpi bundle size budget", () => {
     // A trip here means the bundle grew past budget: split, lazy-load, or trim a dependency.
     // Never raise this ceiling to the failing value.
     expect(bytes).toBeLessThanOrEqual(BUDGET_BYTES)
+  })
+})
+
+describe("omo-senpi bundle size budget has one source", () => {
+  it("#given the two omo.js size checks #when their limits are read #then both come from bundle-budget.json", () => {
+    // One number from one source (lead ruling, batch #20): the build-extension check must not carry its own byte literal.
+    const buildTest = readFileSync(join(packageRoot, "plugin", "scripts", "build-extension.test.mjs"), "utf8")
+    const mainCap = buildTest.match(/expect\(Buffer\.byteLength\(main\)\)\.toBeLessThanOrEqual\(([^)]*)\)/)
+    expect(mainCap, "build-extension.test.mjs must cap the main entry").not.toBeNull()
+    expect(mainCap?.[1]).toBe("bundleBudget.omoJsBytes")
+    expect(buildTest).toContain('from "../../bundle-budget.json"')
+    expect(readFileSync(join(packageRoot, "src", "bundle-size.test.ts"), "utf8")).toContain(
+      'from "../bundle-budget.json"',
+    )
   })
 })

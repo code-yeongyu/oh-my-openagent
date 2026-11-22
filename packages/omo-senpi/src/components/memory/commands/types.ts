@@ -47,6 +47,10 @@ export interface ManualReflectionRequest {
 export interface ReflectionRequestReceipt {
   readonly disposition: "reserved" | "pending"
   readonly runId: string
+  /** A dead run that held the reflection lock was settled, so this request runs next (#10377). */
+  readonly recoveredRunId?: string
+  /** The lock is held by a run whose liveness cannot be proven; shown with the next step (#10377). */
+  readonly stuck?: string
 }
 
 export interface ReflectionRequestSink {
@@ -100,6 +104,8 @@ export interface MemoryCommandDeps {
   /** Environment handed to command-spawned children; defaults to process.env. */
   env?: NodeJS.ProcessEnv
   now?(): number
+  /** `/doctor --fix`: runs the stale reflection-lock reaper for the session's identity and returns its report lines. */
+  reflectionLockFix?(sessionId: string, options: { readonly dryRun: boolean }): Promise<readonly string[]>
   /** Doctor stale-lock liveness probe; defaults to signal-0. */
   isProcessAlive?(pid: number): boolean
 }
@@ -127,10 +133,7 @@ export function identityForInit(deps: MemoryCommandDeps, ctx: MemoryCommandConte
   return identityFor(deps, ctx) ?? deps.resolveIdentity?.()
 }
 
-export function requireIdentity(
-  deps: MemoryCommandDeps,
-  ctx: MemoryCommandContext,
-): MemoryCommandIdentity | string {
+export function requireIdentity(deps: MemoryCommandDeps, ctx: MemoryCommandContext): MemoryCommandIdentity | string {
   const identity = identityFor(deps, ctx)
   if (identity !== undefined) return identity
   return "memory is not bound to this session; start a session with memory enabled and retry"

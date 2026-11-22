@@ -6,10 +6,7 @@ import { join, posix } from "node:path"
 import fixtureExpected from "./2026-08-reasoning-unification/fixture-expected.json"
 import fixtureInput from "./2026-08-reasoning-unification/fixture-input.json"
 import { createLegacyConfigMigrationPlans, executeLegacyConfigMigrationPlan } from "./index"
-import {
-  REASONING_UNIFICATION_MIGRATION_ID,
-  transformReasoningUnification,
-} from "./reasoning-unification"
+import { REASONING_UNIFICATION_MIGRATION_ID, transformReasoningUnification } from "./reasoning-unification"
 
 describe("2026-08 reasoning unification migration", () => {
   test("#given the canonical legacy fixture #when transformed #then rules one through eight match exact expected output", () => {
@@ -66,7 +63,10 @@ describe("2026-08 reasoning unification migration", () => {
         env: { HOME: homeDir },
         onBoundary: (boundary) => {
           if (boundary !== "journal-written") return
-          const journal = JSON.parse(readFileSync(join(homeDir, ".omo", ".migration-journal.json"), "utf-8")) as Record<string, unknown>
+          const journal = JSON.parse(readFileSync(join(homeDir, ".omo", ".migration-journal.json"), "utf-8")) as Record<
+            string,
+            unknown
+          >
           journalDiagnostics = journal["diagnostics"]
         },
       })

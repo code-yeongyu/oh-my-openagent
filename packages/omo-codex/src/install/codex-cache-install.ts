@@ -5,6 +5,7 @@ import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
 import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
+import { finalizeCachedPluginPayload } from "./codex-cache-payload"
 import { assertHookCommandTargets } from "./codex-hook-targets"
 import type { InstalledPlugin, RunCommand } from "./types"
 
@@ -51,6 +52,7 @@ export async function installCachedPlugin(input: {
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
+    await finalizeCachedPluginPayload(tempPath)
     await promoteDirectory(tempPath, targetPath, input.renameDirectory ?? rename)
     // Codex prefers a leftover "local" cache over every versioned install.
     const versions = await readdir(dirname(targetPath), { withFileTypes: true })
@@ -128,7 +130,11 @@ async function promoteDirectory(tempPath: string, targetPath: string, renameDire
   if (backupMoved) await rm(backupPath, { recursive: true, force: true })
 }
 
-async function restoreBackupDirectory(backupPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
+async function restoreBackupDirectory(
+  backupPath: string,
+  targetPath: string,
+  renameDirectory: RenameDirectory,
+): Promise<void> {
   if (!(await fileExistsStrict(backupPath))) return
   await rm(targetPath, { recursive: true, force: true })
   await renameDirectory(backupPath, targetPath)
@@ -163,7 +169,10 @@ async function assertNoRemovedSparkshellPromptReferences(pluginRoot: string): Pr
   }
 }
 
-async function listRemovedSparkshellPromptSurfaceFiles(pluginRoot: string, relativeDirectory: string): Promise<readonly string[]> {
+async function listRemovedSparkshellPromptSurfaceFiles(
+  pluginRoot: string,
+  relativeDirectory: string,
+): Promise<readonly string[]> {
   const directory = relativeDirectory === "" ? pluginRoot : join(pluginRoot, relativeDirectory)
   const entries = await readdir(directory, { withFileTypes: true })
   const files: string[] = []
@@ -201,7 +210,10 @@ function shouldCheckRemovedSparkshellPromptFile(relativePath: string): boolean {
   return removedSparkshellPromptSurfaceDirs.has(parts[0])
 }
 
-async function copyRootRuntimeDists(input: { readonly pluginRoot: string; readonly sourcePath: string }): Promise<void> {
+async function copyRootRuntimeDists(input: {
+  readonly pluginRoot: string
+  readonly sourcePath: string
+}): Promise<void> {
   const repoRoot = repoRootForCodexPluginSource(input.sourcePath)
   if (repoRoot === null) return
   for (const runtimePath of ["dist/cli", "dist/cli-node"] as const) {
@@ -219,7 +231,10 @@ async function copyRootRuntimeDists(input: { readonly pluginRoot: string; readon
 // (plugin/scripts/canonical-ultrawork-directive.mjs). Keep both path lists in lockstep.
 const canonicalPromptRelativePaths = [join("packages", "prompts-core", "prompts", "ultrawork", "codex.md")] as const
 
-async function copyCanonicalPromptSources(input: { readonly pluginRoot: string; readonly sourcePath: string }): Promise<void> {
+async function copyCanonicalPromptSources(input: {
+  readonly pluginRoot: string
+  readonly sourcePath: string
+}): Promise<void> {
   const repoRoot = repoRootForCodexPluginSource(input.sourcePath)
   if (repoRoot === null) return
   for (const relativePath of canonicalPromptRelativePaths) {

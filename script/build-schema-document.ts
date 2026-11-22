@@ -6,7 +6,7 @@ export function createOhMyOpenCodeJsonSchema(): Record<string, unknown> {
   const jsonSchema = z.toJSONSchema(OhMyOpenCodeConfigSchema, {
     target: "draft-7",
     unrepresentable: "any",
-  }) as Record<string, unknown>
+  })
   optionalizeDefaultedProperties(jsonSchema)
 
   return {

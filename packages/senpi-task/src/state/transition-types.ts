@@ -4,6 +4,7 @@ import type { TaskRunStats } from "./run-stats-types"
 import type { HostSessionIdentity, ResidencyState, RunnerKind, TaskStatus } from "./types"
 
 export type TaskTransition =
+  | { readonly type: "pause" | "unpause"; readonly timestamp: string }
   | {
       readonly type: "start"
       readonly timestamp: string

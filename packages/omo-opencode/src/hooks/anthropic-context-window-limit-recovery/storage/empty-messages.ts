@@ -40,4 +40,3 @@ export function findEmptyMessageByIndex(sessionID: string, targetIndex: number):
 
   return null
 }
-

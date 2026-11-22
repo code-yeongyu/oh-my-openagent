@@ -6,8 +6,16 @@ import type { BackgroundTask } from "./types"
 import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient, QueueItem } from "./constants"
 
-const GEMINI_ENTRY: FallbackEntry = { model: "gemini-3.1-pro", providers: ["google", "github-copilot", "opencode"], variant: "high" }
-const OPUS_ENTRY: FallbackEntry = { model: "claude-opus-5", providers: ["anthropic", "github-copilot", "opencode"], variant: "max" }
+const GEMINI_ENTRY: FallbackEntry = {
+  model: "gemini-3.1-pro",
+  providers: ["google", "github-copilot", "opencode"],
+  variant: "high",
+}
+const OPUS_ENTRY: FallbackEntry = {
+  model: "claude-opus-5",
+  providers: ["anthropic", "github-copilot", "opencode"],
+  variant: "max",
+}
 const OPENCODE_FREE_MODELS = ["big-pickle", "nemotron-3-ultra-free", "mimo-v2.5-free"]
 
 function createArgs(cache: ProviderModelsCache, fallbackChain: FallbackEntry[]) {
@@ -117,10 +125,9 @@ describe("tryFallbackRetry with provider model lists (#8540)", () => {
 
   test("keeps the connected provider when its model list is not cached", async () => {
     // given opencode is connected but the cache has no model list for it
-    const args = createArgs(
-      { connected: ["opencode"], models: {}, updatedAt: "2026-09-25T00:00:00.000Z" },
-      [GEMINI_ENTRY],
-    )
+    const args = createArgs({ connected: ["opencode"], models: {}, updatedAt: "2026-09-25T00:00:00.000Z" }, [
+      GEMINI_ENTRY,
+    ])
 
     // when
     const retried = await tryFallbackRetry(args)

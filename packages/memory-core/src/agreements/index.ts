@@ -7,6 +7,7 @@ export {
   type AgreementExtractionRecord,
   type AgreementItem,
   type AgreementScope,
+  type AgreementSourceEvent,
   type AgreementStatus,
   type AgreementsPolicy,
   type FactsKnownAgreement,
@@ -35,6 +36,7 @@ export {
   cleanAgreementText,
   parseAgreementRecord,
   parseAgreementRecordsJsonl,
+  validateAgreementSource,
 } from "./record"
 export {
   agreementItemsOf,

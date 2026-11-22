@@ -1,0 +1,27 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/hashline-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) stripTrailingContinuationTokens, stripMergeOperatorChars, restoreOldWrappedLines, maybeExpandSingleLineMerge, restoreIndentForPairedReplacement
+    "packages/hashline-core/src/autocorrect-replacement-lines.ts": ["stripTrailingContinuationTokens", "stripMergeOperatorChars", "restoreOldWrappedLines", "maybeExpandSingleLineMerge", "restoreIndentForPairedReplacement"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) toHashlineContent
+    "packages/hashline-core/src/diff-utils.ts": ["toHashlineContent"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) stripLinePrefixes, stripInsertBoundaryEcho
+    "packages/hashline-core/src/edit-text-normalization.ts": ["stripLinePrefixes", "stripInsertBoundaryEcho"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) NIBBLE_STR, HASHLINE_DICT, HASHLINE_REF_PATTERN, HASHLINE_OUTPUT_PATTERN, computeLegacyLineHash, formatHashLine, formatHashLines, streamHashLinesFromUtf8, streamHashLinesFromLines, parseLineRef and 30 more
+    "packages/hashline-core/src/index.ts": ["NIBBLE_STR", "HASHLINE_DICT", "HASHLINE_REF_PATTERN", "HASHLINE_OUTPUT_PATTERN", "computeLegacyLineHash", "formatHashLine", "formatHashLines", "streamHashLinesFromUtf8", "streamHashLinesFromLines", "parseLineRef", "validateLineRef", "validateLineRefs", "normalizeLineRef", "applyHashlineEdits", "applySetLine", "applyReplaceLines", "applyInsertAfter", "applyInsertBefore", "applyAppend", "applyPrepend", "getEditLineNumber", "collectLineRefs", "detectOverlappingRanges", "dedupeEdits", "stripLinePrefixes", "toNewLines", "restoreLeadingIndent", "stripInsertAnchorEcho", "stripInsertBeforeEcho", "stripInsertBoundaryEcho", "stripRangeBoundaryEcho", "stripTrailingContinuationTokens", "stripMergeOperatorChars", "restoreOldWrappedLines", "maybeExpandSingleLineMerge", "restoreIndentForPairedReplacement", "autocorrectReplacementLines", "createHashlineChunkFormatter", "toHashlineContent", "generateHashlineDiff"]
+  }
+}

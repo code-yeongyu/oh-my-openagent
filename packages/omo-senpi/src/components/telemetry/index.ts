@@ -5,6 +5,7 @@ import type { OmoSenpiComponent } from "../../extension/types"
 import {
   DEFAULT_POSTHOG_API_KEY,
   DEFAULT_POSTHOG_HOST,
+  isTelemetryClientEnabled,
   recordDailyActive,
   type RecordDailyActiveInput,
   TelemetryEnv,
@@ -12,12 +13,11 @@ import {
   TelemetryProductConfig,
   TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core/injected"
-import { createLazyPostHogTransportFactory } from "./lazy-posthog"
+import { createSenpiTelemetryTransportFactory } from "./otlp"
 import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
-export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
 
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
 const SESSION_START_REASON = "session_start"
@@ -43,7 +43,6 @@ export function createSenpiTelemetryProductConfig(): TelemetryProductConfig {
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: SENPI_TELEMETRY_EVENT_NAME,
-    machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
     packageName: "@oh-my-opencode/omo-senpi",
     packageVersion: packageVersion.get(),
     platform: "omo-senpi",
@@ -58,12 +57,7 @@ export function getSenpiTelemetryStateDir(env: TelemetryEnv = process.env): stri
 
 export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}): Promise<void> {
   const input = createRecordDailyActiveInput(options)
-  await withTimeout(
-    recordDailyActive(
-      input,
-    ),
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  )
+  await withTimeout(recordDailyActive(input), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 }
 
 export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {}): OmoSenpiComponent {
@@ -83,14 +77,19 @@ export const omoSenpiTelemetryComponent = createSenpiTelemetryComponent()
 
 function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDailyActiveInput {
   const env = options.env ?? process.env
+  const product = createSenpiTelemetryProductConfig()
   const baseInput = {
     diagnostics: options.diagnostics,
-    transportFactory: options.transportFactory ?? createLazyPostHogTransportFactory({
-      diagnostics: options.diagnostics,
-      source: SENPI_TELEMETRY_SOURCE,
-    }),
+    transportFactory:
+      options.transportFactory ??
+      createSenpiTelemetryTransportFactory({
+        env,
+        consent: () => isTelemetryClientEnabled({ env, product }),
+        diagnostics: options.diagnostics,
+        source: SENPI_TELEMETRY_SOURCE,
+      }),
     env,
-    product: createSenpiTelemetryProductConfig(),
+    product,
     reason: SESSION_START_REASON,
     source: SENPI_TELEMETRY_SOURCE,
     stateDir: options.stateDir ?? getSenpiTelemetryStateDir(env),

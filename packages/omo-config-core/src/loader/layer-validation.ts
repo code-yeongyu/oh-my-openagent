@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto"
+
 import type * as z from "zod"
 
 import { OmoConfigLayerSchema } from "../schema"
@@ -6,10 +8,17 @@ import { pruneInvalidConfigPaths, type PrunedConfigPath, type PruneValidator } f
 import type { OmoConfigDiagnostic } from "./types"
 
 export type OmoConfigLayerValidation =
-  | { readonly loaded: true; readonly diagnostics: readonly OmoConfigDiagnostic[]; readonly value: Record<string, unknown> }
+  | {
+      readonly loaded: true
+      readonly diagnostics: readonly OmoConfigDiagnostic[]
+      readonly value: Record<string, unknown>
+    }
   | { readonly loaded: false; readonly diagnostics: readonly OmoConfigDiagnostic[] }
 
-export function validationDiagnostic(path: string, issues: readonly { readonly path: readonly PropertyKey[] }[]): OmoConfigDiagnostic {
+export function validationDiagnostic(
+  path: string,
+  issues: readonly { readonly path: readonly PropertyKey[] }[],
+): OmoConfigDiagnostic {
   const issuePaths = issues.map((issue) => issue.path.map((segment) => String(segment)).join("."))
   return {
     kind: "validation",
@@ -19,7 +28,10 @@ export function validationDiagnostic(path: string, issues: readonly { readonly p
   }
 }
 
-export function invalidValueDiagnostics(path: string, dropped: readonly PrunedConfigPath[]): readonly OmoConfigDiagnostic[] {
+export function invalidValueDiagnostics(
+  path: string,
+  dropped: readonly PrunedConfigPath[],
+): readonly OmoConfigDiagnostic[] {
   return dropped.map((entry) => ({
     kind: "invalid-value",
     message: `Ignored invalid value in ${path}: ${entry.key}: ${entry.message}`,
@@ -45,6 +57,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
 }
 
+// Retired top-level sections: accepted and dropped silently; compared by digest.
+export const RETIRED_SECTION_DIGESTS: ReadonlySet<string> = new Set([
+  "447f75a8ebdbdb79a57f0b8cebbfba183820cf54a8119ac01449b30499e5ef0e",
+  "4ea5ee68fea05586106890ded5733820bb77d919cda27bc4b8139b7cd33b8889",
+])
+
+function isRetiredSection(key: string): boolean {
+  return RETIRED_SECTION_DIGESTS.has(createHash("sha256").update(key.toLowerCase()).digest("hex"))
+}
+const HARNESS_BLOCKS = new Set(["[opencode]", "[native]", "[senpi]", "[codex]"])
+
 function sanitizeUnsafeKeys(
   value: unknown,
   path: readonly string[] = [],
@@ -66,6 +89,12 @@ function sanitizeUnsafeKeys(
   }
   const sanitized: Record<string, unknown> = {}
   for (const [key, entry] of Object.entries(value)) {
+    const isConfigContainer =
+      path.length === 0 ||
+      (path.length === 1 && HARNESS_BLOCKS.has(path[0] ?? "")) ||
+      (path.length === 2 && path[0] === "profiles") ||
+      (path.length === 3 && path[0] === "profiles" && HARNESS_BLOCKS.has(path[2] ?? ""))
+    if (isConfigContainer && isRetiredSection(key)) continue
     if (isUnsafeObjectKey(key)) {
       issues.push({ keys: [key], path })
       continue
@@ -137,9 +166,17 @@ export function validateConfigLayer(path: string, data: unknown): OmoConfigLayer
   const sanitized = sanitizeUnsafeKeys(data)
   const record = toRecord(sanitized.value)
   const unsafeIssuePaths = sanitized.issues.flatMap((issue) => issue.keys.map((key) => [...issue.path, key].join(".")))
-  const unsafeDiagnostics: OmoConfigDiagnostic[] = unsafeIssuePaths.length === 0
-    ? []
-    : [{ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`, path, issuePaths: unsafeIssuePaths }]
+  const unsafeDiagnostics: OmoConfigDiagnostic[] =
+    unsafeIssuePaths.length === 0
+      ? []
+      : [
+          {
+            kind: "unknown-keys",
+            message: `Ignored unknown keys in ${path}: ${unsafeIssuePaths.join(", ")}`,
+            path,
+            issuePaths: unsafeIssuePaths,
+          },
+        ]
   const validation = OmoConfigLayerSchema.safeParse(sanitized.value)
   if (validation.success) {
     if (record !== null) return { loaded: true, diagnostics: unsafeDiagnostics, value: record }
@@ -159,7 +196,12 @@ export function validateConfigLayer(path: string, data: unknown): OmoConfigLayer
   if (unknownIssues.length > 0) {
     const { issuePaths, stripped } = stripUnrecognizedKeys(record, unknownIssues)
     if (issuePaths.length > 0) {
-      diagnostics.push({ kind: "unknown-keys", message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`, path, issuePaths })
+      diagnostics.push({
+        kind: "unknown-keys",
+        message: `Ignored unknown keys in ${path}: ${issuePaths.join(", ")}`,
+        path,
+        issuePaths,
+      })
     }
     const strippedValidation = validateLayerRecord(stripped)
     if (strippedValidation.success) return { loaded: true, diagnostics, value: stripped }
@@ -169,5 +211,9 @@ export function validateConfigLayer(path: string, data: unknown): OmoConfigLayer
 
   const pruned = pruneInvalidConfigPaths(candidate, issues, validateLayerRecord)
   if (!pruned.ok) return rejected
-  return { loaded: true, diagnostics: [...diagnostics, ...invalidValueDiagnostics(path, pruned.dropped)], value: pruned.config }
+  return {
+    loaded: true,
+    diagnostics: [...diagnostics, ...invalidValueDiagnostics(path, pruned.dropped)],
+    value: pruned.config,
+  }
 }

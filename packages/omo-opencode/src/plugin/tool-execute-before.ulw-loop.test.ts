@@ -18,9 +18,7 @@ describe("tool.execute.before goal command", () => {
     }
   }
 
-  function createGoalHook(
-    calls: Array<{ sessionID: string; objective: string }>,
-  ) {
+  function createGoalHook(calls: Array<{ sessionID: string; objective: string }>) {
     return {
       setGoal: (sessionID: string, objective: string) => {
         calls.push({ sessionID, objective })
@@ -42,9 +40,7 @@ describe("tool.execute.before goal command", () => {
 
   function createHandler(directory: string, goalHook: unknown) {
     return createToolExecuteBeforeHandler({
-      ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(
-        createCtx(directory),
-      ),
+      ctx: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["ctx"]>(createCtx(directory)),
       hooks: unsafeTestValue<Parameters<typeof createToolExecuteBeforeHandler>[0]["hooks"]>({
         goal: goalHook,
       }),
@@ -105,10 +101,7 @@ describe("tool.execute.before goal command", () => {
     const calls: Array<{ sessionID: string; objective: string }> = []
     const handler = createHandler(directory, createGoalHook(calls))
 
-    await handler(
-      { tool: "skill", sessionID: "ses-main", callID: "call-goal-4" },
-      { args: { name: "/goal" } },
-    )
+    await handler({ tool: "skill", sessionID: "ses-main", callID: "call-goal-4" }, { args: { name: "/goal" } })
 
     expect(calls).toHaveLength(0)
 

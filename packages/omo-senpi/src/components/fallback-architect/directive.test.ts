@@ -26,8 +26,6 @@ describe("fallback-architect directive", () => {
         expect(reminder).toContain("anthropic/claude-fable-5")
         expect(reminder).toContain('task(category: "architect")')
       })
-
-
     })
   })
 })

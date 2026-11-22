@@ -57,7 +57,10 @@ export function parseWorktreeListPorcelain(output: string): WorktreeEntry[] {
     if (!current) continue
 
     if (line.startsWith("branch ")) {
-      current.branch = line.slice("branch ".length).trim().replace(/^refs\/heads\//, "")
+      current.branch = line
+        .slice("branch ".length)
+        .trim()
+        .replace(/^refs\/heads\//, "")
     } else if (line === "bare") {
       current.bare = true
     }

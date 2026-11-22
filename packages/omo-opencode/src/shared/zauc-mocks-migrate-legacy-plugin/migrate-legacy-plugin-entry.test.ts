@@ -98,13 +98,12 @@ describe("migrateLegacyPluginEntry", () => {
         const originalOpenSync = fs.openSync
         const openSyncCalls: string[] = []
 
-        const openSyncSpy = spyOn(fs, "openSync").mockImplementation((
-          path: Parameters<typeof fs.openSync>[0],
-          flags: Parameters<typeof fs.openSync>[1],
-        ) => {
+        const openSyncSpy = spyOn(fs, "openSync").mockImplementation(
+          (path: Parameters<typeof fs.openSync>[0], flags: Parameters<typeof fs.openSync>[1]) => {
             openSyncCalls.push(String(flags))
             return originalOpenSync(path, flags)
-        })
+          },
+        )
 
         try {
           const { migrateLegacyPluginEntry } = await importFreshMigrationModule()

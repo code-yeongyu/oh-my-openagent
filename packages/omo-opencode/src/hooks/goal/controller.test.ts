@@ -9,8 +9,7 @@ function makeController() {
   return {
     controller: createGoalController({ projectDir }),
     projectDir,
-    mirrorPath: (sessionID: string) =>
-      join(projectDir, ".omo", "ulw-loop", sessionID, "goals.json"),
+    mirrorPath: (sessionID: string) => join(projectDir, ".omo", "ulw-loop", sessionID, "goals.json"),
   }
 }
 
@@ -80,13 +79,17 @@ describe("createGoalController", () => {
     const { controller } = makeController()
     controller.setGoal("s1", "Work")
 
-    const updated = controller.accountUsage("s1", {
-      input: 10,
-      output: 20,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 30,
-    }, 5)
+    const updated = controller.accountUsage(
+      "s1",
+      {
+        input: 10,
+        output: 20,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 30,
+      },
+      5,
+    )
 
     expect(updated?.tokensUsed).toBe(30)
     expect(updated?.timeUsedSeconds).toBe(5)
@@ -97,13 +100,17 @@ describe("createGoalController", () => {
     controller.setGoal("s1", "Work")
     controller.pauseGoal("s1")
 
-    const updated = controller.accountUsage("s1", {
-      input: 10,
-      output: 0,
-      cacheRead: 0,
-      cacheWrite: 0,
-      totalTokens: 10,
-    }, 1)
+    const updated = controller.accountUsage(
+      "s1",
+      {
+        input: 10,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        totalTokens: 10,
+      },
+      1,
+    )
 
     expect(updated?.tokensUsed).toBe(0)
   })

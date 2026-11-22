@@ -119,7 +119,7 @@ export class GitPathStateStore {
     try {
       const current = await this.captureMovedWorktree(moved)
       if (!sameIdentity(current, expected)) {
-        if (!await restoreMovedWorktreeFile(this.dir, normalized, moved)) await discardMovedWorktreeFile(moved)
+        if (!(await restoreMovedWorktreeFile(this.dir, normalized, moved))) await discardMovedWorktreeFile(moved)
         return false
       }
       if (next.kind === "missing") {
@@ -143,7 +143,7 @@ export class GitPathStateStore {
       await discardMovedWorktreeFile(moved)
       return published
     } catch (error) {
-      if (!await restoreMovedWorktreeFile(this.dir, normalized, moved)) await discardMovedWorktreeFile(moved)
+      if (!(await restoreMovedWorktreeFile(this.dir, normalized, moved))) await discardMovedWorktreeFile(moved)
       throw error
     }
   }
@@ -152,10 +152,7 @@ export class GitPathStateStore {
     this.ownershipLossRecoveryPath = undefined
     return path
   }
-  async reserveWorktreeDeletion(
-    path: string,
-    moved: string,
-  ): Promise<WorktreeDeletionReservation | undefined> {
+  async reserveWorktreeDeletion(path: string, moved: string): Promise<WorktreeDeletionReservation | undefined> {
     return reserveMovedWorktreeDeletion(this.dir, path, moved, (claimed) => this.restoreWorktreeClaim(path, claimed))
   }
   async restoreWorktreeClaim(path: string, claimed: string): Promise<true | string> {
@@ -210,7 +207,8 @@ export class GitPathStateStore {
     const result = await this.exec.run(argv, {
       cwd: this.dir,
       timeoutMs: GIT_TIMEOUT_MS,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      // Literal lookup must not conflict with inherited global pathspec modes.
+      env: { ...process.env, GIT_TERMINAL_PROMPT: "0", GIT_GLOB_PATHSPECS: "0", GIT_ICASE_PATHSPECS: "0" },
       ...(stdin === undefined ? {} : { stdin }),
     })
     if (result.code !== 0) throw commandError(argv, result)
@@ -220,9 +218,13 @@ export class GitPathStateStore {
 function normalizeGitPath(path: string): string {
   const normalized = path.replace(/\\/g, "/")
   const segments = normalized.split("/")
-  if (!normalized || normalized.includes("\0") || normalized.startsWith("/")
-    || /^[A-Za-z]:\//.test(normalized)
-    || segments.some((part) => !part || part === "." || part === ".." || part.toLowerCase() === ".git")) {
+  if (
+    !normalized ||
+    normalized.includes("\0") ||
+    normalized.startsWith("/") ||
+    /^[A-Za-z]:\//.test(normalized) ||
+    segments.some((part) => !part || part === "." || part === ".." || part.toLowerCase() === ".git")
+  ) {
     throw new GitPathStateError(`Invalid repository-relative Git path: ${path}`)
   }
   return normalized

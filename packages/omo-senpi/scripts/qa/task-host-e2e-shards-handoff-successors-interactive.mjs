@@ -3,10 +3,7 @@ import { join } from "node:path"
 
 import { observeState } from "./task-host-e2e-events.mjs"
 import { lastJsonLine, runBin } from "./task-host-e2e-process.mjs"
-import {
-  taskRecords,
-  teardownSandbox,
-} from "./task-host-e2e-shard-cost-support.mjs"
+import { taskRecords, teardownSandbox } from "./task-host-e2e-shard-cost-support.mjs"
 import {
   createHttpScenario,
   endpoint,
@@ -36,12 +33,7 @@ function route(threadRelease, childRelease, grandchildRelease) {
     }
     if (request.user.includes(CHILD_HOLD)) {
       return request.count("task") === 0
-        ? heldTaskStep(
-            "child held",
-            childRelease,
-            "successor-thread-grandchild",
-            GRANDCHILD_HOLD,
-          )
+        ? heldTaskStep("child held", childRelease, "successor-thread-grandchild", GRANDCHILD_HOLD)
         : textStep("grandchild spawned")
     }
     if (request.user.includes(GRANDCHILD_HOLD)) {
@@ -72,17 +64,35 @@ export async function runInteractiveSuccessorScenario(current, olderBin, artifac
     swapBinary(olderBin, binary)
     const old = { ...sandbox, bin: binary }
     const named = runBin(old, [
-      "host", "shard-path", "--kind", "i", "--owner", "thread-successor",
-      "--root", join(sandbox.agentDir, "rpc", "shards"), "--json",
+      "host",
+      "shard-path",
+      "--kind",
+      "i",
+      "--owner",
+      "thread-successor",
+      "--root",
+      join(sandbox.agentDir, "rpc", "shards"),
+      "--json",
     ])
     const interactiveSocket = lastJsonLine(named.stdout)?.socket
     if (named.status !== 0 || typeof interactiveSocket !== "string") {
       throw new Error(`shard-path failed: ${named.stderr || named.stdout}`)
     }
-    const ensured = runBin(old, [
-      "host", "ensure", "--socket", interactiveSocket,
-      "--launch-spec", current.specPath, "--policy", "never", "--json",
-    ], { timeoutMs: 120_000 })
+    const ensured = runBin(
+      old,
+      [
+        "host",
+        "ensure",
+        "--socket",
+        interactiveSocket,
+        "--launch-spec",
+        current.specPath,
+        "--policy",
+        "never",
+        "--json",
+      ],
+      { timeoutMs: 120_000 },
+    )
     if (ensured.status !== 0) {
       throw new Error(`interactive ensure failed: ${ensured.stderr || ensured.stdout}`)
     }
@@ -103,19 +113,14 @@ export async function runInteractiveSuccessorScenario(current, olderBin, artifac
     void threadPrompt.catch(() => {})
     const child = await observeState(sandbox.root, () => {
       const record = taskRecords(project).find((entry) => entry.name === "successor-thread-child")
-      return record?.host_session?.socket && requestSeen(requestLog, CHILD_HOLD)
-        ? record
-        : undefined
+      return record?.host_session?.socket && requestSeen(requestLog, CHILD_HOLD) ? record : undefined
     })
     if (child === undefined) throw new Error("interactive task child did not reach streamed hold")
     const childSocket = child.host_session.socket
     const before = endpoint(sandbox, "p")
     const generationsBefore = generationNames(sandbox, childSocket)
     swapBinary(current.bin, binary)
-    const handoffRun = startCommand(
-      { ...sandbox, bin: binary },
-      ["daemon", "handoff", "--json"],
-    )
+    const handoffRun = startCommand({ ...sandbox, bin: binary }, ["daemon", "handoff", "--json"])
     const successor = await observeState(sandbox.root, () => {
       const report = endpoint(sandbox, "p")
       return report?.instanceId !== before?.instanceId ? report : undefined
@@ -123,12 +128,8 @@ export async function runInteractiveSuccessorScenario(current, olderBin, artifac
     const generationsAtHandoff = generationNames(sandbox, childSocket)
     writeFileSync(childRelease, "go\n")
     const grandchild = await observeState(sandbox.root, () => {
-      const record = taskRecords(project).find(
-        (entry) => entry.name === "successor-thread-grandchild",
-      )
-      return record?.host_session?.session_path && requestSeen(requestLog, GRANDCHILD_HOLD)
-        ? record
-        : undefined
+      const record = taskRecords(project).find((entry) => entry.name === "successor-thread-grandchild")
+      return record?.host_session?.session_path && requestSeen(requestLog, GRANDCHILD_HOLD) ? record : undefined
     })
     const after = endpoint(sandbox, "p")
     const generationsAfter = generationNames(sandbox, childSocket)
@@ -162,9 +163,6 @@ export async function runInteractiveSuccessorScenario(current, olderBin, artifac
     client?.close()
     scenario.close()
     const cleanup = await teardownSandbox(sandbox)
-    writeFileSync(
-      join(artifacts, "interactive-handoff-nested-cleanup.json"),
-      `${JSON.stringify(cleanup, null, 2)}\n`,
-    )
+    writeFileSync(join(artifacts, "interactive-handoff-nested-cleanup.json"), `${JSON.stringify(cleanup, null, 2)}\n`)
   }
 }

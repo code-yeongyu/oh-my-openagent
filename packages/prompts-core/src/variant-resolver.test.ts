@@ -51,12 +51,10 @@ describe("resolveVariant", () => {
 
     expect(resolveVariant({ modelID: "kimi-k2.8", variants: orderedVariants })).toBe("kimi-k2-7")
     expect(resolveVariant({ modelID: "kimi-for-coding/k2p8", variants: orderedVariants })).toBe("kimi-k2-7")
-    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding", variants: orderedVariants })).toBe(
+    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding", variants: orderedVariants })).toBe("kimi-k2-7")
+    expect(resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding-highspeed", variants: orderedVariants })).toBe(
       "kimi-k2-7",
     )
-    expect(
-      resolveVariant({ modelID: "kimi-for-coding/kimi-for-coding-highspeed", variants: orderedVariants }),
-    ).toBe("kimi-k2-7")
   })
 
   test("#given a kimi-k3 variant ordered before kimi #then K3 wins and K2.x stays on its own variants", () => {
@@ -68,9 +66,24 @@ describe("resolveVariant", () => {
     } satisfies VariantTable
 
     expect(resolveVariant({ modelID: "kimi-k3", variants: orderedVariants })).toBe("kimi-k3")
-    expect(resolveVariant({ modelID: "kimi-for-coding/k3p1", variants: orderedVariants })).toBe("kimi-k3")
     expect(resolveVariant({ modelID: "kimi-k2.7", variants: orderedVariants })).toBe("kimi-k2-7")
     expect(resolveVariant({ modelID: "kimi-k2-6", variants: orderedVariants })).toBe("kimi")
+  })
+
+  test("#given a kimi-k3-1 variant ordered before kimi-k3 #then K3.1 wins and K3 keeps its own", () => {
+    const orderedVariants = {
+      "kimi-k3-1": promptSource("/prompts/kimi-k3-1"),
+      "kimi-k3": promptSource("/prompts/kimi-k3"),
+      default: promptSource("/prompts/default"),
+    } satisfies VariantTable
+
+    expect(resolveVariant({ modelID: "kimi-coding/k3.1-pro", variants: orderedVariants })).toBe("kimi-k3-1")
+    expect(resolveVariant({ modelID: "kimi-for-coding/k3p1", variants: orderedVariants })).toBe("kimi-k3-1")
+    expect(resolveVariant({ modelID: "kimi-k3", variants: orderedVariants })).toBe("kimi-k3")
+  })
+
+  test("#given Atlas Kimi K3.1 #then it loads its own prompt file, not the K3 one", () => {
+    expect(atlasPromptVariants["kimi-k3-1"].filePath).toBe("packages/prompts-core/prompts/atlas/kimi-k3-1.md")
   })
 
   test("#given a Devin SWE-2 model #then resolves the SWE-2 variant", () => {
@@ -94,9 +107,7 @@ describe("resolveVariant", () => {
   })
 
   test("#given Prometheus agent #then planner overrides model variant", () => {
-    expect(resolveVariant({ agentName: "prometheus", modelID: "gpt-5-5", variants })).toBe(
-      "planner"
-    )
+    expect(resolveVariant({ agentName: "prometheus", modelID: "gpt-5-5", variants })).toBe("planner")
   })
 
   test("#given unknown model #then falls back to default variant", () => {

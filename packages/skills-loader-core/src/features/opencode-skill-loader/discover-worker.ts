@@ -10,7 +10,7 @@ interface WorkerInput {
 
 interface WorkerOutputSuccess {
   ok: true
-  skills: LoadedSkill[]
+  skills: Omit<LoadedSkill, "lazyContent">[]
 }
 
 interface WorkerOutputError {
@@ -32,7 +32,8 @@ parentPort.once("message", (data: { port: MessagePort; input: WorkerInput }) => 
     try {
       const results = await Promise.all(input.dirs.map((dir) => discoverSkillsInDirAsync(dir)))
 
-      const skills = results.flat()
+      // lazyContent carries a load() function, which structured clone rejects; blocking.ts rebuilds it.
+      const skills = results.flat().map(({ lazyContent: _lazyContent, ...skill }) => skill)
 
       const output: WorkerOutputSuccess = { ok: true, skills }
 

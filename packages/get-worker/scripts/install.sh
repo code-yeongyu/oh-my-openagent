@@ -15,7 +15,7 @@ cat >"$omo_bash_script" <<'OMO_INSTALL_BASH'
 #   OMO_INSTALL_DIR        launcher directory (default ~/.local/bin)
 #   OMO_NO_MODIFY_PATH=1   never edit shell profiles
 #   OMO_INSTALL_BASE_URL   mirror base (default https://get.omo.dev); GitHub is the fallback
-#   OMO_INSTALL_ALLOW_SUDO=1  allow running as root
+#   OMO_INSTALL_ALLOW_SUDO=1  allow installing into root's home from sudo/doas (a plain root shell needs no override)
 # The whole body runs from main() on the last line, so a truncated download never runs half a script.
 set -euo pipefail
 
@@ -49,6 +49,15 @@ sha256_of() {
   fi
 }
 
+is_musl_libc() { # the system libc, not whether a musl loader happens to be installed (#10562)
+  # musl's ldd exits 1 after printing its version, which pipefail would turn into a miss.
+  case "$(ldd --version 2>&1 || true)" in *[Mm][Uu][Ss][Ll]*) return 0 ;; esac
+  # Debian/Ubuntu's optional `musl` package ships /lib/ld-musl-*.so.1 next to glibc,
+  # so the loader file only counts when the system libc is not glibc.
+  if getconf GNU_LIBC_VERSION >/dev/null 2>&1; then return 1; fi
+  [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1
+}
+
 detect_asset() {
   local os arch libc="" cpu=""
   case "$(uname -s)" in
@@ -65,11 +74,7 @@ detect_asset() {
   if [ "$os" = darwin ] && [ "$arch" = x64 ] && [ "$(sysctl -n sysctl.proc_translated 2>/dev/null || echo 0)" = 1 ]; then
     arch=arm64 # a Rosetta shell on Apple silicon gets the native build
   fi
-  if [ "$os" = linux ]; then
-    if [ -f /etc/alpine-release ] || ls /lib/ld-musl-*.so.1 >/dev/null 2>&1 || (ldd --version 2>&1 | grep -qi musl); then
-      libc="-musl"
-    fi
-  fi
+  if [ "$os" = linux ] && is_musl_libc; then libc="-musl"; fi
   if [ "$arch" = x64 ]; then
     if [ "$os" = linux ] && ! grep -qwi avx2 /proc/cpuinfo 2>/dev/null; then cpu="-baseline"; fi
     if [ "$os" = darwin ] && [ "$(sysctl -n hw.optional.avx2_0 2>/dev/null || echo 0)" != 1 ]; then cpu="-baseline"; fi
@@ -249,6 +254,14 @@ write_receipt() { # write_receipt <channel> <version> <asset> <launcher> <profil
   mv -f "$tmp" "$HOME/.omo/install.json"
 }
 
+refuse_sudo_install() { # sudo/doas from a user would install into root's home; a root-only shell (proot-distro, containers) is its own user (#14344)
+  local invoker="${SUDO_USER:-${DOAS_USER:-root}}"
+  [ "$(id -u)" = 0 ] && [ "$invoker" != root ] && [ "${OMO_INSTALL_ALLOW_SUDO:-}" != 1 ] || return 0
+  fail "refusing to install into root's home from sudo/doas started by ${invoker}.
+  Run it as ${invoker}: curl -fsSL https://get.omo.dev/install.sh | bash
+  To install for root anyway: curl -fsSL https://get.omo.dev/install.sh | OMO_INSTALL_ALLOW_SUDO=1 bash"
+}
+
 main() {
   local want="" remove_other_installs=0 arg base="${OMO_INSTALL_BASE_URL:-https://get.omo.dev}"
   for arg in "$@"; do
@@ -264,9 +277,7 @@ main() {
   done
   want="${want:-latest}"
   base="${base%/}"
-  if [ "$(id -u)" = 0 ] && [ "${OMO_INSTALL_ALLOW_SUDO:-}" != 1 ]; then
-    fail "refusing to run as root; run it as your user (set OMO_INSTALL_ALLOW_SUDO=1 to override)"
-  fi
+  refuse_sudo_install
   [ -n "${HOME:-}" ] || fail "HOME is not set"
 
   local asset version dir launcher work expected actual profile channel
@@ -312,6 +323,11 @@ main() {
   else
     say "Run: omo"
   fi
+  say ""
+  say "OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product."
+  say "The data goes to PostHog in the United States."
+  say "Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1)."
+  say "Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then main "$@"; fi

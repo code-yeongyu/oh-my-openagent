@@ -2,6 +2,9 @@ import type { ManagedChildEvent } from "./manager/child-handle"
 import type { CostReportStatus, TaskRunStats, TokenCoverageStatus } from "./state"
 
 export type RunStatsTracker = {
+  // The run_start_epoch of the run this tracker measures, when its creator knows it: a consumer that
+  // also reads the persisted record keys each run's spend by this, so one run never counts twice.
+  readonly runStartEpoch?: number
   accept(event: ManagedChildEvent): boolean
   snapshot(now: number): TaskRunStats
 }
@@ -12,7 +15,11 @@ export type RunStatsTracker = {
 // An assistant message_end whose stopReason is "error" or "aborted" is a FAILED turn: it contributes
 // no tokens, cost, usage coverage or generation time - only the failed_turns count - but it still
 // re-anchors the window, so a failure's wall time never inflates a later window.
-export function createRunStatsTracker(startedAt: number, now: () => number = Date.now): RunStatsTracker {
+export function createRunStatsTracker(
+  startedAt: number,
+  now: () => number = Date.now,
+  runStartEpoch?: number,
+): RunStatsTracker {
   let turns = 0
   let failedTurns = 0
   let toolCalls = 0
@@ -21,6 +28,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
   let generationMs = 0
   let collapsedWindows = 0
   let windowStart = startedAt
+  let turnsReportingCost = 0
   let costUsd = 0
   let sawCost = false
   let inputTokens = 0
@@ -33,6 +41,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
   let anonymousEvalRuns = 0
 
   return {
+    ...(runStartEpoch === undefined ? {} : { runStartEpoch }),
     accept(event) {
       if (event.type === "tool_execution_start") {
         toolCalls += 1
@@ -62,10 +71,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         const nestedEvalTools = Array.isArray(details?.toolCalls)
           ? details.toolCalls.filter(
               (call) =>
-                isRecord(call) &&
-                typeof call.name === "string" &&
-                call.name.length > 0 &&
-                typeof call.ok === "boolean",
+                isRecord(call) && typeof call.name === "string" && call.name.length > 0 && typeof call.ok === "boolean",
             ).length
           : 0
         toolCalls += nestedEvalTools
@@ -90,13 +96,15 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       generationMs += window
       windowStart = timestamp
       const usage = readUsage(event.message)
-      if (Object.keys(usage).length > 0) turnsReportingUsage += 1
+      const reported = reportsUsage(usage)
+      if (reported) turnsReportingUsage += 1
       if (window === 0 && (usage.output ?? 0) > 0) collapsedWindows += 1
       outputTokens += usage.output ?? 0
       totalTokens += usage.total ?? 0
-      if (usage.cost !== undefined) {
+      if (reported && usage.cost !== undefined) {
         costUsd += usage.cost
         sawCost = true
+        turnsReportingCost += 1
       }
       const requestCacheReadTokens = usage.cacheRead ?? 0
       const requestCacheWriteTokens = usage.cacheWrite ?? 0
@@ -123,8 +131,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
       // token-bearing collapsed window exists (i.e. outputTokens is zero or every window was
       // zero-token): there the runtime is the sole available timing signal and no collapsed
       // token timing has been lost.
-      const throughputWindowMs =
-        collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
+      const throughputWindowMs = collapsedWindows > 0 ? undefined : generationMs > 0 ? generationMs : runtimeMs
       const tps = throughputWindowMs === undefined ? undefined : tokensPerSecond(outputTokens, throughputWindowMs)
       const runCacheHitRate = boundedCacheHitRate(cacheReadTokens, cacheableTokens)
       const costReported = sawCost && Number.isFinite(costUsd)
@@ -137,7 +144,7 @@ export function createRunStatsTracker(startedAt: number, now: () => number = Dat
         // execution time. Reconstructed durations (reconciled records) are the consumer's job.
         duration_status: "monotonic",
         token_status: tokenCoverage(turns, turnsReportingUsage),
-        cost_status: costStatus(sawCost, costReported),
+        cost_status: costStatus(sawCost, costReported, turnsReportingCost < turns),
         ...positiveFiniteTotal("output_tokens", outputTokens),
         ...positiveFiniteTotal("input_tokens", inputTokens),
         ...positiveFiniteTotal("cache_read_tokens", cacheReadTokens),
@@ -168,8 +175,8 @@ function tokenCoverage(turns: number, turnsReportingUsage: number): TokenCoverag
 
 // A cost the provider never reported is unavailable, not zero; a reported-but-non-finite sum is
 // invalid, so aggregates can exclude it instead of poisoning a SUM with NaN/Infinity.
-function costStatus(sawCost: boolean, costReported: boolean): CostReportStatus {
-  if (costReported) return "reported"
+function costStatus(sawCost: boolean, costReported: boolean, someTurnsUnreported: boolean): CostReportStatus {
+  if (costReported) return someTurnsUnreported ? "partial" : "reported"
   return sawCost ? "invalid" : "unavailable"
 }
 
@@ -213,14 +220,19 @@ function readUsage(message: Record<string, unknown>): UsageFacts {
   return {
     ...optionalNumber("output", firstFiniteNonNegativeNumber(usage.output, usage.output_tokens)),
     ...optionalNumber("total", firstFiniteNonNegativeNumber(usage.totalTokens, usage.total_tokens)),
-    ...optionalNumber("cost", readCost(usage.cost)),
+    // A model with no known price marks its usage `costUnknown` (senpi#3844): that zero is not a reported $0.
+    ...optionalNumber("cost", usage.costUnknown === true ? undefined : readCost(usage.cost)),
     ...optionalNumber("input", firstFiniteNonNegativeNumber(usage.input, usage.input_tokens)),
     ...optionalNumber("cacheRead", firstFiniteNonNegativeNumber(usage.cacheRead, usage.cache_read_input_tokens)),
-    ...optionalNumber(
-      "cacheWrite",
-      firstFiniteNonNegativeNumber(usage.cacheWrite, usage.cache_creation_input_tokens),
-    ),
+    ...optionalNumber("cacheWrite", firstFiniteNonNegativeNumber(usage.cacheWrite, usage.cache_creation_input_tokens)),
   }
+}
+
+// senpi attaches a zero-filled usage object to every assistant message and overwrites it only when
+// the provider streams usage, so an all-zero block means the provider reported nothing: counting it
+// would turn "no usage" into a reported $0 (#10724). A zero-priced model still reports its tokens.
+function reportsUsage(usage: UsageFacts): boolean {
+  return Object.values(usage).some((value) => value > 0)
 }
 
 // Senpi reports cost either as a plain number or as a per-bucket breakdown carrying `.total`.
@@ -233,9 +245,7 @@ function optionalNumber<K extends string>(key: K, value: number | undefined): Pa
 }
 
 function firstFiniteNonNegativeNumber(...values: readonly unknown[]): number | undefined {
-  return values.find(
-    (value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0,
-  )
+  return values.find((value): value is number => typeof value === "number" && Number.isFinite(value) && value >= 0)
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

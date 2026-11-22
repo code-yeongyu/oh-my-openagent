@@ -65,10 +65,7 @@ describe("serialized git config", () => {
     await repo.init()
 
     // when
-    await Promise.all([
-      repo.configSet("omo.testOne", "one"),
-      repo.configSet("omo.testTwo", "two"),
-    ])
+    await Promise.all([repo.configSet("omo.testOne", "one"), repo.configSet("omo.testTwo", "two")])
 
     // then
     expect(exec.maxConfigWrites).toBe(1)

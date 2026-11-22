@@ -32,6 +32,14 @@ node script/qa/web-terminal-visual-qa.mjs --title "menu nav" --command "my-tui" 
   --dwell-ms 2000 --evidence-dir .omo/evidence/run/menu
 ```
 
+A TUI that takes a while to start can drop the first keystrokes. Put `{WaitFor:<text>}` before them: it polls the rendered xterm buffer until `<text>` appears, then continues. If the text never appears within `--wait-for-timeout-ms` (default 10000), the capture fails with an error that names the text and the timeout:
+
+```bash
+node script/qa/web-terminal-visual-qa.mjs --title "mcp" --command "senpi" \
+  --input "{WaitFor:❯}" --input "/mcp" --input "{Enter}" --input "{WaitFor:MCP servers}" \
+  --evidence-dir .omo/evidence/run/mcp
+```
+
 ## Redaction Contract
 
 The helper redacts terminal content before writing `terminal.txt`, `terminal-ansi.txt`, and - when a rule matches - re-renders the masked stream so `terminal.png` never shows the secret. Built-in rules cover common authorization headers, token/password/key assignments, GitHub tokens, and OpenAI-style `sk-...` tokens.

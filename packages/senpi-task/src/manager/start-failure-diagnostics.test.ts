@@ -6,9 +6,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { RunnerError } from "../runners/in-process"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import { spawnFakeChild } from "../runners/rpc/__fixtures__/spawn-fake"
-import { terminateRpcChild } from "../runners/rpc/terminate"
+import { stopFakeChild } from "../runners/rpc/__fixtures__/stop-fake-child"
 import { createRpcManagedRunner } from "./runner"
-import { FakeRunner, cleanupProjects, makeManager } from "./__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, launchSettled, makeManager } from "./__fixtures__/manager-fakes"
 
 // The same shape start-failure-security.test.ts uses: a cause carrying a credential, so any test that
 // persists free text fails loudly instead of leaking quietly.
@@ -20,7 +20,7 @@ const spawned: ChildProcess[] = []
 afterEach(async () => {
   while (spawned.length > 0) {
     const child = spawned.pop()
-    if (child) await terminateRpcChild(child, { sigkillDelayMs: 200 })
+    if (child) await stopFakeChild(child)
   }
   cleanupProjects()
 })
@@ -57,7 +57,7 @@ describe("TaskManager start failure diagnostics", () => {
     })
 
     // then: the cause is finally answerable - which exit, which code - instead of a bare status=error
-    expect(result.kind).toBe("start_failed")
+    expect(await launchSettled(manager, result)).toBe("start_failed")
     const eventLog = readOnlyEventLog(store.stateDir)
     const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
       type?: string
@@ -111,7 +111,7 @@ describe("TaskManager start failure diagnostics", () => {
     })
 
     // then
-    expect(result.kind).toBe("start_failed")
+    expect(["start_failed", "error"]).toContain(await launchSettled(manager, result))
     const eventLog = readOnlyEventLog(store.stateDir)
     const event = JSON.parse(eventLog.trim().split("\n").at(-1) ?? "{}") as {
       type?: string
@@ -128,6 +128,59 @@ describe("TaskManager start failure diagnostics", () => {
 
     // and: the stderr-derived message is still excluded from the durable artifact.
     expect(eventLog).not.toContain("credentials.json")
+    await rpcRunner.settleTeardowns()
+  })
+
+  test("#given a refused first prompt and held teardown #when launch settles #then failure and shutdown do not lose the child", async () => {
+    const release = Promise.withResolvers<void>()
+    const terminating = Promise.withResolvers<void>()
+    const terminated = Promise.withResolvers<void>()
+    let teardownDone = false
+    const rpcRunner = new RpcProcessRunner({
+      modelAdmission: async () => {},
+      buildSpawn: (spec) => ({ command: process.execPath, args: [], cwd: spec.cwd, env: process.env }),
+      spawnChild: () => {
+        const child = spawnFakeChild()
+        spawned.push(child)
+        if (child.stdin === null) throw new Error("fake child stdin was not piped")
+        Object.defineProperty(child.stdin, "write", {
+          value: (...args: unknown[]): boolean => {
+            const callback = args.findLast((value): value is (error: Error) => void => typeof value === "function")
+            callback?.(new Error("synthetic first prompt refusal"))
+            return false
+          },
+        })
+        return child
+      },
+      terminateChild: async (child) => {
+        terminating.resolve()
+        await release.promise
+        const exited = new Promise<void>((resolve) => child.once("exit", () => resolve()))
+        child.kill("SIGTERM")
+        await exited
+        teardownDone = true
+        terminated.resolve()
+      },
+    })
+    const { manager } = makeManager({ process: createRpcManagedRunner(rpcRunner) })
+    try {
+      const starting = manager.start(baseSpec({ execution_mode: "process" }))
+      await terminating.promise
+      const result = await starting
+      expect(["start_failed", "error"]).toContain(await launchSettled(manager, result))
+      expect(teardownDone).toBe(false)
+      const shutdown = manager.settleLaunchesForShutdown?.(2_000).then(() => {
+        expect(teardownDone).toBe(true)
+      })
+      release.resolve()
+      await shutdown
+      expect(teardownDone).toBe(true)
+      await terminated.promise
+    } finally {
+      release.resolve()
+      await rpcRunner.settleTeardowns()
+      await manager.settleLaunchesForShutdown?.(2_000)
+    }
   })
 
   test("#given a start failure that never reached a process exit #when it is recorded #then the failure kind alone is persisted", async () => {

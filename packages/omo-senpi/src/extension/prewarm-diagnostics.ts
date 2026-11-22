@@ -1,5 +1,6 @@
 import { z } from "zod"
 import type { ComponentLogger, SenpiExtensionAPI } from "./types"
+import { createSettleObservers } from "./settle-observers"
 
 interface HandlerRegistration {
   readonly component: string
@@ -17,6 +18,7 @@ const hint = "A before_agent_start handler without previewSafe blocks the prompt
 
 /** Per-composition ownership survives late registrations through each component's retained API. */
 export function createPrewarmDiagnostics(pi: SenpiExtensionAPI, logger: ComponentLogger) {
+  const settles = createSettleObservers(pi, logger)
   const registrations: HandlerRegistration[] = []
   const warnedSessions = new Set<string>()
 
@@ -37,7 +39,8 @@ export function createPrewarmDiagnostics(pi: SenpiExtensionAPI, logger: Componen
       if (!skipped.success) continue
       warnedSessions.add(sessionId)
       logger.warn(`omo-senpi prompt-cache prewarm skipped. ${hint}`, {
-        sessionId, reason: skipped.data.data.reason,
+        sessionId,
+        reason: skipped.data.data.reason,
         handlers: registrations.filter(({ previewSafe }) => !previewSafe),
       })
       return
@@ -58,7 +61,8 @@ export function createPrewarmDiagnostics(pi: SenpiExtensionAPI, logger: Componen
           const error = new Error()
           Error.captureStackTrace(error, on)
           const registration = {
-            component, source: error.stack?.split("\n")[1]?.trim() ?? component,
+            component,
+            source: error.stack?.split("\n")[1]?.trim() ?? component,
             previewSafe: options?.previewSafe === true,
           }
           registrations.push(registration)
@@ -66,7 +70,13 @@ export function createPrewarmDiagnostics(pi: SenpiExtensionAPI, logger: Componen
             logger.warn(`omo-senpi unsafe before_agent_start registration. ${hint}`, registration)
           }
         }
-        pi.on(event, handler, options)
+        pi.on(
+          event,
+          event === "agent_settled" && options?.settleDelivery !== true
+            ? settles.wrap(component, options?.hookLabel ?? "onSettled", handler)
+            : handler,
+          options,
+        )
       }
       return new Proxy(pi, {
         get(target, property) {

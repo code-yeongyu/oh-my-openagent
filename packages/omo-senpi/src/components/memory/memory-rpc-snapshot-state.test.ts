@@ -19,7 +19,11 @@ import {
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  await Promise.all(tempDirs.splice(0).map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })))
+  await Promise.all(
+    tempDirs
+      .splice(0)
+      .map((dir) => rmEfaultTolerant(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 })
 
 async function fixtureRepo(): Promise<{ dir: string; repo: GitMemoryRepo; head: string }> {
@@ -38,10 +42,7 @@ async function fixtureRepo(): Promise<{ dir: string; repo: GitMemoryRepo; head: 
   return { dir, repo, head }
 }
 
-async function estimateSystemTokensLegacy(
-  repo: GitMemoryRepo,
-  head: string,
-): Promise<number> {
+async function estimateSystemTokensLegacy(repo: GitMemoryRepo, head: string): Promise<number> {
   const paths = (await repo.lsTree(head)).filter((path) => path.startsWith("system/") && path.endsWith(".md"))
   const contents = await Promise.all(paths.map((path) => repo.show(head, path)))
   const totalBytes = contents.reduce((sum, content) => sum + Buffer.byteLength(content, "utf8"), 0)
@@ -140,20 +141,13 @@ function snapshotDeps(
   }
 }
 
-async function writeCompletion(
-  context: MemoryIdentityContext,
-  record: Record<string, unknown>,
-): Promise<void> {
+async function writeCompletion(context: MemoryIdentityContext, record: Record<string, unknown>): Promise<void> {
   const dir = join(context.identityPaths.reflection, "completions")
   await mkdir(dir, { recursive: true })
   await writeFile(join(dir, `${String(record.runId)}.json`), JSON.stringify(record), "utf8")
 }
 
-function completion(
-  runId: string,
-  outcome: string,
-  finishedAt: string,
-): Record<string, unknown> {
+function completion(runId: string, outcome: string, finishedAt: string): Record<string, unknown> {
   return {
     schemaVersion: 1,
     runId,
@@ -174,15 +168,19 @@ describe("buildMemorySnapshot v1 compatibility", () => {
     const context = await contextFixture()
 
     // when
-    const snapshot = await buildMemorySnapshot(context, "session-1", snapshotDeps(stubRepo(), {
-      activeRun: () => ({
-        runId: "run-2",
-        trigger: "manual",
-        category: "quick",
-        model: "sonnet",
-        startedAt: "2026-08-10T01:00:00.000Z",
+    const snapshot = await buildMemorySnapshot(
+      context,
+      "session-1",
+      snapshotDeps(stubRepo(), {
+        activeRun: () => ({
+          runId: "run-2",
+          trigger: "manual",
+          category: "quick",
+          model: "sonnet",
+          startedAt: "2026-08-10T01:00:00.000Z",
+        }),
       }),
-    }))
+    )
 
     // then
     expect(snapshot.schemaVersion).toBe(1)
@@ -332,11 +330,7 @@ describe("buildMemorySnapshot previousEntryAtISO", () => {
     const context = await contextFixture()
 
     // when
-    const snapshot = await buildMemorySnapshot(
-      context,
-      "session-1",
-      snapshotDeps(createMemoryRpcGitRepo(dir)),
-    )
+    const snapshot = await buildMemorySnapshot(context, "session-1", snapshotDeps(createMemoryRpcGitRepo(dir)))
 
     // then
     expect(log).toHaveLength(2)
@@ -353,11 +347,7 @@ describe("buildMemorySnapshot previousEntryAtISO", () => {
     const context = await contextFixture()
 
     // when
-    const snapshot = await buildMemorySnapshot(
-      context,
-      "session-1",
-      snapshotDeps(createMemoryRpcGitRepo(dir)),
-    )
+    const snapshot = await buildMemorySnapshot(context, "session-1", snapshotDeps(createMemoryRpcGitRepo(dir)))
 
     // then
     expect(snapshot.repo.previousEntryAtISO).toBeUndefined()

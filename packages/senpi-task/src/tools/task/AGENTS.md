@@ -9,7 +9,7 @@ Single or `tasks:[...]` batch spawn of child tasks routed by category or agent. 
 | `tool.ts` | `createTaskTool` / `TASK_TOOL_NAME` (`"task"`). |
 | `params.ts` | TypeBox `TaskToolParams`; batches have no per-call size cap - items beyond the run limit queue in `TaskConcurrency`. Prompts MUST be English; `prompt` XOR `tasks`. |
 | `argument-normalization.ts` | Batch item inheritance from top-level params; empty provider padding normalized before validation; item-level `run_in_background` mirrors survive. |
-| `validation.ts` | `validateTaskTarget`, `resolveSpawnItems`, `validateBatchShape`, `resolveRunInBackground`; codes `both_targets` / `no_target` / `category_with_model` / `run_in_background_conflict`. |
+| `validation.ts` | `validateTaskTarget`, `resolveSpawnItems`, `validateBatchShape`, `resolveRunInBackground`; codes `both_targets` / `no_target` / `category_with_model` / `agent_with_model` (a builtin agent with a call-site model) / `run_in_background_conflict`. |
 | `categories.ts` / `description.ts` | Category/agent discovery and prompt description builders (plan-gated names get their own line). |
 | `execute.ts` | Entry: shape validation -> item resolution -> single/batch dispatch. |
 | `execute-single.ts` / `execute-batch.ts` / `execute-spec.ts` | Single spawn, batch aggregation (start/error/background/foreground), start-spec construction. |

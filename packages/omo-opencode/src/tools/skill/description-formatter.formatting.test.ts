@@ -2,30 +2,18 @@ import { describe, expect, it } from "bun:test"
 import { formatCombinedDescription } from "./description-formatter"
 import type { CommandInfo } from "../slashcommand/types"
 import type { SkillInfo } from "./types"
-import {
-  builtinSharedSkill,
-  makeCommand,
-  makeSkill,
-  sharedSkill,
-} from "./description-formatter.test-support"
+import { builtinSharedSkill, makeCommand, makeSkill, sharedSkill } from "./description-formatter.test-support"
 
 describe("formatCombinedDescription with bare-name skills", () => {
   it("lists all skills when no name collisions exist", () => {
-    const skills: SkillInfo[] = [
-      makeSkill("debugging"),
-      makeSkill("review-work"),
-    ]
+    const skills: SkillInfo[] = [makeSkill("debugging"), makeSkill("review-work")]
     const result = formatCombinedDescription(skills, [], { includeSkills: true })
     expect(result).toContain("/debugging")
     expect(result).toContain("/review-work")
   })
 
   it("keeps bare and qualified names distinct after the shared/ cutover", () => {
-    const skills: SkillInfo[] = [
-      sharedSkill("debugging"),
-      builtinSharedSkill("debugging"),
-      makeSkill("review-work"),
-    ]
+    const skills: SkillInfo[] = [sharedSkill("debugging"), builtinSharedSkill("debugging"), makeSkill("review-work")]
     const result = formatCombinedDescription(skills, [], { includeSkills: true })
     expect(result).toContain("/shared/debugging")
     expect(result).toContain("/debugging")

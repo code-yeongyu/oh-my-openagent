@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
+import { TELEMETRY_INSTALL_DISCLOSURE_LINES } from "@oh-my-opencode/telemetry-core/install-disclosure"
 import { defaultRunCommand } from "./codex-process"
 import { resolveCodexInstallerBinDir } from "./codex-installer-bin-dir"
 import { runCodexInstaller } from "./install-codex"
@@ -49,7 +50,9 @@ export async function runLazyCodexInstallLocalCli(input: {
     return 0
   }
   if (parsed.kind === "version") {
-    const packageJson = JSON.parse(await readFile(join(input.defaultRepoRoot, "package.json"), "utf8")) as { readonly version?: unknown }
+    const packageJson = JSON.parse(await readFile(join(input.defaultRepoRoot, "package.json"), "utf8")) as {
+      readonly version?: unknown
+    }
     const version = typeof packageJson.version === "string" ? packageJson.version : "unknown"
     input.log(`lazycodex-ai ${version}`)
     return 0
@@ -70,10 +73,15 @@ export async function runLazyCodexInstallLocalCli(input: {
         env: input.env,
         log: logWarning,
       })
-      input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
+      logInstalled(input.log, result)
       return 0
     }
-    return runLazyCodexManualUpdate({ env: input.env, dryRun: parsed.dryRun, log: input.log, invokedPath: input.invokedPath })
+    return runLazyCodexManualUpdate({
+      env: input.env,
+      dryRun: parsed.dryRun,
+      log: input.log,
+      invokedPath: input.invokedPath,
+    })
   }
 
   const repoRoot = parsed.repoRoot ? resolve(parsed.repoRoot) : input.defaultRepoRoot
@@ -83,6 +91,12 @@ export async function runLazyCodexInstallLocalCli(input: {
     env: input.env,
     log: logWarning,
   })
-  input.log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
+  logInstalled(input.log, result)
   return 0
+}
+
+function logInstalled(log: (line: string) => void, result: CodexInstallResult): void {
+  log(`Installed ${result.installed.length} plugin(s) from ${result.marketplaceName}.`)
+  log("")
+  for (const line of TELEMETRY_INSTALL_DISCLOSURE_LINES) log(line)
 }

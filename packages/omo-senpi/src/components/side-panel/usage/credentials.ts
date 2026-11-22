@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { resolveAgentHome, type AgentHomeEnv } from "../../agent-home/resolve-agent-home"
-import type { UsageCredentialSource } from "./poller"
+
+/** The credential files, already parsed. Injected so tests never touch a home directory. */
+export interface UsageCredentialSource {
+  readonly auth: unknown
+  readonly pool: unknown
+}
 
 /**
  * Reads the engine's own credential files.
@@ -12,8 +17,8 @@ import type { UsageCredentialSource } from "./poller"
  *
  * The host's generic key resolver normalises a credential and drops the per-account slots, and
  * those slots are exactly what decides which account is serving - so the files are the reliable
- * source here. They are re-read every poll rather than cached: tokens refresh and the pool fails
- * over between polls, and two small reads every couple of minutes cost nothing.
+ * source here. Only names and health are read from them; the numbers come from the engine. They are
+ * re-read on every limits report and turn rather than cached, because the pool fails over between turns.
  */
 export function createCredentialReader(env: AgentHomeEnv = process.env): () => UsageCredentialSource {
   const home = resolveAgentHome({ env })

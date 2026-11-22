@@ -41,6 +41,8 @@ export const DAEMON_LAUNCH_PARENT_ENV_FIXTURE: Readonly<Record<string, string | 
   SENPI_TASK_TEAM_CONFIG: "{}",
   OMO_WORKPOOL_STATE_DIR: "/tmp/workpool",
   OMO_WORKPOOL_TASK_ID: "t-2",
+  // A session of a pinned operator host (`omo daemon run --pinned`) carries this; a task host must not.
+  SENPI_RPC_HOST_COLD_START: "persistent",
   SENPI_RPC_SESSION_IDLE_EVICTION_MS: "60000",
 }
 
@@ -64,6 +66,7 @@ export const DAEMON_LAUNCH_FIXTURE = {
       OMO_SENPI_TASK_DEPTH: null,
       OMO_SENPI_TASK_ROOT_SESSION_ID: null,
       SENPI_CODING_AGENT_SESSION_DIR: null,
+      SENPI_RPC_HOST_COLD_START: null,
       SENPI_TASK_MEMBER: null,
       SENPI_TASK_MEMBER_TASK_ID: null,
       SENPI_TASK_TEAM_CONFIG: null,

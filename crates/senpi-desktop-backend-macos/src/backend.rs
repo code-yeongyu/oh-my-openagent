@@ -2,9 +2,8 @@
 //! runtime capabilities that report the SkyLight/canary truth.
 
 use image::RgbaImage;
-use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
-use senpi_desktop_core::ax::AxBackend;
-use senpi_desktop_core::backend::{Backend, DeliveryMode, PointerEvent};
+use senpi_desktop_core::ax::{AxBackend, AxHandle};
+use senpi_desktop_core::backend::{Backend, DeliveryMode, ElementDelivery, PointerEvent};
 use senpi_desktop_core::error::{CoreResult, DesktopError, TccPermission};
 use senpi_desktop_core::frame::FrameGeometry;
 use senpi_desktop_core::keys::KeyName;
@@ -13,12 +12,14 @@ use senpi_desktop_core::types::{
     CaptureCaps, DesktopCapabilities, DesktopDisplay, DesktopPoint, DesktopWindow, DisplaySelector,
     FrontWindow, Target,
 };
+use senpi_desktop_core::user_input::UserPresses;
 
 use crate::ax::{is_trusted, MacAx};
 use crate::capture::{MacCapture, Screencapture};
-use crate::input::{CanaryMode, CanaryResult, MacInput};
+use crate::input::{CanaryMode, CanaryResult, MacInput, RawFeed, UserInputWatch};
 
 mod capabilities;
+mod raise;
 
 #[path = "permissions.rs"]
 pub(crate) mod permissions;
@@ -28,16 +29,23 @@ pub struct MacosBackend {
     input: MacInput,
     ax: MacAx,
     overlay: crate::overlay::Overlay,
+    screen: std::sync::Arc<crate::screen::MacScreen>,
+    user_input: UserInputWatch,
+    /// The watch's feed shared by the session and key priming, once started.
+    raw_feed: Option<std::sync::Arc<RawFeed>>,
 }
 
 impl MacosBackend {
     pub fn new(display: DisplaySelector) -> CoreResult<Self> {
         let overlay = crate::overlay::Overlay::default();
         Ok(Self {
+            screen: std::sync::Arc::new(crate::screen::MacScreen::new(display.clone())),
             capture: MacCapture::new(display, Screencapture::system()).with_overlay(overlay.clone()),
             input: MacInput::new(CanaryMode::Session)?.with_overlay(overlay.clone()),
             ax: MacAx::with_overlay(overlay.clone()),
             overlay,
+            user_input: UserInputWatch::default(),
+            raw_feed: None,
         })
     }
 
@@ -116,8 +124,20 @@ impl Backend for MacosBackend {
         MacosBackend::capabilities(self)
     }
 
+    fn hit_at(&mut self, x: f64, y: f64) -> CoreResult<Option<senpi_desktop_core::frame::PointHit>> {
+        crate::ax::element::hit_at(x, y)
+    }
+
     fn set_show_cursor(&mut self, enabled: bool) {
         MacosBackend::set_show_cursor(self, enabled);
+    }
+
+    fn set_key_priming(&mut self, mode: senpi_desktop_core::types::KeyPriming) {
+        crate::input::set_key_priming(mode);
+    }
+
+    fn set_report_mode(&mut self, mode: senpi_desktop_core::report::ReportMode) {
+        crate::input::set_key_report_mode(mode);
     }
 
     fn displays(&mut self) -> CoreResult<Vec<DesktopDisplay>> {
@@ -175,10 +195,34 @@ impl Backend for MacosBackend {
         self.input.type_text_interruptible(target, text, mode, &self.capture, check_stop, delivered)
     }
 
+    fn ax_type_text(
+        &mut self,
+        h: &AxHandle,
+        text: &str,
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+    ) -> CoreResult<ElementDelivery> {
+        Self::require_input_permission()?;
+        self.ax.show_target(h);
+        let element = crate::ax::element::element(h)?;
+        self.input.ax_type_text(element, text, mode, &self.capture, check_stop, delivered)
+    }
+
     fn key_chord(&mut self, target: &Target, keys: &[KeyName], mode: DeliveryMode) -> CoreResult<()> {
+        self.key_chord_interruptible(target, keys, mode, &|| Ok(()))
+    }
+
+    fn key_chord_interruptible(
+        &mut self,
+        target: &Target,
+        keys: &[KeyName],
+        mode: DeliveryMode,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+    ) -> CoreResult<()> {
         Self::require_input_permission()?;
         self.show_typing_target(target);
-        self.input.key_chord(target, keys, mode, &self.capture)
+        self.input.key_chord(target, keys, mode, &self.capture, check_stop)
     }
 
     fn hold_keys(
@@ -212,8 +256,10 @@ impl Backend for MacosBackend {
         Self::require_input_permission()?;
         let (input, capture) = (&mut self.input, &self.capture);
         match delivery {
-            DeliveryMode::Background => crate::ax::menus::select(window, path, check_stop, &mut || {
-                input.make_menu_window_key(window, capture)
+            DeliveryMode::Background => crate::skylight::reporting_partial(|| {
+                crate::ax::menus::select(window, path, check_stop, &mut || {
+                    input.make_menu_window_key(window, capture)
+                })
             }),
             // The window is already key inside the foreground scope, so `make_key` only verifies it.
             DeliveryMode::Foreground => {
@@ -227,31 +273,7 @@ impl Backend for MacosBackend {
 
     fn raise_window(&mut self, id: &str) -> CoreResult<()> {
         Self::require_input_permission()?;
-        let window = self
-            .capture
-            .windows()?
-            .into_iter()
-            .find(|window| window.id == id)
-            .ok_or_else(|| {
-                DesktopError::window_not_found(format!(
-                    "window '{id}' was not found; it may be closed or minimized"
-                ))
-            })?;
-        self.ax.raise(&window)?;
-        let pid = window
-            .pid
-            .ok_or_else(|| DesktopError::input_failed(format!("window {id} has no owning process id")))?;
-        let pid = i32::try_from(pid)
-            .map_err(|_| DesktopError::input_failed(format!("window {id} has an invalid process id")))?;
-        let app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid).ok_or_else(|| {
-            DesktopError::window_not_found(format!("application for window '{id}' is no longer running"))
-        })?;
-        if !app.activateWithOptions(NSApplicationActivationOptions::empty()) {
-            return Err(DesktopError::input_failed(format!(
-                "activation request for window '{id}' was rejected"
-            )));
-        }
-        Ok(())
+        self.raise(id)
     }
 
     fn ax(&mut self) -> Option<&mut dyn AxBackend> {
@@ -284,5 +306,43 @@ impl Backend for MacosBackend {
 
     fn screen_locked(&mut self) -> CoreResult<bool> {
         crate::cursor::screen_locked()
+    }
+
+    fn hold_display_awake(&mut self) -> Option<senpi_desktop_core::backend::DisplayAwakeHold> {
+        crate::power::hold_display_awake()
+    }
+
+    fn screen_probe(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::ScreenProbe>> {
+        Some(self.screen.clone())
+    }
+
+    fn epoch_source(&self) -> Option<std::sync::Arc<dyn senpi_desktop_core::backend::EpochSource>> {
+        Some(crate::epoch_sources::MacEpochs::new())
+    }
+
+    fn watch_user_input(&mut self) {
+        self.user_input.start();
+        if self.raw_feed.is_none() {
+            if let Some(feed) = self.user_input.feed() {
+                let raw = std::sync::Arc::new(RawFeed::new(feed));
+                self.input.set_raw_feed(std::sync::Arc::clone(&raw));
+                self.raw_feed = Some(raw);
+            }
+        }
+    }
+
+    fn take_user_presses(&mut self) -> UserPresses {
+        // Presses key priming already drained wait in the raw feed.
+        match &self.raw_feed {
+            Some(raw) => senpi_desktop_core::user_input::UserInputFeed::take(&**raw),
+            None => self.user_input.take(),
+        }
+    }
+
+    fn user_input_feed(&mut self) -> Option<std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>> {
+        match &self.raw_feed {
+            Some(raw) => Some(std::sync::Arc::clone(raw) as std::sync::Arc<dyn senpi_desktop_core::user_input::UserInputFeed>),
+            None => self.user_input.feed(),
+        }
     }
 }

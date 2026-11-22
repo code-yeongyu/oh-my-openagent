@@ -3,6 +3,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { GitMemoryRepo } from "../git"
+import { disableFixtureAutoMaintenance } from "../git/test-repo-config.test-support"
 
 interface CompiledBlockStructure {
   readonly sections: readonly string[]
@@ -25,12 +26,12 @@ export function parseCompiledBlock(block: string): CompiledBlockStructure {
     }
   }
 
-  const projectionPaths = [...block.matchAll(/<projection>\$MEMORY_DIR\/([^<]+)<\/projection>/g)]
-    .map((match) => match[1] ?? "")
+  const projectionPaths = [...block.matchAll(/<projection>\$MEMORY_DIR\/([^<]+)<\/projection>/g)].map(
+    (match) => match[1] ?? "",
+  )
   const memory = region(block, "memory")
-  const memoryOpenTags = memory === undefined
-    ? []
-    : [...memory.matchAll(/^\s*<([a-z][a-z0-9_-]*)>$/gm)].map((match) => match[1] ?? "")
+  const memoryOpenTags =
+    memory === undefined ? [] : [...memory.matchAll(/^\s*<([a-z][a-z0-9_-]*)>$/gm)].map((match) => match[1] ?? "")
   const metadata = requiredRegion(block, "memory_metadata")
   const agentId = requiredMatch(metadata, /^- AGENT_ID: (.+)$/m)
 
@@ -64,6 +65,7 @@ export async function repoWith(files: Array<{ relativePath: string; content: str
   onTestFinished(() => rm(dir, { recursive: true, force: true }))
   const repo = new GitMemoryRepo({ dir, agentId: "fixture-agent" })
   await repo.init({ seedFiles: files })
+  disableFixtureAutoMaintenance(dir)
   return { dir, repo }
 }
 

@@ -5,11 +5,7 @@ function isCrossDeviceError(error: unknown): boolean {
   return error instanceof Error && Reflect.get(error, "code") === "EXDEV"
 }
 
-export function moveMigrationBackup(
-  fileSystem: MigrationFileSystem,
-  sourcePath: string,
-  backupPath: string,
-): void {
+export function moveMigrationBackup(fileSystem: MigrationFileSystem, sourcePath: string, backupPath: string): void {
   // Moving a link must never change its target's mode or replace it with a dereferenced copy.
   if (!fileSystem.lstatSync(sourcePath).isSymbolicLink()) {
     const temporaryPath = `${backupPath}.${randomUUID()}.tmp`

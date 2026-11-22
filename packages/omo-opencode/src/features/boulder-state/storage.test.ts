@@ -112,11 +112,14 @@ describe("boulder-state", () => {
     test("should default session_ids to [] when missing from JSON", () => {
       //#given - boulder.json without session_ids field
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          plan_name: "plan",
+        }),
+      )
 
       //#when
       const result = readBoulderState(TEST_DIR)
@@ -129,12 +132,15 @@ describe("boulder-state", () => {
     test("should default session_ids to [] when not an array", () => {
       //#given - boulder.json with session_ids as a string
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: "not-an-array",
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          session_ids: "not-an-array",
+          plan_name: "plan",
+        }),
+      )
 
       //#when
       const result = readBoulderState(TEST_DIR)
@@ -159,12 +165,15 @@ describe("boulder-state", () => {
     test("should backfill missing origin as direct only for a single tracked session", () => {
       // given
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "plan",
+        }),
+      )
 
       // when
       const result = readBoulderState(TEST_DIR)
@@ -176,12 +185,15 @@ describe("boulder-state", () => {
     test("should keep missing origins empty when multiple sessions are tracked", () => {
       // given
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1", "session-2"],
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          session_ids: ["session-1", "session-2"],
+          plan_name: "plan",
+        }),
+      )
 
       // when
       const result = readBoulderState(TEST_DIR)
@@ -212,12 +224,15 @@ describe("boulder-state", () => {
     test("should default task_sessions to empty object when missing from JSON", () => {
       // given - boulder.json without task_sessions field
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["session-1"],
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          session_ids: ["session-1"],
+          plan_name: "plan",
+        }),
+      )
 
       // when
       const result = readBoulderState(TEST_DIR)
@@ -248,25 +263,25 @@ describe("boulder-state", () => {
       expect(readBack?.active_plan).toBe("/test/plan.md")
     })
 
-    test('should create .omo/.gitignore when .omo directory is first created', () => {
+    test("should create .omo/.gitignore when .omo directory is first created", () => {
       // given - a fresh temp directory without .omo
-      const freshDir = join(tmpdir(), 'boulder-state-fresh-' + Date.now())
+      const freshDir = join(tmpdir(), "boulder-state-fresh-" + Date.now())
       try {
         // when - write boulder state to a fresh directory
         const state: BoulderState = {
-          active_plan: '/test/gitignore-plan.md',
-          started_at: '2026-05-01T00:00:00Z',
-          session_ids: ['ses-gitignore'],
-          plan_name: 'gitignore-test',
+          active_plan: "/test/gitignore-plan.md",
+          started_at: "2026-05-01T00:00:00Z",
+          session_ids: ["ses-gitignore"],
+          plan_name: "gitignore-test",
         }
         const success = writeBoulderState(freshDir, state)
 
         // then
         expect(success).toBe(true)
-        const gitignorePath = join(freshDir, '.omo', '.gitignore')
+        const gitignorePath = join(freshDir, ".omo", ".gitignore")
         expect(existsSync(gitignorePath)).toBe(true)
-        const content = readFileSync(gitignorePath, 'utf-8')
-        expect(content).toBe('*\n!/rules/\n!/rules/**\n')
+        const content = readFileSync(gitignorePath, "utf-8")
+        expect(content).toBe("*\n!/rules/\n!/rules/**\n")
       } finally {
         rmSync(freshDir, { recursive: true, force: true })
       }
@@ -321,11 +336,14 @@ describe("boulder-state", () => {
     test("should not crash when boulder.json has no session_ids field", () => {
       //#given - boulder.json without session_ids
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/plan.md",
-        started_at: "2026-01-01T00:00:00Z",
-        plan_name: "plan",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/plan.md",
+          started_at: "2026-01-01T00:00:00Z",
+          plan_name: "plan",
+        }),
+      )
 
       //#when
       const result = appendSessionId(TEST_DIR, "ses-new")
@@ -451,12 +469,7 @@ describe("boulder-state", () => {
   describe("multi-work helpers", () => {
     test("should add second work and keep both active works", () => {
       // given
-      const firstState = createBoulderState(
-        join(TEST_DIR, ".omo/plans/plan-a.md"),
-        "session-a",
-        "atlas",
-        "/worktree-a",
-      )
+      const firstState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a", "atlas", "/worktree-a")
       writeBoulderState(TEST_DIR, firstState)
       const firstWorkId = firstState.active_work_id
 
@@ -480,10 +493,7 @@ describe("boulder-state", () => {
 
     test("should resolve work for session using updated_at tie-break", () => {
       // given
-      const baseState = createBoulderState(
-        join(TEST_DIR, ".omo/plans/plan-a.md"),
-        "session-a",
-      )
+      const baseState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-a.md"), "session-a")
       writeBoulderState(TEST_DIR, baseState)
       const stateWithSecond = addBoulderWork(TEST_DIR, {
         planPath: join(TEST_DIR, ".omo/plans/plan-b.md"),
@@ -647,10 +657,7 @@ describe("boulder-state", () => {
 
     test("should keep first completion timing when completeBoulder is called repeatedly", () => {
       // given
-      const initialState = createBoulderState(
-        join(TEST_DIR, ".omo/plans/plan-idempotent.md"),
-        "session-a",
-      )
+      const initialState = createBoulderState(join(TEST_DIR, ".omo/plans/plan-idempotent.md"), "session-a")
       writeBoulderState(TEST_DIR, initialState)
       const workId = initialState.active_work_id!
 
@@ -671,7 +678,9 @@ describe("boulder-state", () => {
     test("should return the first unchecked top-level task in TODOs", () => {
       // given - plan with nested and top-level unchecked tasks
       const planPath = join(TEST_DIR, "current-task-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Finished task
@@ -680,7 +689,8 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+      )
 
       // when
       const result = readCurrentTopLevelTask(planPath)
@@ -694,14 +704,17 @@ describe("boulder-state", () => {
     test("should fall back to final-wave task when implementation tasks are complete", () => {
       // given - plan with only final-wave work remaining
       const planPath = join(TEST_DIR, "final-wave-current-task-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Finished task
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+      )
 
       // when
       const result = readCurrentTopLevelTask(planPath)
@@ -717,7 +730,9 @@ describe("boulder-state", () => {
     test("should count only top-level tasks under TODOs and Final Verification Wave sections", () => {
       // given - plan with top-level tasks in tracked sections
       const planPath = join(TEST_DIR, "test-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [ ] 1. Task 1
@@ -727,7 +742,8 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -741,7 +757,9 @@ describe("boulder-state", () => {
     test("should ignore nested Acceptance Criteria checkboxes under TODOs (issue #3066)", () => {
       // given - plan with 9 completed top-level tasks and unchecked nested acceptance criteria
       const planPath = join(TEST_DIR, "issue-3066-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Implement feature A
@@ -766,7 +784,8 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [ ] F1. Final review
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -780,7 +799,9 @@ describe("boulder-state", () => {
     test("should ignore checkboxes outside TODOs and Final Verification Wave sections", () => {
       // given - plan with checkboxes in Work Objectives, Success Criteria, and other sections
       const planPath = join(TEST_DIR, "ignore-other-sections-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## Work Objectives
 
@@ -797,7 +818,8 @@ describe("boulder-state", () => {
 - [ ] All Must Have present
 - [ ] All Must NOT Have absent
 - [ ] All tests pass
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -811,14 +833,17 @@ describe("boulder-state", () => {
     test("#given a child heading inside TODOs #when progress is read #then parent-section rows remain counted", () => {
       // given
       const planPath = join(TEST_DIR, "todo-subsection-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Canonical task
 
 ### Notes
 - [ ] 2. Canonical task after child heading
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -830,7 +855,9 @@ describe("boulder-state", () => {
     test("#given fenced task examples #when progress is read #then fenced rows match continuation scope", () => {
       // given
       const planPath = join(TEST_DIR, "fenced-task-example-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Canonical task
@@ -838,7 +865,8 @@ describe("boulder-state", () => {
 \`\`\`md
 - [ ] 2. Fenced example
 \`\`\`
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -850,12 +878,15 @@ describe("boulder-state", () => {
     test("should ignore indented checkboxes under top-level tasks", () => {
       // given - plan with indented unchecked nested checkboxes
       const planPath = join(TEST_DIR, "nested-indented-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. top-level completed task
   - [ ] nested unchecked task
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -869,12 +900,15 @@ describe("boulder-state", () => {
     test("should require proper task label format in TODOs", () => {
       // given - plan with malformed labels (no numeric prefix)
       const planPath = join(TEST_DIR, "malformed-labels-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [ ] no number prefix
 - [x] 1. Valid numbered task
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -888,7 +922,9 @@ describe("boulder-state", () => {
     test("should require F-prefix label format in Final Verification Wave", () => {
       // given - plan with malformed final-wave labels
       const planPath = join(TEST_DIR, "malformed-final-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Implementation done
@@ -897,7 +933,8 @@ describe("boulder-state", () => {
 - [ ] missing F-prefix
 - [ ] F1. Proper final review
 - [x] F2. Another final review
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -911,7 +948,9 @@ describe("boulder-state", () => {
     test("should return isComplete true when all top-level tasks checked", () => {
       // given - all top-level tasks completed
       const planPath = join(TEST_DIR, "complete-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 - [x] 1. Task 1
@@ -919,7 +958,8 @@ describe("boulder-state", () => {
 
 ## Final Verification Wave
 - [x] F1. Final review
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -956,12 +996,15 @@ describe("boulder-state", () => {
     test("should reject noncanonical asterisk bullets in structured task sections", () => {
       // given - structured rows that do not use the canonical dash marker
       const planPath = join(TEST_DIR, "asterisk-bullet-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## TODOs
 * [x] 1. Task using asterisk bullet
 * [ ] 2. Another asterisk task
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -975,13 +1018,16 @@ describe("boulder-state", () => {
     test("should count only top-level checkboxes for simple plans with nested tasks", () => {
       // given
       const planPath = join(TEST_DIR, "simple-nested-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 - [ ] Top-level task 1
   - [x] Nested task ignored
 - [x] Top-level task 2
     * [ ] Another nested task ignored
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -995,12 +1041,15 @@ describe("boulder-state", () => {
     test("should treat final-wave-only plans as structured mode", () => {
       // given
       const planPath = join(TEST_DIR, "final-wave-only-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 ## Final Verification Wave
 - [ ] F1. Top-level final review
   - [x] Nested verification detail ignored
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -1014,13 +1063,16 @@ describe("boulder-state", () => {
     test("should ignore mixed indentation levels in simple plans", () => {
       // given
       const planPath = join(TEST_DIR, "simple-mixed-indentation-plan.md")
-      writeFileSync(planPath, `# Plan
+      writeFileSync(
+        planPath,
+        `# Plan
 
 * [x] Top-level star task
  - [ ] Indented task ignored
 	- [x] Tab-indented task ignored
 - [ ] Top-level dash task
-`)
+`,
+      )
 
       // when
       const progress = getPlanProgress(planPath)
@@ -1172,12 +1224,15 @@ describe("boulder-state", () => {
     test("#given a legacy boulder file with bare session id #when read #then opencode prefix is migrated", () => {
       // given
       const boulderFile = join(OMO_DIR, "boulder.json")
-      writeFileSync(boulderFile, JSON.stringify({
-        active_plan: "/path/to/legacy.md",
-        started_at: "2026-01-01T00:00:00Z",
-        session_ids: ["legacy-bare-id"],
-        plan_name: "legacy",
-      }))
+      writeFileSync(
+        boulderFile,
+        JSON.stringify({
+          active_plan: "/path/to/legacy.md",
+          started_at: "2026-01-01T00:00:00Z",
+          session_ids: ["legacy-bare-id"],
+          plan_name: "legacy",
+        }),
+      )
 
       // when
       const state = readBoulderState(TEST_DIR)

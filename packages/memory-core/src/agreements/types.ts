@@ -33,6 +33,13 @@ export interface FactsKnownAgreement {
   readonly n: number
 }
 
-export type AgreementExtractionRecord =
+export interface AgreementSourceEvent {
+  readonly sessionId: string
+  readonly messageId: string
+}
+
+// Missing only on extraction/recovery artifacts written before source-event version 1.
+export type AgreementExtractionRecord = (
   | { readonly action: "new"; readonly applies: AgreementScope; readonly text: string; readonly date: string }
   | { readonly action: "reaffirm"; readonly id: string; readonly date: string; readonly text?: string }
+) & { readonly source?: AgreementSourceEvent }

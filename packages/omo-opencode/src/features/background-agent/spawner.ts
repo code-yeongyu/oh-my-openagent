@@ -27,10 +27,7 @@ export function createTask(input: LaunchInput): BackgroundTask {
   return buildTaskRecord(input, `bg_${crypto.randomUUID().slice(0, 8)}`, new Date())
 }
 
-export async function startTask(
-  item: QueueItem,
-  ctx: SpawnerContext
-): Promise<void> {
+export async function startTask(item: QueueItem, ctx: SpawnerContext): Promise<void> {
   const { task, input } = item
   const { client, directory, concurrencyManager, tmuxEnabled, onSubagentSessionCreated, onTaskError } = ctx
 
@@ -40,33 +37,35 @@ export async function startTask(
     model: input.model,
   })
 
-  const concurrencyKey = input.model
-    ? `${input.model.providerID}/${input.model.modelID}`
-    : input.agent
+  const concurrencyKey = input.model ? `${input.model.providerID}/${input.model.modelID}` : input.agent
 
-  const parentSession = await client.session.get({
-    path: { id: input.parentSessionId },
-    query: { directory },
-  }).catch((err: unknown) => {
-    log(`[background-agent] Failed to get parent session: ${err}`)
-    return null
-  })
+  const parentSession = await client.session
+    .get({
+      path: { id: input.parentSessionId },
+      query: { directory },
+    })
+    .catch((err: unknown) => {
+      log(`[background-agent] Failed to get parent session: ${err}`)
+      return null
+    })
   const parentDirectory = parentSession?.data?.directory ?? directory
   const childDirectory = input.cwd ?? parentDirectory
   log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${childDirectory}`)
 
-  const createResult = await client.session.create({
-    body: {
-      parentID: input.parentSessionId,
-      ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
-    } as Record<string, unknown>,
-    query: {
-      directory: childDirectory,
-    },
-  }).catch((error: unknown) => {
-    concurrencyManager.release(concurrencyKey)
-    throw error
-  })
+  const createResult = await client.session
+    .create({
+      body: {
+        parentID: input.parentSessionId,
+        ...(input.sessionPermission ? { permission: input.sessionPermission } : {}),
+      } as Record<string, unknown>,
+      query: {
+        directory: childDirectory,
+      },
+    })
+    .catch((error: unknown) => {
+      concurrencyManager.release(concurrencyKey)
+      throw error
+    })
 
   if (createResult.error) {
     concurrencyManager.release(concurrencyKey)
@@ -117,10 +116,14 @@ export async function startTask(
   setSessionTools(sessionID, promptBody.tools)
 
   // Must fire BEFORE tmux callback: attach client needs session activity to render TUI.
-  const promptChain = promptWithRetryInDirectory(client, {
-    path: { id: sessionID },
-    body: promptBody,
-  }, childDirectory).catch(async (error) => {
+  const promptChain = promptWithRetryInDirectory(
+    client,
+    {
+      path: { id: sessionID },
+      body: promptBody,
+    },
+    childDirectory,
+  ).catch(async (error) => {
     if (isAgentNotFoundError(error) && input.agent !== FALLBACK_AGENT) {
       log("[background-agent] Agent not found, retrying with fallback agent", {
         original: input.agent,
@@ -134,10 +137,14 @@ export async function startTask(
         const fallbackTools = fallbackBody.tools as Record<string, boolean>
         setSessionTools(sessionID, fallbackTools)
         updateSessionAgent(sessionID, FALLBACK_AGENT)
-        await promptWithRetryInDirectory(client, {
-          path: { id: sessionID },
-          body: fallbackBody,
-        }, childDirectory)
+        await promptWithRetryInDirectory(
+          client,
+          {
+            path: { id: sessionID },
+            body: fallbackBody,
+          },
+          childDirectory,
+        )
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {
@@ -166,7 +173,7 @@ export async function startTask(
 export async function resumeTask(
   task: BackgroundTask,
   input: ResumeInput,
-  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "directory" | "onTaskError">
+  ctx: Pick<SpawnerContext, "client" | "concurrencyManager" | "directory" | "onTaskError">,
 ): Promise<void> {
   const { client, concurrencyManager, directory, onTaskError } = ctx
 
@@ -178,7 +185,7 @@ export async function resumeTask(
   if (task.status === "running") {
     throw new Error(
       `Task ${task.id} is currently running and cannot accept a continuation prompt. ` +
-      "Wait for it to complete before resuming it with task_id.",
+        "Wait for it to complete before resuming it with task_id.",
     )
   }
 
@@ -233,10 +240,14 @@ export async function resumeTask(
   })
   setSessionTools(sessionID, resumeBody.tools)
 
-  promptWithRetryInDirectory(client, {
-    path: { id: sessionID },
-    body: resumeBody,
-  }, directory).catch(async (error) => {
+  promptWithRetryInDirectory(
+    client,
+    {
+      path: { id: sessionID },
+      body: resumeBody,
+    },
+    directory,
+  ).catch(async (error) => {
     if (isAgentNotFoundError(error) && task.agent !== FALLBACK_AGENT) {
       log("[background-agent] Resume agent not found, retrying with fallback agent", {
         original: task.agent,
@@ -250,10 +261,14 @@ export async function resumeTask(
         const fallbackTools = fallbackBody.tools as Record<string, boolean>
         setSessionTools(sessionID, fallbackTools)
         updateSessionAgent(sessionID, FALLBACK_AGENT)
-        await promptWithRetryInDirectory(client, {
-          path: { id: sessionID },
-          body: fallbackBody,
-        }, directory)
+        await promptWithRetryInDirectory(
+          client,
+          {
+            path: { id: sessionID },
+            body: fallbackBody,
+          },
+          directory,
+        )
         task.agent = FALLBACK_AGENT
         return
       } catch (retryError) {

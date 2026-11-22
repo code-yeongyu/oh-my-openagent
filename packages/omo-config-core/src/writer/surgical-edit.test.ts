@@ -47,7 +47,7 @@ describe("applyOmoConfigEdit", () => {
 
   test("#given an empty object #when a member is added #then the object is opened onto its own lines", () => {
     // given
-    const content = '// top\n{}\n'
+    const content = "// top\n{}\n"
 
     // when
     const next = applyOmoConfigEdit(content, { path: ["a"], value: 1 })
@@ -120,7 +120,9 @@ describe("applyOmoConfigEdit", () => {
     const next = applyOmoConfigEdit(content, { path: ["d"], value: { e: 1 } })
 
     // then
-    expect(next).toBe('{\r\n    "a": 1, // keep me\r\n    "b": {\r\n        "c": true\r\n    },\r\n    "d": {\r\n        "e": 1\r\n    }\r\n}\r\n')
+    expect(next).toBe(
+      '{\r\n    "a": 1, // keep me\r\n    "b": {\r\n        "c": true\r\n    },\r\n    "d": {\r\n        "e": 1\r\n    }\r\n}\r\n',
+    )
   })
 
   test("#given a CRLF file #when a member is removed #then the other lines are byte-identical", () => {
@@ -146,13 +148,16 @@ describe("applyOmoConfigEdit", () => {
   })
 
   test.each([
-    ['{\n  "a": 1,\n}\n', '{\n}\n'],
-    ['{\r\n  "a": 1,\r\n}\r\n', '{\r\n}\r\n'],
-  ])("#given %p whose sole member has a trailing comma #when it is removed #then the object stays valid", (content, expected) => {
-    // when
-    const next = applyOmoConfigEdit(content, { path: ["a"], value: undefined })
+    ['{\n  "a": 1,\n}\n', "{\n}\n"],
+    ['{\r\n  "a": 1,\r\n}\r\n', "{\r\n}\r\n"],
+  ])(
+    "#given %p whose sole member has a trailing comma #when it is removed #then the object stays valid",
+    (content, expected) => {
+      // when
+      const next = applyOmoConfigEdit(content, { path: ["a"], value: undefined })
 
-    // then
-    expect(next).toBe(expected)
-  })
+      // then
+      expect(next).toBe(expected)
+    },
+  )
 })

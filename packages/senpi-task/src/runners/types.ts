@@ -4,6 +4,7 @@ import type { ChildExtensionListener } from "./child-extension-events"
 import type { EffectiveModel } from "./pinned-model-equivalence"
 import type { TaskRecord } from "../state"
 import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
+import type { NativeRunPause } from "../pause/native-child-pause"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -40,8 +41,8 @@ export type RpcRunnerSpec = {
   // The resolved variant the child must apply as its thinking level (`--thinking`).
   readonly variant?: string
   // The child's own fallback chain after `model`, as `provider/model[:thinking]` selectors in try order.
-  // A daemon-hosted child sends it as `open_session.retryFallback` when the host advertises
-  // `retry_fallback_profile` (#9512); the per-child process runner does not carry it.
+  // A daemon-hosted child sends it as `open_session.retryFallback` (#9512) and a per-child process as
+  // `set_retry_fallback` (#9582); a child whose engine cannot hold it is never started (#12006).
   readonly fallbackModels?: readonly string[]
   // Extension entry paths the child must load (`-e`). The child is spawned with `--no-extensions` and
   // then ONLY these are loaded, so a keyless local provider (or a production `-e` extension) the parent
@@ -51,20 +52,30 @@ export type RpcRunnerSpec = {
   // The child's own place in the task tree. A process child boots its own task engine, which reads
   // these back (per-child env or daemon session context) so ITS spawns count from here, not from 0.
   readonly depth?: number
+  readonly parent_session_id?: string
   readonly root_session_id?: string
+  // The delegating turn's W3C traceparent, read back the same two ways (per-child env or daemon session
+  // context) so the child's turn spans continue the parent's trace.
+  readonly traceparent?: string
+  // The parent's approval mode a separate-process child launches with (`--permission-preset`, #6189 F2c).
+  readonly permissionPreset?: string
 }
 
 export type ChildEventListener = (event: AgentSessionEvent) => void
 
+/** The durable id an input is sent under: the child holds it under this id (#2838 step 4). */
+export type InputIdentity = { readonly clientMessageId: string }
+
 export type ChildHandle = {
   reconcileInputs?(): Promise<void>
   readonly task_id: string
+  readonly runPause?: NativeRunPause
   readonly sessionId: string | undefined
   readonly pid: number | undefined
   /** The model the child actually opened on, when its open path observed one (host get_state; #9722). */
   readonly reportedModel?: EffectiveModel
-  steer(text: string): Promise<void>
-  followUp(text: string): Promise<void>
+  steer(text: string, identity?: InputIdentity): Promise<void>
+  followUp(text: string, identity?: InputIdentity): Promise<void>
   abort(): Promise<void>
   subscribe(listener: ChildEventListener): () => void
   subscribeExtensionEvents?(listener: ChildExtensionListener): () => void

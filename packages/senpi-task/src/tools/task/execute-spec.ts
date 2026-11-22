@@ -22,7 +22,6 @@ export function buildStartSpec(
   deps: TaskToolDeps,
   cwd: string,
   kernelTools?: KernelToolGrant,
-  parentModel?: TaskToolContext["model"],
 ): ResolvedManagerStartSpec {
   const ancestry = deps.resolveAncestry?.(parentSessionId)
   const loadSkills = deps.loadSkills ?? createFsSkillLoader()
@@ -33,11 +32,15 @@ export function buildStartSpec(
   const isolated = params.isolated ?? isolation?.enabled ?? false
   return {
     prompt: skills.prepend + params.prompt,
-    ...(isolated ? {
-      isolated,
-      apply: params.apply ?? isolation?.apply ?? true,
-      merge: params.merge ?? isolation?.merge ?? "patch",
-    } : params.isolated === undefined ? {} : { isolated }),
+    ...(isolated
+      ? {
+          isolated,
+          apply: params.apply ?? isolation?.apply ?? true,
+          merge: params.merge ?? isolation?.merge ?? "patch",
+        }
+      : params.isolated === undefined
+        ? {}
+        : { isolated }),
     ...(skillSummary === undefined ? {} : { skills: skillSummary }),
     ...(params.task_summary !== undefined && { task_summary: params.task_summary }),
     parent_session_id: parentSessionId,
@@ -46,7 +49,6 @@ export function buildStartSpec(
     ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
     ...(executionMode === undefined ? {} : { execution_mode: executionMode }),
     ...(params.model !== undefined && { model: params.model }),
-    ...(parentModel !== undefined && { parent_model: `${parentModel.provider}/${parentModel.id}` }),
     ...(params.name !== undefined && { name: params.name }),
     ...(params.description !== undefined && { description: params.description }),
     ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
@@ -110,7 +112,10 @@ function resolvedAgentMode(
   deps: TaskToolDeps,
 ): ExecutionMode | undefined {
   if (!("subagentType" in target)) return undefined
-  return toExecutionMode(deps.agents[target.subagentType]?.executionMode) ?? deps.omoConfig.agents?.[target.subagentType]?.execution_mode
+  return (
+    toExecutionMode(deps.agents[target.subagentType]?.executionMode) ??
+    deps.omoConfig.agents?.[target.subagentType]?.execution_mode
+  )
 }
 
 function resolvedTaskExecutionMode(
@@ -143,4 +148,3 @@ export function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: bool
     ...(runInBackground !== undefined && { run_in_background: runInBackground }),
   }
 }
-

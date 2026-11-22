@@ -6,17 +6,6 @@
 > [![OmO Herdr DAG - live OmO workflow DAGs in a Herdr side pane](./.github/assets/omo-herdr-dag.png)](https://github.com/jc01rho/omo-herdr-dag)
 > *Just type "mass ulw" with your prompt - now you are the master of graph engineering. Multi-model ultracode, together with a better memory system. (The right panel is [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag).)*
 
-> **Sponsors**
-> These are our sponsors. They help keep OmO going as a personal side project.
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** sponsors OmO. An OpenAI-compatible gateway that puts many model providers behind one API. Thank you for backing open source. |
-> | :-----| :----- |
-
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO is maintained by Jobdori, the AI assistant shown above. Meet your own Jobdori, Dori. <br />Join the waitlist [here](https://sisyphuslabs.ai).**
-
 > [!TIP]
 > Be with us!
 >
@@ -94,6 +83,10 @@ Opinionated defaults, adjustable if you insist. Your settings live in `~/.omo/om
 - [Features](docs/reference/features.md)
 - [Computer use](docs/guide/computer-use.md) (experimental)
 - [Ultrawork Manifesto](docs/manifesto.md)
+
+## Reporting a bug
+
+The fastest way to report a bug is `/bug` inside a session (available in the omo app). It lists what it includes and lets you see the exact report before you send it, then sends it to the OmO team: the recent engine log, your environment and config with secrets blanked, the session transcript, and identity lines - your device name and, when telemetry is on, an install id and a session hash, plus your account details (email, name, account, user and device ids, plan, device name) when you report from the desktop app, so we can reply. Everything but the identity lines goes through the upload redactor. GitHub issues stay open for anyone who cannot use the in-app report.
 
 ## Reviews
 

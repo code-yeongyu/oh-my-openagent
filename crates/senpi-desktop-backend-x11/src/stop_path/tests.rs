@@ -120,3 +120,13 @@ fn a_failed_property_read_fails_closed_for_that_press_only() {
     assert_eq!(classify(DeviceType::SLAVE_KEYBOARD, keyboard, Some(false)), (true, true));
     assert_eq!(classify(DeviceType::SLAVE_KEYBOARD, keyboard, Some(true)), (false, true));
 }
+
+#[test]
+fn the_listener_refuses_a_server_whose_raw_events_stop_during_grabs() {
+    use super::xi2::raw_events_survive_grabs;
+    assert!(!raw_events_survive_grabs(2, 0), "XI 2.0 lets a keyboard grab swallow the chord");
+    assert!(!raw_events_survive_grabs(1, 5));
+    assert!(raw_events_survive_grabs(2, 1));
+    assert!(raw_events_survive_grabs(2, 4));
+    assert!(raw_events_survive_grabs(3, 0));
+}

@@ -115,6 +115,24 @@ fn a_disclaimed_engine_is_refused_before_serving() {
 }
 
 #[test]
+fn a_disclaimed_engine_emits_a_bounded_machine_record_before_the_diagnostic() {
+    let exit = spawn_engine(true);
+    assert_eq!(exit.code, 1);
+    let mut lines = exit.stderr.lines();
+    let record = lines.next().expect("machine record");
+    assert!(record.len() < 512);
+    let json = record
+        .strip_prefix("SENPI_DESKTOP_LAUNCH_REFUSED ")
+        .expect("structured refusal prefix");
+    let value: serde_json::Value = serde_json::from_str(json).expect("strict JSON");
+    assert_eq!(
+        value,
+        serde_json::json!({"version": 1, "reason": "self-responsible"})
+    );
+    assert!(lines.next().is_some(), "original human diagnostic retained");
+}
+
+#[test]
 fn an_engine_charged_to_its_launcher_serves() {
     // When
     let exit = spawn_engine(false);
@@ -147,9 +165,10 @@ fn every_entry_mode_is_refused_when_disclaimed() {
     let dir = tempfile::tempdir().expect("temp dir");
     let socket = dir.path().join("e.sock");
     let socket = socket.to_str().expect("utf-8 path");
-    let modes: [&[&str]; 9] = [
+    let modes: [&[&str]; 10] = [
         &["--stdio"],
         &["--cursor-overlay"],
+        &["--release-helper"],
         &["--schema"],
         &["--selftest"],
         &["--resume", "--endpoint", socket],

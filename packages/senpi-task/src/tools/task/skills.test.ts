@@ -147,11 +147,7 @@ describe("createFsSkillLoader", () => {
     const skillsDir = join(cwd, ".senpi", "skills")
     mkdirSync(skillsDir, { recursive: true })
     const skillPath = join(skillsDir, "direct.md")
-    writeFileSync(
-      skillPath,
-      "---\nname: direct\ndescription: Direct root skill\n---\nDIRECT BODY\n",
-      "utf8",
-    )
+    writeFileSync(skillPath, "---\nname: direct\ndescription: Direct root skill\n---\nDIRECT BODY\n", "utf8")
     const loader = createFsSkillLoader({ homeDir: scratch() })
 
     // when
@@ -203,6 +199,6 @@ describe("createFsSkillLoader", () => {
     // then
     expect(resolution.resolved).toEqual(["aliased"])
     expect(resolution.missing).toEqual(["missing-one", "missing-two"])
-    expect(scans).toEqual([projectSkills, agentSkills, globalSkills, packageSkills])
+    expect(scans).toEqual([agentSkills, globalSkills, packageSkills])
   })
 })

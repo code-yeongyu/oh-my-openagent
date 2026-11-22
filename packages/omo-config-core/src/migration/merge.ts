@@ -65,9 +65,7 @@ function applyAdditions(
   for (const [key, value] of Object.entries(additions)) {
     if (isUnsafeObjectKey(key)) continue
     const current = result[key]
-    result[key] = isPlainObject(current) && isPlainObject(value)
-      ? applyAdditions(current, value)
-      : cloneValue(value)
+    result[key] = isPlainObject(current) && isPlainObject(value) ? applyAdditions(current, value) : cloneValue(value)
   }
   return result
 }

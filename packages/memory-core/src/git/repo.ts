@@ -11,6 +11,7 @@ import { describeDirtyMarkdownEncodingIssues } from "./porcelain"
 import { GitPathStateStore } from "./path-state"
 import { authorFlags, commandError, normalizePathspecs, normalizeSeedPath } from "./repo-arguments"
 import { runMemoryRepoMaintenance } from "./repo-maintenance"
+import { ensureRepoConfigDefaults } from "./repo-config-defaults"
 import { PathCommitTimes } from "./repo-commit-times"
 import { GitRevisionReads } from "./repo-revision-reads"
 import { assertNoUnrelatedChanges } from "./repo-status"
@@ -32,8 +33,18 @@ import type {
 } from "./repo-types"
 
 export type {
-  GitCommitAuthor, GitCommitResult, GitLogOptions, GitMaintenanceOptions, GitMaintenanceResult, GitMemoryRepoOptions,
-  GitMergeOptions, GitSeedFile, GitTreeBlobEntry, GitTreeSizedEntry, InitializeGitRepoOptions, MemoryCommit,
+  GitCommitAuthor,
+  GitCommitResult,
+  GitLogOptions,
+  GitMaintenanceOptions,
+  GitMaintenanceResult,
+  GitMemoryRepoOptions,
+  GitMergeOptions,
+  GitSeedFile,
+  GitTreeBlobEntry,
+  GitTreeSizedEntry,
+  InitializeGitRepoOptions,
+  MemoryCommit,
 } from "./repo-types"
 
 const GIT_TIMEOUT_MS = 30_000
@@ -67,6 +78,7 @@ export class GitMemoryRepo {
     this.hookInstaller = options.installHooks ?? (() => undefined)
     this.commitTimeoutMs = options.commitTimeoutMs ?? COMMIT_TIMEOUT_MS
     this.reads = new GitRevisionReads({
+      dir: this.dir,
       run: (argv, timeoutMs) => this.git(argv, timeoutMs),
       result: (argv, stdin) => this.gitResult(argv, stdin),
     })
@@ -109,7 +121,9 @@ export class GitMemoryRepo {
       }
     }
 
-    await withStrandedGitLockRecovery(this.dir, () => this.git([...NO_AUTO_MAINTENANCE, ...authorFlags(author), "commit", "--allow-empty", "-m", EMPTY_INITIAL_COMMIT]))
+    await withStrandedGitLockRecovery(this.dir, () =>
+      this.git([...NO_AUTO_MAINTENANCE, ...authorFlags(author), "commit", "--allow-empty", "-m", EMPTY_INITIAL_COMMIT]),
+    )
     return this.requireHead()
   }
 
@@ -121,11 +135,7 @@ export class GitMemoryRepo {
     throw new DirtyRepoError(porcelain, describeDirtyMarkdownEncodingIssues(this.dir, porcelain))
   }
 
-  async commitWrite(
-    paths: readonly string[],
-    reason: string,
-    author: GitCommitAuthor,
-  ): Promise<GitCommitResult> {
+  async commitWrite(paths: readonly string[], reason: string, author: GitCommitAuthor): Promise<GitCommitResult> {
     await this.hookInstaller(this.dir)
     const normalized = normalizePathspecs(paths)
     if (normalized.length === 0) throw new NoEffectiveChangesError(normalized)
@@ -136,11 +146,7 @@ export class GitMemoryRepo {
     return this.commitPrepared(normalized, reason, author)
   }
 
-  async commitPrepared(
-    paths: readonly string[],
-    reason: string,
-    author: GitCommitAuthor,
-  ): Promise<GitCommitResult> {
+  async commitPrepared(paths: readonly string[], reason: string, author: GitCommitAuthor): Promise<GitCommitResult> {
     await this.hookInstaller(this.dir)
     const normalized = normalizePathspecs(paths)
     if (normalized.length === 0) throw new NoEffectiveChangesError(normalized)
@@ -154,18 +160,37 @@ export class GitMemoryRepo {
   async status(paths: readonly string[] = []): Promise<string> {
     const normalized = normalizePathspecs(paths)
     const suffix = normalized.length > 0 ? ["--", ...normalized] : []
-    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix])).stdout
+    return (await this.git(["-c", "core.quotePath=false", "status", "--porcelain", "--untracked-files=all", ...suffix]))
+      .stdout
   }
 
-  head(): Promise<string | null> { return this.reads.head() }
-  headCommitTimestamp(): Promise<number | null> { return this.reads.headCommitTimestamp() }
-  lsTree(revision = "HEAD", path?: string): Promise<string[]> { return this.reads.lsTree(revision, path) }
-  lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> { return this.reads.lsTreeSized(revision) }
-  lsTreeBlobs(revision = "HEAD"): Promise<readonly GitTreeBlobEntry[]> { return this.reads.lsTreeBlobs(revision) }
-  show(revision: string, path: string): Promise<string> { return this.reads.show(revision, path) }
-  pathCommitTimes(revision: string): Promise<ReadonlyMap<string, number>> { return this.commitTimes.at(revision) }
-  readBlobs(oids: readonly string[]): Promise<ReadonlyMap<string, string>> { return this.reads.readBlobs(oids) }
-  log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> { return this.reads.log(options) }
+  head(): Promise<string | null> {
+    return this.reads.head()
+  }
+  headCommitTimestamp(): Promise<number | null> {
+    return this.reads.headCommitTimestamp()
+  }
+  lsTree(revision = "HEAD", path?: string): Promise<string[]> {
+    return this.reads.lsTree(revision, path)
+  }
+  lsTreeSized(revision = "HEAD"): Promise<readonly GitTreeSizedEntry[]> {
+    return this.reads.lsTreeSized(revision)
+  }
+  lsTreeBlobs(revision = "HEAD"): Promise<readonly GitTreeBlobEntry[]> {
+    return this.reads.lsTreeBlobs(revision)
+  }
+  show(revision: string, path: string): Promise<string> {
+    return this.reads.show(revision, path)
+  }
+  pathCommitTimes(revision: string): Promise<ReadonlyMap<string, number>> {
+    return this.commitTimes.at(revision)
+  }
+  readBlobs(oids: readonly string[]): Promise<ReadonlyMap<string, string>> {
+    return this.reads.readBlobs(oids)
+  }
+  log(options: GitLogOptions = {}): Promise<readonly MemoryCommit[]> {
+    return this.reads.log(options)
+  }
 
   /**
    * Roll index and worktree back to HEAD for the given pathspecs after a refused
@@ -180,10 +205,14 @@ export class GitMemoryRepo {
     const tracked = normalized.filter((path) => atHead.has(path))
     const untracked = normalized.filter((path) => !atHead.has(path))
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () =>
+        this.git(["restore", "--source=HEAD", "--staged", "--worktree", "--", ...tracked]),
+      )
     }
     for (const path of untracked) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "--ignore-unmatch", "--", path]))
+      await withStrandedGitLockRecovery(this.dir, () =>
+        this.git(["rm", "-q", "--cached", "--ignore-unmatch", "--", path]),
+      )
       await rm(join(this.dir, path), { force: true })
     }
   }
@@ -191,10 +220,14 @@ export class GitMemoryRepo {
   /** Undo staged entries only; the working tree is left exactly as it is. */
   async unstage(tracked: readonly string[], untracked: readonly string[]): Promise<void> {
     if (tracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["restore", "--source=HEAD", "--staged", "--", ...tracked]))
+      await withStrandedGitLockRecovery(this.dir, () =>
+        this.git(["restore", "--source=HEAD", "--staged", "--", ...tracked]),
+      )
     }
     if (untracked.length > 0) {
-      await withStrandedGitLockRecovery(this.dir, () => this.git(["rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]))
+      await withStrandedGitLockRecovery(this.dir, () =>
+        this.git(["rm", "-q", "--cached", "-f", "--ignore-unmatch", "--", ...untracked]),
+      )
     }
   }
 
@@ -237,12 +270,8 @@ export class GitMemoryRepo {
     })
   }
 
-  private async ensureIdentity(authorName: string): Promise<void> {
-    if ((await this.configGet("omo.agentId")) !== this.agentId) await this.configSet("omo.agentId", this.agentId)
-    if (!(await this.configGet("user.email"))) await this.configSet("user.email", `${this.agentId}@omo.local`)
-    if (!(await this.configGet("user.name"))) await this.configSet("user.name", authorName)
-    if ((await this.configGet("commit.gpgsign")) === null) await this.configSet("commit.gpgsign", "false")
-    if ((await this.configGet("gc.auto")) === null) await this.configSet("gc.auto", "0")
+  private ensureIdentity(authorName: string): Promise<void> {
+    return ensureRepoConfigDefaults(this, { result: (argv, stdin) => this.gitResult(argv, stdin) }, authorName)
   }
 
   private async stage(paths: readonly string[]): Promise<void> {
@@ -253,14 +282,14 @@ export class GitMemoryRepo {
     return (await this.status(paths)).trim().length > 0
   }
 
-  private async commitStaged(
-    reason: string,
-    author: GitCommitAuthor,
-  ): Promise<GitCommitResult> {
+  private async commitStaged(reason: string, author: GitCommitAuthor): Promise<GitCommitResult> {
     // Every index/ref mutation on the commit path runs through transient-lock retry plus stranded
     // lock recovery, so a SIGKILLed writer's debris never wedges or corrupts the repo (omo #10177).
     const landedAfterTimeout = await commitJudgedByOutcome(
-      () => withStrandedGitLockRecovery(this.dir, () => this.git([...NO_AUTO_MAINTENANCE, ...authorFlags(author), "commit", "-m", reason], this.commitTimeoutMs)),
+      () =>
+        withStrandedGitLockRecovery(this.dir, () =>
+          this.git([...NO_AUTO_MAINTENANCE, ...authorFlags(author), "commit", "-m", reason], this.commitTimeoutMs),
+        ),
       { head: () => this.head(), result: (argv) => this.gitResult(argv) },
       reason,
     )

@@ -89,17 +89,16 @@ describe("runSenpiInstaller", () => {
     await writeFile(
       join(agentDir, "settings.json"),
       JSON.stringify({
-        packages: [
-          "keep-me",
-          relative(agentDir, legacyGoal),
-          legacyWebfetch,
-          pluginPath,
-        ],
+        packages: ["keep-me", relative(agentDir, legacyGoal), legacyWebfetch, pluginPath],
       }),
     )
 
     // when
-    await runSenpiInstaller({ env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    await runSenpiInstaller({
+      env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+    })
 
     // then
     const settings = await readSettings(agentDir)
@@ -153,11 +152,15 @@ describe("runSenpiInstaller", () => {
     const original = await readFile(runtimeEntry)
     await writeFixtureFile(
       join(pluginPath, "runtime", "ast-grep-mcp", "manifest.json"),
-      `${JSON.stringify({
-        sha256: createHash("sha256").update(original).digest("hex"),
-        mode: 0o755,
-        stagedAtUtc: "2026-08-03T00:00:00.000Z",
-      }, null, 2)}\n`,
+      `${JSON.stringify(
+        {
+          sha256: createHash("sha256").update(original).digest("hex"),
+          mode: 0o755,
+          stagedAtUtc: "2026-08-03T00:00:00.000Z",
+        },
+        null,
+        2,
+      )}\n`,
     )
     await writeFile(runtimeEntry, "#!/usr/bin/env node\nthrow new Error('corrupted runtime')\n", "utf8")
     await chmod(runtimeEntry, 0o755)
@@ -294,7 +297,6 @@ describe("runSenpiInstaller", () => {
     await expect(install).rejects.toThrow("missing required runtime artifacts")
     await expect(readFile(join(agentDir, "settings.json"), "utf8")).rejects.toThrow()
   })
-
 })
 
 describe("runSenpiUninstaller", () => {
@@ -311,7 +313,11 @@ describe("runSenpiUninstaller", () => {
     )
 
     // when
-    const result = await runSenpiUninstaller({ env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const result = await runSenpiUninstaller({
+      env: { HOME: await makeAgentDir(), SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+    })
 
     // then
     const settings = await readSettings(agentDir)

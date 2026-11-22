@@ -1,15 +1,12 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { spawn, spawnSync, type ChildProcess } from "node:child_process"
-import { existsSync, realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readFile, readdir, writeFile } from "node:fs/promises"
-import { tmpdir } from "node:os"
+import { existsSync } from "node:fs"
+import { readFile, readdir } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { rmEfaultTolerant } from "../teardown.test-support"
-import {
-  advanceTestClock,
-  createTestClock,
-  waitForFilesystemState,
-} from "./supervisor-test-signals"
+import { windowsTreeKillArgs } from "../../../../../memory-core/src/concurrency/windows-process-tree.mjs"
+import { makeSupervisorRun } from "./supervisor-manifest.test-support"
+import { advanceTestClock, createTestClock, waitForFilesystemState } from "./supervisor-test-signals"
 
 // Each case drives a real supervisor, bootstrap, and model child - three spawned bun processes
 // plus git work. The 5s default is a fast-machine assumption, not a budget those subprocesses
@@ -18,7 +15,6 @@ const WAIT_MS = 60_000
 setDefaultTimeout(WAIT_MS)
 
 const supervisorPath = join(import.meta.dir, "memory-run-supervisor.ts")
-const childFixture = join(import.meta.dir, "__fixtures__", "supervisor-child.ts")
 const parentFixture = join(import.meta.dir, "__fixtures__", "supervisor-parent.ts")
 const roots: string[] = []
 const processGroups = new Set<number>()
@@ -33,12 +29,13 @@ async function removeRoot(root: string): Promise<void> {
     await rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 30, retryDelay: 200 })
   } catch (error) {
     if (
-      process.platform === "win32"
-      && error instanceof Error
-      && "code" in error
-      && typeof error.code === "string"
-      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
-    ) return
+      process.platform === "win32" &&
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    )
+      return
     throw error
   }
 }
@@ -51,50 +48,23 @@ interface Outcome {
   readonly timedOut: boolean
 }
 
-async function makeRun(options: {
-  readonly mode: "inspect" | "graceful" | "stubborn" | "model-not-found"
-  readonly hardDeadlineAt?: number
-  readonly terminationGraceMs?: number
-  readonly nextAttempt?: { readonly attempt: number; readonly model: string; readonly thinking?: string }
-}): Promise<string> {
-  const runDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-run-supervisor-")))
-  roots.push(runDir)
-  await mkdir(runDir, { recursive: true, mode: 0o700 })
-  await writeFile(join(runDir, "ledger.json"), `${JSON.stringify({ version: 1, runId: "run-a", kind: "reflection" })}\n`)
-  await writeFile(join(runDir, "launch.json"), `${JSON.stringify({
-    version: 1,
-    runId: "run-a",
-    attempt: 1,
-    kind: "reflection",
-    nextAttempt: options.nextAttempt,
-    command: process.execPath,
-    args: [childFixture, options.mode, runDir],
-    cwd: runDir,
-    env: { ...process.env },
-    // Non-deadline runs get a load-tolerant budget: cold bun spawns plus fsync'd identity
-    // writes overshoot 10s on a loaded windows-latest runner, and the supervisor records
-    // timedOut from the deadline instant being reached even when the child exited cleanly.
-    hardDeadlineAt: options.hardDeadlineAt ?? Date.now() + 45_000,
-    terminationGraceMs: options.terminationGraceMs ?? 1_000,
-    maxOutputBytes: 65_536,
-    stdoutPath: join(runDir, "child-stdout.log"),
-    stderrPath: join(runDir, "child-stderr.log"),
-  })}\n`, { mode: 0o600 })
-  return runDir
-}
+const makeRun = (options: Parameters<typeof makeSupervisorRun>[1]) => makeSupervisorRun(roots, options)
 
 function launchSupervisor(runDir: string): ChildProcess {
   const clockPath = join(runDir, "clock-events")
   const child = spawn(process.execPath, [supervisorPath, runDir], {
+    windowsHide: true,
     detached: true,
     stdio: "ignore",
-    env: existsSync(clockPath) ? {
-      ...process.env,
-      OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
-      OMO_MEMORY_SUPERVISOR_CLOCK_PATH: clockPath,
-    } : process.env,
+    env: existsSync(clockPath)
+      ? {
+          ...process.env,
+          OMO_MEMORY_SUPERVISOR_ALLOW_TEST_SEAMS: "1",
+          OMO_MEMORY_SUPERVISOR_CLOCK_PATH: clockPath,
+        }
+      : process.env,
   })
-  // Track every supervisor so afterEach can tree-kill it: on win32 taskkill /T /F takes the
+  // Track every supervisor so afterEach can tree-kill it: on win32 the checked PID list takes the
   // supervisor, bootstrap, and model child together, which is what releases the run directory.
   if (child.pid !== undefined) processGroups.add(child.pid)
   return child
@@ -105,15 +75,20 @@ async function advanceClock(runDir: string, value: number): Promise<void> {
 }
 
 async function waitForPath(path: string, timeoutMs = WAIT_MS): Promise<void> {
-  await waitForFilesystemState(dirname(path), () => existsSync(path) ? true : undefined, timeoutMs, path)
+  await waitForFilesystemState(dirname(path), () => (existsSync(path) ? true : undefined), timeoutMs, path)
 }
 
 async function waitForLedgerChild(runDir: string): Promise<{ readonly childPid: number }> {
   const path = join(runDir, "ledger.json")
-  return await waitForFilesystemState(runDir, async () => {
-    const value = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>
-    return typeof value.childPid === "number" ? { childPid: value.childPid } : undefined
-  }, WAIT_MS, "child identity")
+  return await waitForFilesystemState(
+    runDir,
+    async () => {
+      const value = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>
+      return typeof value.childPid === "number" ? { childPid: value.childPid } : undefined
+    },
+    WAIT_MS,
+    "child identity",
+  )
 }
 
 async function readOutcome(runDir: string): Promise<Outcome> {
@@ -152,7 +127,8 @@ function groupIsAlive(pid: number): boolean {
 // for the run directory to be removable.
 function killTree(pid: number): void {
   if (process.platform === "win32") {
-    spawnSync("taskkill", ["/pid", String(pid), "/T", "/F"], { stdio: "ignore" })
+    const args = windowsTreeKillArgs(pid)
+    if (args.length > 0) spawnSync("taskkill", args, { stdio: "ignore", windowsHide: true })
     return
   }
   signalGroup(pid, "SIGKILL")
@@ -176,6 +152,7 @@ describe("memory run supervisor", () => {
     const runDir = await makeRun({ mode: "inspect" })
     const keepalivePath = join(import.meta.dir, "__fixtures__", "supervisor-keepalive.ts")
     const supervisor = spawn(process.execPath, [keepalivePath, runDir], {
+      windowsHide: true,
       detached: true,
       stdio: "ignore",
     })
@@ -225,12 +202,20 @@ describe("memory run supervisor", () => {
     await exit
 
     // then
-    const observation = JSON.parse(await readFile(join(runDir, "child-observation.json"), "utf8")) as Record<string, unknown>
+    const observation = JSON.parse(await readFile(join(runDir, "child-observation.json"), "utf8")) as Record<
+      string,
+      unknown
+    >
     expect(observation.pid).toBe(supervisor.pid)
     expect(typeof observation.processStart === "string" || observation.processStart === null).toBe(true)
     expect(typeof observation.childPid).toBe("number")
     expect(typeof observation.childProcessStart === "string" || observation.childProcessStart === null).toBe(true)
-    expect(outcome).toMatchObject({ version: 1, runId: "run-a", childExit: { code: 23, signal: null }, timedOut: false })
+    expect(outcome).toMatchObject({
+      version: 1,
+      runId: "run-a",
+      childExit: { code: 23, signal: null },
+      timedOut: false,
+    })
     expect(existsSync(join(runDir, "launch.json"))).toBe(false)
     expect((await readdir(runDir)).filter((name) => name === "outcome.json")).toEqual(["outcome.json"])
   }, 60_000)
@@ -238,7 +223,10 @@ describe("memory run supervisor", () => {
   test("#given a detached supervisor launched by a parent #when the parent is killed #then the supervisor still publishes the child outcome", async () => {
     // given
     const runDir = await makeRun({ mode: "inspect" })
-    const parent = spawn(process.execPath, [parentFixture, supervisorPath, runDir], { stdio: ["pipe", "pipe", "inherit"] })
+    const parent = spawn(process.execPath, [parentFixture, supervisorPath, runDir], {
+      stdio: ["pipe", "pipe", "inherit"],
+      windowsHide: true,
+    })
     const parentExit = waitForExit(parent)
     const ready = await new Promise<string>((resolve, reject) => {
       const timeout = setTimeout(() => reject(new Error(`waited ${WAIT_MS}ms for parent launch receipt`)), WAIT_MS)
@@ -262,6 +250,7 @@ describe("memory run supervisor", () => {
     // given
     const runDir = await makeRun({ mode: "inspect" })
     const bootstrap = spawn(process.execPath, [supervisorPath, "--child-bootstrap", runDir], {
+      windowsHide: true,
       detached: true,
       stdio: ["pipe", "ignore", "ignore", "ignore"],
     })

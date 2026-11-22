@@ -1,6 +1,6 @@
 import { getDailyActiveCaptureState } from "./activity-state"
 import { createTelemetryClient, isTelemetryClientEnabled } from "./injected-client"
-import { getTelemetryDistinctId } from "./machine-id"
+import { getTelemetryInstallDistinctId } from "./install-id"
 import type {
   TelemetryDiagnosticInput,
   TelemetryEnv,
@@ -53,9 +53,13 @@ export async function recordDailyActive(input: RecordDailyActiveInput): Promise<
 
   client.trackActive({
     dayUTC: activityState.dayUTC,
-    distinctId: getTelemetryDistinctId(input.product.machineIdPrefix, osProvider),
+    distinctId: getTelemetryInstallDistinctId(input.stateDir),
     reason: input.reason,
   })
-  await client.flush()
-  await client.shutdown()
+  try {
+    await client.flush()
+  } finally {
+    // A failed flush (a 5xx or a refused connection) must not leave the client and its timers running.
+    await client.shutdown()
+  }
 }

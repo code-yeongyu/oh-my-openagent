@@ -59,10 +59,7 @@ export function createHephaestusAgentsMdInjectorHook(
   const agentsMdCache = options?.agentsMdCache ?? createAgentsMdCache()
   const truncator = options?.truncator ?? createDynamicTruncator(ctx, modelCacheState)
 
-  async function chatMessage(
-    input: ChatMessageInput,
-    output: ChatMessageOutput,
-  ): Promise<void> {
+  async function chatMessage(input: ChatMessageInput, output: ChatMessageOutput): Promise<void> {
     if (injectedSessions.has(input.sessionID)) return
     if (getAgentConfigKey(getEffectiveAgent(input, output)) !== "hephaestus") return
 
@@ -81,11 +78,13 @@ export function createHephaestusAgentsMdInjectorHook(
     for (const agentsPath of agentsPaths) {
       const content = await fsPromises.readFile(agentsPath, "utf-8")
       const { result, truncated } = await truncator.truncate(input.sessionID, content)
-      contextBlocks.push(formatAgentsMdContextBlock({
-        agentsPath,
-        content: result,
-        truncated,
-      }))
+      contextBlocks.push(
+        formatAgentsMdContextBlock({
+          agentsPath,
+          content: result,
+          truncated,
+        }),
+      )
     }
 
     textPart.text = `${contextBlocks.join("")}\n\n---\n\n${textPart.text ?? ""}`

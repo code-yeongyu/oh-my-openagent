@@ -35,7 +35,10 @@ const PLAIN_THEME = {
 
 /** Records every fg/italic call so we can prove semantic colour is actually applied. */
 function recordingTheme(): {
-  readonly theme: { fg: (color: ThemeColor, text: string) => string; bg: (color: "customMessageBg", text: string) => string }
+  readonly theme: {
+    fg: (color: ThemeColor, text: string) => string
+    bg: (color: "customMessageBg", text: string) => string
+  }
   readonly colors: ThemeColor[]
 } {
   const colors: ThemeColor[] = []
@@ -79,7 +82,11 @@ function completion(over: Partial<ReflectionCompletionRecord> = {}): ReflectionC
 }
 
 function render(
-  renderer: (entry: never, options: { expanded: boolean }, theme: never) => { render(width: number): string[] } | undefined,
+  renderer: (
+    entry: never,
+    options: { expanded: boolean },
+    theme: never,
+  ) => { render(width: number): string[] } | undefined,
   data: unknown,
   options: { width?: number; expanded?: boolean; theme?: unknown } = {},
 ): string[] {
@@ -98,13 +105,27 @@ function noticeContent(lines: readonly string[]): string[] {
 
 describe("memory reflection entry rendering", () => {
   test("#given a persisted enriched entry #when expanded #then multiline report and historical attribution render within the terminal", () => {
-    const data = { ...completion(), recap: {
-      schemaVersion: 1, key: "synthetic", identity: "project-a1b2c3d4", runId: "reflection-run-2",
-      startedAt: "2026-08-13T09:00:00.000Z", finishedAt: "2026-08-13T09:01:12.000Z",
-      conversationIds: ["conversation-a", "conversation-b"], mergedCommitSha: "a".repeat(40),
-      filesChanged: 1, changedPaths: ["reference/synthetic.md"],
-      report: { status: "available", text: "# RECAP_SENTINEL\n한국어\n- detail\nEXPANDED_ONLY\n", preview: "# RECAP_SENTINEL\n한국어\n- detail", sourceTruncated: true },
-    } }
+    const data = {
+      ...completion(),
+      recap: {
+        schemaVersion: 1,
+        key: "synthetic",
+        identity: "project-a1b2c3d4",
+        runId: "reflection-run-2",
+        startedAt: "2026-08-13T09:00:00.000Z",
+        finishedAt: "2026-08-13T09:01:12.000Z",
+        conversationIds: ["conversation-a", "conversation-b"],
+        mergedCommitSha: "a".repeat(40),
+        filesChanged: 1,
+        changedPaths: ["reference/synthetic.md"],
+        report: {
+          status: "available",
+          text: "# RECAP_SENTINEL\n한국어\n- detail\nEXPANDED_ONLY\n",
+          preview: "# RECAP_SENTINEL\n한국어\n- detail",
+          sourceTruncated: true,
+        },
+      },
+    }
     const compact = render(renderReflectionCompletionEntry, data).join("\n")
     expect(compact).toContain("RECAP_SENTINEL")
     expect(compact).not.toContain("EXPANDED_ONLY")
@@ -113,15 +134,32 @@ describe("memory reflection entry rendering", () => {
     expect(expanded.join("\n")).toContain("reference/synthetic.md")
     expect(expanded.join("\n")).toContain("conversation-b")
     for (const line of expanded) expect(visibleWidth(line)).toBeLessThanOrEqual(60)
-    expect(renderReflectionCompletionEntry({ data: { ...data, outcome: "failed" } } as never, { expanded: false }, PLAIN_THEME as never)).toBeUndefined()
+    expect(
+      renderReflectionCompletionEntry(
+        { data: { ...data, outcome: "failed" } } as never,
+        { expanded: false },
+        PLAIN_THEME as never,
+      ),
+    ).toBeUndefined()
   })
   test("#given every registered memory notice renderer #when rendered #then each emits a custom-message background block", () => {
     const cases = [
       renderReflectionCompletionEntry({ data: completion() } as never, { expanded: false }, BACKGROUND_THEME as never),
-      renderReflectionHealthEntry({ data: {
-        schemaVersion: 1, identity: "project-a1b2c3d4", streak: 3, fingerprint: "child_exit:stable",
-        lastReason: "child_exit", sinceISO: "2026-08-12T22:15:00.000Z", recommendation: "Retry reflection.",
-      } } as never, { expanded: false }, BACKGROUND_THEME as never),
+      renderReflectionHealthEntry(
+        {
+          data: {
+            schemaVersion: 1,
+            identity: "project-a1b2c3d4",
+            streak: 3,
+            fingerprint: "child_exit:stable",
+            lastReason: "child_exit",
+            sinceISO: "2026-08-12T22:15:00.000Z",
+            recommendation: "Retry reflection.",
+          },
+        } as never,
+        { expanded: false },
+        BACKGROUND_THEME as never,
+      ),
     ]
     for (const component of cases) expectNoticeBackground(component!.render(WIDE))
   })
@@ -134,10 +172,7 @@ describe("memory reflection entry rendering", () => {
       const lines = render(renderReflectionCompletionEntry, completion(), { theme: recorder.theme })
 
       // then
-      expect(lines).toEqual([
-        bold("● Remembered · on reflection"),
-        "Kept what this session taught.",
-      ])
+      expect(lines).toEqual([bold("● Remembered · on reflection"), "Kept what this session taught."])
       expect(recorder.colors).toEqual(["accent", "dim"])
     })
 
@@ -175,18 +210,27 @@ describe("memory reflection entry rendering", () => {
 
     test("#when the report opens with the persona's summary item #then its first sentence is the why line", () => {
       // given
-      const data = { ...completion(), recap: {
-        schemaVersion: 1, key: "synthetic", identity: "project-a1b2c3d4", runId: "reflection-run-2",
-        startedAt: "2026-08-13T09:00:00.000Z", finishedAt: "2026-08-13T09:01:12.000Z",
-        conversationIds: ["conversation-a"], mergedCommitSha: "616af1ae9ca8b00bfbff798cff48047f79bc0c4a",
-        filesChanged: 1, changedPaths: ["reference/tooling/staged-deletion-gates.md"],
-        report: {
-          status: "available",
-          text: "1. **Summary**: Reviewed the captured step-count transcript for the browser-guidance migration. The durable learning was a verification pattern.\n2. **Memory changes**:\n   - Created `reference/tooling/staged-deletion-gates.md`\n",
-          preview: "1. **Summary**: Reviewed the captured step-count transcript",
-          sourceTruncated: false,
+      const data = {
+        ...completion(),
+        recap: {
+          schemaVersion: 1,
+          key: "synthetic",
+          identity: "project-a1b2c3d4",
+          runId: "reflection-run-2",
+          startedAt: "2026-08-13T09:00:00.000Z",
+          finishedAt: "2026-08-13T09:01:12.000Z",
+          conversationIds: ["conversation-a"],
+          mergedCommitSha: "616af1ae9ca8b00bfbff798cff48047f79bc0c4a",
+          filesChanged: 1,
+          changedPaths: ["reference/tooling/staged-deletion-gates.md"],
+          report: {
+            status: "available",
+            text: "1. **Summary**: Reviewed the captured step-count transcript for the browser-guidance migration. The durable learning was a verification pattern.\n2. **Memory changes**:\n   - Created `reference/tooling/staged-deletion-gates.md`\n",
+            preview: "1. **Summary**: Reviewed the captured step-count transcript",
+            sourceTruncated: false,
+          },
         },
-      } }
+      }
 
       // when
       const lines = render(renderReflectionCompletionEntry, data, { expanded: true })

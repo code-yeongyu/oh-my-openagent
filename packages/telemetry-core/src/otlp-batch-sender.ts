@@ -1,7 +1,8 @@
 import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import { maxSendMs, postWithRetry, type OtlpFetch } from "./otlp-http"
+import { maxSendMs, postWithRetry, type AttemptGate, type OtlpFetch } from "./otlp-http"
+import { createSpoolNotBefore } from "./otlp-spool-not-before"
 import {
   claimBatch,
   deleteFile,
@@ -14,7 +15,6 @@ import {
 } from "./otlp-spool-dir"
 import { spoolRequest } from "./otlp-spool-file"
 import type { TelemetryDiagnosticEvent } from "./types"
-
 
 export type BatchSenderInput = {
   readonly ctx: SpoolContext
@@ -78,7 +78,14 @@ export class BatchSender {
     const inFlight = this.#inFlight
     if (inFlight !== undefined) this.#release(inFlight)
     const claiming = this.#claiming
-    if (claiming !== undefined) await Promise.race([claiming.then(() => undefined, () => undefined), grace])
+    if (claiming !== undefined)
+      await Promise.race([
+        claiming.then(
+          () => undefined,
+          () => undefined,
+        ),
+        grace,
+      ])
   }
 
   #release(claimed: string): void {
@@ -127,6 +134,20 @@ export class BatchSender {
     }
   }
 
+  /**
+   * Re-asserts the claim by renaming it to a fresh lease right before each attempt. Rename is the
+   * mutual exclusion: if the lease expired while this process was stalled and another process took
+   * the batch, the rename fails and this process never sends it. Withdrawn consent deletes it unsent.
+   */
+  #gate(): AttemptGate {
+    if (!this.#input.consent()) return "withdrawn"
+    const current = this.#inFlight
+    const renewed = current === undefined ? null : renewClaim(this.#input.ctx, current)
+    if (renewed === null) return "lost"
+    this.#inFlight = renewed
+    return "send"
+  }
+
   async #send(claimed: string): Promise<void> {
     const ctx = this.#input.ctx
     this.#inFlight = claimed
@@ -150,15 +171,21 @@ export class BatchSender {
         quarantineFile(ctx, claimed)
         return
       }
-      const outcome = await postWithRetry({
-        fetch: this.#input.fetch,
-        sleep: this.#input.sleep,
-        random: this.#input.random,
-        endpoint: this.#input.endpoint,
-        ingestKey: this.#input.ingestKey,
-        abort: this.#abort.signal,
-        requestTimeoutMs: this.#input.requestTimeoutMs,
-      }, request.signal, request.body)
+      const outcome = await postWithRetry(
+        {
+          fetch: this.#input.fetch,
+          sleep: this.#input.sleep,
+          random: this.#input.random,
+          endpoint: this.#input.endpoint,
+          ingestKey: this.#input.ingestKey,
+          abort: this.#abort.signal,
+          requestTimeoutMs: this.#input.requestTimeoutMs,
+          beforeAttempt: () => this.#gate(),
+          notBefore: createSpoolNotBefore(ctx.dir),
+        },
+        request.signal,
+        request.body,
+      )
       const current = this.#inFlight ?? claimed
       if (outcome.kind === "accepted") {
         deleteFile(ctx.dir, current)
@@ -168,6 +195,10 @@ export class BatchSender {
         }
       } else if (outcome.kind === "rejected") {
         dropFile(ctx, current, "rejected")
+      } else if (outcome.kind === "withdrawn") {
+        deleteFile(ctx.dir, current)
+      } else if (outcome.kind === "lost") {
+        return
       } else if (!this.#stopped) {
         releaseClaim(ctx, current)
         if (outcome.kind === "retry_later") this.#input.report("telemetry_otlp_send_failed")

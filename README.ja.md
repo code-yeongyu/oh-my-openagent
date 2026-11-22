@@ -7,17 +7,6 @@
 > *プロンプトに "mass ulw" と入れるだけ。あなたはもうグラフエンジニアリングのマスター。マルチモデルの ultracode を、より良いメモリシステムとともに。(右側のパネルは [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag) です)*
 
 
-> **Sponsors**
-> 以下は私たちのスポンサーです。個人のサイドプロジェクトとして継続するための支援をいただいています。
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** は OmO のスポンサーです。複数のモデルプロバイダーをひとつの API で使える OpenAI 互換ゲートウェイです。オープンソースへのご支援に感謝します。 |
-> | :-----| :----- |
-
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO は上記の Jobdori によってメンテナンスされています。あなた専用の Jobdori、Dori に会いましょう。 <br />[こちら](https://sisyphuslabs.ai) からウェイトリストにご登録ください。**
-
 > [!TIP]
 > 私たちと一緒に！
 >

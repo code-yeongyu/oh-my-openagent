@@ -1,12 +1,14 @@
 import { createHash } from "node:crypto"
 
 import { normalizeObservationText } from "../facts/person-routing"
+import { parseAgreementEventLine } from "./events"
 import type { AgreementAuthor, AgreementItem, AgreementScope, AgreementStatus } from "./types"
 
 export interface AgreementsLedgerParse {
   readonly items: readonly AgreementItem[]
   readonly diagnostics: readonly string[]
   readonly unparsed: readonly string[]
+  readonly receipts: readonly string[]
 }
 
 const LINE_RE = /^-\s+\[(global|project)\]\s+(.+?)\s*(?:<!--\s*(.*?)\s*-->)?\s*$/
@@ -25,14 +27,20 @@ export function parseAgreementsLedger(body: string): AgreementsLedgerParse {
   const items: AgreementItem[] = []
   const diagnostics: string[] = []
   const unparsed: string[] = []
+  const receipts = new Set<string>()
   const seen = new Set<string>()
   for (const [index, raw] of body.split(/\r?\n/).entries()) {
     const line = raw.trim()
     if (line.length === 0) continue
+    const receipt = parseAgreementEventLine(line)
+    if (receipt !== undefined) {
+      receipts.add(receipt)
+      continue
+    }
     const match = LINE_RE.exec(line)
     const scope = match?.[1]
     const text = match?.[2]?.trim()
-    if (scope !== "global" && scope !== "project" || text === undefined || text.length === 0) {
+    if ((scope !== "global" && scope !== "project") || text === undefined || text.length === 0) {
       diagnostics.push(`line ${index + 1}: expected "- [global|project] <agreement>"`)
       unparsed.push(line)
       continue
@@ -51,7 +59,7 @@ export function parseAgreementsLedger(body: string): AgreementsLedgerParse {
     seen.add(parsed.id)
     items.push(parsed)
   }
-  return { items, diagnostics, unparsed }
+  return { items, diagnostics, unparsed, receipts: [...receipts] }
 }
 
 export function serializeAgreementsLedger(items: readonly AgreementItem[], unparsed: readonly string[] = []): string {
@@ -59,10 +67,10 @@ export function serializeAgreementsLedger(items: readonly AgreementItem[], unpar
 }
 
 export function sortAgreements(items: readonly AgreementItem[]): AgreementItem[] {
-  return [...items].sort((a, b) =>
-    authorRank(a.by) - authorRank(b.by)
-    || (a.since ?? "").localeCompare(b.since ?? "")
-    || a.id.localeCompare(b.id))
+  return [...items].sort(
+    (a, b) =>
+      authorRank(a.by) - authorRank(b.by) || (a.since ?? "").localeCompare(b.since ?? "") || a.id.localeCompare(b.id),
+  )
 }
 
 function serializeItem(item: AgreementItem): string {
@@ -103,7 +111,12 @@ function parseMeta(raw: string, text: string, scope: AgreementScope): AgreementI
   if (last !== undefined && !DATE_RE.test(last)) return `last must be YYYY-MM-DD`
   const statusValue: AgreementStatus = status
   return {
-    id, scope, by, text, n, status: statusValue,
+    id,
+    scope,
+    by,
+    text,
+    n,
+    status: statusValue,
     ...(since === undefined ? {} : { since }),
     ...(last === undefined ? {} : { last }),
   }

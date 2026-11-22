@@ -8,10 +8,10 @@ Codex has two useful surfaces:
 Use the broad finder for Codex discovery:
 
 ```bash
-python3 scripts/find-agent-sessions.py list --platform codex --limit 10
-python3 scripts/find-agent-sessions.py search "deploy" --platform codex
-python3 scripts/find-agent-sessions.py search --query "deploy" --query "token usage" --platform codex --workers 32
-python3 scripts/find-agent-sessions.py get <session-id> --platform codex
+python3 -B scripts/find-agent-sessions.py list --platform codex --limit 10
+python3 -B scripts/find-agent-sessions.py search "deploy" --platform codex
+python3 -B scripts/find-agent-sessions.py search --query "deploy" --query "token usage" --platform codex --workers 32
+python3 -B scripts/find-agent-sessions.py get <session-id> --platform codex
 ```
 
 Important filters: `--from`, `--to`, `--cwd`, `--model`, `--root`, `--limit`, and `--include-subagents`.

@@ -16,7 +16,6 @@ export function forgetLeakedCandidate(candidatePath: string): void {
   knownLeakedCandidates.delete(candidatePath)
 }
 
-
 export interface CandidateSweepOptions {
   readonly unlink?: (path: string) => Promise<void>
   readonly isSharingError?: (error: unknown) => boolean
@@ -26,8 +25,7 @@ export interface CandidateSweepOptions {
 // Lock DOMAIN names may legally contain ".candidate-" (runFinalizationLockPath permits dots
 // and hyphens in run ids), so only the exact shape publishExclusive generates is ever treated as
 // sweepable garbage: `.candidate-<pid>-<uuid>`, or the older `.candidate-<uuid>` without the pid.
-const LEAKED_CANDIDATE_NAME =
-  /\.candidate-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const LEAKED_CANDIDATE_NAME = /\.candidate-(?:(\d+)-)?[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /** A candidate whose creator is gone can never be published or cleaned up by it. */
 function isCreatorDead(name: string): boolean {
@@ -81,7 +79,10 @@ export async function sweepStaleLockCandidates(
     const candidatePath = path.join(lockDirectory, name)
     try {
       const status = await stat(candidatePath)
-      const stale = knownLeakedCandidates.has(candidatePath) || isCreatorDead(name) || now() - status.mtimeMs > CANDIDATE_STALE_AGE_MS
+      const stale =
+        knownLeakedCandidates.has(candidatePath) ||
+        isCreatorDead(name) ||
+        now() - status.mtimeMs > CANDIDATE_STALE_AGE_MS
       if (!stale) continue
       let removed = false
       for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {

@@ -5,11 +5,12 @@ const logMock = mock((..._args: unknown[]) => {})
 mock.module("../../shared/logger", () => ({
   log: logMock,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 import type { OpencodeClient } from "./opencode-client"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const { abortWithTimeout } = await import("./abort-with-timeout")
-mock.restore()
 
 function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): OpencodeClient {
   return {
@@ -59,10 +60,10 @@ describe("abortWithTimeout", () => {
 
     // then
     expect(result).toBe(false)
-    expect(logMock).toHaveBeenCalledWith(
-      "[background-agent] Session abort returned an error response:",
-      { sessionID: "session-error-response", error },
-    )
+    expect(logMock).toHaveBeenCalledWith("[background-agent] Session abort returned an error response:", {
+      sessionID: "session-error-response",
+      error,
+    })
   })
 
   test("#given abort hangs indefinitely #when abortWithTimeout runs #then it logs warning and continues", async () => {
@@ -79,9 +80,9 @@ describe("abortWithTimeout", () => {
 
     // then
     expect(result).toBe(false)
-    expect(logMock).toHaveBeenCalledWith(
-      "[background-agent] Session abort timed out; continuing cleanup:",
-      { sessionID: "session-2", timeoutMs: 1 },
-    )
+    expect(logMock).toHaveBeenCalledWith("[background-agent] Session abort timed out; continuing cleanup:", {
+      sessionID: "session-2",
+      timeoutMs: 1,
+    })
   })
 })

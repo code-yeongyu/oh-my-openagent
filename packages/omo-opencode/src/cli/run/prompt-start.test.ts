@@ -5,10 +5,12 @@ import { waitForPromptStart } from "./prompt-start"
 import type { RunContext, SessionStatus } from "./types"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-function createMockContext(input: {
-  statuses?: Record<string, SessionStatus>
-  messages?: unknown[]
-} = {}): RunContext {
+function createMockContext(
+  input: {
+    statuses?: Record<string, SessionStatus>
+    messages?: unknown[]
+  } = {},
+): RunContext {
   const statuses = input.statuses ?? {}
   const messages = input.messages ?? []
 

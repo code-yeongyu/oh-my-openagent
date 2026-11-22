@@ -4,11 +4,15 @@ import { join } from "node:path"
 import {
   cleanupReflectionWorktree,
   createLockRecord,
+  describeDroppedEntries,
   integrateValidatedReflection,
   maybeKillAt,
   memoryWriterLockPath,
+  pathsOutsideTarget,
   probeLegacyAutoRunReceipt,
   probeReflectionIntegration,
+  preflightReflectionDescriptions,
+  readDroppedTrailers,
   validateCompletion,
   validateDreamTokenBudget,
   withLock,
@@ -17,21 +21,9 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { estimateSystemTokens } from "../commands/tokens"
-import {
-  readRunJson,
-  readRunTextTail,
-  updateRunLedger,
-  type RunOutcome,
-} from "./run-artifacts"
-import type {
-  DurableFinalizationDecision,
-  RunFinalizationContext,
-} from "./run-finalization-types"
-import {
-  parseReservationRunLedger,
-  worktreeFromLedger,
-  type ReservationRunLedger,
-} from "./reservation-run-ledger"
+import { readRunJson, readRunTextTail, updateRunLedger, type RunOutcome } from "./run-artifacts"
+import type { DurableFinalizationDecision, RunFinalizationContext } from "./run-finalization-types"
+import { parseReservationRunLedger, worktreeFromLedger, type ReservationRunLedger } from "./reservation-run-ledger"
 
 export async function resolveFinalizationDecision(
   context: RunFinalizationContext,
@@ -65,12 +57,16 @@ export async function resolveFinalizationDecision(
   const worktree = worktreeFromLedger(context.identity, ledger)
   let validated = validatedFromLedger(ledger)
   if (validated === undefined && existsSync(worktree.dir)) {
+    await preflightReflectionDescriptions(worktree, ledger.baseSha, worktree.exec, context.warn)
     const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
     if (validation.status === "valid") {
       maybeKillAt("after-validate")
-      if (ledger.targetDoc !== undefined
-        && validation.changedPaths.some((path) => path !== ledger.targetDoc)) {
-        const decision = { outcome: "failed" as const, reason: "invalid_target", detail: "Dream changed paths outside targetDoc" }
+      if (ledger.targetDoc !== undefined && pathsOutsideTarget(validation, [ledger.targetDoc]).length > 0) {
+        const decision = {
+          outcome: "failed" as const,
+          reason: "invalid_target",
+          detail: "Dream changed paths outside targetDoc",
+        }
         await checkpointDecision(ledgerPath, decision)
         await cleanupAndRecord(context, ledger, runDir)
         return decision
@@ -82,12 +78,15 @@ export async function resolveFinalizationDecision(
         validatedChangedPaths: validated.changedPaths,
       })
     } else if (validation.status === "no_changes") {
-      const decision = { outcome: "no_changes" as const }
+      // Every entry the run wrote was refused: say so instead of reading as "nothing to do".
+      const note = validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
+      const decision = { outcome: "no_changes" as const, ...(note === undefined ? {} : { detail: note }) }
       await updateRunLedger(ledgerPath, {
         finalizePhase: "validated",
         validatedTipSha: validation.tipSha,
         validatedChangedPaths: [],
         finalizeOutcome: decision.outcome,
+        ...(note === undefined ? {} : { finalizeDetail: note }),
       })
       await cleanupAndRecord(context, ledger, runDir)
       return decision
@@ -145,6 +144,9 @@ export async function resolveFinalizationDecision(
     await checkpointDecision(ledgerPath, decision)
     return decision
   }
+  // Read from the validated commit's trailers, so a run resumed after the validated checkpoint still reports them.
+  const dropped = await readDroppedTrailers(worktree.exec, worktree.dir, ledger.baseSha, validated.tipSha)
+  const droppedNote = dropped.length > 0 ? describeDroppedEntries(dropped) : undefined
   const integrated = await integrateValidatedReflection(worktree, {
     mode,
     runId: ledger.runId,
@@ -153,12 +155,12 @@ export async function resolveFinalizationDecision(
     withWriterLock: (operation) => writerLock(context, operation),
   })
   maybeKillAt("after-merge")
-  const budget = integrated.outcome === "merged"
-    ? await validateIntegratedDreamBudget(context, ledger)
-    : {}
+  const budget = integrated.outcome === "merged" ? await validateIntegratedDreamBudget(context, ledger) : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
-    ...(integrated.detail === undefined ? {} : { detail: integrated.detail }),
+    ...(integrated.detail === undefined && droppedNote === undefined
+      ? {}
+      : { detail: [integrated.detail, droppedNote].filter(Boolean).join("; ") }),
     ...(integrated.integrationSha === undefined ? {} : { integrationSha: integrated.integrationSha }),
     ...budget,
   }
@@ -174,9 +176,7 @@ function validatedFromLedger(ledger: ReservationRunLedger): ValidatedReflectionT
     : { tipSha: ledger.validatedTipSha, changedPaths: ledger.validatedChangedPaths ?? [] }
 }
 
-function decisionFromLedger(
-  ledger: ReservationRunLedger,
-): DurableFinalizationDecision | undefined {
+function decisionFromLedger(ledger: ReservationRunLedger): DurableFinalizationDecision | undefined {
   if (ledger.finalizeOutcome === undefined) return undefined
   return {
     outcome: ledger.finalizeOutcome,

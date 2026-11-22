@@ -3,12 +3,7 @@ import * as fs from "node:fs"
 import { join } from "node:path"
 
 import { taskEventLogPath } from "../store/event-log"
-import {
-  assistantMessage,
-  cleanupRoots,
-  PARENT_SESSION_ID,
-  startHeldRun,
-} from "./node-projection.test-harness"
+import { assistantMessage, cleanupRoots, PARENT_SESSION_ID, startHeldRun } from "./node-projection.test-harness"
 
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 

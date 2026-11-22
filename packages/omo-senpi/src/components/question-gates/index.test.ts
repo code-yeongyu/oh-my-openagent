@@ -33,7 +33,11 @@ function register(): { pi: FakeExtensionAPI; debug: DebugLine[] } {
   return { pi, debug }
 }
 
-async function dispatchToolCall(pi: FakeExtensionAPI, toolName: string, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+async function dispatchToolCall(
+  pi: FakeExtensionAPI,
+  toolName: string,
+  input: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
   await pi.dispatch("tool_call", { type: "tool_call", toolName, toolCallId: "call-1", input })
   return input
 }
@@ -73,28 +77,28 @@ describe("question-gates", () => {
     expect(input["required"]).toBe(true)
   })
 
-  it.each([
-    ["Authorize"],
-    ["authorise"],
-    ["approval"],
-    ["승인"],
-    ["권한"],
-  ])("#given a pinned gate header %p #when tool_call fires #then required is forced by the header rule", async (header) => {
-    // given
-    const { pi, debug } = register()
+  it.each([["Authorize"], ["authorise"], ["approval"], ["승인"], ["권한"]])(
+    "#given a pinned gate header %p #when tool_call fires #then required is forced by the header rule",
+    async (header) => {
+      // given
+      const { pi, debug } = register()
 
-    // when
-    const input = await dispatchToolCall(pi, "ask_user_question", {
-      questions: [fork(header, "Proceed with the irreversible step?", ["Proceed", "Hold"])],
-      waitForAnswer: true,
-    })
+      // when
+      const input = await dispatchToolCall(pi, "ask_user_question", {
+        questions: [fork(header, "Proceed with the irreversible step?", ["Proceed", "Hold"])],
+        waitForAnswer: true,
+      })
 
-    // then
-    expect(input["required"]).toBe(true)
-    expect(debug).toEqual([
-      { message: "omo-senpi question-gates forced required", details: { tool: "ask_user_question", header, rule: "header" } },
-    ])
-  })
+      // then
+      expect(input["required"]).toBe(true)
+      expect(debug).toEqual([
+        {
+          message: "omo-senpi question-gates forced required",
+          details: { tool: "ask_user_question", header, rule: "header" },
+        },
+      ])
+    },
+  )
 
   it("#given a gate asked without a pinned header #when an option label starts with Approve #then the label rule forces required", async () => {
     // given
@@ -109,7 +113,10 @@ describe("question-gates", () => {
     // then
     expect(input["required"]).toBe(true)
     expect(debug).toEqual([
-      { message: "omo-senpi question-gates forced required", details: { tool: "request_user_input", header: "Next step", rule: "label" } },
+      {
+        message: "omo-senpi question-gates forced required",
+        details: { tool: "request_user_input", header: "Next step", rule: "label" },
+      },
     ])
   })
 
@@ -134,25 +141,22 @@ describe("question-gates", () => {
     expect(debug).toEqual([])
   })
 
-  it.each([
-    ["Approvals log"],
-    ["Pre-approval"],
-    ["Approval UX"],
-    ["권한 모델"],
-    ["승인자"],
-  ])("#given header %p that only contains a gate word #when tool_call fires #then the anchored rule does not force required", async (header) => {
-    // given
-    const { pi } = register()
+  it.each([["Approvals log"], ["Pre-approval"], ["Approval UX"], ["권한 모델"], ["승인자"]])(
+    "#given header %p that only contains a gate word #when tool_call fires #then the anchored rule does not force required",
+    async (header) => {
+      // given
+      const { pi } = register()
 
-    // when
-    const input = await dispatchToolCall(pi, "ask_user_question", {
-      questions: [fork(header, "Which entries should be listed?", ["All", "Recent"])],
-      waitForAnswer: true,
-    })
+      // when
+      const input = await dispatchToolCall(pi, "ask_user_question", {
+        questions: [fork(header, "Which entries should be listed?", ["All", "Recent"])],
+        waitForAnswer: true,
+      })
 
-    // then
-    expect(input["required"]).toBeUndefined()
-  })
+      // then
+      expect(input["required"]).toBeUndefined()
+    },
+  )
 
   it("#given an ordinary fork call #when tool_call fires #then the input is left unchanged", async () => {
     // given
@@ -215,16 +219,23 @@ describe("question-gates", () => {
     expect(serialized).not.toContain("todo.json")
     expect(serialized).not.toContain("plan-reviewer")
     expect(debug).toEqual([
-      { message: "omo-senpi question-gates forced required", details: { tool: "ask_user_question", header: "Approval", rule: "header" } },
+      {
+        message: "omo-senpi question-gates forced required",
+        details: { tool: "ask_user_question", header: "Approval", rule: "header" },
+      },
     ])
   })
 })
 
 const senpiDistDir = dirname(fileURLToPath(import.meta.resolve("@code-yeongyu/senpi")))
-const askUserToolModule = await import(
+const askUserToolModule = (await import(
   pathToFileURL(join(senpiDistDir, "core", "extensions", "builtin", "ask-user", "tool.js")).href
-) as {
-  createAskUserTool(variant: "claude" | "codex", pi: unknown, state: { timedOut: boolean; unavailable: boolean }): {
+)) as {
+  createAskUserTool(
+    variant: "claude" | "codex",
+    pi: unknown,
+    state: { timedOut: boolean; unavailable: boolean },
+  ): {
     prepareArguments(args: Record<string, unknown>): Record<string, unknown>
     execute(
       toolCallId: string,
@@ -273,19 +284,26 @@ describe("question-gates through senpi's ask_user_question tool", () => {
 })
 
 describe("pinned gate headers against senpi's question schema", () => {
-  const tool = askUserToolModule.createAskUserTool("claude", { events: { emit() {} } }, { timedOut: false, unavailable: false })
+  const tool = askUserToolModule.createAskUserTool(
+    "claude",
+    { events: { emit() {} } },
+    { timedOut: false, unavailable: false },
+  )
   const call = (header: string) => ({
     questions: [fork(header, "Proceed?", ["Approve", "Change approach"])],
     waitForAnswer: true,
   })
 
-  it.each(PINNED_GATE_HEADERS.map((header) => [header]))("#given pinned header %p #when senpi prepares the call #then it is accepted", (header) => {
-    // when
-    const prepare = () => tool.prepareArguments(call(header))
+  it.each(PINNED_GATE_HEADERS.map((header) => [header]))(
+    "#given pinned header %p #when senpi prepares the call #then it is accepted",
+    (header) => {
+      // when
+      const prepare = () => tool.prepareArguments(call(header))
 
-    // then
-    expect(prepare).not.toThrow()
-  })
+      // then
+      expect(prepare).not.toThrow()
+    },
+  )
 
   it("#given a 13-character header #when senpi prepares the call #then senpi rejects it before any extension sees it", () => {
     // when

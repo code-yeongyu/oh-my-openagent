@@ -1,4 +1,5 @@
 import { realpathSync } from "@oh-my-opencode/memory-core/fs"
+import { isDarwinAutomountTriggerPath } from "@oh-my-opencode/utils/path-containment"
 import { isAbsolute, relative, resolve, sep } from "node:path"
 
 import type { ComponentLogger, SenpiExtensionAPI } from "../../extension/types"
@@ -27,9 +28,7 @@ export function registerMemoryReadClassifier(
       if (isGitMetadata(lexical)) continue
       const realRoot = realPath(root)
       const realFile = realPath(path)
-      const canonical = realRoot === undefined || realFile === undefined
-        ? undefined
-        : repoRelative(realRoot, realFile)
+      const canonical = realRoot === undefined || realFile === undefined ? undefined : repoRelative(realRoot, realFile)
       if (isGitMetadata(canonical)) continue
       // Existing symlinks must not make a file outside the repo look like memory.
       if (realRoot !== undefined && realFile !== undefined && canonical === undefined) continue
@@ -53,11 +52,14 @@ function isGitMetadata(label: string | undefined): boolean {
 }
 
 function realPath(path: string): string | undefined {
+  // A macOS automount trigger is compared lexically: resolving it can park the host loop (#11545).
+  if (isDarwinAutomountTriggerPath(path)) return undefined
   try {
     return realpathSync.native(path)
   } catch (error) {
     // A read may be rendered before its target exists; lexical containment still applies.
-    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR")) return undefined
+    if (error instanceof Error && "code" in error && (error.code === "ENOENT" || error.code === "ENOTDIR"))
+      return undefined
     throw error
   }
 }

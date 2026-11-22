@@ -9,7 +9,11 @@ import { fileURLToPath } from "node:url"
 test("#given a session with no member identity #when its shared extension loads #then it registers nothing, throws nothing, and never evaluates the workpool graph", async () => {
   const worker = fileURLToPath(new URL("../../workpool/process-worker.ts", import.meta.url))
   const entry = new URL("./index.ts", import.meta.url).href
-  const child = Bun.spawn([process.execPath, "--eval", `
+  const child = Bun.spawn(
+    [
+      process.execPath,
+      "--eval",
+      `
     import { mock } from "bun:test";
     let evaluations = 0;
     mock.module(${JSON.stringify(worker)}, () => {
@@ -23,9 +27,14 @@ test("#given a session with no member identity #when its shared extension loads 
     let errorCode = null;
     try { await register({}); } catch (error) { errorCode = error.code; }
     console.log(JSON.stringify({ evaluations, errorCode }));
-  `], { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: 10000 })
+  `,
+    ],
+    { cwd: import.meta.dir, stdout: "pipe", stderr: "pipe", timeout: 10000 },
+  )
   const [exitCode, stdout, stderr] = await Promise.all([
-    child.exited, new Response(child.stdout).text(), new Response(child.stderr).text(),
+    child.exited,
+    new Response(child.stdout).text(),
+    new Response(child.stderr).text(),
   ])
   expect({ exitCode, stderr }).toEqual({ exitCode: 0, stderr: "" })
   expect(JSON.parse(stdout)).toEqual({ evaluations: 0, errorCode: null })

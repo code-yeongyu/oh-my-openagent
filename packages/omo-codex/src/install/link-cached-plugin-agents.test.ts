@@ -5,7 +5,11 @@ import { describe, expect, test } from "bun:test"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { capturePreservedAgentReasoning, capturePreservedAgentServiceTier, linkCachedPluginAgents } from "./link-cached-plugin-agents"
+import {
+  capturePreservedAgentReasoning,
+  capturePreservedAgentServiceTier,
+  linkCachedPluginAgents,
+} from "./link-cached-plugin-agents"
 
 async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }> {
   const root = await mkdtemp(join(tmpdir(), "omo-codex-agents-"))
@@ -13,18 +17,9 @@ async function makeFixture(): Promise<{ codexHome: string; pluginRoot: string }>
   const pluginRoot = join(root, "plugin")
   await mkdir(join(pluginRoot, "components", "ultrawork", "agents"), { recursive: true })
   await mkdir(join(pluginRoot, "components", "ulw-loop", "agents"), { recursive: true })
-  await writeFile(
-    join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"),
-    'name = "explorer"\n',
-  )
-  await writeFile(
-    join(pluginRoot, "components", "ultrawork", "agents", "librarian.toml"),
-    'name = "librarian"\n',
-  )
-  await writeFile(
-    join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"),
-    'name = "planner"\n',
-  )
+  await writeFile(join(pluginRoot, "components", "ultrawork", "agents", "explorer.toml"), 'name = "explorer"\n')
+  await writeFile(join(pluginRoot, "components", "ultrawork", "agents", "librarian.toml"), 'name = "librarian"\n')
+  await writeFile(join(pluginRoot, "components", "ulw-loop", "agents", "planner.toml"), 'name = "planner"\n')
   return { codexHome, pluginRoot }
 }
 
@@ -37,11 +32,7 @@ describe("linkCachedPluginAgents", () => {
     const linked = await linkCachedPluginAgents({ codexHome, pluginRoot, platform: "linux" })
 
     // then
-    expect(linked.map((entry) => entry.name).sort()).toEqual([
-      "explorer.toml",
-      "librarian.toml",
-      "planner.toml",
-    ])
+    expect(linked.map((entry) => entry.name).sort()).toEqual(["explorer.toml", "librarian.toml", "planner.toml"])
     for (const entry of linked) {
       const linkStat = await lstat(entry.path)
       expect(linkStat.isSymbolicLink()).toBe(false)
@@ -295,9 +286,9 @@ describe("linkCachedPluginAgents", () => {
 
     // then
     expect(linked).toEqual([])
-    const manifest = JSON.parse(
-      await readFile(join(pluginRoot, ".installed-agents.json"), "utf8"),
-    ) as { agents: string[] }
+    const manifest = JSON.parse(await readFile(join(pluginRoot, ".installed-agents.json"), "utf8")) as {
+      agents: string[]
+    }
     expect(manifest.agents).toEqual([])
   })
 

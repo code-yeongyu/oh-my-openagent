@@ -1,10 +1,7 @@
 import { describe, expect, it } from "bun:test"
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 
-import {
-  createTeamCreateTool,
-  createTeamDeleteTool,
-} from "./lifecycle"
+import { createTeamCreateTool, createTeamDeleteTool } from "./lifecycle"
 import {
   createTeamTaskCreateTool,
   createTeamTaskGetTool,
@@ -12,7 +9,12 @@ import {
   createTeamTaskUpdateTool,
 } from "./tasks"
 
-type ToolFactory = (deps: never) => Pick<ToolDefinition, "name" | "exposure" | "allowLazyActivation" | "searchGroup" | "searchKeywords" | "description">
+type ToolFactory = (
+  deps: never,
+) => Pick<
+  ToolDefinition,
+  "name" | "exposure" | "allowLazyActivation" | "searchGroup" | "searchKeywords" | "description"
+>
 
 const CASES: ReadonlyArray<readonly [string, ToolFactory, string]> = [
   ["task_create", createTeamTaskCreateTool, "team-tasklist"],

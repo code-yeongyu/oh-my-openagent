@@ -3,13 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
 import { MemoryFakeExtensionAPI } from "../memory.test-support"
-import {
-  fakeCommandContext,
-  fakeDeps,
-  invoke,
-  seededRepo,
-  tempIdentity,
-} from "./commands.test-support"
+import { fakeCommandContext, fakeDeps, invoke, seededRepo, tempIdentity } from "./commands.test-support"
 import { registerMemoryCommand } from "./memory"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 
@@ -27,12 +21,13 @@ async function removeTempDir(dir: string): Promise<void> {
     // A killed Windows child can retain a temp-directory handle beyond the bounded retry window.
     // Ignore only that platform's known cleanup races; all other cleanup defects still fail loudly.
     if (
-      process.platform === "win32"
-      && error instanceof Error
-      && "code" in error
-      && typeof error.code === "string"
-      && WINDOWS_CLEANUP_RACE_CODES.has(error.code)
-    ) return
+      process.platform === "win32" &&
+      error instanceof Error &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      WINDOWS_CLEANUP_RACE_CODES.has(error.code)
+    )
+      return
     throw error
   }
 }
@@ -43,7 +38,10 @@ afterEach(async () => {
 
 const SEEDS = [
   { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nI am the test persona.\n" },
-  { relativePath: "system/projects/index.md", content: "---\ndescription: Project index\n---\nSee [[external/notes]].\n" },
+  {
+    relativePath: "system/projects/index.md",
+    content: "---\ndescription: Project index\n---\nSee [[external/notes]].\n",
+  },
   { relativePath: "external/notes.md", content: "scratch notes\n" },
   { relativePath: "skills/commit/SKILL.md", content: "---\nname: commit\ndescription: Commit helper\n---\n" },
 ]
@@ -65,9 +63,9 @@ describe("/memory", () => {
     // then
     expect(text).toContain(`HEAD: ${(head ?? "").slice(0, 8)}`)
     expect(text).toContain("clean")
-    expect(text).toContain("### system/persona.md — Persona")
+    expect(text).toContain("### system/persona.md - Persona")
     expect(text).toContain("I am the test persona.")
-    expect(text).toContain("### system/projects/index.md — Project index")
+    expect(text).toContain("### system/projects/index.md - Project index")
     expect(text).toContain("- external/notes.md")
     expect(text).toContain("- skills/commit/SKILL.md")
     expect(text).not.toContain("Uncommitted")
@@ -80,7 +78,10 @@ describe("/memory", () => {
     const { root, identity } = await tempIdentity()
     tempDirs.push(root)
     await seededRepo(identity, SEEDS)
-    await writeFile(join(identity.identityPaths.repo, "system", "persona.md"), "---\ndescription: Persona\n---\nchanged\n")
+    await writeFile(
+      join(identity.identityPaths.repo, "system", "persona.md"),
+      "---\ndescription: Persona\n---\nchanged\n",
+    )
     await writeFile(join(identity.identityPaths.repo, "external", "fresh.md"), "untracked\n")
 
     const pi = new MemoryFakeExtensionAPI()

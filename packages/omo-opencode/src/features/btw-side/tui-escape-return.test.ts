@@ -19,13 +19,15 @@ describe("registerBtwSideKeymap escape return", () => {
       now: () => now,
     })
     const sendEscape = () => {
-      escapeReturn.handle(unsafeTestValue({
-        event: {
-          name: "escape",
-          eventType: "press",
-        },
-        consume: () => undefined,
-      }))
+      escapeReturn.handle(
+        unsafeTestValue({
+          event: {
+            name: "escape",
+            eventType: "press",
+          },
+          consume: () => undefined,
+        }),
+      )
     }
     sendEscape()
 
@@ -46,19 +48,14 @@ describe("registerBtwSideKeymap escape return", () => {
 
   it("#given an idle visible side #when Escape is pressed twice consecutively #then only the second press returns to the parent", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const returnToParent = mock(() => undefined)
     const firstConsume = mock(() => undefined)
     const secondConsume = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          name: string,
-          interceptor: (context: KeyInputContext<KeyEvent>) => void,
-        ) => {
+        intercept: (name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
           if (name === "key") keyInterceptor = interceptor
           return () => undefined
         },
@@ -85,33 +82,39 @@ describe("registerBtwSideKeymap escape return", () => {
       close: async () => undefined,
     })
 
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller,
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => true,
-      returnToParent,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller,
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => true,
+        returnToParent,
+      }),
+    )
     const escapeEvent = unsafeTestValue({
       name: "escape",
       eventType: "press",
     })
 
     // when
-    keyInterceptor?.(unsafeTestValue({
-      event: escapeEvent,
-      setData: () => undefined,
-      getData: () => undefined,
-      consume: firstConsume,
-    }))
-    keyInterceptor?.(unsafeTestValue({
-      event: escapeEvent,
-      setData: () => undefined,
-      getData: () => undefined,
-      consume: secondConsume,
-    }))
+    keyInterceptor?.(
+      unsafeTestValue({
+        event: escapeEvent,
+        setData: () => undefined,
+        getData: () => undefined,
+        consume: firstConsume,
+      }),
+    )
+    keyInterceptor?.(
+      unsafeTestValue({
+        event: escapeEvent,
+        setData: () => undefined,
+        getData: () => undefined,
+        consume: secondConsume,
+      }),
+    )
 
     // then
     expect(keyInterceptor).toBeInstanceOf(Function)
@@ -125,18 +128,13 @@ describe("registerBtwSideKeymap escape return", () => {
 
   it("#given a busy visible side #when Escape is pressed #then host interruption remains unconsumed", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const consume = mock(() => undefined)
     const returnToParent = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          name: string,
-          interceptor: (context: KeyInputContext<KeyEvent>) => void,
-        ) => {
+        intercept: (name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
           if (name === "key") keyInterceptor = interceptor
           return () => undefined
         },
@@ -152,31 +150,35 @@ describe("registerBtwSideKeymap escape return", () => {
       },
     })
 
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        toggle: () => undefined,
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => false,
-      returnToParent,
-    }))
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          toggle: () => undefined,
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => false,
+        returnToParent,
+      }),
+    )
 
     // when
-    keyInterceptor?.(unsafeTestValue({
-      event: {
-        name: "escape",
-        eventType: "press",
-      },
-      setData: () => undefined,
-      getData: () => undefined,
-      consume,
-    }))
+    keyInterceptor?.(
+      unsafeTestValue({
+        event: {
+          name: "escape",
+          eventType: "press",
+        },
+        setData: () => undefined,
+        getData: () => undefined,
+        consume,
+      }),
+    )
 
     // then
     expect(keyInterceptor).toBeInstanceOf(Function)
@@ -186,17 +188,12 @@ describe("registerBtwSideKeymap escape return", () => {
 
   it("#given one pending Escape #when a non-Escape key intervenes #then the next Escape starts a fresh sequence", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const returnToParent = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          _name: string,
-          interceptor: (context: KeyInputContext<KeyEvent>) => void,
-        ) => {
+        intercept: (_name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
           keyInterceptor = interceptor
           return () => undefined
         },
@@ -211,29 +208,33 @@ describe("registerBtwSideKeymap escape return", () => {
         },
       },
     })
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => true,
-      returnToParent,
-    }))
-    const press = (name: string) => {
-      keyInterceptor?.(unsafeTestValue({
-        event: {
-          name,
-          eventType: "press",
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
         },
-        setData: () => undefined,
-        getData: () => undefined,
-        consume: () => undefined,
-      }))
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => true,
+        returnToParent,
+      }),
+    )
+    const press = (name: string) => {
+      keyInterceptor?.(
+        unsafeTestValue({
+          event: {
+            name,
+            eventType: "press",
+          },
+          setData: () => undefined,
+          getData: () => undefined,
+          consume: () => undefined,
+        }),
+      )
     }
 
     // when
@@ -248,17 +249,12 @@ describe("registerBtwSideKeymap escape return", () => {
   it("#given one pending Escape #when a dialog opens #then dialog Escape resets the sequence", () => {
     // given
     let dialogOpen = false
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const returnToParent = mock(() => undefined)
     const api = unsafeTestValue({
       keymap: {
         registerLayer: () => () => undefined,
-        intercept: (
-          _name: string,
-          interceptor: (context: KeyInputContext<KeyEvent>) => void,
-        ) => {
+        intercept: (_name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
           keyInterceptor = interceptor
           return () => undefined
         },
@@ -275,29 +271,33 @@ describe("registerBtwSideKeymap escape return", () => {
         },
       },
     })
-    registerBtwSideKeymap(unsafeTestValue({
-      api,
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => true,
-      returnToParent,
-    }))
-    const pressEscape = () => {
-      keyInterceptor?.(unsafeTestValue({
-        event: {
-          name: "escape",
-          eventType: "press",
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api,
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
         },
-        setData: () => undefined,
-        getData: () => undefined,
-        consume: () => undefined,
-      }))
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => true,
+        returnToParent,
+      }),
+    )
+    const pressEscape = () => {
+      keyInterceptor?.(
+        unsafeTestValue({
+          event: {
+            name: "escape",
+            eventType: "press",
+          },
+          setData: () => undefined,
+          getData: () => undefined,
+          consume: () => undefined,
+        }),
+      )
     }
 
     // when
@@ -313,53 +313,52 @@ describe("registerBtwSideKeymap escape return", () => {
 
   it("#given one pending Escape #when navigation resets controls #then the next Escape does not return", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const returnToParent = mock(() => undefined)
-    const registration = registerBtwSideKeymap(unsafeTestValue({
-      api: {
-        keymap: {
-          registerLayer: () => () => undefined,
-          intercept: (
-            _name: string,
-            interceptor: (context: KeyInputContext<KeyEvent>) => void,
-          ) => {
-            keyInterceptor = interceptor
-            return () => undefined
+    const registration = registerBtwSideKeymap(
+      unsafeTestValue({
+        api: {
+          keymap: {
+            registerLayer: () => () => undefined,
+            intercept: (_name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
+              keyInterceptor = interceptor
+              return () => undefined
+            },
+            clearPendingSequence: () => undefined,
           },
-          clearPendingSequence: () => undefined,
-        },
-        mode: {
-          current: () => "base",
-        },
-        ui: {
-          dialog: {
-            open: false,
+          mode: {
+            current: () => "base",
+          },
+          ui: {
+            dialog: {
+              open: false,
+            },
           },
         },
-      },
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => true,
-      returnToParent,
-    }))
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => true,
+        returnToParent,
+      }),
+    )
     const pressEscape = () => {
-      keyInterceptor?.(unsafeTestValue({
-        event: {
-          name: "escape",
-          eventType: "press",
-        },
-        setData: () => undefined,
-        getData: () => undefined,
-        consume: () => undefined,
-      }))
+      keyInterceptor?.(
+        unsafeTestValue({
+          event: {
+            name: "escape",
+            eventType: "press",
+          },
+          setData: () => undefined,
+          getData: () => undefined,
+          consume: () => undefined,
+        }),
+      )
     }
 
     // when
@@ -373,53 +372,52 @@ describe("registerBtwSideKeymap escape return", () => {
 
   it("#given one pending Escape #when a held Escape repeats #then a later press starts a fresh sequence", () => {
     // given
-    let keyInterceptor:
-      | ((context: KeyInputContext<KeyEvent>) => void)
-      | undefined
+    let keyInterceptor: ((context: KeyInputContext<KeyEvent>) => void) | undefined
     const returnToParent = mock(() => undefined)
-    registerBtwSideKeymap(unsafeTestValue({
-      api: {
-        keymap: {
-          registerLayer: () => () => undefined,
-          intercept: (
-            _name: string,
-            interceptor: (context: KeyInputContext<KeyEvent>) => void,
-          ) => {
-            keyInterceptor = interceptor
-            return () => undefined
+    registerBtwSideKeymap(
+      unsafeTestValue({
+        api: {
+          keymap: {
+            registerLayer: () => () => undefined,
+            intercept: (_name: string, interceptor: (context: KeyInputContext<KeyEvent>) => void) => {
+              keyInterceptor = interceptor
+              return () => undefined
+            },
+            clearPendingSequence: () => undefined,
           },
-          clearPendingSequence: () => undefined,
-        },
-        mode: {
-          current: () => "base",
-        },
-        ui: {
-          dialog: {
-            open: false,
+          mode: {
+            current: () => "base",
+          },
+          ui: {
+            dialog: {
+              open: false,
+            },
           },
         },
-      },
-      controller: {
-        state: () => ({ phase: "closed" }),
-        canCloseCurrentSide: () => false,
-        close: async () => undefined,
-      },
-      activePromptRef: () => undefined,
-      openBtw: async () => undefined,
-      openPicker: async () => undefined,
-      isCurrentSideIdle: () => true,
-      returnToParent,
-    }))
+        controller: {
+          state: () => ({ phase: "closed" }),
+          canCloseCurrentSide: () => false,
+          close: async () => undefined,
+        },
+        activePromptRef: () => undefined,
+        openBtw: async () => undefined,
+        openPicker: async () => undefined,
+        isCurrentSideIdle: () => true,
+        returnToParent,
+      }),
+    )
     const sendEscape = (eventType: "press" | "repeat") => {
-      keyInterceptor?.(unsafeTestValue({
-        event: {
-          name: "escape",
-          eventType,
-        },
-        setData: () => undefined,
-        getData: () => undefined,
-        consume: () => undefined,
-      }))
+      keyInterceptor?.(
+        unsafeTestValue({
+          event: {
+            name: "escape",
+            eventType,
+          },
+          setData: () => undefined,
+          getData: () => undefined,
+          consume: () => undefined,
+        }),
+      )
     }
 
     // when

@@ -3,9 +3,7 @@ import { describe, expect, mock, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { OpencodeClient } from "./types"
 import { sendSyncPrompt } from "./sync-prompt-sender"
-import {
-  promptWithModelSuggestionRetry,
-} from "../../shared/model-suggestion-retry"
+import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 
 type PromptRetryClient = Parameters<typeof promptWithModelSuggestionRetry>[0]
 type PromptRetryArgs = Parameters<typeof promptWithModelSuggestionRetry>[1]

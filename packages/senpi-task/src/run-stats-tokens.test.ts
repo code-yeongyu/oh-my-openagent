@@ -21,7 +21,13 @@ describe("run stats token totals and data-quality statuses", () => {
       message: {
         role: "assistant",
         content: [],
-        usage: { input: 80, output: 10, cache_read_input_tokens: 100, cache_creation_input_tokens: 0, totalTokens: 190 },
+        usage: {
+          input: 80,
+          output: 10,
+          cache_read_input_tokens: 100,
+          cache_creation_input_tokens: 0,
+          totalTokens: 190,
+        },
       },
     })
 
@@ -103,6 +109,51 @@ describe("run stats token totals and data-quality statuses", () => {
     const silentSnapshot = silent.snapshot(2_000)
     expect(silentSnapshot.cost_usd).toBeUndefined()
     expect(silentSnapshot.cost_status).toBe("unavailable")
+  })
+
+  test("#given turns on a model with no known price (senpi#3844 costUnknown) #when snapshot is taken #then the run reports no cost instead of $0", () => {
+    // given
+    const tracker = createRunStatsTracker(1_000, () => 2_000)
+    const unpriced = {
+      input: 10,
+      output: 5,
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+      costUnknown: true,
+    }
+
+    // when
+    tracker.accept({ type: "message_end", message: { role: "assistant", content: [], usage: unpriced } })
+    tracker.accept({ type: "message_end", message: { role: "assistant", content: [], usage: unpriced } })
+
+    // then: tokens still count, the cost is unavailable rather than a reported 0
+    const snapshot = tracker.snapshot(2_000)
+    expect(snapshot.output_tokens).toBe(10)
+    expect(snapshot.cost_usd).toBeUndefined()
+    expect(snapshot.cost_status).toBe("unavailable")
+  })
+
+  test("#given one priced turn and one turn with an unknown price #when snapshot is taken #then the known cost is partial", () => {
+    // given
+    const tracker = createRunStatsTracker(1_000, () => 2_000)
+
+    // when
+    tracker.accept({
+      type: "message_end",
+      message: { role: "assistant", content: [], usage: { input: 10, output: 5, cost: { total: 0.25 } } },
+    })
+    tracker.accept({
+      type: "message_end",
+      message: {
+        role: "assistant",
+        content: [],
+        usage: { input: 10, output: 5, cost: { total: 0 }, costUnknown: true },
+      },
+    })
+
+    // then
+    const snapshot = tracker.snapshot(2_000)
+    expect(snapshot.cost_usd).toBe(0.25)
+    expect(snapshot.cost_status).toBe("partial")
   })
 
   test("#given a tracker measuring the live run #when snapshot is taken #then duration_status is monotonic", () => {

@@ -12,21 +12,14 @@ export interface ResolveXdgDataDirOptions {
   readonly osProvider?: XdgOsProvider
 }
 
-export function resolveXdgDataDir(
-  appName: string,
-  options: ResolveXdgDataDirOptions = {}
-): string {
+export function resolveXdgDataDir(appName: string, options: ResolveXdgDataDirOptions = {}): string {
   const osProvider = options.osProvider ?? os
   const env = options.env ?? process.env
   const preferredDir = env.XDG_DATA_HOME ?? path.join(osProvider.homedir(), ".local", "share")
   return resolveWritableDirectory(preferredDir, `${appName}-data`, osProvider)
 }
 
-function resolveWritableDirectory(
-  preferredDir: string,
-  fallbackSuffix: string,
-  osProvider: XdgOsProvider
-): string {
+function resolveWritableDirectory(preferredDir: string, fallbackSuffix: string, osProvider: XdgOsProvider): string {
   try {
     mkdirSync(preferredDir, { recursive: true })
     accessSync(preferredDir, constants.W_OK)

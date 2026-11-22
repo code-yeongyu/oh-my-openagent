@@ -74,7 +74,9 @@ function refreshMarkedSandbox(sandboxDir: string, cacheDir: string, pid: number)
     if (!isPluginSandboxMarkedStale(sandboxDir)) return
     if (hasOtherLivePluginSandboxLease(sandboxDir, pid)) {
       markPluginSandboxStale(sandboxDir, cacheDir, "another OpenCode window was still open", pid)
-      log(`[auto-update-checker] Another OpenCode process still runs from ${sandboxDir}; the last one to exit refreshes it`)
+      log(
+        `[auto-update-checker] Another OpenCode process still runs from ${sandboxDir}; the last one to exit refreshes it`,
+      )
       return
     }
     const removed = removePluginSandbox(sandboxDir, cacheDir)

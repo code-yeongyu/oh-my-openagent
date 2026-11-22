@@ -2,6 +2,8 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
+import { OMO_BRAND_LOGO } from "../../../omo-native/bin/lib/brand-logo.generated.js"
+
 /**
  * Local `omo` launcher for a sibling-store install.
  *
@@ -40,6 +42,7 @@ export function renderLocalLauncher(options: LocalLauncherOptions): string {
   const updateCommand = channel === "beta" ? "bun add -g omo-ai@beta" : "bun add -g omo-ai"
   const brand = {
     name: "OmO",
+    logo: OMO_BRAND_LOGO,
     command: "omo",
     displayVersion: options.version ?? "local",
     configDir: ".omo",
@@ -76,7 +79,8 @@ const agentDir = process.env.OMO_CODING_AGENT_DIR ?? process.env.SENPI_CODING_AG
   ?? process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".omo", "agent")
 const env = {
   ...process.env,
-  SENPI_BRAND: JSON.stringify(brand),
+  // The plugin this launcher prepends with --extension is the engine's own, never a user flag (#14465).
+  SENPI_BRAND: JSON.stringify({ ...brand, extensions: [plugin] }),
   OMO_NATIVE: "1",
   OMO_CODING_AGENT_DIR: agentDir,
   SENPI_CODING_AGENT_DIR: agentDir,

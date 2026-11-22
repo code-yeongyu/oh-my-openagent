@@ -39,7 +39,11 @@ describe("runSenpiInstaller local launcher", () => {
     const pluginPath = await makePluginFixture()
 
     // when
-    const result = await runSenpiInstaller({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const result = await runSenpiInstaller({
+      env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+    })
 
     // then
     expect(result.launcherPath).toBe(localLauncherPath(homeDir))
@@ -57,7 +61,11 @@ describe("runSenpiInstaller local launcher", () => {
     await writeFile(join(agentDir, "settings.json"), JSON.stringify({ packages: ["keep-me"] }))
 
     // when
-    const result = await runSenpiInstaller({ env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir }, repoRoot, pluginPath })
+    const result = await runSenpiInstaller({
+      env: { HOME: homeDir, SENPI_CODING_AGENT_DIR: agentDir },
+      repoRoot,
+      pluginPath,
+    })
 
     // then
     expect(result.launcherPath).toBeUndefined()

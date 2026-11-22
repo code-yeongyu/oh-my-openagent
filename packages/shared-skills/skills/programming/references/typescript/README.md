@@ -1,5 +1,5 @@
 
-# TypeScript Programmer
+# TypeScript / JavaScript Programmer
 
 Modern TypeScript. Type-strict, stack-first, async-correct.
 
@@ -16,8 +16,8 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Category | Use | Never |
 |---|---|---|
 | Runtime | Bun (native TS, single binary) | ts-node, tsx |
-| Package manager | `pnpm` | npm, yarn (unless workspace requires it) |
-| Linter + formatter | Biome | ESLint, Prettier |
+| Package manager | Bun (`bun install`); `pnpm` only when Node is forced | npm, yarn (unless workspace requires it) |
+| Linter + formatter | **oxlint + oxfmt**, with both local copy rules | New ESLint, Prettier, or Biome setups; retain them only in repositories already using them |
 | Type checker | `tsc --noEmit` with strict config | skip type checking |
 | Web framework | Hono | Express |
 | Validation | Zod | joi, yup, class-validator |
@@ -39,7 +39,7 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 11. **as const for constants** — module-level constant objects and arrays use `as const`.
 12. **import type** — type-only imports use `import type`. Enforced by `verbatimModuleSyntax`.
 13. **Named exports only** — no `export default`. Exception: framework requirement (Next.js pages, etc.).
-14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch`.
+14. **No empty catch, no catch-and-swallow** — every `catch` block must either (a) narrow the error with `instanceof` and handle each case, or (b) re-throw. Empty catch blocks and `catch (e) { console.error(e) }` without narrowing or re-throw are banned — they hide bugs. At top-level boundaries (CLI entry, HTTP handler), opt out with `// no-excuse-ok: catch` on the `catch` line.
 
 ### Data modeling — which construct, when
 
@@ -91,10 +91,10 @@ try {
 }
 
 // GOOD — top-level boundary (only place catch-all is acceptable)
-async function main(): Promise<void> {  // no-excuse-ok: catch
+async function main(): Promise<void> {
   try {
     await run()
-  } catch (e) {
+  } catch (e) {  // no-excuse-ok: catch
     console.error("unhandled:", e)
     process.exit(1)
   }
@@ -125,7 +125,9 @@ bun run ../../scripts/typescript/new-project.ts my-api
 bun run ../../scripts/typescript/new-project.ts my-api --path ./projects
 ```
 
-Creates: `package.json` (Hono + Zod + Biome), `tsconfig.json` (ultra-strict), `biome.json`, `src/index.ts`, `.gitignore`. Works on macOS, Linux, Windows.
+Creates: `package.json` (Hono + Zod + oxlint + oxfmt + oxlint-tsgolint), strict `tsconfig.json`, `.oxlintrc.json`, `.oxfmtrc.json`, `lint/oxlint-plugin/` including its MIT license, `src/index.ts`, and `.gitignore`. Works on macOS, Linux, Windows.
+
+**Use oxlint + oxfmt with `no-em-dash-copy` and `require-suppression-reason` by default for TS and JS.** Load [oxc-lint.md](oxc-lint.md) for the complete setup. Use `--type-aware` with its installed companion where supported; keep `tsc --noEmit` as the type gate. Rewrite paired em dashes as parenthetical or comma-delimited asides, not colon chains.
 
 For manual setup: `bunx tsc --init`, then load `tsconfig-strict.md` for the full strict config.
 
@@ -145,7 +147,8 @@ Load on demand — not all at once.
 
 | Need | Load |
 |---|---|
-| Strict tsconfig + Biome config | `tsconfig-strict.md` |
+| Strict tsconfig | `tsconfig-strict.md` |
+| Default oxlint + oxfmt configs, rule mappings, and local JS plugin | `oxc-lint.md` |
 | Type patterns (branded, as const, satisfies, narrowing, assertNever) | `type-patterns.md` |
 | Data modeling (type vs interface vs Zod, readonly, parse-don't-validate) | `data-modeling.md` |
 | Error handling (Result, typed errors, union vs throw) | `error-handling.md` |
@@ -171,25 +174,24 @@ Violations caught by `../../scripts/typescript/check-no-excuse-rules.ts`. Run af
 | `empty-catch` | `catch { }` or `catch (e) { }` with empty body | `// no-excuse-ok: catch` |
 | `catch-without-narrowing` | `catch (e)` used without `instanceof` or re-throw | `// no-excuse-ok: catch` |
 
-Biome enforces additional rules (noExplicitAny, noNonNullAssertion, noDefaultExport, useImportType). The script catches what Biome cannot.
+Oxlint enforces explicit-any, non-null-assertion, default-export, and type-only-import rules; see [the verified mapping](oxc-lint.md). The audit script retains the checks not covered by those rules, including assertion and enum bans and catch narrowing.
 
 ## In tests
 
-Tests are strict too, with these exceptions (configure in `biome.jsonc` overrides):
+Tests are strict too, with these exceptions (configure in `.oxlintrc.json` overrides):
 
 | In tests you may | Why |
 |---|---|
 | Use `expect()` assertions | That's how testing works |
 | Use magic numbers | Test data |
-| Access private members via bracket notation | Testing internals |
 | Skip readonly on test fixtures | Mutable setup/teardown |
 
-Tests still follow the iron list — branded types, typed errors, exhaustive switch.
+Tests still follow the iron list — branded types, typed errors, exhaustive switch — and the authoring gate in [`../testing/README.md`](../testing/README.md). Private members are reached through the public boundary, never by bracket notation: a test on internals is an implementation mirror that a behavior-preserving refactor breaks.
 
 ## Existing codebases
 
-When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.**
+When editing an existing file that doesn't follow these rules: **write new code in strict style, don't refactor existing code in the same change.** The one exception is the 250 pure-LOC ceiling: if your edit adds lines to a file already over it, split the unit you are touching into its own file first (see [`../code-smells.md`](../code-smells.md) Smell 1); everything else waits for a separate change.
 
 ## Activation
 
-This skill activates whenever you are writing or modifying any `.ts` or `.tsx` file. Even one-off scripts get the strict treatment.
+This reference applies to `.ts`, `.tsx`, `.mts`, `.cts`, `.js`, `.jsx`, `.mjs`, and `.cjs`. JavaScript uses the same lint, formatting, and copy rules; TypeScript-only syntax and compiler gates apply to TS or checked JS projects. Even one-off scripts get the strict treatment.

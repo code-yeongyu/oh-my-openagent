@@ -50,8 +50,12 @@ describe("RpcHostRunner busy host (omo#9067)", () => {
       fallback,
       now: () => clock,
       admissionWaitMs: 1_000,
-      sleep: async (ms) => { clock += ms },
-      shardResolver: () => { throw new Error("a recorded child must not derive a new endpoint") },
+      sleep: async (ms) => {
+        clock += ms
+      },
+      shardResolver: () => {
+        throw new Error("a recorded child must not derive a new endpoint")
+      },
       ensureDaemon: async (input) => {
         ensured.push(input.socket)
         return ensuredDaemon(input.socket ?? "/tmp/rpc.sock")
@@ -76,7 +80,8 @@ describe("RpcHostRunner busy host (omo#9067)", () => {
     })
 
     // when
-    const failure = await runner.start(childSpec({ hostSocket: socket, resumeSessionPath: "/tmp/recorded.jsonl" }))
+    const failure = await runner
+      .start(childSpec({ hostSocket: socket, resumeSessionPath: "/tmp/recorded.jsonl" }))
       .catch((error: unknown) => error)
 
     // then
@@ -194,8 +199,7 @@ describe("RpcHostRunner busy host (omo#9067)", () => {
     const host = await fakeHost()
     const runner = runnerOver(host, {
       fallback,
-      ensureDaemon: () =>
-        Promise.reject(new HostUnavailableError("host_unreachable", { fallbackAllowed: false })),
+      ensureDaemon: () => Promise.reject(new HostUnavailableError("host_unreachable", { fallbackAllowed: false })),
       sleep: (ms) => {
         waits.push(ms)
         return Promise.resolve()
@@ -250,7 +254,9 @@ describe("HostSessionClient silent probe (omo#9067)", () => {
     })
 
     // when
-    const failure = await client.open({ sessionPath: "/tmp/omo-9067/s.jsonl", cwd: "/tmp" } as HostSessionOpenInput).catch((error: unknown) => error)
+    const failure = await client
+      .open({ sessionPath: "/tmp/omo-9067/s.jsonl", cwd: "/tmp" } as HostSessionOpenInput)
+      .catch((error: unknown) => error)
 
     // then
     expect(failure instanceof HostUnavailableError ? failure.reason : undefined).toBe("host_busy")
@@ -264,7 +270,9 @@ describe("HostSessionClient silent probe (omo#9067)", () => {
     })
 
     // when
-    const failure = await client.open({ sessionPath: "/tmp/omo-9067/s.jsonl", cwd: "/tmp" } as HostSessionOpenInput).catch((error: unknown) => error)
+    const failure = await client
+      .open({ sessionPath: "/tmp/omo-9067/s.jsonl", cwd: "/tmp" } as HostSessionOpenInput)
+      .catch((error: unknown) => error)
 
     // then
     expect(failure instanceof HostUnavailableError ? failure.reason : undefined).toBe("host_unreachable")

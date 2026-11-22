@@ -5,6 +5,91 @@
   "description": "Configuration schema for the omo.json / omo.jsonc harness-neutral config surface",
   "type": "object",
   "properties": {
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "workspaces": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "\\S"
+              },
+              "git_owners": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              }
+            },
+            "required": [
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "session_wake": {
+      "type": "object",
+      "properties": {
+        "same_device": {
+          "type": "boolean"
+        },
+        "wake_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "operator_alerts": {
+      "type": "object",
+      "properties": {
+        "error_streak": {
+          "type": "object",
+          "properties": {
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "realert_minutes": {
+              "type": "number",
+              "minimum": 0
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "webhook_url_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -40,14 +125,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "gateway": {
-      "type": "object",
-      "propertyNames": {
-        "type": "string"
-      },
-      "additionalProperties": {},
-      "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
     },
     "$schema": {
       "type": "string"
@@ -189,6 +266,13 @@
                 }
               ]
             }
+          },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
           },
           "reasoning": {
             "anyOf": [
@@ -710,6 +794,13 @@
               ]
             }
           },
+          "models_distribution": {
+            "type": "string",
+            "enum": [
+              "sequential",
+              "round_robin"
+            ]
+          },
           "reasoning": {
             "anyOf": [
               {
@@ -899,7 +990,7 @@
           ]
         },
         "include_co_authored_by": {
-          "default": false,
+          "default": true,
           "type": "boolean"
         },
         "git_env_prefix": {
@@ -1590,6 +1681,30 @@
     "model_profile": {
       "type": "string"
     },
+    "model_pad": {
+      "type": "object",
+      "properties": {
+        "labels": {
+          "type": "object",
+          "properties": {
+            "daily": {
+              "type": "string"
+            },
+            "geeky": {
+              "type": "string"
+            },
+            "normal": {
+              "type": "string"
+            },
+            "heavy": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "memory": {
       "type": "object",
       "properties": {
@@ -1620,6 +1735,7 @@
             "merge": "auto",
             "category": "quick",
             "timeout_minutes": 15,
+            "max_concurrent_runs": 1,
             "sandbox": "auto"
           },
           "type": "object",
@@ -1663,6 +1779,12 @@
             },
             "timeout_minutes": {
               "default": 15,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "max_concurrent_runs": {
+              "default": 1,
               "type": "integer",
               "exclusiveMinimum": 0,
               "maximum": 9007199254740991
@@ -1973,21 +2095,87 @@
           },
           "additionalProperties": false
         },
+        "project_scope": {
+          "default": {
+            "nudge": true,
+            "recall": true
+          },
+          "type": "object",
+          "properties": {
+            "nudge": {
+              "default": true,
+              "type": "boolean"
+            },
+            "recall": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
         "projection": {
           "default": {
-            "max_entries_per_directory": 40,
-            "max_bytes": 24576
+            "max_entries_per_directory": 0,
+            "max_bytes": 40960
           },
           "type": "object",
           "properties": {
             "max_entries_per_directory": {
-              "default": 40,
+              "default": 0,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
             },
             "max_bytes": {
-              "default": 24576,
+              "default": 40960,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "runtime": {
+          "default": {
+            "retention_days": 7,
+            "abandoned_journal_days": 14,
+            "completions_days": 30,
+            "pass_budget_ms": 60000,
+            "discard_unreflected_journals": false,
+            "max_bytes": 2147483648
+          },
+          "type": "object",
+          "properties": {
+            "retention_days": {
+              "default": 7,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "abandoned_journal_days": {
+              "default": 14,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "completions_days": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "pass_budget_ms": {
+              "default": 60000,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "discard_unreflected_journals": {
+              "default": false,
+              "type": "boolean"
+            },
+            "max_bytes": {
+              "default": 2147483648,
               "type": "integer",
               "minimum": 0,
               "maximum": 9007199254740991
@@ -2284,6 +2472,40 @@
                 },
                 "additionalProperties": false
               },
+              "runtime": {
+                "type": "object",
+                "properties": {
+                  "retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "abandoned_journal_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "completions_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "pass_budget_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "discard_unreflected_journals": {
+                    "type": "boolean"
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
               "compile_warn_tokens": {
                 "type": "integer",
                 "exclusiveMinimum": 0,
@@ -2297,6 +2519,21 @@
       "additionalProperties": false
     },
     "telemetry": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "rawTurnSampleRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "device_service": {
       "type": "object",
       "properties": {
         "enabled": {
@@ -2472,6 +2709,34 @@
         },
         "cua_adapter": {
           "type": "boolean"
+        },
+        "run_sandbox": {
+          "type": "string",
+          "enum": [
+            "vm",
+            "quickjs"
+          ],
+          "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+        },
+        "intervention": {
+          "type": "string",
+          "enum": [
+            "continue",
+            "pause"
+          ],
+          "description": "What a background action does while the user uses the target app (default: continue)"
+        },
+        "macos_key_priming": {
+          "type": "string",
+          "enum": [
+            "on",
+            "off"
+          ],
+          "description": "macOS background keys first make the target window key (default: off)"
+        },
+        "trace": {
+          "type": "boolean",
+          "description": "Per-request timing traces (default: false)"
         }
       },
       "additionalProperties": false,
@@ -2482,6 +2747,36 @@
       "items": {
         "type": "string"
       }
+    },
+    "keyword_detector": {
+      "type": "object",
+      "properties": {
+        "enabled_expansions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        },
+        "disabled_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "exclude_models": {
       "type": "array",
@@ -2495,6 +2790,91 @@
     "[native]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -2527,14 +2907,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -2673,6 +3045,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -3193,6 +3572,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -4014,6 +4400,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -4063,6 +4473,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -4282,6 +4697,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -4289,6 +4716,40 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
                 },
                 "max_bytes": {
                   "type": "integer",
@@ -4585,6 +5046,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -4598,6 +5093,20 @@
           "additionalProperties": false
         },
         "telemetry": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
           "type": "object",
           "properties": {
             "enabled": {
@@ -4749,6 +5258,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -4759,6 +5296,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -4772,6 +5339,91 @@
     "[senpi]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -4804,14 +5456,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -4950,6 +5594,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -5470,6 +6121,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -6291,6 +6949,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -6340,6 +7022,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -6559,6 +7246,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -6566,6 +7265,40 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
                 },
                 "max_bytes": {
                   "type": "integer",
@@ -6862,6 +7595,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -6875,6 +7642,20 @@
           "additionalProperties": false
         },
         "telemetry": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
           "type": "object",
           "properties": {
             "enabled": {
@@ -7026,6 +7807,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -7036,6 +7845,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -7049,6 +7888,91 @@
     "[codex]": {
       "type": "object",
       "properties": {
+        "provenance": {
+          "type": "object",
+          "properties": {
+            "workspaces": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "pattern": "\\S"
+                  },
+                  "git_owners": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7081,14 +8005,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "gateway": {
-          "type": "object",
-          "propertyNames": {
-            "type": "string"
-          },
-          "additionalProperties": {},
-          "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
         },
         "categories": {
           "type": "object",
@@ -7227,6 +8143,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -7747,6 +8670,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "reasoning": {
                 "anyOf": [
@@ -8568,6 +9498,30 @@
         "model_profile": {
           "type": "string"
         },
+        "model_pad": {
+          "type": "object",
+          "properties": {
+            "labels": {
+              "type": "object",
+              "properties": {
+                "daily": {
+                  "type": "string"
+                },
+                "geeky": {
+                  "type": "string"
+                },
+                "normal": {
+                  "type": "string"
+                },
+                "heavy": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "memory": {
           "type": "object",
           "properties": {
@@ -8617,6 +9571,11 @@
                   "minLength": 1
                 },
                 "timeout_minutes": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "max_concurrent_runs": {
                   "type": "integer",
                   "exclusiveMinimum": 0,
                   "maximum": 9007199254740991
@@ -8836,6 +9795,18 @@
               },
               "additionalProperties": false
             },
+            "project_scope": {
+              "type": "object",
+              "properties": {
+                "nudge": {
+                  "type": "boolean"
+                },
+                "recall": {
+                  "type": "boolean"
+                }
+              },
+              "additionalProperties": false
+            },
             "projection": {
               "type": "object",
               "properties": {
@@ -8843,6 +9814,40 @@
                   "type": "integer",
                   "minimum": 0,
                   "maximum": 9007199254740991
+                },
+                "max_bytes": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "additionalProperties": false
+            },
+            "runtime": {
+              "type": "object",
+              "properties": {
+                "retention_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "abandoned_journal_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "completions_days": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "pass_budget_ms": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "discard_unreflected_journals": {
+                  "type": "boolean"
                 },
                 "max_bytes": {
                   "type": "integer",
@@ -9139,6 +10144,40 @@
                     },
                     "additionalProperties": false
                   },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "compile_warn_tokens": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
@@ -9152,6 +10191,20 @@
           "additionalProperties": false
         },
         "telemetry": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "rawTurnSampleRate": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            }
+          },
+          "additionalProperties": false
+        },
+        "device_service": {
           "type": "object",
           "properties": {
             "enabled": {
@@ -9303,6 +10356,34 @@
             },
             "cua_adapter": {
               "type": "boolean"
+            },
+            "run_sandbox": {
+              "type": "string",
+              "enum": [
+                "vm",
+                "quickjs"
+              ],
+              "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+            },
+            "intervention": {
+              "type": "string",
+              "enum": [
+                "continue",
+                "pause"
+              ],
+              "description": "What a background action does while the user uses the target app (default: continue)"
+            },
+            "macos_key_priming": {
+              "type": "string",
+              "enum": [
+                "on",
+                "off"
+              ],
+              "description": "macOS background keys first make the target window key (default: off)"
+            },
+            "trace": {
+              "type": "boolean",
+              "description": "Per-request timing traces (default: false)"
             }
           },
           "additionalProperties": false,
@@ -9313,6 +10394,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -9332,6 +10443,91 @@
       "additionalProperties": {
         "type": "object",
         "properties": {
+          "provenance": {
+            "type": "object",
+            "properties": {
+              "workspaces": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "pattern": "\\S"
+                    },
+                    "git_owners": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    },
+                    "paths": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      }
+                    }
+                  },
+                  "required": [
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "session_wake": {
+            "type": "object",
+            "properties": {
+              "same_device": {
+                "type": "boolean"
+              },
+              "wake_limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          "operator_alerts": {
+            "type": "object",
+            "properties": {
+              "error_streak": {
+                "type": "object",
+                "properties": {
+                  "threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "realert_minutes": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "threads": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "webhook_url_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "formatOnMutation": {
             "type": "object",
             "properties": {
@@ -9502,6 +10698,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "reasoning": {
                   "anyOf": [
@@ -10022,6 +11225,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "reasoning": {
                   "anyOf": [
@@ -10843,6 +12053,30 @@
           "model_profile": {
             "type": "string"
           },
+          "model_pad": {
+            "type": "object",
+            "properties": {
+              "labels": {
+                "type": "object",
+                "properties": {
+                  "daily": {
+                    "type": "string"
+                  },
+                  "geeky": {
+                    "type": "string"
+                  },
+                  "normal": {
+                    "type": "string"
+                  },
+                  "heavy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
           "memory": {
             "type": "object",
             "properties": {
@@ -10892,6 +12126,11 @@
                     "minLength": 1
                   },
                   "timeout_minutes": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "max_concurrent_runs": {
                     "type": "integer",
                     "exclusiveMinimum": 0,
                     "maximum": 9007199254740991
@@ -11111,6 +12350,18 @@
                 },
                 "additionalProperties": false
               },
+              "project_scope": {
+                "type": "object",
+                "properties": {
+                  "nudge": {
+                    "type": "boolean"
+                  },
+                  "recall": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
               "projection": {
                 "type": "object",
                 "properties": {
@@ -11118,6 +12369,40 @@
                     "type": "integer",
                     "minimum": 0,
                     "maximum": 9007199254740991
+                  },
+                  "max_bytes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "runtime": {
+                "type": "object",
+                "properties": {
+                  "retention_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "abandoned_journal_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "completions_days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "pass_budget_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "discard_unreflected_journals": {
+                    "type": "boolean"
                   },
                   "max_bytes": {
                     "type": "integer",
@@ -11414,6 +12699,40 @@
                       },
                       "additionalProperties": false
                     },
+                    "runtime": {
+                      "type": "object",
+                      "properties": {
+                        "retention_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "abandoned_journal_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "completions_days": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "pass_budget_ms": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "discard_unreflected_journals": {
+                          "type": "boolean"
+                        },
+                        "max_bytes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "additionalProperties": false
+                    },
                     "compile_warn_tokens": {
                       "type": "integer",
                       "exclusiveMinimum": 0,
@@ -11427,6 +12746,20 @@
             "additionalProperties": false
           },
           "telemetry": {
+            "type": "object",
+            "properties": {
+              "enabled": {
+                "type": "boolean"
+              },
+              "rawTurnSampleRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "device_service": {
             "type": "object",
             "properties": {
               "enabled": {
@@ -11578,6 +12911,34 @@
               },
               "cua_adapter": {
                 "type": "boolean"
+              },
+              "run_sandbox": {
+                "type": "string",
+                "enum": [
+                  "vm",
+                  "quickjs"
+                ],
+                "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+              },
+              "intervention": {
+                "type": "string",
+                "enum": [
+                  "continue",
+                  "pause"
+                ],
+                "description": "What a background action does while the user uses the target app (default: continue)"
+              },
+              "macos_key_priming": {
+                "type": "string",
+                "enum": [
+                  "on",
+                  "off"
+                ],
+                "description": "macOS background keys first make the target window key (default: off)"
+              },
+              "trace": {
+                "type": "boolean",
+                "description": "Per-request timing traces (default: false)"
               }
             },
             "additionalProperties": false,
@@ -11588,6 +12949,36 @@
             "items": {
               "type": "string"
             }
+          },
+          "keyword_detector": {
+            "type": "object",
+            "properties": {
+              "enabled_expansions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              },
+              "disabled_keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
           },
           "exclude_models": {
             "type": "array",
@@ -11601,6 +12992,91 @@
           "[native]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -11633,14 +13109,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -11779,6 +13247,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -12299,6 +13774,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -13120,6 +14602,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -13169,6 +14675,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -13388,6 +14899,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -13395,6 +14918,40 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
                       },
                       "max_bytes": {
                         "type": "integer",
@@ -13691,6 +15248,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -13704,6 +15295,20 @@
                 "additionalProperties": false
               },
               "telemetry": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
                 "type": "object",
                 "properties": {
                   "enabled": {
@@ -13855,6 +15460,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -13865,6 +15498,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -13878,6 +15541,91 @@
           "[senpi]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -13910,14 +15658,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -14056,6 +15796,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -14576,6 +16323,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -15397,6 +17151,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -15446,6 +17224,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -15665,6 +17448,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -15672,6 +17467,40 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
                       },
                       "max_bytes": {
                         "type": "integer",
@@ -15968,6 +17797,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -15981,6 +17844,20 @@
                 "additionalProperties": false
               },
               "telemetry": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
                 "type": "object",
                 "properties": {
                   "enabled": {
@@ -16132,6 +18009,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -16142,6 +18047,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -16155,6 +18090,91 @@
           "[codex]": {
             "type": "object",
             "properties": {
+              "provenance": {
+                "type": "object",
+                "properties": {
+                  "workspaces": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "minLength": 1,
+                          "pattern": "\\S"
+                        },
+                        "git_owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        },
+                        "paths": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "\\S"
+                          }
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -16187,14 +18207,6 @@
                   }
                 },
                 "additionalProperties": false
-              },
-              "gateway": {
-                "type": "object",
-                "propertyNames": {
-                  "type": "string"
-                },
-                "additionalProperties": {},
-                "description": "Chat-surface gateway settings, owned and validated by a separately installed gateway package. omo accepts the key and never reads it."
               },
               "categories": {
                 "type": "object",
@@ -16333,6 +18345,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -16853,6 +18872,13 @@
                           }
                         ]
                       }
+                    },
+                    "models_distribution": {
+                      "type": "string",
+                      "enum": [
+                        "sequential",
+                        "round_robin"
+                      ]
                     },
                     "reasoning": {
                       "anyOf": [
@@ -17674,6 +19700,30 @@
               "model_profile": {
                 "type": "string"
               },
+              "model_pad": {
+                "type": "object",
+                "properties": {
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "daily": {
+                        "type": "string"
+                      },
+                      "geeky": {
+                        "type": "string"
+                      },
+                      "normal": {
+                        "type": "string"
+                      },
+                      "heavy": {
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "memory": {
                 "type": "object",
                 "properties": {
@@ -17723,6 +19773,11 @@
                         "minLength": 1
                       },
                       "timeout_minutes": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "max_concurrent_runs": {
                         "type": "integer",
                         "exclusiveMinimum": 0,
                         "maximum": 9007199254740991
@@ -17942,6 +19997,18 @@
                     },
                     "additionalProperties": false
                   },
+                  "project_scope": {
+                    "type": "object",
+                    "properties": {
+                      "nudge": {
+                        "type": "boolean"
+                      },
+                      "recall": {
+                        "type": "boolean"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "projection": {
                     "type": "object",
                     "properties": {
@@ -17949,6 +20016,40 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "max_bytes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "runtime": {
+                    "type": "object",
+                    "properties": {
+                      "retention_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "abandoned_journal_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "completions_days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "pass_budget_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "discard_unreflected_journals": {
+                        "type": "boolean"
                       },
                       "max_bytes": {
                         "type": "integer",
@@ -18245,6 +20346,40 @@
                           },
                           "additionalProperties": false
                         },
+                        "runtime": {
+                          "type": "object",
+                          "properties": {
+                            "retention_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "abandoned_journal_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "completions_days": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "pass_budget_ms": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "discard_unreflected_journals": {
+                              "type": "boolean"
+                            },
+                            "max_bytes": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            }
+                          },
+                          "additionalProperties": false
+                        },
                         "compile_warn_tokens": {
                           "type": "integer",
                           "exclusiveMinimum": 0,
@@ -18258,6 +20393,20 @@
                 "additionalProperties": false
               },
               "telemetry": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "rawTurnSampleRate": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "device_service": {
                 "type": "object",
                 "properties": {
                   "enabled": {
@@ -18409,6 +20558,34 @@
                   },
                   "cua_adapter": {
                     "type": "boolean"
+                  },
+                  "run_sandbox": {
+                    "type": "string",
+                    "enum": [
+                      "vm",
+                      "quickjs"
+                    ],
+                    "description": "Where `run` code executes (default: vm; reserved: every run uses vm until the QuickJS cell lands)"
+                  },
+                  "intervention": {
+                    "type": "string",
+                    "enum": [
+                      "continue",
+                      "pause"
+                    ],
+                    "description": "What a background action does while the user uses the target app (default: continue)"
+                  },
+                  "macos_key_priming": {
+                    "type": "string",
+                    "enum": [
+                      "on",
+                      "off"
+                    ],
+                    "description": "macOS background keys first make the target window key (default: off)"
+                  },
+                  "trace": {
+                    "type": "boolean",
+                    "description": "Per-request timing traces (default: false)"
                   }
                 },
                 "additionalProperties": false,
@@ -18419,6 +20596,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -18642,6 +20849,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -19195,6 +21409,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -19747,6 +21968,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -20298,6 +22526,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -20854,6 +23089,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -21405,6 +23647,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -21958,6 +24207,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -22509,6 +24765,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -23062,6 +25325,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -23613,6 +25883,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -24166,6 +26443,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -24717,6 +27001,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -25270,6 +27561,13 @@
                     ]
                   }
                 },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
+                },
                 "fallback_models": {
                   "anyOf": [
                     {
@@ -25821,6 +28119,13 @@
                       }
                     ]
                   }
+                },
+                "models_distribution": {
+                  "type": "string",
+                  "enum": [
+                    "sequential",
+                    "round_robin"
+                  ]
                 },
                 "fallback_models": {
                   "anyOf": [
@@ -26374,6 +28679,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -26935,6 +29247,13 @@
                     }
                   ]
                 }
+              },
+              "models_distribution": {
+                "type": "string",
+                "enum": [
+                  "sequential",
+                  "round_robin"
+                ]
               },
               "fallback_models": {
                 "anyOf": [
@@ -27614,6 +29933,10 @@
                   "type": "number",
                   "minimum": 0
                 },
+                "first_prompt_timeout_seconds": {
+                  "type": "number",
+                  "minimum": 0
+                },
                 "notify_on_fallback": {
                   "type": "boolean"
                 },
@@ -28052,7 +30375,7 @@
         "git_master": {
           "default": {
             "commit_footer": false,
-            "include_co_authored_by": false,
+            "include_co_authored_by": true,
             "git_env_prefix": "GIT_MASTER=1"
           },
           "type": "object",
@@ -28065,7 +30388,7 @@
               ]
             },
             "include_co_authored_by": {
-              "default": false,
+              "default": true,
               "type": "boolean"
             },
             "git_env_prefix": {

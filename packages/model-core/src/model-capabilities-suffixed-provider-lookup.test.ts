@@ -47,9 +47,9 @@ describe("getModelCapabilities provider lookup for suffixed model ids", () => {
       readConnectedProvidersCache: () => null,
       findProviderModelMetadata: (_providerID: string, modelID: string) =>
         modelID === "o3:high"
-          ? ({ id: "o3:high", temperature: false } as ModelMetadata)
+          ? { id: "o3:high", temperature: false }
           : modelID === "o3"
-            ? ({ id: "o3", temperature: true } as ModelMetadata)
+            ? { id: "o3", temperature: true }
             : undefined,
     }
 
@@ -127,35 +127,35 @@ describe("getModelCapabilities provider lookup for suffixed model ids", () => {
     expect(capabilities.diagnostics.supportsTemperature.source).toBe("bundled-snapshot")
   })
 
-  test.each([
-    "claude-opus-4.8:high",
-    "anthropic/claude-opus-4.8:high",
-  ])("#given conflicting snapshot entries #when %s is requested #then provider-specific metadata wins", (modelID) => {
-    // given
-    const bundledSnapshot: ModelCapabilitiesSnapshot = {
-      generatedAt: "2026-08-05T00:00:00.000Z",
-      sourceUrl: "https://models.dev/api.json",
-      models: {
-        "anthropic/claude-opus-4.8": {
-          id: "claude-opus-4.8",
-          temperature: true,
+  test.each(["claude-opus-4.8:high", "anthropic/claude-opus-4.8:high"])(
+    "#given conflicting snapshot entries #when %s is requested #then provider-specific metadata wins",
+    (modelID) => {
+      // given
+      const bundledSnapshot: ModelCapabilitiesSnapshot = {
+        generatedAt: "2026-08-05T00:00:00.000Z",
+        sourceUrl: "https://models.dev/api.json",
+        models: {
+          "anthropic/claude-opus-4.8": {
+            id: "claude-opus-4.8",
+            temperature: true,
+          },
+          "claude-opus-4.8": {
+            id: "claude-opus-4.8",
+            temperature: false,
+          },
         },
-        "claude-opus-4.8": {
-          id: "claude-opus-4.8",
-          temperature: false,
-        },
-      },
-    }
+      }
 
-    // when
-    const capabilities = getModelCapabilities({
-      providerID: "anthropic",
-      modelID,
-      bundledSnapshot,
-    })
+      // when
+      const capabilities = getModelCapabilities({
+        providerID: "anthropic",
+        modelID,
+        bundledSnapshot,
+      })
 
-    // then
-    expect(capabilities.supportsTemperature).toBe(true)
-    expect(capabilities.diagnostics.supportsTemperature.source).toBe("bundled-snapshot")
-  })
+      // then
+      expect(capabilities.supportsTemperature).toBe(true)
+      expect(capabilities.diagnostics.supportsTemperature.source).toBe("bundled-snapshot")
+    },
+  )
 })

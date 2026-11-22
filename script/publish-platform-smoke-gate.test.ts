@@ -104,10 +104,14 @@ describe("arm64 publish legs wait on the linux-arm64 smoke", () => {
   })
 
   test("#given the linux-arm64 smoke passed #when an arm64 leg publishes #then it proceeds", () => {
-    expect(runStep(ARM64_GATE, { PLATFORM: "linux-arm64", ARM64_SMOKE_RESULT: "success" }, scratchDir()).exitCode).toBe(0)
+    expect(runStep(ARM64_GATE, { PLATFORM: "linux-arm64", ARM64_SMOKE_RESULT: "success" }, scratchDir()).exitCode).toBe(
+      0,
+    )
   })
 
   test("#given the linux-arm64 smoke failed #when a non-arm64 leg publishes #then that leg is unaffected", () => {
-    expect(runStep(ARM64_GATE, { PLATFORM: "windows-x64", ARM64_SMOKE_RESULT: "failure" }, scratchDir()).exitCode).toBe(0)
+    expect(runStep(ARM64_GATE, { PLATFORM: "windows-x64", ARM64_SMOKE_RESULT: "failure" }, scratchDir()).exitCode).toBe(
+      0,
+    )
   })
 })

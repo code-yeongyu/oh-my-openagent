@@ -1,3 +1,5 @@
+import { LATEST_MODEL_BY_FAMILY } from "@oh-my-opencode/model-core/latest-models"
+
 /**
  * Model version migration map: old full model strings → new full model strings.
  * Used to auto-upgrade hardcoded model versions in user configs when the plugin
@@ -15,7 +17,7 @@
  * (#3777, #4527).
  */
 export const MODEL_VERSION_MAP: Record<string, string> = {
-  "anthropic/claude-opus-4-4": "anthropic/claude-opus-5-5",
+  "anthropic/claude-opus-4-4": `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`,
 }
 
 const CURRENT_USER_SELECTABLE_MODELS = new Set([
@@ -43,7 +45,7 @@ function appliedMigrationSources(appliedMigrations: Set<string> | undefined): Se
 
 export function migrateModelVersions(
   configs: Record<string, unknown>,
-  appliedMigrations?: Set<string>
+  appliedMigrations?: Set<string>,
 ): { migrated: Record<string, unknown>; changed: boolean; newMigrations: string[] } {
   const migrated: Record<string, unknown> = {}
   let changed = false

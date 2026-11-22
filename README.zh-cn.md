@@ -7,17 +7,6 @@
 > *只需在提示词中输入 "mass ulw" - 你就是图工程的大师。多模型 ultracode,搭配更出色的记忆系统。(右侧面板是 [omo-herdr-dag](https://github.com/jc01rho/omo-herdr-dag))*
 
 
-> **Sponsors**
-> 以下是我们的赞助商,支持着这个个人副业项目的持续开发。
-> | [<img alt="OpenGateway" src="./.github/assets/opengateway-logo.svg" width="156px" />](https://opengateway.ai/) | **[OpenGateway](https://opengateway.ai/)** 赞助了 OmO。它是一个兼容 OpenAI 的网关,通过一个 API 即可使用多家模型提供商。感谢对开源的支持。 |
-> | :-----| :----- |
-
-
-> [!NOTE]
->
-> [![Sisyphus Labs - Meet Dori. Not a demo. Subscribes to everything.](./.github/assets/sisyphuslabs.png?v=4)](https://sisyphuslabs.ai)
-> > **OmO 由上述的 Jobdori 进行维护。认识你专属的 Jobdori, Dori。<br />[在此处](https://sisyphuslabs.ai)加入等待名单。**
-
 > [!TIP]
 > 加入我们！
 >

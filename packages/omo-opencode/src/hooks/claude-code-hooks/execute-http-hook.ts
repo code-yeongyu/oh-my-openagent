@@ -14,10 +14,7 @@ function isPlainHttp(url: URL): boolean {
   return url.protocol === "http:"
 }
 
-export function interpolateEnvVars(
-  value: string,
-  allowedEnvVars: string[]
-): string {
+export function interpolateEnvVars(value: string, allowedEnvVars: string[]): string {
   const allowedSet = new Set(allowedEnvVars)
 
   return value.replace(/\$\{(\w+)\}|\$(\w+)/g, (_match, bracedVar: string | undefined, bareVar: string | undefined) => {
@@ -29,9 +26,7 @@ export function interpolateEnvVars(
   })
 }
 
-function resolveHeaders(
-  hook: HookHttp
-): Record<string, string> {
+function resolveHeaders(hook: HookHttp): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   }
@@ -54,10 +49,7 @@ async function readResponseTextOrEmpty(response: Response): Promise<string> {
   }
 }
 
-export async function executeHttpHook(
-  hook: HookHttp,
-  stdin: string
-): Promise<CommandResult> {
+export async function executeHttpHook(hook: HookHttp, stdin: string): Promise<CommandResult> {
   let parsed: URL
   try {
     parsed = new URL(hook.url)

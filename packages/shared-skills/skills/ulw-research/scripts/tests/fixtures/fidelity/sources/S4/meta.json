@@ -1,0 +1,9 @@
+{
+	"source_id": "S4",
+	"url": "https://example.org/bridge",
+	"observed_at": "2026-10-01T00:00:00Z",
+	"sha256": "89abfafc79d0e2c13a5ccad6843c020dc65e86f1eca385f85e7f58153960cdfe",
+	"extractor": "tool:source-snapshot@1",
+	"revision": null,
+	"kind": "page"
+}

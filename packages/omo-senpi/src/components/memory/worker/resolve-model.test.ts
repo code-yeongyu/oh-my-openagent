@@ -66,7 +66,13 @@ describe("resolveReflectionModel", () => {
 
     // then: thinking comes from the builtin quick default (gpt-5.6-luna-fast at low), which a user
     // model pin inherits when it declares no reasoning of its own.
-    expect(result).toEqual({ kind: "resolved", category: "quick", model: "omo-mock/mock-1", thinking: "low", fallbacks: [] })
+    expect(result).toEqual({
+      kind: "resolved",
+      category: "quick",
+      model: "omo-mock/mock-1",
+      thinking: "low",
+      fallbacks: [],
+    })
   })
 
   test("#given a pinned model that find() cannot locate #when resolved #then it still fails closed", () => {
@@ -93,9 +99,7 @@ describe("resolveReflectionModel", () => {
     const staleRegistry = {
       getAvailable: () => [],
       find: (provider: string, modelId: string) =>
-        [primary, fallback].find((candidate) =>
-          candidate.provider === provider && candidate.id === modelId
-        ),
+        [primary, fallback].find((candidate) => candidate.provider === provider && candidate.id === modelId),
     }
     const config: OmoConfig = {
       categories: {
@@ -129,9 +133,7 @@ describe("resolveReflectionModel", () => {
     const snapshotRegistry = {
       getAvailable: () => [selected],
       find: (provider: string, modelId: string) =>
-        [earlier, selected].find((candidate) =>
-          candidate.provider === provider && candidate.id === modelId
-        ),
+        [earlier, selected].find((candidate) => candidate.provider === provider && candidate.id === modelId),
     }
     const config: OmoConfig = {
       categories: {
@@ -164,9 +166,7 @@ describe("resolveReflectionModel", () => {
     const staleRegistry = {
       getAvailable: () => [],
       find: (provider: string, modelId: string) =>
-        [primary, fallback].find((candidate) =>
-          candidate.provider === provider && candidate.id === modelId
-        ),
+        [primary, fallback].find((candidate) => candidate.provider === provider && candidate.id === modelId),
     }
     const config: OmoConfig = {
       categories: {
@@ -333,7 +333,11 @@ describe("resolveReflectionModel", () => {
 
     test("#when neither registry nor session model can help #then it still fails closed", () => {
       // when
-      const result = resolveReflectionModel("quick", { categories: {} }, { getAvailable: () => [], find: () => undefined })
+      const result = resolveReflectionModel(
+        "quick",
+        { categories: {} },
+        { getAvailable: () => [], find: () => undefined },
+      )
 
       // then
       expect(result.kind).toBe("category_unavailable")
@@ -372,7 +376,11 @@ describe("resolveReflectionModel", () => {
 
     test("#when resolved #then the builtin chain's connected rungs follow the pin as fallbacks", () => {
       // when
-      const result = resolveReflectionModel("quick", { categories: { quick: { model: "devin/swe-2-low" } } }, liveRegistry)
+      const result = resolveReflectionModel(
+        "quick",
+        { categories: { quick: { model: "devin/swe-2-low" } } },
+        liveRegistry,
+      )
 
       // then
       expect(result.kind).toBe("resolved")

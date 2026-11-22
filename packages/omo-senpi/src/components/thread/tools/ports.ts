@@ -1,9 +1,20 @@
 import type { AddressBookHost, DiskSession } from "../address-book"
+import type { ThreadActivity } from "../contracts/state"
+import type { InterruptRequest } from "../control/interrupt"
 import type { ThreadControl } from "../endpoint-controls"
 import type { EndpointKind } from "../endpoint-registry"
-import type { GatewayEndpointPort, GatewayWakeReply, ReleaseSessionReply, ReleaseSessionRequest } from "../gateway/adapter"
+import type {
+  GatewayEndpointPort,
+  GatewayWakeReply,
+  ReleaseSessionReply,
+  ReleaseSessionRequest,
+} from "../gateway/adapter"
+import type { ProvenanceRuntime } from "../gateway/provenance-resolver"
+import type { SameDeviceWake } from "../gateway/same-device-wake"
 import type { GatewayStore } from "../gateway/store"
 import type { ThreadTranscriptEntry } from "../reader"
+import type { RemoteThreadSurface } from "../remote/ports"
+import type { SessionWatchHandlers, SessionWatchOutcome } from "../control/wait-settled"
 
 export type ThreadHostSession = {
   readonly sessionId: string
@@ -14,6 +25,25 @@ export type ThreadHostSession = {
   readonly status?: "opening" | "open" | "closing" | "closed"
   /** senpi session kind (`interactive` | `worker`). */
   readonly kind?: string
+  /** The session file's archived flag; an engine from before `set_session_archived` lists none (not archived). */
+  readonly archived?: boolean
+  /**
+   * What the session is doing (senpi#6688): `running` while a turn is in flight, `queued` with steering or follow-up
+   * waiting, `awaiting_approval` on a pending question, `errored` after a turn failed. An older engine lists only
+   * `running` | `idle`, or none (idle).
+   */
+  readonly activity?: ThreadActivity
+  /** With `errored`: the failed turn's category (`auth`, `rate_limit`, `quota`, `network`, ...). */
+  readonly error_code?: string
+  /** The current or most recent turn's id, as the prompt response names it. */
+  readonly turn_id?: string
+  /**
+   * senpi#7025: while a running session sleeps between provider retries,
+   * `{kind: "rate_limit" | "retry", attempt, maxAttempts, delayMs, until, error?}`; an older engine lists none.
+   */
+  readonly waiting?: unknown
+  /** The session's current model; absent while unknown or on an older engine. */
+  readonly model?: { readonly provider: string; readonly id: string }
   readonly createdAt?: string
   readonly updatedAt?: string
   /** A terminal control endpoint reports its timestamps snake-cased. */
@@ -23,6 +53,8 @@ export type ThreadHostSession = {
   readonly endpoint_kind?: EndpointKind
   /** The controls that endpoint accepts (`endpoint-controls.ts`). */
   readonly controls?: readonly ThreadControl[]
+  /** The version of the engine that endpoint runs, as its get_protocol_info names it (#14278). */
+  readonly engine_version?: string
   /**
    * The endpoint that listed this session. Routing ids are per-host counters (`rpc-1` on every
    * host), so a session is only addressable as the pair (socket, sessionId); absent for a host
@@ -34,7 +66,20 @@ export type ThreadHostSession = {
 /** The per-session half of the host surface, bound to the ONE endpoint that holds the session. */
 export type ThreadSessionPort = Pick<
   ThreadHost,
-  "getMessages" | "getState" | "prompt" | "interrupt" | "setSessionName" | "setModel" | "getAvailableModels" | "setThinkingLevel" | "getAvailableThinkingLevels" | "wake" | "releaseSession"
+  | "getMessages"
+  | "getState"
+  | "prompt"
+  | "interrupt"
+  | "setSessionName"
+  | "setSessionArchived"
+  | "setModel"
+  | "getAvailableModels"
+  | "setThinkingLevel"
+  | "getAvailableThinkingLevels"
+  | "wake"
+  | "releaseSession"
+  | "closeSession"
+  | "watchSession"
 >
 
 /**
@@ -60,24 +105,96 @@ export type ThreadHostViewRequest = {
 export type ThreadHost = {
   readonly socket: string
   readonly listSessions: () => Promise<readonly ThreadHostSession[]>
-  readonly openSession: (params: { readonly cwd?: string; readonly sessionPath?: string; readonly name?: string; readonly forkFrom?: string; readonly initialSkills?: readonly string[] }) => Promise<ThreadHostSession>
+  /** `permissionPreset` is the approval mode the new session starts in (its creator's, #12884); absent, the host's default applies. */
+  readonly openSession: (params: {
+    readonly cwd?: string
+    readonly sessionPath?: string
+    readonly name?: string
+    readonly forkFrom?: string
+    readonly initialSkills?: readonly string[]
+    readonly permissionPreset?: string
+    /** The engine's launch profile: the model (`provider` + `modelId`) and thinking level the new session starts on. */
+    readonly provider?: string
+    readonly modelId?: string
+    readonly thinkingLevel?: string
+    /** The id a NEW session is created under (host capability `durable_session_id`; ignored on resume, #14060). */
+    readonly durableSessionId?: string
+  }) => Promise<ThreadHostSession>
   readonly getMessages: (sessionId: string) => Promise<readonly ThreadTranscriptEntry[]>
-  readonly getState: (sessionId: string) => Promise<{ readonly isStreaming?: boolean; readonly activeTurnId?: string }>
-  readonly prompt: (sessionId: string, message: string, options?: { readonly streamingBehavior?: "steer" | "followUp" }) => Promise<{ readonly turnId?: string }>
-  readonly interrupt: (sessionId: string, turnId?: string) => Promise<{ readonly interrupted?: boolean; readonly turnId?: string }>
-  readonly setSessionName: (sessionId: string, name: string) => Promise<void>
-  readonly setModel: (sessionId: string, provider: string, modelId: string) => Promise<{ provider: string; id: string; name?: string }>
-  readonly getAvailableModels: (sessionId: string) => Promise<readonly { provider: string; id: string; name?: string }[]>
-  readonly setThinkingLevel: (sessionId: string, level: string, scope?: "session" | "turn") => Promise<void>
+  readonly getState: (
+    sessionId: string,
+    durable_session_id?: string,
+  ) => Promise<{
+    readonly isStreaming?: boolean
+    readonly activeTurnId?: string
+    readonly model?: unknown
+    readonly thinkingLevel?: unknown
+  }>
+  readonly prompt: (
+    sessionId: string,
+    message: string,
+    options?: { readonly streamingBehavior?: "steer" | "followUp" },
+    durable_session_id?: string,
+  ) => Promise<{ readonly turnId?: string }>
+  /** The engine's `interrupt` record with `request`'s fields (`control/interrupt.ts`); answers the engine's reply data. */
+  readonly interrupt: (
+    sessionId: string,
+    request: InterruptRequest,
+    durable_session_id?: string,
+  ) => Promise<Readonly<Record<string, unknown>>>
+  readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
+  /** senpi `set_session_archived`: writes the flag into the session file. Absent on a port that cannot send it. */
+  readonly setSessionArchived?: (sessionId: string, archived: boolean, durable_session_id?: string) => Promise<void>
+  readonly setModel: (
+    sessionId: string,
+    provider: string,
+    modelId: string,
+    durable_session_id?: string,
+  ) => Promise<{ provider: string; id: string; name?: string }>
+  readonly getAvailableModels: (
+    sessionId: string,
+  ) => Promise<readonly { provider: string; id: string; name?: string }[]>
+  readonly setThinkingLevel: (
+    sessionId: string,
+    level: string,
+    scope?: "session" | "turn",
+    durable_session_id?: string,
+  ) => Promise<void>
   readonly getAvailableThinkingLevels: (sessionId: string) => Promise<readonly string[]>
   /** Runs the session's registered inbox drain once (`wake`); every endpoint kind answers it. */
-  readonly wake?: (sessionId: string, deliveryIds: readonly string[]) => Promise<GatewayWakeReply>
+  readonly wake?: (
+    sessionId: string,
+    deliveryIds: readonly string[],
+    durable_session_id?: string,
+  ) => Promise<GatewayWakeReply>
   /** Hands a quiet host session to another runtime (`release_session`); hosts only. */
-  readonly releaseSession?: (sessionId: string, request: ReleaseSessionRequest) => Promise<ReleaseSessionReply>
+  readonly releaseSession?: (
+    sessionId: string,
+    request: ReleaseSessionRequest,
+    durable_session_id?: string,
+  ) => Promise<ReleaseSessionReply>
+  /**
+   * Follows one session's status and run records on the endpoint's observing `subscribe_sessions` stream (never an
+   * attachment), until the watch is stopped or the session closes; `thread_read`'s `wait_ms` waits on it.
+   */
+  readonly watchSession?: (
+    sessionId: string,
+    handlers: SessionWatchHandlers,
+    durable_session_id?: string,
+  ) => Promise<SessionWatchOutcome>
+  /** Ends one session on its host for every client that holds it; hosts only, a terminal keeps its own session. */
+  readonly closeSession?: (
+    sessionId: string,
+    durable_session_id?: string,
+    options?: ThreadCloseOptions,
+  ) => Promise<ThreadCloseAnswer>
   /** Every endpoint at once; absent on a single-endpoint host, whose `listSessions` is the view. */
   readonly listView?: (request?: ThreadHostViewRequest) => Promise<ThreadHostView>
   /** Fresh identity validation on exactly one published endpoint, without enumeration. */
-  readonly listTarget?: (durableId: string, endpoint: { readonly socket: string; readonly kind: EndpointKind }) => Promise<ThreadHostView>
+  readonly listTarget?: (
+    durableId: string,
+    endpoint: { readonly socket: string; readonly kind: EndpointKind },
+  ) => Promise<ThreadHostView>
   /** The per-session methods on the endpoint a listed session's `socket` names. */
   readonly endpoint?: (socket: string) => ThreadSessionPort
   /** The session gateway's sender port over the same endpoints (`wake`, `release_session`, `extension_ui_response`). */
@@ -85,6 +202,11 @@ export type ThreadHost = {
 }
 
 export type ThreadToolSurfaceOptions = {
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Reads the sender's `provenance.workspaces` table; absent, only the sender's environment and git classify it. */
+  readonly loadProvenanceWorkspaces?: ProvenanceRuntime["loadWorkspaces"]
+  /** Receives a degraded-classification diagnostic; the send goes on either way. */
+  readonly onProvenanceWarning?: ProvenanceRuntime["onWarning"]
   readonly host: ThreadHost
   readonly callerSessionId: () => string
   readonly callerWorkspaceRoot: () => string
@@ -97,6 +219,8 @@ export type ThreadToolSurfaceOptions = {
    */
   readonly sessionsDirectory?: () => string
   readonly ensureHost?: () => Promise<void>
+  /** A same-device send to a session that is not running becomes a wake (#13037 5.3); absent, it is queued offline. */
+  readonly sameDeviceWake?: SameDeviceWake
   /**
    * The gateway store: the tools' idempotency receipts, bindings and outbox. The component passes
    * the one store it shares with the session's control endpoint; the SDK passes the one it opened
@@ -104,25 +228,72 @@ export type ThreadToolSurfaceOptions = {
    * database.
    */
   readonly store: GatewayStore
-  /** The caller's current turn (the gateway's per-turn fan-out budget is keyed by it); absent outside a turn. */
+  /** The caller's current turn, recorded on each delivery as provenance; absent outside a turn. */
   readonly callerTurnId?: () => string | undefined
   /** The caller session's current name, shown to a receiver as "Sent by another agent · <name>"; absent when it has none. */
   readonly callerName?: () => string | undefined
   /**
    * The newest delivery whose message the caller's current run has consumed (`component.ts`
-   * `RunContext.cause`), when one has: a send continues that causal root (hop, cycle and budget
-   * guards), and a send with none starts a new root. A delivery still queued behind the run is not it.
+   * `RunContext.cause`), when one has: a send continues that causal root and its hop
+   * count, and a send with none starts a new root. A delivery still queued behind the run is not it.
    */
   readonly callerCause?: () => string | undefined
+  /** The highest chain hop an input of the caller's current run arrived with from another device; a send continues it (K8). */
+  readonly callerChainHop?: () => number
   /** The deliveries the caller's current answer is for (`component.ts` `RunContext.consumed`); a report without `binding_id` goes to their binding. */
   readonly callerRunDeliveries?: () => readonly string[]
+  /** The agent sessions whose deliveries the caller's current run took in: a `thread_send` back to one asks for no permission (#12886). */
+  readonly callerReplyTargets?: () => readonly string[]
+  /** The senders of the deliveries the current run consumed, as each delivery stated them (decision 0027 section 6): a reply
+   * to one of them, by durable id or by the stated name, is approved from that evidence alone and must resolve to it, on
+   * `device`: the device the delivery came from, parsed from its id (absent = this device; amendment A4.3.1 of #13037). */
+  readonly callerReplySenders?: () => readonly {
+    readonly session_id: string
+    readonly name?: string
+    readonly device?: string
+  }[]
   /** A `user` message (typed in the caller's terminal, or an extension's) is part of that same answer (`RunContext.local`); with a bound delivery there and another outbound binding, a report without `binding_id` is refused. */
   readonly callerRunHasLocalInput?: () => boolean
   /** `thread_report {kind: "completion"}` armed a completion (`arm_seq`) for this session; the component writes it at the next settle. */
   readonly onCompletionArmed?: (durableId: string, armSeq: number) => void
   readonly now?: () => number
+  /**
+   * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,
+   * FIRST_PROMPT_START_WAIT_MS, cut to the call's budget. A test seam: a test with no drain sets it short.
+   */
+  readonly firstPromptWaitMs?: number
+  /** Sessions on the account's other devices and the account-wide alias (O8, A3); absent, the tools reach only this device. */
+  readonly remote?: RemoteThreadSurface
 }
-
 
 /** Placeholder the component supplies when the host passes no per-call caller identity. */
 export const UNKNOWN_CALLER = "unknown-caller"
+
+/** How a close ended: the session ended, no live session held it any more, or another client still holds it. */
+export type ThreadCloseOutcome = "closed" | "not_live" | "held_elsewhere"
+
+/**
+ * `force`: close even when the session has messages it has not read; they are dropped and listed (omo#14234).
+ * `graceful` (omo#14313): let the running turn end instead, within `wait_ms`, handing unread messages back to their
+ * senders; the engine stops the session's monitors, loops and goal cleanly, so a reopen comes back unheld.
+ */
+export type ThreadCloseOptions = {
+  readonly force?: boolean
+  readonly graceful?: boolean
+  readonly wait_ms?: number
+}
+
+/** What a graceful close waited for and stopped (senpi `unload_session { graceful }` `graceful` and `dropped`). */
+export type ThreadCloseGraceful = {
+  readonly turn: number
+  readonly waited_ms: number
+  readonly stopped_wake_sources: readonly string[]
+  readonly returned_user_messages: readonly string[]
+}
+
+/** A close's outcome and the deliveries the engine handed back unwritten (empty when none). */
+export type ThreadCloseAnswer = {
+  readonly outcome: ThreadCloseOutcome
+  readonly dropped_deliveries: readonly string[]
+  readonly graceful?: ThreadCloseGraceful
+}

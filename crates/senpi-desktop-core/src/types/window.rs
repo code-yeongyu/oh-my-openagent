@@ -34,6 +34,20 @@ pub struct DesktopWindow {
     /// Whether the owning process runs above the engine's integrity level
     /// (Windows); `None` where the platform has no such notion.
     pub elevated: Option<bool>,
+    /// Who owns the window, so a reused window number is told apart (object
+    /// mode).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity: Option<WindowIdentity>,
+}
+
+/// A window's identity: its number plus the owning process and that
+/// process's start time (`null` where the OS has none).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WindowIdentity {
+    pub window_number: String,
+    pub pid: u32,
+    pub process_start: Option<u64>,
 }
 
 /// The front application/window snapshot a foreground action restores.
@@ -95,6 +109,8 @@ pub struct PointerOptions {
     pub count: Option<u32>,
     pub modifiers: Option<Vec<String>>,
     pub delivery_mode: Option<String>,
+    /// After this action the frame may not be used for input again.
+    pub consume: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, JsonSchema)]

@@ -47,8 +47,14 @@ function createEnforcerContext() {
       session: {
         messages: async () => ({
           data: [
-            { info: { role: "user", id: "m1", time: { created: 1 } }, parts: [{ type: "text", text: "implement feature" }] },
-            { info: { role: "assistant", id: "m2", time: { created: 2, completed: 3 } }, parts: [{ type: "text", text: "did part of the work" }] },
+            {
+              info: { role: "user", id: "m1", time: { created: 1 } },
+              parts: [{ type: "text", text: "implement feature" }],
+            },
+            {
+              info: { role: "assistant", id: "m2", time: { created: 2, completed: 3 } },
+              parts: [{ type: "text", text: "did part of the work" }],
+            },
           ],
         }),
         todo: async () => ({
@@ -92,7 +98,12 @@ describe("issue #5112 - completed sync subagent must not be re-awakened", () => 
     //#given
     const childSessionID = "ses-sync-child-created"
     const abortMock = mock(async () => ({ data: true }))
-    await executeSync(args, createToolContext(), createExecuteContext(abortMock) as never, createDependencies(childSessionID, true))
+    await executeSync(
+      args,
+      createToolContext(),
+      createExecuteContext(abortMock) as never,
+      createDependencies(childSessionID, true),
+    )
 
     //#when
     const reawakened = await driveEnforcerIdle(childSessionID)
@@ -107,7 +118,12 @@ describe("issue #5112 - completed sync subagent must not be re-awakened", () => 
     const abortMock = mock(async () => ({ data: true }))
 
     //#when
-    await executeSync(args, createToolContext(), createExecuteContext(abortMock) as never, createDependencies(childSessionID, true))
+    await executeSync(
+      args,
+      createToolContext(),
+      createExecuteContext(abortMock) as never,
+      createDependencies(childSessionID, true),
+    )
 
     //#then
     expect(abortMock).toHaveBeenCalledWith({ path: { id: childSessionID } })
@@ -117,7 +133,12 @@ describe("issue #5112 - completed sync subagent must not be re-awakened", () => 
     //#given
     const childSessionID = "ses-sync-child-reused"
     const abortMock = mock(async () => ({ data: true }))
-    await executeSync(args, createToolContext(), createExecuteContext(abortMock) as never, createDependencies(childSessionID, false))
+    await executeSync(
+      args,
+      createToolContext(),
+      createExecuteContext(abortMock) as never,
+      createDependencies(childSessionID, false),
+    )
 
     //#when
     const reawakened = await driveEnforcerIdle(childSessionID)

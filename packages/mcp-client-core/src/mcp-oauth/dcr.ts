@@ -1,5 +1,6 @@
 import { isRecord } from "@oh-my-opencode/utils"
 export type ClientRegistrationRequest = {
+  application_type: "native" | "web"
   redirect_uris: string[]
   client_name: string
   grant_types: ["authorization_code", "refresh_token"]
@@ -8,16 +9,14 @@ export type ClientRegistrationRequest = {
 }
 
 export type ClientCredentials = {
+  issuer?: string
   clientId: string
   clientSecret?: string
 }
 
 export type ClientRegistrationStorage = {
   getClientRegistration: (serverIdentifier: string) => ClientCredentials | null
-  setClientRegistration: (
-    serverIdentifier: string,
-    credentials: ClientCredentials
-  ) => void
+  setClientRegistration: (serverIdentifier: string, credentials: ClientCredentials) => void
 }
 
 export type DynamicClientRegistrationOptions = {
@@ -33,14 +32,13 @@ export type DynamicClientRegistrationOptions = {
 
 export type DcrFetch = (
   input: string,
-  init?: { method?: string; headers?: Record<string, string>; body?: string }
+  init?: { method?: string; headers?: Record<string, string>; body?: string },
 ) => Promise<{ ok: boolean; json: () => Promise<unknown> }>
 
 export async function getOrRegisterClient(
-  options: DynamicClientRegistrationOptions
+  options: DynamicClientRegistrationOptions,
 ): Promise<ClientCredentials | null> {
-  const serverIdentifier =
-    options.serverIdentifier ?? options.registrationEndpoint ?? "default"
+  const serverIdentifier = options.serverIdentifier ?? options.registrationEndpoint ?? "default"
   const existing = options.storage.getClientRegistration(serverIdentifier)
   if (existing) return existing
 
@@ -50,6 +48,15 @@ export async function getOrRegisterClient(
 
   const fetchImpl = options.fetch ?? globalThis.fetch
   const request: ClientRegistrationRequest = {
+    application_type: options.redirectUris.some((uri) => {
+      const url = new URL(uri)
+      return (
+        (url.protocol === "http:" || url.protocol === "https:") &&
+        !["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)
+      )
+    })
+      ? "web"
+      : "native",
     redirect_uris: options.redirectUris,
     client_name: options.clientName,
     grant_types: ["authorization_code", "refresh_token"],

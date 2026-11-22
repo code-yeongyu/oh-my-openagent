@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
+
+import { readDarwinProcessStartSeconds, readWin32ProcessCreationFiletime } from "./process-start-time"
+
+// mock.module is process-global and mock.restore() does not undo it, so both real modules are
+// captured before any stub and put back explicitly once this file is done (#12765). The bindings
+// are copied now: once mocked, the imported names follow the stub.
+const realChildProcess = { ...(await import("node:child_process")) }
+const realProcessStartTime = { readDarwinProcessStartSeconds, readWin32ProcessCreationFiletime }
 
 // The lock protocol re-probes process start identity on every memory write and on every recorded
 // run pid it revalidates. On win32 the in-process kernel32 reader answers first, but it reaches
@@ -17,6 +25,7 @@ const POWERSHELL_INSTANT = "2026-09-19T15:04:05.0000000Z"
 function captureExecFile(): CapturedExecFile[] {
   const captured: CapturedExecFile[] = []
   mock.module("node:child_process", () => ({
+    ...realChildProcess,
     execFile: (
       command: string,
       args: readonly string[],
@@ -44,6 +53,11 @@ describe("process start identity win32 console suppression", () => {
   afterEach(() => {
     Object.defineProperty(process, "platform", { value: realPlatform, configurable: true })
     mock.restore()
+  })
+
+  afterAll(() => {
+    mock.module("node:child_process", () => realChildProcess)
+    mock.module("./process-start-time", () => realProcessStartTime)
   })
 
   describe("#given a win32 host whose in-process start-time reader cannot answer", () => {

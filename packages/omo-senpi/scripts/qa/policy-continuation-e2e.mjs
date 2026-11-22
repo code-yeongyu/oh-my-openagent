@@ -14,7 +14,8 @@ import { engineDependencyDir } from "../../../omo-native/bin/lib/engine-dependen
 
 const here = dirname(fileURLToPath(import.meta.url))
 const root = resolve(here, "../../../..")
-const policyError = "Codex error: This request was blocked by our safety systems. Reason: Potentially unintended activity."
+const policyError =
+  "Codex error: This request was blocked by our safety systems. Reason: Potentially unintended activity."
 // A transient provider failure the pinned host classifies as retryable; `--self-test` pins that
 // against the host classifier rather than against this comment.
 const retryableError = "503 service unavailable from the QA provider"
@@ -63,8 +64,14 @@ export function providerOutcome(phase, failure, call = 1) {
 
 function compactionUsage() {
   const input = Math.floor(QA_COMPACTION_CONTEXT_WINDOW * 0.95)
-  return { input, output: 8, cacheRead: 0, cacheWrite: 0, totalTokens: input + 8,
-    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } }
+  return {
+    input,
+    output: 8,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: input + 8,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  }
 }
 
 export function continuationCustomType(lane) {
@@ -154,7 +161,8 @@ function resolvePinnedPiAi() {
   const senpiRoot = join(root, "node_modules", "@code-yeongyu", "senpi")
   const piAiRoot = engineDependencyDir(senpiRoot, "@earendil-works/pi-ai")
   const entry = piAiRoot === undefined ? undefined : join(piAiRoot, "dist", "index.js")
-  if (entry === undefined || !existsSync(entry)) throw new Error(`pinned @earendil-works/pi-ai is not resolvable from ${senpiRoot}`)
+  if (entry === undefined || !existsSync(entry))
+    throw new Error(`pinned @earendil-works/pi-ai is not resolvable from ${senpiRoot}`)
   return entry
 }
 
@@ -162,11 +170,18 @@ function resolvePinnedPiAi() {
 function assertContinuation(sends, lane) {
   assert.equal(sends.length, 1, "the settled run must make exactly one automatic continuation, then dedupe")
   assert.equal(sends[0].message.customType, "omo-senpi:wake")
-  assert.deepEqual(sends[0].message.details.map((detail) => detail.customType), [continuationCustomType(lane)])
+  assert.deepEqual(
+    sends[0].message.details.map((detail) => detail.customType),
+    [continuationCustomType(lane)],
+  )
 }
 
 function trace(path) {
-  return readFileSync(path, "utf8").trim().split("\n").filter(Boolean).map((line) => JSON.parse(line))
+  return readFileSync(path, "utf8")
+    .trim()
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line))
 }
 
 async function scenario(lane, failure, context) {
@@ -186,10 +201,21 @@ async function scenario(lane, failure, context) {
   try {
     seedSandbox(sandbox)
     // Retry and compaction stay ENABLED: they are the two host-owned edges this driver must drive.
-    writeFileSync(join(sandbox.agentDir, "settings.json"), JSON.stringify({ packages: [],
-      retry: { enabled: true, maxRetries: 1 }, compaction: { enabled: true }, sessionTitle: { enabled: false } }))
+    writeFileSync(
+      join(sandbox.agentDir, "settings.json"),
+      JSON.stringify({
+        packages: [],
+        retry: { enabled: true, maxRetries: 1 },
+        compaction: { enabled: true },
+        sessionTitle: { enabled: false },
+      }),
+    )
     const extension = join(sandbox.root, "extension.mjs")
-    execFileSync(bun, ["build", join(here, "fixtures/policy-continuation-extension.ts"), "--target", "node", "--outfile", extension], { cwd: root })
+    execFileSync(
+      bun,
+      ["build", join(here, "fixtures/policy-continuation-extension.ts"), "--target", "node", "--outfile", extension],
+      { cwd: root },
+    )
     let phaseCalls = 0
     server = createServer((_request, response) => {
       calls++
@@ -204,23 +230,57 @@ async function scenario(lane, failure, context) {
     assert(address && typeof address === "object")
     // Deliberate allowlist: provider credentials, caller agent dirs and task/session env never inherit.
     const env = withTelemetryOptOut({
-      PATH: process.env.PATH, HOME: sandbox.homeDir, USERPROFILE: sandbox.homeDir,
-      TMPDIR: sandbox.root, XDG_CONFIG_HOME: sandbox.xdgConfigHome, XDG_DATA_HOME: sandbox.xdgDataHome,
-      XDG_CACHE_HOME: sandbox.xdgCacheHome, XDG_STATE_HOME: join(sandbox.root, "state"),
-      OMO_CODING_AGENT_DIR: sandbox.agentDir, SENPI_CODING_AGENT_DIR: sandbox.agentDir, PI_CODING_AGENT_DIR: sandbox.agentDir,
-      OMO_AGENT_TOOLKIT_BIN: toolkit, OMO_POLICY_QA_TRACE: traceFile, OMO_POLICY_QA_LANE: lane,
-      OMO_POLICY_QA_ENDPOINT: `http://127.0.0.1:${address.port}`, PI_OFFLINE: "1", OMO_SENPI_QA: "1",
+      PATH: process.env.PATH,
+      HOME: sandbox.homeDir,
+      USERPROFILE: sandbox.homeDir,
+      TMPDIR: sandbox.root,
+      XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+      XDG_DATA_HOME: sandbox.xdgDataHome,
+      XDG_CACHE_HOME: sandbox.xdgCacheHome,
+      XDG_STATE_HOME: join(sandbox.root, "state"),
+      OMO_CODING_AGENT_DIR: sandbox.agentDir,
+      SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+      PI_CODING_AGENT_DIR: sandbox.agentDir,
+      OMO_AGENT_TOOLKIT_BIN: toolkit,
+      OMO_POLICY_QA_TRACE: traceFile,
+      OMO_POLICY_QA_LANE: lane,
+      OMO_POLICY_QA_ENDPOINT: `http://127.0.0.1:${address.port}`,
+      PI_OFFLINE: "1",
+      OMO_SENPI_QA: "1",
       OMO_POLICY_QA_CONTEXT_WINDOW: String(contextWindowFor(failure)),
     })
-    child = spawn(process.execPath, [cli, "--mode", "rpc", "--no-extensions", "--no-skills", "--no-prompt-templates",
-      "-e", extension, "--provider", "omo-policy-qa", "--model", "qa"], { cwd: sandbox.cwd, env, stdio: "pipe" })
+    child = spawn(
+      process.execPath,
+      [
+        cli,
+        "--mode",
+        "rpc",
+        "--no-extensions",
+        "--no-skills",
+        "--no-prompt-templates",
+        "-e",
+        extension,
+        "--provider",
+        "omo-policy-qa",
+        "--model",
+        "qa",
+      ],
+      { cwd: sandbox.cwd, env, stdio: "pipe" },
+    )
     const bus = new EventEmitter()
-    child.stderr.on("data", (data) => { stderr += data })
+    child.stderr.on("data", (data) => {
+      stderr += data
+    })
     child.on("error", (error) => bus.emit("error", error))
     lines = createInterface({ input: child.stdout })
     lines.on("line", (line) => {
       let event
-      try { event = JSON.parse(line) } catch (error) { bus.emit("error", error); return }
+      try {
+        event = JSON.parse(line)
+      } catch (error) {
+        bus.emit("error", error)
+        return
+      }
       events.push(event)
       bus.emit(event.id ? `response:${event.id}` : event.type, event)
     })
@@ -266,7 +326,11 @@ async function scenario(lane, failure, context) {
       // an extra provider call, and then exactly one continuation on the settle that followed.
       assert(failureCalls > 1, `host retry must make more than one provider call, saw ${failureCalls}`)
       assert.equal(failureAudit.retryOwnedEnds, 1, `retry must report willRetry, saw ${JSON.stringify(failureAudit)}`)
-      assert.equal(failureAudit.hostOwnedEnds, 1, `retry must leave one unsettled agent_end, saw ${JSON.stringify(failureAudit)}`)
+      assert.equal(
+        failureAudit.hostOwnedEnds,
+        1,
+        `retry must leave one unsettled agent_end, saw ${JSON.stringify(failureAudit)}`,
+      )
       assertContinuation(failureAudit.sends, lane)
       return report()
     }
@@ -276,7 +340,10 @@ async function scenario(lane, failure, context) {
       // rode an unsettled edge, and that a continuation the host still cannot admit is refused by
       // the host rather than injected into its compaction window.
       const compactionReasons = events.filter((event) => event.type === "compaction_start").map((event) => event.reason)
-      assert(compactionReasons.includes("threshold"), `host must run threshold compaction, saw ${JSON.stringify(compactionReasons)}`)
+      assert(
+        compactionReasons.includes("threshold"),
+        `host must run threshold compaction, saw ${JSON.stringify(compactionReasons)}`,
+      )
       assert(failureAudit.sends.length <= 1, `at most one continuation, saw ${failureAudit.sends.length}`)
       return report(0, { compactionReasons, hostRefusedSends: hostRefusedSendReasons() })
     }
@@ -289,7 +356,9 @@ async function scenario(lane, failure, context) {
       // the demotion diagnostic the single refusal predicate keys on.
       assert.equal(end?.event.messages.at(-1).stopDetails.type, "refusal")
       assert.equal(end.event.messages.at(-1).stopReason, "stop")
-      assert(end.event.messages.at(-1).diagnostics.some((diagnostic) => diagnostic.type === "empty_tool_use_terminal_state"))
+      assert(
+        end.event.messages.at(-1).diagnostics.some((diagnostic) => diagnostic.type === "empty_tool_use_terminal_state"),
+      )
       assert(events.some((event) => event.type === "message_end" && event.message?.stopReason === "toolUse"))
     }
     phase = "clean"
@@ -301,14 +370,30 @@ async function scenario(lane, failure, context) {
     return report(cleanAudit.sends.length)
 
     function hostRefusedSendReasons() {
-      return events.filter((event) => event.type === "extension_error" && event.event === "send_message").map((event) => event.error)
+      return events
+        .filter((event) => event.type === "extension_error" && event.event === "send_message")
+        .map((event) => event.error)
     }
 
     function report(cleanSends = 0, extra = {}) {
-      return { name, result: "PASS", failureCalls, failureSends: failureAudit.sends.length, totalCalls: calls, cleanSends, ...extra,
-        hostOwnedEnds: failureAudit.hostOwnedEnds, retryOwnedEnds: failureAudit.retryOwnedEnds,
-        compactions: failureAudit.compactions, settles: failureAudit.settles,
-        isolatedAgentDir: sandbox.agentDir, coordinator: "production class, default microtask scheduler", get cleanup() { return cleanup } }
+      return {
+        name,
+        result: "PASS",
+        failureCalls,
+        failureSends: failureAudit.sends.length,
+        totalCalls: calls,
+        cleanSends,
+        ...extra,
+        hostOwnedEnds: failureAudit.hostOwnedEnds,
+        retryOwnedEnds: failureAudit.retryOwnedEnds,
+        compactions: failureAudit.compactions,
+        settles: failureAudit.settles,
+        isolatedAgentDir: sandbox.agentDir,
+        coordinator: "production class, default microtask scheduler",
+        get cleanup() {
+          return cleanup
+        },
+      }
     }
   } finally {
     if (child && child.exitCode === null && child.signalCode === null) {
@@ -317,8 +402,12 @@ async function scenario(lane, failure, context) {
       await exited
     }
     lines?.close()
-    if (server) await new Promise((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()))
-    writeFileSync(join(evidence, `${name}-events.jsonl`), events.map((event) => JSON.stringify(event)).join("\n") + "\n")
+    if (server)
+      await new Promise((resolveClose, reject) => server.close((error) => (error ? reject(error) : resolveClose())))
+    writeFileSync(
+      join(evidence, `${name}-events.jsonl`),
+      events.map((event) => JSON.stringify(event)).join("\n") + "\n",
+    )
     writeFileSync(join(evidence, `${name}-stderr.log`), stderr)
     rmSync(sandbox.root, { recursive: true, force: true })
     cleanup = { childTerminal: !child || child.exitCode !== null || child.signalCode !== null, sandboxRemoved: true }
@@ -328,8 +417,17 @@ async function scenario(lane, failure, context) {
 export async function run(options = {}) {
   const lanes = options.lanes ?? LANES
   const failures = options.failures ?? FAILURES
-  const evidence = execFileSync(process.execPath, [join(root, ".agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs"),
-    "--repo-root", root, "--slug", process.env.POLICY_QA_SLUG ?? "20260909-policy-continuation-hooks"], { encoding: "utf8" }).trim()
+  const evidence = execFileSync(
+    process.execPath,
+    [
+      join(root, ".agents/skills/senpi-qa/scripts/resolve-evidence-dir.mjs"),
+      "--repo-root",
+      root,
+      "--slug",
+      process.env.POLICY_QA_SLUG ?? "20260909-policy-continuation-hooks",
+    ],
+    { encoding: "utf8" },
+  ).trim()
   mkdirSync(evidence, { recursive: true })
   const context = {
     evidence,
@@ -350,9 +448,15 @@ export async function run(options = {}) {
   }
   const after = realHomes.map(credentialDigest)
   const realSenpiUntouched = before.every((digest, index) => digest === after[index])
-  const report = { result: failed || !realSenpiUntouched ? "FAIL" : "PASS", cli: context.cli, scenarios: reports, realSenpiUntouched,
-    isolationScope: "credential digests for real ~/.senpi/agent and ~/.omo/agent; allowlisted sandbox-only child environment",
-    evidence }
+  const report = {
+    result: failed || !realSenpiUntouched ? "FAIL" : "PASS",
+    cli: context.cli,
+    scenarios: reports,
+    realSenpiUntouched,
+    isolationScope:
+      "credential digests for real ~/.senpi/agent and ~/.omo/agent; allowlisted sandbox-only child environment",
+    evidence,
+  }
   writeFileSync(join(evidence, "live-report.json"), JSON.stringify(report, null, 2) + "\n")
   return report
 }

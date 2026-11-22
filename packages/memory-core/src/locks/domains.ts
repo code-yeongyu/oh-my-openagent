@@ -38,7 +38,11 @@ export function runFinalizationLockPath(locksDirectory: string, runId: string): 
   if (/^[a-zA-Z0-9][a-zA-Z0-9._-]{0,79}$/.test(trimmed)) {
     return path.join(locksDirectory, `finalize-${trimmed}.lock`)
   }
-  const slug = trimmed.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^[.-]+|[.-]+$/g, "").slice(0, 48) || "run"
+  const slug =
+    trimmed
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^[.-]+|[.-]+$/g, "")
+      .slice(0, 48) || "run"
   const digest = createHash("sha256").update(trimmed).digest("hex").slice(0, 16)
   return path.join(locksDirectory, `finalize-${slug}-${digest}.lock`)
 }

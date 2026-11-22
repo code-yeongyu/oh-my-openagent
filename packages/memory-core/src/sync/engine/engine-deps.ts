@@ -1,9 +1,35 @@
-import type { Clock, ItemStore, Sealer, SyncRepo, Transport, Verifier, WriterLock } from "./ports"
+import type {
+  Clock,
+  FreezeSettler,
+  ItemStore,
+  Sealer,
+  SyncLog,
+  SyncRepo,
+  Transport,
+  Verifier,
+  WriterLock,
+} from "./ports"
 
 /** Where a crash can be injected: right after each journal marker, or between an effect and its marker. */
-export const INBOUND_POINTS = ["captured", "persisted", "downloaded", "verified", "merged", "staged", "render-intent", "render-key", "rendered", "git-commit", "committed", "checkpointed"] as const
+export const INBOUND_POINTS = [
+  "captured",
+  "persisted",
+  "downloaded",
+  "verified",
+  "merged",
+  "staged",
+  "render-intent",
+  "render-key",
+  "rendered",
+  "git-commit",
+  "committed",
+  "checkpointed",
+] as const
 export const OUTBOUND_POINTS = ["sealed", "reserved", "uploaded", "append-landed", "appended"] as const
-export type EnginePoint = (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number]
+/** After an older build's queued oversized ops are wound back in the store, before the journal drops them. */
+const REWIND_POINTS = ["rewound", "rewound-joining"] as const
+export type EnginePoint =
+  (typeof INBOUND_POINTS)[number] | (typeof OUTBOUND_POINTS)[number] | (typeof REWIND_POINTS)[number]
 export type EngineFault = (point: EnginePoint) => void
 
 export class CrashInjected extends Error {
@@ -19,11 +45,22 @@ export interface EngineDeps {
   readonly transport: Transport
   readonly verifier: Verifier
   readonly sealer: Sealer
+  /** The memory space (hex id) the verifier and sealer are bound to; the journal belongs to it. */
+  readonly space: string
+  /**
+   * The per-device space this repository synced before it moved to the account default space
+   * (#13720). A journal an older build wrote names no space; with this set it is that space's.
+   */
+  readonly legacySpace?: string
   readonly lock: WriterLock
   readonly clock: Clock
   readonly fault?: EngineFault
-  readonly log?: (line: string) => void
+  readonly log?: SyncLog
+  /** Called when the failure status() shows appears, changes kind or clears. */
+  readonly onStatusChange?: () => void
   /** The plaintext bound per pushed batch; defaults to MAX_BATCH_BYTES. */
   readonly batchBytes?: number
   readonly random?: () => number
+  /** Ends a service freeze (rotation on revoke); absent, a frozen push is retried as a plain stale base. */
+  readonly freeze?: FreezeSettler
 }
