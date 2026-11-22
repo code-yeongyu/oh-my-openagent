@@ -228,6 +228,7 @@ impl UserInputWatch {
 }
 
 mod feed;
+pub(crate) use feed::process_started;
 
 #[cfg(test)]
 #[path = "user_monitor/tests.rs"]

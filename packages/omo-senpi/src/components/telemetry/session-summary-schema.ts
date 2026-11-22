@@ -17,7 +17,7 @@ const PROVIDER_VALUES = enumProperty([...KNOWN_PROVIDERS, "custom", "none"])
 
 function buildSchema(): Readonly<Record<string, SummaryPropertySchema>> {
   const schema: Record<string, SummaryPropertySchema> = {
-    "$session_id": STRING_PROPERTY,
+    $session_id: STRING_PROPERTY,
     ended_by: enumProperty(ENDED_BY),
     is_final: BOOLEAN_PROPERTY,
     raw_turns_sampled: BOOLEAN_PROPERTY,

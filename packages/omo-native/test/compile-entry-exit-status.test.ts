@@ -10,6 +10,9 @@ test("#given every compile-entry test passes #when the file runs under bun #then
     encoding: "utf8",
     env: { ...process.env, BUN_TEST_EXIT_STATUS_PROBE: "1" },
   })
-  const summary = `${run.stdout}${run.stderr}`.split("\n").filter((line) => / (pass|fail)$/.test(line)).join(" | ")
+  const summary = `${run.stdout}${run.stderr}`
+    .split("\n")
+    .filter((line) => / (pass|fail)$/.test(line))
+    .join(" | ")
   expect({ status: run.status, summary }).toEqual({ status: 0, summary: expect.stringMatching(/ 0 fail/) })
 }, 120_000)

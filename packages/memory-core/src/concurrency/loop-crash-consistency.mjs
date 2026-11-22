@@ -18,12 +18,7 @@
 import { spawn } from "node:child_process"
 import { rm } from "node:fs/promises"
 
-import {
-  expectedRange,
-  fixture,
-  inCommitIteration,
-  sigkillIteration,
-} from "./loop-harness.mjs"
+import { expectedRange, fixture, inCommitIteration, sigkillIteration } from "./loop-harness.mjs"
 
 function arg(name, fallback) {
   const index = process.argv.indexOf(`--${name}`)
@@ -57,12 +52,28 @@ try {
       const badCheck = result.checks.find((check) => !check.ok)
       danglingTotal += result.checks.reduce((sum, check) => sum + check.dangling, 0)
       if (badCheck) {
-        failure = { iteration, stage: badCheck.stage, broken: badCheck.broken, fsckExit: badCheck.exitCode, report: badCheck.report }
+        failure = {
+          iteration,
+          stage: badCheck.stage,
+          broken: badCheck.broken,
+          fsckExit: badCheck.exitCode,
+          report: badCheck.report,
+        }
       } else if (result.commitCount < min || result.commitCount > max || result.mergeCount !== 0) {
-        failure = { iteration, stage: "commit-shape", commitCount: result.commitCount, expected: `${min}..${max}`, mergeCount: result.mergeCount }
+        failure = {
+          iteration,
+          stage: "commit-shape",
+          commitCount: result.commitCount,
+          expected: `${min}..${max}`,
+          mergeCount: result.mergeCount,
+        }
       }
     } catch (error) {
-      failure = { iteration, stage: "driver", message: String(error && error.message ? error.message : error).slice(0, 600) }
+      failure = {
+        iteration,
+        stage: "driver",
+        message: String(error && error.message ? error.message : error).slice(0, 600),
+      }
     }
     if (failure) {
       failures.push(failure)
@@ -85,6 +96,8 @@ try {
 
 const elapsedSec = ((Date.now() - started) / 1000).toFixed(1)
 const rate = `${failures.length}/${iterations} (${((failures.length / iterations) * 100).toFixed(2)}%)`
-console.log(`SUMMARY case=${caseName} iterations=${iterations} failures=${failures.length} rate=${rate} dangling-total=${danglingTotal} load=${loadWorkers} elapsed=${elapsedSec}s`)
+console.log(
+  `SUMMARY case=${caseName} iterations=${iterations} failures=${failures.length} rate=${rate} dangling-total=${danglingTotal} load=${loadWorkers} elapsed=${elapsedSec}s`,
+)
 if (kept.length > 0) console.log(`kept failure fixtures: ${kept.join(", ")}`)
 process.exit(failures.length === 0 ? 0 : 1)

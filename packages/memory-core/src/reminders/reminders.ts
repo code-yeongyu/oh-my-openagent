@@ -17,11 +17,11 @@
  */
 
 /** Conflict operation kind derived from git state. */
-export type ConflictState = "none" | "merge" | "rebase" | "unmerged";
+export type ConflictState = "none" | "merge" | "rebase" | "unmerged"
 
 /** Reason for a failed push, if any. */
 export interface PushFailure {
-  readonly reason: string;
+  readonly reason: string
 }
 
 /**
@@ -31,22 +31,22 @@ export interface PushFailure {
  */
 export interface RepoStatusSnapshot {
   /** Paths reported dirty by `git status --porcelain` (post-trim). */
-  readonly dirtyPaths: readonly string[];
+  readonly dirtyPaths: readonly string[]
   /** Active conflict operation, or 'none'. */
-  readonly conflictState: ConflictState;
+  readonly conflictState: ConflictState
   /** Commits ahead of upstream (0 when no upstream / not ahead). */
-  readonly aheadCount: number;
+  readonly aheadCount: number
   /** Present when the last remote push failed. */
-  readonly lastPushFailed?: PushFailure;
+  readonly lastPushFailed?: PushFailure
 }
 
 /** Stable machine key identifying a reminder category. */
-export type ReminderKind = "dirty" | "conflict" | "push_failed";
+export type ReminderKind = "dirty" | "conflict" | "push_failed"
 
 /** A single emitted reminder. */
 export interface Reminder {
-  readonly kind: ReminderKind;
-  readonly text: string;
+  readonly kind: ReminderKind
+  readonly text: string
 }
 
 /**
@@ -55,25 +55,23 @@ export interface Reminder {
  */
 export interface RemindersState {
   /** The last emitted condition key, or null when nothing is active. */
-  emittedKey: string | null;
+  emittedKey: string | null
 }
 
 /** Factory: create a fresh reminders state with nothing emitted. */
 export function createRemindersState(): RemindersState {
-  return { emittedKey: null };
+  return { emittedKey: null }
 }
 
 /**
  * Determine the active reminder kind for a snapshot, or null when clean.
  * Priority: conflict > push_failed > dirty.
  */
-export function reminderKindFor(
-  snapshot: RepoStatusSnapshot,
-): ReminderKind | null {
-  if (snapshot.conflictState !== "none") return "conflict";
-  if (snapshot.lastPushFailed !== undefined) return "push_failed";
-  if (snapshot.dirtyPaths.length > 0) return "dirty";
-  return null;
+export function reminderKindFor(snapshot: RepoStatusSnapshot): ReminderKind | null {
+  if (snapshot.conflictState !== "none") return "conflict"
+  if (snapshot.lastPushFailed !== undefined) return "push_failed"
+  if (snapshot.dirtyPaths.length > 0) return "dirty"
+  return null
 }
 
 /**
@@ -87,27 +85,23 @@ export function reminderKindFor(
  * - push_failed: `push_failed:<reason>` (a new reason is a new condition).
  * - clean: null (clears any active condition).
  */
-function conditionKeyFor(
-  snapshot: RepoStatusSnapshot,
-  kind: ReminderKind | null,
-): string | null {
-  if (kind === null) return null;
+function conditionKeyFor(snapshot: RepoStatusSnapshot, kind: ReminderKind | null): string | null {
+  if (kind === null) return null
   switch (kind) {
     case "dirty":
-      return "dirty";
+      return "dirty"
     case "conflict":
-      return `conflict:${snapshot.conflictState}`;
+      return `conflict:${snapshot.conflictState}`
     case "push_failed":
-      return `push_failed:${snapshot.lastPushFailed?.reason ?? ""}`;
+      return `push_failed:${snapshot.lastPushFailed?.reason ?? ""}`
   }
 }
 
 /** Render the dirty-state reminder text. */
 function renderDirtyReminder(snapshot: RepoStatusSnapshot): string {
-  const paths = snapshot.dirtyPaths;
-  const listing = paths.slice(0, 20).join("\n  - ") + (
-    paths.length > 20 ? `\n  - ...and ${paths.length - 20} more` : ""
-  );
+  const paths = snapshot.dirtyPaths
+  const listing =
+    paths.slice(0, 20).join("\n  - ") + (paths.length > 20 ? `\n  - ...and ${paths.length - 20} more` : "")
   return [
     "MEMORY COMMIT NEEDED: The memory repository has uncommitted changes.",
     "",
@@ -117,22 +111,18 @@ function renderDirtyReminder(snapshot: RepoStatusSnapshot): string {
     "Commit these memory changes when appropriate. Do not run `git push` " +
       "for MemFS sync; the harness pushes clean committed memory changes " +
       "automatically for remote MemFS agents after turns.",
-  ].join("\n");
+  ].join("\n")
 }
 
 /** Render the conflict-state reminder text with resolution guidance. */
 function renderConflictReminder(snapshot: RepoStatusSnapshot): string {
-  const op = snapshot.conflictState;
-  const opLabel =
-    op === "merge"
-      ? "merge in progress"
-      : op === "rebase"
-        ? "rebase in progress"
-        : "unmerged files";
-  const unmergedPaths = snapshot.dirtyPaths;
-  const pathsLine = unmergedPaths.length > 0
-    ? `\n\nConflicted file(s):\n  - ${unmergedPaths.slice(0, 20).join("\n  - ")}${unmergedPaths.length > 20 ? `\n  - ...and ${unmergedPaths.length - 20} more` : ""}`
-    : "";
+  const op = snapshot.conflictState
+  const opLabel = op === "merge" ? "merge in progress" : op === "rebase" ? "rebase in progress" : "unmerged files"
+  const unmergedPaths = snapshot.dirtyPaths
+  const pathsLine =
+    unmergedPaths.length > 0
+      ? `\n\nConflicted file(s):\n  - ${unmergedPaths.slice(0, 20).join("\n  - ")}${unmergedPaths.length > 20 ? `\n  - ...and ${unmergedPaths.length - 20} more` : ""}`
+      : ""
   return [
     "MEMORY GIT CONFLICT: The memory repository needs manual conflict resolution.",
     "",
@@ -144,16 +134,14 @@ function renderConflictReminder(snapshot: RepoStatusSnapshot): string {
       (op === "rebase" ? "rebase" : "merge") +
       ". The harness will retry remote push after a future turn when the " +
       "repo is clean.",
-  ].join("\n");
+  ].join("\n")
 }
 
 /** Render the push-failed reminder text including the failure reason. */
 function renderPushFailedReminder(snapshot: RepoStatusSnapshot): string {
-  const reason = snapshot.lastPushFailed?.reason ?? "unknown";
-  const ahead = snapshot.aheadCount;
-  const aheadLine = ahead > 0
-    ? `\nLocal commits ahead of remote: ${ahead}.`
-    : "";
+  const reason = snapshot.lastPushFailed?.reason ?? "unknown"
+  const ahead = snapshot.aheadCount
+  const aheadLine = ahead > 0 ? `\nLocal commits ahead of remote: ${ahead}.` : ""
   return [
     "MEMORY SYNC FAILED: The harness could not push pending memory commits.",
     "",
@@ -162,20 +150,17 @@ function renderPushFailedReminder(snapshot: RepoStatusSnapshot): string {
     "Inspect the memory repository and resolve any local git issue. The " +
       "harness will retry remote push after a future turn when the repo is " +
       "clean.",
-  ].join("\n");
+  ].join("\n")
 }
 
-function renderReminder(
-  snapshot: RepoStatusSnapshot,
-  kind: ReminderKind,
-): string {
+function renderReminder(snapshot: RepoStatusSnapshot, kind: ReminderKind): string {
   switch (kind) {
     case "dirty":
-      return renderDirtyReminder(snapshot);
+      return renderDirtyReminder(snapshot)
     case "conflict":
-      return renderConflictReminder(snapshot);
+      return renderConflictReminder(snapshot)
     case "push_failed":
-      return renderPushFailedReminder(snapshot);
+      return renderPushFailedReminder(snapshot)
   }
 }
 
@@ -188,27 +173,24 @@ function renderReminder(
  * snapshot) produces no reminder but resets the state so the next trigger
  * re-emits.
  */
-export function generateReminders(
-  state: RemindersState,
-  snapshot: RepoStatusSnapshot,
-): readonly Reminder[] {
-  const kind = reminderKindFor(snapshot);
-  const key = conditionKeyFor(snapshot, kind);
+export function generateReminders(state: RemindersState, snapshot: RepoStatusSnapshot): readonly Reminder[] {
+  const kind = reminderKindFor(snapshot)
+  const key = conditionKeyFor(snapshot, kind)
 
   // Clean snapshot: clear the active condition so the next trigger emits.
   if (kind === null) {
-    state.emittedKey = null;
-    return [];
+    state.emittedKey = null
+    return []
   }
 
   // Same condition already emitted: suppress.
   if (state.emittedKey === key) {
-    return [];
+    return []
   }
 
   // New or re-triggered condition: emit and record.
   // kind is non-null here because kind === null returned above.
-  state.emittedKey = key;
-  const text = renderReminder(snapshot, kind);
-  return [{ kind, text }];
+  state.emittedKey = key
+  const text = renderReminder(snapshot, kind)
+  return [{ kind, text }]
 }

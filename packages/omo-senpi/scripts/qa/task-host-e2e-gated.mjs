@@ -14,7 +14,15 @@ import {
   spawnParent,
   waitFor,
 } from "./task-host-e2e-process.mjs"
-import { CHILD_BUSY, childSessionFiles, childrenSettled, hostConfig, jsonlLines, spawnScript, transcriptSizes } from "./task-host-e2e-support.mjs"
+import {
+  CHILD_BUSY,
+  childSessionFiles,
+  childrenSettled,
+  hostConfig,
+  jsonlLines,
+  spawnScript,
+  transcriptSizes,
+} from "./task-host-e2e-support.mjs"
 import { join } from "node:path"
 
 const DRIVER = "node packages/omo-senpi/scripts/qa/task-host-e2e.mjs"
@@ -59,7 +67,12 @@ export async function scenarioHandoffSuite(run) {
     return [
       skipped("E", "handoff: a newer build takes the socket while A's children run", reason, command),
       skipped("E2", "old-gen child mid-turn + parent resume: deferred/host_draining then attach", reason, command),
-      skipped("E3", "handoff evidence: session paths, monotonic transcripts, one inode change, old pid gone", reason, command),
+      skipped(
+        "E3",
+        "handoff evidence: session paths, monotonic transcripts, one inode change, old pid gone",
+        reason,
+        command,
+      ),
     ]
   }
   return await runHandoffSuite(run)
@@ -69,11 +82,14 @@ async function runHandoffSuite(run) {
   const sandbox = createScenarioSandbox(run, "sE", { omoConfig: hostConfig(), script: spawnScript(4, CHILD_BUSY) })
   const newer = { ...sandbox, bin: run.secondBin }
   const parent = spawnParent(sandbox, run.mockEntry, "run four children through a generation handoff")
-  const started = await waitFor(() => {
-    const records = readTaskRecords(sandbox)
-    const running = records.filter((record) => record.status === "running")
-    return running.length >= 4 || childrenSettled(records, 4) ? running : undefined
-  }, { timeoutMs: 180_000, intervalMs: 500 })
+  const started = await waitFor(
+    () => {
+      const records = readTaskRecords(sandbox)
+      const running = records.filter((record) => record.status === "running")
+      return running.length >= 4 || childrenSettled(records, 4) ? running : undefined
+    },
+    { timeoutMs: 180_000, intervalMs: 500 },
+  )
   const records = started ?? readTaskRecords(sandbox)
   const socket = join(sandbox.agentDir, "rpc", "rpc.sock")
   const before = {
@@ -89,19 +105,27 @@ async function runHandoffSuite(run) {
     inode: socketInode(socket),
     sessionPaths: sessionPathSet(sandbox, records),
   }
-  const grew = await waitFor(() => {
-    const sizes = transcriptSizes(sandbox, records)
-    return records.every((record) => sizes[record.task_id] >= before.transcripts[record.task_id]) &&
-      records.some((record) => sizes[record.task_id] > before.transcripts[record.task_id])
-      ? sizes
-      : undefined
-  }, { timeoutMs: 90_000, intervalMs: 1_000 })
+  const grew = await waitFor(
+    () => {
+      const sizes = transcriptSizes(sandbox, records)
+      return records.every((record) => sizes[record.task_id] >= before.transcripts[record.task_id]) &&
+        records.some((record) => sizes[record.task_id] > before.transcripts[record.task_id])
+        ? sizes
+        : undefined
+    },
+    { timeoutMs: 90_000, intervalMs: 1_000 },
+  )
   const oldPid = before.status?.pid
-  const oldGone = await waitFor(() => (oldPid === undefined || !pidAlive(oldPid) ? true : undefined), { timeoutMs: 60_000, intervalMs: 1_000 })
+  const oldGone = await waitFor(() => (oldPid === undefined || !pidAlive(oldPid) ? true : undefined), {
+    timeoutMs: 60_000,
+    intervalMs: 1_000,
+  })
   const reuse = runBin(sandbox, ["daemon", "run", "--json"], { timeoutMs: 240_000 })
   const resumed = runBin(sandbox, run.parentArgs(sandbox, "resume across the handoff"), { timeoutMs: 240_000 })
   const resumedRecords = readTaskRecords(sandbox)
-  const writerCounts = Object.fromEntries(records.map((record) => [record.task_id, childSessionFiles(sandbox, record.task_id).length]))
+  const writerCounts = Object.fromEntries(
+    records.map((record) => [record.task_id, childSessionFiles(sandbox, record.task_id).length]),
+  )
   const lastLinesParse = records.every((record) =>
     childSessionFiles(sandbox, record.task_id).every((file) => {
       const lines = jsonlLines(file)
@@ -112,7 +136,8 @@ async function runHandoffSuite(run) {
       } catch {
         return false
       }
-    }))
+    }),
+  )
   try {
     process.kill(-parent.child.pid, "SIGKILL")
   } catch {
@@ -137,15 +162,48 @@ async function runHandoffSuite(run) {
     resumeStatuses: resumedRecords.map((record) => record.status),
     jsonlWriterCountPerChild: writerCounts,
   }
-  const handoffPass = handoffJson?.action === "handoff" && facts.newInstanceId !== facts.oldInstanceId && facts.olderBinaryRerunAction === "reuse"
+  const handoffPass =
+    handoffJson?.action === "handoff" &&
+    facts.newInstanceId !== facts.oldInstanceId &&
+    facts.olderBinaryRerunAction === "reuse"
   const evidencePass =
-    facts.sessionPathsEqual && facts.transcriptsMonotonic && lastLinesParse &&
-    facts.socketInodeBefore !== facts.socketInodeAfter && facts.oldPidGoneWithin60s
+    facts.sessionPathsEqual &&
+    facts.transcriptsMonotonic &&
+    lastLinesParse &&
+    facts.socketInodeBefore !== facts.socketInodeAfter &&
+    facts.oldPidGoneWithin60s
   const resumePass = resumed.status === 0 && Object.values(writerCounts).every((count) => count === 1)
   return [
-    { scenario: "E", title: "handoff: a newer build takes the socket while children run", status: handoffPass ? "pass" : "fail", ...(handoffPass ? {} : { reason: `action=${facts.handoffAction} instance ${facts.oldInstanceId}->${facts.newInstanceId} rerun=${facts.olderBinaryRerunAction}` }), facts, receipt },
-    { scenario: "E2", title: "old-gen child mid-turn + parent resume", status: resumePass ? "pass" : "fail", ...(resumePass ? {} : { reason: `resumeExit=${resumed.status} writers=${JSON.stringify(writerCounts)}` }), facts },
-    { scenario: "E3", title: "handoff evidence", status: evidencePass ? "pass" : "fail", ...(evidencePass ? {} : { reason: `paths=${facts.sessionPathsEqual} monotonic=${facts.transcriptsMonotonic} inode ${facts.socketInodeBefore}->${facts.socketInodeAfter} oldGone=${facts.oldPidGoneWithin60s}` }), facts },
+    {
+      scenario: "E",
+      title: "handoff: a newer build takes the socket while children run",
+      status: handoffPass ? "pass" : "fail",
+      ...(handoffPass
+        ? {}
+        : {
+            reason: `action=${facts.handoffAction} instance ${facts.oldInstanceId}->${facts.newInstanceId} rerun=${facts.olderBinaryRerunAction}`,
+          }),
+      facts,
+      receipt,
+    },
+    {
+      scenario: "E2",
+      title: "old-gen child mid-turn + parent resume",
+      status: resumePass ? "pass" : "fail",
+      ...(resumePass ? {} : { reason: `resumeExit=${resumed.status} writers=${JSON.stringify(writerCounts)}` }),
+      facts,
+    },
+    {
+      scenario: "E3",
+      title: "handoff evidence",
+      status: evidencePass ? "pass" : "fail",
+      ...(evidencePass
+        ? {}
+        : {
+            reason: `paths=${facts.sessionPathsEqual} monotonic=${facts.transcriptsMonotonic} inode ${facts.socketInodeBefore}->${facts.socketInodeAfter} oldGone=${facts.oldPidGoneWithin60s}`,
+          }),
+      facts,
+    },
   ]
 }
 
@@ -158,10 +216,15 @@ function sameSet(a, b) {
 }
 
 async function profileGuard(run) {
-  const sandbox = createScenarioSandbox(run, "sE4", { omoConfig: hostConfig(), script: spawnScript(1, CHILD_BUSY, "pg") })
+  const sandbox = createScenarioSandbox(run, "sE4", {
+    omoConfig: hostConfig(),
+    script: spawnScript(1, CHILD_BUSY, "pg"),
+  })
   const started = runBin(sandbox, ["daemon", "run", "--json"], { timeoutMs: 240_000 })
   const before = daemonStatus(sandbox).json
-  const ensure = runBin({ ...sandbox, bin: run.newerSenpi }, ["host", "ensure", "--json", "--policy", "upgrade"], { timeoutMs: 240_000 })
+  const ensure = runBin({ ...sandbox, bin: run.newerSenpi }, ["host", "ensure", "--json", "--policy", "upgrade"], {
+    timeoutMs: 240_000,
+  })
   const json = lastJsonLine(ensure.stdout)
   const after = daemonStatus(sandbox).json
   const facts = {
@@ -172,23 +235,36 @@ async function profileGuard(run) {
     instanceUnchanged: before?.instanceId === after?.instanceId,
     pidUnchanged: before?.pid === after?.pid,
   }
-  const pass = facts.ensureAction === "reuse" && facts.ensureWarning === "profile_mismatch_attached" && facts.instanceUnchanged && facts.pidUnchanged
+  const pass =
+    facts.ensureAction === "reuse" &&
+    facts.ensureWarning === "profile_mismatch_attached" &&
+    facts.instanceUnchanged &&
+    facts.pidUnchanged
   const receipt = await cleanupScenario(sandbox, { hostPids: [before?.pid].filter(Boolean) })
   return {
     scenario: "E4",
     title: "profile guard: a spec-less bare senpi of a NEWER epoch reuses, never hands off",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `action=${facts.ensureAction} warning=${facts.ensureWarning} instanceUnchanged=${facts.instanceUnchanged}` }),
+    ...(pass
+      ? {}
+      : {
+          reason: `action=${facts.ensureAction} warning=${facts.ensureWarning} instanceUnchanged=${facts.instanceUnchanged}`,
+        }),
     facts,
     receipt,
   }
 }
 
 async function legacyClientFailClosed(run) {
-  const sandbox = createScenarioSandbox(run, "sH2", { omoConfig: hostConfig(), script: spawnScript(1, CHILD_BUSY, "fc") })
+  const sandbox = createScenarioSandbox(run, "sH2", {
+    omoConfig: hostConfig(),
+    script: spawnScript(1, CHILD_BUSY, "fc"),
+  })
   const started = runBin(sandbox, ["daemon", "run", "--json"], { timeoutMs: 240_000 })
   const before = daemonStatus(sandbox).json
-  const legacy = runBin({ ...sandbox, bin: "node" }, [run.legacyEngineCli, "host", "ensure", "--json"], { timeoutMs: 240_000 })
+  const legacy = runBin({ ...sandbox, bin: "node" }, [run.legacyEngineCli, "host", "ensure", "--json"], {
+    timeoutMs: 240_000,
+  })
   const after = daemonStatus(sandbox).json
   const output = `${legacy.stdout}${legacy.stderr}`
   const facts = {
@@ -205,7 +281,11 @@ async function legacyClientFailClosed(run) {
     scenario: "H2",
     title: "legacy client fail-closed (E9)",
     status: pass ? "pass" : "fail",
-    ...(pass ? {} : { reason: `exit=${legacy.status} incompatible=${facts.incompatibleReported} pidAlive=${facts.daemonPidAlive} generationUnchanged=${facts.generationUnchanged}` }),
+    ...(pass
+      ? {}
+      : {
+          reason: `exit=${legacy.status} incompatible=${facts.incompatibleReported} pidAlive=${facts.daemonPidAlive} generationUnchanged=${facts.generationUnchanged}`,
+        }),
     facts,
     receipt,
   }

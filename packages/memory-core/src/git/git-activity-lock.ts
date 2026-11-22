@@ -107,11 +107,15 @@ export async function holdGitActivityShared(repoDir: string): Promise<GitActivit
     }
     if (outcome.kind === "failed") {
       await handle.close()
-      throw new GitActivityLockError(`The memory repository's git-activity lock failed with errno ${outcome.errno}: ${repoDir}`)
+      throw new GitActivityLockError(
+        `The memory repository's git-activity lock failed with errno ${outcome.errno}: ${repoDir}`,
+      )
     }
     if (Date.now() >= deadline) {
       await handle.close()
-      throw new GitActivityLockError(`The memory repository's git-activity lock stayed exclusively held for ${GIT_ACTIVITY_SHARED_WAIT_MS} ms: ${repoDir}`)
+      throw new GitActivityLockError(
+        `The memory repository's git-activity lock stayed exclusively held for ${GIT_ACTIVITY_SHARED_WAIT_MS} ms: ${repoDir}`,
+      )
     }
     await new Promise((resolveRetry) => setTimeout(resolveRetry, SHARED_RETRY_MS))
   }

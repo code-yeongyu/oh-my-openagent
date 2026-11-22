@@ -2,7 +2,15 @@ import { expect, onTestFinished, test } from "bun:test"
 import type { CreateAgentSessionRuntimeFactory } from "@code-yeongyu/senpi"
 import { GitMemoryRepo, buildDefaultSeedFiles } from "@oh-my-opencode/memory-core"
 import { join } from "node:path"
-import { ModelRegistry, ModelRuntime, createAgentSession, createAgentSessionRuntime, DefaultResourceLoader, SessionManager, SettingsManager } from "../../senpi-test-runtime"
+import {
+  ModelRegistry,
+  ModelRuntime,
+  createAgentSession,
+  createAgentSessionRuntime,
+  DefaultResourceLoader,
+  SessionManager,
+  SettingsManager,
+} from "../../senpi-test-runtime"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext } from "./context"
@@ -33,17 +41,30 @@ async function engineFixture() {
       if (extraction) extractionCalls += 1
       const recordsFact = extraction && extractionCalls === 1
       const delta = recordsFact
-        ? { role: "assistant", tool_calls: [{ index: 0, id: "record-fact", type: "function", function: {
-          name: FACTS_RECORD_TOOL_NAME,
-          arguments: JSON.stringify({ scope: "project", text: "The project uses Bun.", date: "2026-10-11" }),
-        } }] }
+        ? {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: "record-fact",
+                type: "function",
+                function: {
+                  name: FACTS_RECORD_TOOL_NAME,
+                  arguments: JSON.stringify({ scope: "project", text: "The project uses Bun.", date: "2026-10-11" }),
+                },
+              },
+            ],
+          }
         : { role: "assistant", content: "Done." }
       const base = { id: "completion-1", object: "chat.completion.chunk", created: 1, model: body.model }
-      return new Response([
-        `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: null }] })}`,
-        `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: recordsFact ? "tool_calls" : "stop" }] })}`,
-        "data: [DONE]",
-      ].join("\n\n") + "\n\n", { headers: { "content-type": "text/event-stream" } })
+      return new Response(
+        [
+          `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: null }] })}`,
+          `data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta: {}, finish_reason: recordsFact ? "tool_calls" : "stop" }] })}`,
+          "data: [DONE]",
+        ].join("\n\n") + "\n\n",
+        { headers: { "content-type": "text/event-stream" } },
+      )
     },
   })
   const activeClosers = new Set<() => Promise<void>>()
@@ -55,11 +76,17 @@ async function engineFixture() {
   const modelRuntime = ModelRuntime.createSync({ modelsPath: null })
   const registry = new ModelRegistry(modelRuntime)
   registry.registerProvider("openai", {
-    api: "openai-completions", baseUrl: `${server.url}v1`, apiKey: "fixture-key",
+    api: "openai-completions",
+    baseUrl: `${server.url}v1`,
+    apiKey: "fixture-key",
     models: ["user-chosen", "gpt-6-luna-fast"].map((id) => ({
-      id, name: id, reasoning: false, input: ["text"],
+      id,
+      name: id,
+      reasoning: false,
+      input: ["text"],
       cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-      contextWindow: 100_000, maxTokens: 4096,
+      contextWindow: 100_000,
+      maxTokens: 4096,
     })),
   })
   const memory = memorySettings({
@@ -68,7 +95,8 @@ async function engineFixture() {
     recall: { ...memorySettings().recall, enabled: false },
   })
   const context = createMemoryIdentityContext({
-    identity: identity.id, identityPaths: identity.paths,
+    identity: identity.id,
+    identityPaths: identity.paths,
     binding: createMemoryBinding({ identity: identity.id, repoPath: identity.paths.repo, boundAt: 1 }),
   })
   const start = async (sessionContext: Readonly<Record<string, string>> = {}, modelId = "user-chosen") => {
@@ -77,12 +105,16 @@ async function engineFixture() {
     const createRuntime: CreateAgentSessionRuntimeFactory = async (runtimeOptions) => {
       const sessions = new Map<string, MemorySessionStateLike>()
       const wiring = createMemoryWiring({
-        sessions, cwd: () => root,
+        sessions,
+        cwd: () => root,
         env: { HOME: root, OMO_CODING_AGENT_DIR: agentDir },
         loadConfig: () => ({ config: { memory }, layers: [], sources: [], diagnostics: [] }),
         createFactsExtractor: (options) => {
           const runner = new FactsExtractorRunner({ ...options, deadlineMs: 10_000 })
-          const track = (operation: Promise<unknown>) => { operations.push(operation); return operation }
+          const track = (operation: Promise<unknown>) => {
+            operations.push(operation)
+            return operation
+          }
           return {
             launchPending: (signal, selection) => track(runner.launchPending(signal, selection)),
             reconcilePending: (signal) => track(runner.reconcilePending(signal)),
@@ -92,48 +124,79 @@ async function engineFixture() {
       })
       const settingsManager = SettingsManager.inMemory({ defaultProjectTrust: "always" })
       const loader = new DefaultResourceLoader({
-        cwd: root, agentDir, settingsManager,
+        cwd: root,
+        agentDir,
+        settingsManager,
         sessionContext: runtimeOptions.launchProfile?.sessionContext,
-        noExtensions: true, noSkills: true, noPromptTemplates: true, noThemes: true, noContextFiles: true,
-        extensionFactories: [composeOmoSenpiExtension([{
-          name: "memory",
-          register(pi, component) {
-            wiring.registerStatic(pi, component)
-            pi.on("session_start", async (_event, ctx) => {
-              const id = sessionIdFrom(ctx)
-              if (id === undefined) throw new Error("engine session_start has no session ID")
-              sessions.set(id, { context })
-              await wiring.afterBind(pi, id, context, ctx)
-            })
-            pi.on("session_shutdown", async (_event, ctx) => {
-              const id = sessionIdFrom(ctx)
-              if (id === undefined) throw new Error("engine session_shutdown has no session ID")
-              await wiring.onSessionShutdown({ reason: "reload", sessionId: id, deadlineAt: Date.now() + 10_000 })
-            })
-          },
-        }], { logger: componentContext().logger })],
+        noExtensions: true,
+        noSkills: true,
+        noPromptTemplates: true,
+        noThemes: true,
+        noContextFiles: true,
+        extensionFactories: [
+          composeOmoSenpiExtension(
+            [
+              {
+                name: "memory",
+                register(pi, component) {
+                  wiring.registerStatic(pi, component)
+                  pi.on("session_start", async (_event, ctx) => {
+                    const id = sessionIdFrom(ctx)
+                    if (id === undefined) throw new Error("engine session_start has no session ID")
+                    sessions.set(id, { context })
+                    await wiring.afterBind(pi, id, context, ctx)
+                  })
+                  pi.on("session_shutdown", async (_event, ctx) => {
+                    const id = sessionIdFrom(ctx)
+                    if (id === undefined) throw new Error("engine session_shutdown has no session ID")
+                    await wiring.onSessionShutdown({ reason: "reload", sessionId: id, deadlineAt: Date.now() + 10_000 })
+                  })
+                },
+              },
+            ],
+            { logger: componentContext().logger },
+          ),
+        ],
       })
       await loader.reload()
       const created = await createAgentSession({
-        cwd: root, agentDir, modelRegistry: registry,
-        model: registry.find("openai", modelId), thinkingLevel: "off",
-        resourceLoader: loader, settingsManager, sessionManager: runtimeOptions.sessionManager,
-        sessionStartEvent: runtimeOptions.sessionStartEvent, autoTitleSessions: false, tools: [],
+        cwd: root,
+        agentDir,
+        modelRegistry: registry,
+        model: registry.find("openai", modelId),
+        thinkingLevel: "off",
+        resourceLoader: loader,
+        settingsManager,
+        sessionManager: runtimeOptions.sessionManager,
+        sessionStartEvent: runtimeOptions.sessionStartEvent,
+        autoTitleSessions: false,
+        tools: [],
       })
       await created.session.bindExtensions({ mode: "print" })
       return {
-        ...created, diagnostics: [],
+        ...created,
+        diagnostics: [],
         services: {
-          cwd: root, agentDir, authStorage: registry.authStorage, modelRegistry: registry,
-          modelRuntime, settingsManager, resourceLoader: loader, diagnostics: [],
+          cwd: root,
+          agentDir,
+          authStorage: registry.authStorage,
+          modelRegistry: registry,
+          modelRuntime,
+          settingsManager,
+          resourceLoader: loader,
+          diagnostics: [],
         },
       }
     }
     const runtime = await createAgentSessionRuntime(createRuntime, {
-      cwd: root, agentDir, sessionManager: SessionManager.create(root, join(root, "sessions")),
+      cwd: root,
+      agentDir,
+      sessionManager: SessionManager.create(root, join(root, "sessions")),
       launchProfile: { cwd: root, sessionContext },
     })
-    const drain = async () => { await Promise.all(operations.splice(0)) }
+    const drain = async () => {
+      await Promise.all(operations.splice(0))
+    }
     let closed = false
     const close = async () => {
       if (closed) return
@@ -147,10 +210,22 @@ async function engineFixture() {
     }
     activeClosers.add(close)
     await drain()
-    return { runtime, get session() { return runtime.session }, drain, close }
+    return {
+      runtime,
+      get session() {
+        return runtime.session
+      },
+      drain,
+      close,
+    }
   }
   return {
-    start, requests, queue, repo, headBefore, debounceSettles: memory.facts.debounce_settles,
+    start,
+    requests,
+    queue,
+    repo,
+    headBefore,
+    debounceSettles: memory.facts.debounce_settles,
     seedPending: () => enqueue(queue, identity, "session-2", "m2", "The project uses TypeScript."),
   }
 }
@@ -207,8 +282,11 @@ test("#given an accepted parent prompt and pending facts #when the real runtime 
   await run.drain()
   const parentId = run.session.sessionId
   const parentFile = run.session.sessionManager.getSessionFile()
-  const entry = run.session.sessionManager.getEntries().find((entry) => entry.type === "message" && entry.message.role === "assistant")
-  if (entry === undefined || parentFile === undefined) throw new Error("the parent must have a persisted assistant entry")
+  const entry = run.session.sessionManager
+    .getEntries()
+    .find((entry) => entry.type === "message" && entry.message.role === "assistant")
+  if (entry === undefined || parentFile === undefined)
+    throw new Error("the parent must have a persisted assistant entry")
   await f.seedPending()
   f.requests.splice(0)
 

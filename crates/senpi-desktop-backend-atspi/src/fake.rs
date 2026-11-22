@@ -22,6 +22,8 @@ pub(crate) struct FakeNode {
     pub(crate) parent: u64,
     pub(crate) extents: Option<Extents>,
     pub(crate) hit: Option<u64>,
+    /// The hit-test round trip fails even though Component is implemented.
+    pub(crate) hit_fails: bool,
     pub(crate) actions: Vec<String>,
     pub(crate) action_succeeds: bool,
     pub(crate) key_binding: String,
@@ -48,6 +50,7 @@ impl FakeNode {
             parent: 0,
             extents: None,
             hit: None,
+            hit_fails: false,
             actions: Vec::new(),
             action_succeeds: true,
             key_binding: String::new(),
@@ -205,9 +208,17 @@ impl AtSpiBus for FakeBus {
         Ok(point.x >= e.x && point.y >= e.y && point.x < e.x + e.width && point.y < e.y + e.height)
     }
 
+    /// Like the bus, an object without a Component interface fails the call.
     fn accessible_at_point(&mut self, node: &u64, point: ScreenPoint) -> BusResult<u64> {
         self.calls.push(format!("hit {node} @{},{}", point.x, point.y));
-        Ok(self.get(*node)?.hit.unwrap_or(0))
+        let found = self.get(*node)?;
+        if !found.interfaces.contains(Interface::Component) {
+            return Err("no Component".to_string());
+        }
+        if found.hit_fails {
+            return Err(format!("AT-SPI element at point: object {node} timed out"));
+        }
+        Ok(found.hit.unwrap_or(0))
     }
 
     fn grab_focus(&mut self, node: &u64) -> BusResult<bool> {

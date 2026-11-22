@@ -62,14 +62,7 @@ describe("omo daemon rollback coverage options", () => {
     const { migration, requests } = migrationFixture(socket)
     const stdout = capture()
 
-    const exitCode = runDaemonCommand([
-      "rollback-prepare",
-      "--json",
-      "--store",
-      storeDir,
-      "--store",
-      missingStore,
-    ], {
+    const exitCode = runDaemonCommand(["rollback-prepare", "--json", "--store", storeDir, "--store", missingStore], {
       engine: deadEngine(socket),
       migration,
       pluginRoot,
@@ -109,9 +102,11 @@ describe("omo daemon rollback coverage options", () => {
   test("#given unreadable endpoint status #when rollback preflights #then it fails closed before writes", () => {
     const { pluginRoot, agentDir, storeDir, socket } = fixture()
     const { migration, requests } = migrationFixture(socket)
-    const engine = scriptedEngine((args) => args.includes("--all")
-      ? { exitCode: 3, stdout: JSON.stringify({ endpoints: [] }) }
-      : { exitCode: 3, stdout: "not-json" })
+    const engine = scriptedEngine((args) =>
+      args.includes("--all")
+        ? { exitCode: 3, stdout: JSON.stringify({ endpoints: [] }) }
+        : { exitCode: 3, stdout: "not-json" },
+    )
     const stderr = capture()
 
     const exitCode = runDaemonCommand(["rollback-prepare", "--store", storeDir], {

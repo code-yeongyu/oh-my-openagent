@@ -29,7 +29,8 @@ const basename = (path: string): string => path.slice(path.lastIndexOf("/") + 1)
 
 function skipFlags(argv: readonly string[], from: number, valueFlags?: ReadonlySet<string>): readonly string[] {
   let index = from
-  while (index < argv.length && (argv[index] as string).startsWith("-")) index += valueFlags?.has(argv[index] as string) ? 2 : 1
+  while (index < argv.length && (argv[index] as string).startsWith("-"))
+    index += valueFlags?.has(argv[index] as string) ? 2 : 1
   return argv.slice(index)
 }
 
@@ -138,11 +139,20 @@ function wrappedKinds(exe: string, rest: readonly string[], depth: number): Invo
   }
   if (SHELLS.has(exe)) {
     const flagIndex = rest.findIndex((arg, index) => index > 0 && /^-[a-z]*c$/.test(arg))
-    if (flagIndex === -1) return skipFlags(rest, 1).slice(0, 1).some((arg) => QA_SCRIPT.test(arg)) ? ["run"] : []
+    if (flagIndex === -1)
+      return skipFlags(rest, 1)
+        .slice(0, 1)
+        .some((arg) => QA_SCRIPT.test(arg))
+        ? ["run"]
+        : []
     const script = rest[flagIndex + 1]
     return script === undefined || depth >= MAX_DEPTH ? [] : invokedKinds(script, depth + 1)
   }
-  if (PACKAGE_EXEC.has(exe)) return argvKinds(rest.slice(1).filter((arg) => !arg.startsWith("-")), depth)
+  if (PACKAGE_EXEC.has(exe))
+    return argvKinds(
+      rest.slice(1).filter((arg) => !arg.startsWith("-")),
+      depth,
+    )
   if (exe === "bun" && rest[1] === "x") return argvKinds(rest.slice(2), depth)
   if (exe === "pnpm" && rest[1] === "exec") return argvKinds(rest.slice(2), depth)
   return undefined
@@ -150,7 +160,8 @@ function wrappedKinds(exe: string, rest: readonly string[], depth: number): Invo
 
 function argvKinds(argv: readonly string[], depth: number): InvokedKind[] {
   let rest = argv
-  while (rest.length > 0 && (ASSIGNMENT.test(rest[0] as string) || SHELL_KEYWORDS.has(rest[0] as string))) rest = rest.slice(1)
+  while (rest.length > 0 && (ASSIGNMENT.test(rest[0] as string) || SHELL_KEYWORDS.has(rest[0] as string)))
+    rest = rest.slice(1)
   if (rest.length === 0) return []
   if (QA_SCRIPT.test(rest[0] as string)) return ["run"]
   const exe = basename(rest[0] as string)
@@ -160,6 +171,7 @@ function argvKinds(argv: readonly string[], depth: number): InvokedKind[] {
 /** Kinds of checks a shell command line actually invokes: the executable and its subcommand decide, never a mention. */
 export function invokedKinds(line: string, depth = 0): InvokedKind[] {
   const kinds: InvokedKind[] = []
-  for (const argv of shellSegments(line)) for (const kind of argvKinds(argv, depth)) if (!kinds.includes(kind)) kinds.push(kind)
+  for (const argv of shellSegments(line))
+    for (const kind of argvKinds(argv, depth)) if (!kinds.includes(kind)) kinds.push(kind)
   return kinds
 }

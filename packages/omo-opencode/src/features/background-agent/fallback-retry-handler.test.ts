@@ -272,12 +272,10 @@ describe("tryFallbackRetry", () => {
       const args = createDefaultArgs({
         model: { providerID: "anthropic", modelID: "claude-opus-4-7" },
         concurrencyKey: "anthropic",
-        fallbackChain: [
-          { model: "claude-sonnet-4-6", providers: ["anthropic"], variant: undefined },
-        ],
+        fallbackChain: [{ model: "claude-sonnet-4-6", providers: ["anthropic"], variant: undefined }],
       })
       args.concurrencyManager.getConcurrencyKey = mock((model: string) =>
-        model.startsWith("anthropic/") ? "anthropic" : model
+        model.startsWith("anthropic/") ? "anthropic" : model,
       )
 
       await tryFallbackRetry(args)
@@ -527,9 +525,9 @@ describe("tryFallbackRetry", () => {
 
       // when / then: a bounded structured error must surface instead
       await expect(tryFallbackRetry(args)).rejects.toThrow(TeamModeFallbackError)
-      await expect(tryFallbackRetry(createDefaultArgs({ teamRunId: "team-run-abc", onSessionCreated: undefined }))).rejects.toThrow(
-        "team-mode fallback denied: cannot preserve team context",
-      )
+      await expect(
+        tryFallbackRetry(createDefaultArgs({ teamRunId: "team-run-abc", onSessionCreated: undefined })),
+      ).rejects.toThrow("team-mode fallback denied: cannot preserve team context")
     })
 
     test("proceeds normally when teamRunId and onSessionCreated are both present", async () => {

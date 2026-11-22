@@ -30,7 +30,8 @@ describe("a failed revival and a same-epoch winner", () => {
 
       try {
         // when
-        const losing = loser === "a scoped reconcile" ? h.lifecycle.reconcileOnSessionStart("parent") : h.send("first message")
+        const losing =
+          loser === "a scoped reconcile" ? h.lifecycle.reconcileOnSessionStart("parent") : h.send("first message")
         await entered.promise
         await h.lifecycle.reconcileOnSessionStart("parent")
         const winner = h.store.load(h.record.task_id)

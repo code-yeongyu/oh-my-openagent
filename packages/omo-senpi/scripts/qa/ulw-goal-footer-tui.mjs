@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from "node:child_process"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir } from "node:os"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -37,19 +46,16 @@ const scopedGoalsDocument = JSON.stringify(activePlan)
 // "inactive" to, so the driver would report a green run while rendering no `ultraworking` frames. The fake
 // mirrors the toolkit's own scope resolution instead: explicit `--session-id` first, then the toolkit env
 // keys in `packages/omo-codex/plugin/components/ulw-loop/src/paths.ts` order, normalized by the same rules.
-const ULW_LOOP_SESSION_ENV_KEYS = [
-  "OMO_ULW_LOOP_SESSION_ID",
-  "CODEX_SESSION_ID",
-  "CODEX_THREAD_ID",
-  "PI_SESSION_ID",
-]
+const ULW_LOOP_SESSION_ENV_KEYS = ["OMO_ULW_LOOP_SESSION_ID", "CODEX_SESSION_ID", "CODEX_THREAD_ID", "PI_SESSION_ID"]
 
 // Mirrors toolkit `normalizeUlwLoopSessionId`; the parity that matters here is the directory name the
 // host will later stat, so a drifting rule must surface as a failing self-test rather than a silent miss.
 function normalizeUlwLoopSessionId(sessionId) {
   const trimmed = typeof sessionId === "string" ? sessionId.trim() : ""
   if (trimmed.length === 0) return null
-  const pathSegments = trimmed.split(/[\\/]+/).filter((segment) => segment.length > 0 && segment !== "." && segment !== "..")
+  const pathSegments = trimmed
+    .split(/[\\/]+/)
+    .filter((segment) => segment.length > 0 && segment !== "." && segment !== "..")
   const candidate = (pathSegments.length > 0 ? pathSegments.join("-") : trimmed)
     .replace(/[^A-Za-z0-9._-]+/g, "-")
     .replace(/-+/g, "-")
@@ -187,7 +193,7 @@ function prepareScenario() {
               language: "js",
               summary: "activate the session-scoped ulw-loop plan",
               code: [
-                'const out = await tool.bash({ command: \'"$OMO_BIN" ulw-loop create-goals\' })',
+                "const out = await tool.bash({ command: '\"$OMO_BIN\" ulw-loop create-goals' })",
                 "String(out)",
               ].join("\n"),
             },
@@ -292,7 +298,10 @@ async function runScenario() {
     const afterRealLog = existsSync(realLogPath) ? readFileSync(realLogPath, "utf8") : ""
     const qaLogWrite = afterRealLog.slice(beforeRealLog.length).includes(basename(prepared.sandbox.root))
     const concurrentLogPaths = changedReal.includes("logs/session.log") && !qaLogWrite ? ["logs/session.log"] : []
-    const classified = classifyRealSenpiChanges(changedReal.filter((path) => path !== "logs/session.log" || qaLogWrite), [basename(prepared.sandbox.root)])
+    const classified = classifyRealSenpiChanges(
+      changedReal.filter((path) => path !== "logs/session.log" || qaLogWrite),
+      [basename(prepared.sandbox.root)],
+    )
     const payload = {
       result: senpiBin !== null && classified.qaAttributedPaths.length === 0 ? "PASS" : "FAIL",
       reason,
@@ -379,9 +388,18 @@ function assertFakeCreateGoalsWritesScopedPlan(prepared, env) {
   const envScoped = spawnSync(prepared.omoBin, ["ulw-loop", "create-goals"], {
     cwd: prepared.sandbox.cwd,
     encoding: "utf8",
-    env: { ...process.env, OMO_ULW_LOOP_SESSION_ID: "", CODEX_SESSION_ID: "", CODEX_THREAD_ID: "", PI_SESSION_ID: "env-session" },
+    env: {
+      ...process.env,
+      OMO_ULW_LOOP_SESSION_ID: "",
+      CODEX_SESSION_ID: "",
+      CODEX_THREAD_ID: "",
+      PI_SESSION_ID: "env-session",
+    },
   })
-  if (envScoped.status !== 0 || !existsSync(join(prepared.sandbox.cwd, ".omo", "ulw-loop", "env-session", "goals.json"))) {
+  if (
+    envScoped.status !== 0 ||
+    !existsSync(join(prepared.sandbox.cwd, ".omo", "ulw-loop", "env-session", "goals.json"))
+  ) {
     throw new Error("self-test: fake create-goals ignored the toolkit env fallback")
   }
 
@@ -399,8 +417,18 @@ function runSelfTest() {
   if (!parseArgs(["--self-test"]).selfTest) throw new Error("self-test: argument parser failed")
   const prepared = prepareScenario()
   const command = composeCommand("/tmp/senpi", prepared.sessionDir)
-  const env = childEnv({ PATH: process.env.PATH, OMO_CODING_AGENT_DIR: "/real", SENPI_CODING_AGENT_DIR: "/real", OPENAI_API_KEY: "secret" }, prepared, "/tmp/senpi")
-  if (command.args.includes("-p") || command.args.includes("--mode")) throw new Error("self-test: command must stay TUI-native")
+  const env = childEnv(
+    {
+      PATH: process.env.PATH,
+      OMO_CODING_AGENT_DIR: "/real",
+      SENPI_CODING_AGENT_DIR: "/real",
+      OPENAI_API_KEY: "secret",
+    },
+    prepared,
+    "/tmp/senpi",
+  )
+  if (command.args.includes("-p") || command.args.includes("--mode"))
+    throw new Error("self-test: command must stay TUI-native")
   if (!command.args.includes("create_goal") && !existsSync(join(prepared.sandbox.cwd, "mock-script.json"))) {
     throw new Error("self-test: goal script missing")
   }
@@ -423,7 +451,10 @@ function runSelfTest() {
   writeFileSync(join(excludedDir, "ignored.txt"), "after\n")
   writeFileSync(join(prepared.sandbox.agentDir, "settings.json"), "{}\n")
   const snapshotChanges = changedRealPaths(beforeSnapshot, snapshotWriteSurface(prepared.sandbox.agentDir))
-  if (!snapshotChanges.includes("settings.json") || snapshotChanges.some((path) => path.startsWith("omo-runtime-worktree/"))) {
+  if (
+    !snapshotChanges.includes("settings.json") ||
+    snapshotChanges.some((path) => path.startsWith("omo-runtime-worktree/"))
+  ) {
     throw new Error("self-test: write-surface snapshot filter failed")
   }
   rmSync(prepared.sandbox.root, { recursive: true, force: true })

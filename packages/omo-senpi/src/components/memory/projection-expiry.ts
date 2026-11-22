@@ -19,6 +19,9 @@ export function newlyExpired(
 
 export function renderExpiredLine(expired: readonly MemoryExpiry[]): string {
   const hidden = expired.length - MAX_LISTED_PATHS
-  const listed = expired.slice(0, MAX_LISTED_PATHS).map((expiry) => expiry.path).join(", ")
+  const listed = expired
+    .slice(0, MAX_LISTED_PATHS)
+    .map((expiry) => expiry.path)
+    .join(", ")
   return `- ${MEMORY_EXPIRED_METADATA_TOKEN} (no longer true): ${listed}${hidden > 0 ? `, ${hidden} more` : ""}.`
 }

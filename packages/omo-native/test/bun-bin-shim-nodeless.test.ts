@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { lstatSync, readFileSync } from "node:fs"
 import { spawnSync } from "node:child_process"
-import { createFixture, NODE, NODELESS_UNAVAILABLE, nodelessEnv, removeFixtureRoots, stageInstalledPackage } from "./bun-bin-shim.fixture"
+import {
+  createFixture,
+  NODE,
+  NODELESS_UNAVAILABLE,
+  nodelessEnv,
+  removeFixtureRoots,
+  stageInstalledPackage,
+} from "./bun-bin-shim.fixture"
 
 afterEach(removeFixtureRoots)
 
@@ -42,15 +49,18 @@ describe("#given a bun add -g update on a machine without node (#9293)", () => {
   // A test run started from a package script inherits NODE and npm_node_execpath pointing at a real
   // node; the node-less machine must stay node-less anyway (#10419).
   for (const name of ["NODE", "npm_node_execpath"] as const) {
-    test.skipIf(NODELESS_UNAVAILABLE || NODE === undefined)(`#then it still holds when the parent exported ${name}`, () => {
-      const previous = process.env[name]
-      process.env[name] = NODE
-      try {
-        expectPostinstallLeavesANodelessOmo()
-      } finally {
-        if (previous === undefined) delete process.env[name]
-        else process.env[name] = previous
-      }
-    })
+    test.skipIf(NODELESS_UNAVAILABLE || NODE === undefined)(
+      `#then it still holds when the parent exported ${name}`,
+      () => {
+        const previous = process.env[name]
+        process.env[name] = NODE
+        try {
+          expectPostinstallLeavesANodelessOmo()
+        } finally {
+          if (previous === undefined) delete process.env[name]
+          else process.env[name] = previous
+        }
+      },
+    )
   }
 })

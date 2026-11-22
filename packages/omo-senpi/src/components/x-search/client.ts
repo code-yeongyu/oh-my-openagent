@@ -82,8 +82,10 @@ export function buildXSearchRequest(
   if (params.to_date !== undefined) tool.to_date = params.to_date
   if (params.allowed_x_handles !== undefined) tool.allowed_x_handles = [...params.allowed_x_handles]
   if (params.excluded_x_handles !== undefined) tool.excluded_x_handles = [...params.excluded_x_handles]
-  if (params.enable_image_understanding !== undefined) tool.enable_image_understanding = params.enable_image_understanding
-  if (params.enable_video_understanding !== undefined) tool.enable_video_understanding = params.enable_video_understanding
+  if (params.enable_image_understanding !== undefined)
+    tool.enable_image_understanding = params.enable_image_understanding
+  if (params.enable_video_understanding !== undefined)
+    tool.enable_video_understanding = params.enable_video_understanding
 
   return {
     model: options.carrier.model,
@@ -269,7 +271,10 @@ function collectQueries(output: unknown[]): string[] {
   })
 }
 
-export function normalizeXSearchResponse(raw: unknown, options: { readonly maxResults?: number } = {}): NormalizedXSearch {
+export function normalizeXSearchResponse(
+  raw: unknown,
+  options: { readonly maxResults?: number } = {},
+): NormalizedXSearch {
   const payload = asObject(raw) ?? {}
   const output = asArray(payload.output)
   const texts = collectMessageTexts(output)

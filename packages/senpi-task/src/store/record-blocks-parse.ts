@@ -55,8 +55,15 @@ export function parseOptionalIsolation(record: Record<string, unknown>): Isolati
   if (mergeResult === undefined) return spec
   if (!isRecord(mergeResult)) throw new Error("isolation.merge_result is not an object")
   const kind = readString(mergeResult, "kind")
-  if (kind !== "applied" && kind !== "already-applied" && kind !== "not-applied" &&
-      kind !== "branch-merged" && kind !== "branch-merge-failed" && kind !== "no-changes" && kind !== "retained") {
+  if (
+    kind !== "applied" &&
+    kind !== "already-applied" &&
+    kind !== "not-applied" &&
+    kind !== "branch-merged" &&
+    kind !== "branch-merge-failed" &&
+    kind !== "no-changes" &&
+    kind !== "retained"
+  ) {
     throw new Error("isolation.merge_result.kind is invalid")
   }
   const changesApplied = readOptionalBoolean(mergeResult, "changesApplied")
@@ -105,16 +112,12 @@ function readOptionalLiteral(
   return value
 }
 
-export function readOptionalRunnerKind(
-  record: Record<string, unknown>,
-): RunnerKind | undefined {
+export function readOptionalRunnerKind(record: Record<string, unknown>): RunnerKind | undefined {
   const val = readOptionalLiteral(record, "runner_kind", RUNNER_KINDS)
   return val as RunnerKind | undefined
 }
 
-export function readOptionalSuspensionReason(
-  record: Record<string, unknown>,
-): SuspensionReason | undefined {
+export function readOptionalSuspensionReason(record: Record<string, unknown>): SuspensionReason | undefined {
   return readOptionalLiteral(record, "suspension_reason", SUSPENSION_REASONS) as SuspensionReason | undefined
 }
 
@@ -143,9 +146,8 @@ export function parseOptionalSpawnSpec(record: Record<string, unknown>): TaskSpa
     const prompt = readString(value, "prompt")
     const instructions = readOptionalString(value, "instructions")
     const memberScopedToolNames = readOptionalStringArray(value, "member_scoped_tool_names")
-    const isolation: TaskIsolationSpec | undefined = value["isolation"] === undefined
-      ? undefined
-      : parseIsolationSpec(value["isolation"])
+    const isolation: TaskIsolationSpec | undefined =
+      value["isolation"] === undefined ? undefined : parseIsolationSpec(value["isolation"])
     return {
       version: 1,
       ...(isolation === undefined ? {} : { isolation }),
@@ -195,17 +197,37 @@ export function parseOptionalPendingSteering(
     }
     const pool = candidate["workpool"]
     if (pool !== undefined) {
-      if (!isRecord(pool) || typeof pool["pool_id"] !== "string" || !/^wp_[0-9a-f]{32}$/.test(pool["pool_id"]) ||
-        typeof pool["item_id"] !== "string" || pool["item_id"] !== id || !/^wi_[0-9a-f]{32}$/.test(id) ||
-        typeof pool["key"] !== "string" || pool["key"].trim().length === 0 ||
-        typeof pool["generation"] !== "number" || !Number.isSafeInteger(pool["generation"]) || pool["generation"] < 1 ||
-        typeof pool["run_epoch"] !== "number" || !Number.isSafeInteger(pool["run_epoch"]) || pool["run_epoch"] < 0) {
+      if (
+        !isRecord(pool) ||
+        typeof pool["pool_id"] !== "string" ||
+        !/^wp_[0-9a-f]{32}$/.test(pool["pool_id"]) ||
+        typeof pool["item_id"] !== "string" ||
+        pool["item_id"] !== id ||
+        !/^wi_[0-9a-f]{32}$/.test(id) ||
+        typeof pool["key"] !== "string" ||
+        pool["key"].trim().length === 0 ||
+        typeof pool["generation"] !== "number" ||
+        !Number.isSafeInteger(pool["generation"]) ||
+        pool["generation"] < 1 ||
+        typeof pool["run_epoch"] !== "number" ||
+        !Number.isSafeInteger(pool["run_epoch"]) ||
+        pool["run_epoch"] < 0
+      ) {
         warnings?.push(`pending_steering[${index}] at ${path}: invalid workpool correlation, dropped`)
         continue
       }
-      entries.push({ id, message, deliver_as: deliverAs, workpool: {
-        pool_id: pool["pool_id"], item_id: pool["item_id"], key: pool["key"], generation: pool["generation"], run_epoch: pool["run_epoch"],
-      } })
+      entries.push({
+        id,
+        message,
+        deliver_as: deliverAs,
+        workpool: {
+          pool_id: pool["pool_id"],
+          item_id: pool["item_id"],
+          key: pool["key"],
+          generation: pool["generation"],
+          run_epoch: pool["run_epoch"],
+        },
+      })
     } else entries.push({ id, message, deliver_as: deliverAs })
   }
   return entries
@@ -226,9 +248,7 @@ export function parseOptionalResolvedModel(
 // lives in a nested `change` block while `source` keeps an old-union value pre-F12 builds parse
 // (store/storable-record.ts); records this branch's earlier heads persisted with a live kind
 // directly in `source` map back unchanged.
-export function parseOptionalEffectiveModel(
-  record: Record<string, unknown>,
-): EffectiveModelRecord | undefined {
+export function parseOptionalEffectiveModel(record: Record<string, unknown>): EffectiveModelRecord | undefined {
   const value = record["effective_model"]
   if (value === undefined) return undefined
   if (!isRecord(value)) throw new Error("effective_model is not an object")
@@ -300,9 +320,7 @@ function readResolvedModel(value: Record<string, unknown>): ResolvedModelRecord 
 
 // Everything but the source, shared by the resolved and effective model readers: each
 // validates its own source union.
-function readResolvedModelFields(
-  value: Record<string, unknown>,
-): Omit<ResolvedModelRecord, "source"> {
+function readResolvedModelFields(value: Record<string, unknown>): Omit<ResolvedModelRecord, "source"> {
   const variant = readOptionalString(value, "variant")
   const legacyReasoningEffort = readOptionalString(value, "reasoning_effort")
   const reasoning = readOptionalString(value, "reasoning")

@@ -37,7 +37,8 @@ export async function projectedChangesBetween(
   options.onCommits?.(commits)
   const touched = new Set<string>()
   for (const commit of commits) {
-    if (options.excludeSessionId !== undefined && commit.trailers[MEMORY_SESSION_TRAILER] === options.excludeSessionId) continue
+    if (options.excludeSessionId !== undefined && commit.trailers[MEMORY_SESSION_TRAILER] === options.excludeSessionId)
+      continue
     for (const path of commit.paths ?? []) if (isProjectedPath(path)) touched.add(path)
   }
   if (touched.size === 0) return NO_CHANGES

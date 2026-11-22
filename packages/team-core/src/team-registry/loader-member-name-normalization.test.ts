@@ -36,9 +36,11 @@ describe("loadTeamSpec member name normalization", () => {
   const temporaryDirectories: string[] = []
 
   afterEach(async () => {
-    await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-      await rm(directoryPath, { recursive: true, force: true })
-    }))
+    await Promise.all(
+      temporaryDirectories.splice(0).map(async (directoryPath) => {
+        await rm(directoryPath, { recursive: true, force: true })
+      }),
+    )
   })
 
   test("auto-assigns missing member names for specs on disk", async () => {
@@ -58,7 +60,11 @@ describe("loadTeamSpec member name normalization", () => {
     })
 
     // when
-    const teamSpec = await loadTeamSpec("autoname", TeamModeConfigSchema.parse({ base_dir: fixturePaths.userBaseDir }), fixturePaths.projectRoot)
+    const teamSpec = await loadTeamSpec(
+      "autoname",
+      TeamModeConfigSchema.parse({ base_dir: fixturePaths.userBaseDir }),
+      fixturePaths.projectRoot,
+    )
 
     // then
     expect(teamSpec.leadAgentId).toBe("lead")

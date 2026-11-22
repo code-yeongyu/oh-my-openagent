@@ -49,7 +49,8 @@ export function resolveGitBash(input: GitBashResolverInput): GitBashResolution {
     { path: PROGRAM_FILES_X86_GIT_BASH, source: "program-files-x86" },
   ] as const) {
     checkedPaths.push(candidate.path)
-    if (input.exists(candidate.path)) return { found: true, path: candidate.path, source: candidate.source, checkedPaths }
+    if (input.exists(candidate.path))
+      return { found: true, path: candidate.path, source: candidate.source, checkedPaths }
   }
 
   for (const pathCandidate of input.where("bash")) {
@@ -57,16 +58,19 @@ export function resolveGitBash(input: GitBashResolverInput): GitBashResolution {
     if (candidate.length === 0) continue
     checkedPaths.push(candidate)
     if (isKnownNonGitBashLauncher(candidate)) continue
-    if (isBashExePath(candidate) && input.exists(candidate)) return { found: true, path: candidate, source: "path", checkedPaths }
+    if (isBashExePath(candidate) && input.exists(candidate))
+      return { found: true, path: candidate, source: "path", checkedPaths }
   }
 
   return missingGitBash(checkedPaths)
 }
 
-export const resolveGitBashForCurrentProcess = (input: {
-  readonly platform?: string
-  readonly env?: { readonly [key: string]: string | undefined }
-} = {}): GitBashResolution => {
+export const resolveGitBashForCurrentProcess = (
+  input: {
+    readonly platform?: string
+    readonly env?: { readonly [key: string]: string | undefined }
+  } = {},
+): GitBashResolution => {
   return resolveGitBash({
     platform: input.platform ?? process.platform,
     env: input.env ?? process.env,

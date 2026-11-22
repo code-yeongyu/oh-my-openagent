@@ -15,9 +15,7 @@ interface SkillMetadata {
   model?: unknown
 }
 
-export function loadPluginSkillsAsCommands(
-  plugins: LoadedPlugin[],
-): Record<string, CommandDefinition> {
+export function loadPluginSkillsAsCommands(plugins: LoadedPlugin[]): Record<string, CommandDefinition> {
   const skills: Record<string, CommandDefinition> = {}
 
   for (const plugin of plugins) {

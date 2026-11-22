@@ -1,15 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { BoulderState } from "../../features/boulder-state"
-import {
-  completeBoulder,
-  formatDurationHuman,
-  getWorkById,
-  getWorkForSession,
-} from "../../features/boulder-state"
-import {
-  isAgentRegistered,
-  resolveRegisteredAgentName,
-} from "../../features/claude-code-session-state"
+import { completeBoulder, formatDurationHuman, getWorkById, getWorkForSession } from "../../features/boulder-state"
+import { isAgentRegistered, resolveRegisteredAgentName } from "../../features/claude-code-session-state"
 import { createInternalAgentContinuationTextPart } from "../../shared"
 import { log } from "../../shared/logger"
 import { isAmbiguousPostDispatchPromptFailure } from "../../shared/prompt-failure-classifier"
@@ -38,9 +30,8 @@ export async function handleCompletedBoulderIdle(input: {
   }
 
   const sessionWork = getWorkForSession(ctx.directory, sessionID)
-  const activeWork = !sessionWork && boulderState.active_work_id
-    ? getWorkById(ctx.directory, boulderState.active_work_id)
-    : null
+  const activeWork =
+    !sessionWork && boulderState.active_work_id ? getWorkById(ctx.directory, boulderState.active_work_id) : null
   const work = sessionWork ?? activeWork
   if (work?.status === "abandoned") {
     log(`[${HOOK_NAME}] Boulder complete`, { sessionID, plan: boulderState.plan_name })
@@ -71,7 +62,7 @@ export async function handleCompletedBoulderIdle(input: {
     return
   }
 
-  const elapsedMilliseconds = work.elapsed_ms ?? (Date.now() - new Date(work.started_at).getTime())
+  const elapsedMilliseconds = work.elapsed_ms ?? Date.now() - new Date(work.started_at).getTime()
   const elapsedHuman = formatDurationHuman(elapsedMilliseconds)
 
   const taskBreakdown = Object.values(work.task_sessions ?? {})
@@ -93,8 +84,7 @@ export async function handleCompletedBoulderIdle(input: {
     })
     .join("\n")
 
-  const prompt = BOULDER_COMPLETE_PROMPT
-    .replace(/{PLAN_NAME}/g, work.plan_name)
+  const prompt = BOULDER_COMPLETE_PROMPT.replace(/{PLAN_NAME}/g, work.plan_name)
     .replace(/{ELAPSED_HUMAN}/g, elapsedHuman)
     .replace(/{TASK_BREAKDOWN}/g, taskBreakdown.length > 0 ? taskBreakdown : "- (no task timings)")
 

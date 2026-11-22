@@ -32,11 +32,7 @@ describe("TeamModeConfigSchema", () => {
   describe("#given invalid bounds are provided", () => {
     test("#when parsed #then it rejects out of range values", () => {
       // given
-      const invalidInputs = [
-        { max_parallel_members: -1 },
-        { max_members: 9 },
-        { message_payload_max_bytes: 512 },
-      ]
+      const invalidInputs = [{ max_parallel_members: -1 }, { max_members: 9 }, { message_payload_max_bytes: 512 }]
 
       // when
       const results = invalidInputs.map((input) => TeamModeConfigSchema.safeParse(input))

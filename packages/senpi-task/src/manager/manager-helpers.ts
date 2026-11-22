@@ -37,13 +37,16 @@ export function nowIso(now: () => number): string {
  * reach a parent JavaScript kernel, so a member spec that carries a grant is refused before a
  * record exists - never spawned silently without the tools its caller believes it has.
  */
-export function memberKernelToolRefusal(spec: ManagerStartSpec): Extract<StartResult, { kind: "plan_unresolved" }> | undefined {
+export function memberKernelToolRefusal(
+  spec: ManagerStartSpec,
+): Extract<StartResult, { kind: "plan_unresolved" }> | undefined {
   if (spec.team_role !== "member" || spec.kernelTools === undefined) return undefined
   return {
     kind: "plan_unresolved",
     error: {
       code: "invalid_target",
-      message: "Team members run out of process and cannot reach a parent JavaScript kernel, so they never receive parent kernel tools.",
+      message:
+        "Team members run out of process and cannot reach a parent JavaScript kernel, so they never receive parent kernel tools.",
     },
   }
 }
@@ -77,12 +80,8 @@ export function buildRecordInput(input: {
     ...(spec.team_name !== undefined ? { team_name: spec.team_name } : {}),
     ...(spec.team_member_name !== undefined ? { team_member_name: spec.team_member_name } : {}),
     ...(spec.team_role !== undefined ? { team_role: spec.team_role } : {}),
-    ...(plan.requested_model !== undefined
-      ? { requested_model: plan.requested_model }
-      : {}),
-    ...(plan.fallback_models !== undefined
-      ? { fallback_models: plan.fallback_models }
-      : {}),
+    ...(plan.requested_model !== undefined ? { requested_model: plan.requested_model } : {}),
+    ...(plan.fallback_models !== undefined ? { fallback_models: plan.fallback_models } : {}),
     ...(plan.resolved_model !== undefined ? { resolved_model: plan.resolved_model } : {}),
     ...(agentType !== undefined ? { agent_type: agentType } : {}),
     ...(category !== undefined ? { category } : {}),
@@ -112,9 +111,8 @@ export function buildManagedSpec(input: {
   const { record, spec, plan, cwd, stateDir } = input
   const prompt = plan.promptAppend ? `${spec.prompt}\n\n${plan.promptAppend}` : spec.prompt
   const instructions = spec.instructions ?? plan.instructions
-  const memberEnv = spec.memberEnv === undefined
-    ? undefined
-    : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id }
+  const memberEnv =
+    spec.memberEnv === undefined ? undefined : { ...spec.memberEnv, SENPI_TASK_MEMBER_TASK_ID: record.task_id }
   return {
     taskId: record.task_id,
     cwd: spec.cwd ?? cwd,
@@ -124,12 +122,8 @@ export function buildManagedSpec(input: {
     parentSessionId: spec.parent_session_id,
     rootSessionId: spec.root_session_id ?? spec.parent_session_id,
     ...(plan.model !== undefined ? { model: plan.model } : {}),
-    ...(plan.requested_model !== undefined
-      ? { requestedModel: plan.requested_model }
-      : {}),
-    ...(plan.fallback_models !== undefined
-      ? { fallbackModels: plan.fallback_models }
-      : {}),
+    ...(plan.requested_model !== undefined ? { requestedModel: plan.requested_model } : {}),
+    ...(plan.fallback_models !== undefined ? { fallbackModels: plan.fallback_models } : {}),
     ...(plan.resolved_model !== undefined ? { resolvedModel: plan.resolved_model } : {}),
     ...(plan.variant !== undefined ? { variant: plan.variant } : {}),
     ...(record.agent_type !== undefined ? { agentType: record.agent_type } : {}),
@@ -157,9 +151,7 @@ export function buildSpawnSpecV1(spec: ManagedStartSpec): SpawnSpecV1 {
     cwd: spec.cwd,
     prompt: spec.prompt,
     ...(spec.instructions !== undefined ? { instructions: spec.instructions } : {}),
-    ...(spec.memberScopedToolNames !== undefined
-      ? { member_scoped_tool_names: spec.memberScopedToolNames }
-      : {}),
+    ...(spec.memberScopedToolNames !== undefined ? { member_scoped_tool_names: spec.memberScopedToolNames } : {}),
   }
 }
 
@@ -233,14 +225,20 @@ export function recordSpawnedRunner(
   hostSession: ManagedChildHandle["hostSession"],
 ): TaskRecord | undefined {
   if (isTerminalRecord(record) || kind !== "host-session" || hostSession === undefined) return undefined
-  return { ...record, runner_kind: "host-session", host_session: {
-    ...record.host_session,
-    ...hostSessionFacts(hostSession),
-    ...(record.effect_seq === undefined ? {} : { effect_seq: record.effect_seq }),
-  } }
+  return {
+    ...record,
+    runner_kind: "host-session",
+    host_session: {
+      ...record.host_session,
+      ...hostSessionFacts(hostSession),
+      ...(record.effect_seq === undefined ? {} : { effect_seq: record.effect_seq }),
+    },
+  }
 }
 
-function hostSessionFacts(hostSession: NonNullable<ManagedChildHandle["hostSession"]>): NonNullable<TaskRecord["host_session"]> {
+function hostSessionFacts(
+  hostSession: NonNullable<ManagedChildHandle["hostSession"]>,
+): NonNullable<TaskRecord["host_session"]> {
   return {
     socket: hostSession.socket,
     routing_id: hostSession.routingId,
@@ -278,10 +276,7 @@ export function hasChildIdentity(identity: ChildIdentity): boolean {
 // Fold the spawned child's own session id onto its record. External readers join a grandchild
 // session's parent_session_id back to this field. Empty/missing ids and already-terminal records
 // leave the record untouched so a settled task is never resurrected.
-export function recordSpawnedChildSession(
-  record: TaskRecord,
-  sessionId: string | undefined,
-): TaskRecord | undefined {
+export function recordSpawnedChildSession(record: TaskRecord, sessionId: string | undefined): TaskRecord | undefined {
   if (sessionId === undefined || sessionId.length === 0 || isTerminalRecord(record)) return undefined
   return { ...record, child_session_id: sessionId }
 }

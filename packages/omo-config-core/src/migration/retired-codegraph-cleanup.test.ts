@@ -43,7 +43,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function expectSection(document: Record<string, unknown>, key: string): Record<string, unknown> {
   const section = document[key]
-  if (!isRecord(section)) throw new Error(`expected ${key} to survive the migration as an object, got ${JSON.stringify(section)}`)
+  if (!isRecord(section))
+    throw new Error(`expected ${key} to survive the migration as an object, got ${JSON.stringify(section)}`)
   return section
 }
 
@@ -105,7 +106,8 @@ describe("runMigration retired codegraph cleanup", () => {
       targetPath: migrationFixture.targetPath,
       transform: (loaded) => {
         const [current] = loaded
-        if (current === undefined || !isRecord(current.value)) throw new Error("replace-target transform received no target document")
+        if (current === undefined || !isRecord(current.value))
+          throw new Error("replace-target transform received no target document")
         return { ...current.value, task: { default_concurrency: 4 } }
       },
     })
@@ -128,7 +130,11 @@ describe("runMigration retired codegraph cleanup", () => {
     const fileSystem = new MemoryMigrationFileSystem()
     fileSystem.files.set(
       migrationFixture.targetPath,
-      JSON.stringify({ "[senpi]": { codegraph: { enabled: true } }, profiles: { default: { "[senpi]": { codegraph: { enabled: true } } } }, _migrations: ["earlier-merge"] }),
+      JSON.stringify({
+        "[senpi]": { codegraph: { enabled: true } },
+        profiles: { default: { "[senpi]": { codegraph: { enabled: true } } } },
+        _migrations: ["earlier-merge"],
+      }),
     )
 
     // when
@@ -152,6 +158,10 @@ describe("runMigration retired codegraph cleanup", () => {
       "removed: profiles.default.[native].codegraph (retired configuration)",
     ])
     const target = parseFile(fileSystem, migrationFixture.targetPath)
-    expect(target).toEqual({ "[native]": {}, profiles: { default: { "[native]": {} } }, _migrations: ["earlier-merge", "harness-native-rename"] })
+    expect(target).toEqual({
+      "[native]": {},
+      profiles: { default: { "[native]": {} } },
+      _migrations: ["earlier-merge", "harness-native-rename"],
+    })
   })
 })

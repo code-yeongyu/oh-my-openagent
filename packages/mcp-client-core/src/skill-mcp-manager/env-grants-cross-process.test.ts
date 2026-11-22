@@ -11,18 +11,28 @@ import { setStdioClientDependenciesForTesting } from "./stdio-client"
 async function bounded<T>(promise: Promise<T>): Promise<T> {
   const timeout = Promise.withResolvers<T>()
   const timer = setTimeout(() => timeout.reject(new Error("Expected cross-process event did not arrive")), 10_000)
-  try { return await Promise.race([promise, timeout.promise]) }
-  finally { clearTimeout(timer) }
+  try {
+    return await Promise.race([promise, timeout.promise])
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 async function runWriter(root: string, operation: string): Promise<void> {
   const module = new URL("./env-grants-store.ts", import.meta.url).href
   const code = `import {addGrant,revoke} from ${JSON.stringify(module)}; ${operation}`
   const child = Bun.spawn([process.execPath, "-e", code], {
-    cwd: root, stdin: "ignore", stdout: "pipe", stderr: "pipe",
+    cwd: root,
+    stdin: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
     env: {
-      PATH: process.env.PATH, HOME: root, SYSTEMROOT: process.env.SYSTEMROOT,
-      TMPDIR: process.env.TMPDIR ?? root, TMP: process.env.TMP, TEMP: process.env.TEMP,
+      PATH: process.env.PATH,
+      HOME: root,
+      SYSTEMROOT: process.env.SYSTEMROOT,
+      TMPDIR: process.env.TMPDIR ?? root,
+      TMP: process.env.TMP,
+      TEMP: process.env.TEMP,
       RUN_TMP: process.env.RUN_TMP,
       NODE_COMPILE_CACHE: process.env.NODE_COMPILE_CACHE ?? join(root, "ncc"),
       BUN_RUNTIME_TRANSPILER_CACHE_PATH: process.env.BUN_RUNTIME_TRANSPILER_CACHE_PATH ?? join(root, "bun-tc"),
@@ -32,7 +42,10 @@ async function runWriter(root: string, operation: string): Promise<void> {
     const code = await bounded(child.exited)
     if (code !== 0) throw new Error(`Synthetic writer exited ${code}: ${await new Response(child.stderr).text()}`)
   } finally {
-    if (child.exitCode === null) { child.kill(); await child.exited }
+    if (child.exitCode === null) {
+      child.kill()
+      await child.exited
+    }
   }
 }
 
@@ -44,8 +57,12 @@ test("separate atomic writers converge and revoke closes a live legacy transport
   const store = createFileGrantStore(join(root, "config"))
   const path = resolveGrantsStorePath(join(root, "config"))
   const info = {
-    sessionID: "cross-process", skillName: "fixture", serverName: "fixture", scope: "project",
-    directory: join(root, "project"), sourcePath: source,
+    sessionID: "cross-process",
+    skillName: "fixture",
+    serverName: "fixture",
+    scope: "project",
+    directory: join(root, "project"),
+    sourcePath: source,
   }
   const config = { command: "synthetic", env: { AUTH_HEADER: "${OMO_CROSS_TOKEN}" } }
   const identity = declarationDigest(info, config)
@@ -67,21 +84,36 @@ test("separate atomic writers converge and revoke closes a live legacy transport
     createClient: () => {
       const index = ++connections
       return {
-        connect: async () => { if (index === 3) { started.resolve(); await release.promise } },
-        close: async () => { if (index === 2) closed.resolve() },
-        listTools: async () => ({ tools: [] }), listResources: async () => ({ resources: [] }),
-        listPrompts: async () => ({ prompts: [] }), callTool: async () => ({ content: [] }),
-        readResource: async () => ({ contents: [] }), getPrompt: async () => ({ messages: [] }),
+        connect: async () => {
+          if (index === 3) {
+            started.resolve()
+            await release.promise
+          }
+        },
+        close: async () => {
+          if (index === 2) closed.resolve()
+        },
+        listTools: async () => ({ tools: [] }),
+        listResources: async () => ({ resources: [] }),
+        listPrompts: async () => ({ prompts: [] }),
+        callTool: async () => ({ content: [] }),
+        readResource: async () => ({ contents: [] }),
+        getPrompt: async () => ({ messages: [] }),
       }
     },
   })
   const manager = new SkillMcpManager({ grantStore: store })
-  const stop = store.watch((event) => { if ((event?.snapshot.generation ?? 0) >= 2) observed.resolve() })
+  const stop = store.watch((event) => {
+    if ((event?.snapshot.generation ?? 0) >= 2) observed.resolve()
+  })
   try {
     await manager.getOrCreateClient(info, config)
     expect(environments.at(-1)?.AUTH_HEADER).toBe("${OMO_CROSS_TOKEN}")
     await Promise.all([
-      runWriter(root, `await addGrant(${JSON.stringify(path)},${JSON.stringify(identity)},${label},["OMO_CROSS_TOKEN"]);`),
+      runWriter(
+        root,
+        `await addGrant(${JSON.stringify(path)},${JSON.stringify(identity)},${label},["OMO_CROSS_TOKEN"]);`,
+      ),
       runWriter(root, `await addGrant(${JSON.stringify(path)},${JSON.stringify(second)},${label},["ODD_DSN"]);`),
     ])
     await bounded(observed.promise)
@@ -90,7 +122,9 @@ test("separate atomic writers converge and revoke closes a live legacy transport
     const pending = manager.getOrCreateClient({ ...info, sessionID: "cross-process-pending" }, config)
     const rejected = pending.then(
       () => Promise.reject(new Error("Pending materialization resolved instead of failing on the policy change")),
-      (error: unknown) => { expect(error instanceof Error ? error.message : String(error)).toContain("policy changed") },
+      (error: unknown) => {
+        expect(error instanceof Error ? error.message : String(error)).toContain("policy changed")
+      },
     )
     await bounded(started.promise)
     await runWriter(root, `await revoke(${JSON.stringify(path)},${JSON.stringify(identity)});`)

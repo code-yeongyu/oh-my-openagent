@@ -111,8 +111,7 @@ function requireState(value: unknown): FactsFailureState {
 function parseRecord(value: unknown): FactsFailureRecord {
   if (!isRecord(value)) throw new FactsFailuresCorruptError("entries must contain objects")
   const state = requireState(value.state)
-  const nextEligibleAt =
-    value.nextEligibleAt === null ? null : requireInstant(value.nextEligibleAt, "nextEligibleAt")
+  const nextEligibleAt = value.nextEligibleAt === null ? null : requireInstant(value.nextEligibleAt, "nextEligibleAt")
   const parkedAt = value.parkedAt === undefined ? undefined : requireInstant(value.parkedAt, "parkedAt")
   // The two states are structurally distinct; accepting a half-parked record would let a
   // parked entry silently become eligible again.

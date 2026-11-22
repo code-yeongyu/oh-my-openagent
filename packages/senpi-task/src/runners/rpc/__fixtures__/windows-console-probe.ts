@@ -1,14 +1,6 @@
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -92,11 +84,7 @@ async function runCase(mode: ProbeMode, root: string): Promise<ProbeCase> {
       windowsHide: true,
     },
   )
-  const closed = withPhase(
-    "close",
-    mode,
-    once(parent, "close", { signal: AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS) }),
-  )
+  const closed = withPhase("close", mode, once(parent, "close", { signal: AbortSignal.timeout(PROBE_STEP_TIMEOUT_MS) }))
 
   let readyPayload: ParentReady | undefined
   let handle = 0
@@ -216,12 +204,14 @@ async function runProbe(): Promise<void> {
   const root = realpathSync.native(mkdtempSync(join(tmpdir(), "omo-rpc-window-probe-")))
   mkdirSync(join(root, "agent"), { recursive: true })
   const credentialsBefore = credentialDigests(CREDENTIAL_FILES)
-  let probeResult: {
-    readonly pass: boolean
-    readonly visible: ProbeCase
-    readonly hidden: ProbeCase
-    readonly credentialsUntouched: boolean
-  } | undefined
+  let probeResult:
+    | {
+        readonly pass: boolean
+        readonly visible: ProbeCase
+        readonly hidden: ProbeCase
+        readonly credentialsUntouched: boolean
+      }
+    | undefined
   try {
     const visible = await runCase("visible-control", root)
     const hidden = await runCase("hidden-fixed", root)

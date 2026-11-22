@@ -10,20 +10,32 @@ import { createComputerUseRuntime } from "./runtime"
 import { describeEnginePermissions } from "./permission-status"
 
 class Host extends FakeExtensionAPI {
-  getActiveTools() { return ["read"] }
+  getActiveTools() {
+    return ["read"]
+  }
   setActiveTools() {}
-  async executeTool() { return { content: [] } }
+  async executeTool() {
+    return { content: [] }
+  }
 }
 
-test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s absence after failed first use without acquisition", async (platform, arch) => {
+test.each([
+  ["linux", "riscv64"],
+  ["win32", "ia32"],
+])("status preserves %s-%s absence after failed first use without acquisition", async (platform, arch) => {
   const root = mkdtempSync(join(tmpdir(), "cu-unsupported-"))
   const pi = new Host()
   const locator = { platform, arch, execDir: root, repoRoot: root, packageDir: root, runtimeDir: "" }
   let starts = 0
   const messages: string[] = []
-  const fetch = spyOn(globalThis, "fetch").mockImplementation(Object.assign(() => {
-    throw new Error("status must not download")
-  }, { preconnect: globalThis.fetch.preconnect }))
+  const fetch = spyOn(globalThis, "fetch").mockImplementation(
+    Object.assign(
+      () => {
+        throw new Error("status must not download")
+      },
+      { preconnect: globalThis.fetch.preconnect },
+    ),
+  )
   try {
     createComputerUseComponent({
       platform,
@@ -44,7 +56,9 @@ test.each([["linux", "riscv64"], ["win32", "ia32"]])("status preserves %s-%s abs
     const registration = pi.commands.find((item) => item.name === "computer")
     if (!registration) throw new Error("computer command missing")
     const ctx = {
-      cwd: root, model: undefined, hasUI: true,
+      cwd: root,
+      model: undefined,
+      hasUI: true,
       sessionManager: { getSessionId: () => "unsupported", getSessionDir: () => root },
       ui: { notify: (text: string) => messages.push(text) },
     }

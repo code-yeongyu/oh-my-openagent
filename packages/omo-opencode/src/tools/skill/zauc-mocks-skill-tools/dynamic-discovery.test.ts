@@ -16,7 +16,10 @@ describe("skill tool - dynamic discovery", () => {
     const secondSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "second-skill")
 
     fs.mkdirSync(initialSkillDirectory, { recursive: true })
-    fs.writeFileSync(join(initialSkillDirectory, "SKILL.md"), "---\ndescription: Initial skill\n---\nInitial skill body")
+    fs.writeFileSync(
+      join(initialSkillDirectory, "SKILL.md"),
+      "---\ndescription: Initial skill\n---\nInitial skill body",
+    )
     process.chdir(temporaryDirectory)
 
     try {
@@ -50,7 +53,6 @@ describe("skill tool - dynamic discovery", () => {
     const result = await tool.execute({ name: "synthetic-only" }, mockContext)
 
     expect(result).toContain(syntheticSkill.definition.template)
-
   })
 
   it("prefers disk-discovered skills over pre-provided ones", async () => {
@@ -87,7 +89,10 @@ describe("skill tool - dynamic description cache invalidation", () => {
     const secondSkillDirectory = join(temporaryDirectory, ".opencode", "skills", "second-skill")
 
     fs.mkdirSync(initialSkillDirectory, { recursive: true })
-    fs.writeFileSync(join(initialSkillDirectory, "SKILL.md"), "---\ndescription: Initial skill\n---\nInitial skill body")
+    fs.writeFileSync(
+      join(initialSkillDirectory, "SKILL.md"),
+      "---\ndescription: Initial skill\n---\nInitial skill body",
+    )
     process.chdir(temporaryDirectory)
 
     try {

@@ -2,13 +2,15 @@ const { afterAll, afterEach, beforeEach, describe, expect, mock, test } = requir
 const { mkdtempSync, rmSync } = require("node:fs")
 const { tmpdir } = require("node:os")
 const { join } = require("node:path")
-const { restoreModuleMocksForTestFile } = await import("../testing/module-mock-lifecycle")
+const { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } =
+  await import("../testing/module-mock-lifecycle")
 
 const mockSetPluginHooksConfigs = mock(() => {})
 
 mock.module("../hooks/claude-code-hooks/config", () => ({
   setPluginHooksConfigs: mockSetPluginHooksConfigs,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const { applyHookConfig } = await import("./hook-config-handler")
 
@@ -71,10 +73,7 @@ describe("applyHookConfig", () => {
 
     // then
     expect(mockSetPluginHooksConfigs).toHaveBeenCalledTimes(1)
-    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(
-      process.cwd(),
-      pluginComponents.hooksConfigs,
-    )
+    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(process.cwd(), pluginComponents.hooksConfigs)
   })
 
   test("#given empty hooksConfigs #when applyHookConfig called #then setPluginHooksConfigs still called with empty array under process.cwd()", () => {
@@ -127,10 +126,7 @@ describe("applyHookConfig", () => {
 
     // then
     expect(mockSetPluginHooksConfigs).toHaveBeenCalledTimes(1)
-    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(
-      expectedCwd,
-      pluginComponents.hooksConfigs,
-    )
+    expect(mockSetPluginHooksConfigs).toHaveBeenCalledWith(expectedCwd, pluginComponents.hooksConfigs)
   })
 })
 

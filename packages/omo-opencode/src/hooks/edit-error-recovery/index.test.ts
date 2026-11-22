@@ -65,7 +65,7 @@ describe("createEditErrorRecoveryHook", () => {
         it("#then should append the recovery reminder", async () => {
           const input = createInput("Edit")
           const output = createOutput(
-            "Error: oldString found multiple times and requires more code context to uniquely identify the intended match"
+            "Error: oldString found multiple times and requires more code context to uniquely identify the intended match",
           )
 
           await hook["tool.execute.after"](input, output)

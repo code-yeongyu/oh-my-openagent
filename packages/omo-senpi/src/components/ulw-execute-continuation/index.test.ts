@@ -70,7 +70,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toEqual([])
     expect(pi.userMessages).toEqual([])
@@ -88,7 +92,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    const results = await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    const results = await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
     expect(results).toBeDefined()
     expect(delivered).toEqual([])
     expect(pi.userMessages).toEqual([])
@@ -119,7 +127,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toEqual([])
   })
@@ -149,7 +161,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toEqual([])
   })
@@ -180,7 +196,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(1)
     const content = delivered[0] ?? ""
@@ -217,7 +237,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(1)
     const content = delivered[0] ?? ""
@@ -252,7 +276,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(1)
     const content = delivered[0] ?? ""
@@ -287,7 +315,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(1)
     expect(delivered[0]).toContain("[Status: 0/1")
@@ -319,8 +351,16 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(1)
   })
@@ -357,7 +397,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       const varied = structuredClone(baseState)
       varied.works.w1.updated_at = `2026-07-17T01:00:0${i}Z`
       writeBoulderJson(root, varied)
-      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+      await dispatchRunEnd(
+        pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        eventCtx(root, "qa-s1"),
+      )
     }
 
     expect(delivered).toHaveLength(8)
@@ -394,7 +438,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       const varied = structuredClone(baseState)
       varied.works.w1.updated_at = `2026-07-17T01:00:0${i}Z`
       writeBoulderJson(root, varied)
-      await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+      await dispatchRunEnd(
+        pi,
+        { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+        eventCtx(root, "qa-s1"),
+      )
     }
     expect(delivered).toHaveLength(8)
 
@@ -402,7 +450,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
     const varied = structuredClone(baseState)
     varied.works.w1.updated_at = "2026-07-17T01:00:10Z"
     writeBoulderJson(root, varied)
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, eventCtx(root, "qa-s1"))
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      eventCtx(root, "qa-s1"),
+    )
 
     expect(delivered).toHaveLength(9)
   })
@@ -489,7 +541,11 @@ describe("omo-senpi ulw-execute-continuation", () => {
       idleCoordinator: coordinator,
     })
 
-    await dispatchRunEnd(pi, { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] }, { cwd: root })
+    await dispatchRunEnd(
+      pi,
+      { type: "agent_end", messages: [{ role: "assistant", stopReason: "stop" }] },
+      { cwd: root },
+    )
 
     expect(delivered).toEqual([])
   })

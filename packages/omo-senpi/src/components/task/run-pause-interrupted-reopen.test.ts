@@ -18,11 +18,17 @@ function bounded<T>(promise: Promise<T>, name: string): Promise<T> {
   const expired = new Promise<never>((_resolve, reject) => {
     timer = setTimeout(() => reject(new Error(`waited 5s for ${name}, never settled`)), 5_000)
   })
-  return Promise.race([promise, expired]).finally(() => { if (timer !== undefined) clearTimeout(timer) })
+  return Promise.race([promise, expired]).finally(() => {
+    if (timer !== undefined) clearTimeout(timer)
+  })
 }
 
 // senpi installs `session_hold` key `interrupted-run` before session_start when the previous run was interrupted; it is not a user Stop (#11856).
-function reopenedAfterInterruptedRun(): { readonly state: () => EnginePauseState; readonly fenceRun: (ref: RunRef) => void; readonly fenced: RunRef[] } {
+function reopenedAfterInterruptedRun(): {
+  readonly state: () => EnginePauseState
+  readonly fenceRun: (ref: RunRef) => void
+  readonly fenced: RunRef[]
+} {
   let state: EnginePauseState = { pauseSeq: 2, holds: [{ kind: "session_hold", key: "interrupted-run" }] }
   const fenced: RunRef[] = []
   return {
@@ -30,7 +36,10 @@ function reopenedAfterInterruptedRun(): { readonly state: () => EnginePauseState
     fenced,
     fenceRun: (ref) => {
       fenced.push(ref)
-      state = { pauseSeq: state.pauseSeq + 1, holds: [...state.holds, { kind: "run_fence", key: `run_fence:${ref.kind}:${ref.id}`, data: { runRef: ref } }] }
+      state = {
+        pauseSeq: state.pauseSeq + 1,
+        holds: [...state.holds, { kind: "run_fence", key: `run_fence:${ref.kind}:${ref.id}`, data: { runRef: ref } }],
+      }
     },
   }
 }
@@ -39,38 +48,66 @@ test("#given a child parked by a mid-turn quit #when the same session reopens un
   const cwd = tempProject()
   const runner = new FakeRunner()
   const pi = new FakeExtensionAPI()
-  pi.rpc = { emit: (name, data) => { pi.rpcEvents.push({ name, data }) } }
+  pi.rpc = {
+    emit: (name, data) => {
+      pi.rpcEvents.push({ name, data })
+    },
+  }
   const engine = composeTaskEngine({
-    pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [],
+    pi,
+    cwd,
+    omoConfig: loadOmoConfig({ cwd }).config,
+    sharedParentTools: () => [],
     runnerFactories: { inProcess: () => runner, process: () => runner },
   })
   const store = createTaskRecordStore({ project_dir: cwd, task: { state_dir: engine.stateDir } })
   const parked = seedRecord(store, {
-    task_id: "st_11856001", parent_session_id: PARENT, status: "running",
-    residency_state: "persisted_only", execution_mode: "in-process",
+    task_id: "st_11856001",
+    parent_session_id: PARENT,
+    status: "running",
+    residency_state: "persisted_only",
+    execution_mode: "in-process",
     spawn_spec: { version: 1, cwd, prompt: "keep mapping the fingerprint signals" },
   })
   store.mutate(parked.task_id, (fresh) => ({ ...fresh, suspension_reason: "session_quit" }))
-  const revived = Promise.withResolvers<void>()
+  const revived = Promise.withResolvers<string>()
   const unsubscribe = engine.onStoreMutation((change) => {
     const current = store.load(parked.task_id)
-    if (change.taskId === parked.task_id && runner.handles.has(parked.task_id) && current?.status === "running" && current.residency_state === "resident") revived.resolve()
+    if (
+      change.taskId === parked.task_id &&
+      runner.handles.has(parked.task_id) &&
+      current?.status === "running" &&
+      current.residency_state === "resident"
+    )
+      revived.resolve(current.task_id)
   })
   const engineHold = reopenedAfterInterruptedRun()
-  const bridge = wireEventBridge(pi, {
-    logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => false }, getCapturedTools: () => [],
-  }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
-  createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
-    runPause: engine.runPause?.bridge,
-    reconcileTeamMailbox: async () => {},
-    leadPollers: { tick: async () => {}, shutdown() {} },
-    resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
-  })
-  const context = { sessionManager: { getSessionId: () => PARENT }, getPauseState: engineHold.state, fenceRun: engineHold.fenceRun }
+  const bridge = wireEventBridge(
+    pi,
+    {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => false },
+      getCapturedTools: () => [],
+    },
+    engine,
+    { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
+    createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }),
+    {
+      runPause: engine.runPause?.bridge,
+      reconcileTeamMailbox: async () => {},
+      leadPollers: { tick: async () => {}, shutdown() {} },
+      resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
+    },
+  )
+  const context = {
+    sessionManager: { getSessionId: () => PARENT },
+    getPauseState: engineHold.state,
+    fenceRun: engineHold.fenceRun,
+  }
   try {
     await pi.dispatch("session_start", {}, context)
     await bounded(bridge.sessionStartRecovered(), "the session-start recovery chain")
-    await bounded(revived.promise, `child ${parked.task_id} to be revived`)
+    expect(await bounded(revived.promise, `child ${parked.task_id} to be revived`)).toBe(parked.task_id)
 
     const record = store.load(parked.task_id)
     expect(record).toMatchObject({ status: "running", residency_state: "resident" })

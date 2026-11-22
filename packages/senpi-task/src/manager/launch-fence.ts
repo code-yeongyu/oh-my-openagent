@@ -31,7 +31,12 @@ export type OwnedRunFailure = {
   readonly failureReason?: TaskRecord["failure_reason"]
 }
 
-export function failOwnedRun(store: TaskRecordStore, run: LaunchRun, timestamp: string, failure: OwnedRunFailure): boolean {
+export function failOwnedRun(
+  store: TaskRecordStore,
+  run: LaunchRun,
+  timestamp: string,
+  failure: OwnedRunFailure,
+): boolean {
   let audit: TaskTransitionAudit | undefined
   let applied = false
   store.mutate(run.taskId, (fresh) => {

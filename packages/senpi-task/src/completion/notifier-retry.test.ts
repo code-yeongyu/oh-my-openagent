@@ -112,7 +112,9 @@ describe("createCompletionNotifier scheduled retries", () => {
     const completion = createCompletionNotifier(notifierDeps({ store, notifier: parent.notifier, scheduler }))
 
     // when
-    expect(completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })).toEqual({ kind: "failed" })
+    expect(completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })).toEqual({
+      kind: "failed",
+    })
     scheduler.run(0)
 
     // then
@@ -135,7 +137,11 @@ describe("createCompletionNotifier scheduled retries", () => {
 
     // when
     scheduler.run(0)
-    const nextEpoch = completion.notifyTerminal({ record: revived, parentState: { kind: "idle" }, runInBackground: true })
+    const nextEpoch = completion.notifyTerminal({
+      record: revived,
+      parentState: { kind: "idle" },
+      runInBackground: true,
+    })
 
     // then
     expect(parent.calls).toHaveLength(1)
@@ -189,7 +195,10 @@ describe("createCompletionNotifier scheduled retries", () => {
   test("#given failed records from mixed sessions w2notif #when reconciled twice #then only eligible work delivers once", () => {
     // given
     const eligible = failedRecord({ task_id: "st_eligible" })
-    const alreadyNotified = failedRecord({ task_id: "st_notified", notification: { run_epoch: 0, notified_epoch: 0, notification_failed_epoch: 0 } })
+    const alreadyNotified = failedRecord({
+      task_id: "st_notified",
+      notification: { run_epoch: 0, notified_epoch: 0, notification_failed_epoch: 0 },
+    })
     const otherSession = failedRecord({ task_id: "st_other", parent_session_id: "session-b" })
     const nonNotifying = failedRecord({ task_id: "st_cancelled", status: "cancelled", final_response: undefined })
     const notFailed = baseRecord({ task_id: "st_clean" })
@@ -237,10 +246,12 @@ describe("createCompletionNotifier scheduled retries", () => {
 
     // then
     const bases = [500, 1_000, 2_000, 4_000, 8_000, 16_000, 30_000, 30_000]
-    expect(scheduler.calls.every((call, index) => {
-      const base = bases[index]
-      return base !== undefined && call.delayMs >= base && call.delayMs <= Math.min(30_000, base + 199)
-    })).toBe(true)
+    expect(
+      scheduler.calls.every((call, index) => {
+        const base = bases[index]
+        return base !== undefined && call.delayMs >= base && call.delayMs <= Math.min(30_000, base + 199)
+      }),
+    ).toBe(true)
   })
 
   test("#given a retry dropped for another session w2notif #when its session reconciles #then backoff restarts at the base delay", () => {
@@ -250,12 +261,14 @@ describe("createCompletionNotifier scheduled retries", () => {
     const parent = scriptedNotifier(Number.POSITIVE_INFINITY)
     const scheduler = fakeScheduler()
     let currentSessionId = "session-b"
-    const completion = createCompletionNotifier(notifierDeps({
-      store,
-      notifier: parent.notifier,
-      scheduler,
-      getCurrentSessionId: () => currentSessionId,
-    }))
+    const completion = createCompletionNotifier(
+      notifierDeps({
+        store,
+        notifier: parent.notifier,
+        scheduler,
+        getCurrentSessionId: () => currentSessionId,
+      }),
+    )
     completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
     scheduler.run(0)
 
@@ -275,12 +288,14 @@ describe("createCompletionNotifier scheduled retries", () => {
     const parent = scriptedNotifier(2)
     const scheduler = fakeScheduler()
     let currentSessionId = "session-b"
-    const completion = createCompletionNotifier(notifierDeps({
-      store,
-      notifier: parent.notifier,
-      scheduler,
-      getCurrentSessionId: () => currentSessionId,
-    }))
+    const completion = createCompletionNotifier(
+      notifierDeps({
+        store,
+        notifier: parent.notifier,
+        scheduler,
+        getCurrentSessionId: () => currentSessionId,
+      }),
+    )
     completion.notifyTerminal({ record, parentState: { kind: "idle" }, runInBackground: true })
 
     // when

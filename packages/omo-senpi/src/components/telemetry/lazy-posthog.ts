@@ -36,7 +36,10 @@ export function createLazyPostHogTransportFactory(input: LazyPostHogOptions = {}
   const now = input.now ?? Date.now
   const report = (event: TelemetryDiagnosticInput["event"], error?: unknown, count?: number): void => {
     input.diagnostics?.({
-      event, source: input.source ?? "omo-telemetry-posthog", error, count,
+      event,
+      source: input.source ?? "omo-telemetry-posthog",
+      error,
+      count,
       errorKind: error === undefined ? undefined : error instanceof Error ? "error" : "non_error",
     })
   }
@@ -46,17 +49,25 @@ export function createLazyPostHogTransportFactory(input: LazyPostHogOptions = {}
   const importRuntime = (): Promise<PostHogRuntime | undefined> => {
     if (loaded !== undefined) return Promise.resolve(loaded)
     if (now() < retryAt) return Promise.resolve(undefined)
-    importing ??= Promise.resolve().then(input.load ?? loadRuntime).then(module => {
-      loaded = module
-      return module
-    }).catch((error: unknown) => {
-      retryAt = now() + IMPORT_BACKOFF_MS
-      report("telemetry_posthog_import_failed", new Error(
-        "PostHog telemetry sidecar could not load; buffered events will retry after 60 seconds",
-        { cause: error },
-      ))
-      return undefined
-    }).finally(() => { importing = undefined })
+    importing ??= Promise.resolve()
+      .then(input.load ?? loadRuntime)
+      .then((module) => {
+        loaded = module
+        return module
+      })
+      .catch((error: unknown) => {
+        retryAt = now() + IMPORT_BACKOFF_MS
+        report(
+          "telemetry_posthog_import_failed",
+          new Error("PostHog telemetry sidecar could not load; buffered events will retry after 60 seconds", {
+            cause: error,
+          }),
+        )
+        return undefined
+      })
+      .finally(() => {
+        importing = undefined
+      })
     return importing
   }
   return (apiKey, options) => {
@@ -65,9 +76,12 @@ export function createLazyPostHogTransportFactory(input: LazyPostHogOptions = {}
         ...options,
         fetch: createConsentGatedFetch({
           isSendAllowed: input.consent,
-          onDropped: count => input.diagnostics?.({
-            event: "telemetry_events_dropped_by_consent", source: input.source ?? "omo-telemetry", count,
-          }),
+          onDropped: (count) =>
+            input.diagnostics?.({
+              event: "telemetry_events_dropped_by_consent",
+              source: input.source ?? "omo-telemetry",
+              count,
+            }),
           ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
         }),
       }
@@ -101,7 +115,9 @@ export function createLazyPostHogTransportFactory(input: LazyPostHogOptions = {}
         }
         for (const message of queued.splice(0)) forward(transport, message)
         return transport
-      })().finally(() => { loading = undefined })
+      })().finally(() => {
+        loading = undefined
+      })
       return loading
     }
     const posthog: TelemetryTransport = {
@@ -154,19 +170,25 @@ function withOtlpTransport(posthog: TelemetryTransport, input: LazyPostHogOption
   const queued: TelemetryCaptureMessage[] = []
   const report = (error: unknown): void => {
     input.diagnostics?.({
-      event: "telemetry_otlp_send_failed", source: input.source ?? "omo-telemetry",
-      error, errorKind: error instanceof Error ? "error" : "non_error",
+      event: "telemetry_otlp_send_failed",
+      source: input.source ?? "omo-telemetry",
+      error,
+      errorKind: error instanceof Error ? "error" : "non_error",
     })
   }
   const allowed = (): boolean => {
-    try { return input.consent?.() ?? true } catch { return false }
+    try {
+      return input.consent?.() ?? true
+    } catch {
+      return false
+    }
   }
   const within = async <T>(operation: Promise<T>, fallback: T, boundMs = timeoutMs): Promise<T> => {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       return await Promise.race([
         operation,
-        new Promise<T>(resolve => {
+        new Promise<T>((resolve) => {
           timer = setTimeout(() => resolve(fallback), boundMs)
         }),
       ])
@@ -176,7 +198,11 @@ function withOtlpTransport(posthog: TelemetryTransport, input: LazyPostHogOption
   }
   const forward = (message: TelemetryCaptureMessage): void => {
     if (!allowed()) return
-    try { target?.capture(message) } catch (error) { report(error) }
+    try {
+      target?.capture(message)
+    } catch (error) {
+      report(error)
+    }
   }
   const captureOtlp = (message: TelemetryCaptureMessage): void => {
     if (closed || input.isOtlpEvent?.(message.event) === false || !allowed()) return
@@ -186,34 +212,51 @@ function withOtlpTransport(posthog: TelemetryTransport, input: LazyPostHogOption
     queued.push(message)
     if (starting !== undefined) return
     const currentAttempt = ++attempt
-    starting = within(Promise.resolve().then(() => input.loadOtlp?.(message)).then(async value => {
-      if (closed || currentAttempt !== attempt) {
-        // A timed-out import may finish later. Dispose it instead of starting a sender after shutdown.
-        await value?.shutdown()
-        return undefined
-      }
-      // Null is the adapter's settled refusal (no key, unsupported OS): refuse once instead of every minute.
-      if (value === null) retryAt = Infinity
-      target = value ?? undefined
-      for (const pending of queued.splice(0)) forward(pending)
-      return target
-    }).catch((error: unknown) => { report(error); return undefined }), undefined, input.timeoutMs ?? 500).then(value => {
-      if (value === undefined) {
-        retryAt = Math.max(retryAt, now() + IMPORT_BACKOFF_MS)
-        attempt++
-      }
-      queued.length = 0
-      return value
-    }).finally(() => { starting = undefined })
+    starting = within(
+      Promise.resolve()
+        .then(() => input.loadOtlp?.(message))
+        .then(async (value) => {
+          if (closed || currentAttempt !== attempt) {
+            // A timed-out import may finish later. Dispose it instead of starting a sender after shutdown.
+            await value?.shutdown()
+            return undefined
+          }
+          // Null is the adapter's settled refusal (no key, unsupported OS): refuse once instead of every minute.
+          if (value === null) retryAt = Infinity
+          target = value ?? undefined
+          for (const pending of queued.splice(0)) forward(pending)
+          return target
+        })
+        .catch((error: unknown) => {
+          report(error)
+          return undefined
+        }),
+      undefined,
+      input.timeoutMs ?? 500,
+    )
+      .then((value) => {
+        if (value === undefined) {
+          retryAt = Math.max(retryAt, now() + IMPORT_BACKOFF_MS)
+          attempt++
+        }
+        queued.length = 0
+        return value
+      })
+      .finally(() => {
+        starting = undefined
+      })
   }
   const finish = async (method: "flush" | "shutdown"): Promise<void> => {
     const [posthogResult] = await Promise.allSettled([
       Promise.resolve().then(() => posthog[method]?.()),
-      within((async () => {
-        await starting
-        if (method === "shutdown") closed = true
-        await target?.[method]?.()
-      })(), undefined),
+      within(
+        (async () => {
+          await starting
+          if (method === "shutdown") closed = true
+          await target?.[method]?.()
+        })(),
+        undefined,
+      ),
     ])
     // The consent-withdrawal drain must keep its gate closed when PostHog did not drain its queue.
     if (method === "flush" && posthogResult.status === "rejected") throw posthogResult.reason
@@ -229,7 +272,7 @@ function withOtlpTransport(posthog: TelemetryTransport, input: LazyPostHogOption
       if (posthog.captureImmediate === undefined) throw new Error("PostHog immediate capture is unavailable")
       await posthog.captureImmediate(message)
     },
-    traces: { startTurn: start => target?.traces?.startTurn(start) },
+    traces: { startTurn: (start) => target?.traces?.startTurn(start) },
     flush: () => finish("flush"),
     shutdown: () => finish("shutdown"),
   }

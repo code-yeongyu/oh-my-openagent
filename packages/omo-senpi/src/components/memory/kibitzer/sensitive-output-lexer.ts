@@ -1,4 +1,4 @@
-// Mirror of the parts of senpi-ai `utils/secret-lexer` (2026.10.30-1, senpi#4283) that the credential-shape pass reads:
+// Mirror of the parts of senpi-ai `utils/secret-lexer` (2026.10.31-2, senpi#4283) that the credential-shape pass reads:
 // character classes, percent escapes and HTML entities read as what they encode, and the token unit. Every function
 // reads forward from the index it is given; none searches back or uses a regular expression.
 

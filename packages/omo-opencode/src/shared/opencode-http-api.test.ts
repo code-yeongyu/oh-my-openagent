@@ -100,11 +100,11 @@ describe("patchPart", () => {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
+          Authorization: "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
         },
         body: JSON.stringify(body),
         signal: expect.any(AbortSignal),
-      })
+      }),
     )
   })
 
@@ -161,10 +161,10 @@ describe("deletePart", () => {
       expect.objectContaining({
         method: "DELETE",
         headers: {
-          "Authorization": "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
+          Authorization: "Basic b3BlbmNvZGU6dGVzdHBhc3N3b3Jk",
         },
         signal: expect.any(AbortSignal),
-      })
+      }),
     )
   })
 

@@ -12,13 +12,21 @@ import { validateCompletion } from "./completion-validation"
 import { preflightReflectionDescriptions } from "./description-preflight"
 import { createReflectionWorktree, finalizeReflectionWorktree } from "./worktree"
 
+// Explicit budget for CPU- or git-bound work that runs 1.5-2.6 s and can pass 5 s on a loaded host: a local
+// multi-file `bun test` gives every file after the first Bun's 5 s default, since only CI passes --timeout (#12453).
+const SLOW_TEST_TIMEOUT_MS = process.platform === "win32" ? 30_000 : 20_000
+
 const roots: string[] = []
 const path = "reference/note.md"
 const body = "\n# Durable note\r\n\r\nBody stays byte-identical.  \r\n"
 const oversized = `${"summary ".repeat(139)}ending`
 const author = { agentId: "agent-one", authorName: "Reflection Agent", authorEmail: "reflection@omo.local" }
 
-async function fixture(content: string, existing = true, baseContent = renderMemoryFile({ description: "a".repeat(937) }, body)) {
+async function fixture(
+  content: string,
+  existing = true,
+  baseContent = renderMemoryFile({ description: "a".repeat(937) }, body),
+) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "description-preflight-")))
   roots.push(root)
   const parent = new GitMemoryRepo({ dir: join(root, "memory"), agentId: author.agentId })
@@ -48,8 +56,9 @@ describe("reflection description preflight", () => {
 
     await preflightReflectionDescriptions(worktree, worktree.baseSha)
 
-    expect(await readFile(join(worktree.dir, path), "utf8"))
-      .toBe(before.replace(`description: ${oversized}`, `description: ${"summary ".repeat(127)}summary…`))
+    expect(await readFile(join(worktree.dir, path), "utf8")).toBe(
+      before.replace(`description: ${oversized}`, `description: ${"summary ".repeat(127)}summary…`),
+    )
   })
 
   it("#given a body-only edit to a legacy oversized header #when preflight runs #then the accepted header and tip stay unchanged", async () => {
@@ -65,42 +74,54 @@ describe("reflection description preflight", () => {
     expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({ status: "valid" })
   })
 
-  for (const [existing, leading] of [[true, false], [false, false], [true, true]] as const) {
-    it(`#given an ${existing ? "existing" : "added"} note with ${leading ? "leading spaces and " : ""}an oversized summary #when preflight runs #then one hooked commit preserves its body and validates`, async () => {
-      const original = leading ? `   ${oversized}` : oversized
-      const input = `---\ndescription: ${JSON.stringify(original)}\n---\n${body}`
-      const { parent, worktree, child, tip } = await fixture(input, existing)
-      expect(oversized.length).toBe(1118)
-      // validateCompletion would repair the branch by dropping the note (#10528), so the pre-check reads the file.
-      expect(describeFrontmatterViolation(input)).toBe(`'description' exceeds 1024 characters (${original.length})`)
-      installHooks(worktree.dir, {
-        checker: { execPath: process.execPath, script: join(import.meta.dir, "../memfs/memory-hook-cli.ts") },
-      })
+  for (const [existing, leading] of [
+    [true, false],
+    [false, false],
+    [true, true],
+  ] as const) {
+    it(
+      `#given an ${existing ? "existing" : "added"} note with ${leading ? "leading spaces and " : ""}an oversized summary #when preflight runs #then one hooked commit preserves its body and validates`,
+      async () => {
+        const original = leading ? `   ${oversized}` : oversized
+        const input = `---\ndescription: ${JSON.stringify(original)}\n---\n${body}`
+        const { parent, worktree, child, tip } = await fixture(input, existing)
+        expect(oversized.length).toBe(1118)
+        // validateCompletion would repair the branch by dropping the note (#10528), so the pre-check reads the file.
+        expect(describeFrontmatterViolation(input)).toBe(`'description' exceeds 1024 characters (${original.length})`)
+        installHooks(worktree.dir, {
+          checker: { execPath: process.execPath, script: join(import.meta.dir, "../memfs/memory-hook-cli.ts") },
+        })
 
-      const trimmed = await preflightReflectionDescriptions(worktree, worktree.baseSha)
+        const trimmed = await preflightReflectionDescriptions(worktree, worktree.baseSha)
 
-      const content = await readFile(join(worktree.dir, path), "utf8")
-      const parsed = parseMemoryFile(content)
-      expect(trimmed[0]?.newLength).toBe(parsed.frontmatter.description.length)
-      expect(parsed.frontmatter.description).toBe(leading
-        ? `   ${"summary ".repeat(126)}summary…`
-        : `${"summary ".repeat(127)}summary…`)
-      expect(parsed.frontmatter.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH)
-      expect(parsed.body).toBe(body)
-      expect(describeFrontmatterViolation(content)).toBeNull()
-      expect(trimmed).toEqual([{ path, originalLength: original.length, newLength: parsed.frontmatter.description.length }])
-      const commits = await child.log({ limit: 2 })
-      expect(commits[0]).toMatchObject({
-        authorName: author.authorName,
-        authorEmail: author.authorEmail,
-      })
-      expect(commits[0]?.body).toContain(`Omo-Description-Trimmed: ${path} (${original.length} -> ${parsed.frontmatter.description.length})`)
-      expect(commits[1]?.sha).toBe(tip)
-      expect(await parent.head()).toBe(worktree.baseSha)
-      expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({ status: "valid" })
-      expect(await preflightReflectionDescriptions(worktree, worktree.baseSha)).toEqual([])
-      expect(await child.head()).toBe(commits[0]?.sha)
-    })
+        const content = await readFile(join(worktree.dir, path), "utf8")
+        const parsed = parseMemoryFile(content)
+        expect(trimmed[0]?.newLength).toBe(parsed.frontmatter.description.length)
+        expect(parsed.frontmatter.description).toBe(
+          leading ? `   ${"summary ".repeat(126)}summary…` : `${"summary ".repeat(127)}summary…`,
+        )
+        expect(parsed.frontmatter.description.length).toBeLessThanOrEqual(MAX_DESCRIPTION_LENGTH)
+        expect(parsed.body).toBe(body)
+        expect(describeFrontmatterViolation(content)).toBeNull()
+        expect(trimmed).toEqual([
+          { path, originalLength: original.length, newLength: parsed.frontmatter.description.length },
+        ])
+        const commits = await child.log({ limit: 2 })
+        expect(commits[0]).toMatchObject({
+          authorName: author.authorName,
+          authorEmail: author.authorEmail,
+        })
+        expect(commits[0]?.body).toContain(
+          `Omo-Description-Trimmed: ${path} (${original.length} -> ${parsed.frontmatter.description.length})`,
+        )
+        expect(commits[1]?.sha).toBe(tip)
+        expect(await parent.head()).toBe(worktree.baseSha)
+        expect(await validateCompletion(worktree, worktree.baseSha)).toMatchObject({ status: "valid" })
+        expect(await preflightReflectionDescriptions(worktree, worktree.baseSha)).toEqual([])
+        expect(await child.head()).toBe(commits[0]?.sha)
+      },
+      SLOW_TEST_TIMEOUT_MS,
+    )
   }
 
   it("#given an oversized summary and duplicate key #when preflight runs #then the invalid note and tip remain untouched", async () => {
@@ -133,12 +154,15 @@ describe("reflection description preflight", () => {
 
     await preflightReflectionDescriptions(worktree, worktree.baseSha)
 
-    expect(parseMemoryFile(await readFile(join(worktree.dir, path), "utf8")).frontmatter.description)
-      .toBe(`${"x".repeat(1023)}…`)
+    expect(parseMemoryFile(await readFile(join(worktree.dir, path), "utf8")).frontmatter.description).toBe(
+      `${"x".repeat(1023)}…`,
+    )
   })
 
   it("#given an emoji across the hard-cut boundary #when preflight runs #then the description contains only complete code points", async () => {
-    const { worktree } = await fixture(renderMemoryFile({ description: `${"x".repeat(1022)}😀${"x".repeat(94)}` }, body))
+    const { worktree } = await fixture(
+      renderMemoryFile({ description: `${"x".repeat(1022)}😀${"x".repeat(94)}` }, body),
+    )
 
     await preflightReflectionDescriptions(worktree, worktree.baseSha)
 

@@ -41,12 +41,14 @@ function createTestTools() {
     sessionExists: async (sessionID) => sessionID === "ses_test123",
     readSessionMessages: async (sessionID): Promise<SessionMessage[]> =>
       sessionID === "ses_test123"
-        ? [{
-            id: `${sessionID}-msg`,
-            role: "user",
-            time: { created: Date.now() },
-            parts: [{ id: `${sessionID}-part`, type: "text", text: "hello" }],
-          }]
+        ? [
+            {
+              id: `${sessionID}-msg`,
+              role: "user",
+              time: { created: Date.now() },
+              parts: [{ id: `${sessionID}-part`, type: "text", text: "hello" }],
+            },
+          ]
         : [],
     readSessionTodos: async (): Promise<TodoItem[]> => [],
     formatSessionMessages: (messages) => `messages:${messages.length}`,
@@ -83,24 +85,27 @@ describe("session-manager tools", () => {
   test("session_list executes without error", async () => {
     const { session_list } = createTestTools()
     const result = await session_list.execute({}, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_list respects limit parameter", async () => {
     const { session_list } = createTestTools()
     const result = await session_list.execute({ limit: 5 }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_list filters by date range", async () => {
     const { session_list } = createTestTools()
-    const result = await session_list.execute({
-      from_date: "2025-12-01T00:00:00Z",
-      to_date: "2025-12-31T23:59:59Z",
-    }, mockContext)
-    
+    const result = await session_list.execute(
+      {
+        from_date: "2025-12-01T00:00:00Z",
+        to_date: "2025-12-31T23:59:59Z",
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
@@ -152,72 +157,87 @@ describe("session-manager tools", () => {
   test("session_read handles non-existent session", async () => {
     const { session_read } = createTestTools()
     const result = await session_read.execute({ session_id: "ses_nonexistent" }, mockContext)
-    
+
     expect(result).toContain("not found")
   })
 
   test("session_read executes with valid parameters", async () => {
     const { session_read } = createTestTools()
-    const result = await session_read.execute({
-      session_id: "ses_test123",
-      include_todos: true,
-      include_transcript: true,
-    }, mockContext)
-    
+    const result = await session_read.execute(
+      {
+        session_id: "ses_test123",
+        include_todos: true,
+        include_transcript: true,
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
   test("session_read respects limit parameter", async () => {
     const { session_read } = createTestTools()
-    const result = await session_read.execute({
-      session_id: "ses_test123",
-      limit: 10,
-    }, mockContext)
-    
+    const result = await session_read.execute(
+      {
+        session_id: "ses_test123",
+        limit: 10,
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
   test("session_search executes without error", async () => {
     const { session_search } = createTestTools()
     const result = await session_search.execute({ query: "test" }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 
   test("session_search filters by session_id", async () => {
     const { session_search } = createTestTools()
-    const result = await session_search.execute({
-      query: "test",
-      session_id: "ses_test123",
-    }, mockContext)
-    
+    const result = await session_search.execute(
+      {
+        query: "test",
+        session_id: "ses_test123",
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
   test("session_search respects case_sensitive parameter", async () => {
     const { session_search } = createTestTools()
-    const result = await session_search.execute({
-      query: "TEST",
-      case_sensitive: true,
-    }, mockContext)
-    
+    const result = await session_search.execute(
+      {
+        query: "TEST",
+        case_sensitive: true,
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
   test("session_search respects limit parameter", async () => {
     const { session_search } = createTestTools()
-    const result = await session_search.execute({
-      query: "test",
-      limit: 5,
-    }, mockContext)
-    
+    const result = await session_search.execute(
+      {
+        query: "test",
+        limit: 5,
+      },
+      mockContext,
+    )
+
     expect(typeof result).toBe("string")
   })
 
   test("session_info handles non-existent session", async () => {
     const { session_info } = createTestTools()
     const result = await session_info.execute({ session_id: "ses_nonexistent" }, mockContext)
-    
+
     expect(result).toContain("not found")
   })
 
@@ -256,13 +276,15 @@ describe("session-manager tools", () => {
 
     //#then
     expect(scanned).toEqual(["ses_a", "ses_gone", "ses_b"])
-    expect(result).toBe("results:0\n\nSkipped 1 session that could not be read: ses_gone (NotFoundError: Session not found: ses_gone)")
+    expect(result).toBe(
+      "results:0\n\nSkipped 1 session that could not be read: ses_gone (NotFoundError: Session not found: ses_gone)",
+    )
   })
 
   test("session_info executes with valid session", async () => {
     const { session_info } = createTestTools()
     const result = await session_info.execute({ session_id: "ses_test123" }, mockContext)
-    
+
     expect(typeof result).toBe("string")
   })
 })

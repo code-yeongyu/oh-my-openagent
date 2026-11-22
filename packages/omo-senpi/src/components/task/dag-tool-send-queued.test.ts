@@ -16,13 +16,16 @@ test("#given a queued node send #when the workflow tool reports acceptance #then
   })
   if (started.details.kind !== "started") throw new Error("run did not start")
 
-  const result = await runDagTool({
-    ...deps,
-    send: async (_runId, nodeId) => ({ nodeId, taskId: "task-queued", delivery: "queued", queuePosition: 2 }),
-  }, { action: "send", run_id: started.details.run_id, node_id: "plan", message: "additional context" })
+  const result = await runDagTool(
+    {
+      ...deps,
+      send: async (_runId, nodeId) => ({ nodeId, taskId: "task-queued", delivery: "queued", queuePosition: 2 }),
+    },
+    { action: "send", run_id: started.details.run_id, node_id: "plan", message: "additional context" },
+  )
 
   expect(result.details).toMatchObject({ kind: "sent", delivery: "queued", queue_position: 2, task_id: "task-queued" })
-  const text = result.content.flatMap(part => part.type === "text" ? [part.text] : []).join("\n")
+  const text = result.content.flatMap((part) => (part.type === "text" ? [part.text] : [])).join("\n")
   expect(text).toMatch(/queued|pending/i)
   expect(text).not.toMatch(/\bdelivered\b/i)
 })

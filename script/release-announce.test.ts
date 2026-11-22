@@ -5,8 +5,11 @@ const tag = "v5.1.29"
 const headline = "**Sessions resume correctly.** Reopened sessions keep their state."
 const body = `${headline}\n\n### Fixed\n\n**Tools stay available.** Shared tools no longer disappear.\n\n- abc123 internal commit`
 const options = {
-  tag, event: "workflow_dispatch", webhook: "https://discord.com/api/webhooks/123/dummy",
-  dryRun: false, probe: false,
+  tag,
+  event: "workflow_dispatch",
+  webhook: "https://discord.com/api/webhooks/123/dummy",
+  dryRun: false,
+  probe: false,
 } as const
 
 function transport(responses: Response[]) {
@@ -35,7 +38,9 @@ describe("release announcement composition", () => {
     expect(content).toContain(headline)
     expect(content).toContain("**Tools stay available.**")
     expect(content).not.toContain("abc123")
-    expect(content.endsWith(`The full notes are at <https://github.com/code-yeongyu/oh-my-openagent/releases/tag/${tag}>`)).toBe(true)
+    expect(
+      content.endsWith(`The full notes are at <https://github.com/code-yeongyu/oh-my-openagent/releases/tag/${tag}>`),
+    ).toBe(true)
   })
 
   test("#given oversized notes #when composed #then complete paragraphs fit below 2000 characters", () => {
@@ -49,27 +54,36 @@ describe("release announcement composition", () => {
   })
 
   test("#given many short headlines #when composed #then only the first four are included", () => {
-    const content = composeMessage(tag, Array.from({ length: 8 }, (_, i) => `**Change ${i}.** Description.`).join("\n\n"))
+    const content = composeMessage(
+      tag,
+      Array.from({ length: 8 }, (_, i) => `**Change ${i}.** Description.`).join("\n\n"),
+    )
     expect(content).toContain("**Change 3.**")
     expect(content).not.toContain("**Change 4.**")
   })
 
-  test.each(["```", "~~~~"])("#given a headline with blank lines inside %s fences #when composed #then its entire block is retained", (fence) => {
-    const paragraph = `**Example**\n${fence}ts\nfirst line\n\nsecond line\n${fence}`
-    const content = composeMessage(tag, `${paragraph}\n\n**Next.** Another fix.`)
-    expect(content).toContain(paragraph)
-    expect(content.length).toBeLessThan(2000)
-    expect(content).toContain(`${fence}\n\n**Next.**`)
-  })
+  test.each(["```", "~~~~"])(
+    "#given a headline with blank lines inside %s fences #when composed #then its entire block is retained",
+    (fence) => {
+      const paragraph = `**Example**\n${fence}ts\nfirst line\n\nsecond line\n${fence}`
+      const content = composeMessage(tag, `${paragraph}\n\n**Next.** Another fix.`)
+      expect(content).toContain(paragraph)
+      expect(content.length).toBeLessThan(2000)
+      expect(content).toContain(`${fence}\n\n**Next.**`)
+    },
+  )
 
-  test.each(["```", "~~~~"])("#given an oversized fenced headline using %s #when truncated #then no partial fence is emitted", (fence) => {
-    const paragraph = `**Example**\n${fence}ts\nfirst line\n\n${"whole words ".repeat(220)}\n${fence}`
-    const content = composeMessage(tag, paragraph)
-    expect(content.length).toBeLessThan(2000)
-    expect(content).not.toContain(`${fence}ts`)
-    expect(content).not.toContain("first line")
-    expect(content).not.toContain("**Example**")
-  })
+  test.each(["```", "~~~~"])(
+    "#given an oversized fenced headline using %s #when truncated #then no partial fence is emitted",
+    (fence) => {
+      const paragraph = `**Example**\n${fence}ts\nfirst line\n\n${"whole words ".repeat(220)}\n${fence}`
+      const content = composeMessage(tag, paragraph)
+      expect(content.length).toBeLessThan(2000)
+      expect(content).not.toContain(`${fence}ts`)
+      expect(content).not.toContain("first line")
+      expect(content).not.toContain("**Example**")
+    },
+  )
 
   test("#given an oversized opening #when composed #then the hook does not overflow", () => {
     expect(composeMessage(tag, `**${"word ".repeat(500)}**`).length).toBeLessThan(2000)
@@ -82,7 +96,10 @@ describe("release announcement composition", () => {
 
 describe("release announcement delivery", () => {
   test("#given mention text #when posted #then mentions are suppressed in the actual payload", async () => {
-    const fake = transport([release({ body: "**Fixed.** @here and @everyone <@123> <@&456>" }), Response.json({ id: "42" })])
+    const fake = transport([
+      release({ body: "**Fixed.** @here and @everyone <@123> <@&456>" }),
+      Response.json({ id: "42" }),
+    ])
     expect(await announce(options, fake.fetch)).toBe("posted")
     const post = fake.calls[1]
     expect(post?.url).toBe(`${options.webhook}?wait=true`)
@@ -95,44 +112,59 @@ describe("release announcement delivery", () => {
   test("#given dry run and probe enabled #when run #then only GitHub is read and the message length is printed", async () => {
     const fake = transport([release()])
     const output: string[] = []
-    expect(await announce({ ...options, dryRun: true, probe: true }, fake.fetch, (line) => output.push(line))).toBe("dry-run")
+    expect(await announce({ ...options, dryRun: true, probe: true }, fake.fetch, (line) => output.push(line))).toBe(
+      "dry-run",
+    )
     expect(fake.calls).toHaveLength(1)
     expect(output).toContain(composeMessage(tag, body))
     expect(output).toContain(`Length: ${composeMessage(tag, body).length} characters`)
     expect(output[0]).toMatch(/^::stop-commands::/)
   })
 
-  test.each([false, true])("#given missing secret and dryRun=%p #when run #then it fails before network access", async (dryRun) => {
-    const fake = transport([])
-    await expect(announce({ ...options, webhook: undefined, dryRun }, fake.fetch)).rejects.toThrow("is missing")
-    expect(fake.calls).toHaveLength(0)
-  })
+  test.each([false, true])(
+    "#given missing secret and dryRun=%p #when run #then it fails before network access",
+    async (dryRun) => {
+      const fake = transport([])
+      await expect(announce({ ...options, webhook: undefined, dryRun }, fake.fetch)).rejects.toThrow("is missing")
+      expect(fake.calls).toHaveLength(0)
+    },
+  )
 
   test.each(["v5.1.29-beta.1", "v5.1.29-lazycodex.1", "5.1.29", "_assets"])(
-    "#given nonstable published tag %s #when triggered #then no requests are made", async (value) => {
+    "#given nonstable published tag %s #when triggered #then no requests are made",
+    async (value) => {
       const fake = transport([])
       expect(await announce({ ...options, tag: value, event: "release" }, fake.fetch)).toBe("skipped")
       expect(fake.calls).toHaveLength(0)
     },
   )
 
-  test.each([{ draft: true }, { prerelease: true }])("#given excluded release %p #when fetched #then no Discord post occurs", async (flags) => {
-    const fake = transport([release(flags)])
-    expect(await announce(options, fake.fetch)).toBe("skipped")
-    expect(fake.calls).toHaveLength(1)
-  })
+  test.each([{ draft: true }, { prerelease: true }])(
+    "#given excluded release %p #when fetched #then no Discord post occurs",
+    async (flags) => {
+      const fake = transport([release(flags)])
+      expect(await announce(options, fake.fetch)).toBe("skipped")
+      expect(fake.calls).toHaveLength(1)
+    },
+  )
 
   test("#given a beta through workflow_call #when announced #then it skips with a notice and no requests", async () => {
     const fake = transport([])
     const output: string[] = []
-    expect(await announce({ ...options, tag: "v5.1.29-beta.1", event: "workflow_call" }, fake.fetch, (line) => output.push(line))).toBe("skipped")
+    expect(
+      await announce({ ...options, tag: "v5.1.29-beta.1", event: "workflow_call" }, fake.fetch, (line) =>
+        output.push(line),
+      ),
+    ).toBe("skipped")
     expect(fake.calls).toHaveLength(0)
     expect(output.some((line) => line.startsWith("::notice::") && line.includes("v5.1.29-beta.1"))).toBe(true)
   })
 
   test("#given a beta through workflow_dispatch #when announced #then it fails loudly without requests", async () => {
     const fake = transport([])
-    await expect(announce({ ...options, tag: "v5.1.29-beta.1" }, fake.fetch)).rejects.toThrow("Tag must be a stable vX.Y.Z release")
+    await expect(announce({ ...options, tag: "v5.1.29-beta.1" }, fake.fetch)).rejects.toThrow(
+      "Tag must be a stable vX.Y.Z release",
+    )
     expect(fake.calls).toHaveLength(0)
   })
 
@@ -154,7 +186,11 @@ describe("release announcement delivery", () => {
   })
 
   test("#given a transport error containing credentials #when run #then only sanitized error text escapes", async () => {
-    await expect(announce(options, async () => { throw new Error(options.webhook) })).rejects.toThrow("GET request failed")
+    await expect(
+      announce(options, async () => {
+        throw new Error(options.webhook)
+      }),
+    ).rejects.toThrow("GET request failed")
   })
 
   test("#given a successful POST without a message ID #when run #then it fails", async () => {

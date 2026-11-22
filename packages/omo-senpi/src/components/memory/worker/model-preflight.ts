@@ -9,7 +9,12 @@ import type { ReflectionModelCandidate } from "./resolve-model"
 
 const PREFLIGHT_TIMEOUT_MS = 10_000
 const CATALOG_CACHE_TTL_MS = 2 * 60_000
-const EXTENSION_MODEL_LIST_ARGS = ["--no-skills", "--no-prompt-templates", "--no-context-files", "--list-models"] as const
+const EXTENSION_MODEL_LIST_ARGS = [
+  "--no-skills",
+  "--no-prompt-templates",
+  "--no-context-files",
+  "--list-models",
+] as const
 const CATALOG_ARGS = {
   "discovery-disabled": ["--no-extensions", ...EXTENSION_MODEL_LIST_ARGS],
   // A provider an extension registers exists only in a child that loads extensions (#9175).
@@ -125,10 +130,7 @@ async function probeChildModels(
   env: NodeJS.ProcessEnv,
   timeoutMs: number,
 ): Promise<ReadonlySet<string>> {
-  const child = spawn(launch.command, [
-    ...launch.prefixArgs,
-    ...CATALOG_ARGS[mode],
-  ], {
+  const child = spawn(launch.command, [...launch.prefixArgs, ...CATALOG_ARGS[mode]], {
     // Same child shape as the reflection spawn: extensions load, omo's own components stay off.
     env: mode === "extensions" ? { ...env, [OMO_SENPI_DISABLED_ENV]: "1" } : env,
     stdio: ["ignore", "pipe", "pipe"],
@@ -150,7 +152,8 @@ async function probeChildModels(
   const stdoutText = Buffer.concat(stdout).toString("utf8")
   const stderrText = Buffer.concat(stderr).toString("utf8")
   if (timedOut) throw new Error(`model catalog probe timed out after ${timeoutMs}ms`)
-  if (code !== 0) throw new Error(`model catalog probe exited with code ${code}: ${stderrText.trim() || stdoutText.trim()}`)
+  if (code !== 0)
+    throw new Error(`model catalog probe exited with code ${code}: ${stderrText.trim() || stdoutText.trim()}`)
   const models = parseModelCatalog(stdoutText)
   if (models.size === 0) throw new Error("model catalog probe returned no parseable model ids")
   return models
@@ -158,7 +161,10 @@ async function probeChildModels(
 
 function parseModelCatalog(output: string): ReadonlySet<string> {
   const models = new Set<string>()
-  const lines = stripAnsi(output).split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+  const lines = stripAnsi(output)
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
   const headerIndex = lines.findIndex((line) => /^provider\s{2,}model(?:\s{2,}|$)/i.test(line))
   if (headerIndex >= 0) {
     for (const line of lines.slice(headerIndex + 1)) {
@@ -180,13 +186,17 @@ async function modelCatalogCacheKey(
   sources: readonly { readonly path: string; readonly exists: boolean }[],
   mode: CatalogMode,
 ): Promise<string> {
-  const sourceMtimes = await Promise.all(sources.filter((source) => source.exists).map(async (source) => {
-    try {
-      return `${source.path}:${(await stat(source.path)).mtimeMs}`
-    } catch {
-      return `${source.path}:missing`
-    }
-  }))
+  const sourceMtimes = await Promise.all(
+    sources
+      .filter((source) => source.exists)
+      .map(async (source) => {
+        try {
+          return `${source.path}:${(await stat(source.path)).mtimeMs}`
+        } catch {
+          return `${source.path}:missing`
+        }
+      }),
+  )
   return JSON.stringify([mode, launch.command, launch.prefixArgs, sourceMtimes])
 }
 

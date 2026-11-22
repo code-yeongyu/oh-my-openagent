@@ -72,10 +72,10 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     while (messages.length > 0) {
       const last = messages[messages.length - 1]
       if (
-        !last
-        || getParentWakeMessageRole(last) !== "user"
-        || !isSyntheticOrInternalUserMessage(last)
-        || !parentWakeMessageContainsNotification(last, input.wake)
+        !last ||
+        getParentWakeMessageRole(last) !== "user" ||
+        !isSyntheticOrInternalUserMessage(last) ||
+        !parentWakeMessageContainsNotification(last, input.wake)
       ) {
         break
       }
@@ -103,9 +103,9 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     return { defer: true, skipPromptGateToolStateCheck: false }
   }
   if (
-    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
-    && latestAssistantTurnHasToolBlock(messages)
-    && !latestAssistantTurnHasFreshToolActivity(messages, now, input.toolCallDeferMaxMs)
+    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs &&
+    latestAssistantTurnHasToolBlock(messages) &&
+    !latestAssistantTurnHasFreshToolActivity(messages, now, input.toolCallDeferMaxMs)
   ) {
     // A reply dispatch here would fork a concurrent assistant turn: the turn is
     // still mid-flight, only its busy signals are quiet (silent tool, blind
@@ -115,8 +115,8 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
     return { defer: true, skipPromptGateToolStateCheck: true }
   }
   if (
-    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs
-    && latestAssistantTurnHasStaleUnknownSubstantiveOutput(messages, now, input.toolCallDeferMaxMs)
+    now - input.wake.toolCallDeferralStartedAt >= input.toolCallDeferMaxMs &&
+    latestAssistantTurnHasStaleUnknownSubstantiveOutput(messages, now, input.toolCallDeferMaxMs)
   ) {
     log("[background-agent] Retrying parent wake after stale unknown-finish assistant output:", {
       sessionID: input.sessionID,
@@ -144,8 +144,8 @@ export function hasRecordedParentWakePromptMessage(input: {
       return false
     }
     if (
-      createdAt >= dispatchedAt - input.acceptedMessageSkewMs
-      && parentWakeMessageContainsNotification(message, input.wake)
+      createdAt >= dispatchedAt - input.acceptedMessageSkewMs &&
+      parentWakeMessageContainsNotification(message, input.wake)
     ) {
       return true
     }
@@ -180,9 +180,7 @@ export function hasAssistantOrToolOutputAfterParentWake(input: {
   const dispatchedAt = input.wake.dispatchedAt
   return input.messages.some((message) => {
     const createdAt = getParentWakeMessageCreatedAt(message)
-    return createdAt !== undefined
-      && createdAt >= dispatchedAt
-      && parentWakeMessageHasOutput(message)
+    return createdAt !== undefined && createdAt >= dispatchedAt && parentWakeMessageHasOutput(message)
   })
 }
 
@@ -208,12 +206,12 @@ function parentWakeMessageHasOutput(message: ParentWakeSessionMessage): boolean 
       return typeof part.text === "string" && part.text.trim().length > 0
     }
     if (
-      part.type === "tool"
-      || part.type === "tool_use"
-      || part.type === "tool-call"
-      || part.type === "tool-invocation"
-      || part.type === "tool_result"
-      || part.type === "tool-result"
+      part.type === "tool" ||
+      part.type === "tool_use" ||
+      part.type === "tool-call" ||
+      part.type === "tool-invocation" ||
+      part.type === "tool_result" ||
+      part.type === "tool-result"
     ) {
       return true
     }
@@ -234,7 +232,10 @@ function parentWakeMessageContainsNotification(message: ParentWakeSessionMessage
   if (getParentWakeMessageRole(message) !== "user") {
     return false
   }
-  return message.parts?.some((part) =>
-    typeof part.text === "string" && wake.notifications.some((notification) => part.text?.includes(notification))
-  ) ?? false
+  return (
+    message.parts?.some(
+      (part) =>
+        typeof part.text === "string" && wake.notifications.some((notification) => part.text?.includes(notification)),
+    ) ?? false
+  )
 }

@@ -21,12 +21,12 @@ export type { TaskSendTeamRouting } from "./send-shutdown"
 
 const DESCRIPTION = [
   "Send a message to a child task or team member, keyed by to.",
-  "Plain-text messages always steer a running child immediately.",
+  "Plain-text messages steer a running child immediately when nothing is ahead of them; while earlier messages are queued or draining, or the child is still launching, suspended or unresponsive, the message is queued and delivered in order.",
   "A plain-text message to a parked in-process or detached RPC child with a transcript and recorded launch spec resumes that session after eligible finished runs. Killed, cancelled, and lost children never revive; unfinished parked children automatically resume or end within the recovery budget.",
   "redispatch:true (no message) re-dispatches a task flagged 'resumed, waiting for input' onto a fresh live session, replaying its persisted prompt; the old dead session is abandoned.",
-  "message is required and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
+  "message is required (except with redispatch:true) and accepts a plain string or a structured shutdown object {type:'shutdown_request'} or {type:'shutdown_response', approve, reason?}; structured messages are lead-only and need team_run_id (defaults to your single owned team).",
   "To retire a member: send {type:'shutdown_request'}, then after it wraps up {type:'shutdown_response', approve:true}.",
-  "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Plain-text bodies are capped by the team payload limit (default 32 KB); split larger payloads or send a file path.",
+  "Addressing: a child task id/name goes to the live session; a team member name goes to the durable mailbox; '*' broadcasts to every member (lead-only). Messages to team members and '*' are capped by the team payload limit (default 32 KB; split larger payloads or send a file path); messages to a child task have no such cap.",
   "Cross-session: a child owned by another session is refused unless you pass all_scope=true.",
   "Team messages always steer into the recipient's running turn.",
   "One-shot agents (plan-reviewer) always refuse task_send in every state; spawn a new plan-reviewer instead.",
@@ -69,28 +69,44 @@ export async function runTaskSend(
   options: TaskSendRunOptions = {},
 ): Promise<SendToolResult> {
   if (options.signal?.aborted === true) {
-    return toolResult(`Not sent to ${params.to}: the turn was aborted before the message went out.`, { kind: "aborted", to: params.to })
+    return toolResult(`Not sent to ${params.to}: the turn was aborted before the message went out.`, {
+      kind: "aborted",
+      to: params.to,
+    })
   }
   const deliver = options.deliverLateOutcome
   const sending = sendNow(manager, params, callerSessionId, teamRouting)
-  const reported = await settledWithin(sending, deliver === undefined ? Number.POSITIVE_INFINITY : SEND_REPORT_WINDOW_MS, options.signal)
+  const reported = await settledWithin(
+    sending,
+    deliver === undefined ? Number.POSITIVE_INFINITY : SEND_REPORT_WINDOW_MS,
+    options.signal,
+  )
   if (reported.settled) return reported.value
   const cause = reported.cause === "aborted" ? "aborted" : "host_slow"
   sending.then(
     (result) => {
       if (deliver !== undefined) deliver(result, { cause, callerSessionId })
-      else log("senpi-task task_send outcome after the caller stopped waiting", { to: params.to, details: result.details })
+      else
+        log("senpi-task task_send outcome after the caller stopped waiting", { to: params.to, details: result.details })
     },
     (error: unknown) => {
       const reason = error instanceof Error ? error.message : String(error)
       log("senpi-task task_send failed after the caller stopped waiting", { to: params.to, reason })
-      deliver?.(toolErrorResult(`task_send to ${params.to} failed: ${reason}`, { kind: "send_failed", to: params.to, reason }), { cause, callerSessionId })
+      deliver?.(
+        toolErrorResult(`task_send to ${params.to} failed: ${reason}`, { kind: "send_failed", to: params.to, reason }),
+        { cause, callerSessionId },
+      )
     },
   )
-  const lead = cause === "aborted" ? "The turn was aborted while the message was being delivered" : "The task host is slow to answer"
+  const lead =
+    cause === "aborted"
+      ? "The turn was aborted while the message was being delivered"
+      : "The task host is slow to answer"
   const follow = deliver === undefined ? "check task_output for the result" : "the outcome arrives as a notification"
   return toolResult(`${lead}; delivery to ${params.to} continues in the background and ${follow}. Do not resend it.`, {
-    kind: "delivering", to: params.to, reason: cause,
+    kind: "delivering",
+    to: params.to,
+    reason: cause,
   })
 }
 
@@ -131,7 +147,10 @@ async function sendNow(
       body: params.message,
       ...(params.summary !== undefined ? { summary: params.summary } : {}),
     })
-    const wrapped: SendToolResult = toolResult(firstText(teamResult), { kind: "team_message", team: teamResult.details })
+    const wrapped: SendToolResult = toolResult(firstText(teamResult), {
+      kind: "team_message",
+      team: teamResult.details,
+    })
     return teamResult.isError === true ? { ...wrapped, isError: true } : wrapped
   }
 
@@ -173,10 +192,11 @@ export function createTaskSendTool(deps: TaskSendDeps): ToolDefinition<typeof Ta
     label: "Task Send",
     description: DESCRIPTION,
     parameters: TaskSendParams,
-    execute: (_toolCallId, params, signal, _onUpdate, ctx) => runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting, {
-      ...(signal === undefined ? {} : { signal }),
-      ...(deps.deliverLateOutcome === undefined ? {} : { deliverLateOutcome: deps.deliverLateOutcome }),
-    }),
+    execute: (_toolCallId, params, signal, _onUpdate, ctx) =>
+      runTaskSend(deps.manager, params, resolveCaller(ctx), deps.teamRouting, {
+        ...(signal === undefined ? {} : { signal }),
+        ...(deps.deliverLateOutcome === undefined ? {} : { deliverLateOutcome: deps.deliverLateOutcome }),
+      }),
     renderCall: (args, theme) => renderTaskSendCall(args, theme),
     renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   }
@@ -209,11 +229,17 @@ export function createMemberScopedTaskSendTool(
     description: MEMBER_SCOPED_DESCRIPTION,
     parameters: MemberScopedTaskSendParams,
     execute: (_toolCallId, params: MemberScopedTaskSendInput, signal, _onUpdate, ctx) =>
-      runTaskSend(deps.manager, params, resolveCaller(ctx), {
-        service: deps.service,
-        from: deps.from,
-        teamRunId: deps.teamRunId,
-      }, signal === undefined ? {} : { signal }),
+      runTaskSend(
+        deps.manager,
+        params,
+        resolveCaller(ctx),
+        {
+          service: deps.service,
+          from: deps.from,
+          teamRunId: deps.teamRunId,
+        },
+        signal === undefined ? {} : { signal },
+      ),
     renderCall: (args, theme) => renderMemberScopedTaskSendCall(args, theme),
     renderResult: (result, options, theme) => renderTaskSendResult(result, options, theme),
   }

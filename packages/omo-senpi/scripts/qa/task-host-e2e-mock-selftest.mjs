@@ -12,18 +12,28 @@ export async function checkMockSessionIsolation(root) {
   mkdirSync(join(cwd, ".omo"))
   const scriptPath = join(cwd, "mock-script.json")
   const steps = Array.from({ length: 25 }, (_, ordinal) => ({
-    type: "tool_call", name: "eval", arguments: { ordinal },
+    type: "tool_call",
+    name: "eval",
+    arguments: { ordinal },
   }))
-  const save = (childSteps) => writeFileSync(scriptPath, JSON.stringify({
-    parentSteps: [{ type: "text", text: "parent complete" }],
-    childSteps: [...childSteps, { type: "text", text: "child complete" }],
-  }))
+  const save = (childSteps) =>
+    writeFileSync(
+      scriptPath,
+      JSON.stringify({
+        parentSteps: [{ type: "text", text: "parent complete" }],
+        childSteps: [...childSteps, { type: "text", text: "child complete" }],
+      }),
+    )
   save(steps)
   let provider
   const handlers = new Map()
   registerMockProvider({
-    registerProvider(_id, value) { provider = value },
-    on(name, handler) { handlers.set(name, handler) },
+    registerProvider(_id, value) {
+      provider = value
+    },
+    on(name, handler) {
+      handlers.set(name, handler)
+    },
   })
   const contexts = Array.from({ length: 8 }, () => ({
     cwd,
@@ -33,9 +43,14 @@ export async function checkMockSessionIsolation(root) {
     const message = await provider.streamSimple({ id: "mock-1" }, context).result()
     context.messages.push(message)
     const call = message.content.find((part) => part.type === "toolCall")
-    if (call) context.messages.push({
-      role: "toolResult", toolCallId: call.id, toolName: call.name, content: [], isError: false,
-    })
+    if (call)
+      context.messages.push({
+        role: "toolResult",
+        toolCallId: call.id,
+        toolName: call.name,
+        content: [],
+        isError: false,
+      })
     return call
   }
   for (let ordinal = 0; ordinal < 25; ordinal++) {
@@ -60,7 +75,11 @@ export async function checkMockSessionIsolation(root) {
   injectDaemonMockProvider(pluginRoot, join(dirname(fileURLToPath(import.meta.url)), "task-host-e2e-mock-provider.mjs"))
   const injected = await import(pathToFileURL(join(pluginRoot, "omo-qa-mock-provider.ts")).href)
   let installedProvider
-  injected.default({ registerProvider(_id, value) { installedProvider = value } })
+  injected.default({
+    registerProvider(_id, value) {
+      installedProvider = value
+    },
+  })
   const installedReply = await installedProvider.streamSimple({ id: "mock-1" }, { cwd, messages: [] }).result()
   if (installedReply.stopReason !== "stop") throw new Error("the injected provider and its dependencies must load")
 }
@@ -76,37 +95,73 @@ async function checkAbortEvidence(cwd, provider, handlers) {
   if (!events.some((event) => event.type === "abort_signal" && event.callIds.includes(callId))) {
     throw new Error("mock abort signal must be captured with its exact tool-call identity")
   }
-  handlers.get("agent_end")({
-    aborted: true, abortSource: "system", willRetry: false, messages: [message],
-  }, { cwd, sessionManager: { getSessionId: () => "fixture-child" } })
+  handlers.get("agent_end")(
+    {
+      aborted: true,
+      abortSource: "system",
+      willRetry: false,
+      messages: [message],
+    },
+    { cwd, sessionManager: { getSessionId: () => "fixture-child" } },
+  )
   const stateDir = scenarioStateDir(cwd, join(dirname(cwd), "mock-provider-agent"))
   mkdirSync(join(stateDir, "tasks"), { recursive: true })
   const sessionPath = join(cwd, "child.jsonl")
-  writeFileSync(sessionPath, [
-    { type: "session", id: "fixture-child" }, { type: "message", message },
-  ].map(JSON.stringify).join("\n") + "\n")
+  writeFileSync(
+    sessionPath,
+    [
+      { type: "session", id: "fixture-child" },
+      { type: "message", message },
+    ]
+      .map(JSON.stringify)
+      .join("\n") + "\n",
+  )
   const record = {
-    task_id: "st_failed", name: "failed-child", status: "error",
-    host_session: { session_path: sessionPath }, error_message: 'RPC child turn ended with stopReason "toolUse"',
+    task_id: "st_failed",
+    name: "failed-child",
+    status: "error",
+    host_session: { session_path: sessionPath },
+    error_message: 'RPC child turn ended with stopReason "toolUse"',
   }
   writeFileSync(join(stateDir, "tasks", "st_failed.json"), JSON.stringify(record))
   const captured = childStartDiagnosis({ cwd, stateDir }, [record]).failedRecords?.[0]
-  if (captured?.record.task_id !== "st_failed" || captured.record.status !== "error" ||
-    captured.agentEnd?.aborted !== true || captured.agentEnd.abortSource !== "system" ||
-    captured.abortSignals.length !== 1 || captured.signalCoverage !== true || captured.driverTeardownStarted) {
+  if (
+    captured?.record.task_id !== "st_failed" ||
+    captured.record.status !== "error" ||
+    captured.agentEnd?.aborted !== true ||
+    captured.agentEnd.abortSource !== "system" ||
+    captured.abortSignals.length !== 1 ||
+    captured.signalCoverage !== true ||
+    captured.driverTeardownStarted
+  ) {
     throw new Error("failed task evidence must retain identity, status, and its observed abort")
   }
   const unaborted = new AbortController()
   const next = await provider.streamSimple({ id: "mock-1" }, context, { signal: unaborted.signal }).result()
-  handlers.get("agent_end")({
-    aborted: false, willRetry: false, messages: [next],
-  }, { cwd, sessionManager: { getSessionId: () => "fixture-unaborted" } })
-  writeFileSync(sessionPath, [
-    { type: "session", id: "fixture-unaborted" }, { type: "message", message: next },
-  ].map(JSON.stringify).join("\n") + "\n")
+  handlers.get("agent_end")(
+    {
+      aborted: false,
+      willRetry: false,
+      messages: [next],
+    },
+    { cwd, sessionManager: { getSessionId: () => "fixture-unaborted" } },
+  )
+  writeFileSync(
+    sessionPath,
+    [
+      { type: "session", id: "fixture-unaborted" },
+      { type: "message", message: next },
+    ]
+      .map(JSON.stringify)
+      .join("\n") + "\n",
+  )
   const absence = childStartDiagnosis({ cwd, stateDir }, [record]).failedRecords[0]
-  if (absence.agentEnd?.aborted !== false || absence.abortSignals.length !== 0 ||
-    !absence.signalCoverage || absence.driverTeardownStarted) {
+  if (
+    absence.agentEnd?.aborted !== false ||
+    absence.abortSignals.length !== 0 ||
+    !absence.signalCoverage ||
+    absence.driverTeardownStarted
+  ) {
     throw new Error("observed non-abort termination must remain distinct from missing signal coverage")
   }
   recordMockEvent(cwd, { type: "driver_teardown" })

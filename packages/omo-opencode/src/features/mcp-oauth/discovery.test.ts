@@ -33,7 +33,7 @@ describe("discoverOAuthServerMetadata", () => {
             token_endpoint: "https://auth.example.com/token",
             registration_endpoint: "https://auth.example.com/register",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -73,7 +73,7 @@ describe("discoverOAuthServerMetadata", () => {
             authorization_endpoint: "https://mcp.example.com/authorize",
             token_endpoint: "https://mcp.example.com/token",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -118,7 +118,7 @@ describe("discoverOAuthServerMetadata", () => {
             token_endpoint: "https://mcp.example.com/oauth/token",
             registration_endpoint: "https://mcp.example.com/oauth/register",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })
@@ -192,9 +192,12 @@ describe("discoverOAuthServerMetadata", () => {
         return new Response(JSON.stringify({ authorization_servers: [authServer] }), { status: 200 })
       }
       if (url === asUrl) {
-        return new Response(JSON.stringify({ issuer: authServer, authorization_endpoint: "https://auth.example.com/authorize" }), {
-          status: 200,
-        })
+        return new Response(
+          JSON.stringify({ issuer: authServer, authorization_endpoint: "https://auth.example.com/authorize" }),
+          {
+            status: 200,
+          },
+        )
       }
       return new Response("not found", { status: 404 })
     }
@@ -227,7 +230,7 @@ describe("discoverOAuthServerMetadata", () => {
             authorization_endpoint: "https://auth.example.com/authorize",
             token_endpoint: "https://auth.example.com/token",
           }),
-          { status: 200 }
+          { status: 200 },
         )
       }
       return new Response("not found", { status: 404 })

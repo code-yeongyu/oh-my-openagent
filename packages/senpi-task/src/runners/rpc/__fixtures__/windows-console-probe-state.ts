@@ -26,9 +26,7 @@ export type ProbeCase = ParentReady & {
   readonly parentExitCode: number
 }
 
-export function credentialDigests(
-  credentialFiles: readonly string[],
-): Readonly<Record<string, string>> {
+export function credentialDigests(credentialFiles: readonly string[]): Readonly<Record<string, string>> {
   const roots = [join(homedir(), ".omo", "agent"), join(homedir(), ".senpi", "agent")]
   const result: Record<string, string> = {}
   for (const root of roots) {

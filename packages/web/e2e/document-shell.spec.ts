@@ -6,20 +6,20 @@ type PrerenderManifest = {
   readonly dynamicRoutes: Record<string, { readonly fallback: string | null | false }>
 }
 
-const ROUTES = [
+/** Every page declares both colour schemes and draws the Night palette when the system is dark. */
+const HOME_ROUTES = [
+  ["/pt-BR/docs", "pt-BR"],
   ["/", "en"],
   ["/ko", "ko"],
   ["/ja", "ja"],
   ["/zh", "zh-CN"],
-  ["/pt-BR/docs", "pt-BR"],
 ] as const
 
 test.describe("Document shell", () => {
-  for (const [route, lang] of ROUTES) {
-    test(`${route} declares lang="${lang}", a dark colour scheme and the ink tokens`, async ({
-      page,
-    }) => {
+  for (const [route, lang] of HOME_ROUTES) {
+    test(`${route} declares lang="${lang}" and follows a dark system theme`, async ({ page }) => {
       // given / when
+      await page.emulateMedia({ colorScheme: "dark" })
       await page.goto(route)
 
       // then
@@ -30,9 +30,9 @@ test.describe("Document shell", () => {
         color: getComputedStyle(document.body).color,
       }))
       expect(shell).toEqual({
-        colorScheme: "dark",
-        background: "rgb(9, 9, 11)",
-        color: "rgb(245, 245, 247)",
+        colorScheme: "light dark",
+        background: "rgb(15, 14, 13)",
+        color: "rgb(238, 238, 239)",
       })
     })
   }

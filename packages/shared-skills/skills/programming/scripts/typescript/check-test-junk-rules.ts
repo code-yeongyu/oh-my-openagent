@@ -1,13 +1,7 @@
 import { extname } from "node:path"
 
 export type RuleId =
-  | "source-grep"
-  | "prose-pin"
-  | "fixed-sleep"
-  | "focused"
-  | "skipped"
-  | "self-compare"
-  | "lower-bound"
+  "source-grep" | "prose-pin" | "fixed-sleep" | "focused" | "skipped" | "self-compare" | "lower-bound"
 
 export type Language = "typescript" | "python" | "rust" | "go"
 
@@ -60,11 +54,22 @@ export const LINE_RULES: readonly LineRule[] = [
   {
     rule: "fixed-sleep",
     languages: ["typescript"],
-    pattern: /\bsetTimeout\s*\(\s*(resolve|res|r|done|cb)\s*,\s*[1-9]|\bawait\s+(Bun\.)?sleep\s*\(\s*[1-9]|new Promise\s*\(\s*\(?\s*\w*\s*\)?\s*=>\s*setTimeout\s*\(\s*\w+\s*,\s*[1-9]/,
+    pattern:
+      /\bsetTimeout\s*\(\s*(resolve|res|r|done|cb)\s*,\s*[1-9]|\bawait\s+(Bun\.)?sleep\s*\(\s*[1-9]|new Promise\s*\(\s*\(?\s*\w*\s*\)?\s*=>\s*setTimeout\s*\(\s*\w+\s*,\s*[1-9]/,
     message: SLEEP_MESSAGE,
   },
-  { rule: "fixed-sleep", languages: ["python"], pattern: /\btime\.sleep\s*\(|\bawait\s+(asyncio|anyio|trio)\.sleep\s*\(\s*[0-9]/, message: SLEEP_MESSAGE },
-  { rule: "fixed-sleep", languages: ["rust"], pattern: /\bthread::sleep\s*\(|\btokio::time::sleep\s*\(/, message: SLEEP_MESSAGE },
+  {
+    rule: "fixed-sleep",
+    languages: ["python"],
+    pattern: /\btime\.sleep\s*\(|\bawait\s+(asyncio|anyio|trio)\.sleep\s*\(\s*[0-9]/,
+    message: SLEEP_MESSAGE,
+  },
+  {
+    rule: "fixed-sleep",
+    languages: ["rust"],
+    pattern: /\bthread::sleep\s*\(|\btokio::time::sleep\s*\(/,
+    message: SLEEP_MESSAGE,
+  },
   { rule: "fixed-sleep", languages: ["go"], pattern: /\btime\.Sleep\s*\(/, message: SLEEP_MESSAGE },
   {
     rule: "focused",
@@ -72,14 +77,25 @@ export const LINE_RULES: readonly LineRule[] = [
     pattern: /\b(test|it|describe)\.only\s*\(/,
     message: "focused test: the rest of the suite is skipped silently",
   },
-  { rule: "skipped", languages: ["typescript"], pattern: /\b(test|it|describe)\.skip\s*\(|\b(xit|xdescribe|xtest)\s*\(/, message: SKIP_MESSAGE },
-  { rule: "skipped", languages: ["python"], pattern: /@pytest\.mark\.skip\b|\bpytest\.skip\s*\(|\bunittest\.skip\b/, message: SKIP_MESSAGE },
+  {
+    rule: "skipped",
+    languages: ["typescript"],
+    pattern: /\b(test|it|describe)\.skip\s*\(|\b(xit|xdescribe|xtest)\s*\(/,
+    message: SKIP_MESSAGE,
+  },
+  {
+    rule: "skipped",
+    languages: ["python"],
+    pattern: /@pytest\.mark\.skip\b|\bpytest\.skip\s*\(|\bunittest\.skip\b/,
+    message: SKIP_MESSAGE,
+  },
   { rule: "skipped", languages: ["rust"], pattern: /#\[ignore\b/, message: SKIP_MESSAGE },
   { rule: "skipped", languages: ["go"], pattern: /\bt\.Skip(f|Now)?\s*\(/, message: SKIP_MESSAGE },
   {
     rule: "lower-bound",
     languages: ["typescript"],
-    pattern: /\.(length|size|count)\s*\)\s*\.(toBeGreaterThan\s*\(\s*[1-9]|toBeGreaterThanOrEqual\s*\(\s*([2-9]|\d{2,}))/,
+    pattern:
+      /\.(length|size|count)\s*\)\s*\.(toBeGreaterThan\s*\(\s*[1-9]|toBeGreaterThanOrEqual\s*\(\s*([2-9]|\d{2,}))/,
     message: LOWER_BOUND_MESSAGE,
   },
   {
@@ -99,7 +115,8 @@ export const SELF_COMPARE: Readonly<Record<Language, RegExp>> = {
 
 const SOURCE_EXTENSIONS = /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs|py|rs|go)$/
 const PROSE_EXTENSIONS = /\.(md|mdc|txt|prompt)$/
-const READ_ASSIGNMENT = /\b(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?(?:\w+\.)?(?:readFileSync|readFile|readTextSync|Bun\.file|open|read_text|read)\s*\(([^\n]*)$/
+const READ_ASSIGNMENT =
+  /\b(?:const|let|var)\s+(\w+)\s*=\s*(?:await\s+)?(?:\w+\.)?(?:readFileSync|readFile|readTextSync|Bun\.file|open|read_text|read)\s*\(([^\n]*)$/
 const PYTHON_READ_ASSIGNMENT = /^\s*(\w+)\s*=\s*(?:\w+\.)?(?:open|Path|read_text)\s*\(([^\n]*)$/
 const STRING_LITERAL = /["'`]([^"'`]+)["'`]/g
 
@@ -129,12 +146,16 @@ export function greppedVariable(line: string, language: Language): string | unde
     return /\bassert\s+(?:not\s+)?["'][^"']*["']\s+(?:not\s+)?in\s+(\w+)/.exec(line)?.[1]
   }
   return (
-    /\bexpect\s*\(\s*(\w+)\s*\)\s*(?:\.not)?\.(?:toContain|toMatch|toMatchSnapshot|toMatchInlineSnapshot|toInclude|toStartWith|toEndWith)\s*\(/.exec(line)?.[1] ??
-    /\bexpect\s*\(\s*(\w+)\.(?:includes|match|indexOf|search)\s*\(/.exec(line)?.[1]
+    /\bexpect\s*\(\s*(\w+)\s*\)\s*(?:\.not)?\.(?:toContain|toMatch|toMatchSnapshot|toMatchInlineSnapshot|toInclude|toStartWith|toEndWith)\s*\(/.exec(
+      line,
+    )?.[1] ?? /\bexpect\s*\(\s*(\w+)\.(?:includes|match|indexOf|search)\s*\(/.exec(line)?.[1]
   )
 }
 
 export const READ_RULE_MESSAGES: Readonly<Record<ReadKind, { readonly rule: RuleId; readonly message: string }>> = {
-  prose: { rule: "prose-pin", message: "wording of a prompt/skill/doc is pinned; assert a machine-consumed value or write no test" },
+  prose: {
+    rule: "prose-pin",
+    message: "wording of a prompt/skill/doc is pinned; assert a machine-consumed value or write no test",
+  },
   source: { rule: "source-grep", message: "a source file is grepped as text; drive the module and assert behavior" },
 }

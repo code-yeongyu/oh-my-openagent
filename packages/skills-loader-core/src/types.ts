@@ -29,11 +29,13 @@ export interface SkillDefinition {
   readonly disable?: boolean
 }
 
-export type SkillSource = string | {
-  readonly path: string
-  readonly recursive?: boolean
-  readonly glob?: string
-}
+export type SkillSource =
+  | string
+  | {
+      readonly path: string
+      readonly recursive?: boolean
+      readonly glob?: string
+    }
 
 export type SkillsConfig =
   | string[]

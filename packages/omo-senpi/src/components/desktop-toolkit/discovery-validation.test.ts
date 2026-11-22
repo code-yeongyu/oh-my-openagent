@@ -7,6 +7,47 @@ import { cleanup, content, execute, mcp, schema, setup } from "./thread-tools-te
 afterEach(cleanup)
 
 describe("desktop thread tool discovery validation", () => {
+  it("#given malformed host metadata mixed with valid tools #when discovering #then invalid entries are skipped individually", async () => {
+    const invalid = [
+      null,
+      [],
+      "private_metadata",
+      {},
+      { name: "bad.name", label: "private_label" },
+      { name: "host_page", label: 42 },
+      { name: "host_page", label: "Page", exposure: "invalid" },
+      { name: "host_page", label: "Page", allowLazyActivation: "yes" },
+      { name: "host_page", label: "Page", searchKeywords: [42] },
+    ]
+    const stub = await mcp({
+      tools: [
+        ...invalid.map((meta) => ({ name: "render_page", inputSchema: schema, _meta: { "senpi/host-tool": meta } })),
+        { name: "thread_organize", inputSchema: schema },
+        {
+          name: "render_page",
+          inputSchema: schema,
+          _meta: { "senpi/host-tool": { name: "host_page", label: "Page" } },
+        },
+      ],
+    })
+    const host = await setup({ offer: "thread,host", hostToolNames: "host_page", reply: () => ({ grant: stub.grant }) })
+    await host.start()
+    expect(host.tools().map((tool) => tool.name)).toEqual(["desktop_thread_organize"])
+    expect(host.routes).toHaveLength(1)
+    expect(host.logs).toHaveLength(invalid.length * 2)
+    expect(
+      host.logs.every(
+        (entry) =>
+          typeof entry === "object" &&
+          entry !== null &&
+          "details" in entry &&
+          JSON.stringify(entry.details) === JSON.stringify({ reason: "invalid_descriptor" }),
+      ),
+    ).toBe(true)
+    expect(JSON.stringify(host.logs)).not.toContain("private")
+    expect((await execute(host.tools()[0])).content).toEqual(content)
+  })
+
   it("#given invalid names mixed with valid names #when discovering #then only provider-safe names register", async () => {
     const valid = ["thread_organize", "a".repeat(56), "Mixed-123_Name"]
     const invalid = ["", "a.b", "a b", "a".repeat(57), "private\nname"]
@@ -23,7 +64,10 @@ describe("desktop thread tool discovery validation", () => {
     const badSchemas = [null, true, [], "object", {}, { type: "array" }, { type: ["object", "null"] }]
     const tools = [
       ...badSchemas.map((inputSchema) => ({ name: "private_schema", inputSchema })),
-      null, [], { name: 12, inputSchema: schema }, { name: "private_description", description: 42, inputSchema: schema },
+      null,
+      [],
+      { name: 12, inputSchema: schema },
+      { name: "private_description", description: 42, inputSchema: schema },
       { name: "thread_organize", inputSchema: schema },
     ]
     const stub = await mcp({ tools })
@@ -46,10 +90,12 @@ describe("desktop thread tool discovery validation", () => {
   })
 
   it("#given duplicate tools in one discovery #when registering #then the first registration wins", async () => {
-    const stub = await mcp({ tools: [
-      { name: "thread_organize", description: "first", inputSchema: schema },
-      { name: "thread_organize", description: "second", inputSchema: schema },
-    ] })
+    const stub = await mcp({
+      tools: [
+        { name: "thread_organize", description: "first", inputSchema: schema },
+        { name: "thread_organize", description: "second", inputSchema: schema },
+      ],
+    })
     const host = await setup({ reply: () => ({ grant: stub.grant }) })
     await host.start()
     expect(host.tools()).toHaveLength(1)

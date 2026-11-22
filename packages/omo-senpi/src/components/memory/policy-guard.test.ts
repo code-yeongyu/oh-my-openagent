@@ -23,7 +23,8 @@ import { canonical, policyFixture, registeredPolicy, type PolicyFixture } from "
 const roots: string[] = []
 
 afterEach(() => {
-  for (const root of roots.splice(0)) rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
+  for (const root of roots.splice(0))
+    rmSyncEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
 })
 
 async function check(

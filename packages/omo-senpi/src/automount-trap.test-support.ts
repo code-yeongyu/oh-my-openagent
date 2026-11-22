@@ -49,10 +49,12 @@ export async function withAutomountTrap(body: () => unknown): Promise<string[]> 
     const original = module[name]
     if (typeof original !== "function") return
     const native = (original as { native?: (...args: unknown[]) => unknown }).native
-    const spy = spyOn(module as Record<string, (...args: unknown[]) => unknown>, name).mockImplementation((path: unknown, ...rest: unknown[]) => {
-      trap(`${label}.${name}`, path)
-      return (original as (...args: unknown[]) => unknown)(path, ...rest)
-    })
+    const spy = spyOn(module as Record<string, (...args: unknown[]) => unknown>, name).mockImplementation(
+      (path: unknown, ...rest: unknown[]) => {
+        trap(`${label}.${name}`, path)
+        return (original as (...args: unknown[]) => unknown)(path, ...rest)
+      },
+    )
     if (native !== undefined) {
       Object.assign(spy, {
         native: (path: unknown, ...rest: unknown[]) => {
@@ -64,10 +66,15 @@ export async function withAutomountTrap(body: () => unknown): Promise<string[]> 
     spies.push(spy)
   }
   try {
-    for (const [module, label] of [[nodeFs, "fs"], [memoryFs, "memoryFs"]] as const) {
-      for (const name of ["realpathSync", "lstatSync", "statSync", "existsSync", "readFileSync", "realpath"]) wrapSync(module as unknown as Record<string, unknown>, name, label)
+    for (const [module, label] of [
+      [nodeFs, "fs"],
+      [memoryFs, "memoryFs"],
+    ] as const) {
+      for (const name of ["realpathSync", "lstatSync", "statSync", "existsSync", "readFileSync", "realpath"])
+        wrapSync(module as unknown as Record<string, unknown>, name, label)
     }
-    for (const name of ["realpath", "lstat", "stat"]) wrapSync(nodeFsPromises as unknown as Record<string, unknown>, name, "fsp")
+    for (const name of ["realpath", "lstat", "stat"])
+      wrapSync(nodeFsPromises as unknown as Record<string, unknown>, name, "fsp")
     Object.defineProperty(process, "platform", { value: "darwin", configurable: true })
     await body()
   } finally {

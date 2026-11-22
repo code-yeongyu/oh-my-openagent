@@ -161,7 +161,10 @@ console.log(JSON.stringify({
   if (evidenceDir !== undefined) {
     writeFileSync(join(evidenceDir, "resolution-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   if (line === undefined) throw new Error("resolution probe printed no JSON")
   return JSON.parse(line)
 }
@@ -193,7 +196,10 @@ console.log(JSON.stringify({ pathOnly: resolveServerBinary(["biome", "lsp-proxy"
   if (evidenceDir !== undefined) {
     writeFileSync(join(evidenceDir, "baseline-path-only-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   return JSON.parse(line)
 }
 
@@ -343,7 +349,10 @@ await runWithRequestContext(context, async () => { await getLspManager().stopAll
     writeFileSync(join(evidenceDir, "diagnostics-probe.log"), `${probe.stdout}\n${probe.stderr}`)
   }
   if (probe.status !== 0) throw new Error(`diagnostics probe failed: ${probe.stderr || probe.stdout}`)
-  const line = probe.stdout.trim().split(/\r?\n/).findLast((entry) => entry.startsWith("{"))
+  const line = probe.stdout
+    .trim()
+    .split(/\r?\n/)
+    .findLast((entry) => entry.startsWith("{"))
   if (line === undefined) throw new Error("diagnostics probe printed no JSON")
   const parsed = JSON.parse(line)
   return {

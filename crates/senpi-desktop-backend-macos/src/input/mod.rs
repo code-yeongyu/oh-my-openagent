@@ -10,12 +10,21 @@ mod element;
 mod global;
 mod guard;
 mod held;
+mod keymap;
 mod holds;
 mod keys;
 mod menu_key;
 mod post;
+mod priming;
+mod remote;
+mod user_feed_raw;
+
+pub(crate) use user_feed_raw::RawFeed;
+
+pub(crate) use keymap::run_helper as run_keymap_helper;
 mod release;
 mod user_monitor;
+pub(crate) use user_monitor::process_started;
 
 #[cfg(test)]
 mod tests;
@@ -27,7 +36,9 @@ mod element_tests;
 mod live;
 
 use core_graphics::event_source::CGEventSource;
-use senpi_desktop_core::backend::{DeliveryMode, PointerEvent};
+use objc2_application_services::AXUIElement;
+use senpi_desktop_core::backend::{DeliveryMode, ElementDelivery, PointerEvent};
+use senpi_desktop_core::protocol_results::AxInputMethod;
 use senpi_desktop_core::error::{CoreResult, DesktopError};
 use senpi_desktop_core::keys::KeyName;
 use senpi_desktop_core::types::{DesktopWindow, Target};
@@ -37,6 +48,7 @@ use crate::skylight;
 use held::{Held, KeyRoute};
 
 pub(crate) use self::canary::CANARY_STOP_REASON;
+pub(crate) use self::guard::{set_key_priming, set_key_report_mode};
 pub use self::canary::{CanaryMode, CanaryResult};
 pub(crate) use self::cgevent::{modifier_flags, mouse_event, probe_event};
 pub(crate) use self::keys::{key_code, update_modifier};
@@ -51,6 +63,8 @@ pub(crate) struct MacInput {
     /// `(pid, wid)` of the last window made key without raising, so key focus
     /// can be handed back afterwards.
     last_activated: Option<(libc::pid_t, u32)>,
+    /// The user's unfiltered presses, for key priming's takeover re-check.
+    raw_feed: Option<std::sync::Arc<RawFeed>>,
 }
 
 // SAFETY: Core Graphics event sources are immutable CF objects after setup,
@@ -66,7 +80,13 @@ impl MacInput {
             canary: canary::CanaryState::new(canary),
             overlay: crate::overlay::Overlay::default(),
             last_activated: None,
+            raw_feed: None,
         })
+    }
+
+    /// Gives key priming the user-input watch's raw feed.
+    pub(crate) fn set_raw_feed(&mut self, feed: std::sync::Arc<RawFeed>) {
+        self.raw_feed = Some(feed);
     }
 
     pub(crate) fn with_overlay(mut self, overlay: crate::overlay::Overlay) -> Self {
@@ -179,14 +199,19 @@ impl MacInput {
             Target::Window(id) => {
                 let window = resolve_window(capture, id)?;
                 let (pid, wid) = window_identity(&window)?;
+                // A remote screen (Screen Sharing, iPhone Mirroring) forwards key
+                // codes and drops the Unicode text: its text goes out as the keys
+                // of the user's layout, mapped in full before anything is posted.
+                if let Some(remote) = remote::remote_screen(pid) {
+                    return self.type_remote(&window, pid, wid, text, remote, mode, capture, check_stop, delivered, None).map(|_| ());
+                }
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
-                        this.last_activated = Some((pid, wid));
-                        keys::type_text_interruptible(
-                            &this.source, &mut this.held, text, KeyRoute::Process(pid), check_stop, delivered,
-                        )
+                        let (source, held, feed) = (&this.source, &mut this.held, this.raw_feed.as_deref());
+                        guard::deliver_keys(&window, pid, wid, capture, feed, &mut this.last_activated, || {
+                            keys::type_text_interruptible(source, held, text, KeyRoute::Process(pid), check_stop, delivered)
+                        })
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;
@@ -196,6 +221,77 @@ impl MacInput {
                     }),
                 }
             }
+        }
+    }
+
+    /// Types `text` into `window`, a remote screen: every character is mapped
+    /// to a key of the current layout first (an unmappable one refuses with
+    /// nothing sent). In the background, Screen Sharing takes modifiers from
+    /// the physical keyboard, so text that needs Shift or Option is refused
+    /// before the first key and a modifier the user holds stops the keys; in
+    /// the foreground the keys go out as bare transitions at the HID tap, each
+    /// press checked against the front window. `element`, when given, must
+    /// hold focus before the keys ([`element::element_keys`]).
+    #[expect(clippy::too_many_arguments, reason = "the typing call's own arguments plus the remote classification")]
+    pub(crate) fn type_remote(
+        &mut self,
+        window: &DesktopWindow,
+        pid: libc::pid_t,
+        wid: u32,
+        text: &str,
+        remote: remote::RemoteScreen,
+        mode: DeliveryMode,
+        capture: &MacCapture,
+        check_stop: &dyn Fn() -> CoreResult<()>,
+        delivered: &mut dyn FnMut(),
+        element: Option<&AXUIElement>,
+    ) -> CoreResult<ElementDelivery> {
+        // The whole text is mapped before anything is posted, so a character
+        // the remote screen cannot receive refuses cleanly.
+        let keys = remote::typed_keys(window, text, remote::remote_layout(window, keymap::layout_strokes)?)?;
+        let gap = remote::key_gap(remote);
+        match mode {
+            DeliveryMode::Background => self.background(|this| {
+                if remote == remote::RemoteScreen::KeyEvents {
+                    let modified = remote::modified_text(&keys);
+                    if !modified.is_empty() {
+                        return Err(remote::keyboard_modifiers_refusal(window, &format!("type {}", modified.join(" "))));
+                    }
+                }
+                let mut physical = (remote == remote::RemoteScreen::KeyEvents)
+                    .then(|| remote::physical_modifier_check(window, remote::physical_flags));
+                guard::guard(window, "keyboard", None)?;
+                let (source, held, feed) = (&this.source, &mut this.held, this.raw_feed.as_deref());
+                guard::deliver_keys(window, pid, wid, capture, feed, &mut this.last_activated, || {
+                    let mut before_press = || {
+                        check_stop()?;
+                        physical.as_mut().map_or(Ok(()), |check| check())
+                    };
+                    let mut send = || {
+                        keys::type_layout_keys(source, held, &keys, gap, KeyRoute::Process(pid), &mut before_press, delivered)
+                    };
+                    match element {
+                        Some(element) => element::element_keys(pid, element, send),
+                        None => send().map(|()| ElementDelivery::Delivered(AxInputMethod::Keys)),
+                    }
+                })
+            }),
+            DeliveryMode::Foreground => skylight::with_foreground(pid, || {
+                crate::ax::prepare_foreground_input(window)?;
+                // A remote screen may read modifiers from the keyboard state, which
+                // only bare key transitions at the HID tap move. They post globally,
+                // so every press first checks that the target still has focus.
+                let transitions = remote::bare_transitions(&keys);
+                let mut before_press = || {
+                    check_stop()?;
+                    crate::focus::require_front_window(pid, wid)
+                };
+                let mut send = || keys::post_bare_keys(&mut self.held, &transitions, gap, &mut before_press, delivered);
+                match element {
+                    Some(element) => element::element_keys(pid, element, send),
+                    None => send().map(|()| ElementDelivery::Delivered(AxInputMethod::Keys)),
+                }
+            }),
         }
     }
 
@@ -218,9 +314,10 @@ impl MacInput {
                 match mode {
                     DeliveryMode::Background => self.background(|this| {
                         guard::guard(&window, "keyboard", None)?;
-                        guard::prepare_keys(&window, pid, wid, capture)?;
-                        this.last_activated = Some((pid, wid));
-                        chord::chord(&this.source, &mut this.held, keys, KeyRoute::Process(pid), check_stop)
+                        let (source, held, feed) = (&this.source, &mut this.held, this.raw_feed.as_deref());
+                        guard::deliver_keys(&window, pid, wid, capture, feed, &mut this.last_activated, || {
+                            chord::chord(source, held, keys, KeyRoute::Process(pid), check_stop)
+                        })
                     }),
                     DeliveryMode::Foreground => skylight::with_foreground(pid, || {
                         crate::ax::prepare_foreground_input(&window)?;

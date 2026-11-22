@@ -1,13 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  writeFileSync,
-} from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -148,9 +140,7 @@ describe("daily-active dedup under failure and concurrency", () => {
       // then - the next process reads a healthy state instead of capturing again
       expect(result.captureDaily).toBe(true)
       expect(readdirSync(stateDir)).toContain(`daily-active.${DAY_UTC}.claim`)
-      expect(readFileSync(stateFilePath, "utf-8")).toBe(
-        `{\n  "lastActiveDayUTC": "${DAY_UTC}"\n}\n`,
-      )
+      expect(readFileSync(stateFilePath, "utf-8")).toBe(`{\n  "lastActiveDayUTC": "${DAY_UTC}"\n}\n`)
     } finally {
       rmSync(stateDir, { recursive: true, force: true })
     }

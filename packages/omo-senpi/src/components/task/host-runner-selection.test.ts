@@ -4,7 +4,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { OmoTaskSettingsSchema, type OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
-import { HostUnavailableError, RpcHostRunner, RpcProcessRunner, type EnsureTaskDaemonPort } from "@oh-my-opencode/senpi-task"
+import {
+  HostUnavailableError,
+  RpcHostRunner,
+  RpcProcessRunner,
+  type EnsureTaskDaemonPort,
+} from "@oh-my-opencode/senpi-task"
 
 import { buildProcessChildRunner, type RunnerBuildContext } from "./engine-runners"
 import { createHostExecutionModeGate, createHostNotices } from "./host-execution-mode"
@@ -173,7 +178,10 @@ describe("host execution mode gate", () => {
       platform: "darwin",
       notices,
       ensure: () =>
-        Promise.resolve({ socket: "/tmp/dh-agent/rpc/rpc.sock", capabilities: ["session_context", "generation_handoff"] }),
+        Promise.resolve({
+          socket: "/tmp/dh-agent/rpc/rpc.sock",
+          capabilities: ["session_context", "generation_handoff"],
+        }),
     })
 
     // when
@@ -216,7 +224,9 @@ describe("host execution mode gate", () => {
         settings: settingsOf(),
         notices,
         ensureDaemon: () =>
-          Promise.reject(new HostUnavailableError("capability", { fallbackAllowed: true, detail: "missing session_context" })),
+          Promise.reject(
+            new HostUnavailableError("capability", { fallbackAllowed: true, detail: "missing session_context" }),
+          ),
       }),
     })
 

@@ -1,9 +1,4 @@
-export type {
-  AvailableAgent,
-  AvailableTool,
-  AvailableSkill,
-  AvailableCategory,
-} from "./dynamic-agent-prompt-types"
+export type { AvailableAgent, AvailableTool, AvailableSkill, AvailableCategory } from "./dynamic-agent-prompt-types"
 
 export { categorizeTools } from "./dynamic-agent-tool-categorization"
 

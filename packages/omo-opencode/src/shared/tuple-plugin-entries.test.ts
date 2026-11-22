@@ -123,7 +123,10 @@ describe("migrateLegacyPluginEntry - tuple entries", () => {
     // given
     const testConfigDir = createTestConfigDir()
     const configPath = join(testConfigDir, "opencode.jsonc")
-    writeFileSync(configPath, '{\n  // keep this comment\n  "plugin": [["oh-my-opencode@3.10.0", { "verbose": true }]]\n}\n')
+    writeFileSync(
+      configPath,
+      '{\n  // keep this comment\n  "plugin": [["oh-my-opencode@3.10.0", { "verbose": true }]]\n}\n',
+    )
 
     // when
     const migrated = migrateLegacyPluginEntry(configPath)
@@ -133,7 +136,10 @@ describe("migrateLegacyPluginEntry - tuple entries", () => {
     const savedContent = readFileSync(configPath, "utf-8")
     expect(savedContent).not.toContain("[object Object]")
     const savedConfig = JSON.parse(
-      savedContent.split("\n").filter((line) => !line.trim().startsWith("//")).join("\n"),
+      savedContent
+        .split("\n")
+        .filter((line) => !line.trim().startsWith("//"))
+        .join("\n"),
     )
     expect(savedConfig.plugin).toEqual([["oh-my-openagent@3.10.0", { verbose: true }]])
   })

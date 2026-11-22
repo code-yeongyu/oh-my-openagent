@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
-import {
-  dispatchInternalPrompt,
-  releaseAllPromptAsyncReservationsForTesting,
-} from "./prompt-async-gate"
+import { dispatchInternalPrompt, releaseAllPromptAsyncReservationsForTesting } from "./prompt-async-gate"
 
 describe("dispatchInternalPrompt question tool gating", () => {
   afterEach(() => {

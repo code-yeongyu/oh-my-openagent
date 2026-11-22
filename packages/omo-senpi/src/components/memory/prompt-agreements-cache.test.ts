@@ -23,7 +23,8 @@ async function commitLedger(repo: GitMemoryRepo, n: number, status: string): Pro
     `---\ndescription: Agreements\n---\n\n- [global] ${TEXT} <!-- id: ${ID}; by: agent; n: ${n}; status: ${status} -->\n`,
   )
   await repo.commitWrite([AGREEMENTS_PATH], "chore(facts): extract 1 fact\n\nGenerated-By: facts-extractor", {
-    agentId: "prompt-agent", authorName: "Facts Extractor",
+    agentId: "prompt-agent",
+    authorName: "Facts Extractor",
   })
 }
 
@@ -40,10 +41,18 @@ describe("agreements and the cached prompt prefix (prompt-cache contract)", () =
       appendEntry: (customType, data) => entries.push({ customType, data }),
     })
     const pi = new FakeExtensionAPI()
-    pi.on("before_agent_start", createMemoryPromptHandler({
-      resolveContext: () => context, createRepo: () => repo, cache: new MemoryBlockCache(), pins, ...inputs,
-    }))
-    const turn = (count: number) => dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext(SESSION, liveBranch(count)))
+    pi.on(
+      "before_agent_start",
+      createMemoryPromptHandler({
+        resolveContext: () => context,
+        createRepo: () => repo,
+        cache: new MemoryBlockCache(),
+        pins,
+        ...inputs,
+      }),
+    )
+    const turn = (count: number) =>
+      dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext(SESSION, liveBranch(count)))
     const first = await turn(1)
 
     // when
@@ -60,7 +69,9 @@ describe("agreements and the cached prompt prefix (prompt-cache contract)", () =
     expect(second?.message?.content).toContain(`updated ${AGREEMENTS_PATH}`)
     expect(second?.message?.content).toContain(MEMORY_AGREEMENT_METADATA_TOKEN)
     expect(third?.message).toBeUndefined()
-    expect(entries).toEqual([{ customType: AGREEMENT_FLAGGED_ENTRY_TYPE, data: { id: ID, text: TEXT, n: 3, by: "agent" } }])
+    expect(entries).toEqual([
+      { customType: AGREEMENT_FLAGGED_ENTRY_TYPE, data: { id: ID, text: TEXT, n: 3, by: "agent" } },
+    ])
     expect(refreshed?.systemPrompt).toContain(`[broken x3] NEEDS-HUMAN: ${TEXT}`)
   }, 30_000)
 })

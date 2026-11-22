@@ -1,11 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync } from "fs"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
-import {
-  buildTranscriptFromSession,
-  hasTranscriptCacheEntry,
-  stopTranscriptCacheCleanup,
-} from "./transcript"
+import { buildTranscriptFromSession, hasTranscriptCacheEntry, stopTranscriptCacheCleanup } from "./transcript"
 
 const TRANSCRIPT_CACHE_TTL_MS = 5 * 60 * 1000
 
@@ -68,13 +64,10 @@ describe("transcript cache idle prune", () => {
     //#given
     const harness = installSweepHarness()
     restore = harness.restore
-    const path = await buildTranscriptFromSession(
-      createMockClient(),
-      "ses_idle_prune",
-      "/tmp",
-      "write",
-      { filePath: "/tmp/idle.txt", content: "stale-body" },
-    )
+    const path = await buildTranscriptFromSession(createMockClient(), "ses_idle_prune", "/tmp", "write", {
+      filePath: "/tmp/idle.txt",
+      content: "stale-body",
+    })
 
     expect(path).not.toBeNull()
     expect(hasTranscriptCacheEntry("ses_idle_prune")).toBe(true)

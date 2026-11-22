@@ -179,6 +179,11 @@ of accepted amendments and is absent on runs that were never amended.
   treated as replayable.
 - `omo.dag.updated` is derived state. It can lag or skip intermediate states (debounce plus
   dedupe); do not use it for event-level bookkeeping.
+- Every attach delivers the current state. When a session starts or resumes, the bridge emits the
+  recovered snapshot immediately (no debounce, and `runs: []` when there are none). The session's
+  first turn starts only after that, so a client attached at that point has it before
+  `turn_start`. A client reattaching to a retained session (`session_resumed`) gets the current
+  snapshot restated even when nothing changed.
 
 ## Request methods
 
@@ -279,12 +284,12 @@ missed durable events and the overflow event itself. Then resume buffered live d
 any event whose seq was already applied. Do not subtract one from `recoverAfterSeq`, and do not infer
 a recovery cursor from `droppedCount` or the overflow event's own seq.
 
-## omo-desktop-app integration
+## Desktop app integration
 
 Deferred follow-up. The wiring described here is NOT shipped; this section only maps the contract
 onto the app's existing pattern so the follow-up is mechanical.
 
-omo-desktop-app already consumes `omo.task.updated`: it registers one `extension_event` name and
+The desktop app already consumes `omo.task.updated`: it registers one `extension_event` name and
 runs a wholesale-replace reducer that swaps the stored task list on every payload. This protocol
 was shaped so `omo.dag.updated` slots into that exact pattern:
 

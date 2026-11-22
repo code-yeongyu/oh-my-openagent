@@ -42,11 +42,7 @@ function cleanupStaleEntries(): void {
  * Store metadata to be restored after fromPlugin() overwrites it.
  * Called from tool execute() functions alongside ctx.metadata().
  */
-export function storeToolMetadata(
-  sessionID: string,
-  callID: string,
-  data: PendingToolMetadata
-): void {
+export function storeToolMetadata(sessionID: string, callID: string, data: PendingToolMetadata): void {
   cleanupStaleEntries()
   pendingStore.set(makeKey(sessionID, callID), { ...data, storedAt: Date.now() })
 }
@@ -60,10 +56,7 @@ export function storeToolMetadata(
  * callID alone - but only when exactly one session holds that callID,
  * declining ambiguous cross-session collisions.
  */
-export function consumeToolMetadata(
-  sessionID: string,
-  callID: string
-): PendingToolMetadata | undefined {
+export function consumeToolMetadata(sessionID: string, callID: string): PendingToolMetadata | undefined {
   const stored = takeEntry(makeKey(sessionID, callID)) ?? takeUnambiguousCallIDEntry(callID)
   if (!stored) {
     return undefined
@@ -84,9 +77,7 @@ function callIDOfKey(key: string): string {
   return key.slice(key.indexOf(":") + 1)
 }
 
-function takeUnambiguousCallIDEntry(
-  callID: string
-): (PendingToolMetadata & { storedAt: number }) | undefined {
+function takeUnambiguousCallIDEntry(callID: string): (PendingToolMetadata & { storedAt: number }) | undefined {
   let matchedKey: string | undefined
   for (const key of pendingStore.keys()) {
     if (callIDOfKey(key) !== callID) {

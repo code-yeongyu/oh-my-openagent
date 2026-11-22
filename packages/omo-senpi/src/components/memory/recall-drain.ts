@@ -10,7 +10,15 @@ import type { ComponentLogger } from "../../extension/types"
 import type { MemoryExtensionAPI } from "./capabilities"
 import type { MemoryIdentityContext } from "./context"
 import { resolveMemorySettings } from "./identity-runtime"
-import { GATE_ENTRY_TYPE, NUDGED_ENTRY_TYPE, renderKibitzerGateEntry, renderKibitzerNudgedEntry, renderKibitzerUnavailableEntry, UNAVAILABLE_ENTRY_TYPE, type KibitzerNudgedRecord } from "./kibitzer/notice"
+import {
+  GATE_ENTRY_TYPE,
+  NUDGED_ENTRY_TYPE,
+  renderKibitzerGateEntry,
+  renderKibitzerNudgedEntry,
+  renderKibitzerUnavailableEntry,
+  UNAVAILABLE_ENTRY_TYPE,
+  type KibitzerNudgedRecord,
+} from "./kibitzer/notice"
 import { renderRecallEntry } from "./recall-notice"
 import { RECALL_CUSTOM_TYPE, readSession } from "./recall-session-read"
 
@@ -61,13 +69,19 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
     try {
       fromFile = await options.pendingFor(context).take(session.id)
     } catch (error) {
-      options.logger?.warn("omo-senpi memory recall pending take skipped", { sessionId: session.id, error: describe(error) })
+      options.logger?.warn("omo-senpi memory recall pending take skipped", {
+        sessionId: session.id,
+        error: describe(error),
+      })
     }
     let fromQueue: RecallNudge[] = []
     try {
       fromQueue = options.drainQueued?.(session.id, context) ?? []
     } catch (error) {
-      options.logger?.warn("omo-senpi memory recall queued drain skipped", { sessionId: session.id, error: describe(error) })
+      options.logger?.warn("omo-senpi memory recall queued drain skipped", {
+        sessionId: session.id,
+        error: describe(error),
+      })
     }
     const nudges = dedupeByPath([...fromQueue, ...fromFile])
     if (nudges.length === 0) return undefined
@@ -112,31 +126,35 @@ export function createRecallDrain(options: RecallDrainOptions): RecallDrain {
       pi.registerEntryRenderer("omo-memorian:recall", renderRecallEntry)
       pi.registerEntryRenderer("omo-memorian:nudged", renderKibitzerNudgedEntry)
       pi.registerEntryRenderer("omo-memorian:gate", renderKibitzerGateEntry)
-      pi.on("before_agent_start", async (payload, eventCtx) => {
-        if (isRecord(payload) && payload.preview === true) return undefined
-        try {
-          const injection = await inject(payload, eventCtx)
-          if (injection === undefined) return undefined
+      pi.on(
+        "before_agent_start",
+        async (payload, eventCtx) => {
+          if (isRecord(payload) && payload.preview === true) return undefined
           try {
-            // Visible half: the model-facing message is display:false, so without this entry the
-            // user would see a memory-shaped answer with no trace of where it came from.
-            pi.appendEntry(NUDGED_ENTRY_TYPE, {
-              version: 1,
-              nudges: injection.nudges.map(({ path, hint }) => ({ path, hint })),
-              via: "prompt",
-            } satisfies KibitzerNudgedRecord)
+            const injection = await inject(payload, eventCtx)
+            if (injection === undefined) return undefined
+            try {
+              // Visible half: the model-facing message is display:false, so without this entry the
+              // user would see a memory-shaped answer with no trace of where it came from.
+              pi.appendEntry(NUDGED_ENTRY_TYPE, {
+                version: 1,
+                nudges: injection.nudges.map(({ path, hint }) => ({ path, hint })),
+                via: "prompt",
+              } satisfies KibitzerNudgedRecord)
+            } catch (error) {
+              // Fail-open: the visible trace is bookkeeping - its failure must never suppress a
+              // nudge the ledger already recorded as delivered.
+              options.logger?.warn("omo-senpi memory recall trace entry skipped", { error: describe(error) })
+            }
+            return injection.result
           } catch (error) {
-            // Fail-open: the visible trace is bookkeeping - its failure must never suppress a
-            // nudge the ledger already recorded as delivered.
-            options.logger?.warn("omo-senpi memory recall trace entry skipped", { error: describe(error) })
+            // Read-only advice: any failure skips the injection and leaves the turn untouched.
+            options.logger?.warn("omo-senpi memory recall skipped", { error: describe(error) })
+            return undefined
           }
-          return injection.result
-        } catch (error) {
-          // Read-only advice: any failure skips the injection and leaves the turn untouched.
-          options.logger?.warn("omo-senpi memory recall skipped", { error: describe(error) })
-          return undefined
-        }
-      }, { previewSafe: true })
+        },
+        { previewSafe: true },
+      )
     },
   }
 }

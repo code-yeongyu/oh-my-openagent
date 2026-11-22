@@ -1,10 +1,6 @@
 import { basename } from "node:path"
 import { resolveGateway } from "./config"
-import {
-  wakeGateway,
-  wakeCommandGateway,
-  interpolateInstruction,
-} from "./dispatcher"
+import { wakeGateway, wakeCommandGateway, interpolateInstruction } from "./dispatcher"
 import { getCurrentTmuxSession, captureTmuxPane } from "./tmux"
 import { startReplyListener, stopReplyListener } from "./reply-listener"
 import type { OpenClawConfig, OpenClawContext, OpenClawPayload, WakeResult } from "./types"
@@ -64,10 +60,7 @@ export async function wakeOpenClaw(
         }
       } catch (error) {
         if (DEBUG) {
-          console.error(
-            "[openclaw] failed to capture tmux tail:",
-            error instanceof Error ? error.message : error,
-          )
+          console.error("[openclaw] failed to capture tmux tail:", error instanceof Error ? error.message : error)
         }
       }
     }

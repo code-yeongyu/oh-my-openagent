@@ -61,6 +61,7 @@ impl AttributeSource for FakeElement {
 
 fn window(title: &str) -> DesktopWindow {
     DesktopWindow {
+        identity: None,
         id: "42".to_string(),
         title: title.to_string(),
         app: "TextEdit".to_string(),

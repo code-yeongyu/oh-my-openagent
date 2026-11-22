@@ -20,7 +20,7 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
     hasZaiCodingPlan: false,
     hasKimiForCoding: false,
     hasOpencodeGo: false,
-      hasBailianCodingPlan: false,
+    hasBailianCodingPlan: false,
     hasMinimaxCnCodingPlan: false,
     hasMinimaxCodingPlan: false,
     hasVercelAiGateway: false,
@@ -29,15 +29,38 @@ function createConfig(overrides: Partial<InstallConfig> = {}): InstallConfig {
 }
 
 function flattenConfiguredModels(result: ReturnType<typeof generateModelConfig>) {
-  return [
-    ...Object.values(result.agents ?? {}),
-    ...Object.values(result.categories ?? {}),
-  ].flatMap((entry) => [entry, ...(entry.fallback_models ?? [])])
+  return [...Object.values(result.agents ?? {}), ...Object.values(result.categories ?? {})].flatMap((entry) => [
+    entry,
+    ...(entry.fallback_models ?? []),
+  ])
 }
 describe("generateModelConfig", () => {
+  describe("exact GPT-6.2 lanes (#14155)", () => {
+    const EXACT_LANES = ["ultrabrain", "deep-high", "deep-low"]
+
+    test.each([
+      ["no provider", {}],
+      ["Copilot only", { hasCopilot: true }],
+      ["Claude only", { hasClaude: true }],
+    ] as const)(
+      "writes no entry for the three lanes with %s, so none becomes an explicit override",
+      (_label, overrides) => {
+        const result = generateModelConfig(createConfig(overrides))
+
+        for (const lane of EXACT_LANES) expect(result.categories?.[lane]).toBeUndefined()
+      },
+    )
+
+    test("writes the exact model alone on OpenAI, with no older, Fast or other-family fallback", () => {
+      const result = generateModelConfig(createConfig({ hasOpenAI: true }))
+
+      expect(result.categories?.ultrabrain).toEqual({ model: "openai/gpt-6.2-astra", variant: "max" })
+      expect(result.categories?.["deep-high"]).toEqual({ model: "openai/gpt-6.2-astra", variant: "high" })
+      expect(result.categories?.["deep-low"]).toEqual({ model: "openai/gpt-6.2-sol", variant: "medium" })
+    })
+  })
 
   describe("fallback providers", () => {
-
     test("downgrades unsupported GitHub Copilot GPT high-tier variants", () => {
       // #given only GitHub Copilot is available
       const config = createConfig({ hasCopilot: true })
@@ -48,8 +71,7 @@ describe("generateModelConfig", () => {
       // #then Copilot GPT routes should not receive variants that hang the provider
       const unsupportedEntries = flattenConfiguredModels(result).filter(
         (entry) =>
-          /^github-copilot\/gpt-[56][.-]/.test(entry.model) &&
-          (entry.variant === "max" || entry.variant === "xhigh")
+          /^github-copilot\/gpt-[56][.-]/.test(entry.model) && (entry.variant === "max" || entry.variant === "xhigh"),
       )
       expect(unsupportedEntries).toEqual([])
       expect(result.agents?.momus).toEqual({
@@ -66,11 +88,6 @@ describe("generateModelConfig", () => {
           },
         ],
       })
-      // Astra max/high rungs land first; Copilot clamps the max tier to high like the Sol rungs.
-      expect(result.categories?.ultrabrain?.model).toBe("github-copilot/gpt-6-astra")
-      expect(result.categories?.ultrabrain?.variant).toBe("high")
-      expect(result.categories?.["deep-high"]?.model).toBe("github-copilot/gpt-6-astra")
-      expect(result.categories?.["deep-high"]?.variant).toBe("high")
       expect(result.categories?.["unspecified-low"]?.model).toBe("github-copilot/claude-sonnet-5.5")
       expect(result.categories?.["unspecified-low"]?.variant).toBe("medium")
     })
@@ -113,7 +130,6 @@ describe("generateModelConfig", () => {
   })
 
   describe("mixed provider scenarios", () => {
-
     test("librarian skips deprecated OpenCode Zen models when OpenCode Zen and ZAI are both available", () => {
       // #given the Discord-reported non-TUI provider selection
       const config = createConfig({
@@ -130,7 +146,6 @@ describe("generateModelConfig", () => {
       expect(JSON.stringify(result)).not.toContain("opencode/claude-haiku-4-5")
       expect(JSON.stringify(result)).not.toContain("opencode/gpt-5.4-nano")
     })
-
   })
 
   describe("explore agent special cases", () => {
@@ -291,7 +306,7 @@ describe("generateModelConfig", () => {
   })
 
   describe("Momus agent model resolution", () => {
-    test("Momus resolves to gpt-6-astra xhigh when OpenAI is available", () => {
+    test("Momus resolves to gpt-6.2-astra xhigh when OpenAI is available", () => {
       // #given
       const config = createConfig({ hasOpenAI: true })
 
@@ -299,13 +314,12 @@ describe("generateModelConfig", () => {
       const result = generateModelConfig(config)
 
       // #then
-      expect(result.agents?.momus?.model).toBe("openai/gpt-6-astra")
+      expect(result.agents?.momus?.model).toBe("openai/gpt-6.2-astra")
       expect(result.agents?.momus?.variant).toBe("xhigh")
       expect(result.agents?.momus?.fallback_models?.[0]).toEqual({
         model: "openai/gpt-6-astra",
-        variant: "high",
+        variant: "xhigh",
       })
     })
   })
-
 })

@@ -124,10 +124,21 @@ export function buildHostChaosHarness(): HostChaosHarness {
       opens.push({ task_id: record.task_id, sessionPath })
       if (daemon.drainingAttemptsLeft > 0) {
         daemon.drainingAttemptsLeft -= 1
-        return Promise.resolve({ ok: false, disposition: "retryable", code: "host_draining", reason: "session_path_in_use", retryAfterMs: 20 })
+        return Promise.resolve({
+          ok: false,
+          disposition: "retryable",
+          code: "host_draining",
+          reason: "session_path_in_use",
+          retryAfterMs: 20,
+        })
       }
       if (!daemon.alive) {
-        return Promise.resolve({ ok: false, disposition: "retryable", code: "session_unavailable", reason: "daemon gone" })
+        return Promise.resolve({
+          ok: false,
+          disposition: "retryable",
+          code: "session_unavailable",
+          reason: "daemon gone",
+        })
       }
       if (sessionPath !== undefined) daemon.hold(sessionPath)
       registry.add(record.task_id, daemon, sessionPath ?? hostChaosIdentity(record.task_id).session_path)

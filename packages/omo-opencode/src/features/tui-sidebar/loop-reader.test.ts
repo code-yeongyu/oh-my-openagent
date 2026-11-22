@@ -226,9 +226,7 @@ describe("readActiveLoop", () => {
       writeGoalFile(projectDir, ".omo/ulw-loop/not-live/goals.json", {
         version: 1,
         activeGoalId: "missing",
-        goals: [
-          { id: "blocked", title: "Blocked", status: "blocked", successCriteria: [] },
-        ],
+        goals: [{ id: "blocked", title: "Blocked", status: "blocked", successCriteria: [] }],
       })
 
       // when

@@ -50,9 +50,7 @@ export async function writeStdioJsonRpcResponse(
 ): Promise<void> {
   const body = JSON.stringify(response)
   const payload =
-    responseMode === "framed"
-      ? `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}`
-      : `${body}\n`
+    responseMode === "framed" ? `Content-Length: ${Buffer.byteLength(body, "utf8")}\r\n\r\n${body}` : `${body}\n`
   await writeChunk(output, payload)
 }
 

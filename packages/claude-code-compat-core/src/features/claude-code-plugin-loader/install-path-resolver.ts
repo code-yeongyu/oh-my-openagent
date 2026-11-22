@@ -12,10 +12,7 @@ function parseSemverPrefix(name: string): [number, number, number] | null {
 
 const SEMVER_SUFFIX_MARKER = /^\d+\.\d+\.\d+[-+]/
 
-function compareCandidatePriority(
-  a: { name: string },
-  b: { name: string },
-): number {
+function compareCandidatePriority(a: { name: string }, b: { name: string }): number {
   const aIsUnknown = a.name === "unknown"
   const bIsUnknown = b.name === "unknown"
   if (aIsUnknown && !bIsUnknown) return 1
@@ -38,10 +35,7 @@ function compareCandidatePriority(
   return a.name.localeCompare(b.name)
 }
 
-export function resolveActualInstallPath(
-  configuredInstallPath: string,
-  pluginKey?: string,
-): string | null {
+export function resolveActualInstallPath(configuredInstallPath: string, pluginKey?: string): string | null {
   if (existsSync(configuredInstallPath)) {
     return configuredInstallPath
   }

@@ -8,15 +8,19 @@ import * as z from "zod"
  * `labels` renames the pad's axes: `daily` / `geeky` are the columns, `heavy` / `normal` the rows.
  * An unset label keeps the builtin word.
  */
-const OmoModelPadLabelsSchema = z.object({
-  daily: z.string().optional(),
-  geeky: z.string().optional(),
-  normal: z.string().optional(),
-  heavy: z.string().optional(),
-}).strict()
+const OmoModelPadLabelsSchema = z
+  .object({
+    daily: z.string().optional(),
+    geeky: z.string().optional(),
+    normal: z.string().optional(),
+    heavy: z.string().optional(),
+  })
+  .strict()
 
-export const OmoModelPadSchema = z.object({
-  labels: OmoModelPadLabelsSchema.optional(),
-}).strict()
+export const OmoModelPadSchema = z
+  .object({
+    labels: OmoModelPadLabelsSchema.optional(),
+  })
+  .strict()
 
 export type OmoModelPad = z.infer<typeof OmoModelPadSchema>
