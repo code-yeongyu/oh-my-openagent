@@ -1,46 +1,20 @@
-import { afterAll, afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test"
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs"
+import { afterEach, beforeEach, describe, expect, jest, spyOn, test } from "bun:test"
+import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { randomUUID } from "node:crypto"
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { ToolContext } from "@opencode-ai/plugin/tool"
+import * as storageDetection from "../../shared/opencode-storage-detection"
+import { MESSAGE_STORAGE, PART_STORAGE } from "../../shared/opencode-storage-paths"
+import { resetStorageClient } from "./storage"
+import { createSessionManagerTools } from "./tools"
 
 // Contract (#10738): session_read / session_search / session_info page through OpenCode's message API
 // with a limit on every request, never hold a whole session, and a timed-out search stops reading.
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-paging-${randomUUID()}`)
-
-mock.module("./constants", () => ({
-  MESSAGE_STORAGE: join(TEST_DIR, "message"),
-  PART_STORAGE: join(TEST_DIR, "part"),
-  SESSION_STORAGE: join(TEST_DIR, "session"),
-  TODO_DIR: join(TEST_DIR, "todos"),
-  TRANSCRIPT_DIR: join(TEST_DIR, "transcripts"),
-  SESSION_LIST_DESCRIPTION: "test",
-  SESSION_READ_DESCRIPTION: "test",
-  SESSION_SEARCH_DESCRIPTION: "test",
-  SESSION_INFO_DESCRIPTION: "test",
-}))
-
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => true,
-  resetSqliteBackendCache: () => {},
-}))
-
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    const dir = join(TEST_DIR, "message", sessionID)
-    return existsSync(dir) ? dir : null
-  },
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createSessionManagerTools } = await import("./tools")
-const { resetStorageClient } = await import("./storage")
+const fixtureDirs: string[] = []
 
 type Request = { sessionID: string; limit?: number; before?: string; signal?: AbortSignal }
 
@@ -134,16 +108,20 @@ function blockRequest(server: ReturnType<typeof createFakeServer>, requestNumber
 }
 
 function writeFileSession(sessionID: string, count: number): void {
+  const messageDir = join(MESSAGE_STORAGE, sessionID)
+  fixtureDirs.push(messageDir)
+  mkdirSync(messageDir, { recursive: true })
   for (let index = 0; index < count; index++) {
     const messageID = `msg_${String(index).padStart(6, "0")}`
-    mkdirSync(join(TEST_DIR, "message", sessionID), { recursive: true })
+    const partDir = join(PART_STORAGE, messageID)
+    fixtureDirs.push(partDir)
     writeFileSync(
-      join(TEST_DIR, "message", sessionID, `${messageID}.json`),
+      join(messageDir, `${messageID}.json`),
       JSON.stringify({ id: messageID, role: "user", time: { created: 1_000 + index } }),
     )
-    mkdirSync(join(TEST_DIR, "part", messageID), { recursive: true })
+    mkdirSync(partDir, { recursive: true })
     writeFileSync(
-      join(TEST_DIR, "part", messageID, "prt_0.json"),
+      join(partDir, "prt_0.json"),
       JSON.stringify({
         id: "prt_0",
         type: "text",
@@ -175,13 +153,21 @@ function createTools(server: ReturnType<typeof createFakeServer>, sessionIDs: st
 const SESSION_SIZE = 1_000
 
 describe("session-manager paging (#10738)", () => {
+  let restoreStorageDetection: () => void
+
   beforeEach(() => {
     mkdirSync(TEST_DIR, { recursive: true })
+    const sqliteSpy = spyOn(storageDetection, "isSqliteBackend").mockReturnValue(true)
+    restoreStorageDetection = () => sqliteSpy.mockRestore()
   })
 
   afterEach(() => {
     jest.useRealTimers()
     resetStorageClient()
+    restoreStorageDetection()
+    for (const directory of fixtureDirs.splice(0)) {
+      rmSync(directory, { recursive: true, force: true })
+    }
     rmSync(TEST_DIR, { recursive: true, force: true })
   })
 

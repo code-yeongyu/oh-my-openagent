@@ -78,10 +78,8 @@ function resetStateDir(): void {
   daemonPids.clear()
 }
 
-beforeAll(async () => {
-  process.env.HOME = tempHome
-  process.env.USERPROFILE = tempHome
-
+// The test setup restores module mocks after every test, so each test installs its own.
+function mockReplyListenerDependencies(): void {
   mock.module("../reply-listener-spawn", () => ({
     spawnReplyListenerDaemon: (...args: unknown[]) => spawnImplementation(...args),
   }))
@@ -97,12 +95,20 @@ beforeAll(async () => {
     analyzePaneContent: () => ({ confidence: 1 }),
     sendToPane: async () => true,
   }))
+}
+
+beforeAll(async () => {
+  process.env.HOME = tempHome
+  process.env.USERPROFILE = tempHome
+
+  mockReplyListenerDependencies()
 
   replyListenerModule = await import("../reply-listener")
   replyListenerStartModule = await import("../reply-listener-start")
 })
 
 beforeEach(() => {
+  mockReplyListenerDependencies()
   resetStateDir()
 })
 
