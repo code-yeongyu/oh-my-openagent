@@ -4,7 +4,7 @@ import { resolve } from "node:path"
 import { NextRequest } from "next/server"
 
 import { locales } from "../i18n/config"
-import proxy from "../proxy"
+import proxy, { config } from "../proxy"
 
 const proxySource = readFileSync(resolve(import.meta.dir, "../proxy.ts"), "utf8")
 
@@ -95,7 +95,20 @@ describe("installer script paths on omo.dev", () => {
     expect(redirectOf(path)).toEqual({ status: 308, location })
   })
 
-  test("#given the static matcher #when a dotted installer path is requested #then the proxy runs for it", () => {
-    for (const path of ["/install.sh", "/install.ps1"]) expect(proxySource).toContain(`"${path}",`)
+  // Next.js runs the proxy only for paths the exported matcher accepts: a literal entry, or the generic
+  // pattern, which excludes every path with a dot. Checked on the exported value, not the source text.
+  const matcherAccepts = (path: string) =>
+    config.matcher.some((entry) => entry === path || (entry.startsWith("/(") && new RegExp(`^${entry}$`).test(path)))
+
+  test.each(["/install", "/install.sh", "/install.ps1"])(
+    "#given the active matcher #when %s is requested #then the proxy runs for it",
+    (path) => {
+      expect(matcherAccepts(path)).toBe(true)
+    },
+  )
+
+  test("#given the active matcher #when another dotted path is requested #then the proxy stays out of it", () => {
+    expect(matcherAccepts("/favicon.ico")).toBe(false)
+    expect(matcherAccepts("/install.txt")).toBe(false)
   })
 })
