@@ -1,16 +1,19 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync, watch } from "node:fs"
 import { dirname } from "node:path"
 import { createHostDaemonPaths, runHostRequest } from "@code-yeongyu/senpi"
 
 import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
+import { RUNAWAY_CAP_MS } from "./daemon-test-runner"
 
 const { sandbox, ensureShard, forgetShard, cleanup } = createDaemonEngineHarness()
+// The engine's cold start is bounded by the runner's CPU-progress stall kill (#11845), as in
+// daemon-real-engine.test.ts. The idle contract itself is bounded from readiness by observeUntilReleased.
+setDefaultTimeout(RUNAWAY_CAP_MS + 5_000)
 afterEach(cleanup)
 
 const OBSERVED_IDLE_EXIT_MS = 8_000
 const REQUIRED_REACHABLE_READS = 2
-const IDLE_TEST_BUDGET_MS = OBSERVED_IDLE_EXIT_MS * 6
 const STATUS_INTERVAL_MS = 250
 
 async function observeUntilReleased(agentDir: string, socket: string): Promise<number> {
@@ -86,7 +89,6 @@ if (process.platform !== "win32") {
         expect(reachableReads).toBe(REQUIRED_REACHABLE_READS)
         forgetShard(supervisorPid)
       },
-      IDLE_TEST_BUDGET_MS,
     )
   })
 }
