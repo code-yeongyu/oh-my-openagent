@@ -440,7 +440,9 @@ export function createSession(options: {
               if (stored !== null)
                 await beforeKeysDiscarded(
                   discardedOf(
-                    stored.accountId === undefined && account !== undefined ? { ...stored, accountId: account } : stored,
+                    stored.accountId === undefined && account !== undefined
+                      ? { ...stored, accountId: account }
+                      : stored,
                     "logout",
                   ),
                 )
