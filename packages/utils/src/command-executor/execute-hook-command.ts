@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { windowsTaskkillArgs } from "../windows-taskkill-args"
 import { getHomeDirectory } from "./home-directory"
 import { findBashPath, findZshPath } from "./shell-path"
 
@@ -156,7 +157,12 @@ export async function executeHookCommand(
         onComplete?.()
         return
       }
-      const killer = spawn("taskkill", ["/PID", String(proc.pid), "/T", "/F"], {
+      const args = windowsTaskkillArgs(proc.pid, true)
+      if (args.length === 0) {
+        onComplete?.()
+        return
+      }
+      const killer = spawn("taskkill", args, {
         windowsHide: true,
         stdio: "ignore",
       })
