@@ -70,6 +70,15 @@ export const BUILD_HOOK_OUTER_BOUND_MS = 95 * 60_000
 const PROGRESS_SAMPLE_MS = 250
 const PROGRESS_EPSILON_S = 0.02
 
+// The build's CPU is its child processes' CPU: this test process's own time (sampling included) is subtracted, or the
+// sampler's own work would read as build progress and a hung bundler would never stall.
+function buildCpuSeconds() {
+  const tree = childTreeCpuSeconds(process.pid)
+  if (tree < 0) return tree
+  const own = process.cpuUsage()
+  return tree - (own.user + own.system) / 1e6
+}
+
 async function outputFingerprint(root) {
   const entries = await readdir(root, { recursive: true, withFileTypes: true }).catch(() => [])
   let fingerprint = entries.length
@@ -83,7 +92,7 @@ async function outputFingerprint(root) {
 
 export function boundBuildProgress(name, root, work, { stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S } = {}) {
   return new Promise((resolve, reject) => {
-    const startCpu = childTreeCpuSeconds(process.pid)
+    const startCpu = buildCpuSeconds()
     let lastCpu = startCpu
     let lastOutput = -1
     let lastAdvance = Date.now()
@@ -91,7 +100,7 @@ export function boundBuildProgress(name, root, work, { stallMs = BUILD_STALL_MS,
     const sampler = setInterval(async () => {
       if (sampling) return
       sampling = true
-      const cpu = childTreeCpuSeconds(process.pid)
+      const cpu = buildCpuSeconds()
       const output = await outputFingerprint(root)
       sampling = false
       const now = Date.now()
