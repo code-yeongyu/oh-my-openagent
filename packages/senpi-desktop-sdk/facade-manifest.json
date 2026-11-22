@@ -1,0 +1,709 @@
+{
+	"generatedFrom": "packages/senpi-desktop-sdk/src/facade.ts",
+	"methods": [
+		{
+			"method": "Computer.capabilities",
+			"params": [],
+			"returns": "Promise<DesktopCapabilities>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"capabilities"
+			],
+			"summary": "Runtime truth about what the backend can do right now."
+		},
+		{
+			"method": "Computer.displays",
+			"params": [],
+			"returns": "Promise<readonly Display[]>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"displays"
+			],
+			"summary": "Every monitor in global points."
+		},
+		{
+			"method": "Computer.windows",
+			"params": [
+				{
+					"name": "filter",
+					"optional": true,
+					"type": "WindowFilter"
+				}
+			],
+			"returns": "Promise<readonly Window[]>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"windows"
+			],
+			"summary": "Every top-level window matching `filter`."
+		},
+		{
+			"method": "Computer.window",
+			"params": [
+				{
+					"name": "selector",
+					"optional": false,
+					"type": "WindowSelector"
+				}
+			],
+			"returns": "Promise<Window>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"windows"
+			],
+			"summary": "Exactly one window: none matching is `WindowNotFound`, more than one is `InvalidTarget` with reason `ambiguous` and the matches in `data.candidates`."
+		},
+		{
+			"method": "Computer.verify",
+			"params": [
+				{
+					"name": "expectation",
+					"optional": false,
+					"type": "Expectation"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "VerifyOptions"
+				}
+			],
+			"returns": "Promise<Verdict>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.node",
+				"ax.attributes",
+				"windows"
+			],
+			"summary": "Polls READ calls until `expectation` holds or the deadline passes; never sends input and never sleeps past the deadline. `unknown` when a read fails."
+		},
+		{
+			"method": "Computer.batch",
+			"params": [
+				{
+					"name": "steps",
+					"optional": false,
+					"type": "readonly Step[]"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "BatchOptions"
+				}
+			],
+			"returns": "Promise<BatchReport>",
+			"tier": "exec",
+			"policy": "none",
+			"wire": [],
+			"summary": "Runs `steps` in order, each like one tool call, and stops at the first failure."
+		},
+		{
+			"method": "Computer.close",
+			"params": [],
+			"returns": "Promise<void>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [],
+			"summary": "Detaches this SDK connection; later calls fail `Closed`. The host's own session stays open."
+		},
+		{
+			"method": "Target.screenshot",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "CaptureOptions"
+				}
+			],
+			"returns": "Promise<Frame>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"capture"
+			],
+			"summary": "A full capture; its frame is what coordinate input aims with."
+		},
+		{
+			"method": "Target.observe",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ObserveOptions"
+				}
+			],
+			"returns": "Promise<Observation>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"observe"
+			],
+			"summary": "A capture and the AX tree of the same moment, in one engine request."
+		},
+		{
+			"method": "Target.ax",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "AxSnapshotOptions"
+				}
+			],
+			"returns": "Promise<AxSnapshot>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.snapshot"
+			],
+			"summary": "The accessibility tree; `options.since` returns only nodes changed after that generation."
+		},
+		{
+			"method": "Frame.zoom",
+			"params": [
+				{
+					"name": "region",
+					"optional": false,
+					"type": "Region"
+				}
+			],
+			"returns": "Promise<Frame>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"captureRegion"
+			],
+			"summary": "Native detail of `region` of this frame; the zoom does not replace this frame for input."
+		},
+		{
+			"method": "Pointer.click",
+			"params": [
+				{
+					"name": "point",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ClickOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"click"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Pointer.move",
+			"params": [
+				{
+					"name": "point",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "PointerOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"moveMouse"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Pointer.drag",
+			"params": [
+				{
+					"name": "from",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "to",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "PointerOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"drag"
+			],
+			"summary": "Both points come from the same frame."
+		},
+		{
+			"method": "Pointer.scroll",
+			"params": [
+				{
+					"name": "point",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "delta",
+					"optional": false,
+					"type": "Delta"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "PointerOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"scroll"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Pointer.hold",
+			"params": [
+				{
+					"name": "point",
+					"optional": false,
+					"type": "FramePoint"
+				},
+				{
+					"name": "options",
+					"optional": false,
+					"type": "MouseHoldOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"holdMouse"
+			],
+			"summary": "Holds a button for 0..=100 s; it is released before the call returns, also on interruption."
+		},
+		{
+			"method": "Keyboard.type",
+			"params": [
+				{
+					"name": "text",
+					"optional": false,
+					"type": "string"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "KeyboardOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"typeText"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Keyboard.chord",
+			"params": [
+				{
+					"name": "keys",
+					"optional": false,
+					"type": "string"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "KeyboardOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"keyChord"
+			],
+			"summary": "`keys` joined by `+` (`cmd+s`); dangerous chords need `force`."
+		},
+		{
+			"method": "Keyboard.hold",
+			"params": [
+				{
+					"name": "keys",
+					"optional": false,
+					"type": "readonly string[]"
+				},
+				{
+					"name": "options",
+					"optional": false,
+					"type": "KeyHoldOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "background",
+			"wire": [
+				"holdKeys"
+			],
+			"summary": "Presses in order and releases in reverse before the call returns."
+		},
+		{
+			"method": "Window.raise",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "foreground",
+			"wire": [
+				"raiseWindow"
+			],
+			"summary": "Brings the window to the front."
+		},
+		{
+			"method": "Window.element",
+			"params": [
+				{
+					"name": "ref",
+					"optional": false,
+					"type": "Ref"
+				}
+			],
+			"returns": "Element",
+			"tier": "read",
+			"policy": "none",
+			"wire": [],
+			"summary": "An element of this window by ref, without a read; `node` stays `null` until `read()`."
+		},
+		{
+			"method": "Window.find",
+			"params": [
+				{
+					"name": "query",
+					"optional": false,
+					"type": "AxQuery"
+				}
+			],
+			"returns": "Promise<readonly Element[]>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.query"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Menus.items",
+			"params": [
+				{
+					"name": "path",
+					"optional": true,
+					"type": "readonly string[]"
+				}
+			],
+			"returns": "Promise<readonly MenuItem[]>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"menus.items"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Menus.select",
+			"params": [
+				{
+					"name": "path",
+					"optional": false,
+					"type": "readonly string[]"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"menus.select"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.read",
+			"params": [],
+			"returns": "Promise<AxNode>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.node"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.press",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.perform"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.click",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.click"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.setValue",
+			"params": [
+				{
+					"name": "value",
+					"optional": false,
+					"type": "string"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.setValue"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.type",
+			"params": [
+				{
+					"name": "text",
+					"optional": false,
+					"type": "string"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<TypeReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.typeText"
+			],
+			"summary": "Inserted through the element's own selection, or keys once it holds its app's keyboard focus."
+		},
+		{
+			"method": "Element.focus",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.focus"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.perform",
+			"params": [
+				{
+					"name": "action",
+					"optional": false,
+					"type": "string"
+				},
+				{
+					"name": "options",
+					"optional": true,
+					"type": "ActionOptions"
+				}
+			],
+			"returns": "Promise<ActionReport>",
+			"tier": "exec",
+			"policy": "semantic",
+			"wire": [
+				"ax.perform"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.attributes",
+			"params": [],
+			"returns": "Promise<Readonly<Record<string, string>>>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.attributes"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Element.drill",
+			"params": [
+				{
+					"name": "options",
+					"optional": true,
+					"type": "AxSnapshotOptions"
+				}
+			],
+			"returns": "Promise<AxSnapshot>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"ax.snapshot"
+			],
+			"summary": "The tree under this element only; refs of the parent snapshot stay valid."
+		},
+		{
+			"method": "ControlLease.release",
+			"params": [],
+			"returns": "Promise<void>",
+			"tier": "exec",
+			"policy": "none",
+			"wire": [
+				"control.revoke"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Control.acquire",
+			"params": [
+				{
+					"name": "reason",
+					"optional": false,
+					"type": "string"
+				}
+			],
+			"returns": "Promise<ControlLease>",
+			"tier": "exec",
+			"policy": "none",
+			"wire": [
+				"control.state",
+				"control.grant"
+			],
+			"summary": "Asks the human through the host's confirm channel, then grants; `ControlRequired` when nobody can be asked or the human declines."
+		},
+		{
+			"method": "Control.state",
+			"params": [],
+			"returns": "Promise<ControlState>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"control.state"
+			],
+			"summary": ""
+		},
+		{
+			"method": "Control.release",
+			"params": [],
+			"returns": "Promise<void>",
+			"tier": "exec",
+			"policy": "none",
+			"wire": [
+				"control.revoke"
+			],
+			"summary": ""
+		},
+		{
+			"method": "StopPath.status",
+			"params": [],
+			"returns": "Promise<StopPathStatus>",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"stopPath.status"
+			],
+			"summary": ""
+		},
+		{
+			"method": "StopPath.on",
+			"params": [
+				{
+					"name": "listener",
+					"optional": false,
+					"type": "(status: StopPathStatus) => void"
+				}
+			],
+			"returns": "() => void",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"stopPath.changed"
+			],
+			"summary": "Called on every `stopPath.changed`; returns the unsubscribe function."
+		},
+		{
+			"method": "Events.on",
+			"params": [
+				{
+					"name": "listener",
+					"optional": false,
+					"type": "(event: T) => void"
+				}
+			],
+			"returns": "() => void",
+			"tier": "read",
+			"policy": "none",
+			"wire": [
+				"audit",
+				"epoch.changed"
+			],
+			"summary": "Returns the unsubscribe function."
+		}
+	]
+}

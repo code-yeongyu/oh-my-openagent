@@ -1,10 +1,25 @@
 import { describe, expect, test } from "bun:test"
 import { createShutdownDrain } from "./shutdown-drain"
-import { DREAM_VOLUME_GATE_BYTES, evaluateDreamGates, resolveDreamTriggerSettings, type DreamTriggerSession } from "./dream-trigger"
+import {
+  DREAM_VOLUME_GATE_BYTES,
+  evaluateDreamGates,
+  resolveDreamTriggerSettings,
+  type DreamTriggerSession,
+} from "./dream-trigger"
 import { fireDream } from "./dream-trigger-fire"
 import { loadConversations } from "./dream-selector"
 import { memorySettings } from "./memory.test-support"
-import { CONVERSATION, NOW_MS, fireTimer, fixture, gateProbe, noopSteps, settle, triggerSettings } from "./dream-trigger.test-support"
+import {
+  CONVERSATION,
+  NOW_MS,
+  fireTimer,
+  fixture,
+  gateProbe,
+  noopSteps,
+  settle,
+  triggerSettings,
+} from "./dream-trigger.test-support"
+import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
 describe("dream shutdown evaluator", () => {
   test("#given every gate passing #when shutdown fireDream uses an injected loader #then the loader runs exactly once", async () => {
@@ -86,9 +101,13 @@ describe("dream shutdown evaluator", () => {
 
   test("#given abort arrives while shutdown reservation is in flight #when the reservation returns active #then no dream child launch starts", async () => {
     let releaseReservation: (() => void) | undefined
-    const reservationReleased = new Promise<void>((resolve) => { releaseReservation = resolve })
+    const reservationReleased = new Promise<void>((resolve) => {
+      releaseReservation = resolve
+    })
     let signalReservationStarted: (() => void) | undefined
-    const reservationStarted = new Promise<void>((resolve) => { signalReservationStarted = resolve })
+    const reservationStarted = new Promise<void>((resolve) => {
+      signalReservationStarted = resolve
+    })
     let reserve: DreamTriggerSession["store"]["tryReserve"] | undefined
     const f = await fixture({
       reservationStore: {
@@ -110,7 +129,9 @@ describe("dream shutdown evaluator", () => {
     })
     await Promise.race([
       reservationStarted,
-      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("shutdown reservation did not start")), 2_000)),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("shutdown reservation did not start")), remainingTestTime()),
+      ),
     ])
 
     controller.abort()
@@ -126,9 +147,13 @@ describe("dream shutdown evaluator", () => {
     const f = await fixture()
     const controller = new AbortController()
     let releaseSnapshot: (() => void) | undefined
-    const snapshotReleased = new Promise<void>((resolve) => { releaseSnapshot = resolve })
+    const snapshotReleased = new Promise<void>((resolve) => {
+      releaseSnapshot = resolve
+    })
     let signalSnapshotStarted: (() => void) | undefined
-    const snapshotStarted = new Promise<void>((resolve) => { signalSnapshotStarted = resolve })
+    const snapshotStarted = new Promise<void>((resolve) => {
+      signalSnapshotStarted = resolve
+    })
     let secondSnapshots = 0
     const snapshot = {
       start_message_id: "start",

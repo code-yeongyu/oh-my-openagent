@@ -6,8 +6,20 @@ import { join } from "node:path"
 import { registrySnapshot } from "../memory/facts-runner.test-support"
 import { digestByteLength } from "./session-history/session-digest"
 import type { SessionDigest } from "./session-history"
-import { digest, fakeModel, snapshotTree, tempRoot, understandRunDirs, UNDERSTAND_MODEL, type FakeTurn } from "./understand.test-support"
-import { ONBOARDING_UNDERSTAND_BUDGET, type OnboardingUnderstandBudgetLimits, type OnboardingUnderstandEvent } from "./understand-contract"
+import {
+  digest,
+  fakeModel,
+  snapshotTree,
+  tempRoot,
+  understandRunDirs,
+  UNDERSTAND_MODEL,
+  type FakeTurn,
+} from "./understand.test-support"
+import {
+  ONBOARDING_UNDERSTAND_BUDGET,
+  type OnboardingUnderstandBudgetLimits,
+  type OnboardingUnderstandEvent,
+} from "./understand-contract"
 import { OnboardingUnderstandingControl } from "./understand-control"
 import { runOnboardingUnderstanding } from "./understand-runtime"
 import { startOnboardingUnderstanding } from "./understand-start"
@@ -35,19 +47,22 @@ async function run(input: {
 }) {
   const model = fakeModel(input.turn, input.onAbort === undefined ? {} : { onAbort: input.onAbort })
   const events: OnboardingUnderstandEvent[] = []
-  const done = await runOnboardingUnderstanding({
-    understandId: "understand-1",
-    scanId: "scan-1",
-    model: UNDERSTAND_MODEL,
-    digests: input.digests,
-    projectRoots: input.projectRoots ?? new Set(input.digests.map((item) => item.cwd)),
-    ...(input.now === undefined ? {} : { now: input.now }),
-    modelRegistry: registrySnapshot(),
-    control: input.control ?? new OnboardingUnderstandingControl(),
-    createRunner: model.createRunner,
-    env: input.env ?? { HOME: "/nonexistent-home" },
-    ...(input.budget === undefined ? {} : { budget: input.budget }),
-  }, (event) => events.push(event))
+  const done = await runOnboardingUnderstanding(
+    {
+      understandId: "understand-1",
+      scanId: "scan-1",
+      model: UNDERSTAND_MODEL,
+      digests: input.digests,
+      projectRoots: input.projectRoots ?? new Set(input.digests.map((item) => item.cwd)),
+      ...(input.now === undefined ? {} : { now: input.now }),
+      modelRegistry: registrySnapshot(),
+      control: input.control ?? new OnboardingUnderstandingControl(),
+      createRunner: model.createRunner,
+      env: input.env ?? { HOME: "/nonexistent-home" },
+      ...(input.budget === undefined ? {} : { budget: input.budget }),
+    },
+    (event) => events.push(event),
+  )
   return { done, events, starts: model.starts }
 }
 
@@ -77,20 +92,36 @@ describe("onboarding understanding (#10480)", () => {
     const digests = [digest(alpha, 1), digest(alpha, 2), digest(alpha, 3), digest(beta, 4), digest(beta, 5)]
 
     // when
-    const { done, events, starts } = await run({ digests, turn: async ({ record }) => {
-      await record("The user runs tests with bun.")
-      return "completed"
-    } })
+    const { done, events, starts } = await run({
+      digests,
+      turn: async ({ record }) => {
+        await record("The user runs tests with bun.")
+        return "completed"
+      },
+    })
 
     // then
     expect(kinds(events)).toEqual(["step_started", "fact", "step_done", "step_started", "step_done", "done"])
-    expect(events[0]?.step).toEqual({ id: "step-1", label: "Read 3 recent sessions in alpha", project: alpha, sessions: 3 })
+    expect(events[0]?.step).toEqual({
+      id: "step-1",
+      label: "Read 3 recent sessions in alpha",
+      project: alpha,
+      sessions: 3,
+    })
     expect(events[3]?.step?.label).toBe("Read 2 recent sessions in beta")
-    const alphaBytes = digests.slice(0, 3).reduce((sum, item) => sum + digestByteLength(item), 0) + Buffer.byteLength(agentsMd)
+    const alphaBytes =
+      digests.slice(0, 3).reduce((sum, item) => sum + digestByteLength(item), 0) + Buffer.byteLength(agentsMd)
     expect(events[2]?.bytesRead).toBe(alphaBytes)
     expect(events[4]?.bytesRead).toBe(alphaBytes + digestByteLength(digests[3]!) + digestByteLength(digests[4]!))
-    expect(events.every((event) => event.understandId === "understand-1" && event.scanId === "scan-1" && event.elapsedMs >= 0)).toBe(true)
-    expect(events[1]?.fact).toMatchObject({ fact: { scope: "project", text: "The user runs tests with bun." }, sources: digests.slice(0, 3).map((item) => item.sessionKey) })
+    expect(
+      events.every(
+        (event) => event.understandId === "understand-1" && event.scanId === "scan-1" && event.elapsedMs >= 0,
+      ),
+    ).toBe(true)
+    expect(events[1]?.fact).toMatchObject({
+      fact: { scope: "project", text: "The user runs tests with bun." },
+      sources: digests.slice(0, 3).map((item) => item.sessionKey),
+    })
     expect(done.kind).toBe("done")
     expect(done.fallback).toBeUndefined()
     expect(done.candidates).toHaveLength(1)
@@ -131,14 +162,22 @@ describe("onboarding understanding (#10480)", () => {
   test("#given a model that records past the cap #when understanding runs #then 24 tool calls end the run with a budget event", async () => {
     // given
     const root = await workspace()
-    const digests = [digest(join(root, "a"), 1), digest(join(root, "a"), 2), digest(join(root, "b"), 3), digest(join(root, "b"), 4)]
+    const digests = [
+      digest(join(root, "a"), 1),
+      digest(join(root, "a"), 2),
+      digest(join(root, "b"), 3),
+      digest(join(root, "b"), 4),
+    ]
     const accepted: boolean[] = []
 
     // when
-    const { done, events, starts } = await run({ digests, turn: async ({ record }) => {
-      for (let index = 0; index < 30; index += 1) accepted.push(await record("The user writes TypeScript."))
-      return "completed"
-    } })
+    const { done, events, starts } = await run({
+      digests,
+      turn: async ({ record }) => {
+        for (let index = 0; index < 30; index += 1) accepted.push(await record("The user writes TypeScript."))
+        return "completed"
+      },
+    })
 
     // then
     expect(accepted.filter(Boolean)).toHaveLength(24)
@@ -151,13 +190,21 @@ describe("onboarding understanding (#10480)", () => {
   test("#given more than twelve distinct facts #when understanding runs #then twelve candidates are kept and the run ends at the cap", async () => {
     // given
     const root = await workspace()
-    const digests = [digest(join(root, "a"), 1), digest(join(root, "a"), 2), digest(join(root, "b"), 3), digest(join(root, "b"), 4)]
+    const digests = [
+      digest(join(root, "a"), 1),
+      digest(join(root, "a"), 2),
+      digest(join(root, "b"), 3),
+      digest(join(root, "b"), 4),
+    ]
 
     // when
-    const { done, events } = await run({ digests, turn: async ({ record }) => {
-      for (let index = 0; index < 20; index += 1) await record(`Distinct fact number ${index}.`)
-      return "completed"
-    } })
+    const { done, events } = await run({
+      digests,
+      turn: async ({ record }) => {
+        for (let index = 0; index < 20; index += 1) await record(`Distinct fact number ${index}.`)
+        return "completed"
+      },
+    })
 
     // then
     expect(done.candidates).toHaveLength(12)
@@ -171,7 +218,8 @@ describe("onboarding understanding (#10480)", () => {
     const root = await workspace()
     const long = "x".repeat(15_000)
     const digests = Array.from({ length: 40 }, (_, index) =>
-      digest(join(root, `p${Math.floor(index / 2)}`), index, { firstRequest: long }))
+      digest(join(root, `p${Math.floor(index / 2)}`), index, { firstRequest: long }),
+    )
     expect(digests.reduce((sum, item) => sum + digestByteLength(item), 0)).toBeGreaterThan(240 * 1024)
 
     // when
@@ -189,10 +237,13 @@ describe("onboarding understanding (#10480)", () => {
     const root = await workspace()
 
     // when
-    const { done, events, starts } = await run({ digests: [digest(join(root, "solo"), 1)], turn: async ({ record }) => {
-      await record("Should never be recorded.")
-      return "completed"
-    } })
+    const { done, events, starts } = await run({
+      digests: [digest(join(root, "solo"), 1)],
+      turn: async ({ record }) => {
+        await record("Should never be recorded.")
+        return "completed"
+      },
+    })
 
     // then
     expect(starts).toHaveLength(0)
@@ -207,10 +258,13 @@ describe("onboarding understanding (#10480)", () => {
     const digests = [digest(join(root, "one"), 1), digest(join(root, "two"), 2)]
 
     // when
-    const { done, events } = await run({ digests, turn: async ({ record }) => {
-      await record("The user works across several repositories.")
-      return "completed"
-    } })
+    const { done, events } = await run({
+      digests,
+      turn: async ({ record }) => {
+        await record("The user works across several repositories.")
+        return "completed"
+      },
+    })
 
     // then
     expect(events[0]?.step?.label).toBe("Read 2 recent sessions across 2 projects")
@@ -220,7 +274,12 @@ describe("onboarding understanding (#10480)", () => {
   test("#given a model call that keeps failing #when understanding runs #then it retries once and ends with the scan-only fallback", async () => {
     // given
     const root = await workspace()
-    const digests = [digest(join(root, "a"), 1), digest(join(root, "a"), 2), digest(join(root, "b"), 3), digest(join(root, "b"), 4)]
+    const digests = [
+      digest(join(root, "a"), 1),
+      digest(join(root, "a"), 2),
+      digest(join(root, "b"), 3),
+      digest(join(root, "b"), 4),
+    ]
 
     // when
     const { done, events, starts } = await run({ digests, turn: async () => "error" })
@@ -238,7 +297,10 @@ describe("onboarding understanding (#10480)", () => {
     const root = await workspace()
 
     // when
-    const { done, starts } = await run({ digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)], turn: async () => "throw" })
+    const { done, starts } = await run({
+      digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
+      turn: async () => "throw",
+    })
 
     // then
     expect(starts).toHaveLength(2)
@@ -250,11 +312,14 @@ describe("onboarding understanding (#10480)", () => {
     const root = await workspace()
 
     // when
-    const { done, events } = await run({ digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)], turn: async ({ start, record }) => {
-      if (start === 1) return "error"
-      await record("The user deploys on Fridays.")
-      return "completed"
-    } })
+    const { done, events } = await run({
+      digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2)],
+      turn: async ({ start, record }) => {
+        if (start === 1) return "error"
+        await record("The user deploys on Fridays.")
+        return "completed"
+      },
+    })
 
     // then
     expect(kinds(events)).toEqual(["step_started", "step_failed", "fact", "step_done", "done"])
@@ -265,7 +330,12 @@ describe("onboarding understanding (#10480)", () => {
   test("#given a step that outlives its time budget #when understanding runs #then the step ends with what it recorded and the next step runs", async () => {
     // given
     const root = await workspace()
-    const digests = [digest(join(root, "a"), 1), digest(join(root, "a"), 2), digest(join(root, "b"), 3), digest(join(root, "b"), 4)]
+    const digests = [
+      digest(join(root, "a"), 1),
+      digest(join(root, "a"), 2),
+      digest(join(root, "b"), 3),
+      digest(join(root, "b"), 4),
+    ]
 
     // when
     const { done, events } = await run({
@@ -278,9 +348,21 @@ describe("onboarding understanding (#10480)", () => {
     })
 
     // then
-    expect(kinds(events)).toEqual(["step_started", "fact", "budget", "step_done", "step_started", "fact", "step_done", "done"])
+    expect(kinds(events)).toEqual([
+      "step_started",
+      "fact",
+      "budget",
+      "step_done",
+      "step_started",
+      "fact",
+      "step_done",
+      "done",
+    ])
     expect(events[2]?.budget).toBe("step_ms")
-    expect(done.candidates?.map((candidate) => candidate.fact.text)).toEqual(["Recorded before the step ran out.", "Recorded in the second step."])
+    expect(done.candidates?.map((candidate) => candidate.fact.text)).toEqual([
+      "Recorded before the step ran out.",
+      "Recorded in the second step.",
+    ])
   })
 
   test("#given steps that never finish #when the total budget runs out #then the run ends", async () => {
@@ -289,7 +371,11 @@ describe("onboarding understanding (#10480)", () => {
     const digests = Array.from({ length: 10 }, (_, index) => digest(join(root, `p${Math.floor(index / 2)}`), index))
 
     // when
-    const { done, events } = await run({ digests, budget: { ...ONBOARDING_UNDERSTAND_BUDGET, stepMs: 60, totalMs: 150 }, turn: async () => "hang" })
+    const { done, events } = await run({
+      digests,
+      budget: { ...ONBOARDING_UNDERSTAND_BUDGET, stepMs: 60, totalMs: 150 },
+      turn: async () => "hang",
+    })
 
     // then
     expect(events.filter((event) => event.kind === "budget").at(-1)?.budget).toBe("total_ms")
@@ -305,7 +391,11 @@ describe("onboarding understanding (#10480)", () => {
     await writeFile(join(alpha, "AGENTS.md"), "UNLISTED-PROJECT-RULES\n")
 
     // when
-    const { starts, events } = await run({ digests: [digest(alpha, 1), digest(alpha, 2)], projectRoots: new Set(), turn: async () => "completed" })
+    const { starts, events } = await run({
+      digests: [digest(alpha, 1), digest(alpha, 2)],
+      projectRoots: new Set(),
+      turn: async () => "completed",
+    })
 
     // then
     expect(starts).toHaveLength(1)
@@ -325,7 +415,11 @@ describe("onboarding understanding (#10480)", () => {
     await symlink(join(outside, "secret.md"), join(alpha, "AGENTS.md"))
 
     // when
-    const { starts } = await run({ digests: [digest(alpha, 1), digest(alpha, 2)], projectRoots: new Set([alpha]), turn: async () => "completed" })
+    const { starts } = await run({
+      digests: [digest(alpha, 1), digest(alpha, 2)],
+      projectRoots: new Set([alpha]),
+      turn: async () => "completed",
+    })
 
     // then
     expect(starts).toHaveLength(1)
@@ -396,18 +490,21 @@ describe("onboarding understanding (#10480)", () => {
     const events: OnboardingUnderstandEvent[] = []
 
     // when
-    const started = await startOnboardingUnderstanding({
-      scanId: "scan-1",
-      model: UNDERSTAND_MODEL,
-      digests,
-      projectRoots: new Set(),
-      modelRegistry: registrySnapshot(),
-      env: { HOME: "/nonexistent-home" },
-      seams: { createRunner: model.createRunner },
-    }, (event) => {
-      events.push(event)
-      if (event.kind === "fact") throw new Error("client went away")
-    })
+    const started = await startOnboardingUnderstanding(
+      {
+        scanId: "scan-1",
+        model: UNDERSTAND_MODEL,
+        digests,
+        projectRoots: new Set(),
+        modelRegistry: registrySnapshot(),
+        env: { HOME: "/nonexistent-home" },
+        seams: { createRunner: model.createRunner },
+      },
+      (event) => {
+        events.push(event)
+        if (event.kind === "fact") throw new Error("client went away")
+      },
+    )
     if ("kind" in started) throw new Error(`understanding did not start: ${started.reason}`)
     await started.finished
 
@@ -461,7 +558,10 @@ describe("onboarding understanding (#10480)", () => {
     })
 
     // then
-    expect(events.find((event) => event.kind === "step_done")).toMatchObject({ skipped: true, step: { project: alpha } })
+    expect(events.find((event) => event.kind === "step_done")).toMatchObject({
+      skipped: true,
+      step: { project: alpha },
+    })
     expect(done.candidates?.map((candidate) => candidate.fact.text)).toEqual(["From beta."])
   })
 
@@ -472,7 +572,12 @@ describe("onboarding understanding (#10480)", () => {
 
     // when
     const { done, starts } = await run({
-      digests: [digest(join(root, "a"), 1), digest(join(root, "a"), 2), digest(join(root, "b"), 3), digest(join(root, "b"), 4)],
+      digests: [
+        digest(join(root, "a"), 1),
+        digest(join(root, "a"), 2),
+        digest(join(root, "b"), 3),
+        digest(join(root, "b"), 4),
+      ],
       control,
       turn: async ({ start, record }) => {
         if (start === 1) {

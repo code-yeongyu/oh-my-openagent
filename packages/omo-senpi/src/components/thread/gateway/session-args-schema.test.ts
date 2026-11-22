@@ -6,14 +6,17 @@ import { argumentFailure, schemaProblem } from "./session-args-schema"
 
 // Contract: the worker's own check replaced typebox's Value.Check for declared op arguments, so the
 // subset must keep the verdicts a typebox-declared schema had, and must refuse what it cannot check.
-const declared = Type.Object({
-  target: Type.String({ minLength: 1, maxLength: 3, pattern: "^[a-z]+$" }),
-  mode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("manual")])),
-  limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })),
-  ratio: Type.Optional(Type.Number({ exclusiveMaximum: 1 })),
-  tags: Type.Optional(Type.Array(Type.String(), { maxItems: 2 })),
-  flag: Type.Optional(Type.Boolean()),
-}, { additionalProperties: false })
+const declared = Type.Object(
+  {
+    target: Type.String({ minLength: 1, maxLength: 3, pattern: "^[a-z]+$" }),
+    mode: Type.Optional(Type.Union([Type.Literal("auto"), Type.Literal("manual")])),
+    limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 10 })),
+    ratio: Type.Optional(Type.Number({ exclusiveMaximum: 1 })),
+    tags: Type.Optional(Type.Array(Type.String(), { maxItems: 2 })),
+    flag: Type.Optional(Type.Boolean()),
+  },
+  { additionalProperties: false },
+)
 
 test("#given an argument schema written with typebox #when the store checks it #then it is inside the subset", () => {
   expect(schemaProblem(declared)).toBeUndefined()
@@ -21,7 +24,11 @@ test("#given an argument schema written with typebox #when the store checks it #
 
 test.each<[string, unknown, boolean]>([
   ["the smallest valid object", { target: "ab" }, true],
-  ["every optional field set", { target: "abc", mode: "manual", limit: 10, ratio: 0.5, tags: ["x", "y"], flag: false }, true],
+  [
+    "every optional field set",
+    { target: "abc", mode: "manual", limit: 10, ratio: 0.5, tags: ["x", "y"], flag: false },
+    true,
+  ],
   ["a missing required field", {}, false],
   ["an undeclared field", { target: "ab", extra: 1 }, false],
   ["a string past maxLength", { target: "abcd" }, false],

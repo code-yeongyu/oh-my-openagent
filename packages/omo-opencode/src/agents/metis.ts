@@ -1,3 +1,4 @@
+import { buildNativeAgentPrompt } from "./native-model-prompt"
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
 import { buildClaudeThinkingConfig, isKimiK2CodeModel } from "./types"
@@ -20,7 +21,7 @@ const MODE: AgentMode = "subagent"
  * - Prepare directives for the planner agent
  */
 
-export const METIS_SYSTEM_PROMPT = `# Metis - Pre-Planning Consultant
+const METIS_SYSTEM_PROMPT = `# Metis - Pre-Planning Consultant
 
 ## CONSTRAINTS
 
@@ -293,7 +294,7 @@ call_omo_agent(subagent_type="librarian", prompt="I'm looking for proven impleme
 - Ensure acceptance criteria are agent-executable (commands, not human actions)
 `
 
-export const METIS_K2_7_SYSTEM_PROMPT = `<role>
+const METIS_K2_7_SYSTEM_PROMPT = `<role>
 You are Metis, the pre-planning consultant from OhMyOpenCode, running on Kimi K2.7. Named for the Titan of deep counsel, you read a request before any plan exists and surface what would derail it: the hidden intent, the ambiguity, the AI-slop trap.
 
 You are read-only: you analyze, question, and advise; you never implement or edit files. Your analysis feeds Prometheus, the planner, so it must be actionable: concrete directives, not observations.
@@ -389,11 +390,7 @@ For Build and Research, run the exploration yourself before questioning. Prompt 
 **ALWAYS**: classify first; be specific ("change UserService only, or AuthService too?"); explore before asking for Build and Research intents; give Prometheus actionable directives; and include the agent-executable QA directives in every output.
 </critical_rules>`
 
-const metisRestrictions = createAgentToolRestrictions([
-  "write",
-  "edit",
-  "apply_patch",
-])
+const metisRestrictions = createAgentToolRestrictions(["write", "edit", "apply_patch"])
 
 export function createMetisAgent(model: string): AgentConfig {
   const prompt = isKimiK2CodeModel(model) ? METIS_K2_7_SYSTEM_PROMPT : METIS_SYSTEM_PROMPT
@@ -404,7 +401,7 @@ export function createMetisAgent(model: string): AgentConfig {
     model,
     temperature: 0.3,
     ...metisRestrictions,
-    prompt,
+    prompt: buildNativeAgentPrompt(model, prompt),
     ...buildClaudeThinkingConfig(model),
   } as AgentConfig
 }
@@ -424,10 +421,7 @@ export const metisPromptMetadata: AgentPromptMetadata = {
     "When user request is ambiguous or open-ended",
     "To prevent AI over-engineering patterns",
   ],
-  avoidWhen: [
-    "Simple, well-defined tasks",
-    "User has already provided detailed requirements",
-  ],
+  avoidWhen: ["Simple, well-defined tasks", "User has already provided detailed requirements"],
   promptAlias: "Metis",
   keyTrigger: "Ambiguous or complex request → consult Metis before Prometheus",
 }

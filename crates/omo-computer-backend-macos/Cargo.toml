@@ -1,0 +1,12 @@
+[package]
+name = "omo-computer-backend-macos"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+omo-computer-core = { path = "../omo-computer-core" }
+omo-computer-safety = { path = "../omo-computer-safety" }

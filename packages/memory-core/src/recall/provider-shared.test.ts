@@ -7,8 +7,6 @@ import { GitMemoryRepo } from "../git"
 import { RecallCorpusCache } from "./provider"
 import { removeTree } from "../../../../test-support/remove-tree"
 
-const GIT_INTEGRATION_TEST_TIMEOUT = process.platform === "win32" ? 20_000 : 5_000
-
 const tempDirs: string[] = []
 
 async function createRepo(description: string): Promise<{ dir: string; repo: GitMemoryRepo }> {
@@ -16,9 +14,7 @@ async function createRepo(description: string): Promise<{ dir: string; repo: Git
   tempDirs.push(dir)
   const repo = new GitMemoryRepo({ dir, agentId: "recall-agent" })
   await repo.init({
-    seedFiles: [
-      { relativePath: "reference/topic.md", content: `---\ndescription: ${description}\n---\nBody.\n` },
-    ],
+    seedFiles: [{ relativePath: "reference/topic.md", content: `---\ndescription: ${description}\n---\nBody.\n` }],
   })
   return { dir, repo }
 }
@@ -43,7 +39,7 @@ describe("RecallCorpusCache shared mode", () => {
     // then
     expect(b).toBe(a)
     expect(b.documents).toBe(a.documents)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given shared caches over two repositories #when each loads #then each repository keeps its own corpus", async () => {
     // given
@@ -60,7 +56,7 @@ describe("RecallCorpusCache shared mode", () => {
     expect(leftCorpus.documents.map((document) => document.description)).toEqual(["Left topic"])
     expect(rightCorpus.documents.map((document) => document.description)).toEqual(["Right topic"])
     expect(leftAgain).toBe(leftCorpus)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given a memory write by one session #when another session's shared cache reloads #then it sees the new revision", async () => {
     // given
@@ -79,7 +75,7 @@ describe("RecallCorpusCache shared mode", () => {
     expect(afterReader).toBe(afterWriter)
     expect(afterReader.revision).not.toBe(before.revision)
     expect(afterReader.documents.map((document) => document.path)).toContain("reference/after.md")
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given one repository reached through a symlinked path #when two sessions load it #then they share one corpus", async () => {
     // given
@@ -91,11 +87,13 @@ describe("RecallCorpusCache shared mode", () => {
 
     // when
     const direct = await new RecallCorpusCache({ shared: true }).load(new GitMemoryRepo({ dir, agentId: "session-a" }))
-    const viaLink = await new RecallCorpusCache({ shared: true }).load(new GitMemoryRepo({ dir: linked, agentId: "session-b" }))
+    const viaLink = await new RecallCorpusCache({ shared: true }).load(
+      new GitMemoryRepo({ dir: linked, agentId: "session-b" }),
+    )
 
     // then
     expect(viaLink).toBe(direct)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 
   it("#given an unshared cache #when it loads a repository a shared cache already holds #then it keeps a private corpus", async () => {
     // given
@@ -108,5 +106,5 @@ describe("RecallCorpusCache shared mode", () => {
     // then
     expect(own).not.toBe(shared)
     expect(own.revision).toBe(shared.revision)
-  }, GIT_INTEGRATION_TEST_TIMEOUT)
+  })
 })

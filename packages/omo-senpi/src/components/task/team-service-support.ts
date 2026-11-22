@@ -21,7 +21,10 @@ export type ResolvedTeamSpec = { readonly spec: TeamSpec; readonly source: TeamS
 // omo.json-declared category name; a subagent_type is any loaded agent definition. Membership-only
 // (the concrete model resolution happens later, at spawn, through the planner + live model registry).
 export function buildMemberPorts(omoConfig: OmoConfig, agentNames: ReadonlySet<string>): SenpiTeamMemberPorts {
-  const categoryNames = new Set<string>([...Object.keys(DEFAULT_CATEGORIES), ...Object.keys(omoConfig.categories ?? {})])
+  const categoryNames = new Set<string>([
+    ...Object.keys(DEFAULT_CATEGORIES),
+    ...Object.keys(omoConfig.categories ?? {}),
+  ])
   return {
     isCategoryResolvable: (category) => categoryNames.has(category),
     isKnownAgent: (subagentType) => agentNames.has(subagentType),
@@ -58,7 +61,8 @@ export async function resolveTeamSpec(
   }
 
   const teamName = input.teamName
-  if (teamName === undefined) throw new SenpiTeamSpecError("no team_name or inline_spec provided", "INVALID_SPEC", "unknown")
+  if (teamName === undefined)
+    throw new SenpiTeamSpecError("no team_name or inline_spec provided", "INVALID_SPEC", "unknown")
 
   const registry = await loadTeamRegistry({ projectRoot, ports, ...(omoTeams !== undefined ? { omoTeams } : {}) })
   const entry = registry.teams.find((candidate) => candidate.name === teamName)
@@ -69,9 +73,13 @@ export async function resolveTeamSpec(
 
   const declared = registry.teams.map((candidate) => candidate.name)
   const declaredSuffix = declared.length > 0 ? ` Declared teams: ${declared.sort().join(", ")}.` : ""
-  const brokenSuffix = registry.errors.length > 0
-    ? ` (${registry.errors.length} team spec(s) failed to load: ${registry.errors.map((error) => error.name).sort().join(", ")}.)`
-    : ""
+  const brokenSuffix =
+    registry.errors.length > 0
+      ? ` (${registry.errors.length} team spec(s) failed to load: ${registry.errors
+          .map((error) => error.name)
+          .sort()
+          .join(", ")}.)`
+      : ""
   throw new SenpiTeamSpecError(
     `team '${teamName}' not found in project .omo/teams or omo.json.${declaredSuffix}${brokenSuffix}`,
     "INVALID_SPEC",
@@ -79,7 +87,11 @@ export async function resolveTeamSpec(
   )
 }
 
-async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberName: string): Promise<string | undefined> {
+async function memberTaskId(
+  stateDir: StateDirConfig,
+  teamRunId: string,
+  memberName: string,
+): Promise<string | undefined> {
   const runtimeDir = resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir
   const map = await readMemberTaskMap(runtimeDir)
   return map[memberName]
@@ -87,16 +99,28 @@ async function memberTaskId(stateDir: StateDirConfig, teamRunId: string, memberN
 
 // Delivers a shutdown-protocol notice to the target member's background child as a steer, resolving
 // the member->task mapping from the run sidecar. A member with no live task is a silent no-op.
-export function makeShutdownMessenger(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): ShutdownMessenger {
+export function makeShutdownMessenger(
+  manager: TaskManager,
+  stateDir: StateDirConfig,
+  teamRunId: string,
+): ShutdownMessenger {
   return async (message) => {
     const taskId = await memberTaskId(stateDir, teamRunId, message.to)
     if (taskId === undefined) return
-    await manager.sendToTask({ idOrName: taskId, message: `[team ${message.kind}] ${message.body}`, deliverAs: "steer" })
+    await manager.sendToTask({
+      idOrName: taskId,
+      message: `[team ${message.kind}] ${message.body}`,
+      deliverAs: "steer",
+    })
   }
 }
 
 // Cancels a member's background child (approve-shutdown teardown), resolving its task via the sidecar.
-export function makeCancelMemberTask(manager: TaskManager, stateDir: StateDirConfig, teamRunId: string): (memberName: string) => Promise<void> {
+export function makeCancelMemberTask(
+  manager: TaskManager,
+  stateDir: StateDirConfig,
+  teamRunId: string,
+): (memberName: string) => Promise<void> {
   return async (memberName) => {
     const taskId = await memberTaskId(stateDir, teamRunId, memberName)
     if (taskId === undefined) return

@@ -1,17 +1,19 @@
-import type { GitTreeSizedEntry } from "@oh-my-opencode/memory-core"
+import {
+  isCanonicalEntry,
+  projectTranscriptEntries,
+  type GitTreeSizedEntry,
+  type TranscriptProjection,
+} from "@oh-my-opencode/memory-core"
 
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { MEMORY_FACTS_APPLY_RPC_METHOD, type MemoryFactsApplier } from "./facts-apply-rpc"
+import { readMemoryRpcJournalState } from "./memory-rpc-journal-state"
 import { MEMORY_REFLECTIONS_RPC_METHOD, readMemoryReflections } from "./memory-rpc-reflections"
 import type { MemoryRpcSync } from "./memory-rpc-sync"
 import type { SyncStatusReader } from "./sync-status-surface"
 export { MEMORY_REFLECTIONS_RPC_METHOD } from "./memory-rpc-reflections"
-import {
-  buildMemorySnapshot,
-  createMemoryRpcGitRepo,
-  type MemoryTreeStats,
-} from "./memory-rpc-snapshot-state"
+import { buildMemorySnapshot, createMemoryRpcGitRepo, type MemoryTreeStats } from "./memory-rpc-snapshot-state"
 
 /** Push channel: RPC clients receive `{type:"extension_event", name, data}` frames under this name. */
 export const MEMORY_UPDATED_RPC_EVENT = "omo.memory.updated"
@@ -50,6 +52,8 @@ export interface MemoryRpcLastOutcome {
 export interface MemoryRpcSnapshot {
   readonly schemaVersion: 1
   readonly identity: string
+  /** Initial journal-only delivery: non-journal defaults are unknown, not measured zeroes. */
+  readonly nonJournalState?: "unknown"
   readonly repo: {
     readonly headSha?: string
     readonly headSubject?: string
@@ -76,6 +80,7 @@ export interface MemoryRpcSnapshot {
   }
   readonly journal: {
     readonly sessionId: string
+    /** Completed answers observed in the session or its durable journal; not a journal fsync fence. */
     readonly totalSteps: number
     readonly reflectedSteps: number
   }
@@ -102,12 +107,19 @@ export interface MemoryRpcBridgeDeps {
 export interface MemoryRpcBridge {
   /** Binds the bridge to a session; a later attach replaces the binding and clears the dedupe. */
   attach(sessionId: string): void
-  /** Publishes the current snapshot unless it is byte-identical to the last published one. */
+  /** Full builds remain FIFO; completed results enter publication behind already admitted journal requests. */
   sync(signal?: AbortSignal): Promise<void>
+  /** Publishes in journal-request order, without waiting for full builds, git or the journal writer lock. */
+  syncJournal(entries: readonly TranscriptProjection[]): Promise<void>
   /** Unbinds the session so later syncs publish nothing. */
   detach(): void
   /** Retires the bridge; every later call is a no-op. */
   dispose(): void
+}
+
+interface MemoryPublication {
+  readonly snapshot: MemoryRpcSnapshot
+  readonly force?: boolean
 }
 
 /**
@@ -115,10 +127,7 @@ export interface MemoryRpcBridge {
  * `omo.memory.status` pull. Snapshots are RPC-only - they are never appended to the transcript -
  * and every rpc touch is guarded, so a host without `pi.rpc` degrades to a silent no-op.
  */
-export function createMemoryRpcBridge(
-  pi: SenpiExtensionAPI,
-  deps: MemoryRpcBridgeDeps,
-): MemoryRpcBridge {
+export function createMemoryRpcBridge(pi: SenpiExtensionAPI, deps: MemoryRpcBridgeDeps): MemoryRpcBridge {
   const createRepo = deps.createGitRepo ?? createMemoryRpcGitRepo
   const repos = new Map<string, MemoryRpcGitRepo>()
   /** Size reads walk the whole tree, so they are cached per commit, not per sync. */
@@ -126,8 +135,13 @@ export function createMemoryRpcBridge(
   const treeStats = new Map<string, MemoryTreeStats>()
   let sessionId: string | undefined
   let lastSnapshot: string | undefined
+  let lastPublished: MemoryRpcSnapshot | undefined
   let disposed = false
   let bindingGeneration = 0
+  let publication = Promise.resolve()
+  let fullBuilds = Promise.resolve()
+  let journalRevision = 0
+  let observedSteps = new Set<string>()
 
   function repoFor(context: MemoryIdentityContext): MemoryRpcGitRepo {
     const cached = repos.get(context.identityPaths.repo)
@@ -147,8 +161,39 @@ export function createMemoryRpcBridge(
       activeRun: deps.activeRun,
       tokenEstimates,
       treeStats,
+      observedSteps,
       ...(deps.syncStatus === undefined ? {} : { syncStatus: deps.syncStatus }),
     })
+  }
+
+  // The settle-time delivery is awaited by the host with no budget, so it refreshes only the
+  // journal fields from local files; repo, health and sync fields come from the last full build.
+  async function buildJournalSnapshot(): Promise<MemoryPublication | undefined> {
+    const boundSession = sessionId
+    if (boundSession === undefined || disposed) return undefined
+    const context = deps.resolveContext(boundSession)
+    if (context === undefined) return undefined
+    const previous: MemoryRpcSnapshot = lastPublished ?? {
+      schemaVersion: 1,
+      identity: context.identity,
+      nonJournalState: "unknown",
+      repo: { dirty: false, dirtyPaths: 0, systemTokensEstimate: 0 },
+      reflection: { backlogSteps: 0, pendingCompaction: false, consecutiveFailures: 0 },
+      journal: { sessionId: boundSession, totalSteps: 0, reflectedSteps: 0 },
+    }
+    const journal = await readMemoryRpcJournalState(context, boundSession, observedSteps)
+    return {
+      snapshot: {
+        ...previous,
+        reflection: {
+          ...previous.reflection,
+          backlogSteps: journal.backlogSteps,
+          pendingCompaction: journal.pendingCompaction,
+        },
+        journal: { ...previous.journal, totalSteps: journal.totalSteps, reflectedSteps: journal.reflectedSteps },
+      },
+      force: journal.transcriptReadFailed === true,
+    }
   }
 
   registerStatusHandler(pi, buildSnapshot)
@@ -171,20 +216,64 @@ export function createMemoryRpcBridge(
     pi.rpc?.handle?.(MEMORY_FACTS_APPLY_RPC_METHOD, async (request) => {
       if (disposed || sessionId === undefined) return { kind: "unavailable", reason: "No bound memory session." }
       const applied = await applyFacts(request, sessionId)
-      if ("outcome" in applied && applied.outcome === "committed") await publishSnapshot()
+      if ("outcome" in applied && applied.outcome === "committed") await syncFullSnapshot()
       return applied
     })
   }
 
-  async function publishSnapshot(signal?: AbortSignal): Promise<void> {
-    if (disposed || signal?.aborted || pi.rpc?.emit === undefined) return
+  function publishSnapshot(
+    build: () => Promise<MemoryPublication | undefined>,
+    generation: number,
+    signal?: AbortSignal,
+    journalOnly = false,
+  ): Promise<void> {
+    const current = publication.then(async () => {
+      if (disposed || signal?.aborted || generation !== bindingGeneration || pi.rpc?.emit === undefined) return
+      const built = await build()
+      if (built === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
+      const { snapshot } = built
+      if (journalOnly) journalRevision++
+      const fingerprint = JSON.stringify(snapshot)
+      if (fingerprint === lastSnapshot && !built.force) return
+      lastSnapshot = fingerprint
+      lastPublished = snapshot
+      pi.rpc.emit(MEMORY_UPDATED_RPC_EVENT, snapshot)
+    })
+    // Keep failures visible to their caller without poisoning the next publication.
+    publication = current.catch(() => {})
+    return current
+  }
+
+  function syncFullSnapshot(signal?: AbortSignal): Promise<void> {
     const generation = bindingGeneration
-    const snapshot = await buildSnapshot()
-    if (snapshot === undefined || signal?.aborted || disposed || generation !== bindingGeneration) return
-    const fingerprint = JSON.stringify(snapshot)
-    if (fingerprint === lastSnapshot) return
-    lastSnapshot = fingerprint
-    pi.rpc.emit(MEMORY_UPDATED_RPC_EVENT, snapshot)
+    const current = fullBuilds.then(async () => {
+      if (disposed || signal?.aborted || generation !== bindingGeneration || pi.rpc?.emit === undefined) return
+      const revision = journalRevision
+      const snapshot = await buildSnapshot()
+      if (snapshot === undefined) return
+      // Full work never occupies publication. A result joins only when ready; any journal
+      // delivery that overtook its build remains authoritative for the journal fields.
+      await publishSnapshot(
+        async () => {
+          if (revision === journalRevision || lastPublished === undefined) return { snapshot }
+          return {
+            snapshot: {
+              ...snapshot,
+              reflection: {
+                ...snapshot.reflection,
+                backlogSteps: lastPublished.reflection.backlogSteps,
+                pendingCompaction: lastPublished.reflection.pendingCompaction,
+              },
+              journal: lastPublished.journal,
+            },
+          }
+        },
+        generation,
+        signal,
+      )
+    })
+    fullBuilds = current.catch(() => {})
+    return current
   }
 
   return {
@@ -193,14 +282,32 @@ export function createMemoryRpcBridge(
       sessionId = nextSessionId
       bindingGeneration++
       lastSnapshot = undefined
+      lastPublished = undefined
+      publication = Promise.resolve()
+      fullBuilds = Promise.resolve()
+      journalRevision = 0
+      observedSteps = new Set()
     },
 
-    sync: publishSnapshot,
+    sync: syncFullSnapshot,
+
+    syncJournal(entries) {
+      if (disposed || sessionId === undefined) return Promise.resolve()
+      for (const entry of entries.flatMap((message) => projectTranscriptEntries(message, ""))) {
+        if (entry.kind === "assistant" && isCanonicalEntry(entry)) observedSteps.add(entry.source_line_id)
+      }
+      return publishSnapshot(buildJournalSnapshot, bindingGeneration, undefined, true)
+    },
 
     detach() {
       bindingGeneration++
       sessionId = undefined
       lastSnapshot = undefined
+      lastPublished = undefined
+      publication = Promise.resolve()
+      fullBuilds = Promise.resolve()
+      journalRevision = 0
+      observedSteps = new Set()
     },
 
     dispose() {
@@ -208,14 +315,12 @@ export function createMemoryRpcBridge(
       disposed = true
       sessionId = undefined
       lastSnapshot = undefined
+      lastPublished = undefined
     },
   }
 }
 
-function registerStatusHandler(
-  pi: SenpiExtensionAPI,
-  snapshot: () => Promise<MemoryRpcSnapshot | undefined>,
-): void {
+function registerStatusHandler(pi: SenpiExtensionAPI, snapshot: () => Promise<MemoryRpcSnapshot | undefined>): void {
   const handle = pi.rpc?.handle
   if (handle === undefined) return
   handle(MEMORY_STATUS_RPC_METHOD, async (): Promise<MemoryRpcSnapshot | MemoryRpcUnavailable> => {

@@ -98,7 +98,7 @@ MIRIFLAGS="\
 **Interpret results:**
 - Fails at Level 1 → Definite UB. Fix immediately.
 - Passes Level 1, fails Level 2 → Provenance or alignment UB. Fix.
-- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate — may be a Tree Borrows false positive, but usually indicates fragile aliasing.
+- Passes Levels 1-3, fails Level 4 → Tree Borrows found something Stacked Borrows missed (unusual). Investigate — may be a Tree Borrows false positive, but usually indicates fragile aliasing. It does not ship until the aliasing is fixed or the false positive is proven and recorded with the Miri output.
 - Passes all 4 → Miri-clean. Proceed to supplementary tools.
 
 ### Phase 3: Supplementary Scans
@@ -159,11 +159,11 @@ Is there unsafe code in the changeset?
   │       NO  → Run Miri Level 2 (strict provenance).
   │             Miri fails?
   │               YES → Stop. Classify. Fix. Prove. Then continue.
-  │               NO  → Proceed with the original task.
+  │               NO  → Proceed with the original task; run Levels 3 and 4 before it ships.
   NO → Proceed normally.
 ```
 
-This is not optional. **Every `unsafe` block gets Miri'd before it ships.**
+This is not optional. **Every `unsafe` block passes Miri Levels 3 and 4 before it ships.**
 
 ## SAFETY Comment Standard
 

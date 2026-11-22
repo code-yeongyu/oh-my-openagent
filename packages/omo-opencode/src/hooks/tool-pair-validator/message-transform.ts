@@ -1,9 +1,5 @@
 import { subagentSessions } from "../../features/claude-code-session-state"
-import {
-  diagnoseSubAgentUnpairedToolParts,
-  getMessageSessionID,
-  repairUnpairedToolParts,
-} from "./tool-result-repair"
+import { diagnoseSubAgentUnpairedToolParts, getMessageSessionID, repairUnpairedToolParts } from "./tool-result-repair"
 import type { MessageWithParts } from "./types"
 
 export function validateToolPairsForMessages(messages: MessageWithParts[]): void {

@@ -9,7 +9,20 @@ import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store-api"
 export type { Deduplicated, DeliveryView, GatewayStore, OutboxPage, ReceiptScope } from "./store-api"
 import { createExtensionFacade, type ExtensionRegisterReply, type RetainedRegistration } from "./store-extension-facade"
-export type { DeclaredSessionOp, SessionCallableOp, SessionCaller, StoreExtensionApi, StoreExtensionOperation, StoreExtensionRefusal, StoreExtensionRefusalCode, StoreExtensionRegistration, StoreExtensionResult, StoreExtensionSessionApi, StoreExtensionTransaction } from "./store-extensions"
+import { createIntakeMarkFacade, createSessionWaitFacade, createWokenFacade } from "./store-woken-facade"
+export type {
+  DeclaredSessionOp,
+  SessionCallableOp,
+  SessionCaller,
+  StoreExtensionApi,
+  StoreExtensionOperation,
+  StoreExtensionRefusal,
+  StoreExtensionRefusalCode,
+  StoreExtensionRegistration,
+  StoreExtensionResult,
+  StoreExtensionSessionApi,
+  StoreExtensionTransaction,
+} from "./store-extensions"
 import type { GatewayStoreConfig, GatewayStoreEvent, GatewayStoreTestHooks, ProcessIdentity, Provenance } from "./types"
 
 export type GatewayStoreOptions = {
@@ -21,7 +34,11 @@ export type GatewayStoreOptions = {
   readonly now?: () => number
   /** The module location the worker sidecar is resolved from when the facade does not run inside `omo.js` (the thread SDK runtime). */
   readonly workerModuleUrl?: string | URL
-  /** Resolves extension enqueue targets through the caller's live-and-disk address book. */
+  /**
+   * Resolves extension enqueue targets through the caller's live-and-disk address book (`createExtensionResolver`).
+   * The creator passes it: a store module that loaded the resolver itself would carry the engine's live surface into
+   * every bundle that opens a store, the shipped `omo` CLI included, which only writes receipts and never resolves.
+   */
   readonly resolveTarget?: GatewayResolve
   /** Sender-owned resolution for deliveries created by extension transactions. */
   readonly senderProvenance?: () => Promise<Provenance>
@@ -54,13 +71,32 @@ export function gatewayStoreWorkerUrl(moduleUrl: string | URL = import.meta.url)
   return existsSync(fileURLToPath(bundled)) ? bundled : new URL("./store-worker.ts", moduleUrl)
 }
 
-type Pending = { readonly worker: Worker; readonly resolve: (value: unknown) => void; readonly reject: (error: Error) => void }
+type Pending = {
+  readonly worker: Worker
+  readonly resolve: (value: unknown) => void
+  readonly reject: (error: Error) => void
+}
 
 type WorkerMessage =
-  | { readonly type: "resolve"; readonly id: number; readonly address: string; readonly request: Parameters<GatewayResolve>[1] }
+  | {
+      readonly type: "resolve"
+      readonly id: number
+      readonly address: string
+      readonly request: Parameters<GatewayResolve>[1]
+    }
   | { readonly type: "provenance"; readonly id: number }
   | { readonly type: "response"; readonly id: number; readonly ok: true; readonly value: unknown }
-  | { readonly type: "response"; readonly id: number; readonly ok: false; readonly error: { readonly message: string; readonly stack?: string; readonly code?: string } }
+  | {
+      readonly type: "response"
+      readonly id: number
+      readonly ok: false
+      readonly error: {
+        readonly message: string
+        readonly stack?: string
+        readonly code?: string
+        readonly details?: Readonly<Record<string, unknown>>
+      }
+    }
   | { readonly type: "event"; readonly event: GatewayStoreEvent }
 
 /**
@@ -97,16 +133,18 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   let idleTimer: ReturnType<typeof setTimeout> | undefined
   /** The close-and-terminate of a retired worker, until it settles: `dispose` waits for it. */
   let retiring: Promise<void> | undefined
+  /** Set by `dispose` while calls are in flight: the last one to settle releases it. */
+  let callsSettled: (() => void) | undefined
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
-  let resolveTarget = options.resolveTarget
+  const resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
   const registrations = new Map<string, RetainedRegistration>()
 
   const resolveExtensionTarget: GatewayResolve = async (address, request) => {
-    if (resolveTarget === undefined) {
-      const { createExtensionResolver } = await import("./extension-resolver")
-      resolveTarget = createExtensionResolver(options.agentDir)
-    }
+    if (resolveTarget === undefined)
+      throw new Error(
+        "this gateway store was created without an extension resolver (resolveTarget); it cannot resolve an extension target",
+      )
     return await resolveTarget(address, request)
   }
 
@@ -148,15 +186,36 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     spawned.on("message", (message: WorkerMessage) => {
       if (message.type === "provenance") {
         void (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })).then(
-          (value) => { if (worker === spawned) spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value }) },
-          (error: unknown) => { if (worker === spawned) spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) },
+          (value) => {
+            if (worker === spawned)
+              spawned.postMessage({ type: "provenance_resolved", id: message.id, ok: true, value })
+          },
+          (error: unknown) => {
+            if (worker === spawned)
+              spawned.postMessage({
+                type: "provenance_resolved",
+                id: message.id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              })
+          },
         )
         return
       }
       if (message.type === "resolve") {
         void resolveExtensionTarget(message.address, message.request).then(
-          (value) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value }) },
-          (error: unknown) => { if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: false, error: error instanceof Error ? error.message : String(error) }) },
+          (value) => {
+            if (worker === spawned) spawned.postMessage({ type: "resolution", id: message.id, ok: true, value })
+          },
+          (error: unknown) => {
+            if (worker === spawned)
+              spawned.postMessage({
+                type: "resolution",
+                id: message.id,
+                ok: false,
+                error: error instanceof Error ? error.message : String(error),
+              })
+          },
         )
         return
       }
@@ -169,7 +228,14 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       pending.delete(message.id)
       if (pending.size === 0) spawned.unref()
       if (message.ok) entry.resolve(message.value)
-      else entry.reject(Object.assign(new Error(message.error.message), { workerStack: message.error.stack, ...(message.error.code === undefined ? {} : { code: message.error.code }) }))
+      else
+        entry.reject(
+          Object.assign(new Error(message.error.message), {
+            workerStack: message.error.stack,
+            ...(message.error.code === undefined ? {} : { code: message.error.code }),
+            ...(message.error.details === undefined ? {} : { details: message.error.details }),
+          }),
+        )
     })
     spawned.on("error", (error: unknown) => failAll(spawned, error instanceof Error ? error : new Error(String(error))))
     // A worker that exits (a crash, or the termination after a failed open) takes its open with it:
@@ -182,12 +248,21 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       failAll(spawned, new Error(`the gateway store worker exited (${code})`))
     })
     options._test?.onWorkerStarted?.(spawned)
-    const attempt = (post("init", { config, now: now() }) as Promise<{ readonly self: ProcessIdentity; readonly legacy_migrated: number }>).then(async (value) => {
+    const attempt = (
+      post("init", { config, now: now() }) as Promise<{
+        readonly self: ProcessIdentity
+        readonly legacy_migrated: number
+      }>
+    ).then(async (value) => {
       // A fresh worker holds no extension registrations: restore the ones its predecessor held
       // before any call reaches it, keeping only those the new worker holds in turn. Each is replayed
       // as of its registration time, so it never overwrites a newer one another process persisted.
       for (const [name, { extension, registeredAt }] of registrations) {
-        const reply = (await post("extension_register", { extension, now: now(), restored_at: registeredAt })) as ExtensionRegisterReply
+        const reply = (await post("extension_register", {
+          extension,
+          now: now(),
+          restored_at: registeredAt,
+        })) as ExtensionRegisterReply
         if (!reply.retained) registrations.delete(name)
       }
       return value
@@ -237,7 +312,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     const closing: Promise<void> = post("close", null, idle)
       .catch(() => undefined)
       .then(() => idle.terminate())
-      .then(() => options._test?.onWorkerRetired?.(idle), () => options._test?.onWorkerRetired?.(idle))
+      .then(
+        () => options._test?.onWorkerRetired?.(idle),
+        () => options._test?.onWorkerRetired?.(idle),
+      )
       .finally(() => {
         if (retiring === closing) retiring = undefined
       })
@@ -245,7 +323,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     options._test?.onWorkerRetiring?.(idle)
   }
 
-  /** Holds the worker from retiring for the whole call, its open included, then re-arms the idle timer. */
+  /**
+   * Holds the worker from retiring, and `dispose` from closing it, for the whole call, its open included, then
+   * re-arms the idle timer.
+   */
   async function track<T>(run: () => Promise<T>): Promise<T> {
     callsInFlight += 1
     cancelIdleRetire()
@@ -253,6 +334,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       return await run()
     } finally {
       callsInFlight -= 1
+      if (callsInFlight === 0) callsSettled?.()
       armIdleRetire()
     }
   }
@@ -264,7 +346,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     })
   }
 
-  const extensions = createExtensionFacade({ agentDir: options.agentDir, now, call, registrations, ...(options._test?.onAwaitArmed === undefined ? {} : { onAwaitArmed: options._test.onAwaitArmed }) })
+  const extensions = createExtensionFacade({
+    agentDir: options.agentDir,
+    now,
+    call,
+    registrations,
+    ...(options._test?.onAwaitArmed === undefined ? {} : { onAwaitArmed: options._test.onAwaitArmed }),
+  })
 
   return {
     ...extensions,
@@ -272,10 +360,15 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     now,
     identity: () => track(async () => (await start()).self),
     enqueue: (request) => call("enqueue", request),
+    intake: (request) => call("intake", request),
+    woken: createWokenFacade(call, now),
+    sessionWait: createSessionWaitFacade(call, now),
+    intakeMarks: createIntakeMarkFacade(call, now),
     reconcile: (request) => call("reconcile", request),
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
     refuseQueued: (request) => call("refuse_queued", request),
+    refuseReturned: (request) => call("refuse_returned", request),
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
@@ -283,11 +376,14 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     recoverDelivery: (request) => call("recover_delivery", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
+    backlogs: (durableIds) => call("backlogs", { targets: durableIds, now: now() }),
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),
     toolReceiptBegin: (request) => call("tool_receipt_begin", request),
     toolReceiptSettle: (request) => call("tool_receipt_settle", request),
+    toolReceiptRevise: (request) => call("tool_receipt_revise", request),
+    toolReceiptRelease: (request) => call("tool_receipt_release", request),
     bind: (request) => call("bind", request),
     unbind: (request) => call("unbind", request),
     rebind: (request) => call("rebind", request),
@@ -316,6 +412,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       if (disposed) return
       disposed = true
       cancelIdleRetire()
+      // A call already admitted finishes before the close: a close posted under it would reach the worker between the
+      // call's open and its own request, and the call would fail with "the gateway store is not open". Calls made from
+      // here on are refused as disposed by `start`.
+      if (callsInFlight > 0)
+        await new Promise<void>((resolve) => {
+          callsSettled = resolve
+        })
       // A worker retired just before still holds its database until its close settles; a caller that
       // removes the agent directory after `dispose` must find it closed.
       await retiring

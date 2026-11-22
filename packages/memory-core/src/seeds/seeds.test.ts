@@ -7,11 +7,7 @@ import { promisify } from "node:util"
 import { GitMemoryRepo } from "../git"
 import { parseMemoryFile } from "../memfs/frontmatter"
 import { compileMemoryBlock } from "../compile"
-import {
-  DEFAULT_MEMORY_BLOCK_LABELS,
-  buildDefaultSeedFiles,
-  initMemoryWithSeeds,
-} from "./seeds"
+import { DEFAULT_MEMORY_BLOCK_LABELS, buildDefaultSeedFiles, initMemoryWithSeeds } from "./seeds"
 import { MEMORY_DISCIPLINE_SKILL_PATH } from "./memory-discipline"
 import { realpathSync } from "node:fs"
 import { removeTree } from "../../../../test-support/remove-tree"

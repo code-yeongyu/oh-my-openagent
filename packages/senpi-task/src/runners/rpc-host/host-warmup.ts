@@ -2,7 +2,8 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { askHost, isRecord, type HostReply } from "./host-request"
+import { askHost } from "./host-request"
+import { classifyWarmReply } from "./host-warm-reply"
 import { HOST_WARMUP_CONTEXT } from "./session-role"
 import { HostSessionClient, type HostSessionClientPorts } from "./session-client"
 
@@ -54,21 +55,19 @@ export class HostWarmRefusedError extends Error {
 const WARM_REQUEST_ID = "omo-task-host-warm"
 // The first load compiles the extension graph; a loaded host answers in well under a second.
 const WARM_TIMEOUT_MS = 60_000
-// What an engine that KNOWS `warm` refuses it with. Any other refusal (`missing_session_id` from a
-// router that reads an unknown session-less command as a session command) is an engine from before it.
-const WARM_REFUSALS = ["host_draining", "warm_failed", "invalid_session_kind", "invalid_session_context", "invalid_path"] as const
-
-type WarmAnswer =
-  | { readonly kind: "warm"; readonly state: "warmed" | "already_warm" }
-  | { readonly kind: "unsupported" }
-  | { readonly kind: "refused"; readonly code: string }
-
 export async function warmTaskHost(input: WarmHostSessionInput): Promise<TaskHostWarmth> {
   const stateDir = await mkdtemp(join(input.tempRoot ?? tmpdir(), "omo-host-warmup-"))
   const context = { role: "child", task_id: HOST_WARMUP_TASK_ID, state_dir: stateDir, [HOST_WARMUP_CONTEXT]: "1" }
   try {
     const request = { id: WARM_REQUEST_ID, type: "warm", cwd: input.cwd, kind: "worker", context }
-    const answer = classifyWarmReply(await askHost(input.socket, request, WARM_TIMEOUT_MS, input.agentDir === undefined ? {} : { agentDir: input.agentDir }))
+    const answer = classifyWarmReply(
+      await askHost(
+        input.socket,
+        request,
+        WARM_TIMEOUT_MS,
+        input.agentDir === undefined ? {} : { agentDir: input.agentDir },
+      ),
+    )
     switch (answer.kind) {
       case "warm":
         return answer.state
@@ -85,23 +84,15 @@ export async function warmTaskHost(input: WarmHostSessionInput): Promise<TaskHos
   }
 }
 
-function classifyWarmReply(reply: HostReply | undefined): WarmAnswer {
-  if (reply === undefined) return { kind: "refused", code: "no_answer" }
-  if (reply.success === true) {
-    const state = isRecord(reply.data) ? reply.data.state : undefined
-    return state === "warmed" || state === "already_warm" ? { kind: "warm", state } : { kind: "unsupported" }
-  }
-  const error = typeof reply.error === "string" ? reply.error : ""
-  const known = WARM_REFUSALS.some((code) => error === code || error.startsWith(`${code}:`))
-  return known ? { kind: "refused", code: error } : { kind: "unsupported" }
-}
-
 async function openAndCloseWarmUpSession(
   input: WarmHostSessionInput,
   stateDir: string,
   context: Readonly<Record<string, string>>,
 ): Promise<void> {
-  const client = new HostSessionClient({ socketPath: input.socket, ...(input.ports === undefined ? {} : { ports: input.ports }) })
+  const client = new HostSessionClient({
+    socketPath: input.socket,
+    ...(input.ports === undefined ? {} : { ports: input.ports }),
+  })
   try {
     await client.open({
       sessionPath: join(stateDir, "warmup.jsonl"),

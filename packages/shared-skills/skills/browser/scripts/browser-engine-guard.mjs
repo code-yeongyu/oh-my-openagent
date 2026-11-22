@@ -38,7 +38,8 @@ export function guardOmowright(raw, { env = process.env, host } = {}) {
     } catch {
       details = undefined
     }
-    if (details?.ok !== true) throw new BuiltinBrowserUnavailableError(typeof details?.reason === "string" ? details.reason : "unavailable")
+    if (details?.ok !== true)
+      throw new BuiltinBrowserUnavailableError(typeof details?.reason === "string" ? details.reason : "unavailable")
     // Without an endpoint CdpClient falls back to 127.0.0.1:9222 and would send the token to whatever listens there.
     const endpoint = details.grant?.endpoint
     if (typeof endpoint !== "string" || endpoint === "") throw new BuiltinBrowserUnavailableError("invalid_grant")

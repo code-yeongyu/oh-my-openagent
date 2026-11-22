@@ -60,7 +60,7 @@ rather than borders, creating layers you feel more than see."
 | Status/info | --status-info | #2563EB | #3B82F6 | Informational |
 
 ### Rules
-- Accent marks the one or two most likely actions on a screen, on the control's background rather than its glyph or label. Peer choices differ by style, never by size. Nothing decorative carries accent.
+- Accent marks the screen's one primary action, on the control's background rather than its glyph or label; a second likely action takes a quieter style. Peer choices differ by style, never by size. Nothing decorative carries accent.
 - Never introduce a color not in this table. Extend the table first.
 
 ## 3. Typography
@@ -73,11 +73,11 @@ rather than borders, creating layers you feel more than see."
 | H1 | 36px / 2.25rem | 700 | 1.2 | -0.015em | Section headers |
 | H2 | 28px / 1.75rem | 600 | 1.3 | -0.01em | Subsection headers |
 | H3 | 22px / 1.375rem | 600 | 1.4 | 0 | Card titles |
-| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs |
+| Body/lg | 18px / 1.125rem | 400 | 1.6 | 0 | Lead paragraphs, in the secondary ink |
 | Body | 16px / 1rem | 400 | 1.6 | 0 | Default text |
-| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info |
+| Body/sm | 14px / 0.875rem | 400 | 1.5 | 0 | Secondary info, in the secondary ink |
 | Caption | 12px / 0.75rem | 500 | 1.4 | 0.02em | Labels, metadata |
-| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Section labels, uppercase |
+| Overline | 11px / 0.6875rem | 600 | 1.3 | 0.08em | Field, table and metadata labels, uppercase; by default not a label above a heading, unless the chosen route asks for one (`references/perfection/craft-floor.md`) |
 
 ### Font Stack
 - Primary: [specify — e.g. "Inter, system-ui, -apple-system, sans-serif"]
@@ -229,7 +229,7 @@ Both paths start with `grounding.md`: the guideline source read in full, the ide
 
 ### For New Projects
 
-1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use `open-design` only when the curated set has no fit.
+1. **Select references before taste** — no visual reference means `_INDEX.md` shortlist of 2-3 Layer B candidates, then exactly one Layer A style skill and one Layer B brand/design-system reference. Use the open-design library only when the curated set has no fit.
 2. **Assemble from references** — extract tokens, layout grammar, component anatomy, states, motion, and taste decisions, then recombine them into project-specific primitives. Customize for the user's product; never copy logos, trademarked assets, or brand-specific copy.
 3. **Define the system** — colour roles first (both themes), then atmosphere, typography, spacing, and one depth strategy, grounded in the selected references and product semantics. Sanity-check the palette and type pairing with one `ui-ux-db` domain search (CLI in `references/ui-ux-db/README.md`).
 4. **Document initial primitives** — only components you are about to build, including variants and states, starting from shadcn/ui anatomy (or the project's own kit) restyled with the tokens.

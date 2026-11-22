@@ -56,11 +56,7 @@ describe("formatFsyncSkipWarning", () => {
   })
 
   it("uses the most common classification when entries are mixed", () => {
-    const warning = formatFsyncSkipWarning([
-      makeEntry(1, "onedrive"),
-      makeEntry(2, "onedrive"),
-      makeEntry(3, "icloud"),
-    ])
+    const warning = formatFsyncSkipWarning([makeEntry(1, "onedrive"), makeEntry(2, "onedrive"), makeEntry(3, "icloud")])
 
     expect(warning).toContain("Detected environment: OneDrive")
   })

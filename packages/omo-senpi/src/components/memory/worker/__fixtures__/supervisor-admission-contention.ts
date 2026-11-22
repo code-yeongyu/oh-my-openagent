@@ -23,7 +23,9 @@ mock.module("@oh-my-opencode/memory-core/fs", () => ({
           code: "EPERM",
         })
       },
-      sleep: async (ms) => { elapsed += ms },
+      sleep: async (ms) => {
+        elapsed += ms
+      },
     })
   },
 }))

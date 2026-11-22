@@ -12,10 +12,10 @@
 // it in place and the sweep promotes it into the durable agents root once no detached child can
 // still be writing into it.
 
-import { existsSync, rm } from "@oh-my-opencode/memory-core/fs"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 
-import { REPO_DIRNAME, buildIdentityPaths, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
+import { REPO_DIRNAME, buildIdentityPaths, removeTree, type MemoryIdentityPaths } from "@oh-my-opencode/memory-core"
 import { readSessionRole } from "@oh-my-opencode/senpi-task"
 
 export const TRANSIENT_DIRNAME = "transient-runs"
@@ -104,7 +104,7 @@ export async function finalizeIdentityRun(input: {
 
 export async function removeMemoryTree(path: string, warn?: TransientWarn): Promise<boolean> {
   try {
-    await rm(path, { recursive: true, force: true })
+    await removeTree(path)
     return true
   } catch (error) {
     warn?.("omo-senpi memory transient run cleanup failed", { path, error: describe(error) })

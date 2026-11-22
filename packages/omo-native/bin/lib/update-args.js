@@ -45,5 +45,9 @@ export function updateUsageAnswer(args) {
   if (rest.some((arg) => HELP_FLAGS.has(arg))) return { exitCode: 0, stream: "stdout", text: UPDATE_USAGE }
   const unknown = rest.find((arg) => arg.startsWith("-") && !KNOWN_FLAGS.has(arg))
   if (unknown === undefined) return undefined
-  return { exitCode: 2, stream: "stderr", text: `omo update: unknown option ${unknown}\nRun omo update --help for usage.` }
+  return {
+    exitCode: 2,
+    stream: "stderr",
+    text: `omo update: unknown option ${unknown}\nRun omo update --help for usage.`,
+  }
 }

@@ -70,10 +70,7 @@ function findLastMessage(messages: SessionMessage[], role: "user" | "assistant")
   return undefined
 }
 
-async function readSessionTitle(
-  ctx: ReadyNotificationContext,
-  sessionID: string,
-): Promise<string> {
+async function readSessionTitle(ctx: ReadyNotificationContext, sessionID: string): Promise<string> {
   if (typeof ctx.client.session.get !== "function") {
     return sessionID
   }
@@ -96,10 +93,7 @@ async function readSessionTitle(
   return sessionID
 }
 
-async function readSessionMessages(
-  ctx: ReadyNotificationContext,
-  sessionID: string,
-): Promise<SessionMessage[]> {
+async function readSessionMessages(ctx: ReadyNotificationContext, sessionID: string): Promise<SessionMessage[]> {
   if (typeof ctx.client.session.messages !== "function") {
     return []
   }
@@ -133,9 +127,7 @@ export async function buildReadyNotificationContent(
   ])
 
   const lastUserText = collapseWhitespace(extractMessageText(findLastMessage(messages, "user")))
-  const lastAssistantLine = getLastNonEmptyLine(
-    extractMessageText(findLastMessage(messages, "assistant")),
-  )
+  const lastAssistantLine = getLastNonEmptyLine(extractMessageText(findLastMessage(messages, "assistant")))
 
   const detailLines = [
     lastUserText ? `User: ${lastUserText}` : "",
@@ -144,8 +136,6 @@ export async function buildReadyNotificationContent(
 
   return {
     title: `${input.baseTitle} · ${sessionTitle}`,
-    message: detailLines.length > 0
-      ? [input.baseMessage, ...detailLines].join("\n")
-      : input.baseMessage,
+    message: detailLines.length > 0 ? [input.baseMessage, ...detailLines].join("\n") : input.baseMessage,
   }
 }

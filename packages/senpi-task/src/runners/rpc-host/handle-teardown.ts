@@ -23,6 +23,7 @@ export interface HandleTeardownHost extends HostTeardownInput {
   clearActive(): void
   stopHeartbeat(): void
   settle(classified: SessionExitClassification): void
+  markHostEndAnswered(): void
   /** Extra teardown work the owning handle registers (settlement timers, trackers). */
   onTornDown?(): void
 }
@@ -58,9 +59,13 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
   let markedTerminal = host.openedAttached
   let lastStatus: TaskStatus | undefined
   const sendNow = (status: TaskStatus): void => {
-    const failed = (error: unknown): void => log("senpi-task host task_status publish failed", { taskId: host.taskId, status, error: String(error) })
+    const failed = (error: unknown): void =>
+      log("senpi-task host task_status publish failed", { taskId: host.taskId, status, error: String(error) })
     try {
-      void host.port().send({ type: "set_session_context", patch: { task_status: status } }).catch(failed)
+      void host
+        .port()
+        .send({ type: "set_session_context", patch: { task_status: status } })
+        .catch(failed)
     } catch (error) {
       failed(error)
     }
@@ -71,7 +76,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
     ending ??= (async () => {
       host.stopHeartbeat()
       host.onTornDown?.()
-      await endSessionOnHost(host, next)
+      if (await endSessionOnHost(host, next)) host.markHostEndAnswered()
       const intent = host.intent()
       const reason = intent === "terminated" ? "terminated" : "client_close"
       host.settle(classifySessionExit({ cause: { kind: "session_closed", reason }, intent }))
@@ -110,7 +115,7 @@ export function createHandleTeardown(host: HandleTeardownHost): HandleTeardown {
 
 // Bounded teardown: a daemon that never answers must not hold the parent's shutdown open, and a
 // session is never ended with a signal.
-export async function endSessionOnHost(input: HostTeardownInput, next: "closed" | "terminated"): Promise<void> {
+export async function endSessionOnHost(input: HostTeardownInput, next: "closed" | "terminated"): Promise<boolean> {
   const bestEffort = async (work: () => Promise<void>, step: string): Promise<void> => {
     try {
       await work()
@@ -118,8 +123,19 @@ export async function endSessionOnHost(input: HostTeardownInput, next: "closed" 
       log("senpi-task host session teardown step failed", { taskId: input.taskId, step, error: String(error) })
     }
   }
-  if (next === "terminated") await settleWithin(bestEffort(() => input.port().send({ type: "abort" }), "abort"), ABORT_GRACE_MS)
-  await settleWithin(bestEffort(() => input.port().close(), "close_session"), input.closeGraceMs)
+  if (next === "terminated")
+    await settleWithin(
+      bestEffort(() => input.port().send({ type: "abort" }), "abort"),
+      ABORT_GRACE_MS,
+    )
+  let answered = false
+  await settleWithin(
+    bestEffort(async () => {
+      answered = await input.port().close()
+    }, "close_session"),
+    input.closeGraceMs,
+  )
+  return answered
 }
 
 /** Resolve when the work settles or the budget expires, whichever comes first. */

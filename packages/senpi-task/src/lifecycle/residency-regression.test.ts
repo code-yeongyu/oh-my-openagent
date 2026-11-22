@@ -29,7 +29,7 @@ function transcript(store: TaskRecordStore, taskId: string): string {
   const directory = join(store.stateDir, "children", taskId, "sessions", taskId)
   mkdirSync(directory, { recursive: true })
   const path = join(directory, "resume.jsonl")
-  writeFileSync(path, "{\"role\":\"assistant\"}\n")
+  writeFileSync(path, '{"role":"assistant"}\n')
   return path
 }
 
@@ -83,7 +83,11 @@ function lifecycleFor(
   return { lifecycle, signals }
 }
 
-function terminalResident(store: TaskRecordStore, taskId: string, status: "completed" | "error" = "completed"): TaskRecord {
+function terminalResident(
+  store: TaskRecordStore,
+  taskId: string,
+  status: "completed" | "error" = "completed",
+): TaskRecord {
   const record = seedRecord(store, {
     task_id: taskId,
     status,
@@ -216,7 +220,10 @@ describe("terminal resident reconciliation", () => {
 describe("scoped terminal revival", () => {
   test("#given suspended completed and error records with transcripts #when their session resumes #then neither is respawned", async () => {
     const store = tempStore()
-    for (const [taskId, status] of [["st_75500003", "completed"], ["st_75500004", "error"]] as const) {
+    for (const [taskId, status] of [
+      ["st_75500003", "completed"],
+      ["st_75500004", "error"],
+    ] as const) {
       const record = seedRecord(store, {
         task_id: taskId,
         parent_session_id: parentSessionId,
@@ -238,7 +245,10 @@ describe("scoped terminal revival", () => {
 
   test("#given suspended running and interrupted records with transcripts #when their session resumes #then both still respawn", async () => {
     const store = tempStore()
-    for (const [taskId, status] of [["st_75500005", "running"], ["st_75500006", "interrupted"]] as const) {
+    for (const [taskId, status] of [
+      ["st_75500005", "running"],
+      ["st_75500006", "interrupted"],
+    ] as const) {
       const record = seedRecord(store, {
         task_id: taskId,
         parent_session_id: parentSessionId,

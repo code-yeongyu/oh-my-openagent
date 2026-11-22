@@ -9,40 +9,47 @@ const ReasoningEffortSchema = z.enum(["none", "minimal", "low", "medium", "high"
 
 const AgentModelEntrySchema = z.union([
   z.string(),
-  z.object({
-    model: z.string(),
-    variant: z.string().optional(),
-    reasoningEffort: ReasoningEffortSchema.optional(),
-  }).passthrough(),
+  z
+    .object({
+      model: z.string(),
+      variant: z.string().optional(),
+      reasoningEffort: ReasoningEffortSchema.optional(),
+    })
+    .passthrough(),
 ])
 
-export const RawAgentDefinitionSchema = z.object({
-  description: z.string().optional(),
-  prompt: z.string().optional(),
-  mode: z.string().optional(),
-  model: z.string().optional(),
-  models: z.array(AgentModelEntrySchema).optional(),
-  variant: z.string().optional(),
-  reasoningEffort: ReasoningEffortSchema.optional(),
-  temperature: z.number().min(0).max(2).optional(),
-  tools: ToolsInputSchema.optional(),
-  disable: z.boolean().optional(),
-  background: z.boolean().optional(),
-  executionMode: z.string().optional(),
-  execution_mode: z.string().optional(),
-  allowedSubagents: z.array(z.string()).optional(),
-  allowed_subagents: z.array(z.string()).optional(),
-  disallowedTools: z.array(z.string()).optional(),
-  disallowed_tools: z.array(z.string()).optional(),
-  maxDepth: z.number().int().nonnegative().optional(),
-  max_depth: z.number().int().nonnegative().optional(),
-  maxTurns: z.number().int().nonnegative().optional(),
-  max_turns: z.number().int().nonnegative().optional(),
-}).passthrough()
+export const RawAgentDefinitionSchema = z
+  .object({
+    description: z.string().optional(),
+    prompt: z.string().optional(),
+    mode: z.string().optional(),
+    model: z.string().optional(),
+    models: z.array(AgentModelEntrySchema).optional(),
+    models_distribution: z.enum(["sequential", "round_robin"]).optional(),
+    variant: z.string().optional(),
+    reasoningEffort: ReasoningEffortSchema.optional(),
+    temperature: z.number().min(0).max(2).optional(),
+    tools: ToolsInputSchema.optional(),
+    disable: z.boolean().optional(),
+    background: z.boolean().optional(),
+    executionMode: z.string().optional(),
+    execution_mode: z.string().optional(),
+    allowedSubagents: z.array(z.string()).optional(),
+    allowed_subagents: z.array(z.string()).optional(),
+    disallowedTools: z.array(z.string()).optional(),
+    disallowed_tools: z.array(z.string()).optional(),
+    maxDepth: z.number().int().nonnegative().optional(),
+    max_depth: z.number().int().nonnegative().optional(),
+    maxTurns: z.number().int().nonnegative().optional(),
+    max_turns: z.number().int().nonnegative().optional(),
+  })
+  .passthrough()
 
-export const OmoAgentOverlaySchema = z.object({
-  agents: z.record(z.string(), RawAgentDefinitionSchema).optional(),
-}).passthrough()
+export const OmoAgentOverlaySchema = z
+  .object({
+    agents: z.record(z.string(), RawAgentDefinitionSchema).optional(),
+  })
+  .passthrough()
 
 export type RawAgentDefinition = z.infer<typeof RawAgentDefinitionSchema>
 
@@ -62,6 +69,7 @@ export function normalizeAgentDefinition(
     ...(raw.mode === undefined ? {} : { mode: raw.mode }),
     ...(raw.model === undefined ? {} : { model: raw.model }),
     ...(raw.models === undefined ? {} : { models: raw.models }),
+    ...(raw.models_distribution === undefined ? {} : { models_distribution: raw.models_distribution }),
     ...(raw.variant === undefined ? {} : { variant: raw.variant }),
     ...(raw.reasoningEffort === undefined ? {} : { reasoningEffort: raw.reasoningEffort }),
     ...(raw.temperature === undefined ? {} : { temperature: raw.temperature }),

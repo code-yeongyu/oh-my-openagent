@@ -20,7 +20,10 @@ function workspace(): Workspace {
   const agentDir = join(home, ".omo", "agent")
   const pluginRoot = join(root, "plugin")
   for (const dir of [project, agentDir, pluginRoot]) mkdirSync(dir, { recursive: true })
-  writeFileSync(join(pluginRoot, "daemon-launch-spec.json"), JSON.stringify({ schemaVersion: 1, argv: ["--mode", "rpc"], env: {} }))
+  writeFileSync(
+    join(pluginRoot, "daemon-launch-spec.json"),
+    JSON.stringify({ schemaVersion: 1, argv: ["--mode", "rpc"], env: {} }),
+  )
   return { home, project, agentDir, pluginRoot }
 }
 
@@ -59,6 +62,10 @@ function runEngine(ws: Workspace, options: RunOptions = {}): ReturnType<typeof f
     stdout: sink,
     stderr: sink,
     platform: "darwin",
+    // The warm `run` sends after its ensure is not what these tests read.
+    threadSdk: async () => ({
+      sdk: { warmDaemon: async () => ({ kind: "warm", state: "warmed" }), dispose: async () => undefined },
+    }),
   })
   return engine
 }
@@ -207,12 +214,38 @@ describe("omo daemon task.host_idle_exit_ms source (#9192)", () => {
   test("#given a policy in omo.jsonc and an idle exit only in the deprecated file #when run and doctor #then each key keeps its own source", () => {
     const ws = workspace()
     write(join(ws.home, ".omo", "omo.jsonc"), JSON.stringify({ task: { host_engine_policy: "fallback" } }))
-    write(join(ws.agentDir, "omo.json"), JSON.stringify({ task: { host_engine_policy: "upgrade", host_idle_exit_ms: 5000 } }))
+    write(
+      join(ws.agentDir, "omo.json"),
+      JSON.stringify({ task: { host_engine_policy: "upgrade", host_idle_exit_ms: 5000 } }),
+    )
 
     const engine = runEngine(ws)
     const args = engine.calls[0] ?? []
     expect(args[args.indexOf("--policy") + 1]).toBe("fallback")
     expect(engine.envs[0]?.SENPI_RPC_HOST_IDLE_EXIT_MS).toBe("5000")
     expect(configWarns(doctorLines(ws))).toEqual([legacyWarn(ws, "host_idle_exit_ms")])
+  })
+})
+
+// omo#13594: the always-on session host unit runs `omo daemon run --pinned`; only that ensure asks for a host that never
+// idle-exits (the engine's SENPI_RPC_HOST_COLD_START=persistent), and nothing else does.
+describe("omo daemon run --pinned", () => {
+  test("pins the host the run ensures and leaves a plain run and other subcommands alone", () => {
+    const ws = workspace()
+    expect(runEngine(ws, { args: ["--pinned"] }).envs[0]?.SENPI_RPC_HOST_COLD_START).toBe("persistent")
+    expect(runEngine(ws).envs[0]?.SENPI_RPC_HOST_COLD_START).toBeUndefined()
+    const engine = fakeEngine()
+    runDaemonCommand(["stop", "--pinned"], {
+      engine,
+      pluginRoot: ws.pluginRoot,
+      agentDir: ws.agentDir,
+      env: { HOME: ws.home },
+      cwd: ws.home,
+      loadTaskConfig: () => taskConfigRuntime,
+      stdout: sink,
+      stderr: sink,
+      platform: "darwin",
+    })
+    expect(engine.envs[0]?.SENPI_RPC_HOST_COLD_START).toBeUndefined()
   })
 })

@@ -12,6 +12,7 @@ use x11rb::protocol::xtest::ConnectionExt as _;
 use x11rb::rust_connection::RustConnection;
 use x11rb::CURRENT_TIME;
 
+use super::client_process::ClientProcess;
 use super::keys::Keymap;
 use super::server::{FakeInput, InputServer, SentEvent};
 
@@ -220,6 +221,10 @@ impl InputServer for X11InputConnection {
             .reply()
             .ok()?;
         (!reply.value.is_empty()).then_some(reply.value)
+    }
+
+    fn client_process(&self, window: Window) -> Result<ClientProcess, String> {
+        super::connection_client::client_process(&self.conn, window)
     }
 
     fn flush(&self) -> CoreResult<()> {

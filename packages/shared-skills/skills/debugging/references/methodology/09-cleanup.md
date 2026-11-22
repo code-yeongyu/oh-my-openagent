@@ -108,13 +108,13 @@ Last gate before reporting done. All four gates must be true, and all four must 
 
 ### The four gates
 
-1. **Red→green toggle confirmed** — show the failing test output from before the fix and passing output after. Both outputs visible in the reply or the journal.
+1. **Red→green toggle confirmed** — show the failing test output from before the fix and passing output after. Both outputs visible in the final message (the journal was removed in Phase 9).
 
 2. **Full test suite green** — show the suite's final pass line (e.g. `42 passed in 3.14s`). Not just the new test.
 
 3. **Manual QA reproduced the fix** — show the command or scenario that originally failed and its now-correct output. Verbatim, not paraphrased.
 
-4. **Working tree clean of debug artifacts** — show `git diff --stat` output containing only fix + test, plus `git status` clean of untracked debug files.
+4. **Working tree clean of debug artifacts** — show `git diff --stat` output containing only fix + test (plus the Phase 7 oversized-file split, if one was required), plus `git status` clean of untracked debug files.
 
 If any of the four lacks evidence, you have not finished — return to the appropriate phase.
 

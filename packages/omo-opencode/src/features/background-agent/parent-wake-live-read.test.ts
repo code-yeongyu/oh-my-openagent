@@ -6,10 +6,7 @@ import {
   _setFetchImplementationForTesting,
   resetLiveServerRouteForTesting,
 } from "../../shared/live-server-route"
-import {
-  subagentSessions,
-  _resetForTesting as resetClaudeCodeSessionState,
-} from "../claude-code-session-state/state"
+import { subagentSessions, _resetForTesting as resetClaudeCodeSessionState } from "../claude-code-session-state/state"
 import { BackgroundManager } from "./manager"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import type { PluginInput } from "@opencode-ai/plugin"

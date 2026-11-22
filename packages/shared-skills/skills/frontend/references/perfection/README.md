@@ -16,7 +16,7 @@ The correct path:
 3. Run Lighthouse against the Playwright-controlled page via `playwright-lighthouse` OR via `chrome-launcher` + the `lighthouse` Node API, attaching to the Playwright CDP endpoint so cookies, auth state, and warmed caches mirror what a real returning user sees.
 4. Use the **mobile** preset (4x CPU throttle, Fast 3G) for the primary number, AND the **desktop** preset for the secondary number. Report both.
 
-If the `playwright` skill is not loaded in this session, load it now via the `skill` tool.
+If no browser-automation skill is loaded in this session, load the `browser` skill now (read its `SKILL.md`).
 
 ### 2. 100 IN EVERY CATEGORY IS THE FLOOR.
 
@@ -90,7 +90,6 @@ Quick audit via the cross-platform Python CLI (macOS, Linux, Windows):
 
 ```bash
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000
-uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --threshold 95
 uv run $SKILL_DIR/scripts/perfection/lighthouse-audit.py https://localhost:3000 --desktop-only
 bun $SKILL_DIR/scripts/perfection/check-draft-guard.ts src/   # exit 1 = accent stripe or outline, promo copy, emoji icon, hype badge, or vanity stat
 ```

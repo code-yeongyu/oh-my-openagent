@@ -18,7 +18,10 @@ function pathWords(value: string): string[] {
 }
 
 function shellTokens(command: string): string[] {
-  return command.split(/\s+/).map((token) => token.replace(/^['"]|['"]$/g, "")).filter(Boolean)
+  return command
+    .split(/\s+/)
+    .map((token) => token.replace(/^['"]|['"]$/g, ""))
+    .filter(Boolean)
 }
 
 function pathChunks(token: string): string[] {
@@ -79,7 +82,8 @@ export function toolArgTexts(toolName: string, input: Record<string, unknown>): 
     }
     if (ARRAY_KEYS.has(key) && Array.isArray(value)) {
       for (const item of value) {
-        if (typeof item === "string" && isUsable(item)) result.push(...(PATH_LIKE.test(item) ? pathWords(item) : [item]))
+        if (typeof item === "string" && isUsable(item))
+          result.push(...(PATH_LIKE.test(item) ? pathWords(item) : [item]))
       }
     }
   }

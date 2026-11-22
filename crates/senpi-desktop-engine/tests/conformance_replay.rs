@@ -3,7 +3,9 @@
 //! expected ones modulo the declared `variable` JSON pointers (present, any
 //! value). Within one step the order of messages is free: a reply and the
 //! notifications it caused are written by different threads. A message left
-//! over after the last step fails the case.
+//! over after the last step fails the case. An expectation's `bind` names
+//! values of the matched message (`{"frame": "/result/frameId"}`); a later
+//! `send` string that is exactly `{{frame}}` is replaced by the bound value.
 //!
 //! `SENPI_DESKTOP_CONFORMANCE_DIR` replays another corpus directory; the TS
 //! twin (`packages/desktop-engine/test/conformance.test.ts`) reports the same
@@ -43,6 +45,28 @@ struct Expected {
     message: Value,
     #[serde(default)]
     variable: Vec<String>,
+    #[serde(default)]
+    bind: BTreeMap<String, String>,
+}
+
+/// `value` with every string `{{name}}` replaced by the bound `name`.
+fn substituted(value: &Value, bound: &BTreeMap<String, Value>) -> Value {
+    match value {
+        Value::String(text) => text
+            .strip_prefix("{{")
+            .and_then(|rest| rest.strip_suffix("}}"))
+            .and_then(|name| bound.get(name))
+            .cloned()
+            .unwrap_or_else(|| value.clone()),
+        Value::Array(items) => Value::Array(items.iter().map(|item| substituted(item, bound)).collect()),
+        Value::Object(members) => Value::Object(
+            members
+                .iter()
+                .map(|(key, member)| (key.clone(), substituted(member, bound)))
+                .collect(),
+        ),
+        other => other.clone(),
+    }
 }
 
 /// `message` with every `variable` member nulled; `None` when one is absent.
@@ -67,8 +91,9 @@ fn replay(name: &str, case: &Case) -> Result<(), String> {
     let mut env = vec![fake_backend(scenario.to_str().expect("repo paths are UTF-8"))];
     env.extend(case.env.iter().map(|(key, value)| (key.as_str(), value.clone())));
     let mut engine = Engine::spawn(&env);
+    let mut bound = BTreeMap::new();
     for (index, step) in case.steps.iter().enumerate() {
-        engine.send(&step.send);
+        engine.send(&substituted(&step.send, &bound));
         let mut actual: Vec<Value> = step.expect.iter().map(|_| engine.next()).collect();
         for (slot, expected) in step.expect.iter().enumerate() {
             let Some(found) = actual.iter().position(|message| matches(expected, message)) else {
@@ -77,6 +102,12 @@ fn replay(name: &str, case: &Case) -> Result<(), String> {
                     expected.message
                 ));
             };
+            for (name, pointer) in &expected.bind {
+                let Some(value) = actual[found].pointer(pointer) else {
+                    return Err(format!("{name}: steps/{index}/expect/{slot}: bind {pointer} is absent"));
+                };
+                bound.insert(name.clone(), value.clone());
+            }
             actual.swap_remove(found);
         }
     }

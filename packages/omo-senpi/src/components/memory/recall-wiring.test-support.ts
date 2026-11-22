@@ -3,10 +3,7 @@ import { realpathSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import {
-  GitMemoryRepo,
-  buildIdentityPaths,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryBinding } from "./binding"
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
@@ -20,8 +17,7 @@ export const ROLLOUTS_BODY =
   "Always drain kubernetes nodes before a rollout, then verify the deployment health endpoint.\n"
 export const DRAINS_PATH = "notes/kubernetes-drains.md"
 export const DRAINS_DESCRIPTION = "Kubernetes drain checklist"
-export const DRAINS_BODY =
-  "Drain kubernetes nodes and check the deployment health endpoint before any rollout.\n"
+export const DRAINS_BODY = "Drain kubernetes nodes and check the deployment health endpoint before any rollout.\n"
 export const KUBERNETES_PROMPT = "how do we handle kubernetes rollouts here"
 
 export interface Fixture {

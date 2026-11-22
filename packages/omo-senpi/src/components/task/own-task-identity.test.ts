@@ -27,13 +27,17 @@ function piWith(context: Record<string, string>): unknown {
 describe("ownHostedTaskId", () => {
   test("#given a state_dir that is exactly <store>/children/<task id> on disk #then it answers the task id", () => {
     const { store } = realStore()
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), store)).toBe(TASK_ID)
+    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), store)).toBe(
+      TASK_ID,
+    )
   })
 
   test("#given a lookalike state_dir whose middle folder is not children #then it answers undefined", () => {
     const { store } = realStore()
     mkdirSync(join(store, "tasks", TASK_ID), { recursive: true })
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "tasks", TASK_ID) }), store)).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "tasks", TASK_ID) }), store),
+    ).toBeUndefined()
   })
 
   test("#given a state_dir one folder deeper than children/<task id> #then it answers undefined", () => {
@@ -54,14 +58,18 @@ describe("ownHostedTaskId", () => {
     symlinkSync(store, alias)
     const childDir = join(store, "children", TASK_ID)
     expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: childDir }), alias)).toBe(TASK_ID)
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(alias, "children", TASK_ID) }), store)).toBe(TASK_ID)
+    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(alias, "children", TASK_ID) }), store)).toBe(
+      TASK_ID,
+    )
   })
 
   test("#given a child dir not created yet under a symlinked store #then it still matches through the store's real path", () => {
     const { root, store } = realStore()
     const alias = join(root, "alias-store")
     symlinkSync(store, alias)
-    expect(ownHostedTaskId(piWith({ task_id: "st_notyet", state_dir: join(alias, "children", "st_notyet") }), store)).toBe("st_notyet")
+    expect(
+      ownHostedTaskId(piWith({ task_id: "st_notyet", state_dir: join(alias, "children", "st_notyet") }), store),
+    ).toBe("st_notyet")
   })
 
   test("#given <store>/children/<task id> is a dangling symlink pointing outside the store #then it answers undefined", () => {
@@ -78,21 +86,34 @@ describe("ownHostedTaskId", () => {
     mkdirSync(join(elsewhere, TASK_ID), { recursive: true })
     mkdirSync(store, { recursive: true })
     symlinkSync(elsewhere, join(store, "children"))
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), store)).toBeUndefined()
-    expect(ownHostedTaskId(piWith({ task_id: "st_notyet", state_dir: join(store, "children", "st_notyet") }), store)).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), store),
+    ).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: "st_notyet", state_dir: join(store, "children", "st_notyet") }), store),
+    ).toBeUndefined()
   })
 
   test("#given a state_dir whose path runs through a regular file (ENOTDIR) #then it answers undefined instead of throwing", () => {
     const { store } = realStore()
     writeFileSync(join(store, "children", "st_file"), "")
-    expect(ownHostedTaskId(piWith({ task_id: "x", state_dir: join(store, "children", "st_file", "x") }), store)).toBeUndefined()
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), join(store, "children", "st_file", "x"))).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: "x", state_dir: join(store, "children", "st_file", "x") }), store),
+    ).toBeUndefined()
+    expect(
+      ownHostedTaskId(
+        piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }),
+        join(store, "children", "st_file", "x"),
+      ),
+    ).toBeUndefined()
   })
 
   test("#given a real state_dir inside another store #then it answers undefined", () => {
     const mine = realStore()
     const other = realStore()
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(other.store, "children", TASK_ID) }), mine.store)).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(other.store, "children", TASK_ID) }), mine.store),
+    ).toBeUndefined()
   })
 
   test("#given a context with no state_dir #then it answers undefined", () => {
@@ -102,6 +123,8 @@ describe("ownHostedTaskId", () => {
 
   test("#given an empty engine state dir #then it answers undefined", () => {
     const { store } = realStore()
-    expect(ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), "")).toBeUndefined()
+    expect(
+      ownHostedTaskId(piWith({ task_id: TASK_ID, state_dir: join(store, "children", TASK_ID) }), ""),
+    ).toBeUndefined()
   })
 })

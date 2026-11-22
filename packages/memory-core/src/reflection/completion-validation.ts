@@ -6,18 +6,43 @@ import { FRONTMATTER_RE } from "../memfs/frontmatter-scalar"
 import { describeFrontmatterViolation } from "../memfs/frontmatter-validation"
 import { isMemoryContentPath } from "../memfs/paths"
 import { redactSecretLikeMaterial } from "../sync/redact"
-import { commitCount, readDroppedTrailers, squashWithoutPaths, type DroppedEntry } from "./completion-repair"
+import {
+  commitCount,
+  readDroppedTrailers as readTrailersAt,
+  squashWithoutPaths,
+  type DroppedEntry,
+} from "./completion-repair"
 import { findSecretLikeFailures } from "./completion-secret-scan"
 import type { ReflectionWorktree } from "./worktree"
 
 const GIT_TIMEOUT_MS = 30_000
 
 export type { DroppedEntry }
-export { describeDroppedEntries, readDroppedTrailers } from "./completion-repair"
+export { describeDroppedEntries } from "./completion-repair"
 
-/** `dropped` lists entries the gate removed so the valid ones could land; absent when nothing was dropped. */
+/** The drop report a validated tip carries, read past the gate's own link-repair commit when one sits on top. */
+export async function readDroppedTrailers(
+  exec: GitExec,
+  dir: string,
+  baseSha: string,
+  tipSha: string,
+): Promise<DroppedEntry[]> {
+  const repair = await (await import("#memory-completion-links")).recognizeLinkRepair(exec, dir, baseSha, tipSha)
+  return await readTrailersAt(exec, dir, baseSha, repair?.runTip ?? tipSha)
+}
+
+/**
+ * `dropped` lists entries the gate removed so the valid ones could land; absent when nothing was dropped.
+ * `linkRepairs` lists the changed paths only the gate's own link repair wrote (#12642); absent when there are none.
+ */
 export type CompletionValidation =
-  | { status: "valid"; tipSha: string; changedPaths: readonly string[]; dropped?: readonly DroppedEntry[] }
+  | {
+      status: "valid"
+      tipSha: string
+      changedPaths: readonly string[]
+      dropped?: readonly DroppedEntry[]
+      linkRepairs?: readonly string[]
+    }
   | { status: "no_changes"; tipSha: string; changedPaths: readonly []; dropped?: readonly DroppedEntry[] }
   | { status: "dirty_uncommitted"; detail: string }
   | { status: "failed"; detail: string }
@@ -67,10 +92,36 @@ export async function validateCompletion(
     }
     if (tipSha === recordedBase) return { status: "no_changes", tipSha, changedPaths: [] }
 
-    return await screenEntries(exec, worktree, recordedBase, tipSha)
+    // A tip that is provably the gate's own earlier link repair is set aside, so the run is screened alone and the
+    // repair is recomputed on the screened tip; the screen never sees, drops or squashes the repair.
+    // The link repair is a lazy sidecar in bundles that map `#memory-completion-links` (omo-senpi's omo.js).
+    const { applyLinkRepair, recognizeLinkRepair } = await import("#memory-completion-links")
+    const prior = await recognizeLinkRepair(exec, worktree.dir, recordedBase, tipSha)
+    if (prior !== undefined) await git(exec, worktree.dir, ["reset", "-q", "--hard", prior.runTip])
+    const screened = await screenEntries(exec, worktree, recordedBase, prior?.runTip ?? tipSha)
+    if (screened.status !== "valid") return screened
+    const dropped = (screened.dropped ?? []).map((entry) => entry.path)
+    const repair = await applyLinkRepair(exec, worktree.dir, recordedBase, screened.tipSha, dropped, prior)
+    if (repair === undefined) return screened
+    const changedPaths = await listReflectionChangedPaths(exec, worktree.dir, recordedBase, repair.tipSha)
+    return {
+      ...screened,
+      tipSha: repair.tipSha,
+      changedPaths,
+      ...(repair.linkRepairs.length === 0 ? {} : { linkRepairs: repair.linkRepairs }),
+    }
   } catch (error) {
     return { status: "failed", detail: errorMessage(error) }
   }
+}
+
+/** The changed paths a run restricted to `allowed` may not land; the gate's own link repairs never count against it. */
+export function pathsOutsideTarget(
+  validation: { readonly changedPaths: readonly string[]; readonly linkRepairs?: readonly string[] },
+  allowed: readonly string[],
+): string[] {
+  const repairs = new Set(validation.linkRepairs ?? [])
+  return validation.changedPaths.filter((path) => !allowed.includes(path) && !repairs.has(path))
 }
 
 const MAX_REPAIR_ROUNDS = 3
@@ -106,9 +157,20 @@ async function screenEntries(
       }
     }
     // Rename detection is off here on purpose: `git mv system/agreements.md elsewhere` must read as a deletion.
-    const ledger = await git(exec, dir, ["diff", "--no-renames", "--name-only", "-z", `${recordedBase}..${tipSha}`, "--", AGREEMENTS_PATH])
+    const ledger = await git(exec, dir, [
+      "diff",
+      "--no-renames",
+      "--name-only",
+      "-z",
+      `${recordedBase}..${tipSha}`,
+      "--",
+      AGREEMENTS_PATH,
+    ])
     if (ledger.stdout.split("\0").some(Boolean)) {
-      return { status: "failed", detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements` }
+      return {
+        status: "failed",
+        detail: `Reflection may not modify ${AGREEMENTS_PATH}; agreements change only through the facts lane and /agreements`,
+      }
     }
     const secrets = await findSecretLikeFailures((argv, stdin) => run(exec, dir, argv, stdin), recordedBase, tipSha)
     const frontmatter = await findFrontmatterFailures(exec, dir, recordedBase, tipSha, changedPaths)
@@ -117,12 +179,15 @@ async function screenEntries(
     }
     if (secrets.length === 0 && frontmatter.size === 0) {
       if (dropped.size === 0) {
-        for (const entry of await readDroppedTrailers(exec, dir, recordedBase, tipSha)) dropped.set(entry.path, entry.reason)
+        for (const entry of await readTrailersAt(exec, dir, recordedBase, tipSha)) dropped.set(entry.path, entry.reason)
       }
       return { status: "valid", tipSha, changedPaths, ...droppedList() }
     }
     if (round >= MAX_REPAIR_ROUNDS) {
-      return { status: "failed", detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed" }
+      return {
+        status: "failed",
+        detail: secrets[0]?.detail ?? [...frontmatter.values()][0] ?? "completion validation failed",
+      }
     }
     // A secret in an earlier commit may be gone from the tip, so a multi-commit branch is first
     // squashed with only the tip-level frontmatter failures removed; the squashed commit is then

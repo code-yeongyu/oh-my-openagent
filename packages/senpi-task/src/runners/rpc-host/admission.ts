@@ -12,9 +12,7 @@ export type HostAdmissionOptions = {
   readonly onWarning: (message: string) => void | (() => void)
 }
 
-export async function openHostSessionWithAdmission(
-  options: HostAdmissionOptions,
-): Promise<OpenedHostSession> {
+export async function openHostSessionWithAdmission(options: HostAdmissionOptions): Promise<OpenedHostSession> {
   const deadline = options.now() + options.admissionWaitMs
   let pressureNoted = false
   let clearPressureNote: (() => void) | undefined

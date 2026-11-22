@@ -61,7 +61,8 @@ describe("runtime-fallback quota error regressions", () => {
     //#given
     const error = {
       name: "SessionRetry",
-      message: "You have exceeded the 5-hour usage quota. It will reset at 2026-05-11 01:20:12 +0800 CST. We recommend using a different model.",
+      message:
+        "You have exceeded the 5-hour usage quota. It will reset at 2026-05-11 01:20:12 +0800 CST. We recommend using a different model.",
     }
 
     //#when
@@ -77,8 +78,7 @@ describe("runtime-fallback quota error regressions", () => {
   test("classifies UnifyLLM pre-charge balance failures as quota_exceeded", () => {
     //#given
     const error = {
-      message:
-        "预扣费额度失败, 用户剩余额度: 0.265718, 需要预扣费额度: 0.680208 (request id: test-request-id)",
+      message: "预扣费额度失败, 用户剩余额度: 0.265718, 需要预扣费额度: 0.680208 (request id: test-request-id)",
     }
 
     //#when
@@ -152,8 +152,7 @@ describe("runtime-fallback quota error regressions", () => {
     // match any of the existing quota regex patterns, so the runtime-fallback
     // never fires and the user is stuck on the dead model.
     const error = {
-      message:
-        "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
+      message: "Weekly/Monthly Limit Exhausted. Your limit will reset at 2026-05-20 15:43:27",
     }
 
     //#when
@@ -170,8 +169,7 @@ describe("runtime-fallback quota error regressions", () => {
     // Weekly-only variant uses the same phrasing minus the slash; the regex
     // must not require the literal `Weekly/Monthly` prefix.
     const error = {
-      message:
-        "Weekly Limit Exhausted. Your limit will reset at 2026-05-28 10:30:00",
+      message: "Weekly Limit Exhausted. Your limit will reset at 2026-05-28 10:30:00",
     }
 
     //#when

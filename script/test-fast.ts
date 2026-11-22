@@ -1,4 +1,9 @@
 import { spawn, type SpawnOptions } from "node:child_process"
+import {
+  ROOT_TEST_SERIAL_QUARANTINE_PATHS,
+  serialQuarantineArgs,
+  testTimeoutArgs,
+} from "./root-test-serial-quarantine.ts"
 
 export interface TestFastGroup {
   readonly name: string
@@ -17,9 +22,7 @@ export function isReentry(env: Readonly<Record<string, string | undefined>>): bo
   return (env[REENTRY_ENV_VAR] ?? "") !== ""
 }
 
-export function childEnv(
-  parent: Readonly<Record<string, string | undefined>>,
-): Record<string, string | undefined> {
+export function childEnv(parent: Readonly<Record<string, string | undefined>>): Record<string, string | undefined> {
   return { ...parent, [REENTRY_ENV_VAR]: "1" }
 }
 
@@ -27,11 +30,19 @@ export function testFastGroups(): TestFastGroup[] {
   return [
     {
       name: "opencode-memory",
-      args: ["test", "packages/omo-opencode", "packages/memory-core"],
+      args: ["test", ...testTimeoutArgs(), "packages/omo-opencode", "packages/memory-core"],
     },
-    { name: "root-rest", args: ["--config=bunfig.win2.toml", "test"] },
-    { name: "senpi", args: ["test", "packages/omo-senpi"] },
+    { name: "root-rest", args: ["--config=bunfig.win2.parallel.toml", "test", ...testTimeoutArgs()] },
+    { name: "senpi", args: ["test", ...testTimeoutArgs(), "packages/omo-senpi"] },
   ]
+}
+
+/**
+ * The serial phase every local full run starts with. It runs the quarantine list CI
+ * already enforces, from that list's own definition, before anything parallel starts.
+ */
+export function testFastQuarantineGroup(): TestFastGroup {
+  return { name: "serial-quarantine", args: serialQuarantineArgs() }
 }
 
 /** Minimal view of a spawned child the registry needs; keeps fakes cheap in tests. */
@@ -45,6 +56,8 @@ export type KillProcessGroup = (negatedPid: number, signal: NodeJS.Signals) => v
 export interface ChildRegistry {
   add(child: ChildHandle): void
   remove(child: ChildHandle): void
+  /** Drops the child AND its retained group: the group's work is finished, not merely leaderless. */
+  release(child: ChildHandle): void
   hasSignalTargets(): boolean
   killAll(signal: NodeJS.Signals, kill: KillProcessGroup): void
 }
@@ -72,8 +85,7 @@ export async function shutdownChildren(
   registry: ChildRegistry,
   signal: TerminationSignal,
   kill: KillProcessGroup,
-  waitGrace: () => Promise<void> = () =>
-    new Promise((resolve) => void setTimeout(resolve, SHUTDOWN_GRACE_MS)),
+  waitGrace: () => Promise<void> = () => new Promise((resolve) => void setTimeout(resolve, SHUTDOWN_GRACE_MS)),
 ): Promise<void> {
   registry.killAll(signal, kill)
   await waitGrace()
@@ -92,14 +104,25 @@ export function createChildRegistry(platform: NodeJS.Platform): ChildRegistry {
   const live = new Set<ChildHandle>()
   const retainedGroups = new Set<number>()
   const isPosix = platform !== "win32"
+  let shuttingDown = false
   return {
     add: (child) => {
       live.add(child)
       if (isPosix && child.pid !== undefined) retainedGroups.add(child.pid)
     },
     remove: (child) => void live.delete(child),
+    release: (child) => {
+      live.delete(child)
+      if (child.pid === undefined) return
+      // A group is released when its phase finished normally. During a shutdown the leader's
+      // exit is the signal landing, not the work ending, so the PGID must survive for the
+      // SIGKILL escalation to reach a descendant that ignored it.
+      if (shuttingDown) return
+      retainedGroups.delete(child.pid)
+    },
     hasSignalTargets: () => (isPosix ? retainedGroups.size > 0 : live.size > 0),
     killAll: (signal, kill) => {
+      shuttingDown = true
       if (!isPosix) {
         for (const child of live) if (child.pid !== undefined) child.kill(signal)
         return
@@ -126,22 +149,14 @@ export interface ChildLifecycleEvents {
 }
 
 export interface SpawnedChild extends ChildHandle {
-  once<E extends keyof ChildLifecycleEvents>(
-    event: E,
-    listener: (payload: ChildLifecycleEvents[E]) => void,
-  ): unknown
+  once<E extends keyof ChildLifecycleEvents>(event: E, listener: (payload: ChildLifecycleEvents[E]) => void): unknown
 }
 
-export type SpawnChildProcess = (
-  command: string,
-  args: readonly string[],
-  options: SpawnGroupOptions,
-) => SpawnedChild
+export type SpawnChildProcess = (command: string, args: readonly string[], options: SpawnGroupOptions) => SpawnedChild
 
 /** Selects node's three-argument overload; the bare `spawn` symbol carries a
  * two-argument overload that is not assignable to the seam. */
-const spawnChildProcess: SpawnChildProcess = (command, args, options) =>
-  spawn(command, args, options)
+const spawnChildProcess: SpawnChildProcess = (command, args, options) => spawn(command, args, options)
 
 /**
  * Every group child inherits the parent's stdio, carries the re-entry marker so
@@ -153,6 +168,7 @@ export function spawnInheritingStdio(
   registry: ChildRegistry,
   log: LogLine,
   spawnChild: SpawnChildProcess = spawnChildProcess,
+  releaseOnExit = false,
 ): SpawnTestGroup {
   return (group) =>
     new Promise((resolve, reject) => {
@@ -167,7 +183,8 @@ export function spawnInheritingStdio(
         reject(error)
       })
       child.once("exit", (code) => {
-        registry.remove(child)
+        if (releaseOnExit) registry.release(child)
+        else registry.remove(child)
         log(`[test-fast] ${group.name}: exit ${code ?? 1}`)
         resolve(code ?? 1)
       })
@@ -175,22 +192,28 @@ export function spawnInheritingStdio(
 }
 
 /**
- * Runs every group in parallel. A rejected group (a failed spawn) aborts the
- * `Promise.all` while its detached siblings are still running, so the failure
- * path shuts the survivors down before the error propagates and the parent
- * exits; otherwise those siblings outlive the run as orphans.
+ * Runs the serial quarantine to completion, then every group in parallel. A
+ * failed serial phase returns its own exit code and starts no group; a rejected
+ * group (a failed spawn) aborts the `Promise.all` while its detached siblings
+ * are still running, so the failure path shuts the survivors down before the
+ * error propagates and the parent exits; otherwise those siblings outlive the
+ * run as orphans.
  */
 export async function runTestFast(
   spawnGroup: SpawnTestGroup,
   log: LogLine = console.log,
   shutdownSurvivors: () => void | Promise<void> = () => {},
+  spawnSerialGroup: SpawnTestGroup = spawnGroup,
 ): Promise<number> {
+  const quarantine = testFastQuarantineGroup()
+  log(`[test-fast] serial quarantine first: ${ROOT_TEST_SERIAL_QUARANTINE_PATHS.length} files`)
+  const quarantineExit = await spawnSerialGroup(quarantine)
+  if (quarantineExit !== 0) {
+    log(`[test-fast] ${quarantine.name}: exit ${quarantineExit}; no parallel group starts`)
+    return quarantineExit
+  }
   const groups = testFastGroups()
-  log(
-    `[test-fast] running ${groups.length} groups in parallel: ${groups
-      .map((group) => group.name)
-      .join(", ")}`,
-  )
+  log(`[test-fast] running ${groups.length} groups in parallel: ${groups.map((group) => group.name).join(", ")}`)
   try {
     const exits = await Promise.all(groups.map(spawnGroup))
     return exits.every((exit) => exit === 0) ? 0 : 1
@@ -202,9 +225,7 @@ export async function runTestFast(
 
 if (import.meta.main) {
   if (isReentry(process.env)) {
-    console.error(
-      `[test-fast] re-entry blocked: ${REENTRY_ENV_VAR} is set; refusing to recurse`,
-    )
+    console.error(`[test-fast] re-entry blocked: ${REENTRY_ENV_VAR} is set; refusing to recurse`)
     process.exit(1)
   }
   const registry = createChildRegistry(process.platform)
@@ -212,9 +233,7 @@ if (import.meta.main) {
   for (const signal of ["SIGINT", "SIGTERM"] as const) {
     process.once(signal, () => {
       console.error(`[test-fast] ${signal} received: terminating group children`)
-      void shutdownChildren(registry, signal, killGroup).then(() =>
-        process.exit(signalExitCode(signal)),
-      )
+      void shutdownChildren(registry, signal, killGroup).then(() => process.exit(signalExitCode(signal)))
     })
   }
   process.exitCode = await runTestFast(
@@ -224,5 +243,6 @@ if (import.meta.main) {
       console.error("[test-fast] group failed to start: terminating surviving groups")
       return shutdownChildren(registry, "SIGTERM", killGroup)
     },
+    spawnInheritingStdio(registry, console.log, undefined, true),
   )
 }

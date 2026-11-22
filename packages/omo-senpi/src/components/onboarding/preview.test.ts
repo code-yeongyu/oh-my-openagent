@@ -22,11 +22,26 @@ for (const forced of [false, true]) {
     let releases = 0
     let historyReads = 0
     const component = createOnboardingComponent({
-      claimOnboarding: () => { claims += 1; return claimOnboarding(dir) },
+      claimOnboarding: () => {
+        claims += 1
+        return claimOnboarding(dir)
+      },
       isOnboardingComplete: () => isOnboardingComplete(dir),
-      releaseOnboarding: () => { releases += 1; releaseOnboarding(dir) },
-      scan: async () => ({ scanId: "preview", digests: [], projectRoots: new Set<string>(), context: "Scan rows: 2 sign-ins.", inventory: "2 sign-ins" }),
-      sessionHistory: async () => { historyReads += 1; return undefined },
+      releaseOnboarding: () => {
+        releases += 1
+        releaseOnboarding(dir)
+      },
+      scan: async () => ({
+        scanId: "preview",
+        digests: [],
+        projectRoots: new Set<string>(),
+        context: "Scan rows: 2 sign-ins.",
+        inventory: "2 sign-ins",
+      }),
+      sessionHistory: async () => {
+        historyReads += 1
+        return undefined
+      },
     })
     const h = createOnboardingHarness(dir, "preview", "tui", component)
     if (forced) claimOnboarding(dir)
@@ -62,17 +77,29 @@ test("#given a claim whose owner died #when previewed #then it adds what the rea
   const dir = mkdtempSync(join(tmpdir(), "onboard-preview-stale-"))
   dirs.push(dir)
   const deadOwner = { pid: 2_147_483_000, processStart: null }
-  writeFileSync(join(dir, "onboarding-completed"), JSON.stringify({ claimedAt: new Date().toISOString(), version: 2, owner: deadOwner }))
+  writeFileSync(
+    join(dir, "onboarding-completed"),
+    JSON.stringify({ claimedAt: new Date().toISOString(), version: 2, owner: deadOwner }),
+  )
   const claimOwnerSeams = { getPidLiveness: () => "dead" as const }
   let claims = 0
   const component = createOnboardingComponent({
-    claimOnboarding: (stateDir, seams) => { claims += 1; return claimOnboardingOwned(stateDir, seams) },
+    claimOnboarding: (stateDir, seams) => {
+      claims += 1
+      return claimOnboardingOwned(stateDir, seams)
+    },
     isOnboardingComplete: () => isOnboardingComplete(dir),
     isOnboardingClaimable: claimableWithOwner,
     releaseOnboarding: () => releaseOnboarding(dir),
     claimOwnerSeams,
     stateDir: dir,
-    scan: async () => ({ scanId: "stale", digests: [], projectRoots: new Set<string>(), context: "Scan rows: 1 sign-in.", inventory: "1 sign-in" }),
+    scan: async () => ({
+      scanId: "stale",
+      digests: [],
+      projectRoots: new Set<string>(),
+      context: "Scan rows: 1 sign-in.",
+      inventory: "1 sign-in",
+    }),
     sessionHistory: async () => undefined,
   })
   const h = createOnboardingHarness(dir, "stale", "tui", component)

@@ -11,18 +11,44 @@ function registryOf(provider: string, ids: readonly string[]): SenpiModelRegistr
   const models = ids.map((id) => ({ provider, id }))
   return {
     getAvailable: () => models,
-    find: (modelProvider: string, modelId: string) => models.find((model) => model.provider === modelProvider && model.id === modelId),
+    find: (modelProvider: string, modelId: string) =>
+      models.find((model) => model.provider === modelProvider && model.id === modelId),
   }
 }
 
-// The pinned engine's catalog for each provider (senpi 2026.10.27-1, ModelRuntime.getAvailable("zai" | "anthropic"), re-checked 2026-10-26).
-const ZAI_MODELS = ["glm-4.7", "glm-5-turbo", "glm-5.2", "glm-5.2-highspeed", "glm-5.3", "glm-5.3-flash", "glm-5.3-highspeed"]
-const ANTHROPIC_MODELS = [
-  "claude-fable-5", "claude-fable-5-1", "claude-haiku-4-5", "claude-haiku-4-5-20251001", "claude-haiku-5-5", "claude-opus-4-5",
-  "claude-opus-4-5-20251101", "claude-opus-4-6", "claude-opus-4-7", "claude-opus-4-8", "claude-opus-5", "claude-opus-5-5",
-  "claude-sonnet-4-5", "claude-sonnet-4-5-20250929", "claude-sonnet-4-6", "claude-sonnet-5", "claude-sonnet-5-5",
+// The pinned engine's catalog for each provider (senpi 2026.10.31-2, ModelRuntime.getAvailable("zai" | "anthropic"), re-checked 2026-10-31).
+const ZAI_MODELS = [
+  "glm-4.7",
+  "glm-5-turbo",
+  "glm-5.2",
+  "glm-5.2-highspeed",
+  "glm-5.3",
+  "glm-5.3-flash",
+  "glm-5.3-highspeed",
 ]
-const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"]
+const ANTHROPIC_MODELS = [
+  "claude-fable-5",
+  "claude-fable-5-1",
+  "claude-haiku-4-5",
+  "claude-haiku-4-5-20251001",
+  "claude-haiku-5-5",
+  "claude-opus-4-5",
+  "claude-opus-4-5-20251101",
+  "claude-opus-4-6",
+  "claude-opus-4-7",
+  "claude-opus-4-8",
+  "claude-opus-5",
+  "claude-opus-5-5",
+  "claude-sonnet-4-5",
+  "claude-sonnet-4-5-20250929",
+  "claude-sonnet-4-6",
+  "claude-sonnet-5",
+  "claude-sonnet-5-5",
+]
+// The GPT-6.2 Astra lanes list the providers serving that exact model; Copilot does not serve GPT-6.2.
+const ASTRA_PROVIDERS = ["chatgpt-subscription", "openai", "opencode"]
+// GPT-6.2 Sol is served only on the two OpenAI lanes.
+const SOL_PROVIDERS = ["chatgpt-subscription", "openai"]
 
 describe("resolveCategoryCoverage", () => {
   describe("#given a zai-only registry", () => {
@@ -32,11 +58,23 @@ describe("resolveCategoryCoverage", () => {
 
         expect(coverage.usable).toEqual(["quick", "unspecified-high", "unspecified-low"])
         expect(coverage.unusable.map((gap) => gap.name)).toEqual([
-          "architect", "artistry", "deep-high", "deep-low", "ultrabrain", "visual-engineering", "writing",
+          "architect",
+          "artistry",
+          "deep-high",
+          "deep-low",
+          "ultrabrain",
+          "visual-engineering",
+          "writing",
         ])
         const providersOf = (name: string) => coverage.unusable.find((gap) => gap.name === name)?.providers
-        expect(providersOf("architect")).toEqual(["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"])
-        expect(providersOf("deep-high")).toEqual(GPT_PROVIDERS)
+        expect(providersOf("architect")).toEqual([
+          "anthropic-subscription",
+          "anthropic",
+          "anthropic-api",
+          "github-copilot",
+          "opencode",
+        ])
+        expect(providersOf("deep-high")).toEqual(ASTRA_PROVIDERS)
         expect(providersOf("writing")).not.toContain("zai")
       })
     })
@@ -48,12 +86,18 @@ describe("resolveCategoryCoverage", () => {
         const coverage = resolveCategoryCoverage({}, registryOf("anthropic", ANTHROPIC_MODELS))
 
         expect(coverage.usable).toEqual([
-          "architect", "artistry", "quick", "unspecified-high", "unspecified-low", "visual-engineering", "writing",
+          "architect",
+          "artistry",
+          "quick",
+          "unspecified-high",
+          "unspecified-low",
+          "visual-engineering",
+          "writing",
         ])
         expect(coverage.unusable).toEqual([
-          { name: "deep-high", providers: GPT_PROVIDERS },
-          { name: "deep-low", providers: GPT_PROVIDERS },
-          { name: "ultrabrain", providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] },
+          { name: "deep-high", providers: ASTRA_PROVIDERS },
+          { name: "deep-low", providers: SOL_PROVIDERS },
+          { name: "ultrabrain", providers: ASTRA_PROVIDERS },
         ])
       })
     })
@@ -79,7 +123,10 @@ describe("resolveCategoryCoverage", () => {
       it("#then deep-high is unusable and its needed providers leave out the connected openai", () => {
         const coverage = resolveCategoryCoverage({}, registryOf("openai", ["gpt-4o"]))
 
-        expect(coverage.unusable.find((gap) => gap.name === "deep-high")?.providers).toEqual(["chatgpt-subscription", "github-copilot", "opencode"])
+        expect(coverage.unusable.find((gap) => gap.name === "deep-high")?.providers).toEqual([
+          "chatgpt-subscription",
+          "opencode",
+        ])
       })
     })
   })

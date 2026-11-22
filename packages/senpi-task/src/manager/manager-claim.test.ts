@@ -8,9 +8,19 @@ import type { TaskRecord, TaskTransition, TaskTransitionResult } from "../state"
 import { TaskRecordCollisionError, createTaskRecordStore } from "../store"
 import type { PersistedTaskEvent, TaskRecordStore } from "../store"
 import { collisionStore } from "./__fixtures__/collision-store"
-import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, flush, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  flush,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
@@ -76,7 +86,10 @@ const seedFloorChildFixturePath = resolve(import.meta.dir, "__fixtures__", "seed
 async function expectSeedFloorChildModeToSucceed(mode: string): Promise<void> {
   const result = await runSignalledChild([seedFloorChildFixturePath, mode])
 
-  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({ phase: "exited", exitCode: 0 })
+  expect({ phase: result.phase, exitCode: result.exitCode }, describeChild(result)).toEqual({
+    phase: "exited",
+    exitCode: 0,
+  })
 }
 
 afterEach(cleanupProjects)
@@ -112,7 +125,7 @@ describe("TaskManager claim characterization", () => {
   test("#given an id-shaped requested name #when an unnamed task claims its fallback #then every saved sibling name is unique", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const invariantStore: TaskRecordStore = {
       ...inner,
       save(record) {
@@ -130,7 +143,12 @@ describe("TaskManager claim characterization", () => {
     // when sibling test files seeded higher fixture ids (e.g. st_deadbeef) in this process, so the
     // first id cannot be pinned to the clock. Probe the allocator, then assert the RELATIONSHIP the
     // test is about: an id-shaped requested name forces the unnamed sibling past it, names unique.
-    const probe = await managerWithStore(createTaskRecordStore({ project_dir: tempProject() }), new FakeRunner(), new FakeRunner(), clock).manager.start(baseSpec())
+    const probe = await managerWithStore(
+      createTaskRecordStore(ownedTaskState(tempProject())),
+      new FakeRunner(),
+      new FakeRunner(),
+      clock,
+    ).manager.start(baseSpec())
     if (probe.kind !== "started") throw new Error("expected probe to start")
     const firstTaskId = bumpTaskId(probe.task_id as `st_${string}`)
     const { manager } = managerWithStore(invariantStore, new FakeRunner(), new FakeRunner(), clock)
@@ -191,18 +209,21 @@ describe("TaskManager claim characterization", () => {
     expect(store.load(result.task_id)?.spawn_spec).toBeDefined()
   })
 
-  test.each(["", "   "])("#given a blank requested name %p #when started #then it falls back to the task id", async (name) => {
-    // given
-    const { manager } = makeManager()
+  test.each(["", "   "])(
+    "#given a blank requested name %p #when started #then it falls back to the task id",
+    async (name) => {
+      // given
+      const { manager } = makeManager()
 
-    // when
-    const result = await manager.start(baseSpec({ name }))
+      // when
+      const result = await manager.start(baseSpec({ name }))
 
-    // then
-    if (result.kind !== "started") throw new Error("expected started")
-    expect(result.name).toMatch(/^st_[0-9a-f]{8}$/)
-    expect(result.name).toBe(result.task_id)
-  })
+      // then
+      if (result.kind !== "started") throw new Error("expected started")
+      expect(result.name).toMatch(/^st_[0-9a-f]{8}$/)
+      expect(result.name).toBe(result.task_id)
+    },
+  )
 
   test.each(["seed", "warm-cache", "diagnostics"])(
     "#given an isolated manager process #when %s seeds from disk #then it succeeds",
@@ -215,7 +236,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a foreign winner for the first candidate #when started #then it claims the next id", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 
@@ -233,7 +254,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a requested name and a foreign winner #when started #then only the loser keeps the requested name", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 
@@ -252,7 +273,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a real manager under collision #when team members spawn #then no member start is rejected", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
     const spec = normalizeSenpiTeamSpec(
@@ -281,7 +302,7 @@ describe("TaskManager claim characterization", () => {
   test("#given an allocation failure #when the requested name is retried #then its reservation was released", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const { manager } = managerWithStore(firstAllocationFailsStore(inner))
 
     // when
@@ -301,7 +322,7 @@ describe("TaskManager claim characterization", () => {
   test("#given bookkeeping fails after a claim #when process mode starts #then it records a terminal failure", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const transitions: TaskTransition[] = []
     const bookkeeping = replaceFailsOnceStore(inner, transitions)
     const { manager } = managerWithStore(bookkeeping.store)
@@ -325,7 +346,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a whitespace requested name #when a collision is claimed #then the fallback follows the final id", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 

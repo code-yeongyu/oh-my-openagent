@@ -59,8 +59,9 @@ export function collectPendingBuiltinAgents(input: {
     if (agentName === "sisyphus-junior") continue
     if (disabledAgents.some((name) => name.toLowerCase() === agentName.toLowerCase())) continue
 
-    const override = agentOverrides[agentName]
-      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
+    const override =
+      agentOverrides[agentName] ??
+      Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === agentName.toLowerCase())?.[1]
     const requirement = AGENT_MODEL_REQUIREMENTS[agentName]
 
     // Check if agent requires a specific model
@@ -77,7 +78,7 @@ export function collectPendingBuiltinAgents(input: {
     const isPrimaryAgent = isFactory(source) && source.mode === "primary"
 
     let resolution = applyModelResolution({
-      uiSelectedModel: (isPrimaryAgent && override?.model === undefined) ? uiSelectedModel : undefined,
+      uiSelectedModel: isPrimaryAgent && override?.model === undefined ? uiSelectedModel : undefined,
       userModel: override?.model,
       requirement,
       availableModels,

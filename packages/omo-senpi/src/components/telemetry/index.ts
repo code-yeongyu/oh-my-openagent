@@ -18,7 +18,6 @@ import { createLazyValue } from "../../extension/startup-deferral"
 import type { ComponentLogger } from "../../extension/types"
 
 export const SENPI_TELEMETRY_EVENT_NAME = "omo_senpi_daily_active"
-export const SENPI_MACHINE_ID_PREFIX = "omo-senpi:"
 
 const SENPI_TELEMETRY_SOURCE = "senpi-extension"
 const SESSION_START_REASON = "session_start"
@@ -44,7 +43,6 @@ export function createSenpiTelemetryProductConfig(): TelemetryProductConfig {
     defaultApiKey: DEFAULT_POSTHOG_API_KEY,
     defaultHost: DEFAULT_POSTHOG_HOST,
     eventName: SENPI_TELEMETRY_EVENT_NAME,
-    machineIdPrefix: SENPI_MACHINE_ID_PREFIX,
     packageName: "@oh-my-opencode/omo-senpi",
     packageVersion: packageVersion.get(),
     platform: "omo-senpi",
@@ -59,12 +57,7 @@ export function getSenpiTelemetryStateDir(env: TelemetryEnv = process.env): stri
 
 export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}): Promise<void> {
   const input = createRecordDailyActiveInput(options)
-  await withTimeout(
-    recordDailyActive(
-      input,
-    ),
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  )
+  await withTimeout(recordDailyActive(input), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 }
 
 export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {}): OmoSenpiComponent {
@@ -87,12 +80,14 @@ function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDai
   const product = createSenpiTelemetryProductConfig()
   const baseInput = {
     diagnostics: options.diagnostics,
-    transportFactory: options.transportFactory ?? createSenpiTelemetryTransportFactory({
-      env,
-      consent: () => isTelemetryClientEnabled({ env, product }),
-      diagnostics: options.diagnostics,
-      source: SENPI_TELEMETRY_SOURCE,
-    }),
+    transportFactory:
+      options.transportFactory ??
+      createSenpiTelemetryTransportFactory({
+        env,
+        consent: () => isTelemetryClientEnabled({ env, product }),
+        diagnostics: options.diagnostics,
+        source: SENPI_TELEMETRY_SOURCE,
+      }),
     env,
     product,
     reason: SESSION_START_REASON,

@@ -34,13 +34,21 @@ function fakeProbe(answers: ProbeAnswers): OwnerProbe {
   }
 }
 
-function makeLifecycle(store: TaskRecordStore, options: {
-  readonly homeDir: string
-  readonly probe: OwnerProbe
-  readonly alive?: Set<number>
-}) {
+function makeLifecycle(
+  store: TaskRecordStore,
+  options: {
+    readonly homeDir: string
+    readonly probe: OwnerProbe
+    readonly alive?: Set<number>
+  },
+) {
   const alive = options.alive ?? new Set<number>()
-  const signaller: ProcessSignaller = { isAlive: (pid) => alive.has(pid), signal: (pid) => { alive.delete(pid) } }
+  const signaller: ProcessSignaller = {
+    isAlive: (pid) => alive.has(pid),
+    signal: (pid) => {
+      alive.delete(pid)
+    },
+  }
   return createTaskLifecycle({
     hostEndpoint: NO_HOST_ENDPOINT,
     store,
@@ -67,7 +75,9 @@ function seedClone(root: string, name: string, marker: Record<string, unknown> |
 
 function marker(id: string, host: number, child?: Record<string, unknown>, host_name = hostname()) {
   return {
-    id, hostname: host_name, created_at: 1,
+    id,
+    hostname: host_name,
+    created_at: 1,
     host: { pid: host, start_identity: null },
     ...(child === undefined ? {} : { child }),
   }
@@ -82,10 +92,26 @@ describe("startup isolation reclamation", () => {
 
     const deadHost = seedClone(wt, "t0000000001", marker("t0000000001", 5001))
     const liveHost = seedClone(wt, "t0000000002", marker("t0000000002", 5002))
-    const liveChildPid = seedClone(wt, "t0000000003", marker("t0000000003", 5001, { kind: "process", pid: 5003, start_identity: null }))
-    const liveSession = seedClone(wt, "t0000000004", marker("t0000000004", 5001, { kind: "host-session", socket: "sock-alive", session_path: "/s/a" }))
-    const unknownSession = seedClone(wt, "t0000000005", marker("t0000000005", 5001, { kind: "host-session", socket: "sock-unknown", session_path: "/s/u" }))
-    const deadSession = seedClone(wt, "t0000000006", marker("t0000000006", 5001, { kind: "host-session", socket: "sock-dead", session_path: "/s/d" }))
+    const liveChildPid = seedClone(
+      wt,
+      "t0000000003",
+      marker("t0000000003", 5001, { kind: "process", pid: 5003, start_identity: null }),
+    )
+    const liveSession = seedClone(
+      wt,
+      "t0000000004",
+      marker("t0000000004", 5001, { kind: "host-session", socket: "sock-alive", session_path: "/s/a" }),
+    )
+    const unknownSession = seedClone(
+      wt,
+      "t0000000005",
+      marker("t0000000005", 5001, { kind: "host-session", socket: "sock-unknown", session_path: "/s/u" }),
+    )
+    const deadSession = seedClone(
+      wt,
+      "t0000000006",
+      marker("t0000000006", 5001, { kind: "host-session", socket: "sock-dead", session_path: "/s/d" }),
+    )
     const retained = seedClone(wt, "t0000000007.retained-1700000000-abc", marker("t0000000007", 5001))
     const foreign = seedClone(wt, "t0000000008", marker("t0000000008", 5001, undefined, "some-other-box"))
     const creatingAlive = seedClone(wt, "t0000000009.creating-5002", marker("t0000000009", 5002))
@@ -93,8 +119,16 @@ describe("startup isolation reclamation", () => {
     const lifecycle = makeLifecycle(store, {
       homeDir: fixture.homeDir,
       probe: fakeProbe({
-        pids: new Map<number, OwnerStatus>([[5001, "dead"], [5002, "alive"], [5003, "alive"]]),
-        sessions: new Map<string, OwnerStatus>([["sock-alive", "alive"], ["sock-unknown", "unknown"], ["sock-dead", "dead"]]),
+        pids: new Map<number, OwnerStatus>([
+          [5001, "dead"],
+          [5002, "alive"],
+          [5003, "alive"],
+        ]),
+        sessions: new Map<string, OwnerStatus>([
+          ["sock-alive", "alive"],
+          ["sock-unknown", "unknown"],
+          ["sock-dead", "dead"],
+        ]),
       }),
     })
 
@@ -120,12 +154,19 @@ describe("startup isolation reclamation", () => {
     writeFileSync(join(baselineDir, "baseline.json"), JSON.stringify(baseline))
 
     const seeded = seedRecord(store, {
-      task_id: "st_30000001", status: "running", residency_state: "resident", host_pid: 9999,
+      task_id: "st_30000001",
+      status: "running",
+      residency_state: "resident",
+      host_pid: 9999,
     })
     const record: TaskRecord = {
       ...seeded,
       isolation: {
-        backend: handle.backend, merged_dir: handle.mergedDir, base_dir: handle.baseDir, mode: "patch", apply: true,
+        backend: handle.backend,
+        merged_dir: handle.mergedDir,
+        base_dir: handle.baseDir,
+        mode: "patch",
+        apply: true,
       },
     }
     store.replace(record)

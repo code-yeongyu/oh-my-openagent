@@ -1,7 +1,13 @@
 import { join, resolve } from "node:path"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { installCachedPlugin, linkCachedPluginBins, linkRootRuntimeBin, pruneMarketplaceCache, pruneMarketplacePluginCaches } from "./codex-cache"
+import {
+  installCachedPlugin,
+  linkCachedPluginBins,
+  linkRootRuntimeBin,
+  pruneMarketplaceCache,
+  pruneMarketplacePluginCaches,
+} from "./codex-cache"
 import { writeCachedMarketplaceManifest } from "./codex-cached-marketplace-manifest"
 import { shouldBuildSourcePackages } from "./codex-package-layout"
 import { updateCodexConfig } from "./codex-config-toml"
@@ -10,7 +16,12 @@ import { prepareGitBashForInstall, resolveGitBashForCurrentProcess } from "./git
 import { linkInstalledPluginAgents } from "./install-codex-agents"
 import { readMarketplace, readPluginManifest, resolvePluginSource, validatePathSegment } from "./codex-marketplace"
 import type { MarketplaceSnapshotPluginSource } from "./codex-marketplace-snapshot"
-import { readDistributionManifest, resolveLazyCodexPluginVersion, stampLazyCodexPluginVersion, writeLazyCodexInstallSnapshot } from "./lazycodex-version-stamp"
+import {
+  readDistributionManifest,
+  resolveLazyCodexPluginVersion,
+  stampLazyCodexPluginVersion,
+  writeLazyCodexInstallSnapshot,
+} from "./lazycodex-version-stamp"
 import { defaultRunCommand } from "./codex-process"
 import { repairProjectLocalCodexArtifactsBestEffort } from "./codex-project-local-cleanup-best-effort"
 import { reapLspDaemons } from "./lsp-daemon-reaper"
@@ -38,9 +49,10 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
   const gitBashResolution = await prepareGitBashForInstall({
     platform,
     env,
-    resolveGitBash: platform === "win32"
-      ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
-      : undefined,
+    resolveGitBash:
+      platform === "win32"
+        ? (options.gitBashResolver ?? (() => resolveGitBashForCurrentProcess({ platform, env })))
+        : undefined,
   })
   if (!gitBashResolution.found) {
     throw new Error(gitBashResolution.installHint)
@@ -220,7 +232,10 @@ export function findRepoRootFromImporter(importerDir: string): string {
   let current = importerDir
   for (let depth = 0; depth <= 7; depth += 1) {
     if (isRepoRootWithCodexPlugin(current)) return current
-    for (const wrapperPackageRoot of [join(current, "node_modules", "oh-my-openagent"), join(current, "oh-my-openagent")]) {
+    for (const wrapperPackageRoot of [
+      join(current, "node_modules", "oh-my-openagent"),
+      join(current, "oh-my-openagent"),
+    ]) {
       if (isRepoRootWithCodexPlugin(wrapperPackageRoot)) return wrapperPackageRoot
     }
     current = resolve(current, "..")

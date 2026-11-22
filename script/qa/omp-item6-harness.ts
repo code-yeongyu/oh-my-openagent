@@ -7,7 +7,10 @@ import { join } from "node:path"
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import { loadSenpiBarrel } from "../../packages/senpi-task/src/lazy/senpi-barrel"
 import { createKernelToolBindings } from "../../packages/senpi-task/src/kernel-tools/bindings"
-import type { KernelToolInvokeOptions, KernelToolsCapability } from "../../packages/senpi-task/src/kernel-tools/contract"
+import type {
+  KernelToolInvokeOptions,
+  KernelToolsCapability,
+} from "../../packages/senpi-task/src/kernel-tools/contract"
 import { createTaskManager } from "../../packages/senpi-task/src/manager/manager"
 import { createInProcessManagedRunner } from "../../packages/senpi-task/src/manager/runner"
 import { InProcessRunner } from "../../packages/senpi-task/src/runners/in-process"
@@ -39,7 +42,10 @@ export function producerCheckout(): { readonly dir: string; readonly sha: string
   const required = process.env["OMP_SENPI_PRODUCER_SHA"]
   let head: string | undefined
   try {
-    head = execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim()
+    head = execFileSync("git", ["-C", dir, "rev-parse", "HEAD"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim()
   } catch {
     head = undefined
   }
@@ -96,7 +102,10 @@ export async function openProducerKernel(sessionId: string): Promise<ProducerKer
     nextToolCall(): Promise<ToolCallMessage>
     deliverToolReply(message: { type: "tool-reply"; callId: string; ok: boolean; value: unknown }): void
     describeKernelTools(names: readonly string[]): Promise<unknown>
-    invokeKernelTool(request: Record<string, unknown>, options?: AbortSignal | KernelToolInvokeOptions): Promise<unknown>
+    invokeKernelTool(
+      request: Record<string, unknown>,
+      options?: AbortSignal | KernelToolInvokeOptions,
+    ): Promise<unknown>
     reset(): Promise<void>
     close(): Promise<void>
   }
@@ -108,7 +117,10 @@ export async function openProducerKernel(sessionId: string): Promise<ProducerKer
     sha,
     verified_by,
     invocations: () => ({ ...counts }),
-    invocationsSince: (mark) => ({ attempted: counts.attempted - mark.attempted, succeeded: counts.succeeded - mark.succeeded }),
+    invocationsSince: (mark) => ({
+      attempted: counts.attempted - mark.attempted,
+      succeeded: counts.succeeded - mark.succeeded,
+    }),
     capability: {
       ...(capabilities === undefined ? {} : { capabilities }),
       describe: (names) => kernel.describeKernelTools(names),
@@ -146,18 +158,19 @@ function providerServer(turn: ProviderTurnDecider) {
       const body = await request.text()
       const next = await turn(body)
       const usage = { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
-      const delta = next.toolName === undefined
-        ? { content: next.text ?? "DONE" }
-        : {
-            tool_calls: [
-              {
-                index: 0,
-                id: `call_${(callSeq += 1).toString().padStart(4, "0")}`,
-                type: "function",
-                function: { name: next.toolName, arguments: JSON.stringify(next.args ?? {}) },
-              },
-            ],
-          }
+      const delta =
+        next.toolName === undefined
+          ? { content: next.text ?? "DONE" }
+          : {
+              tool_calls: [
+                {
+                  index: 0,
+                  id: `call_${(callSeq += 1).toString().padStart(4, "0")}`,
+                  type: "function",
+                  function: { name: next.toolName, arguments: JSON.stringify(next.args ?? {}) },
+                },
+              ],
+            }
       const chunk = {
         id: "fixture",
         object: "chat.completion.chunk",
@@ -208,10 +221,17 @@ export async function openChildEnv(turn: ProviderTurnDecider, options: ChildEnvO
     api: "openai-completions",
     apiKey: "fixture-key",
     baseUrl: `http://127.0.0.1:${server.port}/v1`,
-    models: [{
-      id: "fixture", name: "fixture", reasoning: false, input: ["text" as const],
-      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow: 100_000, maxTokens: 1000,
-    }],
+    models: [
+      {
+        id: "fixture",
+        name: "fixture",
+        reasoning: false,
+        input: ["text" as const],
+        cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+        contextWindow: 100_000,
+        maxTokens: 1000,
+      },
+    ],
   })
   const model = registry.find("omp-fixture", "fixture")
   assert.ok(model)
@@ -227,17 +247,26 @@ export async function openChildEnv(turn: ProviderTurnDecider, options: ChildEnvO
     },
   })
   const runner = createInProcessManagedRunner(inProcess, () => ({
-    agentDir, modelRuntime: runtime, modelRegistry: registry, model,
+    agentDir,
+    modelRuntime: runtime,
+    modelRegistry: registry,
+    model,
   }))
   const config = OmoTaskSettingsSchema.parse({
-    default_concurrency: 2, global_concurrency: 2, residency_max_children: 4,
+    default_concurrency: 2,
+    global_concurrency: 2,
+    residency_max_children: 4,
     ...(options.idleTimeoutMs === undefined ? {} : { resident_idle_timeout_ms: options.idleTimeoutMs }),
   })
   let now = 1000
   let tick: () => void = () => assert.fail("idle reclaimer was never scheduled")
   const childToolNames = options.childToolNames ?? CHILD_TOOL_NAMES
   const manager = createTaskManager({
-    store, config, cwd: root, kernelToolBindings, now: () => now,
+    store,
+    config,
+    cwd: root,
+    kernelToolBindings,
+    now: () => now,
     destruction: { destroyResidentTask: (taskId, cause) => lifecycle.destroyResidentTask(taskId, cause) },
     runners: { "in-process": runner, process: runner },
     resolveChildToolNames: () => childToolNames,
@@ -245,9 +274,18 @@ export async function openChildEnv(turn: ProviderTurnDecider, options: ChildEnvO
   })
   const lifecycle = createTaskLifecycle({
     hostEndpoint: NO_HOST_ENDPOINT,
-    store, config, kernelToolBindings, now: () => now,
+    store,
+    config,
+    kernelToolBindings,
+    now: () => now,
     registry: createManagerResidencyRegistry(() => manager),
-    idleReclaimerScheduler: { setInterval: (callback) => { tick = callback; return { unref: () => undefined } }, clearInterval: () => undefined },
+    idleReclaimerScheduler: {
+      setInterval: (callback) => {
+        tick = callback
+        return { unref: () => undefined }
+      },
+      clearInterval: () => undefined,
+    },
   })
   const deps = {
     manager,
@@ -259,7 +297,15 @@ export async function openChildEnv(turn: ProviderTurnDecider, options: ChildEnvO
   const taskTool = createTaskTool(deps)
   const workpoolTool = createWorkpoolTool({ ...deps, workpools: manager.workpools })
   return {
-    root, store, manager, taskTool, workpoolTool, kernelToolBindings, inProcess, sessions, lifecycle,
+    root,
+    store,
+    manager,
+    taskTool,
+    workpoolTool,
+    kernelToolBindings,
+    inProcess,
+    sessions,
+    lifecycle,
     // TTL park is the ONE clock-driven path: time itself is the behaviour, so the clock is injected
     // and advanced explicitly instead of slept on.
     park: async (taskId: string) => {

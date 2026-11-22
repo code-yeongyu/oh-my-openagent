@@ -58,19 +58,24 @@ async function seedReservedPendingMessage(config: TeamModeConfig, messageId: str
   const teamRunId = randomUUID()
   await mkdir(path.join(config.base_dir ?? "", "runtime", teamRunId), { recursive: true })
   await saveRuntimeState(createRuntimeState(teamRunId, [messageId]), config)
-  await sendMessage({
-    version: 1,
-    messageId,
-    from: "lead",
-    to: "worker",
-    kind: "message",
-    body: "in-flight live delivery",
-    timestamp: 100,
-  }, teamRunId, config, {
-    isLead: true,
-    activeMembers: ["worker"],
-    reservedRecipients: new Set(["worker"]),
-  })
+  await sendMessage(
+    {
+      version: 1,
+      messageId,
+      from: "lead",
+      to: "worker",
+      kind: "message",
+      body: "in-flight live delivery",
+      timestamp: 100,
+    },
+    teamRunId,
+    config,
+    {
+      isLead: true,
+      activeMembers: ["worker"],
+      reservedRecipients: new Set(["worker"]),
+    },
+  )
   return teamRunId
 }
 
@@ -88,10 +93,13 @@ async function driveIdle(config: TeamModeConfig, withMessagesApi: boolean): Prom
   if (withMessagesApi) {
     session.messages = async () => ({ data: [] })
   }
-  const handler = createTeamIdleWakeHint({
-    directory: "/tmp/project",
-    client: { session },
-  } as never, config)
+  const handler = createTeamIdleWakeHint(
+    {
+      directory: "/tmp/project",
+      client: { session },
+    } as never,
+    config,
+  )
   await handler({
     event: {
       type: "session.idle",
@@ -102,9 +110,11 @@ async function driveIdle(config: TeamModeConfig, withMessagesApi: boolean): Prom
 
 afterEach(async () => {
   clearTeamSessionRegistry()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 describe("issue #5101 - pending live delivery must not be silently lost on idle-ack", () => {
@@ -122,7 +132,11 @@ describe("issue #5101 - pending live delivery must not be silently lost on idle-
     // then
     const unreadMessages = await listUnreadMessages(teamRunId, "worker", config)
     expect(unreadMessages.map((message) => message.messageId)).toContain(messageId)
-    const processedPath = path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed", `${messageId}.json`)
+    const processedPath = path.join(
+      getInboxDir(resolveBaseDir(config), teamRunId, "worker"),
+      "processed",
+      `${messageId}.json`,
+    )
     expect(await fileExists(processedPath)).toBe(false)
     const runtimeState = await loadRuntimeState(teamRunId, config)
     expect(runtimeState.members[0]?.pendingInjectedMessageIds).toEqual([])
@@ -140,7 +154,11 @@ describe("issue #5101 - pending live delivery must not be silently lost on idle-
     await driveIdle(config, false)
 
     // then
-    const processedPath = path.join(getInboxDir(resolveBaseDir(config), teamRunId, "worker"), "processed", `${messageId}.json`)
+    const processedPath = path.join(
+      getInboxDir(resolveBaseDir(config), teamRunId, "worker"),
+      "processed",
+      `${messageId}.json`,
+    )
     expect(await fileExists(processedPath)).toBe(true)
     expect(await listUnreadMessages(teamRunId, "worker", config)).toEqual([])
   })

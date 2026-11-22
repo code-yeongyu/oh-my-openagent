@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock, afterAll } from "bun:test"
 import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 type PostToolUseMockResult = {
   block?: boolean
@@ -19,14 +20,6 @@ const appendTranscriptEntry = mock((sessionId: string, entry: unknown) => {
 })
 let postToolUseResult: PostToolUseMockResult = { warnings: [] }
 
-mock.module("../config", () => ({
-  loadClaudeHooksConfig: async () => ({}),
-}))
-
-mock.module("../config-loader", () => ({
-  loadPluginExtendedConfig: async () => ({}),
-}))
-
 mock.module("../post-tool-use", () => ({
   executePostToolUseHooks: async () => postToolUseResult,
 }))
@@ -44,6 +37,8 @@ afterAll(() => {
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after-handler")
 
 describe("createToolExecuteAfterHandler", () => {
+  useEmptyHookConfig()
+
   beforeEach(() => {
     appendTranscriptEntry.mockClear()
     transcriptCalls.length = 0
@@ -60,7 +55,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: ["PostToolUse"] }
+      { disabledHooks: ["PostToolUse"] },
     )
 
     await handler(
@@ -89,7 +84,7 @@ describe("createToolExecuteAfterHandler", () => {
             keep: false,
           },
         },
-      }
+      },
     )
 
     expect(appendTranscriptEntry).toHaveBeenCalledTimes(1)
@@ -160,7 +155,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: [] }
+      { disabledHooks: [] },
     )
     const output = {
       title: "tool",
@@ -173,11 +168,7 @@ describe("createToolExecuteAfterHandler", () => {
 
     // then
     expect(output.output).toBe(
-      [
-        "Warning line\n  warning detail",
-        "Context line\n  context detail",
-        "Message line\nmessage detail",
-      ].join("\n\n")
+      ["Warning line\n  warning detail", "Context line\n  context detail", "Message line\nmessage detail"].join("\n\n"),
     )
     expect(output.output).not.toContain("\r")
   })
@@ -201,7 +192,7 @@ describe("createToolExecuteAfterHandler", () => {
         },
         directory: "/repo",
       } as never,
-      { disabledHooks: [] }
+      { disabledHooks: [] },
     )
     const output = {
       title: "tool",

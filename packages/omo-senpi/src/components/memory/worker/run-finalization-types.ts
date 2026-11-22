@@ -16,6 +16,8 @@ export interface ReservationStatePort extends ReflectionReservationPort {
     readonly active?: ReservedRun
     readonly pending?: ReservedRun
   }>
+  /** Promotes a lone `pending.json` that a CLI release left behind (DESIGN.r2 4.1b), under this process. */
+  promotePending?(options?: ReflectionReservationLockOptions): Promise<ReservedRun | undefined>
 }
 
 export interface RunFinalizationContext extends RunLivenessSeams {

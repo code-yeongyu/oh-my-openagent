@@ -23,7 +23,13 @@ type Warning = { readonly message: string; readonly data?: Record<string, unknow
 // Work that never settles: the only way shutdown can account for it is to race it against the drain budget.
 const never = (): Promise<never> => new Promise<never>(() => {})
 
-async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; runtime?: MemoryIdentityRuntime; corpusCache?: RecallCorpusCache; budgetMs?: number; whileShuttingDown?: (shutdown: { readonly returned: () => boolean }) => Promise<void> }) {
+async function bindAndShutDown(overrides: {
+  maintenance?: MemoryMaintenance
+  runtime?: MemoryIdentityRuntime
+  corpusCache?: RecallCorpusCache
+  budgetMs?: number
+  whileShuttingDown?: (shutdown: { readonly returned: () => boolean }) => Promise<void>
+}) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-shutdown-settle-")))
   roots.push(root)
   const identityName = "shutdown-settle-agent"
@@ -37,7 +43,9 @@ async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; run
   const logger = {
     debug: () => {},
     info: () => {},
-    warn: (message: string, data?: Record<string, unknown>) => { warnings.push({ message, ...(data === undefined ? {} : { data }) }) },
+    warn: (message: string, data?: Record<string, unknown>) => {
+      warnings.push({ message, ...(data === undefined ? {} : { data }) })
+    },
     error: () => {},
   }
   const wiring = createMemoryWiring({
@@ -63,8 +71,11 @@ async function bindAndShutDown(overrides: { maintenance?: MemoryMaintenance; run
   await pi.dispatch("agent_settled", {}, eventCtx)
   // A zero budget (the default) reports every raced step as over budget instead of awaiting it.
   let returned = false
-  const shutdown = wiring.onSessionShutdown({ reason: "reload", sessionId, deadlineAt: Date.now() + (overrides.budgetMs ?? 0) })
-    .then(() => { returned = true })
+  const shutdown = wiring
+    .onSessionShutdown({ reason: "reload", sessionId, deadlineAt: Date.now() + (overrides.budgetMs ?? 0) })
+    .then(() => {
+      returned = true
+    })
   await overrides.whileShuttingDown?.({ returned: () => returned })
   await shutdown
   return warnings
@@ -118,9 +129,13 @@ describe("memory wiring shutdown settles maintenance running in the identity dir
   test("#given a reflection launch still in flight and budget to spare #when the session shuts down #then shutdown returns only after the launch settles", async () => {
     // given: settled() is shutdown's last await, so once it is called only synchronous resets remain
     let releaseLaunch!: () => void
-    const launchSettled = new Promise<void>((resolve) => { releaseLaunch = resolve })
+    const launchSettled = new Promise<void>((resolve) => {
+      releaseLaunch = resolve
+    })
     let settledCalled!: () => void
-    const settledInvoked = new Promise<void>((resolve) => { settledCalled = resolve })
+    const settledInvoked = new Promise<void>((resolve) => {
+      settledCalled = resolve
+    })
     const runtime = {
       reconcile: async () => {},
       store: { tryReserve: async () => ({ status: "skipped" }) },

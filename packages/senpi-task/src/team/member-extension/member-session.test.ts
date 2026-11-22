@@ -6,7 +6,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { ExtensionAPI } from "@code-yeongyu/senpi"
 import { TeamModeConfigSchema } from "@oh-my-opencode/team-core/config"
 
-import { MEMBER_WAKE_SOURCE, MEMBER_WAKE_SOURCE_STATE_EVENT, createMemberWakeSource, resolveMemberExtensionConfig } from "./member-session"
+import {
+  MEMBER_WAKE_SOURCE,
+  MEMBER_WAKE_SOURCE_STATE_EVENT,
+  createMemberWakeSource,
+  resolveMemberExtensionConfig,
+} from "./member-session"
 
 const TEAM_RUN_ID = "77777777-7777-4777-8777-777777777777"
 const roots: string[] = []
@@ -30,7 +35,9 @@ function memberContext(overrides: Record<string, string> = {}): Record<string, s
   }
 }
 
-function fakePi(context?: Record<string, string>): ExtensionAPI & { readonly emitted: Array<{ name: string; data: unknown }> } {
+function fakePi(
+  context?: Record<string, string>,
+): ExtensionAPI & { readonly emitted: Array<{ name: string; data: unknown }> } {
   const emitted: Array<{ name: string; data: unknown }> = []
   const pi = {
     emitted,
@@ -59,7 +66,9 @@ describe("resolveMemberExtensionConfig", () => {
   test("#given a session with no role at all #when resolved #then nothing is reported and nothing throws", () => {
     // given / when / then
     expect(resolveMemberExtensionConfig(fakePi(), {})).toBeUndefined()
-    expect(resolveMemberExtensionConfig(fakePi({ role: "child", task_id: "st_1", state_dir: "/tmp/dh-x" }), {})).toBeUndefined()
+    expect(
+      resolveMemberExtensionConfig(fakePi({ role: "child", task_id: "st_1", state_dir: "/tmp/dh-x" }), {}),
+    ).toBeUndefined()
   })
 
   test("#given a member context missing its team config #when resolved #then the typed config error still names the fault", () => {

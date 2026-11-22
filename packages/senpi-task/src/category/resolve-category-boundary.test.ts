@@ -25,21 +25,26 @@ function registry(models: readonly FakeModel[]): FakeRegistry {
 }
 
 function throwingProviderAccessorModel(message: string): object {
-  return Object.defineProperties({}, {
-    provider: {
-      enumerable: true,
-      get() {
-        throw new Error(message)
+  return Object.defineProperties(
+    {},
+    {
+      provider: {
+        enumerable: true,
+        get() {
+          throw new Error(message)
+        },
+      },
+      id: {
+        enumerable: true,
+        value: "gpt-6-luna-fast",
       },
     },
-    id: {
-      enumerable: true,
-      value: "gpt-6-luna-fast",
-    },
-  })
+  )
 }
 
-function expectResolved(result: ReturnType<typeof resolveCategory<FakeModel>>): Extract<typeof result, { readonly kind: "resolved" }> {
+function expectResolved(
+  result: ReturnType<typeof resolveCategory<FakeModel>>,
+): Extract<typeof result, { readonly kind: "resolved" }> {
   if (result.kind !== "resolved") {
     throw new Error(`Expected resolved category, got ${result.kind}`)
   }
@@ -86,10 +91,15 @@ describe("resolveCategory boundary parsing", () => {
   test("#given getAvailable returns a throwing-accessor model #when resolved #then category resolution returns sanitized model_unavailable", () => {
     // given
     const throwingModel = throwingProviderAccessorModel("hidden available accessor marker")
-    const resolver = () => resolveCategory("quick", {}, {
-      getAvailable: () => [throwingModel],
-      find: () => undefined,
-    })
+    const resolver = () =>
+      resolveCategory(
+        "quick",
+        {},
+        {
+          getAvailable: () => [throwingModel],
+          find: () => undefined,
+        },
+      )
 
     // when
     expect(resolver).not.toThrow()
@@ -115,10 +125,16 @@ describe("resolveCategory boundary parsing", () => {
     const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
 
     // when
-    const results = malformedFindResults.map((findResult) => resolveCategory("quick", {}, {
-      getAvailable: () => [availableModel],
-      find: () => findResult,
-    }))
+    const results = malformedFindResults.map((findResult) =>
+      resolveCategory(
+        "quick",
+        {},
+        {
+          getAvailable: () => [availableModel],
+          find: () => findResult,
+        },
+      ),
+    )
 
     // then
     for (const result of results) {
@@ -134,10 +150,15 @@ describe("resolveCategory boundary parsing", () => {
     // given
     const availableModel = model("chatgpt-subscription", "gpt-6-luna-fast")
     const throwingModel = throwingProviderAccessorModel("hidden find accessor marker")
-    const resolver = () => resolveCategory("quick", {}, {
-      getAvailable: () => [availableModel],
-      find: () => throwingModel,
-    })
+    const resolver = () =>
+      resolveCategory(
+        "quick",
+        {},
+        {
+          getAvailable: () => [availableModel],
+          find: () => throwingModel,
+        },
+      )
 
     // when
     expect(resolver).not.toThrow()
@@ -161,10 +182,16 @@ describe("resolveCategory boundary parsing", () => {
     ] satisfies readonly FakeModel[]
 
     // when
-    const results = malformedFindResults.map((findResult) => resolveCategory("quick", {}, {
-      getAvailable: () => [availableModel],
-      find: () => findResult,
-    }))
+    const results = malformedFindResults.map((findResult) =>
+      resolveCategory(
+        "quick",
+        {},
+        {
+          getAvailable: () => [availableModel],
+          find: () => findResult,
+        },
+      ),
+    )
 
     // then
     for (const result of results) {
@@ -193,10 +220,14 @@ describe("resolveCategory boundary parsing", () => {
     })
 
     // when
-    const result = resolveCategory("quick", {}, {
-      getAvailable: () => [availableModel],
-      find: () => inheritedIdentityModel,
-    })
+    const result = resolveCategory(
+      "quick",
+      {},
+      {
+        getAvailable: () => [availableModel],
+        find: () => inheritedIdentityModel,
+      },
+    )
 
     // then
     expect(result.kind).toBe("model_unavailable")
@@ -215,10 +246,16 @@ describe("resolveCategory boundary parsing", () => {
     ]
 
     // when
-    const results = malformedAvailableResults.map((availableResult) => resolveCategory("quick", {}, {
-      getAvailable: () => availableResult,
-      find: () => model("chatgpt-subscription", "gpt-6-luna-fast"),
-    }))
+    const results = malformedAvailableResults.map((availableResult) =>
+      resolveCategory(
+        "quick",
+        {},
+        {
+          getAvailable: () => availableResult,
+          find: () => model("chatgpt-subscription", "gpt-6-luna-fast"),
+        },
+      ),
+    )
 
     // then
     for (const result of results) {
@@ -234,9 +271,7 @@ describe("resolveCategory boundary parsing", () => {
     const models = registry([model("chatgpt-subscription", "gpt-6-luna-fast")])
 
     // when
-    const results = ["__proto__", "toString", "hasOwnProperty"].map((category) =>
-      resolveCategory(category, {}, models)
-    )
+    const results = ["__proto__", "toString", "hasOwnProperty"].map((category) => resolveCategory(category, {}, models))
 
     // then
     expect(results.map((result) => result.kind)).toEqual(["not_found", "not_found", "not_found"])

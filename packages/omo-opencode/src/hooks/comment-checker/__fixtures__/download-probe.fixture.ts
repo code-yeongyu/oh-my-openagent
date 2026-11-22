@@ -3,10 +3,14 @@ import * as nodeModule from "node:module"
 import { z } from "zod"
 
 // One process probes every target (the downloader reads process.platform/arch per call) instead of six cold starts.
-const targets = z.array(z.object({
-  platform: z.string(),
-  arch: z.string(),
-})).parse(JSON.parse(process.argv[2] ?? "[]"))
+const targets = z
+  .array(
+    z.object({
+      platform: z.string(),
+      arch: z.string(),
+    }),
+  )
+  .parse(JSON.parse(process.argv[2] ?? "[]"))
 
 let resolutionAttempts = 0
 mock.module("module", () => ({

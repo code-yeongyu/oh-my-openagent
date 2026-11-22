@@ -38,7 +38,12 @@ function nodeBinary(): string {
 function firstCommandLine(command: string, args: readonly string[]): string | null {
   try {
     const output = execFileSync(command, [...args], { encoding: "utf8", timeout: NODE_BINARY_LOOKUP_TIMEOUT_MS })
-    return output.split(/\r?\n/).find((line) => line.trim().length > 0)?.trim() ?? null
+    return (
+      output
+        .split(/\r?\n/)
+        .find((line) => line.trim().length > 0)
+        ?.trim() ?? null
+    )
   } catch {
     return null
   }
@@ -72,7 +77,11 @@ export function legacyEndpointFor(input: {
   if (input.kind === "natural") return endpointPathJoin(input.platform ?? platform(), versionDir, "daemon.sock")
   if (input.kind === "windowsPipe") return legacyWindowsPipeEndpoint(versionDir, input.version)
   const digest = createHash("sha256").update(versionDir).digest("hex").slice(0, 16)
-  return endpointPathJoin(input.platform ?? platform(), input.tempDir ?? tmpdir(), `omo-lsp-${input.version}-${digest}.sock`)
+  return endpointPathJoin(
+    input.platform ?? platform(),
+    input.tempDir ?? tmpdir(),
+    `omo-lsp-${input.version}-${digest}.sock`,
+  )
 }
 
 export function liveLegacyEndpointFor(input: {
@@ -153,9 +162,9 @@ export function startLegacyDaemonProcess(input: {
     'const { mkdirSync, unlinkSync } = require("node:fs")',
     'const { dirname } = require("node:path")',
     "const endpoint = process.env.LEGACY_ENDPOINT",
-    "const holdSocketOpen = process.env.LEGACY_HOLD_SOCKET_OPEN === \"1\"",
+    'const holdSocketOpen = process.env.LEGACY_HOLD_SOCKET_OPEN === "1"',
     "const isWindowsPipe = endpoint.startsWith('\\\\\\\\.\\\\pipe\\\\')",
-    "if (process.env.LEGACY_IGNORE_SIGTERM === \"1\") process.on(\"SIGTERM\", () => {})",
+    'if (process.env.LEGACY_IGNORE_SIGTERM === "1") process.on("SIGTERM", () => {})',
     "if (!isWindowsPipe) mkdirSync(dirname(endpoint), { recursive: true })",
     "if (!isWindowsPipe) { try { unlinkSync(endpoint) } catch {} }",
     "const server = createServer((socket) => {",
@@ -201,7 +210,10 @@ export function startIdleNodeProcess(): SpawnedChild {
 
 export async function waitForChildReady(child: SpawnedChild): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("legacy daemon fixture did not report ready")), CHILD_READY_TIMEOUT_MS)
+    const timeout = setTimeout(
+      () => reject(new Error("legacy daemon fixture did not report ready")),
+      CHILD_READY_TIMEOUT_MS,
+    )
     const onData = (chunk: Buffer): void => {
       if (!chunk.toString("utf8").includes("ready")) return
       clearTimeout(timeout)

@@ -41,10 +41,7 @@ async function fixture(): Promise<{
   return { repo, lock, domains }
 }
 
-async function run(
-  setup: Awaited<ReturnType<typeof fixture>>,
-  params: Omit<MemoryToolParams, "author">,
-) {
+async function run(setup: Awaited<ReturnType<typeof fixture>>, params: Omit<MemoryToolParams, "author">) {
   return runMemoryTool({ repo: setup.repo, lock: setup.lock, params: { ...params, author: AUTHOR } })
 }
 
@@ -60,7 +57,10 @@ async function seed(
 ): Promise<void> {
   const fullPath = join(setup.repo.dir, path)
   await mkdir(dirname(fullPath), { recursive: true })
-  await writeFile(fullPath, renderMemoryFile({ description: "Seed", ...(readOnly ? { read_only: readOnly } : {}) }, text))
+  await writeFile(
+    fullPath,
+    renderMemoryFile({ description: "Seed", ...(readOnly ? { read_only: readOnly } : {}) }, text),
+  )
   await setup.repo.commitWrite([path], `seed ${path}`, AUTHOR)
 }
 
@@ -69,7 +69,7 @@ async function git(repo: GitMemoryRepo, args: string[]): Promise<string> {
   return String(result.stdout).trim()
 }
 
-setDefaultTimeout(process.platform === "win32" ? 30000 : 5000)
+if (process.platform === "win32") setDefaultTimeout(30000)
 
 describe("runMemoryTool", () => {
   it("#given a codex patch #when apply_patch runs #then it applies and commits through the memory tool", async () => {
@@ -96,12 +96,16 @@ describe("runMemoryTool", () => {
   it("#given create params #when run #then it renders frontmatter, commits under the writer lock, and reports local", async () => {
     const setup = await fixture()
     const result = await run(setup, {
-      command: "create", reason: "create profile", file_path: "system/profile.md",
-      description: "User profile", file_text: "Name: Ada",
+      command: "create",
+      reason: "create profile",
+      file_path: "system/profile.md",
+      description: "User profile",
+      file_text: "Name: Ada",
     })
 
     expect(parseMemoryFile(await readFile(join(setup.repo.dir, "system/profile.md"), "utf8"))).toEqual({
-      frontmatter: { description: "User profile" }, body: "Name: Ada",
+      frontmatter: { description: "User profile" },
+      body: "Name: Ada",
     })
     expect(result.message).toMatch(/^Memory create committed locally \([0-9a-f]{7}\)\.$/)
     expect(setup.domains).toEqual(["memory-write"])
@@ -140,7 +144,10 @@ describe("runMemoryTool", () => {
     const setup = await fixture()
 
     await run(setup, {
-      command: "create", reason: "create empty note", file_path: "empty", description: "Empty note",
+      command: "create",
+      reason: "create empty note",
+      file_path: "empty",
+      description: "Empty note",
     })
 
     expect(await body(setup.repo, "empty.md")).toBe("")
@@ -151,8 +158,11 @@ describe("runMemoryTool", () => {
     await setup.repo.configSet("remote.backup.url", "file:///tmp/memory-backup.git")
 
     const result = await run(setup, {
-      command: "create", reason: "create remote note", file_path: "reference/note",
-      description: "Note", file_text: "body",
+      command: "create",
+      reason: "create remote note",
+      file_path: "reference/note",
+      description: "Note",
+      file_text: "body",
     })
 
     expect(result.message).toMatch(/^Memory create committed \([0-9a-f]{7}\); harness will sync after the turn\.$/)
@@ -163,8 +173,11 @@ describe("runMemoryTool", () => {
     await seed(setup, "reference/notes.md", "same\nmiddle\nsame")
 
     await run(setup, {
-      command: "str_replace", reason: "replace first", file_path: "reference/notes.md",
-      old_string: "same", new_string: "changed",
+      command: "str_replace",
+      reason: "replace first",
+      file_path: "reference/notes.md",
+      old_string: "same",
+      new_string: "changed",
     })
 
     expect(await body(setup.repo, "reference/notes.md")).toBe("changed\nmiddle\nsame")
@@ -174,10 +187,18 @@ describe("runMemoryTool", () => {
     const setup = await fixture()
     await seed(setup, "system/list.md", "two\nthree")
     await run(setup, {
-      command: "insert", reason: "prepend", file_path: "system/list", insert_line: -20, insert_text: "one",
+      command: "insert",
+      reason: "prepend",
+      file_path: "system/list",
+      insert_line: -20,
+      insert_text: "one",
     })
     await run(setup, {
-      command: "insert", reason: "append", file_path: "system/list", insert_line: 999, insert_text: "four\nfive",
+      command: "insert",
+      reason: "append",
+      file_path: "system/list",
+      insert_line: 999,
+      insert_text: "four\nfive",
     })
 
     expect(await body(setup.repo, "system/list.md")).toBe("one\ntwo\nthree\nfour\nfive")
@@ -199,13 +220,15 @@ describe("runMemoryTool", () => {
     await seed(setup, "system/old.md", "body")
 
     await run(setup, {
-      command: "rename", reason: "move note", old_path: "system/old.md", new_path: "reference/deep/new.md",
+      command: "rename",
+      reason: "move note",
+      old_path: "system/old.md",
+      new_path: "reference/deep/new.md",
     })
 
     expect(await setup.repo.lsTree()).toContain("reference/deep/new.md")
     expect(await setup.repo.lsTree()).not.toContain("system/old.md")
   })
-
 })
 
 describe("runMemoryTool secret screening", () => {
@@ -216,17 +239,24 @@ describe("runMemoryTool secret screening", () => {
 
     // when
     const error = await run(setup, {
-      command: "create", reason: "remember note", file_path: "notes/a.md",
-      description: "Note", file_text: "the token is token=abc123456",
+      command: "create",
+      reason: "remember note",
+      file_path: "notes/a.md",
+      description: "Note",
+      file_text: "the token is token=abc123456",
     }).then(
-      () => { throw new Error("expected the write to be refused") },
+      () => {
+        throw new Error("expected the write to be refused")
+      },
       (caught: unknown) => caught,
     )
 
     // then
     expect(error).toBeInstanceOf(MemoryToolError)
     const message = (error as Error).message
-    expect(message).toBe("memory: refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry")
+    expect(message).toBe(
+      "memory: refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry",
+    )
     expect(message).not.toContain("abc123456")
     expect(await setup.repo.head()).toBe(headBefore)
     expect((await setup.repo.status()).trim()).toBe("")
@@ -234,8 +264,11 @@ describe("runMemoryTool secret screening", () => {
     await execCheck("git", ["diff", "--cached", "--quiet"], { cwd: setup.repo.dir })
     // the next tool call's cleanCheck passes
     const after = await run(setup, {
-      command: "create", reason: "remember clean note", file_path: "notes/b.md",
-      description: "Clean", file_text: "ordinary body",
+      command: "create",
+      reason: "remember clean note",
+      file_path: "notes/b.md",
+      description: "Clean",
+      file_text: "ordinary body",
     })
     expect(after.message).toContain("committed locally")
   })

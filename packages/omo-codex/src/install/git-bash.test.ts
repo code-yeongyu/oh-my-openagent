@@ -156,7 +156,11 @@ describe("git-bash", () => {
 
   test("#given Windows without Git Bash #when preparing Codex install #then winget is not run automatically", async () => {
     // given
-    const missingResolution = { found: false, checkedPaths: [PROGRAM_FILES_GIT_BASH], installHint: "install hint" } as const
+    const missingResolution = {
+      found: false,
+      checkedPaths: [PROGRAM_FILES_GIT_BASH],
+      installHint: "install hint",
+    } as const
     let resolveCallCount = 0
 
     // when

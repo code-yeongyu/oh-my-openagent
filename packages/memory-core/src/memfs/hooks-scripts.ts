@@ -25,14 +25,18 @@ import { getPostCommitHookScript } from "../sync/mirror"
  * sync/redact.ts; single-quoted forms are left out because the expression is embedded in single quotes, which
  * only makes the hook stricter.
  */
-const END = "[],<>})\"]*$"
+const END = '[],<>})"]*$'
 const REFERENCE_TOKEN =
-  "(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?(\"[A-Za-z0-9_]*\")?[])]*|" +
+  '(process\\.env\\.[A-Za-z_][A-Za-z0-9_]*|os\\.environ(\\.get\\(|\\[)?("[A-Za-z0-9_]*")?[])]*|' +
   "env\\.[A-Za-z_][A-Za-z0-9_]*|\\$\\{[A-Za-z_][A-Za-z0-9_]*\\}|\\$[A-Za-z_][A-Za-z0-9_]*|\\{\\{([^}]*\\}\\})?|\\[(redacted|filtered)\\]|(redacted|filtered)|" +
   "(bearer|changeme|placeholder|example|none|null|undefined|true|false))"
 const MATCH_START = "^[^A-Za-z0-9_]?"
 
-export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; readonly ere: string; readonly exclude?: string }> = [
+export const HOOK_SECRET_PATTERNS: ReadonlyArray<{
+  readonly class: string
+  readonly ere: string
+  readonly exclude?: string
+}> = [
   { class: "aws_access_key", ere: "(^|[^A-Za-z0-9_])AKIA[0-9A-Z]{16}([^A-Za-z0-9_]|$)" },
   {
     class: "credential_assignment",
@@ -46,16 +50,21 @@ export const HOOK_SECRET_PATTERNS: ReadonlyArray<{ readonly class: string; reado
     exclude: `${MATCH_START}authorization[[:space:]]*:[[:space:]]*bearer[[:space:]]+([]<>,})"]|${REFERENCE_TOKEN}${END})`,
   },
   { class: "openai_key", ere: "(^|[^A-Za-z0-9_])sk-(proj-)?[-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
-  { class: "vendor_token", ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)" },
+  {
+    class: "vendor_token",
+    ere: "(^|[^A-Za-z0-9_])(ghp|github_pat|glpat|xox[baprs])[-_][-_A-Za-z0-9]+([^A-Za-z0-9_-]|$)",
+  },
 ]
 
-const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) => [
-  exclude === undefined
-    ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
-    : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
-  `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
-  "      fi",
-].join("\n")).join("\n")
+const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, exclude }) =>
+  [
+    exclude === undefined
+      ? `      if printf '%s' "$blob" | grep -E -q -e '${ere}'; then`
+      : `      if printf '%s' "$blob" | grep -E -o -e '${ere}' | grep -E -v -i -e '${exclude}' | grep -q .; then`,
+    `        printf 'memory pre-commit: %s contains secret-like content (${patternClass})\\n' "$p"`,
+    "      fi",
+  ].join("\n"),
+).join("\n")
 
 /**
  * Pre-commit validator for staged memory markdown.
@@ -68,8 +77,9 @@ const SECRET_SCAN_LINES = HOOK_SECRET_PATTERNS.map(({ class: patternClass, ere, 
  * - `description` is required and must be a non-empty single line.
  * - Every value must be a quoted scalar or a plain scalar that strict YAML
  *   reads verbatim: no `: `, no ` #`, no trailing `:`, no leading indicator.
- * - Known keys are `description`, `read_only`, the legacy `limit`, and the
- *   people-record keys `kind` and `aliases`; any other key fails the commit.
+ * - Known keys are `description`, `read_only`, the legacy `limit`, the
+ *   people-record keys `kind` and `aliases`, the claim receipt `provenance`,
+ *   and `expires` (#11450); any other key fails the commit.
  *   SKILL.md may carry any additional key (`name`, `version`, `deprecated`).
  * - `read_only` is protected: it cannot be added, changed or removed by the
  *   agent, and a file that is `read_only: true` in HEAD cannot be modified.
@@ -81,7 +91,8 @@ export const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 # Installed by omo memory-core. Do not edit by hand - regenerated on startup.
 
 # provenance is the claim receipt the memory tool stamps (#10488); its value is always a quoted JSON string.
-ALL_KNOWN_KEYS="description read_only limit kind aliases provenance"
+# expires is the instant a file stops being projected (#11450); an unreadable value means no expiry, never a rejection.
+ALL_KNOWN_KEYS="description read_only limit kind aliases provenance expires"
 TAB=$(printf '\\t')
 
 fm_value() {

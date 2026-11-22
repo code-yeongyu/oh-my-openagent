@@ -106,7 +106,10 @@ function failure(errors: readonly DagCompileError[], at: string): DagCompileResu
 
 // Deterministic cycle listing: walk from the lexicographically smallest member of each strongly
 // entangled region, always stepping to the smallest dependency that re-enters the region.
-function findCycles(ids: readonly DagNodeId[], dependencies: ReadonlyMap<DagNodeId, readonly DagNodeId[]>): DagNodeId[][] {
+function findCycles(
+  ids: readonly DagNodeId[],
+  dependencies: ReadonlyMap<DagNodeId, readonly DagNodeId[]>,
+): DagNodeId[][] {
   const remaining = new Set(ids)
   let changed = true
   while (changed) {

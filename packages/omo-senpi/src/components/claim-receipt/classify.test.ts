@@ -22,7 +22,11 @@ describe("claim-receipt classifier", () => {
       expect(shape("tsc is clean.")).toEqual({ kind: "typecheck", strength: "asserted", admitted: false })
       expect(shape("No type errors.")).toEqual({ kind: "typecheck", strength: "asserted", admitted: false })
       expect(shape("The build succeeds.")).toEqual({ kind: "build", strength: "asserted", admitted: false })
-      expect(shape("This already exists in `auth.ts`.")).toEqual({ kind: "exists", strength: "asserted", admitted: false })
+      expect(shape("This already exists in `auth.ts`.")).toEqual({
+        kind: "exists",
+        strength: "asserted",
+        admitted: false,
+      })
       expect(shape("Done.")).toEqual({ kind: "done", strength: "asserted", admitted: false })
     })
   })
@@ -110,7 +114,11 @@ describe("claim-receipt classifier", () => {
       expect(classifyClaims("Gate v2 passed at 11:56.")).toEqual([])
       expect(classifyClaims("That alert is one I've already handled.")).toEqual([])
       expect(classifyClaims("A machine that already has memory gets the label.")).toEqual([])
-      expect(classifyClaims("\uC774\uBBF8 \uAD6C\uD604\uB41C \uD568\uC218\uB97C \uC7AC\uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.")).toEqual([])
+      expect(
+        classifyClaims(
+          "\uC774\uBBF8 \uAD6C\uD604\uB41C \uD568\uC218\uB97C \uC7AC\uC0AC\uC6A9\uD588\uC2B5\uB2C8\uB2E4.",
+        ),
+      ).toEqual([])
     })
   })
 

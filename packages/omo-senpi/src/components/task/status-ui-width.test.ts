@@ -1,11 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import {
-  rendererVisibleWidth,
-  type ListedTask,
-  type TaskRecord,
-  type TaskRunStats,
-} from "@oh-my-opencode/senpi-task"
+import { rendererVisibleWidth, type ListedTask, type TaskRecord, type TaskRunStats } from "@oh-my-opencode/senpi-task"
 
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager } from "./status-ui"

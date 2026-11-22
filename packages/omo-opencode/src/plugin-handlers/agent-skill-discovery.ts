@@ -1,4 +1,4 @@
-import type { LoadedSkill } from "../features/opencode-skill-loader";
+import type { LoadedSkill } from "../features/opencode-skill-loader"
 import {
   deduplicateSkillsByName,
   discoverConfigSourceSkills,
@@ -10,18 +10,18 @@ import {
   discoverProjectAgentsSkills,
   discoverProjectClaudeSkills,
   discoverUserClaudeSkills,
-} from "../features/opencode-skill-loader";
-import { adaptHostSkillConfig } from "../shared/host-skill-config";
-import type { ApplyAgentConfigParams } from "./agent-config-types";
-import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs";
+} from "../features/opencode-skill-loader"
+import { adaptHostSkillConfig } from "../shared/host-skill-config"
+import type { ApplyAgentConfigParams } from "./agent-config-types"
+import { detectWorktreePath } from "@oh-my-opencode/skills-loader-core/shared/project-discovery-dirs"
 
 export async function discoverAgentSkills(
   params: Pick<ApplyAgentConfigParams, "config" | "pluginConfig" | "ctx">,
 ): Promise<LoadedSkill[]> {
-  const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true;
-  const hostSkillConfig = adaptHostSkillConfig(params.config.skills);
-  const diskHostSkills = readOpencodeConfigSkills(params.ctx.directory);
-  const sourceProvenance = getSkillSourceProvenance(params.pluginConfig.skills);
+  const includeClaudeSkillsForAwareness = params.pluginConfig.claude_code?.skills ?? true
+  const hostSkillConfig = adaptHostSkillConfig(params.config.skills)
+  const diskHostSkills = readOpencodeConfigSkills(params.ctx.directory)
+  const sourceProvenance = getSkillSourceProvenance(params.pluginConfig.skills)
   const [
     discoveredConfigSourceSkills,
     discoveredHostConfigSkills,
@@ -41,7 +41,12 @@ export async function discoverAgentSkills(
       configDir: params.ctx.directory,
       userSources: diskHostSkills?.userPaths,
       projectSources: diskHostSkills?.projectPaths,
-      provenance: { ...sourceProvenance, kind: "host", selectedRoot: params.ctx.directory, projectRoot: sourceProvenance?.projectRoot ?? detectWorktreePath(params.ctx.directory) ?? params.ctx.directory },
+      provenance: {
+        ...sourceProvenance,
+        kind: "host",
+        selectedRoot: params.ctx.directory,
+        projectRoot: sourceProvenance?.projectRoot ?? detectWorktreePath(params.ctx.directory) ?? params.ctx.directory,
+      },
     }),
     includeClaudeSkillsForAwareness ? discoverUserClaudeSkills() : Promise.resolve([]),
     includeClaudeSkillsForAwareness
@@ -53,7 +58,7 @@ export async function discoverAgentSkills(
     discoverOpencodeGlobalSkills(),
     discoverOpencodeProjectSkills(params.ctx.directory, sourceProvenance),
     includeClaudeSkillsForAwareness ? discoverGlobalAgentsSkills() : Promise.resolve([]),
-  ]);
+  ])
 
   return deduplicateSkillsByName([
     ...discoveredConfigSourceSkills,
@@ -64,5 +69,5 @@ export async function discoverAgentSkills(
     ...discoveredOpencodeGlobalSkills,
     ...discoveredUserSkills,
     ...discoveredGlobalAgentsSkills,
-  ]);
+  ])
 }

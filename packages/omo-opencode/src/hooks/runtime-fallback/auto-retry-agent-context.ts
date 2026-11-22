@@ -5,10 +5,7 @@ import { extractSessionMessages } from "./session-messages"
 export function createAgentContextResolver(deps: HookDeps) {
   const { ctx } = deps
 
-  return async (
-    sessionID: string,
-    eventAgent?: string,
-  ): Promise<string | undefined> => {
+  return async (sessionID: string, eventAgent?: string): Promise<string | undefined> => {
     const resolved = resolveAgentForSession(sessionID, eventAgent)
     if (resolved) return resolved
 

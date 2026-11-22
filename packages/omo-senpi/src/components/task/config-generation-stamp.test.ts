@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createTaskRecord, createTaskRecordStore, type TaskRecord, type TaskRecordStore } from "@oh-my-opencode/senpi-task"
+import {
+  createTaskRecord,
+  createTaskRecordStore,
+  type TaskRecord,
+  type TaskRecordStore,
+} from "@oh-my-opencode/senpi-task"
 
 import { createConfigGenerationStampingStore } from "./config-generation-store"
 import { TaskRecordCollisionError } from "../../../../senpi-task/src/store/record-write"

@@ -24,12 +24,14 @@ export function buildRecoveredSyncTaskCompletion(input: {
     modelRoutingNote = `\n⚠️  Model fallback used: requested ${parentModelStr}, executed ${actualModelStr}`
   }
 
-  return `Task completed in ${duration}.\n\n---\n\n${input.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock({
-    sessionId: input.activeSessionID,
-    taskId: input.activeSessionID,
-    agent: input.agentToUse,
-    category: input.args.category,
-  })}`
+  return `Task completed in ${duration}.\n\n---\n\n${input.textContent || "(No text output)"}${modelRoutingNote}\n\n${buildTaskMetadataBlock(
+    {
+      sessionId: input.activeSessionID,
+      taskId: input.activeSessionID,
+      agent: input.agentToUse,
+      category: input.args.category,
+    },
+  )}`
 }
 
 export function buildSyncTaskCompletion(input: {
@@ -60,9 +62,9 @@ Agent: ${input.agentToUse}${input.args.category ? ` (category: ${input.args.cate
 ${input.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
-    sessionId: input.activeSessionID,
-    taskId: input.activeSessionID,
-    agent: input.agentToUse,
-    category: input.args.category,
-  })}`
+  sessionId: input.activeSessionID,
+  taskId: input.activeSessionID,
+  agent: input.agentToUse,
+  category: input.args.category,
+})}`
 }

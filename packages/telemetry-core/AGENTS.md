@@ -4,7 +4,7 @@
 
 ## OVERVIEW
 
-Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, once-per-UTC-day capture dedup, and JSONL diagnostics. No product-specific strings live here — each consumer passes a `TelemetryProductConfig` (event name, cache dir, machine-id prefix, env prefix). Package: `@oh-my-opencode/telemetry-core`.
+Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed random install id, once-per-UTC-day capture dedup, and JSONL diagnostics. No product-specific strings live here — each consumer passes a `TelemetryProductConfig` (event name, cache dir, env prefix). Package: `@oh-my-opencode/telemetry-core`.
 
 ## PUBLIC API (`src/index.ts` barrel)
 
@@ -14,7 +14,8 @@ Harness-neutral PostHog telemetry: env-gated opt-out, SHA256-hashed machine id, 
 | `posthog-client.ts` | `createTelemetryClient`, `isTelemetryClientEnabled`, `createDefaultPostHogTransport`, `TelemetryDeliveryError` (`telemetry-delivery-error.ts`; `permanent` marks 400/413). The transport's `captureImmediate` resolves only on a 2xx answer and rejects with it otherwise; its sender (`posthog-immediate-send.ts`, given the PostHog class by the caller) is loaded on the first immediate send through the package import `#telemetry-immediate-send`, which bundlers inline and the senpi plugin maps to its telemetry sidecar; a failed load is retried by the next send. The package subpath `@oh-my-opencode/telemetry-core/immediate-send` exposes the same module (the sender plus `TelemetryDeliveryError`), so the sidecar takes it without the barrel and without posthog-node's top-level code |
 | `activity-state.ts` | `getDailyActiveCaptureState`, `resolveTelemetryStateDir`, `getTelemetryActivityStateFilePath` |
 | `env.ts` | `shouldDisableTelemetry`, `getTelemetryApiKey/Host`, `hasTelemetryApiKey` |
-| `machine-id.ts` | `getTelemetryDistinctId`, `getDefaultTelemetryOsProvider` |
+| `machine-id.ts` | `getDefaultTelemetryOsProvider` (OS metadata for shared properties; never an identity) |
+| `install-id.ts` | `getTelemetryInstallDistinctId(stateDir)`: sha256 of a random 64-hex `install-id` file (0600) created on first send in the product's state dir |
 | `events.ts` | `createEventTelemetryClient` — typed event capture wrapper (see NOTES) + `EventTelemetryClient`, `EventPropertyAllowlist`, `CreateEventTelemetryClientInput`, … |
 | `diagnostics.ts` | `writeTelemetryDiagnostic`, `cleanupTelemetryDiagnostics` |
 | `consent-gated-fetch.ts` | `createConsentGatedFetch` — the PostHog `fetch` option gated on consent at send time; every SDK flush (interval, batch size, shutdown) goes through it, and a dropped batch answers 200 so it leaves the queue unsent |
@@ -55,7 +56,7 @@ The collector transport (telemetry-collector plan, todo 21). Kept off the main b
 
 - **At most once per UTC day per machine.** `getDailyActiveCaptureState` compares last-active UTC day in the state file; same day → `captureDaily: false`, nothing sent.
 - **`$process_person_profile: false`** hardcoded on every capture — no PostHog person profiles.
-- **Distinct id = `sha256(prefix + hostname)`** — never the raw hostname.
+- **Distinct id = `sha256(install id)`**, a random id created lazily on the send path (after every consent check). No identifier is derived from the hostname, user name, home path or any machine attribute.
 - **Opt-out env matrix:** `${PREFIX}_DISABLE_POSTHOG` (truthy `1/true/yes`) OR `${PREFIX}_SEND_ANONYMOUS_TELEMETRY` (opt-out `0/false/no/yes`); global `OMO_` prefix also checked; plus the standard unprefixed `DO_NOT_TRACK`.
 - **NO_OP_CLIENT** returned when disabled or transport init fails (`enabled: false`, all methods no-op). Transport + OS provider are injectable for tests.
 - **Diagnostics** JSONL: 7-day retention, 256 KB cap, cleanup on every write.

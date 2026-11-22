@@ -28,15 +28,17 @@ async function listPackageSourceFiles(): Promise<string[]> {
     return []
   }
 
-  const nestedFiles = await Promise.all(packageNames.map(async (name) => {
-    if (SKIP_PACKAGES.has(name)) {
-      return []
-    }
+  const nestedFiles = await Promise.all(
+    packageNames.map(async (name) => {
+      if (SKIP_PACKAGES.has(name)) {
+        return []
+      }
 
-    const packageSrc = path.join(PACKAGES_DIR, name, "src")
-    const entries = await listSourceFilesRecursive(packageSrc)
-    return entries
-  }))
+      const packageSrc = path.join(PACKAGES_DIR, name, "src")
+      const entries = await listSourceFilesRecursive(packageSrc)
+      return entries
+    }),
+  )
 
   return nestedFiles.flat()
 }
@@ -49,21 +51,23 @@ async function listSourceFilesRecursive(directory: string): Promise<string[]> {
     return []
   }
 
-  const nestedFiles = await Promise.all(entries.map(async (entry) => {
-    const entryPath = path.join(directory, entry.name)
-    if (entry.isDirectory()) {
-      return listSourceFilesRecursive(entryPath)
-    }
-    if (
-      entry.isFile()
-      && entry.name.endsWith(".ts")
-      && !entry.name.endsWith(".test.ts")
-      && !entry.name.endsWith(".d.ts")
-    ) {
-      return [entryPath]
-    }
-    return []
-  }))
+  const nestedFiles = await Promise.all(
+    entries.map(async (entry) => {
+      const entryPath = path.join(directory, entry.name)
+      if (entry.isDirectory()) {
+        return listSourceFilesRecursive(entryPath)
+      }
+      if (
+        entry.isFile() &&
+        entry.name.endsWith(".ts") &&
+        !entry.name.endsWith(".test.ts") &&
+        !entry.name.endsWith(".d.ts")
+      ) {
+        return [entryPath]
+      }
+      return []
+    }),
+  )
 
   return nestedFiles.flat()
 }

@@ -14,6 +14,7 @@ import {
 import { createTaskManager } from "./manager"
 import type { SpawnAdmission, TaskManager } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -30,9 +31,11 @@ function toResidentHandle(handle: ManagedChildHandle | undefined): ResidentHandl
   }
 }
 
-function makeUnlimitedManager(residency: Record<string, unknown> = { residency_max_children: "unlimited" }): TaskManager {
+function makeUnlimitedManager(
+  residency: Record<string, unknown> = { residency_max_children: "unlimited" },
+): TaskManager {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const runner = new FakeRunner()
   const config = settings({
     default_concurrency: 16,
@@ -46,10 +49,13 @@ function makeUnlimitedManager(residency: Record<string, unknown> = { residency_m
   }
   const registry: ResidencyRegistry = {
     get: (taskId) => toResidentHandle(manager().getResidentHandle(taskId)),
-    entries: () => manager().residentTaskIds().flatMap((taskId) => {
-      const handle = toResidentHandle(manager().getResidentHandle(taskId))
-      return handle === undefined ? [] : [handle]
-    }),
+    entries: () =>
+      manager()
+        .residentTaskIds()
+        .flatMap((taskId) => {
+          const handle = toResidentHandle(manager().getResidentHandle(taskId))
+          return handle === undefined ? [] : [handle]
+        }),
     forget: (taskId, options) => manager().forget(taskId, options),
     hasPendingSends: () => false,
   }

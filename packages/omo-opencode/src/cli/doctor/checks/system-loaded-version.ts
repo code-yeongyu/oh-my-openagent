@@ -106,13 +106,17 @@ function createTaggedInstallCandidates(rootDir: string): InstallCandidate[] {
 }
 
 function selectInstalledPackage(candidate: InstallCandidate): PackageCandidate {
-  return candidate.packageCandidates.find((packageCandidate) => existsSync(packageCandidate.installedPackagePath))
-    ?? candidate.packageCandidates[0]
+  return (
+    candidate.packageCandidates.find((packageCandidate) => existsSync(packageCandidate.installedPackagePath)) ??
+    candidate.packageCandidates[0]
+  )
 }
 
 function getExpectedVersion(cachePackage: PackageJsonShape | null, packageName: string): string | null {
-  return normalizeVersion(cachePackage?.dependencies?.[packageName])
-    ?? normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
+  return (
+    normalizeVersion(cachePackage?.dependencies?.[packageName]) ??
+    normalizeVersion(cachePackage?.dependencies?.[PACKAGE_NAME])
+  )
 }
 
 function resolveInstalledPackageJsonPath(): { packageName: string; packageJsonPath: string } | null {
@@ -160,8 +164,10 @@ export function getLoadedPluginVersion(): LoadedVersionInfo {
     ...createTaggedInstallCandidates(cacheDir),
   ]
 
-  const selectedCandidate = candidates.find((candidate) => candidate.packageCandidates.some((packageCandidate) => existsSync(packageCandidate.installedPackagePath)))
-    ?? candidates[0]
+  const selectedCandidate =
+    candidates.find((candidate) =>
+      candidate.packageCandidates.some((packageCandidate) => existsSync(packageCandidate.installedPackagePath)),
+    ) ?? candidates[0]
 
   const { cacheDir: selectedDir, cachePackagePath } = selectedCandidate
   const selectedPackage = selectInstalledPackage(selectedCandidate)

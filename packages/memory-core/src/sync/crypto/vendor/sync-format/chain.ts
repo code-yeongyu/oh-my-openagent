@@ -22,8 +22,11 @@ export type SyncRecoveryKey = {
   readonly enrollment_nonce: string;
   readonly sealing_public_key: string;
   readonly signing_public_key: string;
-  readonly survivable: "synced" | "roaming";
+  readonly survivable: "synced" | "roaming" | "phrase";
 };
+
+/** The rp_id every recovery-phrase key carries in place of a WebAuthn relying party (#1025). */
+export const PHRASE_RECOVERY_RP_ID = "omo-sync/v1/recovery-phrase";
 
 export type RecordRef = {
   readonly seq: number;
