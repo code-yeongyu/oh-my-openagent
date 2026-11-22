@@ -179,7 +179,8 @@ export function registerMemoryStatic(input: {
       const identity = resolveContext(sessionId)
       if (identity === undefined) return undefined
       activeSession.current = sessionId
-      if (branchEntryCount(eventCtx) === 0) {
+      const entryCount = branchEntryCount(eventCtx)
+      if (entryCount === undefined || entryCount === 0) {
         await onSettled?.(sessionId, eventCtx, observer)
         return undefined
       }

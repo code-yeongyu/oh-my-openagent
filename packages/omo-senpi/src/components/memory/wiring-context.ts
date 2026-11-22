@@ -9,18 +9,16 @@ export function sessionIdFrom(eventCtx: unknown): string | undefined {
   return typeof id === "string" && id.length > 0 ? id : undefined
 }
 
-export function branchEntryCount(eventCtx: unknown): number {
+export function branchEntryCount(eventCtx: unknown): number | undefined {
   if (!isRecord(eventCtx)) return 0
   const manager = isRecord(eventCtx.sessionManager) ? eventCtx.sessionManager : undefined
+  if (manager === undefined) return 0
   const getEntryCount = manager?.getEntryCount
   if (typeof getEntryCount === "function") {
     const count = Reflect.apply(getEntryCount, manager, [])
     if (typeof count === "number" && Number.isFinite(count)) return count
   }
-  const getEntries = manager?.getEntries
-  if (typeof getEntries !== "function") return 0
-  const entries = Reflect.apply(getEntries, manager, [])
-  return Array.isArray(entries) ? entries.length : 0
+  return undefined
 }
 
 export function readUi(eventCtx: unknown): StatusUi | undefined {
