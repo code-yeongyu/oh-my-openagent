@@ -21,10 +21,10 @@ afterEach(() => {
   }
 })
 
-function tempProject(): string {
+function tempStore(): ReturnType<typeof createTaskRecordStore> {
   const directory = mkdtempSync(join(tmpdir(), "senpi-task-store-"))
   cleanupRoots.push(directory)
-  return directory
+  return createTaskRecordStore({ project_dir: directory, task: { state_dir: join(directory, "state") } })
 }
 
 describe("resolveStateDir", () => {
@@ -56,8 +56,7 @@ describe("resolveStateDir", () => {
 describe("TaskRecordStore", () => {
   test("#given completed task record #when saved and reloaded #then durable task facts are identical", () => {
     // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const record = createTaskRecord({
       name: "Summarize logs",
       parent_session_id: "parent-session",
@@ -91,8 +90,7 @@ describe("TaskRecordStore", () => {
 
   test("#given a task spawned with a description #when saved and reloaded #then the description survives the round trip", () => {
     // given a record carrying the human label the task tool accepts
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const record = createTaskRecord({
       name: "task-1",
       description: "Audit the waiting-line renderers",
@@ -115,8 +113,7 @@ describe("TaskRecordStore", () => {
 
   test("#given sensitive event payload #when event is appended #then jsonl payload is redacted", () => {
     // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const record = createTaskRecord({
       parent_session_id: "parent-session",
       root_session_id: "root-session",
@@ -142,8 +139,7 @@ describe("TaskRecordStore", () => {
 
   test("#given corrupt task json #when records are listed #then typed diagnostic is reported and corrupt record is skipped", () => {
     // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const good = createTaskRecord({
       parent_session_id: "parent-session",
       root_session_id: "root-session",
@@ -153,7 +149,7 @@ describe("TaskRecordStore", () => {
       notify_on_terminal: false,
     })
     store.save(good)
-    const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+    const tasksDir = join(store.stateDir, "tasks")
     mkdirSync(tasksDir, { recursive: true })
     writeFileSync(join(tasksDir, "st_badbeef.json"), "{not-json", "utf8")
 
@@ -173,8 +169,7 @@ describe("TaskRecordStore", () => {
 
   test("#given duplicate generated task id #when a different record is saved #then existing task file is not overwritten", () => {
     // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const original = createTaskRecord({
       parent_session_id: "parent-session",
       root_session_id: "root-session",
@@ -213,8 +208,7 @@ describe("TaskRecordStore", () => {
 
   test("#given completed record #when illegal running transition is persisted #then transition is rejected and completion remains", () => {
     // given
-    const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = tempStore()
     const running = transitionTaskRecord(
       createTaskRecord({
         parent_session_id: "parent-session",

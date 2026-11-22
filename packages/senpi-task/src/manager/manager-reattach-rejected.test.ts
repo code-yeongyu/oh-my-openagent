@@ -5,6 +5,7 @@ import { createTaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { reattachManagedTask } from "./manager-reattach"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // A revived daemon child reattaches to the task's one daemon session. When the reattach is rejected
 // because another revival owns the task now, that owner may be using the session: it must stay open.
@@ -14,7 +15,7 @@ afterEach(cleanupProjects)
 const HOST = 11_001
 
 function rejectedReattach(kind: "host-session" | "rpc", rejection: "superseded" | "not_owned" | "attached") {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const taskId = "st_0bad0001"
   seedRecord(store, {
     task_id: taskId,

@@ -9,6 +9,7 @@ import type { WorkpoolAdmission, WorkpoolRequest } from "./ports"
 import { createWorkpoolStore } from "./store"
 import type { WorkpoolSpec } from "./types"
 import { acknowledgeWorkerTurn, appendAssignedMessages, beginWorkerTurn } from "./worker-turn"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const roots: string[] = []
 afterEach(() => {
@@ -32,7 +33,7 @@ test("design 21: Stop with two busy workers, a granted waiter and three queued i
       execution_mode: "in-process",
     },
   }
-  const tasks = createTaskRecordStore({ project_dir: root })
+  const tasks = createTaskRecordStore(ownedTaskState(root))
   const pools = createWorkpoolStore(root)
   const workers = ["one", "two"].map(() => {
     const record = {

@@ -12,6 +12,7 @@ import { createDagManager, type DagManager, type DagRunRecordV1 } from "./manage
 import { createDagScheduler, type DagScheduler } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 export const PARENT_SESSION_ID = "session-node-projection-parent"
 
@@ -108,10 +109,10 @@ export const cleanupRoots: string[] = []
 export async function startHeldRun(nodeIds: readonly string[]): Promise<ProjectionFixture> {
   const project = fs.mkdtempSync(join(tmpdir(), "senpi-dag-projection-"))
   cleanupRoots.push(project)
-  const store = createDagFileStore({ project_dir: project })
+  const store = createDagFileStore(ownedTaskState(project))
   const runner = new HeldRunner()
   const taskManager = createTaskManager({
-    store: createTaskRecordStore({ project_dir: project }),
+    store: createTaskRecordStore(ownedTaskState(project)),
     runners: { "in-process": runner, process: runner },
     planner,
     config: OmoTaskSettingsSchema.parse({ default_concurrency: 16, max_depth: 1 }),
