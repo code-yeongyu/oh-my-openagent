@@ -354,7 +354,7 @@ const cases = [
       // and removes its separate fixture before Senpi starts, so the two writes and O1-O7 stay unchanged.
       const warmup = spawnSync("bun", [join(scriptDir, "fused-equivalence-lsp-warmup.mjs")], {
         cwd: run.box.cwd,
-        env: run.env,
+        env: withTelemetryOptOut(run.env),
         encoding: "utf8",
         timeout: 65_000,
         killSignal: "SIGKILL",
