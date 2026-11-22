@@ -6,12 +6,36 @@ import { join } from "node:path"
 import { startFakeOwner, type FakeOwner } from "@oh-my-opencode/device-service-core/conformance/fake-owner"
 import { defaultWorld, PEER } from "@oh-my-opencode/device-service-core/conformance/world"
 
-import type { ThreadHost } from "../components/thread/tools"
+import type { ThreadHost } from "../components/thread/tools/ports"
 import { createThreadSdk } from "./thread-sdk"
 
 const STATE_DIR_ENV = "OMO_DEVICE_SERVICE_STATE_DIR"
 const savedStateDir = process.env[STATE_DIR_ENV]
 const cleanups: Array<() => Promise<void> | void> = []
+const HOST_SOCKET = "/tmp/thread-sdk-entry-host.sock"
+const unused = async (): Promise<never> => {
+  throw new Error("not used by a listing")
+}
+// This device runs one host with no sessions: the only threads to list are the other device's.
+const emptyHost: ThreadHost = {
+  socket: HOST_SOCKET,
+  listSessions: async () => [],
+  listView: async () => ({
+    sessions: [],
+    hosts: [{ socket: HOST_SOCKET, list_sessions: { sessions: [] }, endpoint_kind: "rpc_host", alive: true }],
+    disk: [],
+  }),
+  openSession: unused,
+  getMessages: unused,
+  getState: unused,
+  prompt: unused,
+  interrupt: unused,
+  setSessionName: unused,
+  setModel: unused,
+  getAvailableModels: unused,
+  setThinkingLevel: unused,
+  getAvailableThinkingLevels: unused,
+}
 afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
   if (savedStateDir === undefined) delete process.env[STATE_DIR_ENV]
@@ -36,31 +60,11 @@ test("#given a script that opens the shipped SDK without a remote #when it lists
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { recursive: true })
 
-  // This device answers with no sessions, so the listing's devices come from the default account surface alone.
-  const unused = async (): Promise<never> => {
-    throw new Error("not used by a listing")
-  }
-  const host: ThreadHost = {
-    socket: join(agentDir, "none.sock"),
-    listSessions: async () => [],
-    listView: async () => ({ sessions: [], hosts: [], disk: [] }),
-    openSession: unused,
-    getMessages: unused,
-    getState: unused,
-    prompt: unused,
-    interrupt: unused,
-    setSessionName: unused,
-    setModel: unused,
-    getAvailableModels: unused,
-    setThinkingLevel: unused,
-    getAvailableThinkingLevels: unused,
-  }
-
-  const sdk = createThreadSdk({ agentDir, cwd: agentDir, uid: 501, user: "lane-monitor", host })
+  const sdk = createThreadSdk({ agentDir, cwd: agentDir, uid: 501, user: "lane-monitor", host: emptyHost })
   cleanups.push(() => sdk.dispose())
   const listed = await sdk.list({ all_scope: true })
 
-  expect(listed.kind).toBe("ok")
+  expect(listed).toMatchObject({ kind: "ok" })
   const devices = listed.kind === "ok" && "devices" in listed ? (listed.devices ?? []) : []
   expect(devices.map((device) => device.device)).toContain(PEER)
 }, 30_000)
