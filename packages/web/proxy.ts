@@ -27,6 +27,13 @@ const installGuidePaths = new Set([
 
 const desktopPaths = new Set(["desktop"])
 
+// `curl -fsSL https://omo.dev/install | bash` is a natural guess; the scripts are served by get.omo.dev (#12579).
+const installerScripts: Readonly<Record<string, string>> = {
+  "/install": "https://get.omo.dev/install.sh",
+  "/install.sh": "https://get.omo.dev/install.sh",
+  "/install.ps1": "https://get.omo.dev/install.ps1",
+}
+
 // Shipped desktop builds link https://omo.dev/download (reinstall screen, deb update pill). While this
 // site's own download page is off, that path goes to the public stable download page (which links the
 // beta page), or to the beta page when `?channel=beta` asks for it, instead of a 404.
@@ -79,6 +86,9 @@ function isDownloadPath(pathname: string): boolean {
 }
 
 export default function proxy(request: NextRequest): NextResponse {
+  const installerScript = installerScripts[request.nextUrl.pathname]
+  if (installerScript) return NextResponse.redirect(installerScript, 308)
+
   if (!desktopDownloadEnabled() && isDownloadPath(request.nextUrl.pathname)) {
     return NextResponse.redirect(publicDesktopDownloadPage(request), 307)
   }
@@ -137,6 +147,8 @@ export const config = {
     "/((?!api|design|_next|_vercel|opengraph-image|twitter-image|icon|apple-icon|manifest\\.webmanifest|robots\\.txt|sitemap\\.xml|.*\\..*).+)",
     // Locale-agnostic on purpose: Next.js needs a literal matcher, so the locale itself is
     // checked against the registry by getLocaleSegment instead of a second hand-written list.
+    "/install.sh",
+    "/install.ps1",
     "/installation.md",
     "/:locale/installation.md",
     "/docs/installation.md",

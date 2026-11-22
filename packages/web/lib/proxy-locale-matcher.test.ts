@@ -84,3 +84,18 @@ describe("installation redirects in every locale", () => {
     },
   )
 })
+
+// #12579: omo.dev/install and /install.sh returned 404; they hand the installer scripts over to get.omo.dev.
+describe("installer script paths on omo.dev", () => {
+  test.each([
+    ["/install", "https://get.omo.dev/install.sh"],
+    ["/install.sh", "https://get.omo.dev/install.sh"],
+    ["/install.ps1", "https://get.omo.dev/install.ps1"],
+  ])("#given %s #when requested #then it redirects permanently to %s", (path, location) => {
+    expect(redirectOf(path)).toEqual({ status: 308, location })
+  })
+
+  test("#given the static matcher #when a dotted installer path is requested #then the proxy runs for it", () => {
+    for (const path of ["/install.sh", "/install.ps1"]) expect(proxySource).toContain(`"${path}",`)
+  })
+})
