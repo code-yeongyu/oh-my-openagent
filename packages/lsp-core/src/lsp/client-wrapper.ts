@@ -175,7 +175,7 @@ function formatInstallOptions(serverId: string, installHint: string): string[] {
 }
 
 function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_installed" }>): string {
-  const { server, installHint } = result
+  const { server, installHint, searchedFrom } = result
   const extensions = server.extensions.join(", ")
   const decision = loadInstallDecision(server.id)?.decision
   const context = lspRequestContext()
@@ -188,6 +188,14 @@ function formatNotInstalled(result: Extract<ServerLookupResult, { status: "not_i
     `LSP server '${server.id}' for ${extensions} is NOT INSTALLED.`,
     "",
     `Command not found: ${server.command[0]}`,
+    // The lookup is bounded to the session's directory and its repository (#12522): name that boundary, so a
+    // server installed in another project reads as "outside this lookup", not as "missing everywhere".
+    ...(searchedFrom === undefined
+      ? []
+      : [
+          `Searched project tool directories from ${searchedFrom} up to its repository root (or the filesystem root outside a repository), then PATH.`,
+          "If the file you are working on belongs to a different project, its locally installed server is outside this lookup: start the session in that project instead of installing.",
+        ]),
     "",
   ]
   const installOptions = formatInstallOptions(server.id, installHint)

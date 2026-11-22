@@ -69,6 +69,7 @@ export function findServerForExtension(ext: string): ServerLookupResult {
           extensions: server.extensions,
         },
         installHint,
+        searchedFrom: workingDirectory,
       }
     }
   }
