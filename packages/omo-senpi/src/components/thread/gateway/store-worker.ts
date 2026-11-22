@@ -4,11 +4,12 @@
  * the session loop that owns the store facade. Requests run strictly one at a time.
  */
 import { createHash, randomUUID } from "node:crypto"
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, renameSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
+import { CONNECTION_LOST_CODE, connectionLost, isSqliteIoError, watchWalFiles } from "./connection-lost"
 import { OPEN_STATES, WAKE_LEASE_MS } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
@@ -249,6 +250,8 @@ const barriers = new Map<string, () => void>()
 let running = false
 let context: ops.StoreContext | undefined
 let connection: SqliteConnection | undefined
+/** Names a `-wal`/`-shm` file of the open connection that was removed or replaced since it opened. */
+let walFilesLost: (() => string | undefined) | undefined
 let extensions: StoreExtensions | undefined
 /** The extension whose registration or call ran most recently; a late error is attributed to it. */
 let lastExtensionActivity: string | undefined
@@ -333,8 +336,9 @@ async function pump(): Promise<void> {
           error: {
             message: error instanceof Error ? error.message : String(error),
             stack: error instanceof Error ? error.stack : undefined,
-            code:
-              typeof (error as { code?: unknown } | null)?.code === "string"
+            code: isSqliteIoError(error)
+              ? CONNECTION_LOST_CODE
+              : typeof (error as { code?: unknown } | null)?.code === "string"
                 ? (error as { code: string }).code
                 : undefined,
             details: error instanceof GatewaySchemaVersionError ? error.details : undefined,
@@ -916,8 +920,11 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     connection = undefined
     context = undefined
     extensions = undefined
+    walFilesLost = undefined
     return null
   }
+  const lost = walFilesLost?.()
+  if (lost !== undefined) throw connectionLost(lost)
   const ctx = requireContext()
   if (op.startsWith("woken_")) return await dispatchWoken(ctx, op, args)
   switch (op) {
@@ -1048,10 +1055,14 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   mkdirSync(join(root, "inbox"), { recursive: true, mode: 0o700 })
   chmodSync(root, 0o700)
   const path = gatewayDatabasePath(config.agent_dir)
-  closeSync(openSync(path, "a", 0o600))
-  chmodSync(path, 0o600)
+  // Never open and close the database file outside SQLite: POSIX record locks belong to the process, so
+  // closing ANY descriptor of the file drops every lock this process holds on it, the SHARED lock of each
+  // other store already open here included. A foreign client then takes itself for the last connection
+  // and deletes -wal and -shm on close under every live store. SQLite creates the file; the gateway
+  // directory is already 0700 when it does, and the mode is narrowed right after.
   const sqlite = await import("node:sqlite")
   connection = new sqlite.DatabaseSync(path, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
+  chmodSync(path, 0o600)
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
   // Two processes opening a brand-new store race for the WAL switch, which does not wait on
@@ -1074,6 +1085,8 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   }
   sql.exec("PRAGMA synchronous = FULL")
   for (const suffix of ["-wal", "-shm"]) if (existsSync(`${path}${suffix}`)) chmodSync(`${path}${suffix}`, 0o600)
+  walFilesLost = watchWalFiles(path)
+  walFilesLost()
   const self = {
     pid: process.pid,
     process_start_time: await processStartTime(process.pid),
