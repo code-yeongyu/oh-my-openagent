@@ -453,7 +453,15 @@ jobs:
       # The full install runs the root `prepare` (`bun run build`), whose `build:lsp-daemon` step already runs
       # `npm ci && npm run build` in packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Install dependencies
+        if: matrix.part != 'memory-core'
         run: bun install --frozen-lockfile
+
+      # memory-core needs only the vendored LSP daemon built by the shared test preload.
+      - name: Install memory-core test dependencies
+        if: matrix.part == 'memory-core'
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run build:lsp-daemon
 
       - name: Remove stale self-package test copies
         run: bun run script/remove-stale-self-package-tests.ts
