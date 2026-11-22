@@ -110,6 +110,7 @@ evidence: screenshot + plain transcript + cleanup receipt.
 ## Task resources
 Before the first task command, create one `RUN_TMP=$(mktemp -d)` per task, tracking its paths under section 3 immediately. Export `TMPDIR="$RUN_TMP" NODE_COMPILE_CACHE="$RUN_TMP/node-compile-cache" BUN_RUNTIME_TRANSPILER_CACHE_PATH="$RUN_TMP/bun-transpiler"` for every command; pass the same environment explicitly to children that do not inherit it. Give independent child tasks their own run roots.
 At task end, after owned processes exit, remove only owned directories, including runtime caches. Never wipe shared caches; retain worktrees still needed by open PRs and any parent directory containing them.
+`RUN_TMP` is scratch: the task-end cleanup and a reboot both delete it, so anything the user may want afterwards (scripts, data files, test records, reports) goes in the project or another lasting directory, and your final message names where it is.
 
 ## 0. Survey the skills, gather context, then size the work
 This section records into the notepad, so run section 2's `NOTE=`
