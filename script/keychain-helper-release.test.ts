@@ -74,16 +74,31 @@ describe("keychain helper release gate", () => {
     expect(designatedRequirement(`Executable=${FILE}\n`)).toBeUndefined()
   })
 
-  test("reads codesign's annotated requirement as the same requirement", () => {
+  const QUOTED_COMMENT_SPAN = KEYCHAIN_HELPER_REQUIREMENT.replace(
+    KEYCHAIN_HELPER_IDENTIFIER,
+    `${KEYCHAIN_HELPER_IDENTIFIER}/*x*/`,
+  )
+
+  test("normalizes only codesign's /* exists */ annotations, never comment-like text inside quotes", () => {
     const annotated = KEYCHAIN_HELPER_REQUIREMENT.replace(
       "[field.1.2.840.113635.100.6.2.6]",
       "[field.1.2.840.113635.100.6.2.6] /* exists */",
     ).replace("[field.1.2.840.113635.100.6.1.13]", "[field.1.2.840.113635.100.6.1.13] /* exists */")
     expect(annotated).not.toBe(KEYCHAIN_HELPER_REQUIREMENT)
-    expect(designatedRequirement(`Executable=${FILE}\ndesignated => ${annotated}\n`)).toBe(KEYCHAIN_HELPER_REQUIREMENT)
-    expect(keychainHelperFailures(FILE, codesignFake({ ...DEVELOPER_ID, requirement: annotated }), 0o100755)).toEqual(
-      [],
-    )
+    const renamed = KEYCHAIN_HELPER_REQUIREMENT.replace(KEYCHAIN_HELPER_IDENTIFIER, "omo-keychain")
+    const cases: ReadonlyArray<readonly [string, string, string | undefined]> = [
+      ["codesign's annotated real output", annotated, KEYCHAIN_HELPER_REQUIREMENT],
+      ["a quoted identifier containing a comment-like span", QUOTED_COMMENT_SPAN, QUOTED_COMMENT_SPAN],
+      ["a re-sign that renamed the identifier", renamed, renamed],
+      ["an ad-hoc cdhash requirement", 'cdhash H"0000"', 'cdhash H"0000"'],
+    ]
+    for (const [label, requirement, expected] of cases) {
+      const observed = designatedRequirement(`Executable=${FILE}\ndesignated => ${requirement}\n`)
+      expect(observed, label).toBe(expected)
+      const failures = keychainHelperFailures(FILE, codesignFake({ ...DEVELOPER_ID, requirement }), 0o100755)
+      if (expected === KEYCHAIN_HELPER_REQUIREMENT) expect(failures, label).toEqual([])
+      else expect(failures.join("\n"), label).toMatch(/designated requirement differs/)
+    }
   })
 
   test("accepts the Developer ID helper the contract describes", () => {
@@ -97,6 +112,11 @@ describe("keychain helper release gate", () => {
     [
       "a re-sign that renamed the identifier",
       { requirement: KEYCHAIN_HELPER_REQUIREMENT.replace(KEYCHAIN_HELPER_IDENTIFIER, "omo-keychain") },
+      /designated requirement differs/,
+    ],
+    [
+      "a quoted identifier containing a comment-like span",
+      { requirement: QUOTED_COMMENT_SPAN },
       /designated requirement differs/,
     ],
     ["an ad-hoc signature", { requirement: 'cdhash H"0000"', team: "not set" }, /TeamIdentifier=not set/],
