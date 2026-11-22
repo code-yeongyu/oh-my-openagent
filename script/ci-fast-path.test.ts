@@ -240,6 +240,61 @@ describe("CI fast-path workflow wiring", () => {
     }
   })
 
+  test("pins one timing snapshot across Linux shards and only publishes verified timings from dev pushes", () => {
+    const jobs = workflowJobs(ciWorkflowPath)
+    const mode = jobs["ci-mode"]
+    if (!isRecord(mode) || !Array.isArray(mode["steps"])) throw new Error("CI must define ci-mode steps")
+    expect(mode["outputs"]).toHaveProperty("shard_timings_key", "${{ steps.shard-timings.outputs.cache-matched-key }}")
+    const selector = mode["steps"].filter(isRecord).find((step) => step["id"] === "shard-timings")
+    expect(selector).toMatchObject({
+      uses: "actions/cache/restore@v6",
+      with: { "restore-keys": "ci-test-timings-" },
+    })
+    for (const [jobId, group] of [
+      ["test-linux", "root"],
+      ["senpi-tests-linux", "senpi"],
+    ] as const) {
+      const job = jobs[jobId]
+      const status = jobs[group === "root" ? "linux-test-status" : "linux-senpi-status"]
+      if (!isRecord(job) || !Array.isArray(job["steps"])) throw new Error(`${jobId} must define steps`)
+      if (!isRecord(status) || !Array.isArray(status["steps"])) throw new Error(`${group} status must define steps`)
+      const restore = job["steps"].filter(isRecord).find((step) => step["id"] === "shard-timings")
+      expect(restore).toMatchObject({
+        uses: "actions/cache/restore@v6",
+        with: {
+          path: "${{ runner.temp }}/ci-test-timings.json",
+          key: "${{ needs.ci-mode.outputs.shard_timings_key }}",
+          "fail-on-cache-miss": true,
+        },
+      })
+      expect(restore?.["with"]).not.toHaveProperty("restore-keys")
+      const steps = status["steps"].filter(isRecord)
+      expect(steps.find((step) => step["id"] === "coverage")).toMatchObject({
+        if: `needs.${jobId}.result == 'success'`,
+        run: `bun script/ci-shard-coverage.ts ${group} "$RUNNER_TEMP/ci-shard-records"`,
+      })
+      const guard = steps.find((step) => String(step["run"]).includes("ci-macos-status.sh"))
+      expect(guard?.["if"]).toBe("always()")
+      const env = guard?.["env"]
+      if (!isRecord(env)) throw new Error(`${group} status guard must receive step outcomes`)
+      expect(env["TEST_OUTCOMES"]).toContain("${{ steps.coverage.outcome || 'missing' }}")
+    }
+
+    const save = jobs["save-shard-timings"]
+    if (!isRecord(save) || !Array.isArray(save["steps"])) throw new Error("CI must define shard timing save steps")
+    expect(save["needs"]).toEqual(["test-linux", "senpi-tests-linux"])
+    expect(save["if"]).toBe("github.event_name == 'push' && github.ref == 'refs/heads/dev'")
+    const steps = save["steps"].filter(isRecord)
+    const merge = steps.findIndex((step) => String(step["run"]).startsWith("bun script/ci-shard-coverage.ts merge "))
+    const publish = steps.findIndex((step) => step["uses"] === "actions/cache/save@v6")
+    expect(merge).toBeGreaterThanOrEqual(0)
+    expect(publish).toBeGreaterThan(merge)
+    expect(steps[publish]?.["with"]).toEqual({
+      path: "${{ runner.temp }}/ci-test-timings.json",
+      key: "ci-test-timings-${{ github.run_id }}",
+    })
+  })
+
   test("keeps schema generation on master and skips duplicate draft generation", () => {
     const triggers = parseWorkflow(ciWorkflowPath)["on"]
     if (!isRecord(triggers) || !isRecord(triggers["push"])) throw new Error("CI must define push triggers")
