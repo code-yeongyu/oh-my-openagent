@@ -33,6 +33,7 @@ interface ClassifyInput {
   readonly labels?: readonly string[]
   readonly body?: string
   readonly changedFiles?: number
+  readonly basePlatformGreen?: boolean
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -59,6 +60,7 @@ function classify(input: ClassifyInput): FullMatrixMode {
       JSON.stringify(input.labels ?? []),
       ...(input.body === undefined ? [] : ["--body-file", writeBody(input.body)]),
       ...(input.changedFiles === undefined ? [] : ["--changed-files", String(input.changedFiles)]),
+      ...(input.basePlatformGreen === undefined ? [] : ["--base-platform-green", String(input.basePlatformGreen)]),
     ],
     {
       encoding: "utf8",
@@ -253,6 +255,52 @@ describe("full-matrix classification", () => {
         expect(mode.fullMatrix).toBe(true)
       },
     )
+
+    // The paths of the real v5.1.80 stamp (f23e7ad390), one per kind prepare-release-state writes.
+    const stampPaths = [
+      "CHANGELOG.md",
+      "changes/unreleased/14255.md",
+      "packages/omo-native/changes.md",
+      "package.json",
+      "bun.lock",
+      "packages/oh-my-opencode-windows-x64/package.json",
+      "packages/omo-codex/plugin/package-lock.json",
+      "packages/omo-codex/plugin/components/bootstrap/hooks/hooks.json",
+      "packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs",
+      "packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js",
+      "packages/omo-codex/scripts/install-dist/install-local.mjs",
+      "packages/omo-native/bin/lib/service-auth.generated.js",
+    ]
+    const releaseState = { eventName: "pull_request", headRef: "release/v5.1.80-source-state" }
+
+    test("#then a stamp on a base whose macOS/Windows legs ran green stays on Linux and still runs heavy", () => {
+      const mode = classify({ ...releaseState, changedPaths: stampPaths, basePlatformGreen: true })
+      expect(mode.fullMatrix).toBe(false)
+      expect(mode.runHeavy).toBe(true)
+    })
+
+    test.each([
+      ["the base was not proven green on macOS/Windows", { changedPaths: stampPaths, basePlatformGreen: false }],
+      ["the base's proof is not passed at all", { changedPaths: stampPaths }],
+      [
+        "the pull request also changes source the stamp never writes",
+        { changedPaths: [...stampPaths, "packages/omo-native/sync-status-cli.ts"], basePlatformGreen: true },
+      ],
+      ["the diff could not be read", { changedPaths: [], diffAvailable: false, basePlatformGreen: true }],
+    ])("#then it keeps the full matrix when %s", (_name, input) => {
+      expect(classify({ ...releaseState, ...input }).fullMatrix).toBe(true)
+    })
+
+    test("#then a green base never takes another branch off the full matrix", () => {
+      const mode = classify({
+        eventName: "pull_request",
+        headRef: "feature/bump",
+        labels: ["ci:full-matrix"],
+        changedPaths: ["packages/oh-my-opencode-windows-x64/package.json"],
+        basePlatformGreen: true,
+      })
+      expect(mode.fullMatrix).toBe(true)
+    })
   })
 
   // The label costs macOS/Windows runners, so it is honored only when the diff touches a platform path or the PR body
