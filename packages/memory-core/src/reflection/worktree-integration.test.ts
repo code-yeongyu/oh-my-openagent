@@ -57,7 +57,7 @@ describe("reflection worktree integration", () => {
       detail: process.platform === "win32" ? "before�31m.md" : "before�[31m�31m.md",
     },
   ])(
-    "#given a conflicting $name filename #when integrated #then the outcome shows a safe path and aborts the merge",
+    "#given a conflicting $name filename #when integrated #then the outcome keeps the raw path and aborts the merge",
     async ({ name, path, detail }) => {
       const { root, repo, worktree } = await fixture("conflict")
       for (const [dir, content] of [
@@ -87,7 +87,7 @@ describe("reflection worktree integration", () => {
         withWriterLock: unlocked,
       })
 
-      expect(result).toEqual({ outcome: "merge_conflict", detail })
+      expect(result).toEqual({ outcome: "merge_conflict", detail, conflictPaths: [path] })
       expect((await git(repo.dir, ["status", "--porcelain"])).stdout.trim()).toBe("")
     },
   )
