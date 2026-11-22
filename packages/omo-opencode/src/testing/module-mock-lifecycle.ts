@@ -306,7 +306,7 @@ export function installModuleMockLifecycle(
     const nextActiveMockStack = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
     nextActiveMockStack.push({ specifier: restoreSpecifier, factory, ownerUrl: callerUrl })
     activeMocks.set(restoreSpecifier, nextActiveMockStack)
-    return delegateModule(specifier, factory)
+    return delegateModule(restoreSpecifier, factory)
   }
 
   mockApi.restore = (): unknown => {
