@@ -1,14 +1,15 @@
 import { describe, test, expect, mock, afterAll } from "bun:test"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const mockLog = mock()
 mock.module("../../shared/logger", () => ({ log: mockLog }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
 })
 
 const { isActiveSessionStatus, isTerminalSessionStatus } = await import("./session-status-classifier")
-mock.restore()
 
 describe("isActiveSessionStatus", () => {
   describe("#given a known active session status", () => {

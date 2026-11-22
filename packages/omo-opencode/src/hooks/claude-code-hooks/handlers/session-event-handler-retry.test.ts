@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
-import { restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
+import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 import { useEmptyHookConfig } from "./empty-hook-config.fixture"
 
 const executeStopHooks = mock(async (context: { parentSessionId?: string; transcriptPath?: string }) => ({
@@ -10,6 +10,7 @@ const executeStopHooks = mock(async (context: { parentSessionId?: string; transc
 mock.module("../stop", () => ({
   executeStopHooks,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 afterAll(() => {
   mock.restore()
