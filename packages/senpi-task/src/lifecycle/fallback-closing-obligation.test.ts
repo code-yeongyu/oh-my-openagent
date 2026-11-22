@@ -7,6 +7,7 @@ import { cleanupProjects, tempProject } from "../manager/__fixtures__/manager-fa
 import { createTaskLifecycle } from "./create"
 import { hostLifecycleDeps } from "./__fixtures__/host-session-fakes"
 import { seedRecord } from "./__fixtures__/lifecycle-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The failed rung's child named in `fallback_closing_child` is an obligation of whoever owns the record
 // next. These cases run on the production daemon probe and closer over a real socket, so a refused
@@ -23,7 +24,7 @@ let sequence = 0
 
 async function crashedHandoff(status: TaskStatus, options: { readonly terminalAt?: string } = {}) {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const host = await harness.fakeHost({ transcripts: true })
   const rpc = harness.runnerOver(host)
   sequence += 1

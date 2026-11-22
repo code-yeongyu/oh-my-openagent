@@ -72,6 +72,8 @@ async function fill(h: GatewayHarness, to: string, count: number): Promise<strin
         writeFileSync(join(inbox, id), "", { mode: 0o600 })
       })
     })()
+    // close() leaves the database open while a prepared statement is unfinalized; Windows then cannot delete it.
+    insert.finalize()
   } finally {
     db.close()
   }
