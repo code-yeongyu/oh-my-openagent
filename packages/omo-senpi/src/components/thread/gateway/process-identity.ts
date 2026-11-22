@@ -22,10 +22,21 @@ export function parseLstart(text: string): number | null {
 /**
  * The process's start time as `epoch:<seconds>`. `ps` runs with `LC_ALL=C` and `TZ=UTC`, so two
  * processes with different locales or time zones record the same value for the same process.
+ * A `ps` that cannot be started at all answers null like one that fails: Bun and Node throw some spawn
+ * failures (EPERM from a process limit or a sandbox, #12314) synchronously rather than through the callback.
  */
 export function processStartTime(pid: number): Promise<string | null> {
   return new Promise((resolve) => {
-    execFile(
+    try {
+      startPs(pid, resolve)
+    } catch {
+      resolve(null)
+    }
+  })
+}
+
+function startPs(pid: number, resolve: (startTime: string | null) => void): void {
+  execFile(
       "ps",
       ["-o", "lstart=", "-p", String(pid)],
       { env: { ...process.env, LC_ALL: "C", LANG: "C", TZ: "UTC" }, windowsHide: true, timeout: 5_000 },
@@ -34,7 +45,6 @@ export function processStartTime(pid: number): Promise<string | null> {
         resolve(seconds === null ? null : `${EPOCH_PREFIX}${seconds}`)
       },
     )
-  })
 }
 
 function pidExists(pid: number): boolean {
