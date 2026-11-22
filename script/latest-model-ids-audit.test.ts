@@ -70,7 +70,7 @@ describe("latest model id audit", () => {
     expect(`model: "gpt-6.1-sol-fast"`.match(pattern)).toBeNull()
     expect(`model: "gpt-601-sol"`.match(pattern)).toBeNull()
     expect(`export { buildPrompt } from "./claude-opus-5-5"`.match(pattern)).toBeNull()
-    expect("model: `anthropic/${LATEST_MODEL_BY_FAMILY.claudeOpus}`".match(pattern)).toBeNull()
+    expect(`model: \`anthropic/\${LATEST_MODEL_BY_FAMILY.claudeOpus}\``.match(pattern)).toBeNull()
   })
 
   test("#given shipped source #when scanning for a latest family id #then only model-identity files spell one", async () => {
