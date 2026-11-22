@@ -282,44 +282,50 @@ jobs:
             return 1
           }
 
-          # The prepared source is validated either by the post-merge push run or
-          # by the release-state PR's own pull_request run at the exact SHA
-          # (the grep/tag short-circuits return the stamp commit, which only
-          # ever has a pull_request run). Both are full ci.yml executions.
+          # Unpinned releases can also use the release-state PR's CI at the prepared SHA.
+          # Pinned releases require a push and proof that its heavy validation actually ran.
           wait_for_ci() {
-            local sha="$1"
-            shift
+            local sha="$1" event="${2:-}" push_run
+            if [ "$event" = "push" ]; then set -- -f "event=push"; else set --; fi
             for attempt in $(seq 1 120); do
               RUNS="$(retry_gh "Read CI workflow runs" gh api --method GET \
                 "repos/${{ github.repository }}/actions/workflows/ci.yml/runs" \
                 -f head_sha="$sha" "$@" -f per_page=100)"
 
-              SUCCESS_ID="$(jq -r --arg sha "$sha" '
-                [.workflow_runs[] | select(.head_sha == $sha and .status == "completed" and .conclusion == "success")]
-                | sort_by(.created_at) | last | .id // empty
-              ' <<< "$RUNS")"
+              if [ "$event" = "push" ]; then
+                push_run="$(select_green_push "$sha" <<< "$RUNS")"
+                SUCCESS_ID="${push_run%%$'\t'*}"
+              else
+                SUCCESS_ID="$(jq -r --arg sha "$sha" '
+                  [.workflow_runs[] | select(.head_sha == $sha and .status == "completed" and .conclusion == "success")]
+                  | sort_by(.created_at) | last | .id // empty
+                ' <<< "$RUNS")"
+              fi
               if [ -n "$SUCCESS_ID" ]; then
-                echo "CI workflow run ${SUCCESS_ID} succeeded for ${sha}."
-                if [ "$#" -eq 0 ]; then
-                  # An unpinned release can reuse platform CI only for a verified stamp over a green base.
-                  LEGS="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${SUCCESS_ID}/jobs?filter=latest&per_page=100" \
-                    --jq "$(cat .github/scripts/platform-jobs.jq)" | cut -f2)"
-                  if [ -n "$LEGS" ] && ! grep -qvx success <<< "$LEGS"; then
-                    echo "Its macOS/Windows legs ran and passed."
-                    return 0
-                  fi
-                  git fetch --no-tags --depth=2 origin "$sha"
-                  PLATFORM_BASE="$(git rev-parse "${sha}^")"
-                  if ! node script/release-state-paths.mjs --check-stamp "$PLATFORM_BASE" "$sha"; then
-                    echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and ${sha} changes more than the release stamp over ${PLATFORM_BASE}; run the full matrix on it."
-                    return 1
-                  fi
-                  if [ "$(GH_REPO="$REPOSITORY" BASE_SHA="$PLATFORM_BASE" bash .github/scripts/base-platform-green.sh)" != "true" ]; then
-                    echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and the base ${PLATFORM_BASE} has no dev push run whose macOS/Windows legs ran green."
-                    return 1
-                  fi
-                  echo "Its macOS/Windows legs did not run; base ${PLATFORM_BASE} proved them and the delta is the release stamp only."
+                if [ "$event" = "push" ]; then
+                  require_push_validation "$REPOSITORY" "$push_run" || return 1
+                  echo "CI workflow run ${SUCCESS_ID} ran and passed required validation for ${sha}."
+                  return 0
                 fi
+                echo "CI workflow run ${SUCCESS_ID} succeeded for ${sha}."
+                # An unpinned release can reuse platform CI only for a verified stamp over a green base.
+                LEGS="$(retry_gh "Read CI run jobs" gh api "repos/${REPOSITORY}/actions/runs/${SUCCESS_ID}/jobs?filter=latest&per_page=100" \
+                  --jq "$(cat .github/scripts/platform-jobs.jq)" | cut -f2)"
+                if [ -n "$LEGS" ] && ! grep -qvx success <<< "$LEGS"; then
+                  echo "Its macOS/Windows legs ran and passed."
+                  return 0
+                fi
+                git fetch --no-tags --depth=2 origin "$sha"
+                PLATFORM_BASE="$(git rev-parse "${sha}^")"
+                if ! node script/release-state-paths.mjs --check-stamp "$PLATFORM_BASE" "$sha"; then
+                  echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and ${sha} changes more than the release stamp over ${PLATFORM_BASE}; run the full matrix on it."
+                  return 1
+                fi
+                if [ "$(GH_REPO="$REPOSITORY" BASE_SHA="$PLATFORM_BASE" bash .github/scripts/base-platform-green.sh)" != "true" ]; then
+                  echo "::error::CI run ${SUCCESS_ID} did not run macOS/Windows, and the base ${PLATFORM_BASE} has no dev push run whose macOS/Windows legs ran green."
+                  return 1
+                fi
+                echo "Its macOS/Windows legs did not run; base ${PLATFORM_BASE} proved them and the delta is the release stamp only."
                 return 0
               fi
 
@@ -346,7 +352,8 @@ jobs:
           }
 
           if [ -n "$SOURCE_SHA" ]; then
-            wait_for_ci "$SOURCE_SHA" -f "event=push"
+            source ".github/scripts/release-push-proof.sh"
+            wait_for_ci "$SOURCE_SHA" "push"
             if [ -z "$PREPARED_RELEASE_SHA" ]; then exit 0; fi
             # Read the checker from the green basis, not from the delta it is judging.
             git checkout --detach "$SOURCE_SHA"
@@ -356,7 +363,7 @@ jobs:
             fi
             # PR CI can be indexed by the stamp SHA while testing its merge tree.
             # A push run at the stamp tests the source we actually publish.
-            wait_for_ci "$PREPARED_RELEASE_SHA" -f "event=push"
+            wait_for_ci "$PREPARED_RELEASE_SHA" "push"
             exit 0
           fi
           wait_for_ci "$PREPARED_RELEASE_SHA"
@@ -368,7 +375,7 @@ jobs:
           JOB_SUMMARY_TITLE: Release gate reuse decision
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - A pinned source requires successful push CI before stamping. Only a verified release stamp can reuse it.
+            - A pinned source requires push CI that ran and passed required validation before stamping. Only a verified release stamp can reuse it.
             - Otherwise checks CI at the exact prepared SHA, skipping the wait on unpinned preparation. When macOS/Windows did not run, requires a verified stamp over a base that proved them.
             - A repository admin or maintainer may waive that wait with a ci_basis_receipt whose head differs from the prepared SHA only under .github/workflows/; the waiver and delta are logged.
             - Fails closed when CI fails, is cancelled, times out, or cannot be read.
@@ -995,12 +1002,16 @@ jobs:
             fi
             if ! node "$proof_dir/dispatch.mjs" --check-stamp "$pin" "$RELEASE_SHA"; then
               # A reused stamp may already have exact push CI even though it cannot reuse the pin's CI.
+              git show "${GITHUB_SHA}:.github/scripts/release-push-proof.sh" > "$proof_dir/push-proof.sh"
+              source "$proof_dir/push-proof.sh"
               runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
                 -f event=push -f "head_sha=${RELEASE_SHA}" -f status=success -f per_page=100)"
-              if ! jq -e --arg sha "$RELEASE_SHA" 'any(.workflow_runs[]; .event == "push" and .head_sha == $sha and .status == "completed" and .conclusion == "success")' <<< "$runs" >/dev/null; then
+              push_run="$(select_green_push "$RELEASE_SHA" <<< "$runs")"
+              if [ -z "$push_run" ]; then
                 echo "::error::No exact push CI for release stamp ${RELEASE_SHA}; refusing to tag or dispatch."
                 exit 1
               fi
+              require_push_validation "$GITHUB_REPOSITORY" "$push_run"
             fi
 
             # The tag owns the child workflow; a legacy child cannot enforce the pin.

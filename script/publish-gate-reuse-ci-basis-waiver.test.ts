@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process"
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
+import { ciJobs, type Validation } from "./fixtures/publish-ci-validation"
 import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
 
 /**
@@ -55,8 +56,11 @@ const GH_STUB = [
   '      local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
   '      printf "none\\n" ;;',
   '    *"actions/workflows/ci.yml/runs"*)',
-  '      local sha conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; fi ;; esac; done',
-  '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$sha" "$conclusion" ;;',
+  '      local sha id=42 event=pull_request conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) event=push; conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; else id=41; fi ;; esac; done',
+  '      printf \'{"workflow_runs":[{"id":%s,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$id" "$event" "$sha" "$conclusion" ;;',
+  '    *"/actions/runs/41/attempts/2/jobs?"*) printf "%s" "$PIN_JOBS" ;;',
+  '    *"/actions/runs/42/attempts/2/jobs?"*) printf "%s" "$STAMP_JOBS" ;;',
+  "    *) return 1 ;;",
   "  esac",
   "}",
   "export -f gh leg_jobs",
@@ -83,6 +87,8 @@ interface Dispatch {
   readonly pin?: string
   readonly pushConclusion?: string
   readonly stampPushConclusion?: string
+  readonly pinValidation?: Validation
+  readonly stampValidation?: Validation
   readonly prepared?: string
   readonly receipt?: string
   readonly head?: string
@@ -151,6 +157,8 @@ function dispatch(input: Dispatch): Outcome {
       LAZYCODEX_ONLY: "false",
       PUSH_CONCLUSION: input.pushConclusion ?? "success",
       STAMP_PUSH_CONCLUSION: input.stampPushConclusion ?? "success",
+      PIN_JOBS: ciJobs(input.pinValidation),
+      STAMP_JOBS: ciJobs(input.stampValidation),
       PREPARED_RELEASE_SHA: prepared,
       CI_BASIS_RECEIPT: input.receipt ?? "",
       CI_BASIS_HEAD: input.head ?? "",
@@ -176,6 +184,25 @@ function dispatch(input: Dispatch): Outcome {
 const RECEIPT = "ci-basis-20261116-01"
 
 describe("#given a pinned release", () => {
+  test.each(["skipped-job", "skipped-step", "empty-response", "passed"] as const)(
+    "the parent requires validation evidence (%s) even if the pin push is green",
+    (validation) => {
+      const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
+      expect(result.status === 0, result.output).toBe(validation === "passed")
+      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+    },
+  )
+
+  test.each(["skipped-job", "skipped-step", "passed"] as const)(
+    "the child requires independent validation evidence (%s) for an exact non-stamp push",
+    (validation) => {
+      const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.B, stampValidation: validation })
+      expect(result.status === 0, result.output).toBe(validation === "passed")
+      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+      expect(result.ghCalls).toContain("/actions/runs/42/attempts/2/jobs?")
+    },
+  )
+
   test("#when the source is malformed or outside dev #then it cannot start preparation", () => {
     for (const pin of ["dev", fixture.sha.B.slice(0, 12), fixture.sha.D]) {
       const result = dispatch({ pin, prepared: "" })

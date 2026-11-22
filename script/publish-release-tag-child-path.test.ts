@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { ciJobs, type Validation } from "./fixtures/publish-ci-validation"
 import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
 import {
   needsOf,
@@ -69,7 +70,8 @@ const STUBS = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
   '  case "$1 $2" in',
-  '    "api --method") printf \'{"workflow_runs":[{"event":"%s","head_sha":"%s","status":"completed","conclusion":"success"}]}\\n\' "$CI_EVENT" "$CI_HEAD" ;;',
+  '    "api --method") printf \'{"workflow_runs":[{"id":42,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"success"}]}\\n\' "$CI_EVENT" "$CI_HEAD" ;;',
+  '    "api --paginate") [[ "$*" == *"/actions/runs/42/attempts/2/jobs?"* ]] && printf "%s" "$CI_JOBS" ;;',
   '    "release list") printf "v1.0.0\\n" ;;',
   '    "release view") return 1 ;;',
   "  esac",
@@ -100,6 +102,7 @@ interface Run {
   readonly pinSupported?: boolean
   readonly ciEvent?: "push" | "pull_request"
   readonly ciHead?: CommitName
+  readonly validation?: Validation
 }
 
 interface Outcome {
@@ -145,6 +148,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
       GITHUB_REPOSITORY: "test/repo",
       GITHUB_SHA: fixture.sha.A,
       CI_EVENT: input.ciEvent ?? "pull_request",
+      CI_JOBS: ciJobs(input.validation),
       CI_HEAD: fixture.sha[input.ciHead ?? input.prepared],
       GITHUB_OUTPUT: join(root, "output"),
       GITHUB_STEP_SUMMARY: join(root, "summary"),
@@ -224,9 +228,21 @@ describe("publish.yml child path release tag", () => {
     const result = runStep({ where: DISPATCH_STEP, prepared: "HX", pin: "H", pinSupported: false, ciEvent: "push" })
     expect(result.status, result.output).toBe(0)
     expect(result.ghCalls).toContain(`head_sha=${result.sha.HX}`)
+    expect(result.ghCalls).toContain("/actions/runs/42/attempts/2/jobs?")
     expect(result.originTag(`v${VERSION}`)).toBe(result.sha.HX)
     expect(result.ghCalls).toContain(`workflow run publish.yml --ref v${VERSION}`)
   })
+
+  test.each(["skipped-job", "skipped-step"] as const)(
+    "the parent dispatch fallback refuses a green exact push with %s",
+    (validation) => {
+      const result = runStep({ where: DISPATCH_STEP, prepared: "HX", pin: "H", ciEvent: "push", validation })
+      expect(result.status).not.toBe(0)
+      expect(result.ghCalls).toContain("/actions/runs/42/attempts/2/jobs?")
+      expect(result.originTag(`v${VERSION}`)).toBe("")
+      expect(result.ghCalls).not.toContain("workflow run")
+    },
+  )
 
   test("a legacy child can receive a tag for a non-stamp delta only with exact push CI", () => {
     const root = mkdtempSync(join(tmpdir(), "publish-release-tag-seed-"))
