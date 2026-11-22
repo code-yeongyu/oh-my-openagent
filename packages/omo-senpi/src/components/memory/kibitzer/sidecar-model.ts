@@ -265,7 +265,7 @@ export function createKibitzerSidecarChildStarter(
       )
     }
     let runtime: StarterTaskRuntime | undefined
-    if (options.createRunner === undefined) {
+    if (options.createRunner === undefined || options.loadTaskRuntime !== undefined) {
       try {
         runtime = await (options.loadTaskRuntime ?? loadKibitzerTaskRuntime)()
       } catch (error) {
@@ -296,7 +296,12 @@ export function createKibitzerSidecarChildStarter(
         prompt: input.prompt,
       })
       try {
-        return await runner.start(spec)
+        const handle = await runner.start(spec)
+        // A successful start ends the refusal episode: the refused candidates were refused by THIS
+        // ladder walk, and a later wake must offer them again instead of skipping them for the
+        // sidecar's whole life (#11104).
+        refusedModels.clear()
+        return handle
       } catch (error) {
         lastError = error
         if (runtime?.isModelUnavailableStart(error) !== true) break

@@ -3,10 +3,10 @@
 // A start the post-start pin check refuses (`model_unavailable`: the engine opened another model
 // than the pinned one) is not the user's to fix while the category still has another connected
 // candidate, so the starter moves to the next one in the same call and remembers the refused model
-// for the sidecar's life; later wakes then begin on the candidate that answered. The ladder is the
-// resolution's own chain and never reaches beyond the category (#9111 / #9114). When every
-// candidate has been refused, the next start walks the whole chain again so the failure is reported
-// through the gate notice instead of being hidden.
+// until the next SUCCESSFUL start clears the set (#11104); later wakes then begin on the candidate
+// that answered. The ladder is the resolution's own chain and never reaches beyond the category
+// (#9111 / #9114). When every candidate has been refused, the next start walks the whole chain
+// again so the failure is reported through the gate notice instead of being hidden.
 
 import { childModelChainSpec, type ChildModelChainSpec } from "../memory-child-model-chain"
 import type { ReflectionModelCandidate, ReflectionThinkingLevel } from "../worker/resolve-model"

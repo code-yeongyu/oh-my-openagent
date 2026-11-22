@@ -912,10 +912,15 @@ async function runFastAliasConfig({ session, state, identity, router, facts, par
   const childModels = children
     .flatMap((transcript) => transcript.entries)
     .filter((entry) => entry.type === "model_change")
-    .map((entry) => `${entry.provider}/${entry.modelId}`)
+    .map((entry) => `${entry.provider}/${entry.modelId}`
+  // The pin can only pair on the mock's own luna pair (#11104): a ladder step to an unrelated
+  // fallback candidate would else satisfy a weaker "at least one child" check.
+  const pairedOnMockLuna =
+    childModels.includes(`${FAST_ALIAS.provider}/${FAST_ALIAS.base}`) ||
+    childModels.includes(`${FAST_ALIAS.provider}/${FAST_ALIAS.alias}`)
   record(
     "pin-accepted-alias-on-base",
-    !refusedAsSubstitution && children.length >= 1,
+    !refusedAsSubstitution && children.length >= 1 && pairedOnMockLuna,
     `wake=${JSON.stringify({ status: wake?.status, cause: wake?.cause, model: wake?.model, reason: wake?.reason })} childSessions=${children.length} childModelChanges=[${childModels.join(",")}]`,
   )
   facts.result = {

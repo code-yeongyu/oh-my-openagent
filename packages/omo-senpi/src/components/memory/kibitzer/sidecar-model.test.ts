@@ -330,6 +330,62 @@ describe("createKibitzerSidecarChildStarter", () => {
     for (const error of transient) expect(kibitzerConfigurationFailure(error)).toBeUndefined()
   })
 
+  test("#given a model-unavailable ladder #when a later candidate starts #then the success clears the refused set for the next wake (#11104)", async () => {
+    const twoModels = [
+      { provider: "omo-mock", id: "mock-1" },
+      { provider: "omo-mock", id: "mock-2" },
+    ]
+    const chained = {
+      getAvailable: () => twoModels,
+      find: (provider: string, modelId: string) =>
+        twoModels.find((candidate) => provider === candidate.provider && modelId === candidate.id),
+    }
+    const selected: Array<string | undefined> = []
+    const handle = { task_id: "t" } as unknown as ChildHandle
+    const modelUnavailable = new Error("model unavailable")
+    const input = {
+      sessionId: "parent-1",
+      generation: 1,
+      prompt: "<kibitzer-seed/>",
+      tools: [nudgeTool()],
+      maxItems: 2,
+    }
+    const start = createKibitzerSidecarChildStarter({
+      ...base,
+      loadConfig: () => ({
+        categories: { quick: { model: "omo-mock/mock-1", fallback_models: ["omo-mock/mock-2"] } },
+      }),
+      modelRegistry: () => chained as unknown as ChildModelRegistry,
+      loadTaskRuntime: async () => ({
+        findModelReference: () => undefined,
+        createInProcessJudgeRunner: () => {
+          throw new Error("unused: the runner seam replaces this")
+        },
+        isModelUnavailableStart: (error: unknown) => error === modelUnavailable,
+      }),
+      createRunner: () => ({
+        start: async (spec: ChildSpec) => {
+          selected.push(spec.selectedModel)
+          if (spec.selectedModel === "omo-mock/mock-1") throw modelUnavailable
+          return handle
+        },
+      }),
+    })
+
+    // First wake: mock-1 is refused as model-unavailable and mock-2 answers.
+    expect(await start(input)).toBe(handle)
+    expect(selected).toEqual(["omo-mock/mock-1", "omo-mock/mock-2"])
+
+    // Second wake: the earlier refusal was episodic, so mock-1 is offered (and refused) again.
+    expect(await start({ ...input, generation: 2 })).toBe(handle)
+    expect(selected).toEqual([
+      "omo-mock/mock-1",
+      "omo-mock/mock-2",
+      "omo-mock/mock-1",
+      "omo-mock/mock-2",
+    ])
+  })
+
   test("#given a runner seam #when the starter runs #then one child starts from the persona and the seed and the handle is returned", async () => {
     const specs: ChildSpec[] = []
     const handle = { task_id: "t", sessionId: "child-1" } as unknown as ChildHandle

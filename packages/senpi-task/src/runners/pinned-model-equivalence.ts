@@ -64,12 +64,17 @@ function isModelIdentity(entry: unknown): entry is ModelIdentity & object {
 /**
  * A catalog priority alias, not a different SKU that happens to end in `-fast`. With a registry in
  * scope the pairing is read the way senpi reads it; without one, from the entry's own fields.
+ * senpi pairs the alias when its upstream id equals the BASE'S upstream id, falling back to the
+ * base's own id (#11104): a base carrying its own `upstreamModelId` mapping must not be a wrong
+ * refusal.
  */
 export function isPriorityAliasOf(entry: unknown, base: ModelIdentity, registry?: PriorityPairingRegistry): boolean {
   if (!isModelIdentity(entry) || entry.provider !== base.provider || priorityAliasBaseId(entry.id) !== base.id)
     return false
   const pairing = aliasPairing(entry, registry)
-  return pairing.serviceTier === "priority" && pairing.upstreamModelId === base.id
+  if (pairing.serviceTier !== "priority") return false
+  const baseUpstream = aliasPairing(base, registry).upstreamModelId
+  return pairing.upstreamModelId === (baseUpstream ?? base.id)
 }
 
 /** The alias entry is the pairing proof in whichever direction the engine started. */
