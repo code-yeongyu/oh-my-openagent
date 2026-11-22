@@ -10,6 +10,7 @@ import type { SteeringPort } from "./types"
 import { readFileSync } from "node:fs"
 import { buildRevived } from "./engine-policy"
 import { roots, cleanupRoots, detachedTerminal, fakeHandle } from "./__fixtures__/residency"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupRoots)
 
@@ -17,7 +18,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child that exits before acknowledging followUp #when task_send rejects #then delivery is uncertain and the message is not automatically re-sent", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-followup-exit-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let followUpCalls = 0
@@ -98,7 +99,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a record carrying an unacknowledged-delivery marker #when a new run is built #then building an epoch cannot resolve the prior delivery", () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-marker-clear-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     const marked: TaskRecord = {
       ...record,
@@ -114,7 +115,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child that exits before acknowledging followUp #when a cancel already terminalized that epoch #then no uncertainty marker is written and the cancel is preserved", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-uncertain-fence-"))
     roots.push(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(store)
     let live = false
     let destroys = 0
@@ -176,7 +177,7 @@ describe("task_send lazy terminal RPC revival", () => {
   test("#given a revived child that exits before acknowledging followUp #when the fenced marker write throws #then the reservation is released exactly once and no marker is written", async () => {
     const project = mkdtempSync(join(tmpdir(), "senpi-task-steering-uncertain-mutate-throws-"))
     roots.push(project)
-    const baseStore = createTaskRecordStore({ project_dir: project })
+    const baseStore = createTaskRecordStore(ownedTaskState(project))
     const record = detachedTerminal(baseStore)
     let live = false
     let destroys = 0

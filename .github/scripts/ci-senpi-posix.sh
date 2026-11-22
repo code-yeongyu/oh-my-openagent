@@ -3,7 +3,7 @@ set -euo pipefail
 # CI_JUNIT_DIR (set by the macOS job) adds a JUnit report to the package test run (#13315); see ci-root-shard-2.sh.
 # all (macOS, local receipts): every step and the whole package suite. one / two (Linux, #14573): two parallel parts; each
 # builds the plugin the tests read, part one also runs the one-off pack, daemon and typecheck steps, and the package tests are
-# split by Bun's --shard balanced by .github/ci-test-timings.json. Mode names stay lowercase letters and the blocks stay flat
+# split by Bun's --shard using a private timing copy that Bun rewrites. Mode names stay lowercase letters and the blocks stay flat
 # if-blocks of plain commands: the local-receipt reader parses this file in its default mode without running it.
 mode="${1:-all}"
 case "$mode" in
@@ -24,10 +24,10 @@ if [ "$mode" = "all" ] || [ "$mode" = "one" ]; then
   bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
 fi
 if [ "$mode" = "one" ]; then
-  bun test --timeout 20000 packages/omo-senpi --shard=1/2 --timings=.github/ci-test-timings.json $(junit senpi-one)
+  bun test --timeout 20000 packages/omo-senpi --shard=1/2 --timings=.omo/ci-shard-record.json --update-timings $(junit senpi-one)
 fi
 if [ "$mode" = "two" ]; then
-  bun test --timeout 20000 packages/omo-senpi --shard=2/2 --timings=.github/ci-test-timings.json $(junit senpi-two)
+  bun test --timeout 20000 packages/omo-senpi --shard=2/2 --timings=.omo/ci-shard-record.json --update-timings $(junit senpi-two)
 fi
 if [ "$mode" = "all" ]; then
   bun test --timeout 20000 packages/omo-senpi $(junit senpi)
