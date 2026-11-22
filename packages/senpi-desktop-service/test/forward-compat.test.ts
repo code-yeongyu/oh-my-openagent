@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import { isExecResult } from "../src/run/engine-results"
 import { runComputerCode } from "../src/run/runtime"
 import { NotificationHub } from "../src/service/notifications"
-import { isDesktopCapabilities, parseErrorData } from "../src/service/parse"
+import { isDesktopCapabilities, parseErrorData, parseSessionOpened, toCapabilities } from "../src/service/parse"
 import { DesktopService } from "../src/service/service"
 import type { DesktopSessionOpenParams } from "../src/service/session-state"
 import { fakeEngineFactory, rejectionOf, type SpawnLog } from "./harness"
@@ -95,6 +95,32 @@ describe("capabilities across releases", () => {
       { ...capabilities, displayAsleep: "no" },
     ]
     expect(wrong.map((value) => isDesktopCapabilities(value))).toEqual([false, false])
+  })
+
+  it("narrows an interventionWatch value this host does not know to the unknown sentinel (#11731)", () => {
+    const cases = [
+      [undefined, undefined],
+      [null, null],
+      ["on", "on"],
+      ["off", "off"],
+      ["not_started", "not_started"],
+      ["paused", "unknown"],
+    ] as const
+    const read = cases.map(([interventionWatch]) => {
+      const raw = { ...capabilities, interventionWatch }
+      if (!isDesktopCapabilities(raw)) throw new Error("fixture must pass the shape check")
+      return toCapabilities(raw).interventionWatch
+    })
+    expect(read).toEqual(cases.map(([, expected]) => expected))
+  })
+
+  it("narrows interventionWatch in an opened session's capabilities too (#11731)", () => {
+    const opened = parseSessionOpened({
+      resumeToken: "r",
+      capabilities: { ...capabilities, interventionWatch: "paused" },
+    })
+    expect(opened?.capabilities.interventionWatch).toBe("unknown")
+    expect(opened?.capabilities.cursorOverlay).toBe(false)
   })
 })
 
