@@ -53,7 +53,7 @@ export interface MemoryWiring {
   afterBind(pi: SenpiExtensionAPI, sessionId: string, identity: MemoryIdentityContext, eventCtx: unknown): Promise<void>
   flushSkillsUsage(): Promise<void>
   /** IC-10: bounded drain the session_shutdown handler awaits before the session is released. */
-  onSessionShutdown(input: ShutdownDrainInput): Promise<void>
+  onSessionShutdown(input: ShutdownDrainInput & { readonly eventCtx?: unknown }): Promise<void>
   /** IC-10: appends an evaluator run last on quit; unregistered is a no-op. */
   registerShutdownEvaluator(evaluator: ShutdownEvaluator): void
   /** Clears the memory status footer for the session behind this event context. */

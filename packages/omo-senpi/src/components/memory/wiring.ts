@@ -356,7 +356,10 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       await flushSkillsUsageTrackers()
     },
 
-    onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
+    onSessionShutdown(input: ShutdownDrainInput & { readonly eventCtx?: unknown }): Promise<void> {
+      if (reflectionLive.retire(input.sessionId) && input.eventCtx !== undefined) {
+        lastEventCtx.current = input.eventCtx
+      }
       const resetSession = (sessionId: string): void => {
         pressureDreamAdmission.reset(sessionId)
         userActivity.reset(sessionId)

@@ -7,7 +7,7 @@ import { PROJECTION_PIN_ENTRY_TYPE } from "./projection-pin"
 import { rmEfaultTolerant } from "./teardown.test-support"
 
 import { buildIdentityPaths, GitMemoryRepo, resolveMemoryIdentity } from "@oh-my-opencode/memory-core"
-import type { MemoryIdentityRuntime } from "./identity-runtime"
+import type { MemoryIdentityRuntime, MemoryIdentityRuntimeDeps } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryComponent, ensureIdentityRuntimeDirs } from "./index"
@@ -319,7 +319,7 @@ function sessionContext(
   sessionId: string,
   statusCalls?: Array<{ key: string; text: string | undefined }>,
   entries: readonly unknown[] = [],
-): unknown {
+) {
   return {
     sessionManager: {
       getBranch: () => entries,
@@ -642,6 +642,70 @@ async function liveFooterHarness(): Promise<{
     },
   }
 }
+
+describe("print-mode shutdown context (#7114)", () => {
+  test.each(["none", "same id", "different id"])("replacement bind: %s", async (replacement) => {
+    const root = await mkdtemp(join(tmpdir(), "omo-7114-"))
+    roots.push(root)
+    const identity = createMemoryIdentityContext({
+      identity: "agent",
+      identityPaths: buildIdentityPaths(root, "agent"),
+      binding: { identity: "agent", repoPathHash: "hash", boundAt: 1 },
+    })
+    const id = "retiring"
+    const next = replacement === "different id" ? "next" : id
+    let deps: MemoryIdentityRuntimeDeps | undefined
+    const wiring = createMemoryWiring({
+      sessions: new Map([
+        [id, { context: identity }],
+        [next, { context: identity }],
+      ]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      createRuntime: (_, runtimeDeps) => {
+        deps = runtimeDeps
+        return {
+          store: { evaluate: async () => undefined },
+          reconcile: async () => {},
+          settled: async () => {},
+        } as unknown as MemoryIdentityRuntime
+      },
+    })
+    const successor = new MemoryFakeExtensionAPI()
+    const registry = { find: () => undefined, getProviderAuth: () => undefined }
+    const nextRegistry = { ...registry }
+    const bound = new MemoryFakeExtensionAPI()
+    const ctx = sessionContext(id)
+    wiring.registerStatic(bound, componentContext())
+    await wiring.afterBind(bound, id, identity, ctx)
+    await bound.dispatch("input", { source: "rpc", inputId: "turn", text: "Continue." }, ctx)
+    await bound.dispatch("input_disposition", { inputId: "turn", disposition: "started" }, ctx)
+    await bound.dispatch("agent_settled", {}, ctx)
+    expect(deps).toBeDefined()
+    if (replacement !== "none") {
+      await wiring.afterBind(successor, next, identity, { ...sessionContext(next), modelRegistry: nextRegistry })
+    }
+    let observed: unknown
+    let live: boolean | undefined
+    wiring.registerShutdownEvaluator(() => {
+      observed = deps?.resolveModelRegistry()
+      const session = deps?.liveSession?.()
+      live = session !== undefined
+      session?.api.appendEntry("successor-probe", {})
+    })
+    const input = {
+      reason: "quit" as const,
+      sessionId: id,
+      deadlineAt: Date.now() + 30_000,
+      eventCtx: { ...sessionContext(id), modelRegistry: registry },
+    }
+    await wiring.onSessionShutdown(input)
+    expect(observed).toBe(replacement === "none" ? registry : nextRegistry)
+    expect(live).toBe(replacement !== "none")
+    if (replacement !== "none") expect(successor.entries).toContainEqual({ customType: "successor-probe", data: {} })
+  })
+})
 
 describe("facts shutdown wiring", () => {
   const FIXED_NOW = 10_000

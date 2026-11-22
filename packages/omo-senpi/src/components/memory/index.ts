@@ -242,6 +242,7 @@ export function createMemoryComponent(options: MemoryComponentOptions = {}): Omo
         }
         // The drain runs BEFORE the session is released: its steps read the bound identity.
         await wiring.onSessionShutdown({
+          eventCtx,
           reason: readShutdownReason(payload),
           sessionId,
           deadlineAt: shutdownDeadlineAt(now),
