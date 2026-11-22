@@ -26,7 +26,10 @@ function sparseLists(): { readonly where: string; readonly paths: readonly strin
       for (const step of steps) {
         const sparse = step.with?.["sparse-checkout"]
         if (!step.uses?.startsWith("actions/checkout@") || typeof sparse !== "string") continue
-        const paths = sparse.split("\n").map((line) => line.trim()).filter(Boolean)
+        const paths = sparse
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
         lists.push({ where: `${file} jobs.${job}`, paths })
       }
     }
