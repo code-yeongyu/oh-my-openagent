@@ -36,11 +36,6 @@ export interface PostEditDiagnosticsResult {
   widgetLines: readonly string[] | undefined
 }
 
-interface DiagnosticBlock {
-  filePath: string
-  diagnostics: string
-}
-
 export interface LspPostEditSessionState {
   getOrCreate(sessionId: string | undefined): PostEditNotConfiguredCache
   onSessionStart(sessionId: string | undefined): void
@@ -91,15 +86,13 @@ export async function appendPostEditDiagnostics(
   const filePaths = extractMutatedFilePaths(event)
   if (filePaths.length === 0) return undefined
 
-  const result = await collectPostEditDiagnostics({
+  const { blocks } = await collectPostEditDiagnostics({
     filePaths,
     runDiagnostics,
     cache,
     maxConcurrency: POST_EDIT_DIAGNOSTICS_CONCURRENCY,
     ...(locateFile === undefined ? {} : { locateFile }),
   })
-  const blocks: readonly DiagnosticBlock[] = result.blocks
-
   if (blocks.length === 0) {
     return { widgetLines: undefined }
   }
@@ -107,9 +100,11 @@ export async function appendPostEditDiagnostics(
   return {
     content: [
       ...event.content,
-      ...blocks.map(({ filePath, diagnostics }) => ({
+      ...blocks.map(({ filePath, diagnostics, blocking }) => ({
         type: "text" as const,
-        text: `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`,
+        text: blocking
+          ? `\n\nLSP errors detected in ${filePath}, please fix:\n${diagnostics}`
+          : `\n\nLSP note for ${filePath}:\n${diagnostics}`,
       })),
     ],
     widgetLines: undefined,
@@ -125,7 +120,3 @@ export function syncPostEditDiagnosticsWidget(
 }
 
 export const extractMutatedFilePaths = extractSharedMutatedFilePaths
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null
-}

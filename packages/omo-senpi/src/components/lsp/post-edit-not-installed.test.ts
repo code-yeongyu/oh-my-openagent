@@ -103,11 +103,62 @@ describe("omo-senpi post-edit not-installed guidance (#9223)", () => {
 
     expect(agentConfig).toEqual([])
     expect(firstTs).toHaveLength(1)
+    expect(firstTs[0]).toStartWith("\n\nLSP note for src/a.ts:\n")
+    expect(firstTs[0]).not.toContain("LSP errors detected")
     expect(firstTs[0]).toContain("[ask]")
     expect(secondTs).toEqual([])
     expect(firstJson).toHaveLength(1)
     expect(otherSession).toHaveLength(1)
   })
+
+  it.each([false, true])(
+    "#given missing-server guidance and real errors (#14653) #when one edit checks both (error first: %s) #then each file keeps its own framing",
+    async (errorFirst) => {
+      const root = tempRoot("senpi-14653-mixed-")
+      touch(join(root, "package.json"))
+      const pi = new FakeExtensionAPI()
+      pi.cwd = root
+      createLspComponent({
+        callDaemonTool: async (_name, args) => {
+          if (args["filePath"] === "tsconfig.json") return notInstalledResult("tsconfig.json")
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  args["filePath"] === "src/broken.ts"
+                    ? "error[typescript] (2322) at 1:1: broken"
+                    : "No diagnostics found",
+              },
+            ],
+          }
+        },
+      }).register(pi, {
+        logger: { info() {}, warn() {}, error() {} },
+        config: { getFlag: (name) => pi.getFlag(name) },
+      })
+      const filePaths = ["tsconfig.json", "src/clean.rs", "src/broken.ts"]
+      const expected = [
+        {
+          type: "text",
+          text: "\n\nLSP note for tsconfig.json:\nLSP server 'biome' is NOT INSTALLED.\nACTION REQUIRED: ASK THE USER whether to install this LSP server. [ask]",
+        },
+        {
+          type: "text",
+          text: "\n\nLSP errors detected in src/broken.ts, please fix:\nerror[typescript] (2322) at 1:1: broken",
+        },
+      ]
+      const event = { ...writeEvent("unused"), toolName: "edit", input: { filePaths } }
+      if (errorFirst) {
+        filePaths.reverse()
+        expected.reverse()
+      }
+
+      const results = await pi.dispatch("tool_result", event, eventContext("mixed", join(root, "agent")))
+
+      expect(results).toEqual([{ content: [...event.content, ...expected] }])
+    },
+  )
 
   it("#given a scratch file outside any project #when the server is missing #then no nudge is appended", async () => {
     const root = tempRoot("senpi-9223-noproject-")
