@@ -326,6 +326,11 @@ export function createRemoteThreadFixture() {
        * it made, unnamed, from then on.
        */
       openLosesReply?: number
+      /**
+       * With openLosesReply: b's route never lists the session the lost open made (as openUnrouted): b's engine holds it
+       * under its own routing id, which only its endpoint `list_sessions` names, and an endpoint unload by it ends it.
+       */
+      lostUnrouted?: boolean
       /** With openLosesReply: b's engine makes the session under its own id, not the one the open asked for. */
       ignoresDurableSessionId?: boolean
       /** With openLosesReply: the next listing of b after a lost reply fails too, so the create cannot recover on the spot. */
@@ -393,6 +398,8 @@ export function createRemoteThreadFixture() {
     // b's engine's run and its unwritten deliveries (omo#14234); an interrupting unload ends the one and hands back the other.
     // The sessions b's engine holds that b's route does not list (openUnrouted), by the engine's routing id.
     const unrouted = new Set<string>()
+    // Routing id -> durable id of the sessions b's engine holds unrouted (lostUnrouted).
+    const held = new Map<string, string>()
     // The sessions b's engine made for opens whose reply was lost (openLosesReply), as b lists them.
     const made: RemoteSessionRow[] = []
     let lostReplies = options.openLosesReply ?? 0
@@ -437,9 +444,21 @@ export function createRemoteThreadFixture() {
         if (options.protocolInfoFails === true) return { kind: "refused", reason: "request_timeout" }
         return ok({ capabilities: capable ? ["unload_session", "unload_refuse_deliveries"] : ["unload_session"] })
       }
+      // b's engine's own session list names the sessions it holds unrouted by their routing ids (#14569).
+      if (rpc["type"] === "list_sessions" && attachedTo === undefined)
+        return ok({
+          sessions: [...held]
+            .filter(([handle]) => unrouted.has(handle))
+            .map(([sessionId, durableSessionId]) => ({ sessionId, durableSessionId })),
+        })
       // An endpoint unload (no attach) of a session b's engine holds unrouted ends it there (#14394's rollback path).
-      if (rpc["type"] === "unload_session" && attachedTo === undefined && unrouted.delete(String(rpc["sessionId"])))
+      if (rpc["type"] === "unload_session" && attachedTo === undefined && unrouted.delete(String(rpc["sessionId"]))) {
+        // An ended session leaves b's listing.
+        const durable = held.get(String(rpc["sessionId"]))
+        const at = made.findIndex((row) => row.durable_id === durable)
+        if (at >= 0) made.splice(at, 1)
         return ok({ outcome: "unloaded" })
+      }
       if (rpc["type"] === "unload_session" && attachedTo !== undefined) {
         if (options.unloadReason !== undefined)
           return ok({ outcome: "refused", reason: options.unloadReason, detail: `refused: ${options.unloadReason}` })
@@ -508,13 +527,24 @@ export function createRemoteThreadFixture() {
           live.has(durable) || keys.some((key) => live.has(key)) || (relayKey !== undefined && live.has(relayKey))
         return ok({ found: { sessionPath: file, cwd: B_ROW.project, open } })
       }
-      if (rpc["type"] === "open_session" && rpc["sessionPath"] === undefined && lostReplies > 0) {
+      // Only a create's open (it asks for its derived id) loses its reply, never a worktree's short-lived setup session.
+      if (
+        rpc["type"] === "open_session" &&
+        rpc["sessionPath"] === undefined &&
+        rpc["durableSessionId"] !== undefined &&
+        lostReplies > 0
+      ) {
         lostReplies -= 1
         const asked = rpc["durableSessionId"]
         const id = options.ignoresDurableSessionId !== true && typeof asked === "string" ? asked : "dur-made-on-b"
         made.push({ ...B_ROW, session_id: `rk-${id}`, durable_id: id, title: "" })
-        live.add(`rk-${id}`)
-        live.add(id)
+        if (options.lostUnrouted === true) {
+          unrouted.add(`rpc-lost-${id}`)
+          held.set(`rpc-lost-${id}`, id)
+        } else {
+          live.add(`rk-${id}`)
+          live.add(id)
+        }
         failNextList = options.listFailsAfterLostReply === true
         return { kind: "uncertain", reason: "reply_lost" }
       }

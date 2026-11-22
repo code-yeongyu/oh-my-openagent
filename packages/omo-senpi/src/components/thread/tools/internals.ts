@@ -45,13 +45,48 @@ export function failure(
   return { kind: "error", error: threadToolFailure(code, message, next, details) }
 }
 
+/**
+ * The receipt note of a thread_create left uncertain (#14569): its first uncertain answer's message and details (the
+ * reason, a worktree it kept, a cleanup), so a retry answers that cause and can finish what the first run made.
+ */
+export function uncertainNote(error: { readonly message: string; readonly details?: unknown }): string {
+  return JSON.stringify({ message: error.message, ...(error.details === undefined ? {} : { details: error.details }) })
+}
+
+/** A receipt note as `uncertainNote` wrote it; any other note is its own message, with no details. */
+export function noteCause(note: string): {
+  readonly message: string
+  readonly details?: Readonly<Record<string, unknown>>
+} {
+  if (note.startsWith("{"))
+    try {
+      const parsed: unknown = JSON.parse(note)
+      if (
+        typeof parsed === "object" &&
+        parsed !== null &&
+        typeof (parsed as { message?: unknown }).message === "string"
+      ) {
+        const { message, details } = parsed as { message: string; details?: unknown }
+        return typeof details === "object" && details !== null && !Array.isArray(details)
+          ? { message, details: details as Readonly<Record<string, unknown>> }
+          : { message }
+      }
+    } catch {
+      // Not a structured note: the text is the message.
+    }
+  return { message: note }
+}
+
 /** The answer to an operation whose earlier run under the same key may have acted: read before retrying. */
 export function uncertainFailure(note: string | null): ThreadToolResult {
+  const cause = note === null ? undefined : noteCause(note)
   return failure(
     "idempotency_uncertain",
     "The earlier operation may have been delivered.",
     "Read the target transcript before deciding whether to retry.",
-    note === null ? undefined : { error_note: note },
+    cause === undefined
+      ? undefined
+      : { error_note: cause.message, ...(cause.details === undefined ? {} : { first_cause: cause.details }) },
   )
 }
 

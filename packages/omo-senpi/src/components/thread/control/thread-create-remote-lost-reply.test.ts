@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import type { RemoteThreadSurface } from "../remote/ports"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
+import { gitRepoKit } from "../worktree/git-repo.testkit"
+import { answerWorktreeRequest } from "../worktree/worktree-rpc"
 import { createdThreadId } from "./session-host"
 
 // A create on another device whose open_session reply is lost (the caller's budget ran out while b's engine was still
@@ -7,7 +10,30 @@ import { createdThreadId } from "./session-host"
 // it by the id the call's idempotency key derives, on the spot or on a retry under the same key, never answer it
 // uncertain once b lists it, and never open a second session.
 const { account, surface, cleanup } = createRemoteThreadFixture()
-afterEach(cleanup)
+const kit = gitRepoKit()
+afterEach(async () => {
+  await cleanup()
+  kit.cleanup()
+})
+
+// b answers worktree requests from a real repository under farRoot, as its engine's worktree extension does.
+const withFarWorktrees = (a: ReturnType<typeof account>, farRoot: string): RemoteThreadSurface => ({
+  ...a.remote,
+  sessions: {
+    ...a.remote.sessions,
+    sessionCommand: async (device, session, rpc, options) => {
+      if (rpc["type"] !== "extension_request") return a.remote.sessions.sessionCommand(device, session, rpc, options)
+      return {
+        kind: "ok",
+        response: {
+          type: "response",
+          success: true,
+          data: await answerWorktreeRequest(rpc["data"] as Record<string, unknown>, farRoot),
+        },
+      }
+    },
+  },
+})
 
 const opens = (sent: readonly { rpc?: Record<string, unknown> }[]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "open_session")
@@ -50,6 +76,79 @@ describe("thread_create on another device survives a lost open reply", () => {
     const args = { device: "studio", name: "no-capability", idempotency_key: "remote-lost-3" }
 
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(opens(a.sent)).toHaveLength(1)
+  })
+})
+
+// #14569: a same-key recovery answers what the first create would have, keeps the first uncertain cause, and an
+// adopted session its route does not reach is ended and never settles the receipt as a final answer.
+describe("thread_create same-key recovery on another device (#14569)", () => {
+  test("#given a create with a worktree whose open reply is lost and b cannot be listed #when it is retried under the same key #then the retry answers the thread with that worktree", async () => {
+    const repo = kit.repository()
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(withFarWorktrees(a, kit.folder("thread-wt-far-")))
+    const args = {
+      device: "studio",
+      name: "lost-wt",
+      cwd: repo,
+      worktree: { branch: "far-lost" },
+      idempotency_key: "remote-lost-wt",
+    }
+
+    const first = await run("thread_create", args)
+    expect(first).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_uncertain", details: { worktree: { branch: "far-lost" } } },
+    })
+    const retry = await run("thread_create", args)
+
+    expect(retry).toMatchObject({
+      kind: "ok",
+      thread: createdThreadId("dur-caller", "remote-lost-wt"),
+      worktree: { branch: "far-lost" },
+    })
+    // One create open; the other open is the worktree's short-lived setup session.
+    expect(opens(a.sent).filter((entry) => entry.rpc?.["durableSessionId"] !== undefined)).toHaveLength(1)
+  })
+
+  test("#given b ignores the derived id and the reply is lost #when the create is retried twice under the same key #then each retry names the first uncertain cause", async () => {
+    const a = account({ openLosesReply: 1, ignoresDurableSessionId: true })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "first-cause", idempotency_key: "remote-lost-cause" }
+
+    const first = await run("thread_create", args)
+    expect(first).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    const firstError = (first as { error: { message: string; details: Record<string, unknown> } }).error
+    for (const _ of [1, 2])
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: {
+          code: "idempotency_uncertain",
+          details: { error_note: firstError.message, first_cause: firstError.details },
+        },
+      })
+  })
+
+  test("#given the lost open's session is one b's route never lists #when the create is retried under the same key #then the adopted session is ended by the routing id b's engine names and the receipt stays uncertain", async () => {
+    const a = account({
+      openLosesReply: 1,
+      listFailsAfterLostReply: true,
+      lostUnrouted: true,
+      unlistedReason: "route_unlisted",
+    })
+    const { run } = surface(a.remote)
+    const args = { device: "studio", name: "lost-unrouted", idempotency_key: "remote-lost-unrouted" }
+    const id = createdThreadId("dur-caller", "remote-lost-unrouted")
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "route_unlisted", created: false } },
+    })
+    const unloads = a.sent.filter((entry) => entry.via === "endpoint" && entry.rpc?.["type"] === "unload_session")
+    expect(unloads.map((entry) => entry.rpc?.["sessionId"])).toEqual([`rpc-lost-${id}`])
+    // Not replayed as a final answer: the next retry runs again and, with nothing left on b, answers uncertain.
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     expect(opens(a.sent)).toHaveLength(1)
   })

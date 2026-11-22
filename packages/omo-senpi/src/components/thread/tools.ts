@@ -88,6 +88,7 @@ import {
   type AnyTool,
   type ToolOutput,
   uncertainFailure,
+  uncertainNote,
 } from "./tools/internals"
 import { currentResult, threadRow } from "./tools/thread-row"
 
@@ -348,10 +349,14 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       result = { kind: "error", error: refusal }
     }
     // A create that may have made its thread (its open's reply was lost) has no answer yet: its receipt stays uncertain,
-    // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060).
+    // so a retry under the key runs the create again, which finds that thread or answers uncertain again (#14060). The
+    // note keeps the first uncertain answer's cause (#14569); a retry that fails in any way has not settled what the
+    // first run made, so its receipt stays uncertain under that same note and its error is never replayed as final.
     const undecided =
-      name === "thread_create" && result.kind === "error" && result.error.code === "idempotency_uncertain"
-        ? result.error.message
+      name === "thread_create" &&
+      result.kind === "error" &&
+      (result.error.code === "idempotency_uncertain" || retrying !== undefined)
+        ? (retrying?.error_note ?? uncertainNote(result.error))
         : undefined
     if (receipted)
       await store

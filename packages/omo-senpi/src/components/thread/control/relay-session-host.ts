@@ -133,6 +133,18 @@ export function createRelaySessionHost(
       },
     )
   }
+  /**
+   * The routing id b's engine holds a session under, from its own session list: an open whose reply named none, or a
+   * create adopted after its reply was lost (#14569), is still ended by it. Undefined when b's engine lists no such session.
+   */
+  const heldUnder = async (durable: string | undefined): Promise<string | undefined> => {
+    if (durable === undefined) return undefined
+    const listedHere = await remote.sessions.endpointCommand(device, { type: "list_sessions" })
+    if (listedHere.kind !== "ok") return undefined
+    const rows = replyData(listedHere.response)["sessions"]
+    const row = (Array.isArray(rows) ? rows : []).map(recordOf).find((entry) => entry["durableSessionId"] === durable)
+    return nonEmpty(row?.["sessionId"])
+  }
   type Finish = {
     readonly name?: string
     readonly reopens: boolean
@@ -221,7 +233,7 @@ export function createRelaySessionHost(
       if (reached?.kind === "refused" && reached.reason === ROUTE_UNLISTED)
         return await unreachable(
           reached.reason,
-          nonEmpty(data["sessionId"]),
+          nonEmpty(data["sessionId"]) ?? (await heldUnder(nonEmpty(state["durableSessionId"]))),
           nonEmpty(state["durableSessionId"]) ?? threadId,
           step.worktree,
         )
@@ -357,6 +369,7 @@ export function createRelaySessionHost(
       await adopted(request.durableSessionId, {
         confirmReach: options?.confirmReach === true,
         ...(request.name === undefined ? {} : { name: request.name }),
+        ...(request.worktree === undefined ? {} : { worktree: request.worktree }),
       }),
   }
 }

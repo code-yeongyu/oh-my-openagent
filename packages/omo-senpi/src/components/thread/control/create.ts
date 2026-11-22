@@ -22,6 +22,7 @@ import { resolveAddress } from "../address/lazy"
 import {
   addressBook,
   failure,
+  noteCause,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -36,6 +37,7 @@ import { locateControl } from "./locate"
 import type { PromptStart } from "./prompt-start"
 import { controlRefusalOf } from "./port"
 import { createdThreadId, type HostedThread, type SessionOpenOutcome } from "./session-host"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
 
 /** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
 const RENAME_REASON_MAX_CHARS = 300
@@ -110,6 +112,8 @@ export async function createThread(
     retriesElsewhere = derived.kind !== "live" && derived.kind !== "file"
   }
   const stillUncertain = () => uncertainFailure(retrying?.error_note ?? null)
+  // #14569: the worktree the first run made on the far device, kept in its uncertain answer, is the adopted thread's own.
+  const firstWorktree = keptWorktree(retrying?.error_note)
   // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
   let opened: HostedThread | undefined
   const made = await (async (): Promise<ThreadToolResult> => {
@@ -199,7 +203,11 @@ export async function createThread(
         createdId === undefined
           ? undefined
           : await plan.host.adopt?.(
-              { durableSessionId: createdId, ...(openName === undefined ? {} : { name: openName }) },
+              {
+                durableSessionId: createdId,
+                ...(openName === undefined ? {} : { name: openName }),
+                ...(firstWorktree === undefined ? {} : { worktree: firstWorktree }),
+              },
               { confirmReach: true },
             )
       if (found === undefined) return stillUncertain()
@@ -516,3 +524,16 @@ const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
   sessionPath: file.sessionPath,
   ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
 })
+
+/** The worktree an uncertain create's first answer kept (its receipt note, `uncertainNote`), when it names a whole one. */
+function keptWorktree(note: string | null | undefined): ThreadWorktree | undefined {
+  const kept = note === null || note === undefined ? undefined : noteCause(note).details?.["worktree"]
+  if (typeof kept !== "object" || kept === null) return undefined
+  const { path, branch, base, repository } = kept as Record<string, unknown>
+  return typeof path === "string" &&
+    typeof branch === "string" &&
+    typeof base === "string" &&
+    typeof repository === "string"
+    ? (kept as ThreadWorktree)
+    : undefined
+}
