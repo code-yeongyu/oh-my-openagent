@@ -103,11 +103,7 @@ export function startHostHeartbeat(input: HostHeartbeatInput) {
           if (!active()) return
           closeFailures += 1
           log("senpi-task unresponsive session close pending", { taskId: input.taskId, error: String(error) })
-          if (
-            !closeEscalated &&
-            closeFailures >= CLOSE_ESCALATION_FAILURES &&
-            status.state === "terminal-pending"
-          ) {
+          if (!closeEscalated && closeFailures >= CLOSE_ESCALATION_FAILURES && status.state === "terminal-pending") {
             closeEscalated = true
             publish({ ...status, escalated: true })
           }

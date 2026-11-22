@@ -178,9 +178,9 @@ test("a host that keeps failing the close confirm escalates to the parent exactl
       status.state !== "running" && status.escalated === true,
   )
   expect(escalated).toHaveLength(1)
-  expect(hostLivenessText(escalated[0]!)).not.toBe(
-    hostLivenessText({ state: "terminal-pending", since: escalated[0]!.since }),
-  )
+  const [first] = escalated
+  if (first === undefined) throw new Error("expected one escalated liveness status")
+  expect(hostLivenessText(first)).not.toBe(hostLivenessText({ state: "terminal-pending", since: first.since }))
   expect(refusing.handle.hasExited()).toBe(false)
   expect(refusing.closes()).toBeGreaterThan(3)
   await refusing.handle.dispose()
