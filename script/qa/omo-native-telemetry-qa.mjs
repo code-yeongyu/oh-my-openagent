@@ -5,7 +5,13 @@ import { basename, join, relative, resolve } from "node:path"
 import { pathToFileURL } from "node:url"
 import { repoRoot, pluginRoot } from "./omo-native-telemetry-provider.mjs"
 import { assertEnabled, parseCapturedEvents } from "./omo-native-telemetry-assertions.mjs"
-import { findExecutable, startCaptureServer, readCaptureRequests, closeCaptureServer, removeSandboxes } from "./omo-native-telemetry-capture.mjs"
+import {
+  findExecutable,
+  startCaptureServer,
+  readCaptureRequests,
+  closeCaptureServer,
+  removeSandboxes,
+} from "./omo-native-telemetry-capture.mjs"
 import { driveCli } from "./omo-native-telemetry-drive.mjs"
 import { withTelemetryOptOut } from "../../packages/omo-senpi/scripts/qa/telemetry-opt-out-env.mjs"
 import { redactEvents, sanitizeTranscript, evidenceMarkdown } from "./omo-native-telemetry-evidence.mjs"
@@ -38,7 +44,12 @@ function parseArgs(argv) {
 }
 
 function runHelp(senpiBin) {
-  const result = spawnSync(senpiBin, ["--help"], { cwd: repoRoot, encoding: "utf8", env: withTelemetryOptOut(process.env), timeout: 30_000 })
+  const result = spawnSync(senpiBin, ["--help"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+    env: withTelemetryOptOut(process.env),
+    timeout: 30_000,
+  })
   const output = `${result.stdout ?? ""}${result.stderr ?? ""}`
   if (result.status !== 0) throw new Error(`senpi --help failed with exit ${result.status}\n${output}`)
   if (!/(?:--print, -p|--print\b[\s\S]*\b-p\b)/.test(output)) {
@@ -52,9 +63,13 @@ function runHelp(senpiBin) {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2))
-  if (args.help) { process.stdout.write(helpText); return }
+  if (args.help) {
+    process.stdout.write(helpText)
+    return
+  }
   const senpiBin = args.senpiBin ?? findExecutable(process.env.SENPI_BIN?.trim() || "senpi")
-  if (senpiBin === null) throw new Error("BlockedClaim: installed senpi CLI was not found on PATH or in node_modules/.bin")
+  if (senpiBin === null)
+    throw new Error("BlockedClaim: installed senpi CLI was not found on PATH or in node_modules/.bin")
   const help = runHelp(senpiBin)
   if (!existsSync(join(pluginRoot, "extensions", "omo.js"))) throw new Error("built omo-senpi plugin is missing")
   mkdirSync(args.evidenceDir, { recursive: true })
@@ -74,30 +89,46 @@ async function main() {
     const checks = assertEnabled(events)
 
     const dntStart = readCaptureRequests(capture).length
-    const dnt = await driveCli({ senpiBin, port: capture.port, evidenceDir: args.evidenceDir, label: "dnt", extraEnv: { DO_NOT_TRACK: "1" } })
+    const dnt = await driveCli({
+      senpiBin,
+      port: capture.port,
+      evidenceDir: args.evidenceDir,
+      label: "dnt",
+      extraEnv: { DO_NOT_TRACK: "1" },
+    })
     sandboxes.push(dnt.sandbox)
     const optOutDntRequests = readCaptureRequests(capture).length - dntStart
     if (optOutDntRequests !== 0) throw new Error(`DO_NOT_TRACK opt-out emitted ${optOutDntRequests} requests`)
 
     const configStart = readCaptureRequests(capture).length
-    const config = await driveCli({ senpiBin, port: capture.port, evidenceDir: args.evidenceDir, label: "config", configEnabled: false })
+    const config = await driveCli({
+      senpiBin,
+      port: capture.port,
+      evidenceDir: args.evidenceDir,
+      label: "config",
+      configEnabled: false,
+    })
     sandboxes.push(config.sandbox)
     const optOutConfigRequests = readCaptureRequests(capture).length - configStart
-    if (optOutConfigRequests !== 0) throw new Error(`omo.json telemetry.enabled:false emitted ${optOutConfigRequests} requests`)
+    if (optOutConfigRequests !== 0)
+      throw new Error(`omo.json telemetry.enabled:false emitted ${optOutConfigRequests} requests`)
 
-    const transcript = [enabled, dnt, config].map((run) => {
-      const eventTypes = new Map()
-      for (const line of run.transcript) {
-        const event = JSON.parse(line)
-        eventTypes.set(event.type, (eventTypes.get(event.type) ?? 0) + 1)
-      }
-      return `## ${basename(run.sandbox.root)}\nagent_settled=${run.settledCount}\nevent_types=${JSON.stringify(Object.fromEntries(eventTypes))}\nstderr_tail=${JSON.stringify(run.stderr.slice(-2000))}`
-    }).join("\n\n")
+    const transcript = [enabled, dnt, config]
+      .map((run) => {
+        const eventTypes = new Map()
+        for (const line of run.transcript) {
+          const event = JSON.parse(line)
+          eventTypes.set(event.type, (eventTypes.get(event.type) ?? 0) + 1)
+        }
+        return `## ${basename(run.sandbox.root)}\nagent_settled=${run.settledCount}\nevent_types=${JSON.stringify(Object.fromEntries(eventTypes))}\nstderr_tail=${JSON.stringify(run.stderr.slice(-2000))}`
+      })
+      .join("\n\n")
     writeFileSync(join(args.evidenceDir, "transcript.txt"), `${sanitizeTranscript(transcript, sandboxes).trimEnd()}\n`)
 
     cleanup = await closeCaptureServer(capture)
     tempCleanup = removeSandboxes([...sandboxes, { root: capture.root }])
-    if (!cleanup.killZeroFails || !cleanup.portFree || tempCleanup.some((receipt) => !receipt.removed)) throw new Error("cleanup verification failed")
+    if (!cleanup.killZeroFails || !cleanup.portFree || tempCleanup.some((receipt) => !receipt.removed))
+      throw new Error("cleanup verification failed")
     const evidence = evidenceMarkdown({
       checks,
       cleanup,
@@ -109,8 +140,13 @@ async function main() {
       tempCleanup,
     })
     writeFileSync(join(args.evidenceDir, "task-14.md"), evidence)
-    writeFileSync(join(args.evidenceDir, "cleanup-receipt.json"), `${JSON.stringify({ captureServer: cleanup, tempDirectories: tempCleanup }, null, 2)}\n`)
-    process.stdout.write(`${JSON.stringify({ result: "PASS", evidenceDir: relative(repoRoot, args.evidenceDir), assertions: checks.length + 2, enabledRequests: enabledRequests.length, capturedEvents: events.length, optOutDntRequests, optOutConfigRequests, cleanup }, null, 2)}\n`)
+    writeFileSync(
+      join(args.evidenceDir, "cleanup-receipt.json"),
+      `${JSON.stringify({ captureServer: cleanup, tempDirectories: tempCleanup }, null, 2)}\n`,
+    )
+    process.stdout.write(
+      `${JSON.stringify({ result: "PASS", evidenceDir: relative(repoRoot, args.evidenceDir), assertions: checks.length + 2, enabledRequests: enabledRequests.length, capturedEvents: events.length, optOutDntRequests, optOutConfigRequests, cleanup }, null, 2)}\n`,
+    )
   } finally {
     if (capture.child.exitCode === null && capture.child.signalCode === null) await closeCaptureServer(capture)
     const remaining = [...sandboxes, { root: capture.root }].filter((sandbox) => existsSync(sandbox.root))
@@ -125,7 +161,9 @@ if (invokedPath !== undefined && import.meta.url === pathToFileURL(invokedPath).
       process.stderr.write(`${error.name}: ${error.message}\n${error.helpOutput ?? ""}`)
       process.exit(2)
     }
-    process.stderr.write(`${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error)}\n`)
+    process.stderr.write(
+      `${error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : String(error)}\n`,
+    )
     process.exit(1)
   })
 }

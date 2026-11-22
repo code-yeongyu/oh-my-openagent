@@ -9277,6 +9277,10 @@
               "type": "number",
               "minimum": 0
             },
+            "first_prompt_timeout_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
             "notify_on_fallback": {
               "type": "boolean"
             },

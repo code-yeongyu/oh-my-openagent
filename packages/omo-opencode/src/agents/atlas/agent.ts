@@ -41,7 +41,8 @@ import {
 
 const MODE: AgentMode = "primary"
 
-type AtlasRoleSource = "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k3-1" | "kimi-k2-7" | "opus-4-7" | "glm"
+type AtlasRoleSource =
+  "default" | "gpt" | "gemini" | "kimi" | "kimi-k3" | "kimi-k3-1" | "kimi-k2-7" | "opus-4-7" | "glm"
 
 class AtlasPromptVariantError extends Error {
   readonly name = "AtlasPromptVariantError"
@@ -151,6 +152,5 @@ export const atlasPromptMetadata: AgentPromptMetadata = {
     "Tasks that can be handled directly by one agent",
     "When user wants to execute tasks manually",
   ],
-  keyTrigger:
-    "Todo list path provided OR multiple tasks requiring multi-agent orchestration",
+  keyTrigger: "Todo list path provided OR multiple tasks requiring multi-agent orchestration",
 }

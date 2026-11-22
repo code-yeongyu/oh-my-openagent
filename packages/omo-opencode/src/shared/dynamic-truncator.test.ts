@@ -30,7 +30,7 @@ function resetContextLimitEnv(): void {
 
 function createContextUsageMockContext(
   inputTokens: number,
-  options?: { providerID?: string; modelID?: string; cacheRead?: number }
+  options?: { providerID?: string; modelID?: string; cacheRead?: number; cacheWrite?: number; outputTokens?: number },
 ) {
   return {
     client: {
@@ -44,9 +44,9 @@ function createContextUsageMockContext(
                 modelID: options?.modelID,
                 tokens: {
                   input: inputTokens,
-                  output: 0,
+                  output: options?.outputTokens ?? 0,
                   reasoning: 0,
-                  cache: { read: options?.cacheRead ?? 0, write: 0 },
+                  cache: { read: options?.cacheRead ?? 0, write: options?.cacheWrite ?? 0 },
                 },
               },
             },
@@ -94,6 +94,46 @@ describe("getContextWindowUsage", () => {
   afterEach(() => {
     resetContextLimitEnv()
     _setContextWindowUsageFetchTimeoutMsForTesting(undefined)
+  })
+
+  it("counts cold cache writes once alongside input, reads and output", async () => {
+    // The trigger's 879,744-token prompt row also occupies 1,000 output tokens here.
+    const ctx = createContextUsageMockContext(33, {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      cacheRead: 79_711,
+      cacheWrite: 800_000,
+      outputTokens: 1_000,
+    })
+
+    const usage = await getContextWindowUsage(ctx as never, "ses_cold_cache_usage", {
+      anthropicContext1MEnabled: true,
+    })
+
+    expect(usage).toEqual({
+      usedTokens: 880_744,
+      remainingTokens: 119_256,
+      usagePercentage: 880_744 / 1_000_000,
+    })
+  })
+
+  it("keeps warm-cache usage and its output tokens unchanged when cache writes are zero", async () => {
+    const ctx = createContextUsageMockContext(33, {
+      providerID: "anthropic",
+      modelID: "claude-sonnet-4-6",
+      cacheRead: 79_711,
+      outputTokens: 1_000,
+    })
+
+    const usage = await getContextWindowUsage(ctx as never, "ses_warm_cache_usage", {
+      anthropicContext1MEnabled: true,
+    })
+
+    expect(usage).toEqual({
+      usedTokens: 80_744,
+      remainingTokens: 919_256,
+      usagePercentage: 80_744 / 1_000_000,
+    })
   })
 
   describe("#given client.session.messages never settles", () => {

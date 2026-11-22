@@ -53,7 +53,11 @@ interface InstallInvocation {
 
 type TimedInvocationOutcome = AstGrepInstallSpawnOutcome | { readonly kind: "timed-out" }
 
-export function astGrepRuntimeDir(baseDir: string, platform: NodeJS.Platform = process.platform, arch: string = process.arch): string {
+export function astGrepRuntimeDir(
+  baseDir: string,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch,
+): string {
   return join(baseDir, "runtime", "ast-grep", runtimeSlug(platform, arch))
 }
 
@@ -62,7 +66,11 @@ function isMissingExecutable(error: Error): boolean {
   return error.code === "ENOENT"
 }
 
-function defaultSpawnProcess(command: string, args: readonly string[], options: AstGrepInstallSpawnOptions): AstGrepInstallSpawnedProcess {
+function defaultSpawnProcess(
+  command: string,
+  args: readonly string[],
+  options: AstGrepInstallSpawnOptions,
+): AstGrepInstallSpawnedProcess {
   const child = spawn(command, args, {
     cwd: options.cwd,
     env: options.env,
@@ -98,7 +106,10 @@ function scriptPathForPlatform(skillDir: string, platform: NodeJS.Platform): str
 function invocationsForPlatform(scriptPath: string, platform: NodeJS.Platform): readonly InstallInvocation[] {
   if (platform !== "win32") return [{ command: "bash", args: [scriptPath] }]
   const args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", scriptPath]
-  return [{ command: "pwsh", args }, { command: "powershell.exe", args }]
+  return [
+    { command: "pwsh", args },
+    { command: "powershell.exe", args },
+  ]
 }
 
 async function runInvocation(input: {
@@ -108,7 +119,10 @@ async function runInvocation(input: {
   readonly spawnProcess: AstGrepInstallSpawn
   readonly timeoutMs: number
 }): Promise<TimedInvocationOutcome> {
-  const child = input.spawnProcess(input.invocation.command, input.invocation.args, { cwd: input.skillDir, env: input.env })
+  const child = input.spawnProcess(input.invocation.command, input.invocation.args, {
+    cwd: input.skillDir,
+    env: input.env,
+  })
   let timedOut = false
   // The timeout MUST stay ref'd: it is the only producer of progress when the
   // child never exits. An unref'd timer can be starved by the runtime's event
@@ -144,7 +158,9 @@ async function runInvocation(input: {
   }
 }
 
-function failedReason(outcome: Exclude<TimedInvocationOutcome, { readonly kind: "exit" } | { readonly kind: "timed-out" }>): string {
+function failedReason(
+  outcome: Exclude<TimedInvocationOutcome, { readonly kind: "exit" } | { readonly kind: "timed-out" }>,
+): string {
   return outcome.error.message
 }
 
@@ -165,7 +181,10 @@ export async function runAstGrepSkillInstall(options: AstGrepSkillInstallOptions
       if (outcome.kind === "timed-out") return { kind: "timed-out" }
       if (outcome.kind === "exit") {
         if (outcome.code === 0) return { kind: "succeeded" }
-        return { kind: "failed", reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}` }
+        return {
+          kind: "failed",
+          reason: `${invocation.command} exited ${outcome.code ?? outcome.signal ?? "without status"}`,
+        }
       }
       if (platform === "win32" && outcome.missingExecutable && invocation.command === "pwsh") continue
       return { kind: "failed", reason: failedReason(outcome) }

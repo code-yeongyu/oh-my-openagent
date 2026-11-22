@@ -1,6 +1,14 @@
 import { afterEach, expect, test } from "bun:test"
 
-import { b64urlOfHex, createHttpTransport, hexOfB64url, SyncAuthError, SyncHttpError, SyncNetworkError } from "./http-transport"
+import {
+  b64urlOfHex,
+  createHttpTransport,
+  hexOfB64url,
+  SyncAuthError,
+  SyncHttpError,
+  SyncNetworkError,
+} from "./http-transport"
+import { SYNC_CAPABILITIES, SYNC_CONTRACT_VERSION, syncRequestHeaders } from "../../contract-version"
 import { startWireServer, type WireServer } from "./wire-server.test-support"
 
 const servers: WireServer[] = []
@@ -25,7 +33,15 @@ async function pushOne(t: ReturnType<typeof createHttpTransport>, bytes: Uint8Ar
   const uploadId = await t.reserve(bytes.byteLength, digest)
   await t.upload(uploadId, bytes)
   const id = batchId()
-  const result = await t.append({ uploadId, digest, baseSeq, batchId: id, epoch: 1, link: "A".repeat(43), recordSig: "S".repeat(86) })
+  const result = await t.append({
+    uploadId,
+    digest,
+    baseSeq,
+    batchId: id,
+    epoch: 1,
+    link: "A".repeat(43),
+    recordSig: "S".repeat(86),
+  })
   pushedIds.push(id)
   return result
 }
@@ -46,7 +62,13 @@ test("reserve, upload and append land a batch the other device pulls and downloa
   expect(page.entries).toHaveLength(1)
   const [entry] = page.entries
   if (entry === undefined) throw new Error("no entry")
-  expect(entry).toMatchObject({ seq: 1, kind: "batch", digest: sha256Hex(bytes), author: "device:dev-a", batchId: pushedIds.at(-1) })
+  expect(entry).toMatchObject({
+    seq: 1,
+    kind: "batch",
+    digest: sha256Hex(bytes),
+    author: "device:dev-a",
+    batchId: pushedIds.at(-1),
+  })
   expect(entry.batchId).toMatch(/^[A-Za-z0-9_-]{22}$/)
   expect(await b.download(entry.objectId)).toEqual(bytes)
 })
@@ -55,19 +77,32 @@ test("a token that cannot be refreshed fails the request as SyncAuthError, and a
   const { server } = await pair()
   const refused = new Error("refresh refused")
   const unrefreshable = createHttpTransport({ baseUrl: server.url, token: () => Promise.reject(refused) })
-  const failure = await unrefreshable.pull(0, 500).then(() => null, (error: unknown) => error)
+  const failure = await unrefreshable.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(SyncAuthError)
   expect((failure as SyncAuthError).cause).toBe(refused)
   const unknownDevice = createHttpTransport({ baseUrl: server.url, token: () => "not-a-device-token" })
-  const refusal = await unknownDevice.pull(0, 500).then(() => null, (error: unknown) => error)
+  const refusal = await unknownDevice.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(refusal).toBeInstanceOf(SyncHttpError)
   expect(refusal).toMatchObject({ code: "unauthorized", status: 401, transient: false })
 })
 
 test("a sync service that cannot be reached fails the request as SyncNetworkError, keeping the fetch error (omo #10637)", async () => {
   const refused = new TypeError("fetch failed")
-  const unreachable = createHttpTransport({ baseUrl: "http://sync.invalid", token: () => "tok", fetch: (() => Promise.reject(refused)) as unknown as typeof fetch })
-  const failure = await unreachable.pull(0, 500).then(() => null, (error: unknown) => error)
+  const unreachable = createHttpTransport({
+    baseUrl: "http://sync.invalid",
+    token: () => "tok",
+    fetch: (() => Promise.reject(refused)) as unknown as typeof fetch,
+  })
+  const failure = await unreachable.pull(0, 500).then(
+    () => null,
+    (error: unknown) => error,
+  )
   expect(failure).toBeInstanceOf(SyncNetworkError)
   expect((failure as SyncNetworkError).cause).toBe(refused)
 })
@@ -117,6 +152,7 @@ test("the event stream delivers sync.advanced heads and reports the connection",
         connected.push(up)
         if (up) void pushOne(a, new TextEncoder().encode("live"), 0)
       },
+      onStateChanged: () => undefined,
     })
   })
   await first
@@ -125,3 +161,80 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(connected[0]).toBe(true)
   expect(await server.untilStreamsClosed()).toBe(0)
 })
+
+// #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
+// `sync.state.changed`, the state route shows the flag, and a push is refused `stale_base`.
+test("#given a subscribed device #when another device is signed out through the sign-out route #then the stream delivers a state change and pushes are refused stale_base", async () => {
+  const { server, a, b } = await pair()
+  let stop: () => void = () => undefined
+  const changed = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("waited 10s for sync.state.changed, never fired")), 10_000)
+    stop = a.subscribe({
+      onAdvanced: () => undefined,
+      onConnected: (up) => {
+        if (up)
+          void fetch(`${server.url}/v1/session/sign-out`, {
+            method: "POST",
+            headers: syncRequestHeaders(server.tokenOf("b")),
+          })
+      },
+      onStateChanged: () => {
+        clearTimeout(timer)
+        resolve()
+      },
+    })
+  })
+  await changed
+  stop()
+  expect(server.freeze.pending).toBe(true)
+  expect(await pushOne(a, new TextEncoder().encode("frozen"), 0)).toMatchObject({ ok: false, error: "stale_base" })
+  await expect(b.pull(0, 500)).rejects.toMatchObject({ code: "device_revoked", status: 401 })
+})
+
+// The service refuses every sync route 426 client_update_required for an account whose keyring holds a
+// phrase key unless the request declares the phrase capability; after phrase genesis no engine synced (#13691).
+test("every request the engine sends, the event stream included, carries the contract version and the phrase capability, so a phrase account's floor admits it (#13691)", async () => {
+  const { server, a, b } = await pair()
+  let stop: () => void = () => undefined
+  try {
+    const advanced = new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error("waited 5s for sync.advanced over the floor, never fired")),
+        5_000,
+      )
+      stop = b.subscribe({
+        onAdvanced: () => {
+          clearTimeout(timer)
+          resolve()
+        },
+        onConnected: (up) => {
+          if (up) void pushOne(a, new TextEncoder().encode("over the floor"), 0)
+        },
+        onStateChanged: () => undefined,
+      })
+    })
+
+    await advanced
+    const page = await b.pull(0, 500)
+    await b.download(page.entries[0]?.objectId ?? "")
+  } finally {
+    stop()
+  }
+
+  const routes = new Set(
+    server.requests.map(
+      ({ method, path }) => `${method} ${path.replace(/^(\/v1\/sync\/(?:objects|uploads))\/.+$/, "$1/:id")}`,
+    ),
+  )
+  expect([...routes].sort()).toEqual([
+    "GET /v1/me/events",
+    "GET /v1/sync/batches",
+    "GET /v1/sync/objects/:id",
+    "GET /v1/sync/state",
+    "POST /v1/sync/batches",
+    "POST /v1/sync/uploads",
+    "PUT /v1/sync/uploads/:id",
+  ])
+  for (const request of server.requests)
+    expect(request).toMatchObject({ version: SYNC_CONTRACT_VERSION, capabilities: SYNC_CAPABILITIES })
+}, 15_000)

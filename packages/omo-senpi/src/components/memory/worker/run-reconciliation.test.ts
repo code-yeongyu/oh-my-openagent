@@ -2,12 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { readFile, rm, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 
-import {
-  createLockRecord,
-  parseLockRecord,
-  reflectionSchedulerLockPath,
-  withLock,
-} from "@oh-my-opencode/memory-core"
+import { createLockRecord, parseLockRecord, reflectionSchedulerLockPath, withLock } from "@oh-my-opencode/memory-core"
 
 import { reconcileReflectionRuns } from "./run-reconciliation"
 import { writeRunJsonAtomic } from "./run-artifacts"
@@ -31,8 +26,11 @@ describe("reflection and dream run reconciliation", () => {
     async (branch) => {
       const item = await fixture()
       await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-        ...item.ledger, pid: 222, processStart: "supervisor",
-        childPid: 333, childProcessStart: "child",
+        ...item.ledger,
+        pid: 222,
+        processStart: "supervisor",
+        childPid: 333,
+        childProcessStart: "child",
       })
       const initial = await item.store.readState()
       const entered = Promise.withResolvers<void>()
@@ -42,27 +40,39 @@ describe("reflection and dream run reconciliation", () => {
       const signals: NodeJS.Signals[] = []
       let waits = 0
       // The pass starts inside the outer phase, so its git work is traced from its first process.
-      expect(await withinPhase("observer pass", async () => {
-        const pass = reconcileReflectionRuns({
-          identity: item.identity,
-          reservation: item.store,
-          signal: controller.signal,
-          getPidLiveness: (pid) => pid === 333 ? "alive" : branch.startsWith("dead") ? "dead" : branch === "unknown" ? "unknown" : "alive",
-          getProcessStartIdentity: async (pid) => pid === 222 ? "supervisor" : "child",
-          waitForOutcome: async () => { entered.resolve(); await release.promise; return "timeout" },
-          waitUntil: async () => {
-            waits += 1
-            if (branch === "dead-before-kill" && waits === 1) return
-            entered.resolve()
-            await release.promise
-          },
-          signalProcessGroup: (_pid, signal) => { signals.push(signal) },
-        }).then(() => undefined, (error: unknown) => error)
-        await withinPhase("observer entered wait", () => entered.promise)
-        controller.abort(reason)
-        release.resolve()
-        return await withinPhase("cancelled pass", () => pass)
-      })).toBe(reason)
+      expect(
+        await withinPhase("observer pass", async () => {
+          const pass = reconcileReflectionRuns({
+            identity: item.identity,
+            reservation: item.store,
+            signal: controller.signal,
+            getPidLiveness: (pid) =>
+              pid === 333 ? "alive" : branch.startsWith("dead") ? "dead" : branch === "unknown" ? "unknown" : "alive",
+            getProcessStartIdentity: async (pid) => (pid === 222 ? "supervisor" : "child"),
+            waitForOutcome: async () => {
+              entered.resolve()
+              await release.promise
+              return "timeout"
+            },
+            waitUntil: async () => {
+              waits += 1
+              if (branch === "dead-before-kill" && waits === 1) return
+              entered.resolve()
+              await release.promise
+            },
+            signalProcessGroup: (_pid, signal) => {
+              signals.push(signal)
+            },
+          }).then(
+            () => undefined,
+            (error: unknown) => error,
+          )
+          await withinPhase("observer entered wait", () => entered.promise)
+          controller.abort(reason)
+          release.resolve()
+          return await withinPhase("cancelled pass", () => pass)
+        }),
+      ).toBe(reason)
       expect(signals).toEqual(branch === "dead-before-kill" ? ["SIGTERM"] : [])
       expect(await item.store.readState()).toEqual(initial)
       for (const name of ["terminal-claim.json", "abandoned.json", "final.json"]) {
@@ -71,7 +81,9 @@ describe("reflection and dream run reconciliation", () => {
       expect(existsSync(item.worktree.dir)).toBe(true)
       // A later uncancelled observer still owns recovery; cancellation did not consume the run.
       const recovered = await reconcileReflectionRuns({
-        identity: item.identity, reservation: item.store, getPidLiveness: () => "dead",
+        identity: item.identity,
+        reservation: item.store,
+        getPidLiveness: () => "dead",
       })
       expect(recovered).toEqual([{ runId: "run-orphan", outcome: "failed" }])
     },
@@ -83,11 +95,13 @@ describe("reflection and dream run reconciliation", () => {
     const initialState = await item.store.readState()
     const lockPath = reflectionSchedulerLockPath(item.identity.paths.locks)
 
-    const result = await withinPhase("defer", () => reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: contendedReservation(lockPath, null),
-      deferOnSchedulerContention: true,
-    }))
+    const result = await withinPhase("defer", () =>
+      reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: contendedReservation(lockPath, null),
+        deferOnSchedulerContention: true,
+      }),
+    )
 
     expect(result).toEqual([])
     expect(await item.store.readState()).toEqual(initialState)
@@ -102,22 +116,28 @@ describe("reflection and dream run reconciliation", () => {
 
     const result = await withinPhase("scheduler-lock-held", () =>
       withLock(lockPath, record, async () => {
-        const deferred = await withinPhase("defer", () => reconcileReflectionRuns({
-          identity: item.identity,
-          reservation: contendedReservation(lockPath, record),
-          deferOnSchedulerContention: true,
-        }))
+        const deferred = await withinPhase("defer", () =>
+          reconcileReflectionRuns({
+            identity: item.identity,
+            reservation: contendedReservation(lockPath, record),
+            deferOnSchedulerContention: true,
+          }),
+        )
         expect(await readFile(activePath, "utf8")).toBe(initialReservation)
         expect(parseLockRecord(await readFile(lockPath, "utf8"))).toEqual(record)
         return deferred
-      })
+      }),
     )
 
     expect(result).toEqual([])
-    expect(await withinPhase("post-release-reconcile", () => reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-    }))).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+    expect(
+      await withinPhase("post-release-reconcile", () =>
+        reconcileReflectionRuns({
+          identity: item.identity,
+          reservation: item.store,
+        }),
+      ),
+    ).toEqual([{ runId: "run-orphan", outcome: "failed" }])
   })
 
   test("#given an orphaned successful dream worktree #when session-start reconciliation runs #then it merges clears the reservation records completion and publishes final", async () => {
@@ -131,8 +151,12 @@ describe("reflection and dream run reconciliation", () => {
       thinking: "minimal",
     })
     await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
-      version: 1, runId: "run-orphan", finishedAt: "2026-08-10T00:00:01.000Z",
-      attempt: 2, childExit: { code: 0, signal: null }, timedOut: false,
+      version: 1,
+      runId: "run-orphan",
+      finishedAt: "2026-08-10T00:00:01.000Z",
+      attempt: 2,
+      childExit: { code: 0, signal: null },
+      timedOut: false,
     })
 
     // when
@@ -143,12 +167,20 @@ describe("reflection and dream run reconciliation", () => {
     expect(await readFile(join(item.identity.paths.repo, "system", "orphan.md"), "utf8")).toContain("recovered")
     expect((await item.store.readState()).active).toBeUndefined()
     expect((await item.journal.getState()).reflected_completed_steps).toBe(1)
-    expect(JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", "run-orphan.json"), "utf8"))).toMatchObject({
-      runId: "run-orphan", trigger: "dream", origin: "shutdown", outcome: "merged",
-      model: "omo-mock/mock-1", thinking: "minimal",
+    expect(
+      JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", "run-orphan.json"), "utf8")),
+    ).toMatchObject({
+      runId: "run-orphan",
+      trigger: "dream",
+      origin: "shutdown",
+      outcome: "merged",
+      model: "omo-mock/mock-1",
+      thinking: "minimal",
     })
     expect(JSON.parse(await readFile(join(item.runDir, "final.json"), "utf8"))).toMatchObject({
-      version: 1, runId: "run-orphan", outcome: "merged",
+      version: 1,
+      runId: "run-orphan",
+      outcome: "merged",
     })
   }, 30_000)
 
@@ -178,7 +210,7 @@ describe("reflection and dream run reconciliation", () => {
       identity: item.identity,
       reservation: item.store,
       getPidLiveness: () => "alive",
-      getProcessStartIdentity: async (pid) => pid === 222 ? "supervisor-two" : "child-two",
+      getProcessStartIdentity: async (pid) => (pid === 222 ? "supervisor-two" : "child-two"),
     })
 
     // then
@@ -223,8 +255,11 @@ describe("reflection and dream run reconciliation", () => {
     await commitOrphanWorktree(item)
     await writeFile(join(item.runDir, "child-stderr.log"), "model child failed validation\n")
     await writeRunJsonAtomic(join(item.runDir, "outcome.json"), {
-      version: 1, runId: "run-orphan", finishedAt: "2026-08-10T00:00:01.000Z",
-      childExit: { code: 7, signal: null }, timedOut: false,
+      version: 1,
+      runId: "run-orphan",
+      finishedAt: "2026-08-10T00:00:01.000Z",
+      childExit: { code: 7, signal: null },
+      timedOut: false,
     })
 
     // when
@@ -234,7 +269,9 @@ describe("reflection and dream run reconciliation", () => {
     expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
     expect(Bun.file(join(item.identity.paths.repo, "system", "orphan.md")).size).toBe(0)
     expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
-    const completion = JSON.parse(await readFile(join(item.identity.paths.reflection, "completions", "run-orphan.json"), "utf8"))
+    const completion = JSON.parse(
+      await readFile(join(item.identity.paths.reflection, "completions", "run-orphan.json"), "utf8"),
+    )
     expect(completion.detail).toContain("model child failed validation")
   }, 30_000)
 
@@ -242,7 +279,11 @@ describe("reflection and dream run reconciliation", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: null, childPid: 333, childProcessStart: null,
+      ...item.ledger,
+      pid: 222,
+      processStart: null,
+      childPid: 333,
+      childProcessStart: null,
     })
 
     // when
@@ -258,7 +299,9 @@ describe("reflection and dream run reconciliation", () => {
     // then
     expect(results).toEqual([{ runId: "run-orphan", outcome: "abandoned_unknown" }])
     expect(JSON.parse(await readFile(join(item.runDir, "abandoned.json"), "utf8"))).toMatchObject({
-      version: 1, runId: "run-orphan", outcome: "abandoned_unknown",
+      version: 1,
+      runId: "run-orphan",
+      outcome: "abandoned_unknown",
     })
     expect(Bun.file(join(item.runDir, "final.json")).size).toBe(0)
     expect(Bun.file(item.worktree.dir).size).not.toBe(0)
@@ -269,7 +312,11 @@ describe("reflection and dream run reconciliation", () => {
     // given
     const item = await fixture()
     await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
-      ...item.ledger, pid: 222, processStart: "supervisor-start", childPid: 333, childProcessStart: "child-start",
+      ...item.ledger,
+      pid: 222,
+      processStart: "supervisor-start",
+      childPid: 333,
+      childProcessStart: "child-start",
     })
     let childAlive = true
     const signals: Array<{ pid: number; signal: NodeJS.Signals; at: number }> = []
@@ -280,9 +327,11 @@ describe("reflection and dream run reconciliation", () => {
       identity: item.identity,
       reservation: item.store,
       now: () => now,
-      getPidLiveness: (pid) => pid === 222 ? "dead" : childAlive ? "alive" : "dead",
-      getProcessStartIdentity: async (pid) => pid === 333 ? "child-start" : null,
-      waitUntil: async (deadlineAt) => { now = deadlineAt },
+      getPidLiveness: (pid) => (pid === 222 ? "dead" : childAlive ? "alive" : "dead"),
+      getProcessStartIdentity: async (pid) => (pid === 333 ? "child-start" : null),
+      waitUntil: async (deadlineAt) => {
+        now = deadlineAt
+      },
       signalProcessGroup: (pid, signal) => {
         signals.push({ pid, signal, at: now })
         if (signal === "SIGKILL") childAlive = false
@@ -328,93 +377,118 @@ describe("reflection and dream run reconciliation", () => {
   }, 30_000)
 
   test.each([
-    ["final", true], ["final", false], ["abandoned", true], ["abandoned", false],
-  ] as const)("#given a retired %s run dir with prelaunch=%s shadowing a newer dead-launcher reservation #when reconciled #then pending is promoted", async (terminal, hasPrelaunch) => {
-    // given: the terminal directory predates the reservation holding the same run id.
-    // Abandonment writes abandonedAt and leaves the ledger without finalization fields.
-    const item = await fixture()
-    await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
-    if (!hasPrelaunch) await rm(join(item.runDir, "prelaunch.json"))
-    const terminalPath = join(item.runDir, `${terminal}.json`)
-    const terminalBefore = await readFile(terminalPath, "utf8")
-    const ledgerBefore = await readFile(join(item.runDir, "ledger.json"), "utf8")
-    await queuePendingReservation(item)
+    ["final", true],
+    ["final", false],
+    ["abandoned", true],
+    ["abandoned", false],
+  ] as const)(
+    "#given a retired %s run dir with prelaunch=%s shadowing a newer dead-launcher reservation #when reconciled #then pending is promoted",
+    async (terminal, hasPrelaunch) => {
+      // given: the terminal directory predates the reservation holding the same run id.
+      // Abandonment writes abandonedAt and leaves the ledger without finalization fields.
+      const item = await fixture()
+      await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
+      if (!hasPrelaunch) await rm(join(item.runDir, "prelaunch.json"))
+      const terminalPath = join(item.runDir, `${terminal}.json`)
+      const terminalBefore = await readFile(terminalPath, "utf8")
+      const ledgerBefore = await readFile(join(item.runDir, "ledger.json"), "utf8")
+      await queuePendingReservation(item)
 
-    // when
-    const launched: string[] = []
-    const results = await reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-      launch: (run) => { launched.push(run.runId) },
-      hostname: () => "fixture-host",
-      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
-      getPidLiveness: () => "dead",
-    })
+      // when
+      const launched: string[] = []
+      const results = await reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        launch: (run) => {
+          launched.push(run.runId)
+        },
+        hostname: () => "fixture-host",
+        now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+        getPidLiveness: () => "dead",
+      })
 
-    // then
-    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
-    expect(launched).toEqual(["run-pending"])
-    expect(await readFile(terminalPath, "utf8")).toBe(terminalBefore)
-    expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe(ledgerBefore)
-    expect(existsSync(item.worktree.dir)).toBe(true)
-    expect((await item.store.readState()).active?.runId).toBe("run-pending")
-    expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
-  }, 30_000)
-
-  test.each([
-    ["final", "2026-08-10T00:00:00.000Z"], ["final", "2026-08-10T00:00:30.000Z"],
-    ["abandoned", "2026-08-10T00:00:00.000Z"], ["abandoned", "2026-08-10T00:00:30.000Z"],
-  ] as const)("#given a %s run dir terminated at %s in its own generation #when reconciled #then it is left untouched", async (terminal, finishedAt) => {
-    // given: the same shape as the reclaim case except the run directory belongs to THIS
-    // reservation - it was finalized after reservedAt - so it must never be reclaimed.
-    const item = await fixture()
-    await retireRunGeneration(item, finishedAt, terminal)
-    const before = await item.store.readState()
-
-    // when
-    const results = await reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-      hostname: () => "fixture-host",
-      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
-      getPidLiveness: () => "dead",
-    })
-
-    // then
-    expect(results).toEqual([])
-    expect(await item.store.readState()).toEqual(before)
-  }, 30_000)
+      // then
+      expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+      expect(launched).toEqual(["run-pending"])
+      expect(await readFile(terminalPath, "utf8")).toBe(terminalBefore)
+      expect(await readFile(join(item.runDir, "ledger.json"), "utf8")).toBe(ledgerBefore)
+      expect(existsSync(item.worktree.dir)).toBe(true)
+      expect((await item.store.readState()).active?.runId).toBe("run-pending")
+      expect((await item.journal.getState()).reflected_completed_steps).toBe(0)
+    },
+    30_000,
+  )
 
   test.each([
-    ["final", undefined], ["final", "invalid"], ["final", 123], ["final", null],
-    ["abandoned", undefined], ["abandoned", "invalid"], ["abandoned", 123], ["abandoned", null],
-  ] as const)("#given %s has invalid terminal timestamp %s #when reconciled #then the reservation is released, the finished run is not quarantined and its artifact is untouched", async (terminal, timestamp) => {
-    const item = await fixture()
-    await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
-    const path = join(item.runDir, `${terminal}.json`)
-    const artifact = JSON.parse(await readFile(path, "utf8"))
-    await writeRunJsonAtomic(path, {
-      ...artifact,
-      [terminal === "final" ? "finishedAt" : "abandonedAt"]: timestamp,
-    })
-    await queuePendingReservation(item)
-    const terminalBefore = await readFile(path, "utf8")
-    const launched: string[] = []
+    ["final", "2026-08-10T00:00:00.000Z"],
+    ["final", "2026-08-10T00:00:30.000Z"],
+    ["abandoned", "2026-08-10T00:00:00.000Z"],
+    ["abandoned", "2026-08-10T00:00:30.000Z"],
+  ] as const)(
+    "#given a %s run dir terminated at %s in its own generation #when reconciled #then it is left untouched",
+    async (terminal, finishedAt) => {
+      // given: the same shape as the reclaim case except the run directory belongs to THIS
+      // reservation - it was finalized after reservedAt - so it must never be reclaimed.
+      const item = await fixture()
+      await retireRunGeneration(item, finishedAt, terminal)
+      const before = await item.store.readState()
 
-    const results = await reconcileReflectionRuns({
-      identity: item.identity,
-      reservation: item.store,
-      launch: (run) => launched.push(run.runId),
-      hostname: () => "fixture-host",
-      now: () => Date.parse("2026-08-10T00:01:01.001Z"),
-      getPidLiveness: () => "dead",
-    })
+      // when
+      const results = await reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        hostname: () => "fixture-host",
+        now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+        getPidLiveness: () => "dead",
+      })
 
-    expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
-    expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
-    expect(await readFile(path, "utf8")).toBe(terminalBefore)
-    expect(launched).toEqual(["run-pending"])
-  }, 30_000)
+      // then
+      expect(results).toEqual([])
+      expect(await item.store.readState()).toEqual(before)
+    },
+    30_000,
+  )
+
+  test.each([
+    ["final", undefined],
+    ["final", "invalid"],
+    ["final", 123],
+    ["final", null],
+    ["abandoned", undefined],
+    ["abandoned", "invalid"],
+    ["abandoned", 123],
+    ["abandoned", null],
+  ] as const)(
+    "#given %s has invalid terminal timestamp %s #when reconciled #then the reservation is released, the finished run is not quarantined and its artifact is untouched",
+    async (terminal, timestamp) => {
+      const item = await fixture()
+      await retireRunGeneration(item, "2026-08-09T00:00:00.000Z", terminal)
+      const path = join(item.runDir, `${terminal}.json`)
+      const artifact = JSON.parse(await readFile(path, "utf8"))
+      await writeRunJsonAtomic(path, {
+        ...artifact,
+        [terminal === "final" ? "finishedAt" : "abandonedAt"]: timestamp,
+      })
+      await queuePendingReservation(item)
+      const terminalBefore = await readFile(path, "utf8")
+      const launched: string[] = []
+
+      const results = await reconcileReflectionRuns({
+        identity: item.identity,
+        reservation: item.store,
+        launch: (run) => launched.push(run.runId),
+        hostname: () => "fixture-host",
+        now: () => Date.parse("2026-08-10T00:01:01.001Z"),
+        getPidLiveness: () => "dead",
+      })
+
+      expect(results).toEqual([{ runId: "run-orphan", outcome: "failed" }])
+      expect(existsSync(join(item.runDir, "quarantined.json"))).toBe(false)
+      expect(await readFile(path, "utf8")).toBe(terminalBefore)
+      expect(launched).toEqual(["run-pending"])
+    },
+    30_000,
+  )
 
   test("#given an old prelaunch worktree without a ledger and a confirmed-dead launcher #when reconciled #then resources and reservation are released and the run dir records the interrupted launch", async () => {
     // given
@@ -438,11 +512,18 @@ describe("reflection and dream run reconciliation", () => {
     expect(existsSync(item.worktree.dir)).toBe(false)
     expect(await readFile(join(item.runDir, "prelaunch.json"), "utf8")).toBe(prelaunchBefore)
     expect(JSON.parse(await readFile(join(item.runDir, "abandoned.json"), "utf8"))).toMatchObject({
-      runId: "run-orphan", reason: "launch_interrupted", kind: "reflection", trigger: "step-count",
+      runId: "run-orphan",
+      reason: "launch_interrupted",
+      kind: "reflection",
+      trigger: "step-count",
     })
-    expect((await item.worktree.exec.run(
-      ["show-ref", "--verify", `refs/heads/${item.worktree.branch}`],
-      { cwd: item.repo.dir, timeoutMs: 30_000 },
-    )).code).not.toBe(0)
+    expect(
+      (
+        await item.worktree.exec.run(["show-ref", "--verify", `refs/heads/${item.worktree.branch}`], {
+          cwd: item.repo.dir,
+          timeoutMs: 30_000,
+        })
+      ).code,
+    ).not.toBe(0)
   }, 30_000)
 })

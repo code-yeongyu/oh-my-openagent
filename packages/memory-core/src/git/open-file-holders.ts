@@ -147,8 +147,14 @@ function boundedScan(scan: Promise<ProcScan>, boundMs: number): Promise<ProcScan
   return new Promise((resolveScan) => {
     const bound = setTimeout(() => resolveScan({ kind: "indeterminate" }), boundMs)
     scan.then(
-      (answer) => { clearTimeout(bound); resolveScan(answer) },
-      () => { clearTimeout(bound); resolveScan({ kind: "indeterminate" }) },
+      (answer) => {
+        clearTimeout(bound)
+        resolveScan(answer)
+      },
+      () => {
+        clearTimeout(bound)
+        resolveScan({ kind: "indeterminate" })
+      },
     )
   })
 }
@@ -180,9 +186,16 @@ export async function answerFromProcOrLsof(
 }
 
 /** Pids holding `path` open right now, or null when no available source can answer. */
-export function findOpenFileHolderPids(path: string, options: HolderLookupOptions = {}): Promise<readonly number[] | null> {
+export function findOpenFileHolderPids(
+  path: string,
+  options: HolderLookupOptions = {},
+): Promise<readonly number[] | null> {
   const boundMs = options.lsofBoundMs ?? LSOF_ANSWER_BOUND_MS
-  return answerFromProcOrLsof((view) => scanProcFdHolders(path, view), () => scanLsofHolders(path, boundMs), boundMs)
+  return answerFromProcOrLsof(
+    (view) => scanProcFdHolders(path, view),
+    () => scanLsofHolders(path, boundMs),
+    boundMs,
+  )
 }
 
 /** Fail closed (review LOW 5): a check that could not answer counts as held, never as clean. */

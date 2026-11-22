@@ -18,10 +18,7 @@ type TeamMemberTaskIdentity = {
 }
 
 export type TeamMemberRespawnLaunchErrorCode =
-  | "runtime_unavailable"
-  | "runtime_inactive"
-  | "member_missing"
-  | "task_mapping_mismatch"
+  "runtime_unavailable" | "runtime_inactive" | "member_missing" | "task_mapping_mismatch"
 
 export class TeamMemberRespawnLaunchError extends Error {
   readonly code: TeamMemberRespawnLaunchErrorCode
@@ -56,7 +53,9 @@ export function createTeamMemberRespawnLaunchResolver(
     // Resolved per revival, never snapshotted at construction: a child revived after its session
     // loaded more extensions must reproduce the set it actually had, not the one this resolver was
     // built with (#8492).
-    const inheritedExtensions = [...new Set(await resolveInheritedExtensionList(options.memberExtension.inheritedExtensions))]
+    const inheritedExtensions = [
+      ...new Set(await resolveInheritedExtensionList(options.memberExtension.inheritedExtensions)),
+    ]
     const extensions = assembleMemberExtensions(options.memberExtension.entryPath, inheritedExtensions)
     const identity = parseTeamMemberTaskName(record.name)
     if (identity === undefined) return { extensions: inheritedExtensions }

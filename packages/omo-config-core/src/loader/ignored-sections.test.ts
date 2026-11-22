@@ -49,8 +49,13 @@ describe("ignored config sections", () => {
         const result = loadOmoConfig({ cwd, env: { HOME: homeDir }, harness: "senpi", profile: "work" })
 
         expect(result.sources.filter((source) => source.loaded).map((source) => source.path)).toEqual([path])
+        // Read issuePaths, not the serialized text: messages embed the config path, which can contain a key.
+        expect(result.diagnostics.map((diagnostic) => diagnostic.kind)).toEqual(["deprecated-keys"])
+        const issueSegments = result.diagnostics.flatMap((diagnostic) =>
+          (diagnostic.issuePaths ?? []).flatMap((issuePath) => issuePath.split(".")),
+        )
         for (const sectionKey of sections) {
-          expect(JSON.stringify(result.diagnostics)).not.toContain(sectionKey)
+          expect(issueSegments).not.toContain(sectionKey)
         }
         expect(result.config.disabled_skills).toEqual(["kept"])
         expect(result.config.task?.default_concurrency).toBe(3)

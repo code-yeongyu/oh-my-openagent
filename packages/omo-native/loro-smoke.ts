@@ -26,10 +26,13 @@ export async function runLoroSmoke(): Promise<number> {
     const updateHex = hexOf(doc.export({ mode: "update" }))
     const shallowHex = hexOf(doc.export({ mode: "shallow-snapshot", frontiers: doc.oplogFrontiers() }))
     if (updateHex !== LORO_SMOKE_UPDATE_HEX) throw new Error("update encoding drifted from the committed fixture")
-    if (shallowHex !== LORO_SMOKE_SHALLOW_HEX) throw new Error("shallow-snapshot encoding drifted from the committed fixture")
+    if (shallowHex !== LORO_SMOKE_SHALLOW_HEX)
+      throw new Error("shallow-snapshot encoding drifted from the committed fixture")
   } finally {
     doc.free()
   }
-  console.log(`loro-smoke ok: runtime initialized, edits applied, encodings match loro-crdt 1.16.4 (${LORO_SMOKE_UPDATE_HEX.length / 2}-byte update, ${LORO_SMOKE_SHALLOW_HEX.length / 2}-byte shallow snapshot)`)
+  console.log(
+    `loro-smoke ok: runtime initialized, edits applied, encodings match loro-crdt 1.16.4 (${LORO_SMOKE_UPDATE_HEX.length / 2}-byte update, ${LORO_SMOKE_SHALLOW_HEX.length / 2}-byte shallow snapshot)`,
+  )
   return 0
 }

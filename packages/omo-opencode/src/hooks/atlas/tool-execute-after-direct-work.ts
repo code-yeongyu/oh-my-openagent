@@ -1,10 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resolve } from "node:path"
-import {
-  endTaskTimer,
-  getWorkForSession,
-  resolveBoulderPlanPathForWork,
-} from "../../features/boulder-state"
+import { endTaskTimer, getWorkForSession, resolveBoulderPlanPathForWork } from "../../features/boulder-state"
 import { log } from "../../shared/logger"
 import { HOOK_NAME } from "./hook-name"
 import { isOmoPath } from "./omo-path"
@@ -26,9 +22,7 @@ export async function handleDirectWorkToolAfter(input: {
   }
 
   let filePath = toolInput.callID ? pendingFilePaths.get(toolInput.callID) : undefined
-  const planSnapshot = toolInput.callID && pendingPlanSnapshots
-    ? pendingPlanSnapshots.get(toolInput.callID)
-    : undefined
+  const planSnapshot = toolInput.callID && pendingPlanSnapshots ? pendingPlanSnapshots.get(toolInput.callID) : undefined
   if (toolInput.callID) {
     pendingFilePaths.delete(toolInput.callID)
     pendingPlanSnapshots?.delete(toolInput.callID)

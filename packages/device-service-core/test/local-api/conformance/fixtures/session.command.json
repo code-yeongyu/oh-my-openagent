@@ -45,9 +45,9 @@
             "type": "session.command",
             "attach": "<ref:a>",
             "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
-            "command": {
-              "op": "prompt",
-              "text": "hello"
+            "rpc": {
+              "type": "prompt",
+              "message": "hello"
             }
           }
         },
@@ -133,8 +133,8 @@
             "id": "2",
             "type": "session.command",
             "attach": "<ref:a>",
-            "command": {
-              "op": "abort"
+            "rpc": {
+              "type": "abort"
             }
           }
         },
@@ -221,8 +221,8 @@
             "type": "session.command",
             "attach": "<ref:a>",
             "command_id": "cmd_0123456789abcdef0123",
-            "command": {
-              "op": "abort"
+            "rpc": {
+              "type": "abort"
             }
           }
         },
@@ -282,9 +282,9 @@
             "type": "session.command",
             "attach": "<ref:a>",
             "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
-            "command": {
-              "op": "prompt",
-              "text": "one"
+            "rpc": {
+              "type": "prompt",
+              "message": "one"
             }
           }
         },
@@ -331,9 +331,9 @@
             "type": "session.command",
             "attach": "<ref:a>",
             "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
-            "command": {
-              "op": "prompt",
-              "text": "two"
+            "rpc": {
+              "type": "prompt",
+              "message": "two"
             }
           }
         },
@@ -358,8 +358,8 @@
             "id": "1",
             "type": "session.command",
             "attach": "bm8tc3VjaC1hdHRhY2g",
-            "command": {
-              "op": "abort"
+            "rpc": {
+              "type": "abort"
             }
           }
         },
@@ -370,6 +370,68 @@
             "ok": false,
             "error": {
               "code": "not_attached"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "the five-op command body is refused invalid_request",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "att",
+            "type": "session.attach",
+            "device": "dev-peer-1",
+            "session_id": "c2Vzc2lvbi1rZXktMDAwMQ"
+          }
+        },
+        {
+          "expect": {
+            "id": "att",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "attach": "<capture:a>"
+            }
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.snapshot",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "expect": {
+            "type": "event",
+            "kind": "session.records",
+            "attach": "<ref:a>",
+            "attach_id": 1
+          }
+        },
+        {
+          "send": {
+            "id": "2",
+            "type": "session.command",
+            "attach": "<ref:a>",
+            "command_id": "Y29tbWFuZC1pZC0wMDAwMQ",
+            "command": {
+              "op": "prompt",
+              "text": "hello"
+            }
+          }
+        },
+        {
+          "expect": {
+            "id": "2",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
             }
           }
         }

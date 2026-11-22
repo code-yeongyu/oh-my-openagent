@@ -47,7 +47,11 @@ export function removeStaleMarketplaceHookStateBlocks(
   })
 }
 
-export function ensureMarketplaceBlock(config: string, marketplaceName: string, source: CodexMarketplaceSource): string {
+export function ensureMarketplaceBlock(
+  config: string,
+  marketplaceName: string,
+  source: CodexMarketplaceSource,
+): string {
   const header = `marketplaces.${marketplaceName}`
   const lines = [
     `[${header}]`,

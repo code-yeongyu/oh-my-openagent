@@ -11,7 +11,8 @@ export interface SkillCommandsComponentOptions {
   readonly skillsDir?: string
 }
 
-type InputResult = { action: "continue" } | { action: "handled" } | { action: "transform"; text: string; images?: unknown[] }
+type InputResult =
+  { action: "continue" } | { action: "handled" } | { action: "transform"; text: string; images?: unknown[] }
 
 interface InputEvent {
   readonly text: string
@@ -38,9 +39,13 @@ export function createSkillCommandsComponent(options: SkillCommandsComponentOpti
   return {
     name: SKILL_COMMANDS_COMPONENT_NAME,
     register(pi: SenpiExtensionAPI, ctx: ComponentContext): void {
-      const bundledSkillNames = readBundledSkillNames(options.skillsDir ?? resolveBundledSkillsDir(undefined, options.env, ctx))
+      const bundledSkillNames = readBundledSkillNames(
+        options.skillsDir ?? resolveBundledSkillsDir(undefined, options.env, ctx),
+      )
       if (bundledSkillNames.size === 0) {
-        ctx.logger.debug?.("no bundled skills found; bare skill commands disabled", { component: SKILL_COMMANDS_COMPONENT_NAME })
+        ctx.logger.debug?.("no bundled skills found; bare skill commands disabled", {
+          component: SKILL_COMMANDS_COMPONENT_NAME,
+        })
         return
       }
       const hostCommands = (): readonly HostCommandInfo[] | undefined => pi.getCommands?.()

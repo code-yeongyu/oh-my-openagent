@@ -59,19 +59,25 @@ describe("omo doctor transient memory identities", () => {
     const packageRoot = join(root, "app")
     mkdirSync(packageRoot, { recursive: true })
     cpSync(join(SOURCE_ROOT, "bin"), join(packageRoot, "bin"), { recursive: true })
-    writeFile(join(packageRoot, "package.json"), JSON.stringify({
-      name: "omo-ai",
-      version: "1.2.3-test.0",
-      type: "module",
-      dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
-    }))
+    writeFile(
+      join(packageRoot, "package.json"),
+      JSON.stringify({
+        name: "omo-ai",
+        version: "1.2.3-test.0",
+        type: "module",
+        dependencies: { "@code-yeongyu/senpi": "2026.8.9" },
+      }),
+    )
     const senpiRoot = join(packageRoot, "node_modules", "@code-yeongyu", "senpi")
-    writeFile(join(senpiRoot, "package.json"), JSON.stringify({
-      name: "@code-yeongyu/senpi",
-      version: "2026.8.9",
-      type: "module",
-      exports: { ".": "./dist/index.js" },
-    }))
+    writeFile(
+      join(senpiRoot, "package.json"),
+      JSON.stringify({
+        name: "@code-yeongyu/senpi",
+        version: "2026.8.9",
+        type: "module",
+        exports: { ".": "./dist/index.js" },
+      }),
+    )
     writeFile(join(senpiRoot, "dist", "index.js"), "export const fixture = true\n")
     writeFile(join(senpiRoot, "dist", "cli.js"), "process.exit(0)\n")
     writeFile(join(senpiRoot, "dist", "core", "brand.js"), "export {}\n")
@@ -80,7 +86,8 @@ describe("omo doctor transient memory identities", () => {
       "plugin/extensions/omo.js",
       "plugin/runtime/lsp-daemon/dist/cli.js",
       "plugin/runtime/agent-toolkit/cli.js",
-    ]) writeFile(join(packageRoot, artifact))
+    ])
+      writeFile(join(packageRoot, artifact))
 
     const memoryHome = join(root, "memory")
     writeFile(join(memoryHome, "agents", "durable-1", "repo", "system", "persona.md"))

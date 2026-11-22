@@ -51,9 +51,7 @@ export function createUuidV7Generator(source: UuidV7Source = {}): () => string {
 const fallbackEventId = createUuidV7Generator()
 
 export function createEventId(): string {
-  return typeof Bun !== "undefined" && typeof Bun.randomUUIDv7 === "function"
-    ? Bun.randomUUIDv7()
-    : fallbackEventId()
+  return typeof Bun !== "undefined" && typeof Bun.randomUUIDv7 === "function" ? Bun.randomUUIDv7() : fallbackEventId()
 }
 
 function formatUuid(bytes: Uint8Array): string {

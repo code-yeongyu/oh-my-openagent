@@ -44,7 +44,13 @@ describe("suspendOnSessionShutdown", () => {
     expect(registry.forgotten).toEqual(["st_000000f4"])
     expect(readEvents(store, "st_000000f4").at(-1)).toBe("destroyed")
     expect(readEvents(store, "st_000000f4")).not.toContain("suspended")
-    expect(summary).toEqual({ suspended_in_process: 0, suspended_rpc: 0, suspended_pending: 0, disposed: 1, failures: [] })
+    expect(summary).toEqual({
+      suspended_in_process: 0,
+      suspended_rpc: 0,
+      suspended_pending: 0,
+      disposed: 1,
+      failures: [],
+    })
   })
 
   test("#given a killed resident #when its session shuts down #then it is disposed with a destroyed event, never persisted_only", async () => {
@@ -73,7 +79,13 @@ describe("suspendOnSessionShutdown", () => {
     expect(record?.residency_state).toBe("disposed")
     expect(readEvents(store, "st_000000f8").at(-1)).toBe("destroyed")
     expect(readEvents(store, "st_000000f8")).not.toContain("suspended")
-    expect(summary).toEqual({ suspended_in_process: 0, suspended_rpc: 0, suspended_pending: 0, disposed: 1, failures: [] })
+    expect(summary).toEqual({
+      suspended_in_process: 0,
+      suspended_rpc: 0,
+      suspended_pending: 0,
+      disposed: 1,
+      failures: [],
+    })
   })
 
   test("#given resume_children false #when the session shuts down #then the legacy dispose path runs and pending records stay untouched", async () => {
@@ -120,7 +132,13 @@ describe("suspendOnSessionShutdown", () => {
     expect(pending?.host_pid).toBe(HOST)
     expect(dequeued).toEqual([])
     expect(readEvents(store, "st_000000fa")).toEqual([])
-    expect(summary).toEqual({ suspended_in_process: 0, suspended_rpc: 0, suspended_pending: 0, disposed: 1, failures: [] })
+    expect(summary).toEqual({
+      suspended_in_process: 0,
+      suspended_rpc: 0,
+      suspended_pending: 0,
+      disposed: 1,
+      failures: [],
+    })
   })
 
   test("#given one child whose dispose throws #when the session shuts down #then the other child still suspends and the failure is reported", async () => {
@@ -186,6 +204,12 @@ describe("suspendOnSessionShutdown", () => {
     const record = store.load("st_000000fd")
     expect(record?.residency_state).toBe("persisted_only")
     expect(readEvents(store, "st_000000fd").at(-1)).toBe("suspended")
-    expect(summary).toEqual({ suspended_in_process: 1, suspended_rpc: 0, suspended_pending: 0, disposed: 0, failures: [] })
+    expect(summary).toEqual({
+      suspended_in_process: 1,
+      suspended_rpc: 0,
+      suspended_pending: 0,
+      disposed: 0,
+      failures: [],
+    })
   })
 })

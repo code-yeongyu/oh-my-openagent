@@ -51,14 +51,32 @@ const PER_MODEL: ReadonlyArray<readonly [string, NumericTurnField]> = [
 ]
 
 export const SUMMARY_NUMBER_KEYS: readonly string[] = [
-  "summary_seq", "sample_rate", "turns", "first_turn_index", "last_turn_index", "window_ms",
-  "total_tokens_p50", "total_tokens_p95", "total_tokens_max", "model_count",
-  "other_turns", "other_total_tokens", "other_cost_usd", "cost_usd", "dropped_events",
+  "summary_seq",
+  "sample_rate",
+  "turns",
+  "first_turn_index",
+  "last_turn_index",
+  "window_ms",
+  "total_tokens_p50",
+  "total_tokens_p95",
+  "total_tokens_max",
+  "model_count",
+  "other_turns",
+  "other_total_tokens",
+  "other_cost_usd",
+  "cost_usd",
+  "dropped_events",
   ...SUMMED.map(([key]) => key),
   ...COUNTED.map(([key]) => key),
 ]
 // Per-model slots publish cost in USD only; their integer sums stay internal.
-export const MODEL_SLOT_NUMBER_KEYS: readonly string[] = ["turns", "input_tokens", "output_tokens", "total_tokens", "cost_usd"]
+export const MODEL_SLOT_NUMBER_KEYS: readonly string[] = [
+  "turns",
+  "input_tokens",
+  "output_tokens",
+  "total_tokens",
+  "cost_usd",
+]
 
 export type ModelTotals = { provider: string; model: string; sums: Record<string, number> }
 
@@ -97,7 +115,15 @@ export function newSummaryEpoch(): string {
 export const SUMMARY_EPOCH_SHAPE = /^[0-9a-f]{16}$/
 
 export function openWindow(at: number, turnIndex: number): SummaryWindow {
-  return { startedAt: at, lastAt: at, firstTurnIndex: turnIndex, lastTurnIndex: turnIndex, sums: {}, totals: [], models: [] }
+  return {
+    startedAt: at,
+    lastAt: at,
+    firstTurnIndex: turnIndex,
+    lastTurnIndex: turnIndex,
+    sums: {},
+    totals: [],
+    models: [],
+  }
 }
 
 const isFiniteNumber = (value: unknown): boolean => Number.isFinite(value)
@@ -108,13 +134,26 @@ const isSums = (value: unknown): boolean =>
 // rather than summed into a row that claims exact totals.
 export function isSummaryWindow(value: unknown): value is SummaryWindow {
   if (typeof value !== "object" || value === null) return false
-  if (!["startedAt", "lastAt", "firstTurnIndex", "lastTurnIndex"].every((key) => isFiniteNumber(Reflect.get(value, key)))) return false
+  if (
+    !["startedAt", "lastAt", "firstTurnIndex", "lastTurnIndex"].every((key) => isFiniteNumber(Reflect.get(value, key)))
+  )
+    return false
   const totals: unknown = Reflect.get(value, "totals")
   const models: unknown = Reflect.get(value, "models")
-  return isSums(Reflect.get(value, "sums")) && Array.isArray(totals) && totals.every(isFiniteNumber)
-    && Array.isArray(models) && models.every((model: unknown) => typeof model === "object" && model !== null
-      && typeof Reflect.get(model, "provider") === "string" && typeof Reflect.get(model, "model") === "string"
-      && isSums(Reflect.get(model, "sums")))
+  return (
+    isSums(Reflect.get(value, "sums")) &&
+    Array.isArray(totals) &&
+    totals.every(isFiniteNumber) &&
+    Array.isArray(models) &&
+    models.every(
+      (model: unknown) =>
+        typeof model === "object" &&
+        model !== null &&
+        typeof Reflect.get(model, "provider") === "string" &&
+        typeof Reflect.get(model, "model") === "string" &&
+        isSums(Reflect.get(model, "sums")),
+    )
+  )
 }
 
 const add = (sums: Record<string, number>, key: string, value: number): void => {
@@ -136,9 +175,16 @@ export function addTurn(window: SummaryWindow, turn: SummaryTurn, at: number): v
   for (const [key, field] of PER_MODEL) add(entry.sums, key, turn[field])
 }
 
-export function summaryProperties(sessionHash: string, window: SummaryWindow, meta: SummaryMeta): EventTelemetryProperties {
-  const ranked = [...window.models].sort((left, right) =>
-    (right.sums["turns"] ?? 0) - (left.sums["turns"] ?? 0) || (right.sums["total_tokens"] ?? 0) - (left.sums["total_tokens"] ?? 0))
+export function summaryProperties(
+  sessionHash: string,
+  window: SummaryWindow,
+  meta: SummaryMeta,
+): EventTelemetryProperties {
+  const ranked = [...window.models].sort(
+    (left, right) =>
+      (right.sums["turns"] ?? 0) - (left.sums["turns"] ?? 0) ||
+      (right.sums["total_tokens"] ?? 0) - (left.sums["total_tokens"] ?? 0),
+  )
   const rest = ranked.slice(MODEL_SLOTS)
   const restSum = (key: string) => rest.reduce((sum, model) => sum + (model.sums[key] ?? 0), 0)
   const properties: Record<string, string | number | boolean> = {
@@ -168,7 +214,8 @@ export function summaryProperties(sessionHash: string, window: SummaryWindow, me
   for (let slot = 1; slot <= MODEL_SLOTS; slot += 1) {
     const model = ranked[slot - 1]
     // A window recovered from disk may predate a vocabulary change, so the provider is re-masked here, not trusted.
-    properties[`m${slot}_provider`] = model === undefined ? "none" : (Object.hasOwn(KNOWN_MODELS, model.provider) ? model.provider : "custom")
+    properties[`m${slot}_provider`] =
+      model === undefined ? "none" : Object.hasOwn(KNOWN_MODELS, model.provider) ? model.provider : "custom"
     properties[`m${slot}_model`] = model?.model ?? "none"
     for (const key of MODEL_SLOT_NUMBER_KEYS) properties[`m${slot}_${key}`] = model?.sums[key] ?? 0
     properties[`m${slot}_cost_usd`] = usdOf(model?.sums["cost_1e4"] ?? 0)

@@ -1,0 +1,80 @@
+import type { ThreadAddressEntry } from "../addressing"
+import { rowFolder, rowStatus, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+
+// Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
+// local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
+// alias, then the name ladder across every entry (two devices sharing a name are ambiguous_target naming each device).
+export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly string[]): ThreadAddressEntry {
+  const updated = new Date(row.updated_ms).toISOString()
+  const thread_id = row.durable_id ?? ""
+  const session_ids =
+    thread_id.length > 0 && row.session_id.length > 0 && row.session_id !== thread_id ? [row.session_id] : undefined
+  return {
+    thread_id,
+    // The device's own title, never rowName's folder fallback: that fallback is display-only (thread_list, marked
+    // unnamed), because folder names collide across threads and would turn into ambiguous addresses (#14043).
+    name: row.title,
+    status: rowStatus(row),
+    cwd: rowFolder(row),
+    created_at: updated,
+    updated_at: updated,
+    device: row.device,
+    ...(aliases === undefined ? {} : { aliases }),
+    ...(session_ids === undefined ? {} : { session_ids }),
+    transport: { kind: "relay", row },
+  }
+}
+
+/**
+ * The relay's transport reference for an address that names its device (`<device>/<durable id>`, as `omo remote` takes
+ * it), read without the account listing: the listing settles only with the slowest device and lags a session just opened
+ * (#12709). The device service resolves the durable id to its own key (decision 0027 D2).
+ */
+export function namedDeviceRow(device: string, durableId: string): RemoteSessionRow {
+  return {
+    device,
+    session_id: durableId,
+    durable_id: durableId,
+    title: "",
+    project: "",
+    path: "",
+    state: "idle",
+    updated_ms: 0,
+  }
+}
+
+/**
+ * The session a create just made on another device (thread_create, `omo remote open`), addressed by the relay key its open
+ * reply named (`sessionId`) and only failing that by its durable id: the device has not listed the new session yet, so its
+ * service cannot resolve the durable id and answers unknown_session (measured over the relay, omo#13748).
+ */
+export function createdDeviceRow(
+  device: string,
+  thread: { readonly thread_id: string; readonly sessionId?: string; readonly name: string; readonly cwd: string },
+): RemoteSessionRow {
+  return {
+    ...namedDeviceRow(device, thread.thread_id),
+    session_id: thread.sessionId ?? thread.thread_id,
+    title: thread.name,
+    project: thread.cwd,
+  }
+}
+
+/** One device's listing with whether it missed the round (#14280); a port without `listing` reports it answered. */
+export async function deviceListing(remote: RemoteThreadSurface, device: string): Promise<RemoteListing> {
+  return remote.sessions.listing !== undefined
+    ? await remote.sessions.listing({ device })
+    : { rows: await remote.sessions.sessions({ device }), incomplete: [] }
+}
+
+/**
+ * Device-service states in which no relay is set up for this account (`STATUS_STATES`, device-service-core vocabulary):
+ * a local address miss stays a local miss. Every other non-connected state (offline, connecting, activation_pending,
+ * keychain_locked, authorization_stale, service_degraded, update_required) means a configured relay is failing: the
+ * typed `host_unavailable` answers before `not_found`. No device service installed (no state) is not set up; a service
+ * that is installed but does not answer is an outage (`remoteReady` names its state `unreachable`).
+ */
+const REMOTE_NOT_SET_UP: ReadonlySet<string> = new Set(["not_configured", "disabled", "signed_out", "sign_in_required"])
+/** No state at all = no device service is installed on this device: the relay is not set up either. */
+export const remoteNotSetUp = (state: unknown): boolean =>
+  state === undefined || (typeof state === "string" && REMOTE_NOT_SET_UP.has(state))

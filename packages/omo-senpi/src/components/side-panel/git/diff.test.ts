@@ -110,7 +110,9 @@ describe("colorizeDiff", () => {
 })
 
 describe("readGitDiff", () => {
-  const exec = (stdout: string, code: number): PanelExec => async () => ({ stdout, code })
+  const exec =
+    (stdout: string, code: number): PanelExec =>
+    async () => ({ stdout, code })
 
   test("#given an untracked file whose diff exits 1 #when read #then the content is still returned", async () => {
     // given
@@ -164,9 +166,7 @@ describe("readGitDiff", () => {
     const calls: string[][] = []
     const runner: PanelExec = async (_command, args) => {
       calls.push([...args])
-      return calls.length === 1
-        ? { stdout: "", code: 128 }
-        : { stdout: "+++ b/new.txt\n+hello", code: 1 }
+      return calls.length === 1 ? { stdout: "", code: 128 } : { stdout: "+++ b/new.txt\n+hello", code: 1 }
     }
 
     // when

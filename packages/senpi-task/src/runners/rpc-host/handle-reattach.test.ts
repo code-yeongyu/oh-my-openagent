@@ -35,7 +35,11 @@ function reopenOn(host: FakeHost): HostSessionReattach {
   }
 }
 
-async function openWithReattach(host: FakeHost, sessionPath: string, reattach: HostSessionReattach): Promise<HostSessionChildHandle> {
+async function openWithReattach(
+  host: FakeHost,
+  sessionPath: string,
+  reattach: HostSessionReattach,
+): Promise<HostSessionChildHandle> {
   const client = hostClient(host)
   const opened = await client.open(childOpenInput(sessionPath))
   return createHostSessionHandle({
@@ -237,9 +241,9 @@ describe("host-session handle reattach", () => {
 
     // then: nothing was re-prompted; the steer is the only command after the restart
     expect(promptsOn(host)).toEqual(["do the work"])
-    expect(host.commands.filter((command) => command.type === "steer").map((command) => command.payload.message)).toEqual([
-      "one more thing",
-    ])
+    expect(
+      host.commands.filter((command) => command.type === "steer").map((command) => command.payload.message),
+    ).toEqual(["one more thing"])
     // no turn was running when the host died, so none is reported resumed
     expect(observed).not.toContain(HOST_TURN_RESUMED_EVENT)
     expect(handle.hasExited()).toBe(false)

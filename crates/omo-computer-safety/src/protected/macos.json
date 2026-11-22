@@ -1,0 +1,56 @@
+{
+  "v": 4,
+  "os": "macos",
+  "protectedSurfaces": [
+    "com.apple.SecurityAgent",
+    "com.apple.loginwindow",
+    "com.apple.appkit.xpc.openAndSavePanelService",
+    "com.apple.PrivacySecurity.extension",
+    "com.apple.systempreferences:PrivacySecurity",
+    "com.apple.controlcenter:pane",
+    "com.apple.UserNotificationCenter"
+  ],
+  "readOnlySurfaces": [
+    "com.apple.dock",
+    "com.apple.Spotlight",
+    "com.apple.controlcenter:menubar"
+  ],
+  "systemSurfaces": [
+    "com.apple.finder:desktop",
+    "com.apple.notificationcenterui",
+    "surface:menubar"
+  ],
+  "processes": [
+    "com.apple.finder",
+    "com.apple.dock",
+    "com.apple.controlcenter",
+    "com.apple.notificationcenterui",
+    "launchd",
+    "loginwindow",
+    "WindowServer"
+  ],
+  "deniedApps": [
+    "com.1password.1password",
+    "com.bitwarden.desktop",
+    "com.dashlane.Dashlane",
+    "com.lastpass.LastPass",
+    "com.nordpass.macos",
+    "me.proton.pass.electron",
+    "org.keepassxc.keepassxc",
+    "com.apple.Passwords",
+    "com.apple.keychainaccess"
+  ],
+  "dangerousChords": [
+    "cmd+q",
+    "cmd+opt+esc",
+    "ctrl+cmd+q"
+  ],
+  "chordsMatchSupersets": false,
+  "secureLabelRegex": "\\b(passw(or)?d|passcode|pin|otp|cvv|cvc|csc|ssn|card number)\\b",
+  "secureInputSources": [
+    "IsSecureEventInputEnabled",
+    "kCGSSessionSecureInputPID",
+    "AXSecureTextField",
+    "label:secureLabelRegex"
+  ]
+}

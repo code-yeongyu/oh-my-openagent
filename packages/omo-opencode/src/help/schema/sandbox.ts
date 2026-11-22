@@ -10,11 +10,13 @@ export const SandboxConfigSchema = z
     timeout: z.number().describe("Default execution timeout in seconds"),
     memory: z.string().nullable().optional().describe("Memory limit (e.g., '512MB')"),
     network: z.boolean().describe("Whether network access is allowed"),
-    filesystem: z.object({
-      read: z.array(z.string()).describe("Readable paths"),
-      write: z.array(z.string()).describe("Writable paths"),
-      tempDir: z.string().describe("Sandbox temporary directory"),
-    }).describe("Filesystem access rules"),
+    filesystem: z
+      .object({
+        read: z.array(z.string()).describe("Readable paths"),
+        write: z.array(z.string()).describe("Writable paths"),
+        tempDir: z.string().describe("Sandbox temporary directory"),
+      })
+      .describe("Filesystem access rules"),
   })
   .meta({ ref: "SandboxConfig" })
 

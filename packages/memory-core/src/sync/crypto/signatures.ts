@@ -76,5 +76,4 @@ export const authorSigningKey = (authority: Authority, author: SyncAuthor): stri
 export const verifyRecordSig = (
   signingPublicKey: string,
   fields: SyncRecordFields & { readonly record_sig: string },
-): Promise<boolean> =>
-  verifyTagged("omo-sync/v1/record", recordPayload(fields), signingPublicKey, fields.record_sig)
+): Promise<boolean> => verifyTagged("omo-sync/v1/record", recordPayload(fields), signingPublicKey, fields.record_sig)

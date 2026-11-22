@@ -37,8 +37,11 @@ function scenarioDiagnostics(outDir: string, scenario: ScenarioVerdict): string 
   const events = readIfPresent(join(dir, "task.jsonl.log"))
     .split("\n")
     .filter((line) => line.length > 0)
-    .map((line) => (JSON.parse(line) as { readonly type?: string; readonly payload?: unknown }))
-    .map((event) => `${event.type}${event.type === "child_error" || event.type === "task_start_failed" ? ` ${JSON.stringify(event.payload)}` : ""}`)
+    .map((line) => JSON.parse(line) as { readonly type?: string; readonly payload?: unknown })
+    .map(
+      (event) =>
+        `${event.type}${event.type === "child_error" || event.type === "task_start_failed" ? ` ${JSON.stringify(event.payload)}` : ""}`,
+    )
   return [
     `--- ${scenario.runner}/${scenario.scenario}: status=${String(record.status)} model=${String(record.model)} error=${String(record.error_message)}`,
     `events: ${events.join(", ")}`,
@@ -80,7 +83,10 @@ test.skipIf(!isWin32)(
     })
     let timer: ReturnType<typeof setTimeout> | undefined
     const deadline = new Promise<never>((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`fallback driver did not finish in ${DRIVER_TIMEOUT_MS}ms`)), DRIVER_TIMEOUT_MS)
+      timer = setTimeout(
+        () => reject(new Error(`fallback driver did not finish in ${DRIVER_TIMEOUT_MS}ms`)),
+        DRIVER_TIMEOUT_MS,
+      )
     })
 
     // when

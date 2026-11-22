@@ -1,12 +1,8 @@
-import type { WrapEntry } from "../crypto/entry.ts";
-import { wrapSetDigest } from "../crypto/links.ts";
-import type { RecoveryKeyPairs } from "./derive.ts";
-import {
-	disposeMaterial,
-	type EpochMaterial,
-	openWrapWithKey,
-} from "./key-material.ts";
-import type { RecoverRefusal, RecoveryCandidate } from "./ports.ts";
+import type { WrapEntry } from "../crypto/entry.ts"
+import { wrapSetDigest } from "../crypto/links.ts"
+import type { RecoveryKeyPairs } from "./derive.ts"
+import { disposeMaterial, type EpochMaterial, openWrapWithKey } from "./key-material.ts"
+import type { RecoverRefusal, RecoveryCandidate } from "./ports.ts"
 
 /**
  * Which recovery wrap the reference bridge opens (desktop #2897 review r4 H2), the same rule the
@@ -22,75 +18,61 @@ import type { RecoverRefusal, RecoveryCandidate } from "./ports.ts";
  * zeroed.
  */
 export const provenRecoveryMaterial = async (
-	account: string,
-	candidate: RecoveryCandidate,
-	keys: RecoveryKeyPairs,
+  account: string,
+  candidate: RecoveryCandidate,
+  keys: RecoveryKeyPairs,
 ): Promise<EpochMaterial | RecoverRefusal> => {
-	const id = `recovery:${candidate.key.credential_id}`;
-	const listed = candidate.enrollment.wraps;
-	const digest = await wrapSetDigest(listed);
-	const recoveryEntries = listed.filter((wrap) => wrap.id === id);
-	const enrollmentWrap = recoveryEntries[0];
-	if (
-		!digest.ok ||
-		digest.digest !== candidate.countersign.wrapsDigest ||
-		recoveryEntries.length !== 1 ||
-		enrollmentWrap === undefined ||
-		listed.some((wrap) => wrap.epoch !== enrollmentWrap.epoch)
-	)
-		return "wrap-unbound";
-	const open = async (
-		wrap: WrapEntry,
-		history: ReadonlyArray<readonly [number, string]>,
-	): Promise<EpochMaterial | null> => {
-		const opened = await openWrapWithKey(
-			keys.sealPrivate,
-			keys.sealPublic,
-			wrap,
-			{ account, epoch: wrap.epoch, id },
-			new Map(history),
-		);
-		return opened.ok ? opened.material : null;
-	};
-	if (sameEntry(candidate.wrap, enrollmentWrap))
-		return (
-			(await open(candidate.wrap, candidate.enrollment.expectedHistory)) ??
-			"wrap-refused"
-		);
-	if (candidate.wrap.epoch <= enrollmentWrap.epoch) return "wrap-unbound";
-	const enrolled = await open(
-		enrollmentWrap,
-		candidate.enrollment.expectedHistory,
-	);
-	if (enrolled === null) return "wrap-refused";
-	try {
-		const later = await open(candidate.wrap, candidate.expectedHistory);
-		if (later === null) return "wrap-refused";
-		const atEnrollment = later.history.find(
-			(row) => row.epoch === enrollmentWrap.epoch,
-		);
-		if (
-			atEnrollment === undefined ||
-			!sameKey(atEnrollment.key, enrolled.current)
-		) {
-			disposeMaterial(later);
-			return "wrap-unbound";
-		}
-		return later;
-	} finally {
-		disposeMaterial(enrolled);
-	}
-};
+  const id = `recovery:${candidate.key.credential_id}`
+  const listed = candidate.enrollment.wraps
+  const digest = await wrapSetDigest(listed)
+  const recoveryEntries = listed.filter((wrap) => wrap.id === id)
+  const enrollmentWrap = recoveryEntries[0]
+  if (
+    !digest.ok ||
+    digest.digest !== candidate.countersign.wrapsDigest ||
+    recoveryEntries.length !== 1 ||
+    enrollmentWrap === undefined ||
+    listed.some((wrap) => wrap.epoch !== enrollmentWrap.epoch)
+  )
+    return "wrap-unbound"
+  const open = async (
+    wrap: WrapEntry,
+    history: ReadonlyArray<readonly [number, string]>,
+  ): Promise<EpochMaterial | null> => {
+    const opened = await openWrapWithKey(
+      keys.sealPrivate,
+      keys.sealPublic,
+      wrap,
+      { account, epoch: wrap.epoch, id },
+      new Map(history),
+    )
+    return opened.ok ? opened.material : null
+  }
+  if (sameEntry(candidate.wrap, enrollmentWrap))
+    return (await open(candidate.wrap, candidate.enrollment.expectedHistory)) ?? "wrap-refused"
+  if (candidate.wrap.epoch <= enrollmentWrap.epoch) return "wrap-unbound"
+  const enrolled = await open(enrollmentWrap, candidate.enrollment.expectedHistory)
+  if (enrolled === null) return "wrap-refused"
+  try {
+    const later = await open(candidate.wrap, candidate.expectedHistory)
+    if (later === null) return "wrap-refused"
+    const atEnrollment = later.history.find((row) => row.epoch === enrollmentWrap.epoch)
+    if (atEnrollment === undefined || !sameKey(atEnrollment.key, enrolled.current)) {
+      disposeMaterial(later)
+      return "wrap-unbound"
+    }
+    return later
+  } finally {
+    disposeMaterial(enrolled)
+  }
+}
 
 const sameEntry = (left: WrapEntry, right: WrapEntry): boolean =>
-	left.epoch === right.epoch &&
-	left.id === right.id &&
-	left.wrap === right.wrap;
+  left.epoch === right.epoch && left.id === right.id && left.wrap === right.wrap
 
 const sameKey = (left: Uint8Array, right: Uint8Array): boolean => {
-	if (left.length !== right.length) return false;
-	let difference = 0;
-	for (let index = 0; index < left.length; index += 1)
-		difference |= (left[index] ?? 0) ^ (right[index] ?? 0);
-	return difference === 0;
-};
+  if (left.length !== right.length) return false
+  let difference = 0
+  for (let index = 0; index < left.length; index += 1) difference |= (left[index] ?? 0) ^ (right[index] ?? 0)
+  return difference === 0
+}

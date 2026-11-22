@@ -24,14 +24,25 @@ export function checkFileEnvironment(path: string): void {
   fileBaselines.delete(path)
   const replaced = process.env !== processEnvironment
   if (replaced) process.env = processEnvironment
-  const added = Object.keys(process.env).filter((key) => !Object.hasOwn(baseline, key)).sort()
-  const removed = Object.keys(baseline).filter((key) => !Object.hasOwn(process.env, key)).sort()
-  const changed = Object.keys(baseline).filter((key) => Object.hasOwn(process.env, key) && process.env[key] !== baseline[key]).sort()
+  const added = Object.keys(process.env)
+    .filter((key) => !Object.hasOwn(baseline, key))
+    .sort()
+  const removed = Object.keys(baseline)
+    .filter((key) => !Object.hasOwn(process.env, key))
+    .sort()
+  const changed = Object.keys(baseline)
+    .filter((key) => Object.hasOwn(process.env, key) && process.env[key] !== baseline[key])
+    .sort()
   restoreEnvironment(baseline)
   const problems: string[] = []
-  if (replaced) problems.push(`Test file ${path} replaced process.env with another object; set and restore keys instead (restoreEnvironment)`)
+  if (replaced)
+    problems.push(
+      `Test file ${path} replaced process.env with another object; set and restore keys instead (restoreEnvironment)`,
+    )
   if (added.length || removed.length || changed.length) {
-    problems.push(`Test file ${path} leaked process.env: added [${added.join(", ")}]; removed [${removed.join(", ")}]; changed [${changed.join(", ")}]`)
+    problems.push(
+      `Test file ${path} leaked process.env: added [${added.join(", ")}]; removed [${removed.join(", ")}]; changed [${changed.join(", ")}]`,
+    )
   }
   if (problems.length > 0) throw new Error(problems.join("\n"))
 }
@@ -46,7 +57,8 @@ export function installEnvironmentIntegrityCheck(): void {
         fileBaselines.set(path, { ...process.env })
         const suffix = `\nimport { afterAll as __omoEnvAfterAll } from "bun:test";\nimport { checkFileEnvironment as __omoCheckFileEnv } from ${JSON.stringify(import.meta.path)};\n__omoEnvAfterAll(() => __omoCheckFileEnv(${JSON.stringify(path)}));\n`
         const extension = extname(path)
-        const loader = extension === ".tsx" ? "tsx" : extension === ".jsx" ? "jsx" : extension.endsWith("ts") ? "ts" : "js"
+        const loader =
+          extension === ".tsx" ? "tsx" : extension === ".jsx" ? "jsx" : extension.endsWith("ts") ? "ts" : "js"
         return { contents: contents + suffix, loader }
       })
     },

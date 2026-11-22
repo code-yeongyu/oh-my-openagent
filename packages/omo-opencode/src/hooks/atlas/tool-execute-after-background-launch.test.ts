@@ -21,7 +21,9 @@ const collectGitDiffStatsMock = mock(() => ({
 }))
 const formatFileChangesMock = mock(() => "No file changes")
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 
@@ -75,10 +77,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
     } as SessionGetResult
   }
 
-  function createHandler(
-    parentSessionIDs?: Record<string, string | undefined>,
-    trackedState?: SessionState,
-  ) {
+  function createHandler(parentSessionIDs?: Record<string, string | undefined>, trackedState?: SessionState) {
     const project = createProject()
     const client = unsafeTestValue<PluginInput["client"]>({
       session: {
@@ -87,9 +86,9 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
     })
 
     if (parentSessionIDs) {
-      spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-        createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""]),
-      ) as never)
+      spyOn(client.session, "get").mockImplementation(
+        (input) => Promise.resolve(createSessionGetResult(parentSessionIDs[input?.path?.id ?? ""])) as never,
+      )
     }
 
     const ctx = {
@@ -150,15 +149,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         })
 
-        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
-        ) as never)
+        spyOn(client.session, "get").mockImplementation(
+          (input) =>
+            Promise.resolve(
+              createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
+            ) as never,
+        )
 
-        writeFileSync(planPath, `# Plan
+        writeFileSync(
+          planPath,
+          `# Plan
 
 ## TODOs
 - [ ] 1. Implement auth flow
-`)
+`,
+        )
 
         writeBoulderState(testDirectory, {
           active_plan: planPath,
@@ -201,7 +206,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         const output = {
           title: "Sisyphus Task",
-          output: "Background task launched.\n\nBackground Task ID: bg_123\n\n<task_metadata>\nsession_id: ses_child123\n</task_metadata>",
+          output:
+            "Background task launched.\n\nBackground Task ID: bg_123\n\n<task_metadata>\nsession_id: ses_child123\n</task_metadata>",
           metadata: {
             sessionId: childSessionID,
             agent: "sisyphus-junior",
@@ -209,16 +215,15 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         }
 
-        await afterHandler(
-          { tool: "task", sessionID, callID: "call-bg-task" },
-          output,
-        )
+        await afterHandler({ tool: "task", sessionID, callID: "call-bg-task" }, output)
 
         expect(output.output).toContain("Background task launched.")
         expect(collectGitDiffStatsMock).not.toHaveBeenCalled()
         expect(readBoulderState(testDirectory)?.session_ids).toContain(`opencode:${childSessionID}`)
         expect(readBoulderState(testDirectory)?.session_origins?.[`opencode:${childSessionID}`]).toBe("appended")
-        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(`opencode:${childSessionID}`)
+        expect(readBoulderState(testDirectory)?.task_sessions?.["todo:1"]?.session_id).toBe(
+          `opencode:${childSessionID}`,
+        )
       })
 
       it("#then background_output plugin retrieval requires completion gate when tracked task is still unchecked", async () => {
@@ -226,11 +231,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
         const childSessionID = "ses_child123"
         const planPath = join(testDirectory, "background-output-plugin-retrieval.md")
 
-        writeFileSync(planPath, `# Plan
+        writeFileSync(
+          planPath,
+          `# Plan
 
 ## TODOs
 - [ ] 1. Implement auth flow
-`)
+`,
+        )
 
         writeBoulderState(testDirectory, {
           active_plan: planPath,
@@ -261,10 +269,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         }
 
-        await handler(
-          { tool: "background_output", sessionID, callID: "call-bg-output" },
-          output,
-        )
+        await handler({ tool: "background_output", sessionID, callID: "call-bg-output" }, output)
 
         // the unchecked task is recorded for verification instead of taking the already-verified shortcut
         expect(output.output).toContain("<system-reminder>")
@@ -290,11 +295,14 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           return Promise.resolve(createSessionGetResult(undefined)) as never
         })
 
-        writeFileSync(planPath, `# Plan
+        writeFileSync(
+          planPath,
+          `# Plan
 
 ## TODOs
 - [ ] 1. Implement auth flow
-`)
+`,
+        )
 
         writeBoulderState(testDirectory, {
           active_plan: planPath,
@@ -337,7 +345,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         const output = {
           title: "Sisyphus Task",
-          output: "Background task launched.\n\nBackground Task ID: bg_456\n\n<task_metadata>\nsession_id: ses_child_lookup_failure\n</task_metadata>",
+          output:
+            "Background task launched.\n\nBackground Task ID: bg_456\n\n<task_metadata>\nsession_id: ses_child_lookup_failure\n</task_metadata>",
           metadata: {
             sessionId: childSessionID,
             agent: "sisyphus-junior",
@@ -345,10 +354,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         }
 
-        await afterHandler(
-          { tool: "task", sessionID, callID: "call-bg-task-lookup-failure" },
-          output,
-        )
+        await afterHandler({ tool: "task", sessionID, callID: "call-bg-task-lookup-failure" }, output)
 
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
       })
@@ -364,15 +370,21 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         })
 
-        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input?.path?.id === childSessionID ? "ses_unrelated_parent" : undefined),
-        ) as never)
+        spyOn(client.session, "get").mockImplementation(
+          (input) =>
+            Promise.resolve(
+              createSessionGetResult(input?.path?.id === childSessionID ? "ses_unrelated_parent" : undefined),
+            ) as never,
+        )
 
-        writeFileSync(planPath, `# Plan
+        writeFileSync(
+          planPath,
+          `# Plan
 
 ## TODOs
 - [ ] 1. Implement auth flow
-`)
+`,
+        )
 
         writeBoulderState(testDirectory, {
           active_plan: planPath,
@@ -415,7 +427,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         const output = {
           title: "Sisyphus Task",
-          output: "Background task launched.\n\nBackground Task ID: bg_789\n\n<task_metadata>\nsession_id: ses_outside_lineage\n</task_metadata>",
+          output:
+            "Background task launched.\n\nBackground Task ID: bg_789\n\n<task_metadata>\nsession_id: ses_outside_lineage\n</task_metadata>",
           metadata: {
             sessionId: childSessionID,
             agent: "sisyphus-junior",
@@ -423,10 +436,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         }
 
-        await afterHandler(
-          { tool: "task", sessionID, callID: "call-bg-task-outside-lineage" },
-          output,
-        )
+        await afterHandler({ tool: "task", sessionID, callID: "call-bg-task-outside-lineage" }, output)
 
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
       })
@@ -442,21 +452,27 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         })
 
-        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
-        ) as never)
+        spyOn(client.session, "get").mockImplementation(
+          (input) =>
+            Promise.resolve(
+              createSessionGetResult(input?.path?.id === childSessionID ? sessionID : undefined),
+            ) as never,
+        )
 
-        writeFileSync(planPath, `# Plan
+        writeFileSync(
+          planPath,
+          `# Plan
 
 ## TODOs
 - [ ] 1. Implement auth flow
-`)
+`,
+        )
 
         writeBoulderState(testDirectory, {
           active_plan: planPath,
           started_at: "2026-01-02T10:00:00Z",
           session_ids: ["ses_boulder_root"],
-          session_origins: { "ses_boulder_root": "direct" },
+          session_origins: { ses_boulder_root: "direct" },
           plan_name: "background-launch-plan",
         })
 
@@ -494,7 +510,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
 
         const output = {
           title: "Sisyphus Task",
-          output: "Background task launched.\n\nBackground Task ID: bg_999\n\n<task_metadata>\nsession_id: ses_unrelated_child\n</task_metadata>",
+          output:
+            "Background task launched.\n\nBackground Task ID: bg_999\n\n<task_metadata>\nsession_id: ses_unrelated_child\n</task_metadata>",
           metadata: {
             sessionId: childSessionID,
             agent: "sisyphus-junior",
@@ -502,10 +519,7 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         }
 
-        await afterHandler(
-          { tool: "task", sessionID, callID: "call-bg-task-unrelated-launcher" },
-          output,
-        )
+        await afterHandler({ tool: "task", sessionID, callID: "call-bg-task-unrelated-launcher" }, output)
 
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(sessionID)
         expect(readBoulderState(testDirectory)?.session_ids).not.toContain(childSessionID)
@@ -523,9 +537,12 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           },
         })
 
-        spyOn(client.session, "get").mockImplementation((input) => Promise.resolve(
-          createSessionGetResult(input?.path?.id === childSessionID ? parentSessionID : undefined),
-        ) as never)
+        spyOn(client.session, "get").mockImplementation(
+          (input) =>
+            Promise.resolve(
+              createSessionGetResult(input?.path?.id === childSessionID ? parentSessionID : undefined),
+            ) as never,
+        )
 
         writeFileSync(planPathA, "# Plan\n\n## TODOs\n- [ ] 1. Work A\n")
         writeFileSync(planPathB, "# Plan\n\n## TODOs\n- [ ] 1. Work B\n")
@@ -593,7 +610,8 @@ describe("createToolExecuteAfterHandler background launch detection", () => {
           { tool: "task", sessionID: parentSessionID, callID: "call-bg-work" },
           {
             title: "Sisyphus Task",
-            output: "Background task launched.\n\nBackground Task ID: bg_work\n\n<task_metadata>\nsession_id: ses_child_for_work\n</task_metadata>",
+            output:
+              "Background task launched.\n\nBackground Task ID: bg_work\n\n<task_metadata>\nsession_id: ses_child_for_work\n</task_metadata>",
             metadata: {
               sessionId: childSessionID,
               agent: "sisyphus-junior",

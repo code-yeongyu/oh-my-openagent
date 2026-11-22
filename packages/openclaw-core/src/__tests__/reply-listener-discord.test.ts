@@ -72,11 +72,13 @@ describe("pollDiscordReplies", () => {
   })
 
   test("records HTTP failures in daemon state when Discord returns non-ok", async () => {
-    const fetchMock = mock(() => Promise.resolve(
-      new Response("unauthorized", {
-        status: 401,
-      }),
-    ))
+    const fetchMock = mock(() =>
+      Promise.resolve(
+        new Response("unauthorized", {
+          status: 401,
+        }),
+      ),
+    )
     globalThis.fetch = unsafeTestValue<typeof fetch>(fetchMock)
 
     const state = createState()

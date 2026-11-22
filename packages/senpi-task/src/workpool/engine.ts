@@ -13,9 +13,23 @@ import { deliverAggregate, poolWorkIsFinished, type WorkpoolAggregatePort } from
 import { WORKPOOL_DEFAULT_MODE } from "./default-mode"
 import { createPoolRunPause } from "./run-pause"
 import type { ResumeCredential } from "../pause/admission-barrier"
-import { WorkpoolError, type WorkpoolAgent, type WorkpoolCaller, type WorkpoolCreate, type WorkpoolEvent, type WorkpoolInput, type WorkpoolItem, type PoolId, type ItemId } from "./types"
+import {
+  WorkpoolError,
+  type WorkpoolAgent,
+  type WorkpoolCaller,
+  type WorkpoolCreate,
+  type WorkpoolEvent,
+  type WorkpoolInput,
+  type WorkpoolItem,
+  type PoolId,
+  type ItemId,
+} from "./types"
 
-export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmission, kernelToolBindings?: KernelToolBindingRegistry) {
+export function createWorkpoolEngine(
+  stateDir: string,
+  admission: WorkpoolAdmission,
+  kernelToolBindings?: KernelToolBindingRegistry,
+) {
   const store = createWorkpoolStore(stateDir)
   // The pool ids THIS engine bound, so disposal releases its own bindings without touching the
   // child-task entries that share the map.
@@ -29,14 +43,24 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   const awaitingAck = new Set<string>()
   const emit = (event: WorkpoolEvent): void => {
     for (const listener of listeners) listener(event)
-    if (event.kind === "item_result" || event.kind === "worker_idle" || event.kind === "cancelled") flushAggregate(event.pool_id)
+    if (event.kind === "item_result" || event.kind === "worker_idle" || event.kind === "cancelled")
+      flushAggregate(event.pool_id)
   }
-  function persistAggregate(poolId: PoolId, generation: number, state: { readonly delivered: boolean; readonly accepted: boolean }): void {
-    store.mutate(poolId, pool => pool.generation !== generation ? pool : {
-      ...pool,
-      aggregate: state.delivered ? { generation, delivered: true }
-        : { generation, delivered: false, ...(state.accepted ? { accepted: true } : {}) },
-    })
+  function persistAggregate(
+    poolId: PoolId,
+    generation: number,
+    state: { readonly delivered: boolean; readonly accepted: boolean },
+  ): void {
+    store.mutate(poolId, (pool) =>
+      pool.generation !== generation
+        ? pool
+        : {
+            ...pool,
+            aggregate: state.delivered
+              ? { generation, delivered: true }
+              : { generation, delivered: false, ...(state.accepted ? { accepted: true } : {}) },
+          },
+    )
   }
   function flushAggregate(poolId: PoolId): void {
     const pool = store.load(poolId)
@@ -45,12 +69,23 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     if (poolWorkIsFinished(pool)) releaseKernelTools(pool.pool_id)
     const key = `${pool.pool_id}:${pool.generation}`
     if (pool.aggregate?.delivered === true && pool.aggregate.generation === pool.generation) return
-    if (awaitingAck.has(key) || pool.aggregate?.accepted === true && pool.aggregate.generation === pool.generation) return
+    if (awaitingAck.has(key) || (pool.aggregate?.accepted === true && pool.aggregate.generation === pool.generation))
+      return
     awaitingAck.add(key)
-    const started = deliverAggregate(pool, aggregatePort, state => {
-      persistAggregate(pool.pool_id, pool.generation, state)
-      if (state.delivered || !state.accepted) awaitingAck.delete(key)
-    }, error => emit({ kind: "aggregate_failed", pool_id: pool.pool_id, error: { code: "delivery_uncertain", message: error instanceof Error ? error.message : String(error) } }))
+    const started = deliverAggregate(
+      pool,
+      aggregatePort,
+      (state) => {
+        persistAggregate(pool.pool_id, pool.generation, state)
+        if (state.delivered || !state.accepted) awaitingAck.delete(key)
+      },
+      (error) =>
+        emit({
+          kind: "aggregate_failed",
+          pool_id: pool.pool_id,
+          error: { code: "delivery_uncertain", message: error instanceof Error ? error.message : String(error) },
+        }),
+    )
     if (!started) awaitingAck.delete(key)
   }
   let checkPolicy = (agent: WorkpoolAgent, _parent: string): void => {
@@ -58,12 +93,21 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     const verdict = evaluateInvocationGuard(agent.subagent_type, EMPTY_SKILL_INVOCATIONS)
     if (verdict.kind === "deny") throw new WorkpoolError("policy_denied", verdict.message)
   }
-  const dispatcher = createWorkpoolDispatcher({ store, admission, emit, authorize: pool => checkPolicy(pool.agent, pool.parent_session_id) })
+  const dispatcher = createWorkpoolDispatcher({
+    store,
+    admission,
+    emit,
+    authorize: (pool) => checkPolicy(pool.agent, pool.parent_session_id),
+  })
   function assertParent(caller: Pick<WorkpoolCaller, "sessionId">): void {
-    if (caller.sessionId.trim().length === 0) throw new WorkpoolError("scope_denied", "A host session identity is required.")
+    if (caller.sessionId.trim().length === 0)
+      throw new WorkpoolError("scope_denied", "A host session identity is required.")
     for (const pool of store.list()) {
-      const bindings = [...pool.workers, ...pool.items.flatMap(item => item.binding === undefined ? [] : [item.binding])]
-      if (bindings.some(worker => admission.get(worker.task_id)?.child_session_id === caller.sessionId)) {
+      const bindings = [
+        ...pool.workers,
+        ...pool.items.flatMap((item) => (item.binding === undefined ? [] : [item.binding])),
+      ]
+      if (bindings.some((worker) => admission.get(worker.task_id)?.child_session_id === caller.sessionId)) {
         throw new WorkpoolError("scope_denied", "Assigned workers may only yield their current assignment.")
       }
     }
@@ -97,10 +141,17 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     const input = parseInput(WorkpoolCreateSchema, value)
     const names = (input.tools ?? []).map(normalizeKernelToolName)
     if (names.length > 0 && grant === undefined) {
-      throw new WorkpoolError("tools_unavailable", "Parent-defined worker tools need a live JavaScript kernel capability.")
+      throw new WorkpoolError(
+        "tools_unavailable",
+        "Parent-defined worker tools need a live JavaScript kernel capability.",
+      )
     }
     checkPolicy(input.agent, caller.sessionId)
-    const pool = store.create(caller, { ...input, mode: input.mode ?? WORKPOOL_DEFAULT_MODE, tools: names }, admission.resolve(caller, input.agent))
+    const pool = store.create(
+      caller,
+      { ...input, mode: input.mode ?? WORKPOOL_DEFAULT_MODE, tools: names },
+      admission.resolve(caller, input.agent),
+    )
     if (grant !== undefined) {
       kernelToolBindings?.bind(pool.pool_id, grant)
       boundPools.add(pool.pool_id)
@@ -108,20 +159,27 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
     dispatcher.schedule(pool.pool_id)
     return pool
   }
-  function inspect(caller: Pick<WorkpoolCaller, "sessionId">, poolId: string) { assertParent(caller); return store.owned(caller, poolId) }
+  function inspect(caller: Pick<WorkpoolCaller, "sessionId">, poolId: string) {
+    assertParent(caller)
+    return store.owned(caller, poolId)
+  }
   function push(caller: WorkpoolCaller, poolId: string, values: readonly WorkpoolInput[]) {
     const owned = inspect(caller, poolId)
     const inputs = parseInput(WorkpoolItemsSchema, values)
     const receipts: { key: string; item_id: ItemId }[] = []
-    store.mutate(owned.pool_id, pool => {
+    store.mutate(owned.pool_id, (pool) => {
       if (pool.status !== "open") throw new WorkpoolError("pool_closed", "This pool no longer accepts items.")
       const items: WorkpoolItem[] = [...pool.items]
       for (const input of inputs) {
-        const prior = items.find(item => item.key === input.key)
+        const prior = items.find((item) => item.key === input.key)
         if (prior !== undefined && canonicalJson(prior.input) !== canonicalJson(input.input)) {
           throw new WorkpoolError("duplicate_key_conflict", "The key already identifies different input.")
         }
-        const item: WorkpoolItem = prior ?? { ...input, item_id: `wi_${randomBytes(16).toString("hex")}`, status: "queued" }
+        const item: WorkpoolItem = prior ?? {
+          ...input,
+          item_id: `wi_${randomBytes(16).toString("hex")}`,
+          status: "queued",
+        }
         if (prior === undefined) items.push(item)
         receipts.push({ key: item.key, item_id: item.item_id })
       }
@@ -133,18 +191,32 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   }
   function close(caller: WorkpoolCaller, poolId: string) {
     const owned = inspect(caller, poolId)
-    const closed = store.mutate(owned.pool_id, pool => pool.status === "open" ? { ...pool, status: "closing" } : pool)
+    const closed = store.mutate(owned.pool_id, (pool) =>
+      pool.status === "open" ? { ...pool, status: "closing" } : pool,
+    )
     flushAggregate(owned.pool_id)
     return closed
   }
   function cancel(caller: Pick<WorkpoolCaller, "sessionId">, poolId: string) {
     const owned = inspect(caller, poolId)
-    const cancelled = store.mutate(owned.pool_id, pool => pool.status === "cancelled" ? pool : {
-      ...pool, status: "cancelled", generation: pool.generation + 1,
-      items: pool.items.map(item => item.status === "queued" || item.status === "assigned" ? {
-        ...item, status: "cancelled", error: { code: "cancelled", message: "Pool cancelled." },
-      } : item),
-    })
+    const cancelled = store.mutate(owned.pool_id, (pool) =>
+      pool.status === "cancelled"
+        ? pool
+        : {
+            ...pool,
+            status: "cancelled",
+            generation: pool.generation + 1,
+            items: pool.items.map((item) =>
+              item.status === "queued" || item.status === "assigned"
+                ? {
+                    ...item,
+                    status: "cancelled",
+                    error: { code: "cancelled", message: "Pool cancelled." },
+                  }
+                : item,
+            ),
+          },
+    )
     dispatcher.cancel(owned.pool_id)
     // A cancelled pool never spawns another worker, so its binding goes now - the workers still
     // tearing down keep their own per-child bindings until destruction releases them.
@@ -157,41 +229,90 @@ export function createWorkpoolEngine(stateDir: string, admission: WorkpoolAdmiss
   function waitForEvent(poolId: PoolId, kind: WorkpoolEvent["kind"], signal: AbortSignal): Promise<WorkpoolEvent> {
     signal.throwIfAborted()
     return new Promise((resolve, reject) => {
-      const cleanup = (): void => { listeners.delete(listener); signal.removeEventListener("abort", abort) }
-      const listener = (event: WorkpoolEvent): void => { if (event.pool_id === poolId && event.kind === kind) { cleanup(); resolve(event) } }
-      const abort = (): void => { cleanup(); reject(signal.reason) }
+      const cleanup = (): void => {
+        listeners.delete(listener)
+        signal.removeEventListener("abort", abort)
+      }
+      const listener = (event: WorkpoolEvent): void => {
+        if (event.pool_id === poolId && event.kind === kind) {
+          cleanup()
+          resolve(event)
+        }
+      }
+      const abort = (): void => {
+        cleanup()
+        reject(signal.reason)
+      }
       listeners.add(listener)
       signal.addEventListener("abort", abort, { once: true })
     })
   }
-  return { create, resolveKernelTools, inspect, push, close, cancel, yieldResults, waitForEvent,
+  return {
+    create,
+    resolveKernelTools,
+    inspect,
+    push,
+    close,
+    cancel,
+    yieldResults,
+    waitForEvent,
     ...createPoolRunPause({ store, admission, stop: dispatcher.cancel, attach: dispatcher.attach }),
-    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => { checkPolicy = policy },
-    ownsTask: (taskId: string) => store.list().some(pool => pool.workers.some(worker => worker.task_id === taskId) || pool.items.some(item => item.binding?.task_id === taskId)),
+    setSpawnPolicy: (policy: (agent: WorkpoolAgent, parent: string) => void) => {
+      checkPolicy = policy
+    },
+    ownsTask: (taskId: string) =>
+      store
+        .list()
+        .some(
+          (pool) =>
+            pool.workers.some((worker) => worker.task_id === taskId) ||
+            pool.items.some((item) => item.binding?.task_id === taskId),
+        ),
     // One store read for every task a pool owns, for callers that classify many records at once (#10782).
-    ownedTaskIds: (): ReadonlySet<string> => new Set(store.list().flatMap(pool => [
-      ...pool.workers.flatMap(worker => worker.task_id === undefined ? [] : [worker.task_id]),
-      ...pool.items.flatMap(item => item.binding?.task_id === undefined ? [] : [item.binding.task_id]),
-    ])),
-    subscribe: (listener: (event: WorkpoolEvent) => void) => { listeners.add(listener); return () => { listeners.delete(listener) } },
-    attach: (caller: Pick<WorkpoolCaller, "sessionId">, credential?: ResumeCredential) => {
-      assertParent(caller)
-      for (const pool of store.list()) if (pool.parent_session_id === caller.sessionId) {
-        dispatcher.attach(pool.pool_id, credential)
-        const key = `${pool.pool_id}:${pool.generation}`
-        if (pool.aggregate?.accepted === true && pool.aggregate.delivered !== true && pool.aggregate.generation === pool.generation && !awaitingAck.has(key)) {
-          persistAggregate(pool.pool_id, pool.generation, { delivered: false, accepted: false })
-        }
-        flushAggregate(pool.pool_id)
+    ownedTaskIds: (): ReadonlySet<string> =>
+      new Set(
+        store
+          .list()
+          .flatMap((pool) => [
+            ...pool.workers.flatMap((worker) => (worker.task_id === undefined ? [] : [worker.task_id])),
+            ...pool.items.flatMap((item) => (item.binding?.task_id === undefined ? [] : [item.binding.task_id])),
+          ]),
+      ),
+    subscribe: (listener: (event: WorkpoolEvent) => void) => {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
       }
     },
-    bindAggregate: (port: WorkpoolAggregatePort) => { aggregatePort = port; for (const pool of store.list()) flushAggregate(pool.pool_id) },
+    attach: (caller: Pick<WorkpoolCaller, "sessionId">, credential?: ResumeCredential) => {
+      assertParent(caller)
+      for (const pool of store.list())
+        if (pool.parent_session_id === caller.sessionId) {
+          dispatcher.attach(pool.pool_id, credential)
+          const key = `${pool.pool_id}:${pool.generation}`
+          if (
+            pool.aggregate?.accepted === true &&
+            pool.aggregate.delivered !== true &&
+            pool.aggregate.generation === pool.generation &&
+            !awaitingAck.has(key)
+          ) {
+            persistAggregate(pool.pool_id, pool.generation, { delivered: false, accepted: false })
+          }
+          flushAggregate(pool.pool_id)
+        }
+    },
+    bindAggregate: (port: WorkpoolAggregatePort) => {
+      aggregatePort = port
+      for (const pool of store.list()) flushAggregate(pool.pool_id)
+    },
     noteAggregateFailure: (poolId: PoolId, generation: number) => {
       awaitingAck.delete(`${poolId}:${generation}`)
       persistAggregate(poolId, generation, { delivered: false, accepted: false })
     },
     dispose: () => {
-      dispatcher.stopScheduling(); listeners.clear(); awaitingAck.clear()
+      dispatcher.stopScheduling()
+      listeners.clear()
+      awaitingAck.clear()
       for (const poolId of [...boundPools]) releaseKernelTools(poolId)
     },
   }

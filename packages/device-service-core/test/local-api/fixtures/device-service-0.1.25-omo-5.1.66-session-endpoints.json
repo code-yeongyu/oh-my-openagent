@@ -1,0 +1,71 @@
+{
+  "recorded_from": "omo-relay-daemon device-service-v0.1.25 (6b6b41aea86c9e79e29dd97b9d641834168654f5, packages/relayd version 0.1.25): its local API server (startLocalApiServer) on a Unix socket with a viewer for a peer that serves environments, frames read off the client's socket; welcome.service_version and welcome.state come from the recorder's owner port",
+  "client": {
+    "name": "omo",
+    "version": "5.1.66"
+  },
+  "client_frames": [
+    {
+      "type": "hello",
+      "v": 1,
+      "client": {
+        "name": "omo",
+        "version": "5.1.66"
+      },
+      "client_nonce": "xYvZ5GC0c5cHc0InNvPCnCrDriu1C_Ofz2u93Y5B0IQ"
+    },
+    {
+      "id": "1",
+      "type": "authenticate",
+      "client_proof": "GOBt_6h8c-Frkoc8GCJAMxHk2sWcmuxxzinMEFpUsno"
+    },
+    {
+      "id": "2",
+      "type": "session.endpoints",
+      "device": "dev-a"
+    }
+  ],
+  "service_frames": [
+    {
+      "type": "welcome",
+      "v": 1,
+      "service_version": "0.1.25",
+      "owner": "service",
+      "server_proof": "ULt26xBMZuPjiWkKtqbwhACjQgWBKGjA84yGWlOMh2w",
+      "server_nonce": "rVxT3qmFxRy3wklTjm-oAjG2H30M2PqqEAz-t0MvmoU",
+      "capabilities": [
+        "sessions",
+        "devices",
+        "enforcement",
+        "upgrade",
+        "control"
+      ],
+      "state": {
+        "state": "connected",
+        "since_ms": 1800000000000,
+        "device": {
+          "id": "dev-self",
+          "name": "This Mac"
+        },
+        "origin_configured": true,
+        "enabled": true
+      }
+    },
+    {
+      "id": "1",
+      "type": "response",
+      "ok": true,
+      "data": {}
+    },
+    {
+      "id": "2",
+      "type": "response",
+      "ok": true,
+      "data": {
+        "endpoints": [
+          "RVBFUEVQRVBFUEVQRVBFUA"
+        ]
+      }
+    }
+  ]
+}

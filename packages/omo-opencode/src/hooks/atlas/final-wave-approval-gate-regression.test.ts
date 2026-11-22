@@ -31,7 +31,9 @@ mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
 
-afterAll(() => { mock.restore() })
+afterAll(() => {
+  mock.restore()
+})
 
 const { createToolExecuteAfterHandler } = await import("./tool-execute-after")
 const { MESSAGE_STORAGE } = await import("../../features/hook-message-injector")

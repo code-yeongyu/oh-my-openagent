@@ -1,17 +1,11 @@
 import { afterEach, describe, expect, it, setDefaultTimeout } from "bun:test"
 
 import { runMemoryTool } from "./memory"
-import {
-  author,
-  createPatchFixtureHarness,
-  git,
-  memoryApplyPatch,
-  params,
-} from "./memory-apply-patch.test-support"
+import { author, createPatchFixtureHarness, git, memoryApplyPatch, params } from "./memory-apply-patch.test-support"
 
 // Each case drives a real git repository through commit and patch application; the 5s default is not
 // a budget those subprocesses fit on a loaded Windows runner.
-setDefaultTimeout(process.platform === "win32" ? 30_000 : 5_000)
+if (process.platform === "win32") setDefaultTimeout(30_000)
 const { fixture, cleanup } = createPatchFixtureHarness()
 
 afterEach(cleanup)
@@ -21,12 +15,9 @@ describe("memoryApplyPatch success operations", () => {
     // #given
     const { dir, repo, locksDirectory } = await fixture()
     const reason = "remember a contact"
-    const input = [
-      "*** Begin Patch",
-      "*** Add File: system/contact.md",
-      "+Sarah: cofounder",
-      "*** End Patch",
-    ].join("\n")
+    const input = ["*** Begin Patch", "*** Add File: system/contact.md", "+Sarah: cofounder", "*** End Patch"].join(
+      "\n",
+    )
 
     // #when
     const result = await memoryApplyPatch(repo, params(locksDirectory, reason, input))
@@ -112,13 +103,14 @@ describe("memory patch chained moves", () => {
         const files: Record<string, string> = { "system/a.md": memory }
         if (trackedIntermediate) files["system/c.md"] = memory
         const { dir, repo, locksDirectory } = await fixture(files)
-        const apply = (input: string) => command === "memory_apply_patch"
-          ? memoryApplyPatch(repo, params(locksDirectory, "chain moves", input))
-          : runMemoryTool({
-            repo,
-            lock: async (_domain, operation) => operation(),
-            params: { ...params(locksDirectory, "chain moves", input), command: "apply_patch" },
-          })
+        const apply = (input: string) =>
+          command === "memory_apply_patch"
+            ? memoryApplyPatch(repo, params(locksDirectory, "chain moves", input))
+            : runMemoryTool({
+                repo,
+                lock: async (_domain, operation) => operation(),
+                params: { ...params(locksDirectory, "chain moves", input), command: "apply_patch" },
+              })
         const input = [
           "*** Begin Patch",
           ...(trackedIntermediate ? ["*** Delete File: system/c.md"] : []),
@@ -139,9 +131,9 @@ describe("memory patch chained moves", () => {
         const result = await apply(input)
 
         // #then
-        expect(result.commit?.affectedPaths.slice().sort()).toEqual(trackedIntermediate
-          ? ["system/a.md", "system/c.md", "system/d.md"]
-          : ["system/a.md", "system/d.md"])
+        expect(result.commit?.affectedPaths.slice().sort()).toEqual(
+          trackedIntermediate ? ["system/a.md", "system/c.md", "system/d.md"] : ["system/a.md", "system/d.md"],
+        )
         expect(await repo.lsTree()).toEqual(["system/d.md"])
         expect(await repo.show("HEAD", "system/d.md")).toContain("final")
         expect((await repo.status()).trim()).toBe("")
@@ -171,14 +163,18 @@ describe("memoryApplyPatch secret screening", () => {
 
     // #when
     const error = await memoryApplyPatch(repo, params(locksDirectory, "add secret note", input)).then(
-      () => { throw new Error("expected the patch to be refused") },
+      () => {
+        throw new Error("expected the patch to be refused")
+      },
       (caught: unknown) => caught,
     )
 
     // #then
     expect(error).toBeInstanceOf(Error)
     const message = (error as Error).message
-    expect(message).toContain("refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry")
+    expect(message).toContain(
+      "refused: notes/a.md contains secret-like content (credential_assignment); remove it and retry",
+    )
     expect(message).not.toContain("abc123456")
     expect(await repo.head()).toBe(headBefore)
     expect((await repo.status()).trim()).toBe("")

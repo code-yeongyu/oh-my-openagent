@@ -33,7 +33,11 @@ export function createMemoryNoticeInputs(input: {
     resolveSoulNotice: async (repo, sessionId, identity) => {
       const context = bound(sessionId, identity)
       if (context === undefined) return undefined
-      return consumeSoulNoticeDelta(repo, { noticesDir: context.identityPaths.notices, locksDir: context.identityPaths.locks, ...warnSink })
+      return consumeSoulNoticeDelta(repo, {
+        noticesDir: context.identityPaths.notices,
+        locksDir: context.identityPaths.locks,
+        ...warnSink,
+      })
     },
     resolveAgreementsNotice: async (repo, sessionId, identity) => {
       const context = bound(sessionId, identity)

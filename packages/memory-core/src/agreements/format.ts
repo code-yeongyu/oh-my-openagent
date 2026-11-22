@@ -40,7 +40,7 @@ export function parseAgreementsLedger(body: string): AgreementsLedgerParse {
     const match = LINE_RE.exec(line)
     const scope = match?.[1]
     const text = match?.[2]?.trim()
-    if (scope !== "global" && scope !== "project" || text === undefined || text.length === 0) {
+    if ((scope !== "global" && scope !== "project") || text === undefined || text.length === 0) {
       diagnostics.push(`line ${index + 1}: expected "- [global|project] <agreement>"`)
       unparsed.push(line)
       continue
@@ -67,10 +67,10 @@ export function serializeAgreementsLedger(items: readonly AgreementItem[], unpar
 }
 
 export function sortAgreements(items: readonly AgreementItem[]): AgreementItem[] {
-  return [...items].sort((a, b) =>
-    authorRank(a.by) - authorRank(b.by)
-    || (a.since ?? "").localeCompare(b.since ?? "")
-    || a.id.localeCompare(b.id))
+  return [...items].sort(
+    (a, b) =>
+      authorRank(a.by) - authorRank(b.by) || (a.since ?? "").localeCompare(b.since ?? "") || a.id.localeCompare(b.id),
+  )
 }
 
 function serializeItem(item: AgreementItem): string {
@@ -111,7 +111,12 @@ function parseMeta(raw: string, text: string, scope: AgreementScope): AgreementI
   if (last !== undefined && !DATE_RE.test(last)) return `last must be YYYY-MM-DD`
   const statusValue: AgreementStatus = status
   return {
-    id, scope, by, text, n, status: statusValue,
+    id,
+    scope,
+    by,
+    text,
+    n,
+    status: statusValue,
     ...(since === undefined ? {} : { since }),
     ...(last === undefined ? {} : { last }),
   }

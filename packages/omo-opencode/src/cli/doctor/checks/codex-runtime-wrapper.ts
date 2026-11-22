@@ -21,7 +21,10 @@ export async function checkCodexRuntimeWrapper(deps: CodexRuntimeWrapperDoctorDe
   const platform = deps.platform ?? process.platform
   const wrapperPath = join(binDir, platform === "win32" ? "omo-agent-toolkit.cmd" : "omo-agent-toolkit")
   const legacyWrapperPath = join(binDir, platform === "win32" ? "omo.cmd" : "omo")
-  const [wrapper, legacyWrapper] = await Promise.all([readRuntimeWrapper(wrapperPath), readRuntimeWrapper(legacyWrapperPath)])
+  const [wrapper, legacyWrapper] = await Promise.all([
+    readRuntimeWrapper(wrapperPath),
+    readRuntimeWrapper(legacyWrapperPath),
+  ])
   const issues: DoctorIssue[] = []
 
   if (wrapper?.includes(RUNTIME_WRAPPER_MARKER) === true) {
@@ -50,7 +53,10 @@ export async function checkCodexRuntimeWrapper(deps: CodexRuntimeWrapperDoctorDe
   return {
     name: CHECK_NAME,
     status: issues.length > 0 ? "warn" : "pass",
-    message: issues.length > 0 ? `${issues.length} Codex runtime wrapper issue(s) detected` : "Codex runtime wrapper checks passed",
+    message:
+      issues.length > 0
+        ? `${issues.length} Codex runtime wrapper issue(s) detected`
+        : "Codex runtime wrapper checks passed",
     details: [`Wrapper: ${wrapperPath}`],
     issues,
   }

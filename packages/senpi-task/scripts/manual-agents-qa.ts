@@ -4,7 +4,8 @@ import { dirname, join, resolve } from "node:path"
 import { loadAgents, resolveToolRule } from "../src/index"
 
 const evidenceDir = process.argv[2]
-if (evidenceDir === undefined) throw new Error("Usage: bun packages/senpi-task/scripts/manual-agents-qa.ts <evidence-dir>")
+if (evidenceDir === undefined)
+  throw new Error("Usage: bun packages/senpi-task/scripts/manual-agents-qa.ts <evidence-dir>")
 
 const fixtureRoot = join(resolve(evidenceDir), "manual-agents-fixture")
 const homeDir = join(fixtureRoot, "home")

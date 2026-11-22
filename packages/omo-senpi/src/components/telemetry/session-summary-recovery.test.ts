@@ -8,7 +8,13 @@ import { purgeOptedOutQueue } from "./session-summary-optout-purge"
 import { withRecoveryOps } from "./session-summary-recovery-storage"
 import { currentProcessOwner } from "./session-summary-owner"
 import { PENDING_CAP, RESENDS_PER_SWEEP, RESEND_BACKOFF_MS } from "./session-summary-recovery"
-import { OWNER_STALE_MS, SUMMARY_TTL_MS, createSummaryStorage, summaryDir, type SummaryStorage } from "./session-summary-storage"
+import {
+  OWNER_STALE_MS,
+  SUMMARY_TTL_MS,
+  createSummaryStorage,
+  summaryDir,
+  type SummaryStorage,
+} from "./session-summary-storage"
 import { createTempStateDirs, createTestRecorder, rows, summaryTurn } from "./session-summary.test-support"
 
 // Protocol contract (plan todo 8): a window is claimed only when its heartbeat is older than 5 minutes AND
@@ -36,7 +42,14 @@ describe("session_summary recovery ownership", () => {
     const recovered = [...next.published, ...racing.published]
     expect(recovered).toHaveLength(1)
     expect(recovered[0]?.uuid).toBe(windowId)
-    expect(recovered[0]?.properties).toMatchObject({ $session_id: "dead", summary_seq: 0, ended_by: "recovered", turns: 2, total_tokens: 12, is_final: false })
+    expect(recovered[0]?.properties).toMatchObject({
+      $session_id: "dead",
+      summary_seq: 0,
+      ended_by: "recovered",
+      turns: 2,
+      total_tokens: 12,
+      is_final: false,
+    })
   })
 
   test("#given a dead owner whose heartbeat is still fresh #when a sweep runs #then nothing is claimed, and resuming the session continues the same window", async () => {
@@ -145,7 +158,11 @@ describe("session_summary recovery hygiene", () => {
     expect(optedOut.storage.pendingUuids()).toHaveLength(1)
 
     const later = createTestRecorder({
-      dir, pid: 181_818, startAt: T0 + SUMMARY_TTL_MS + 1, consentScope: { cwd: "/on" }, isScopeConsented: (scope) => scope.cwd !== "/off",
+      dir,
+      pid: 181_818,
+      startAt: T0 + SUMMARY_TTL_MS + 1,
+      consentScope: { cwd: "/on" },
+      isScopeConsented: (scope) => scope.cwd !== "/off",
     })
     await later.summary.recordTurn("s2", summaryTurn())
     await later.summary.finish("s2", "quit")
@@ -159,18 +176,37 @@ describe("session_summary recovery hygiene", () => {
     const dir = stateDirs.make()
     const storage = createTestRecorder({ dir, pid: 191_919, startAt: T0 }).storage
     const pending = (uuid: string, cwd: string) => ({
-      consent: "enabled" as const, scope: { cwd }, uuid, sessionHash: `h-${cwd}`, owner: storage.owner, createdAt: T0, properties: { turns: 1 },
+      consent: "enabled" as const,
+      scope: { cwd },
+      uuid,
+      sessionHash: `h-${cwd}`,
+      owner: storage.owner,
+      createdAt: T0,
+      properties: { turns: 1 },
     })
     storage.writePending(pending("0395eae0-1111-4222-8333-944455556661", "/off"))
     storage.writePending(pending("0395eae0-1111-4222-8333-944455556662", "/on"))
     const window = (cwd: string) => ({
-      consent: "enabled" as const, scope: { cwd }, sessionHash: `w-${cwd}`, sessionRole: "root" as const, owner: storage.owner,
-      heartbeatAt: T0, epoch: "0123456789abcdef", seq: 1, sampleRate: 0.05, windowId: null, window: null,
+      consent: "enabled" as const,
+      scope: { cwd },
+      sessionHash: `w-${cwd}`,
+      sessionRole: "root" as const,
+      owner: storage.owner,
+      heartbeatAt: T0,
+      epoch: "0123456789abcdef",
+      seq: 1,
+      sampleRate: 0.05,
+      windowId: null,
+      window: null,
     })
     storage.writeWindow("w-off", window("/off"))
     storage.writeWindow("w-on", window("/on"))
 
-    const purger = createSummaryStorage({ stateDir: dir, owner: currentProcessOwner(), isPidAlive: (pid) => pid === process.pid })
+    const purger = createSummaryStorage({
+      stateDir: dir,
+      owner: currentProcessOwner(),
+      isPidAlive: (pid) => pid === process.pid,
+    })
     purgeOptedOutQueue({ storage: withRecoveryOps(purger), isScopeConsented: (scope) => scope.cwd !== "/off" })
 
     expect(storage.pendingUuids()).toEqual(["0395eae0-1111-4222-8333-944455556662"])
@@ -187,16 +223,20 @@ describe("session_summary recovery hygiene", () => {
         window: storage.readWindow(storage.windowKey("s1")),
       }),
     })
-    for (let index = 0; index < CHECKPOINT_MAX_TURNS; index += 1) await probe.summary.recordTurn("s1", summaryTurn({ turnIndex: index }))
+    for (let index = 0; index < CHECKPOINT_MAX_TURNS; index += 1)
+      await probe.summary.recordTurn("s1", summaryTurn({ turnIndex: index }))
 
-    expect(probe.observed).toEqual([{ pending: true, window: expect.objectContaining({ seq: 1, window: null, windowId: null }) }])
+    expect(probe.observed).toEqual([
+      { pending: true, window: expect.objectContaining({ seq: 1, window: null, windowId: null }) },
+    ])
     expect(probe.storage.pendingUuids()).toEqual([])
   })
 })
 
 function readWindow(recorder: ReturnType<typeof createTestRecorder>, sessionHash: string) {
   const record = recorder.storage.readWindow(recorder.storage.windowKey(sessionHash))
-  if (record === undefined || record === CORRUPT || record.windowId === null) throw new Error(`no open window for ${sessionHash}`)
+  if (record === undefined || record === CORRUPT || record.windowId === null)
+    throw new Error(`no open window for ${sessionHash}`)
   return { ...record, windowId: record.windowId }
 }
 
@@ -205,7 +245,15 @@ function readWindow(recorder: ReturnType<typeof createTestRecorder>, sessionHash
 const queuePending = (storage: SummaryStorage, count: number, owner = { pid: 999_100, bootId: "gone" }): string[] =>
   Array.from({ length: count }, (_, index) => {
     const uuid = `00000000-0000-4000-8000-${String(index).padStart(12, "0")}`
-    storage.writePending({ consent: "enabled", scope: { cwd: "/repo" }, uuid, sessionHash: "s", owner, createdAt: T0 + index, properties: { turns: 1 } })
+    storage.writePending({
+      consent: "enabled",
+      scope: { cwd: "/repo" },
+      uuid,
+      sessionHash: "s",
+      owner,
+      createdAt: T0 + index,
+      properties: { turns: 1 },
+    })
     return uuid
   })
 

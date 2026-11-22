@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { endpointKindOf, listRegistryEndpoints } from "./endpoint-registry"
+import { claimedSessionPaths, endpointKindOf, listRegistryEndpoints } from "./endpoint-registry"
 
 const scratch: string[] = []
 afterEach(() => {
@@ -47,10 +47,22 @@ describe("endpoint registry reader (endpoint.json, layout 2)", () => {
     const tui = join(root, "rpc", "tui", "t-0123456789abcdef.sock")
     const legacy = join(root, "rpc", "rpc.sock")
     const shard = join(root, "rpc", "shards", "i-00000000000000aa.sock")
-    writeEndpoint(root, dirName(tui), { "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: tui, created_at: "2026-09-29T00:00:00.000Z" } })
-    writeEndpoint(root, dirName(legacy), { "endpoint.json": { layout: 2, socket: legacy, created_at: "2026-09-01T00:00:00.000Z" } })
+    writeEndpoint(root, dirName(tui), {
+      "endpoint.json": {
+        layout: 2,
+        registry_version: 1,
+        endpoint_kind: "tui",
+        socket: tui,
+        created_at: "2026-09-29T00:00:00.000Z",
+      },
+    })
+    writeEndpoint(root, dirName(legacy), {
+      "endpoint.json": { layout: 2, socket: legacy, created_at: "2026-09-01T00:00:00.000Z" },
+    })
     writeEndpoint(root, dirName(shard), { "settings.json": { socket: shard } })
-    const foreign = writeEndpoint(root, "ffffffffffffffff", { "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: tui } })
+    const foreign = writeEndpoint(root, "ffffffffffffffff", {
+      "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: tui },
+    })
 
     // when
     const listed = await listRegistryEndpoints(root)
@@ -58,9 +70,17 @@ describe("endpoint registry reader (endpoint.json, layout 2)", () => {
     // then
     const bySocket = new Map(listed.map((entry) => [entry.socket, entry]))
     expect(bySocket.get(tui)).toMatchObject({ endpoint_kind: "tui", identity: "endpoint", registry_version: 1 })
-    expect(bySocket.get(legacy)).toMatchObject({ endpoint_kind: "rpc_host", identity: "endpoint", registry_version: null })
+    expect(bySocket.get(legacy)).toMatchObject({
+      endpoint_kind: "rpc_host",
+      identity: "endpoint",
+      registry_version: null,
+    })
     expect(bySocket.get(shard)).toMatchObject({ endpoint_kind: "rpc_host", identity: "settings" })
-    expect(listed.find((entry) => entry.dir === foreign)).toMatchObject({ socket: null, identity: "unknown", endpoint_kind: "rpc_host" })
+    expect(listed.find((entry) => entry.dir === foreign)).toMatchObject({
+      socket: null,
+      identity: "unknown",
+      endpoint_kind: "rpc_host",
+    })
     expect(listed.map((entry) => entry.dir)).toEqual([...listed.map((entry) => entry.dir)].sort())
   })
 
@@ -73,7 +93,9 @@ describe("endpoint registry reader (endpoint.json, layout 2)", () => {
     symlinkSync(real, join(root, "link-rpc"))
     const spelled = join(root, "link-rpc", "tui", "t-fedcba9876543210.sock")
     const canonical = join(real, "tui", "t-fedcba9876543210.sock")
-    writeEndpoint(root, dirName(canonical), { "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: spelled } })
+    writeEndpoint(root, dirName(canonical), {
+      "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: spelled },
+    })
 
     // when
     const listed = await listRegistryEndpoints(root)
@@ -93,11 +115,40 @@ describe("endpoint registry reader (endpoint.json, layout 2)", () => {
     layout(root)
     const recorded = join(root, "rpc", "custom.sock")
     mkdirSync(join(root, "rpc"), { recursive: true })
-    writeEndpoint(root, dirName(recorded), { "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: recorded } })
+    writeEndpoint(root, dirName(recorded), {
+      "endpoint.json": { layout: 2, registry_version: 1, endpoint_kind: "tui", socket: recorded },
+    })
     const registry = await listRegistryEndpoints(root)
     expect(endpointKindOf("/anywhere/t-0123456789abcdef.sock", [])).toBe("tui")
     expect(endpointKindOf(recorded, registry)).toBe("tui")
     expect(endpointKindOf(join(root, "rpc", "rpc.sock"), registry)).toBe("rpc_host")
     expect(endpointKindOf("/anywhere/p-0123456789abcdef.sock", registry)).toBe("rpc_host")
+  })
+})
+
+// #13452 review L2: a dead endpoint's claims are the record of its threads; a claim that names no session file is skipped,
+// never an error and never an empty path that a reader would then try to open.
+describe("claimed session paths of an endpoint directory", () => {
+  test("#given readable, blank, unreadable and non-claim files under reservations #when read #then only the named session files come back, in claim-file order", async () => {
+    // given
+    const dir = writeEndpoint(agentDir(), "0123456789abcdef", {
+      "reservations/b0000000000000000.json": { sessionPath: "/s/b.jsonl" },
+      "reservations/a0000000000000000.json": { sessionPath: "/s/a.jsonl" },
+      "reservations/c0000000000000000.json": { sessionPath: "" },
+      "reservations/d0000000000000000.json": { sessionPath: 7 },
+      "reservations/e0000000000000000.json": {},
+      "reservations/notes.txt": { sessionPath: "/s/not-a-claim.jsonl" },
+    })
+    writeFileSync(join(dir, "reservations", "f0000000000000000.json"), "{ not json")
+
+    // when
+    const paths = await claimedSessionPaths(dir)
+
+    // then
+    expect(paths).toEqual(["/s/a.jsonl", "/s/b.jsonl"])
+  })
+
+  test("#given an endpoint directory with no reservations #when read #then nothing is claimed", async () => {
+    expect(await claimedSessionPaths(writeEndpoint(agentDir(), "fedcba9876543210", {}))).toEqual([])
   })
 })

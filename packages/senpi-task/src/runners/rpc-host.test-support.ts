@@ -108,7 +108,11 @@ export function hostRunnerHarness(): HostRunnerHarness {
         ...overrides,
       }),
     runnerWithout: (overrides) =>
-      new RpcHostRunner({ ...baseOptions, ...testRouting("/tmp/dh-30-unreached.sock", ensureDir(agentDir)), ...overrides }),
+      new RpcHostRunner({
+        ...baseOptions,
+        ...testRouting("/tmp/dh-30-unreached.sock", ensureDir(agentDir)),
+        ...overrides,
+      }),
     release: async () => {
       for (const client of clients.splice(0)) await client.detach()
       for (const host of hosts.splice(0)) await host.stop()
@@ -187,7 +191,8 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
       return calls
     },
     open: (request) => {
-      if (request.provider !== undefined && request.modelId !== undefined) openedModel = { provider: request.provider, id: request.modelId }
+      if (request.provider !== undefined && request.modelId !== undefined)
+        openedModel = { provider: request.provider, id: request.modelId }
       return record(
         "open",
         Promise.resolve({
@@ -200,7 +205,8 @@ export function stubChannel(sendFailure: Error | undefined): StubChannel {
     },
     send: (command) =>
       record(command.type, sendFailure === undefined ? Promise.resolve() : Promise.reject(sendFailure)),
-    getState: () => Promise.resolve({ sessionId: "durable-stub", ...(openedModel === undefined ? {} : { model: openedModel }) }),
+    getState: () =>
+      Promise.resolve({ sessionId: "durable-stub", ...(openedModel === undefined ? {} : { model: openedModel }) }),
     getEntries: () => Promise.resolve({ entries: [], leafId: null }),
     switchSession: () => record("switch_session", Promise.resolve({ cancelled: false })),
     onEvent: (_listener: (event: AgentSessionEvent) => void) => () => undefined,

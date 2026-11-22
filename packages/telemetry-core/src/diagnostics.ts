@@ -51,10 +51,7 @@ export function cleanupTelemetryDiagnostics(options: WriteTelemetryDiagnosticOpt
         .split("\n")
         .filter((line) => shouldRetainLine(line, cutoffMs)),
     )
-    writeFileAtomically(
-      diagnosticsFilePath,
-      retainedLines.length === 0 ? "" : `${retainedLines.join("\n")}\n`,
-    )
+    writeFileAtomically(diagnosticsFilePath, retainedLines.length === 0 ? "" : `${retainedLines.join("\n")}\n`)
   } catch (error) {
     if (error instanceof Error) {
       return
@@ -75,10 +72,7 @@ function toDiagnosticRecord(input: TelemetryDiagnosticInput, now: Date): Record<
   }
 }
 
-function serializeError(
-  error: unknown,
-  errorKind?: TelemetryDiagnosticErrorKind,
-): Record<string, string> {
+function serializeError(error: unknown, errorKind?: TelemetryDiagnosticErrorKind): Record<string, string> {
   if (error instanceof Error) {
     return {
       error_kind: errorKind ?? "error",

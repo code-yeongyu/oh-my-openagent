@@ -13,7 +13,9 @@ export const digestByteLength = (digest: SessionDigest): number => encoder.encod
 
 function clip(text: string, limit: number): { readonly text: string; readonly clipped: boolean } {
   const trimmed = text.trim()
-  return trimmed.length <= limit ? { text: trimmed, clipped: false } : { text: `${trimmed.slice(0, limit - 1)}…`, clipped: true }
+  return trimmed.length <= limit
+    ? { text: trimmed, clipped: false }
+    : { text: `${trimmed.slice(0, limit - 1)}…`, clipped: true }
 }
 
 function summarizeTools(records: ReadonlyArray<TranscriptRecord>) {
@@ -69,8 +71,14 @@ export function buildSessionDigest(input: {
     else if (digest.toolsUsed.length > 0) digest = { ...digest, toolsUsed: digest.toolsUsed.slice(0, -1) }
     else if (digest.firstRequest.length >= digest.outcome.length && digest.firstRequest.length > 0)
       digest = { ...digest, firstRequest: clip(digest.firstRequest, Math.floor(digest.firstRequest.length * 0.9)).text }
-    else if (digest.outcome.length > 0) digest = { ...digest, outcome: clip(digest.outcome, Math.floor(digest.outcome.length * 0.9)).text }
-    else digest = { ...digest, title: clip(digest.title, Math.floor(digest.title.length * 0.9)).text, cwd: clip(digest.cwd, MAX_PATH_CHARS).text }
+    else if (digest.outcome.length > 0)
+      digest = { ...digest, outcome: clip(digest.outcome, Math.floor(digest.outcome.length * 0.9)).text }
+    else
+      digest = {
+        ...digest,
+        title: clip(digest.title, Math.floor(digest.title.length * 0.9)).text,
+        cwd: clip(digest.cwd, MAX_PATH_CHARS).text,
+      }
     digest = { ...digest, truncated: true }
   }
   return digest

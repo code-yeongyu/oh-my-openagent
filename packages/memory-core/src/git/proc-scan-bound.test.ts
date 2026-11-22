@@ -10,19 +10,26 @@ import { answerFromProcOrLsof } from "./open-file-holders"
 // A scan that never settles is the behavior under test, so it is a promise that never resolves.
 
 describe("Linux /proc scans are bounded", () => {
-  test.skipIf(process.platform !== "linux")("#given a /proc scan that never answers #when the bound passes #then the answer is unknown and lsof is not asked", async () => {
-    // #given
-    let lsofAsked = false
-    const neverAnswers = () => new Promise<never>(() => undefined)
+  test.skipIf(process.platform !== "linux")(
+    "#given a /proc scan that never answers #when the bound passes #then the answer is unknown and lsof is not asked",
+    async () => {
+      // #given
+      let lsofAsked = false
+      const neverAnswers = () => new Promise<never>(() => undefined)
 
-    // #when
-    const answer = await answerFromProcOrLsof(neverAnswers, async () => {
-      lsofAsked = true
-      return []
-    }, 500)
+      // #when
+      const answer = await answerFromProcOrLsof(
+        neverAnswers,
+        async () => {
+          lsofAsked = true
+          return []
+        },
+        500,
+      )
 
-    // #then
-    expect(answer).toBeNull()
-    expect(lsofAsked).toBe(false)
-  }, 10_000)
+      // #then
+      expect(answer).toBeNull()
+      expect(lsofAsked).toBe(false)
+    },
+  )
 })

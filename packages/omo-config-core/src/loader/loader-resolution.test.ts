@@ -87,17 +87,17 @@ describe("loadOmoConfig resolution", () => {
     expect(result.layers.map((layer) => layer.source.scope)).toEqual(["user", "project"])
     expect(result.layers.map((layer) => layer.config)).toEqual([
       { task: { max_depth: 4 }, profiles: { opus: { task: { ttl_ms: 111_000 } } } },
-      { "[native]": { task: { default_concurrency: 3 } }, profiles: { opus: { "[native]": { task: { resume_children: false } } } } },
+      {
+        "[native]": { task: { default_concurrency: 3 } },
+        profiles: { opus: { "[native]": { task: { resume_children: false } } } },
+      },
     ])
   })
 
   test("#given base telemetry and an empty codex block #when loading the codex view #then defaults do not overwrite the base value", () => {
     // given
     const fixture = makeFixture()
-    writeJsonc(
-      join(fixture.homeDir, ".omo", "omo.jsonc"),
-      `{"telemetry":{"enabled":false},"[codex]":{"telemetry":{}}}`,
-    )
+    writeJsonc(join(fixture.homeDir, ".omo", "omo.jsonc"), `{"telemetry":{"enabled":false},"[codex]":{"telemetry":{}}}`)
 
     // when
     const result = loadOmoConfig({

@@ -20,20 +20,26 @@ const EXPIRES_AT = Date.UTC(2026, 9, 27, 6, 33)
 const OUTAGE = "provider X is down"
 
 async function commitExpiring(repo: GitMemoryRepo): Promise<void> {
-  await writeFile(join(repo.dir, "system/outage.md"), `---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\n${OUTAGE}\n`)
+  await writeFile(
+    join(repo.dir, "system/outage.md"),
+    `---\ndescription: Outage\nexpires: 2026-10-27T06:33Z\n---\n${OUTAGE}\n`,
+  )
   await repo.commitWrite(["system/outage.md"], "record outage", { agentId: IDENTITY, authorName: "Prompt Agent" })
 }
 
 function clockedHandler(repo: GitMemoryRepo, context: MemoryIdentityContext, clock: { now: number }) {
   const records: ProjectionPinRecord[] = []
   const pi = new FakeExtensionAPI()
-  pi.on("before_agent_start", createMemoryPromptHandler({
-    resolveContext: () => context,
-    createRepo: () => repo,
-    cache: new MemoryBlockCache({ now: () => clock.now }),
-    pins: createProjectionPins({ now: () => clock.now }),
-    recordPin: (record) => records.push(record),
-  }))
+  pi.on(
+    "before_agent_start",
+    createMemoryPromptHandler({
+      resolveContext: () => context,
+      createRepo: () => repo,
+      cache: new MemoryBlockCache({ now: () => clock.now }),
+      pins: createProjectionPins({ now: () => clock.now }),
+      recordPin: (record) => records.push(record),
+    }),
+  )
   const dispatch = (branch: readonly unknown[], sessionId = SESSION) =>
     dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext(sessionId, branch))
   return { dispatch, records }

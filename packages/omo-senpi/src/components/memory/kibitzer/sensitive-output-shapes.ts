@@ -3,7 +3,16 @@
 // alternating tokens and delimiters; a token is replaced from where a known key prefix or a JWT starts a word in it.
 // No regular expressions, linear in the input.
 
-import { isAlnum, isBase64Url, isDigit, isUpper, matchesAt, readDelimiterEnd, readUnit, tokenUnitLength } from "./sensitive-output-lexer"
+import {
+  isAlnum,
+  isBase64Url,
+  isDigit,
+  isUpper,
+  matchesAt,
+  readDelimiterEnd,
+  readUnit,
+  tokenUnitLength,
+} from "./sensitive-output-lexer"
 
 interface PrefixRule {
   prefixes: readonly string[]
@@ -67,7 +76,7 @@ function jwtAt(text: string, p: number, end: number): number {
   let length = 0
   let firstDot = -1
   let i = p
-  for (; i < end; ) {
+  for (; i < end;) {
     const unit = readUnit(text, i)
     const c = unit.character
     if (c === 46) {
@@ -91,7 +100,7 @@ function credentialShapeStart(text: string, start: number, end: number, withinCr
   while (stop > start && text.charCodeAt(stop - 1) === 46) stop--
   let jwtFrom = start
   let wordStart = true
-  for (let p = start; p < stop; ) {
+  for (let p = start; p < stop;) {
     const unit = readUnit(text, p)
     const candidate = withinCredential || wordStart
     wordStart = !isWordChar(unit.character)

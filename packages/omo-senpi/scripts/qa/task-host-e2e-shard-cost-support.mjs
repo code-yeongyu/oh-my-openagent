@@ -5,7 +5,13 @@ import { fileURLToPath } from "node:url"
 
 import { stopParent } from "./task-host-e2e-events.mjs"
 import { pidAlive, spawnParent } from "./task-host-e2e-process.mjs"
-import { binaryDigest, createScenarioSandbox, injectDaemonMockProvider, provisionRuntime, scenarioStateDir } from "./task-host-e2e-sandbox.mjs"
+import {
+  binaryDigest,
+  createScenarioSandbox,
+  injectDaemonMockProvider,
+  provisionRuntime,
+  scenarioStateDir,
+} from "./task-host-e2e-sandbox.mjs"
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 export const MOCK_ENTRY = join(scriptDir, "task-host-e2e-shard-cost-mock-provider.mjs")
@@ -17,20 +23,41 @@ export function provisionConfig(kind, bin, runRoot) {
   mkdirSync(root, { recursive: true })
   const runtime = provisionRuntime(bin, root)
   const injected = injectDaemonMockProvider(runtime.pluginRoot, MOCK_ENTRY)
-  copyFileSync(join(scriptDir, "task-host-e2e-mock-provider.mjs"), join(runtime.pluginRoot, "task-host-e2e-mock-provider.mjs"))
+  copyFileSync(
+    join(scriptDir, "task-host-e2e-mock-provider.mjs"),
+    join(runtime.pluginRoot, "task-host-e2e-mock-provider.mjs"),
+  )
   if (!injected.launchSpecPresent) throw new Error(`${kind} binary ships no daemon launch spec: ${bin}`)
-  return { kind, bin, root, home: runtime.home, pluginRoot: runtime.pluginRoot, specPath: injected.specPath, version: runtime.version, digest: binaryDigest(bin) }
+  return {
+    kind,
+    bin,
+    root,
+    home: runtime.home,
+    pluginRoot: runtime.pluginRoot,
+    specPath: injected.specPath,
+    version: runtime.version,
+    digest: binaryDigest(bin),
+  }
 }
 
 export function taskConfig(task = {}) {
   return {
-    task: { default_execution_mode: "process", process_runner: "host", global_concurrency: 16, residency_max_children: 16, ...task },
+    task: {
+      default_execution_mode: "process",
+      process_runner: "host",
+      global_concurrency: 16,
+      residency_max_children: 16,
+      ...task,
+    },
     categories: { proc: { description: "Shard cost mock category.", model: "omo-mock/mock-1" } },
   }
 }
 
 export function newSandbox(config, name, { omoConfig = taskConfig(), script }) {
-  return createScenarioSandbox({ runRoot: config.root, home: config.home, bin: config.bin }, name, { omoConfig, script })
+  return createScenarioSandbox({ runRoot: config.root, home: config.home, bin: config.bin }, name, {
+    omoConfig,
+    script,
+  })
 }
 
 export function addProject(sandbox, name, { omoConfig = taskConfig(), script }) {
@@ -84,14 +111,20 @@ export function startParent(sandbox, project, prompt, env = {}) {
       }
     }
   })
-  parent.taskCallAt = () => parent.events.find((entry) => entry.event.type === "tool_execution_start" && entry.event.toolName === "task")?.at
+  parent.taskCallAt = () =>
+    parent.events.find((entry) => entry.event.type === "tool_execution_start" && entry.event.toolName === "task")?.at
   parent.sessionId = () => parent.events.find((entry) => entry.event.type === "session")?.event.id
   return parent
 }
 
 export async function awaitParent(parent, timeoutMs) {
   let timer
-  const outcome = await Promise.race([parent.closed, new Promise((resolve) => { timer = setTimeout(() => resolve("timeout"), timeoutMs) })])
+  const outcome = await Promise.race([
+    parent.closed,
+    new Promise((resolve) => {
+      timer = setTimeout(() => resolve("timeout"), timeoutMs)
+    }),
+  ])
   clearTimeout(timer)
   if (outcome === "timeout") await stopParent(parent)
   return outcome === "timeout" ? { status: null, timedOut: true } : { ...outcome, timedOut: false }
@@ -104,13 +137,16 @@ export function stepsKey(steps) {
 export function mockEvents(project) {
   const path = join(project.cwd, ".omo", "task-host-mock-events.jsonl")
   if (!existsSync(path)) return []
-  return readFileSync(path, "utf8").split("\n").filter(Boolean).flatMap((line) => {
-    try {
-      return [JSON.parse(line)]
-    } catch {
-      return []
-    }
-  })
+  return readFileSync(path, "utf8")
+    .split("\n")
+    .filter(Boolean)
+    .flatMap((line) => {
+      try {
+        return [JSON.parse(line)]
+      } catch {
+        return []
+      }
+    })
 }
 
 export function childRequests(project) {
@@ -123,13 +159,15 @@ export function childRequests(project) {
 export function taskRecords(project) {
   const dir = join(project.stateDir, "tasks")
   if (!existsSync(dir)) return []
-  return readdirSync(dir).filter((file) => file.endsWith(".json")).flatMap((file) => {
-    try {
-      return [JSON.parse(readFileSync(join(dir, file), "utf8"))]
-    } catch {
-      return []
-    }
-  })
+  return readdirSync(dir)
+    .filter((file) => file.endsWith(".json"))
+    .flatMap((file) => {
+      try {
+        return [JSON.parse(readFileSync(join(dir, file), "utf8"))]
+      } catch {
+        return []
+      }
+    })
 }
 
 export {

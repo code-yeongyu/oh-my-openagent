@@ -1,10 +1,7 @@
 import { spawn } from "node:child_process"
 import { StringDecoder } from "node:string_decoder"
 
-import {
-  terminateProcessTree,
-  type ProcessTreeTerminationReport,
-} from "./process-tree-termination"
+import { terminateProcessTree, type ProcessTreeTerminationReport } from "./process-tree-termination"
 
 export type {
   ProcessTreeSignalAttempt,
@@ -64,14 +61,15 @@ export function runProcessWithTreeTimeout(options: ProcessTreeRunOptions): Promi
 
     const startTermination = (): Promise<ProcessTreeTerminationReport> => {
       if (treeTermination !== undefined) return treeTermination
-      treeTermination = child.pid === undefined
-        ? Promise.resolve({ attempts: [], survivorPids: [] })
-        : terminateProcessTree(child.pid, {
-            childClosed,
-            graceMs: options.terminationGraceMs ?? DEFAULT_TERMINATION_GRACE_MS,
-            platform: process.platform,
-            waitMs: options.terminationWaitMs ?? DEFAULT_TERMINATION_WAIT_MS,
-          })
+      treeTermination =
+        child.pid === undefined
+          ? Promise.resolve({ attempts: [], survivorPids: [] })
+          : terminateProcessTree(child.pid, {
+              childClosed,
+              graceMs: options.terminationGraceMs ?? DEFAULT_TERMINATION_GRACE_MS,
+              platform: process.platform,
+              waitMs: options.terminationWaitMs ?? DEFAULT_TERMINATION_WAIT_MS,
+            })
       treeTermination = treeTermination.then((report) => {
         try {
           options.onTerminationReport?.(report)

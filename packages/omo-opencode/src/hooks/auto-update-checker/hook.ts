@@ -59,12 +59,7 @@ export function createAutoUpdateCheckerHook(
   options: AutoUpdateCheckerOptions = {},
   deps: AutoUpdateCheckerDeps = defaultDeps,
 ) {
-  const {
-    showStartupToast = true,
-    isSisyphusEnabled = false,
-    autoUpdate = true,
-    modelCapabilities,
-  } = options
+  const { showStartupToast = true, isSisyphusEnabled = false, autoUpdate = true, modelCapabilities } = options
   const isCliRunMode = process.env.OPENCODE_CLI_RUN_MODE === "true"
   deps.trackLoadedPluginSandbox?.()
 

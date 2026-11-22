@@ -11,8 +11,18 @@ import { backgroundConversionText } from "./start-presentation"
 import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDetails, TaskToolItemDetail } from "./types"
 
 type BatchStart =
-  | { readonly kind: "started"; readonly item: ResolvedSpawnItem; readonly result: StartedResult; readonly skills?: TaskSkillSummary }
-  | { readonly kind: "failed"; readonly item: ResolvedSpawnItem; readonly detail: TaskToolItemDetail; readonly skills?: TaskSkillSummary }
+  | {
+      readonly kind: "started"
+      readonly item: ResolvedSpawnItem
+      readonly result: StartedResult
+      readonly skills?: TaskSkillSummary
+    }
+  | {
+      readonly kind: "failed"
+      readonly item: ResolvedSpawnItem
+      readonly detail: TaskToolItemDetail
+      readonly skills?: TaskSkillSummary
+    }
 
 type LiveStart = Extract<BatchStart, { kind: "started" }>
 
@@ -50,7 +60,12 @@ async function startAll(input: ExecuteBatchInput): Promise<readonly BatchStart[]
       starts.push(
         start.kind === "started"
           ? { kind: "started", item, result: start, ...(skills === undefined ? {} : { skills }) }
-          : { kind: "failed", item, detail: failedStartDetail(item, start, skills), ...(skills === undefined ? {} : { skills }) },
+          : {
+              kind: "failed",
+              item,
+              detail: failedStartDetail(item, start, skills),
+              ...(skills === undefined ? {} : { skills }),
+            },
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -76,15 +91,23 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
   const status = live.length > 0 ? "running" : "error"
   const taskId = live[0]?.result.task_id ?? ""
   const runEpoch = live[0]?.result.run_epoch
-  const items = starts.map((start) => start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail)
-  return result(appendMissingSkills(backgroundText(starts, status), starts.map((start) => start.skills)), {
-    task_id: taskId,
-    ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
-    status,
-    mode: "spawn",
-    run_in_background: true,
-    items,
-  })
+  const items = starts.map((start) =>
+    start.kind === "started" ? startedDetail(start.item, start.result, start.skills) : start.detail,
+  )
+  return result(
+    appendMissingSkills(
+      backgroundText(starts, status),
+      starts.map((start) => start.skills),
+    ),
+    {
+      task_id: taskId,
+      ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
+      status,
+      mode: "spawn",
+      run_in_background: true,
+      items,
+    },
+  )
 }
 
 function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSkillSummary): BatchItemOutput {
@@ -108,7 +131,11 @@ function promotedOutput(start: LiveStart, budgetSeconds: number): BatchItemOutpu
       ...startedDetail(start.item, start.result, start.skills),
       run_in_background: true,
     },
-    body: backgroundConversionText(start.result, { taskSummary: start.item.task_summary, description: start.item.description }, budgetSeconds),
+    body: backgroundConversionText(
+      start.result,
+      { taskSummary: start.item.task_summary, description: start.item.description },
+      budgetSeconds,
+    ),
     continuation: false,
   }
 }
@@ -132,14 +159,20 @@ function rejectedOutput(start: LiveStart, aborted: boolean, reason: unknown): Ba
   }
 }
 
-function aggregateStatus(items: readonly TaskToolItemDetail[], aborted: boolean): "running" | "error" | "cancelled" | "completed" {
+function aggregateStatus(
+  items: readonly TaskToolItemDetail[],
+  aborted: boolean,
+): "running" | "error" | "cancelled" | "completed" {
   if (items.some((item) => item.status === "running" || item.status === "pending")) return "running"
   if (items.some((item) => item.status === "error" || item.status === "lost")) return "error"
   if (aborted || items.some((item) => item.status === "cancelled" || item.status === "interrupted")) return "cancelled"
   return "completed"
 }
 
-function syncText(status: "running" | "error" | "cancelled" | "completed", outputs: readonly BatchItemOutput[]): string {
+function syncText(
+  status: "running" | "error" | "cancelled" | "completed",
+  outputs: readonly BatchItemOutput[],
+): string {
   const lines = outputs.map((output, index) => {
     const label = output.detail.name ?? (output.detail.task_id || "task")
     const footer = output.continuation ? continuationFooter(output.detail.task_id) : ""
@@ -152,45 +185,59 @@ function settledStatus(waited: ForegroundWaitResult): string {
   return waited.kind === "completed" ? waited.record.status : "background"
 }
 
-async function waitForAll(input: ExecuteBatchInput, live: readonly LiveStart[]): Promise<readonly PromiseSettledResult<ForegroundWaitResult>[]> {
+async function waitForAll(
+  input: ExecuteBatchInput,
+  live: readonly LiveStart[],
+): Promise<readonly PromiseSettledResult<ForegroundWaitResult>[]> {
   const progress = trackBatchProgress({ manager: input.manager, live, onUpdate: input.onUpdate })
   try {
-    return await Promise.allSettled(live.map((start) => waitForForegroundTask({
-      manager: input.manager,
-      taskId: start.result.task_id,
-      signal: input.signal,
-      ctx: input.ctx,
-      ...(input.env !== undefined && { env: input.env }),
-      ...(input.scheduleDeadline !== undefined && { scheduleDeadline: input.scheduleDeadline }),
-    }).then(
-      (waited) => {
-        progress.settle(start.result.task_id, settledStatus(waited))
-        return waited
-      },
-      (reason: unknown) => {
-        const aborted = input.signal?.aborted === true && reason === input.signal.reason
-        progress.settle(start.result.task_id, aborted ? "cancelled" : "error")
-        throw reason
-      },
-    )))
+    return await Promise.allSettled(
+      live.map((start) =>
+        waitForForegroundTask({
+          manager: input.manager,
+          taskId: start.result.task_id,
+          signal: input.signal,
+          ctx: input.ctx,
+          ...(input.env !== undefined && { env: input.env }),
+          ...(input.scheduleDeadline !== undefined && { scheduleDeadline: input.scheduleDeadline }),
+        }).then(
+          (waited) => {
+            progress.settle(start.result.task_id, settledStatus(waited))
+            return waited
+          },
+          (reason: unknown) => {
+            const aborted = input.signal?.aborted === true && reason === input.signal.reason
+            progress.settle(start.result.task_id, aborted ? "cancelled" : "error")
+            throw reason
+          },
+        ),
+      ),
+    )
   } finally {
     progress.stop()
   }
 }
 
-async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[]): Promise<AgentToolResult<TaskToolDetails>> {
+async function syncResult(
+  input: ExecuteBatchInput,
+  starts: readonly BatchStart[],
+): Promise<AgentToolResult<TaskToolDetails>> {
   const live = starts.filter((start): start is LiveStart => start.kind === "started")
   const settled = await waitForAll(input, live)
   const batchAborted = settled.some(
     (entry) => entry.status === "rejected" && input.signal?.aborted === true && entry.reason === input.signal.reason,
   )
   const unsettledIndexes = batchAborted
-    ? settled.flatMap((entry, index) => entry.status === "rejected" ? [index] : [])
+    ? settled.flatMap((entry, index) => (entry.status === "rejected" ? [index] : []))
     : []
-  await Promise.allSettled(unsettledIndexes.map((index) => {
-    const start = live[index]
-    return start === undefined ? Promise.resolve() : input.manager.cancelTask(start.result.task_id, "parent turn aborted")
-  }))
+  await Promise.allSettled(
+    unsettledIndexes.map((index) => {
+      const start = live[index]
+      return start === undefined
+        ? Promise.resolve()
+        : input.manager.cancelTask(start.result.task_id, "parent turn aborted")
+    }),
+  )
 
   let liveIndex = 0
   const outputs = starts.map((start): BatchItemOutput => {
@@ -214,14 +261,20 @@ async function syncResult(input: ExecuteBatchInput, starts: readonly BatchStart[
   const taskId = live[0]?.result.task_id ?? ""
   const runEpoch = items.find((item) => item.task_id === taskId)?.run_epoch
   const runInBackground = items.some((item) => item.run_in_background === true)
-  return result(appendMissingSkills(syncText(status, outputs), starts.map((start) => start.skills)), {
-    task_id: taskId,
-    ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
-    status,
-    mode: "spawn",
-    run_in_background: runInBackground,
-    items,
-  })
+  return result(
+    appendMissingSkills(
+      syncText(status, outputs),
+      starts.map((start) => start.skills),
+    ),
+    {
+      task_id: taskId,
+      ...(runEpoch === undefined ? {} : { run_epoch: runEpoch }),
+      status,
+      mode: "spawn",
+      run_in_background: runInBackground,
+      items,
+    },
+  )
 }
 
 export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolResult<TaskToolDetails>> {
@@ -232,7 +285,8 @@ export async function executeBatch(input: ExecuteBatchInput): Promise<AgentToolR
   const starts = await startAll(input)
   if (input.runInBackground) return backgroundResult(starts)
   const parent = input.manager.findTaskByChildSession?.(input.ctx.sessionManager.getSessionId())
-  const parked = parent === undefined ? undefined : input.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
+  const parked =
+    parent === undefined ? undefined : input.manager.concurrency?.park(parent.task_id, parent.notification.run_epoch)
   let promoted = false
   try {
     const result = await syncResult(input, starts)

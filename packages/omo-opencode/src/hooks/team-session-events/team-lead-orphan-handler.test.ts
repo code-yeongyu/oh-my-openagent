@@ -9,10 +9,7 @@ import path from "node:path"
 import { TeamModeConfigSchema } from "../../config/schema/team-mode"
 import type { TeamModeConfig } from "../../config/schema/team-mode"
 import * as deleteTeamModule from "../../features/team-mode/team-runtime/delete-team"
-import {
-  clearTeamSessionRegistry,
-  registerTeamSession,
-} from "../../features/team-mode/team-session-registry"
+import { clearTeamSessionRegistry, registerTeamSession } from "../../features/team-mode/team-session-registry"
 import type { RuntimeState } from "../../features/team-mode/types"
 import { loadRuntimeState, saveRuntimeState } from "../../features/team-mode/team-state-store/store"
 import { createTeamLeadOrphanHandler } from "./team-lead-orphan-handler"
@@ -66,9 +63,11 @@ async function seedRuntimeState(runtimeState: RuntimeState, config: TeamModeConf
 afterEach(async () => {
   mock.restore()
   clearTeamSessionRegistry()
-  await Promise.all(temporaryDirectories.splice(0).map(async (directoryPath) => {
-    await rm(directoryPath, { recursive: true, force: true })
-  }))
+  await Promise.all(
+    temporaryDirectories.splice(0).map(async (directoryPath) => {
+      await rm(directoryPath, { recursive: true, force: true })
+    }),
+  )
 })
 
 describe("createTeamLeadOrphanHandler", () => {
@@ -102,10 +101,13 @@ describe("createTeamLeadOrphanHandler", () => {
     const baseDir = await createTemporaryBaseDir()
     const config = createConfig(baseDir)
     const teamRunId = randomUUID()
-    await seedRuntimeState({
-      ...createRuntimeState(teamRunId),
-      leadSessionId: undefined,
-    }, config)
+    await seedRuntimeState(
+      {
+        ...createRuntimeState(teamRunId),
+        leadSessionId: undefined,
+      },
+      config,
+    )
     registerTeamSession("lead-session", {
       teamRunId,
       memberName: "lead",
@@ -137,10 +139,13 @@ describe("createTeamLeadOrphanHandler", () => {
     const correctTeamRunId = randomUUID()
     const wrongTeamRunId = randomUUID()
     await seedRuntimeState(createRuntimeState(correctTeamRunId), config)
-    await seedRuntimeState({
-      ...createRuntimeState(wrongTeamRunId),
-      leadSessionId: "other-lead-session",
-    }, config)
+    await seedRuntimeState(
+      {
+        ...createRuntimeState(wrongTeamRunId),
+        leadSessionId: "other-lead-session",
+      },
+      config,
+    )
     registerTeamSession("lead-session", {
       teamRunId: wrongTeamRunId,
       memberName: "lead",

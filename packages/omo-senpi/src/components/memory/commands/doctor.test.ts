@@ -3,7 +3,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { hostname } from "node:os"
 import { join } from "node:path"
 
-import { FactsFailureStore, GitMemoryRepo, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
+import { FactsFailureStore, GitMemoryRepo, measureRuntimeSize, memoryWriterLockPath } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "../memory.test-support"
 import {
@@ -16,6 +16,7 @@ import {
   type FakeDeps,
 } from "./commands.test-support"
 import { registerDoctorCommand } from "./doctor"
+import { checkRuntimeSize } from "./doctor-checks"
 import { removeTree } from "../../../../../../test-support/remove-tree"
 
 const tempDirs: string[] = []
@@ -26,9 +27,7 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => removeTree(dir, { maxRetries: 10, retryDelay: 200 })))
 })
 
-const SEEDS = [
-  { relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" },
-]
+const SEEDS = [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\nseeded persona\n" }]
 
 async function harness(options: { readonly seeded?: boolean; readonly deps?: Partial<FakeDeps> } = {}) {
   const { root, identity } = await tempIdentity()
@@ -78,7 +77,10 @@ describe("/doctor", () => {
   test("#given a dangling target #when doctor runs #then audit warns", async () => {
     const { identity, pi, ctx } = await harness()
     await mkdir(join(identity.identityPaths.repo, "reference"))
-    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Link\n---\n[[reference/missing.md]]\n")
+    await writeFile(
+      join(identity.identityPaths.repo, "reference/a.md"),
+      "---\ndescription: Link\n---\n[[reference/missing.md]]\n",
+    )
     const text = await invoke(pi, "doctor", "", ctx)
     expect(text).toContain("[warn] audit:link_dangling: 1 issue: reference/a.md -> reference/missing.md")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("warning")
@@ -105,7 +107,10 @@ describe("/doctor", () => {
   test("#given legacy secrets #when JSON is requested #then audit redaction preserves counts", async () => {
     const { identity, pi, ctx } = await harness()
     await mkdir(join(identity.identityPaths.repo, "reference"))
-    await writeFile(join(identity.identityPaths.repo, "reference/a.md"), "---\ndescription: Legacy link\n---\n[[notes/token=abc123456.md]]\n")
+    await writeFile(
+      join(identity.identityPaths.repo, "reference/a.md"),
+      "---\ndescription: Legacy link\n---\n[[notes/token=abc123456.md]]\n",
+    )
     await mkdir(identity.identityPaths.locks, { recursive: true })
     await writeFile(join(identity.identityPaths.locks, "AKIAABCDEFGHIJKLMNOP.lock"), "invalid")
     const text = await invoke(pi, "doctor", "--json", ctx)
@@ -132,19 +137,27 @@ describe("/doctor", () => {
 
   test("#given an unknown repair flag #when doctor runs #then audit refuses it", async () => {
     const { pi, ctx } = await harness()
-    const text = await invoke(pi, "doctor", "--json --fix", ctx)
-    expect(text).toContain("unknown flag --fix")
+    const text = await invoke(pi, "doctor", "--json --repair", ctx)
+    expect(text).toContain("unknown flag --repair")
     expect(ctx.ui.notifications.at(-1)?.level).toBe("error")
   })
 
   test("#given registration #when doctor is not invoked #then no identity or settings are resolved", () => {
     const pi = new MemoryFakeExtensionAPI()
     registerDoctorCommand(pi, {
-      contextForSession: () => { throw new Error("registration resolved identity") },
-      bustPromptCache: () => { throw new Error("registration cleared prompt cache") },
-      loadSettings: () => { throw new Error("registration loaded settings") },
+      contextForSession: () => {
+        throw new Error("registration resolved identity")
+      },
+      bustPromptCache: () => {
+        throw new Error("registration cleared prompt cache")
+      },
+      loadSettings: () => {
+        throw new Error("registration loaded settings")
+      },
     })
-    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe("Run deterministic memory health checks and repair skill frontmatter.")
+    expect(pi.commands.find((command) => command.name === "doctor")?.options.description).toBe(
+      "Run deterministic memory health checks and repair skill frontmatter.",
+    )
   })
 
   test("#given a healthy repository #when doctor runs #then every deterministic check passes", async () => {
@@ -265,20 +278,23 @@ describe("/doctor", () => {
     const failureBaseMs = Date.now() - 3 * 60 * 60_000
     for (let index = 0; index < 3; index += 1) {
       const startedAtMs = failureBaseMs + index * 60_000
-      await writeFile(join(completions, `run-${index}.json`), `${JSON.stringify({
-        schemaVersion: 1,
-        runId: `run-${index}`,
-        identity: identity.identity,
-        category: "quick",
-        conversationIds: ["past-session"],
-        trigger: "manual",
-        outcome: "failed",
-        reason: "model-not-found",
-        detail: "configured model unavailable",
-        startedAt: new Date(startedAtMs).toISOString(),
-        finishedAt: new Date(startedAtMs + 60_000).toISOString(),
-        delivery: { status: index === 2 ? "pending" : "consumed" },
-      })}\n`)
+      await writeFile(
+        join(completions, `run-${index}.json`),
+        `${JSON.stringify({
+          schemaVersion: 1,
+          runId: `run-${index}`,
+          identity: identity.identity,
+          category: "quick",
+          conversationIds: ["past-session"],
+          trigger: "manual",
+          outcome: "failed",
+          reason: "model-not-found",
+          detail: "configured model unavailable",
+          startedAt: new Date(startedAtMs).toISOString(),
+          finishedAt: new Date(startedAtMs + 60_000).toISOString(),
+          delivery: { status: index === 2 ? "pending" : "consumed" },
+        })}\n`,
+      )
     }
 
     // when
@@ -306,12 +322,22 @@ describe("/doctor", () => {
     const { identity, pi, ctx } = await harness({ deps: { now: () => WARN_NOW_MS } })
     await seedReflectionFailureStreak(identity.identityPaths.reflection, WARN_NOW_MS - 60 * 60_000)
     await mkdir(identity.identityPaths.reflection, { recursive: true })
-    await writeFile(join(identity.identityPaths.reflection, "park.json"), JSON.stringify({
-      version: 1,
-      streak: 3,
-      parkedAt: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(),
-      lastFailure: { runId: "run-3", at: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(), fingerprint: "spawn_failed:Model not found", retryable: false, reason: "spawn_failed", detail: "Model not found" },
-    }))
+    await writeFile(
+      join(identity.identityPaths.reflection, "park.json"),
+      JSON.stringify({
+        version: 1,
+        streak: 3,
+        parkedAt: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(),
+        lastFailure: {
+          runId: "run-3",
+          at: new Date(WARN_NOW_MS - 60 * 60_000).toISOString(),
+          fingerprint: "spawn_failed:Model not found",
+          retryable: false,
+          reason: "spawn_failed",
+          detail: "Model not found",
+        },
+      }),
+    )
 
     // when
     const text = await invoke(pi, "doctor", "", ctx)
@@ -355,12 +381,15 @@ describe("/doctor", () => {
     const { identity, pi, ctx } = await harness()
     const runDir = join(identity.identityPaths.reflection, "runs", "run-abandoned")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "abandoned.json"), `${JSON.stringify({
-      version: 1,
-      runId: "run-abandoned",
-      outcome: "abandoned_unknown",
-      abandonedAt: "2026-08-10T00:00:00.000Z",
-    })}\n`)
+    await writeFile(
+      join(runDir, "abandoned.json"),
+      `${JSON.stringify({
+        version: 1,
+        runId: "run-abandoned",
+        outcome: "abandoned_unknown",
+        abandonedAt: "2026-08-10T00:00:00.000Z",
+      })}\n`,
+    )
 
     // when
     const text = await invoke(pi, "doctor", "", ctx)
@@ -387,7 +416,9 @@ describe("/doctor", () => {
   test("#given a system estimate over the warn threshold #when doctor runs #then a token advisory is reported", async () => {
     // given
     const { pi, ctx } = await harness({
-      deps: { loadSettings: () => ({ settings: memorySettings({ compile_warn_tokens: 1 }), configPath: "/tmp/omo.jsonc" }) },
+      deps: {
+        loadSettings: () => ({ settings: memorySettings({ compile_warn_tokens: 1 }), configPath: "/tmp/omo.jsonc" }),
+      },
     })
 
     // when
@@ -409,20 +440,26 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toMatch(/^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\)$/m)
+    expect(text).toMatch(
+      /^\[ok\] projection: \d+ entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\)$/m,
+    )
   })
 
   test("#given commit times that cannot be read #when doctor runs #then the projection check warns that names fell back to name order", async () => {
     // given
     const { identity, pi, ctx } = await harness({ seeded: false })
     await seededRepo(identity, [...SEEDS, { relativePath: "reference/a.md", content: "---\ndescription: A\n---\na\n" }])
-    const commitTimes = spyOn(GitMemoryRepo.prototype, "pathCommitTimes").mockRejectedValue(new Error("git log timed out"))
+    const commitTimes = spyOn(GitMemoryRepo.prototype, "pathCommitTimes").mockRejectedValue(
+      new Error("git log timed out"),
+    )
 
     // when
     const text = await invoke(pi, "doctor", "", ctx).finally(() => commitTimes.mockRestore())
 
     // then
-    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\); commit times unreadable, names listed in name order$/m)
+    expect(text).toMatch(
+      /^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits no per-directory limit, 40960 bytes\); commit times unreadable, names listed in name order$/m,
+    )
   })
 
   test("#given more names than the per-directory limit #when doctor runs #then the omitted count is a warning", async () => {
@@ -446,7 +483,9 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 1 omitted, \d+ bytes \(limits 1\/dir, no byte limit\)$/m)
+    expect(text).toMatch(
+      /^\[warn\] projection: 1 entries shown, 1 omitted, \d+ bytes \(limits 1\/dir, no byte limit\)$/m,
+    )
   })
 
   test("#given a byte limit no listing fits #when doctor runs #then the overflow is reported with the smallest listing", async () => {
@@ -466,7 +505,9 @@ describe("/doctor", () => {
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toMatch(/^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 10 bytes\); no listing fits max_bytes, the smallest is \d+ bytes over$/m)
+    expect(text).toMatch(
+      /^\[warn\] projection: 1 entries shown, 0 omitted, \d+ bytes \(limits 40\/dir, 10 bytes\); no listing fits max_bytes, the smallest is \d+ bytes over$/m,
+    )
   })
 
   test("#given a skill missing name frontmatter #when doctor runs #then the repair helper reports the fix", async () => {
@@ -565,10 +606,17 @@ describe("doctor receipts and quarantined runs", () => {
   const NOW_MS = Date.parse("2026-10-06T12:00:00.000Z")
   const HOUR_MS = 60 * 60_000
 
-  async function writeReceipts(runtimeDir: string, lines: readonly Record<string, unknown>[], tail = ""): Promise<void> {
+  async function writeReceipts(
+    runtimeDir: string,
+    lines: readonly Record<string, unknown>[],
+    tail = "",
+  ): Promise<void> {
     await mkdir(runtimeDir, { recursive: true })
     const base = { v: 1, host: "fixture-host", pid: 1 }
-    await writeFile(join(runtimeDir, "receipts.jsonl"), `${lines.map((line) => JSON.stringify({ ...base, ...line })).join("\n")}\n${tail}`)
+    await writeFile(
+      join(runtimeDir, "receipts.jsonl"),
+      `${lines.map((line) => JSON.stringify({ ...base, ...line })).join("\n")}\n${tail}`,
+    )
   }
 
   function at(msBeforeNow: number): string {
@@ -579,10 +627,40 @@ describe("doctor receipts and quarantined runs", () => {
     // given
     const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
     await writeReceipts(identity.identityPaths.runtime, [
-      { at: at(72 * HOUR_MS), kind: "reflection", runId: "reflection-older", trigger: "step-count", event: "merged", generation: at(73 * HOUR_MS) },
-      { at: at(48 * HOUR_MS), kind: "dream", runId: "dream-run-abcdef", trigger: "idle", event: "merged", generation: at(49 * HOUR_MS), sha: "abc123" },
-      { at: at(HOUR_MS), kind: "reflection", runId: "reflection-newer", trigger: "step-count", event: "failed", generation: at(2 * HOUR_MS), reason: "validation_failed" },
-      { at: at(60_000), kind: "dream", runId: "dream-run-next", trigger: "idle", event: "launched", generation: at(60_000) },
+      {
+        at: at(72 * HOUR_MS),
+        kind: "reflection",
+        runId: "reflection-older",
+        trigger: "step-count",
+        event: "merged",
+        generation: at(73 * HOUR_MS),
+      },
+      {
+        at: at(48 * HOUR_MS),
+        kind: "dream",
+        runId: "dream-run-abcdef",
+        trigger: "idle",
+        event: "merged",
+        generation: at(49 * HOUR_MS),
+        sha: "abc123",
+      },
+      {
+        at: at(HOUR_MS),
+        kind: "reflection",
+        runId: "reflection-newer",
+        trigger: "step-count",
+        event: "failed",
+        generation: at(2 * HOUR_MS),
+        reason: "validation_failed",
+      },
+      {
+        at: at(60_000),
+        kind: "dream",
+        runId: "dream-run-next",
+        trigger: "idle",
+        event: "launched",
+        generation: at(60_000),
+      },
     ])
 
     // when
@@ -590,10 +668,18 @@ describe("doctor receipts and quarantined runs", () => {
     const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
 
     // then
-    expect(text).toContain("[ok] receipts: dream merged 2d ago (run dream-ru); reflection failed 1h ago (validation_failed); facts never")
+    expect(text).toContain(
+      "[ok] receipts: dream merged 2d ago (run dream-ru); reflection failed 1h ago (validation_failed); facts never",
+    )
     expect(report.receipts).toEqual({
       dream: { event: "merged", at: at(48 * HOUR_MS), runId: "dream-run-abcdef", trigger: "idle", sha: "abc123" },
-      reflection: { event: "failed", at: at(HOUR_MS), runId: "reflection-newer", trigger: "step-count", reason: "validation_failed" },
+      reflection: {
+        event: "failed",
+        at: at(HOUR_MS),
+        runId: "reflection-newer",
+        trigger: "step-count",
+        reason: "validation_failed",
+      },
       facts: null,
     })
   })
@@ -604,8 +690,14 @@ describe("doctor receipts and quarantined runs", () => {
     const runDir = join(identity.identityPaths.reflection, "runs", "run-quarantined")
     await mkdir(runDir, { recursive: true })
     const record = {
-      version: 1, runId: "run-quarantined", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
-      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ["final.json", "ledger.json"],
+      version: 1,
+      runId: "run-quarantined",
+      kind: "reflection",
+      trigger: "step-count",
+      generation: at(3 * HOUR_MS),
+      reason: "ledger_unreadable",
+      quarantinedAt: at(2 * HOUR_MS),
+      evidence: ["final.json", "ledger.json"],
     }
     await writeFile(join(runDir, "quarantined.json"), JSON.stringify(record))
 
@@ -615,9 +707,15 @@ describe("doctor receipts and quarantined runs", () => {
 
     // then
     expect(text).toContain(`[warn] quarantined-runs: 1 run needs manual disposal: ${runDir} (ledger_unreadable)`)
-    expect(report.quarantinedRuns).toEqual([{
-      runId: "run-quarantined", reason: "ledger_unreadable", at: record.quarantinedAt, dir: runDir, evidence: record.evidence,
-    }])
+    expect(report.quarantinedRuns).toEqual([
+      {
+        runId: "run-quarantined",
+        reason: "ledger_unreadable",
+        at: record.quarantinedAt,
+        dir: runDir,
+        evidence: record.evidence,
+      },
+    ])
     expect(report.level).toBe("warn")
   })
 
@@ -626,10 +724,19 @@ describe("doctor receipts and quarantined runs", () => {
     const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
     const runDir = join(identity.identityPaths.reflection, "runs", "run-quoted")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "quarantined.json"), JSON.stringify({
-      version: 1, runId: "run-quoted", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
-      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ['notes/token=abc\\x"def.md', "ledger.json"],
-    }))
+    await writeFile(
+      join(runDir, "quarantined.json"),
+      JSON.stringify({
+        version: 1,
+        runId: "run-quoted",
+        kind: "reflection",
+        trigger: "step-count",
+        generation: at(3 * HOUR_MS),
+        reason: "ledger_unreadable",
+        quarantinedAt: at(2 * HOUR_MS),
+        evidence: ['notes/token=abc\\x"def.md', "ledger.json"],
+      }),
+    )
 
     // when
     const text = await invoke(pi, "doctor", "--json", ctx)
@@ -643,15 +750,19 @@ describe("doctor receipts and quarantined runs", () => {
   test("#given a receipts file ending in a partial line #when doctor runs #then the receipts check warns and counts the skipped line", async () => {
     // given
     const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
-    await writeReceipts(identity.identityPaths.runtime, [
-      { at: at(HOUR_MS), kind: "facts", batchId: "batch-0001", trigger: "settle", event: "committed" },
-    ], '{"v":1,"at":"2026-10-06T11:59')
+    await writeReceipts(
+      identity.identityPaths.runtime,
+      [{ at: at(HOUR_MS), kind: "facts", batchId: "batch-0001", trigger: "settle", event: "committed" }],
+      '{"v":1,"at":"2026-10-06T11:59',
+    )
 
     // when
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
-    expect(text).toContain("[warn] receipts: dream never; reflection never; facts committed 1h ago (batch batch-00) (1 partial line skipped)")
+    expect(text).toContain(
+      "[warn] receipts: dream never; reflection never; facts committed 1h ago (batch batch-00) (1 partial line skipped)",
+    )
   })
 
   test("#given receipts, a quarantined run and projection omissions together #when doctor runs with --json #then one parsed report carries all three", async () => {
@@ -672,22 +783,43 @@ describe("doctor receipts and quarantined runs", () => {
       { relativePath: "reference/b.md", content: "---\ndescription: B\n---\nb\n" },
     ])
     await writeReceipts(identity.identityPaths.runtime, [
-      { at: at(HOUR_MS), kind: "reflection", runId: "reflection-run-1", trigger: "step-count", event: "merged", generation: at(2 * HOUR_MS), sha: "abc" },
+      {
+        at: at(HOUR_MS),
+        kind: "reflection",
+        runId: "reflection-run-1",
+        trigger: "step-count",
+        event: "merged",
+        generation: at(2 * HOUR_MS),
+        sha: "abc",
+      },
     ])
     const runDir = join(identity.identityPaths.reflection, "runs", "run-quarantined")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "quarantined.json"), JSON.stringify({
-      version: 1, runId: "run-quarantined", kind: "reflection", trigger: "step-count", generation: at(3 * HOUR_MS),
-      reason: "ledger_unreadable", quarantinedAt: at(2 * HOUR_MS), evidence: ["ledger.json"],
-    }))
+    await writeFile(
+      join(runDir, "quarantined.json"),
+      JSON.stringify({
+        version: 1,
+        runId: "run-quarantined",
+        kind: "reflection",
+        trigger: "step-count",
+        generation: at(3 * HOUR_MS),
+        reason: "ledger_unreadable",
+        quarantinedAt: at(2 * HOUR_MS),
+        evidence: ["ledger.json"],
+      }),
+    )
 
     // when
     const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
 
     // then
     expect(report.receipts.reflection).toMatchObject({ event: "merged", runId: "reflection-run-1" })
-    expect(report.quarantinedRuns).toEqual([expect.objectContaining({ runId: "run-quarantined", reason: "ledger_unreadable" })])
-    expect(report.checks).toContainEqual(expect.objectContaining({ name: "projection", level: "warn", detail: expect.stringMatching(/1 omitted/) }))
+    expect(report.quarantinedRuns).toEqual([
+      expect.objectContaining({ runId: "run-quarantined", reason: "ledger_unreadable" }),
+    ])
+    expect(report.checks).toContainEqual(
+      expect.objectContaining({ name: "projection", level: "warn", detail: expect.stringMatching(/1 omitted/) }),
+    )
   })
 
   test("#given a launch the reconciler recorded as interrupted #when doctor runs #then it is not a run needing manual disposal", async () => {
@@ -695,15 +827,264 @@ describe("doctor receipts and quarantined runs", () => {
     const { identity, pi, ctx } = await harness({ deps: { now: () => NOW_MS } })
     const runDir = join(identity.identityPaths.reflection, "runs", "run-interrupted")
     await mkdir(runDir, { recursive: true })
-    await writeFile(join(runDir, "abandoned.json"), JSON.stringify({
-      version: 1, runId: "run-interrupted", abandonedAt: at(HOUR_MS), reason: "launch_interrupted",
-      generation: at(2 * HOUR_MS), kind: "reflection", trigger: "step-count",
-    }))
+    await writeFile(
+      join(runDir, "abandoned.json"),
+      JSON.stringify({
+        version: 1,
+        runId: "run-interrupted",
+        abandonedAt: at(HOUR_MS),
+        reason: "launch_interrupted",
+        generation: at(2 * HOUR_MS),
+        kind: "reflection",
+        trigger: "step-count",
+      }),
+    )
 
     // when
     const text = await invoke(pi, "doctor", "", ctx)
 
     // then
     expect(text).toContain("[ok] abandoned-runs: no abandoned runs")
+  })
+})
+
+describe("doctor runtime size: measurement over budget (B16, r4 R5)", () => {
+  test("#given a measurement deadline that has passed #when the runtime-size check runs #then it reports size unknown with the budget and the date", async () => {
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
+    await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), "{}\n")
+
+    const { check, report } = await checkRuntimeSize(identity.identityPaths, {
+      maxBytes: 1024,
+      policy: {
+        retentionDays: 7,
+        abandonedJournalDays: 14,
+        completionsDays: 30,
+        discardUnreflectedJournals: true,
+        passBudgetMs: 60_000,
+      },
+      now: Date.parse("2026-11-05T07:00:00.000Z"),
+      reflectionEnabled: true,
+      discardUnreflectedJournals: true,
+      measureBudgetMs: 60_000,
+      measureSignal: AbortSignal.abort(),
+    })
+
+    expect(report.sizeUnknown).toEqual({ budgetMs: 60_000, at: "2026-11-05T07:00:00.000Z" })
+    expect(check.level).toBe("warn")
+  })
+})
+
+describe("doctor runtime size: last cleanup (#12932)", () => {
+  test("#given a runtime with a logged cleanup and one without #when the runtime-size check runs #then the report and the detail say when it last cleaned, or that none is recorded", async () => {
+    const input = {
+      maxBytes: 0,
+      policy: {
+        retentionDays: 7,
+        abandonedJournalDays: 14,
+        completionsDays: 30,
+        discardUnreflectedJournals: false,
+        passBudgetMs: 60_000,
+      },
+      now: Date.parse("2026-11-05T07:00:00.000Z"),
+      reflectionEnabled: true,
+      discardUnreflectedJournals: false,
+    }
+    const cleaned = await tempIdentity()
+    const never = await tempIdentity()
+    tempDirs.push(cleaned.root, never.root)
+    for (const { identity } of [cleaned, never]) {
+      await mkdir(join(identity.identityPaths.transcripts, "s1"), { recursive: true })
+      await writeFile(join(identity.identityPaths.transcripts, "s1", "transcript.jsonl"), "{}\n")
+    }
+    await writeFile(
+      join(cleaned.identity.identityPaths.runtime, "retention-log.jsonl"),
+      `${JSON.stringify({ v: 1, at: "2026-11-05T00:00:00.000Z", total: 2, removed: { journals: ["a", "b"] } })}\n`,
+    )
+
+    const withLog = await checkRuntimeSize(cleaned.identity.identityPaths, input)
+    const withoutLog = await checkRuntimeSize(never.identity.identityPaths, input)
+
+    expect(withLog.report.lastCleanup).toEqual({ at: "2026-11-05T00:00:00.000Z", total: 2 })
+    expect(withLog.check.detail).toContain("last cleanup 2026-11-05T00:00:00.000Z removed 2")
+    expect(withoutLog.report.lastCleanup).toBeUndefined()
+    expect(withoutLog.check.detail).toContain("no cleanup recorded")
+  })
+})
+
+describe("doctor runtime size (B10)", () => {
+  async function sizedIdentity(
+    maxBytesFor: (bytes: number) => number,
+    runtime: Partial<ReturnType<typeof memorySettings>["runtime"]> = {},
+  ) {
+    const { root, identity } = await tempIdentity()
+    tempDirs.push(root)
+    await seededRepo(identity, SEEDS)
+    const session = join(identity.identityPaths.transcripts, "s-big")
+    await mkdir(session, { recursive: true })
+    await writeFile(join(session, "transcript.jsonl"), Buffer.alloc(4 * 1024 * 1024, 1))
+    const bytes = (await measureRuntimeSize(identity.identityPaths.runtime)).bytes
+    const maxBytes = maxBytesFor(bytes)
+    const deps = fakeDeps(identity, {
+      loadSettings: () => ({
+        settings: memorySettings({ runtime: { ...memorySettings().runtime, ...runtime, max_bytes: maxBytes } }),
+        configPath: "/tmp/omo.jsonc",
+      }),
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    registerDoctorCommand(pi, deps)
+    return { pi, ctx: fakeCommandContext(), maxBytes, identityPaths: identity.identityPaths }
+  }
+
+  test("#given a runtime at 85 % of its cap #when doctor runs #then the runtime-size check warns with bytes, cap, top stores and past-retention counts", async () => {
+    const { pi, ctx, maxBytes } = await sizedIdentity((bytes) => Math.floor(bytes / 0.85))
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.level).toBe("warn")
+    expect(report.runtimeSize.maxBytes).toBe(maxBytes)
+    expect(report.runtimeSize.percent).toBeGreaterThanOrEqual(80)
+    expect(report.runtimeSize.stores[0].store).toBe("transcripts")
+    expect(report.runtimeSize.stores.length).toBeLessThanOrEqual(3)
+    expect(report.runtimeSize.pastRetention).toEqual({ runs: 0, journals: 0, sidecars: 0, unclassifiedJournals: 0 })
+  })
+
+  test("#given the switch on, failing reflection and a journal no retention row classifies #when doctor runs #then runtime-size reports the suspension and the unclassified count (r2 item 7)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes * 2, { discard_unreflected_journals: true })
+    const finishedAt = new Date(1_782_000_000_000 - 2 * 24 * 60 * 60 * 1000).toISOString()
+    await mkdir(join(identityPaths.reflection, "completions"), { recursive: true })
+    await writeFile(
+      join(identityPaths.reflection, "completions", "reflection-run-2.json"),
+      JSON.stringify({ runId: "reflection-run-2", outcome: "failed", finishedAt }),
+    )
+    const odd = join(identityPaths.transcripts, "s-odd")
+    await mkdir(odd, { recursive: true })
+    await writeFile(
+      join(odd, "state.json"),
+      JSON.stringify({
+        total_completed_steps: 2,
+        reflected_completed_steps: 0,
+        steps_since_last_successful_reflection: 2,
+        reflected_through_message_id: "m1",
+      }),
+    )
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.suspendedSince).toBe(finishedAt)
+    expect(report.runtimeSize.unclassifiedJournals).toBe(1)
+  })
+
+  test("#given a runtime under its cap holding an unreflected journal #when doctor runs #then the unreflected bytes, which only the over-cap line prints, are not measured (#12538 review r3 M2)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes * 4)
+    await writeFile(
+      join(identityPaths.transcripts, "s-big", "state.json"),
+      JSON.stringify({
+        total_completed_steps: 3,
+        reflected_completed_steps: 0,
+        steps_since_last_successful_reflection: 3,
+      }),
+    )
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.runtimeSize.unreflectedBytes).toBeUndefined()
+  })
+
+  test("#given transcripts holding a stray file and an unreadable state.json #when doctor runs #then the runtime-size check still reports (#12538 review r3 M1)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
+    await writeFile(join(identityPaths.transcripts, ".DS_Store"), "x")
+    await mkdir(join(identityPaths.transcripts, "s-torn", "state.json"), { recursive: true })
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")).toBeDefined()
+  })
+
+  test("#given a runtime over its cap held by unreflected journals and the default switch (off) #when doctor runs #then runtime-size reports the held bytes (r4 R1)", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2))
+    await writeFile(
+      join(identityPaths.transcripts, "s-big", "state.json"),
+      JSON.stringify({
+        total_completed_steps: 3,
+        reflected_completed_steps: 0,
+        steps_since_last_successful_reflection: 3,
+      }),
+    )
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.unreflectedBytes).toBeGreaterThan(4 * 1024 * 1024)
+    expect(report.runtimeSize.discardUnreflectedJournals).toBe(false)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).toContain(
+      "discard_unreflected_journals off",
+    )
+  })
+
+  test("#given a runtime over its cap with folded runs to evict and an unreflected journal, switch off #when doctor runs #then it reports the evictable bytes and does not blame the unreflected journals (#12538 review M1)", async () => {
+    const RUN_BYTES = 2 * 1024 * 1024
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => bytes + 5 * 1024 * 1024)
+    await writeFile(
+      join(identityPaths.transcripts, "s-big", "state.json"),
+      JSON.stringify({
+        total_completed_steps: 3,
+        reflected_completed_steps: 0,
+        steps_since_last_successful_reflection: 3,
+      }),
+    )
+    for (const index of [1, 2, 3]) {
+      const dir = join(identityPaths.reflection, "runs", `reflection-run-${index}`)
+      await mkdir(dir, { recursive: true })
+      await writeFile(
+        join(dir, "final.json"),
+        JSON.stringify({
+          runId: `reflection-run-${index}`,
+          outcome: "merged",
+          finishedAt: new Date(Date.parse("2026-11-01T00:00:00.000Z") + index * 1000).toISOString(),
+        }),
+      )
+      await writeFile(join(dir, "child-1.log"), Buffer.alloc(RUN_BYTES, 1))
+    }
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.bytes).toBeGreaterThan(report.runtimeSize.maxBytes)
+    expect(report.runtimeSize.evictableBytes).toBeGreaterThanOrEqual(2 * RUN_BYTES)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).not.toContain(
+      "discard_unreflected_journals off",
+    )
+  })
+
+  test("#given the switch on over its cap #when doctor runs #then no held-by-unreflected remainder is reported", async () => {
+    const { pi, ctx, identityPaths } = await sizedIdentity((bytes) => Math.floor(bytes / 2), {
+      discard_unreflected_journals: true,
+    })
+    await writeFile(
+      join(identityPaths.transcripts, "s-big", "state.json"),
+      JSON.stringify({
+        total_completed_steps: 3,
+        reflected_completed_steps: 0,
+        steps_since_last_successful_reflection: 3,
+      }),
+    )
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.runtimeSize.discardUnreflectedJournals).toBe(true)
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.detail).not.toContain(
+      "discard_unreflected_journals off",
+    )
+  })
+
+  test("#given a runtime at 50 % of its cap #when doctor runs #then the runtime-size check is ok", async () => {
+    const { pi, ctx } = await sizedIdentity((bytes) => bytes * 2)
+
+    const report = JSON.parse(await invoke(pi, "doctor", "--json", ctx))
+
+    expect(report.checks.find((check: { name: string }) => check.name === "runtime-size")?.level).toBe("ok")
+    expect(report.runtimeSize.percent).toBeLessThan(80)
   })
 })

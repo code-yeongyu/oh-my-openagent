@@ -15,18 +15,22 @@ test("a provisional write failure cannot strand the live manager's terminal wait
   const clock = exitClock()
   const failedWrite = Promise.withResolvers<void>()
   let refuse = true
-  const started = exitedTask((store) => ({
-    ...store,
-    mutate: (id, mutation) => store.mutate(id, (record) => {
-      const next = mutation(record)
-      if (refuse && next.provisional_exit !== undefined) {
-        refuse = false
-        failedWrite.resolve()
-        throw new Error("provisional write failed")
-      }
-      return next
+  const started = exitedTask(
+    (store) => ({
+      ...store,
+      mutate: (id, mutation) =>
+        store.mutate(id, (record) => {
+          const next = mutation(record)
+          if (refuse && next.provisional_exit !== undefined) {
+            refuse = false
+            failedWrite.resolve()
+            throw new Error("provisional write failed")
+          }
+          return next
+        }),
     }),
-  }), clock)
+    clock,
+  )
   await failedWrite.promise
   // When persistence fails, confirmation is still bounded rather than abandoned.
   expect(clock.size()).toBe(1)
@@ -53,7 +57,8 @@ test("a later fallback rung or revived run cannot inherit the old provisional ex
     // When the run-reset builders create a new epoch.
     const next = handOffToNextRung(record, {
       model: { provider: "test", model_id: "next", display: "test/next", source: "category" },
-      remaining: [], timestamp,
+      remaining: [],
+      timestamp,
     })
     // Then neither new run carries evidence about its predecessor's exit.
     expect(next.provisional_exit).toBeUndefined()
@@ -145,21 +150,24 @@ test("a committed own-crash ERROR survives a later parent death", async () => {
   }
 })
 
-test.each(["parent-1", "new-parent", undefined])("a shutdown-detached provisional exit is LOST instead of replayed on resume (%s)", async (sessionId) => {
-  const f = await exitedTask()
-  try {
-    // Given shutdown detached the dead child's record before the process exited.
-    f.store.transition(f.taskId, { type: "detach_rpc", timestamp: new Date(f.clock.now()).toISOString() })
-    f.manager.forget(f.taskId, { path: "park" })
-    // When the parent resumes, suspension must not erase the unconfirmed exit.
-    await f.lifecycle.reconcileOnSessionStart(sessionId)
-    expect(f.store.load(f.taskId)?.status).toBe("lost")
-    expect(f.events()).toContain("reconcile_lost")
-    expect(f.respawns()).toBe(0)
-  } finally {
-    f.dispose()
-  }
-})
+test.each(["parent-1", "new-parent", undefined])(
+  "a shutdown-detached provisional exit is LOST instead of replayed on resume (%s)",
+  async (sessionId) => {
+    const f = await exitedTask()
+    try {
+      // Given shutdown detached the dead child's record before the process exited.
+      f.store.transition(f.taskId, { type: "detach_rpc", timestamp: new Date(f.clock.now()).toISOString() })
+      f.manager.forget(f.taskId, { path: "park" })
+      // When the parent resumes, suspension must not erase the unconfirmed exit.
+      await f.lifecycle.reconcileOnSessionStart(sessionId)
+      expect(f.store.load(f.taskId)?.status).toBe("lost")
+      expect(f.events()).toContain("reconcile_lost")
+      expect(f.respawns()).toBe(0)
+    } finally {
+      f.dispose()
+    }
+  },
+)
 
 test("task_output and its renderer expose running, not a provisional error", async () => {
   const f = await exitedTask()
@@ -168,16 +176,24 @@ test("task_output and its renderer expose running, not a provisional error", asy
     for (const mode of ["status", "tail", "full"] as const) {
       const result = await runTaskOutput(
         { manager: f.manager, stateDir: f.store.stateDir, now: f.clock.now },
-        { task_id: f.taskId, mode }, "parent-1",
+        { task_id: f.taskId, mode },
+        "parent-1",
       )
       if (result.details.kind !== "status" && result.details.kind !== "transcript") throw new Error("missing snapshot")
       // Then the machine-readable status and renderer's semantic color both remain non-error.
       expect(result.details.snapshot.status).toBe("running")
       expect(result.details.snapshot.error_message).toBeUndefined()
       const colors: string[] = []
-      renderTaskOutputResult(result, { expanded: false, isPartial: false }, {
-        fg: (color, text) => { colors.push(color); return text },
-      }).render(120)
+      renderTaskOutputResult(
+        result,
+        { expanded: false, isPartial: false },
+        {
+          fg: (color, text) => {
+            colors.push(color)
+            return text
+          },
+        },
+      ).render(120)
       expect(colors).not.toContain("error")
       expect(shouldNotifyStatus(result.details.snapshot.status)).toBe(false)
     }

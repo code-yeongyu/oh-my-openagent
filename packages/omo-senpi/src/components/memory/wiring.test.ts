@@ -11,17 +11,8 @@ import type { MemoryIdentityRuntime } from "./identity-runtime"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { createMemoryComponent, ensureIdentityRuntimeDirs } from "./index"
-import {
-  MemoryFakeExtensionAPI,
-  componentContext,
-  loadedMemoryConfig,
-  memorySettings,
-} from "./memory.test-support"
-import {
-  MEMORY_STATUS_KEY,
-  type MemoryStatusResult,
-  type RefreshMemoryStatusInput,
-} from "./status"
+import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
+import { MEMORY_STATUS_KEY, type MemoryStatusResult, type RefreshMemoryStatusInput } from "./status"
 import { withinMs } from "./kibitzer/sidecar.test-support"
 import { MEMORY_NOTICE_CUSTOM_TYPE, MEMORY_PRESSURE_METADATA_TOKEN } from "./prompt"
 import { RECALL_CUSTOM_TYPE } from "./recall-wiring"
@@ -29,6 +20,7 @@ import { SESSION_SHUTDOWN_DRAIN_BUDGET_MS } from "./shutdown-drain"
 import { createMemoryWiring } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
+import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -77,7 +69,10 @@ describe("memory pressure compile wiring", () => {
     })
     const pi = new MemoryFakeExtensionAPI()
     createMemoryWiring({
-      sessions: new Map([["session-pressure", { context }], ["session-pressure-next", { context }]]),
+      sessions: new Map([
+        ["session-pressure", { context }],
+        ["session-pressure-next", { context }],
+      ]),
       loadConfig: () => loadedMemoryConfig(memorySettings({ compile_warn_tokens: 100 })),
       cwd: () => root,
       env: {},
@@ -147,13 +142,19 @@ describe("memory recall wiring", () => {
       "before_agent_start",
       { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
       sessionContext("session-recall", undefined, [
-        { type: "message", id: "m1", message: { role: "user", content: [{ type: "text", text: "how do we handle kubernetes rollouts" }] } },
+        {
+          type: "message",
+          id: "m1",
+          message: { role: "user", content: [{ type: "text", text: "how do we handle kubernetes rollouts" }] },
+        },
       ]),
     )
 
     // then
-    const messages = results
-      .filter((result): result is { message?: { customType?: string; display?: boolean }; systemPrompt?: string } => result !== undefined)
+    const messages = results.filter(
+      (result): result is { message?: { customType?: string; display?: boolean }; systemPrompt?: string } =>
+        result !== undefined,
+    )
     const recall = messages.find((result) => result.message?.customType === RECALL_CUSTOM_TYPE)
     const notice = messages.find((result) => result.message?.customType === MEMORY_NOTICE_CUSTOM_TYPE)
     const projection = messages.find((result) => result.systemPrompt !== undefined)
@@ -162,7 +163,11 @@ describe("memory recall wiring", () => {
     expect(notice).toBeUndefined()
     // The kibitzer prompt trigger may append its gate observability entry and the projection records its
     // session pin; nothing else may land.
-    expect(pi.entries.filter((entry) => entry.customType !== "omo-kibitzer:gate" && entry.customType !== PROJECTION_PIN_ENTRY_TYPE)).toEqual([])
+    expect(
+      pi.entries.filter(
+        (entry) => entry.customType !== "omo-kibitzer:gate" && entry.customType !== PROJECTION_PIN_ENTRY_TYPE,
+      ),
+    ).toEqual([])
     expect(projection?.systemPrompt).toContain("persona")
   }, 30_000)
 })
@@ -227,20 +232,13 @@ describe("memory footer wiring", () => {
     const pi = new MemoryFakeExtensionAPI()
     const statusCalls: Array<{ key: string; text: string | undefined }> = []
     const wiring = createMemoryWiring({
-      sessions: new Map([[
-        fixture.sessionId,
-        { context: fixture.context, memoryStatusAttempted: false },
-      ]]),
+      sessions: new Map([[fixture.sessionId, { context: fixture.context, memoryStatusAttempted: false }]]),
       loadConfig: () => loadedMemoryConfig(memorySettings()),
       cwd: () => fixture.cwd,
       env: fixture.env,
       refreshStatus: fakeRefreshMemoryStatus,
     })
-    const eventCtx = sessionContext(
-      fixture.sessionId,
-      statusCalls,
-      [{ type: "custom" }],
-    )
+    const eventCtx = sessionContext(fixture.sessionId, statusCalls, [{ type: "custom" }])
 
     wiring.clearStatus(eventCtx)
     const bindCompletion = wiring.afterBind(pi, fixture.sessionId, fixture.context, eventCtx)
@@ -299,9 +297,7 @@ async function createFixture(): Promise<{
   return { cwd, env, context, identity: identity.id, sessionId }
 }
 
-async function fakeRefreshMemoryStatus(
-  input: RefreshMemoryStatusInput,
-): Promise<MemoryStatusResult> {
+async function fakeRefreshMemoryStatus(input: RefreshMemoryStatusInput): Promise<MemoryStatusResult> {
   if (input.showFooter === false) {
     return { notified: false, footerShown: false }
   }
@@ -343,10 +339,7 @@ function sessionContext(
   }
 }
 
-function expectRelativeStatus(
-  call: { key: string; text: string | undefined } | undefined,
-  identity: string,
-): void {
+function expectRelativeStatus(call: { key: string; text: string | undefined } | undefined, identity: string): void {
   expect(call?.key).toBe("memory")
   expect(call?.text).toMatch(new RegExp(`^mem:${identity} (?:just now|[1-9]\\d*[mhd] ago)$`))
 }
@@ -377,15 +370,22 @@ async function reflectionFixture(settings: ReturnType<typeof memorySettings> | u
   const pi = new MemoryFakeExtensionAPI()
   createMemoryWiring({
     sessions,
-    loadConfig: () => settings === undefined
-      ? { config: {}, diagnostics: [], layers: [], sources: [] }
-      : loadedMemoryConfig(settings),
+    loadConfig: () =>
+      settings === undefined ? { config: {}, diagnostics: [], layers: [], sources: [] } : loadedMemoryConfig(settings),
     cwd: () => root,
     env: {},
     createRuntime: () => runtime,
   }).registerStatic(pi, componentContext())
-  await pi.dispatch("input", { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." }, eventCtx)
-  await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "first-real-input", disposition: "started" }, eventCtx)
+  await pi.dispatch(
+    "input",
+    { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." },
+    eventCtx,
+  )
+  await pi.dispatch(
+    "input_disposition",
+    { type: "input_disposition", inputId: "first-real-input", disposition: "started" },
+    eventCtx,
+  )
   return { pi, evaluations }
 }
 
@@ -398,6 +398,7 @@ const eventCtx = {
 
 for (const assertion of ["bounded", "attributed"] as const) {
   test(`#given a never-resolving reflection reconcile #when the composed memory subscriber settles #then it is ${assertion}`, async () => {
+    useTestTimeout(15_000)
     // given: the real memory wiring reaches its injected runtime, not a substitute settle handler.
     const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-settle-")))
     roots.push(root)
@@ -408,38 +409,57 @@ for (const assertion of ["bounded", "attributed"] as const) {
     })
     const entered = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
-    const runtime = { reconcile: () => { entered.resolve(); return release.promise } } as unknown as MemoryIdentityRuntime
+    const runtime = {
+      reconcile: () => {
+        entered.resolve()
+        return release.promise
+      },
+    } as unknown as MemoryIdentityRuntime
     const pi = new MemoryFakeExtensionAPI()
     const context = componentContext()
-    await composeOmoSenpiExtension([{
-      name: "memory",
-      register(api, ctx) {
-        createMemoryWiring({
-          sessions: new Map([["session-1", { context: identity }]]),
-          loadConfig: () => loadedMemoryConfig(memorySettings()),
-          cwd: () => root,
-          env: {},
-          logger: ctx.logger,
-          createRuntime: () => runtime,
-        }).registerStatic(api, ctx)
-      },
-    }], { logger: context.logger })(pi)
+    await composeOmoSenpiExtension(
+      [
+        {
+          name: "memory",
+          register(api, ctx) {
+            createMemoryWiring({
+              sessions: new Map([["session-1", { context: identity }]]),
+              loadConfig: () => loadedMemoryConfig(memorySettings()),
+              cwd: () => root,
+              env: {},
+              logger: ctx.logger,
+              createRuntime: () => runtime,
+            }).registerStatic(api, ctx)
+          },
+        },
+      ],
+      { logger: context.logger },
+    )(pi)
     await pi.dispatch("input", { source: "rpc", inputId: "accepted", text: "Work." }, eventCtx)
     await pi.dispatch("input_disposition", { inputId: "accepted", disposition: "started" }, eventCtx)
     const settled = pi.dispatch("agent_settled", {}, eventCtx)
     try {
-      await withinMs(entered.promise, "memory reconciliation entered", 5_000)
+      await withinMs(entered.promise, "memory reconciliation entered", remainingTestTime())
       // when: this watchdog bounds the assertion, never supplies the completion under test.
-      const completed = await withinMs(settled, "bounded memory settle", 4_000).then(() => true, () => false)
+      const completed = await withinMs(settled, "bounded memory settle", remainingTestTime()).then(
+        () => true,
+        () => false,
+      )
       // then
       if (assertion === "bounded") expect(completed).toBe(true)
-      else expect(context.logs).toContainEqual(expect.objectContaining({
-        message: "extension_handler_stalled",
-        details: expect.objectContaining({
-          component: "memory", hook: "onSettled.reflection.reconcile",
-          handlerEvent: "agent_settled", stage: "timeout", sessionId: "session-1",
-        }),
-      }))
+      else
+        expect(context.logs).toContainEqual(
+          expect.objectContaining({
+            message: "extension_handler_stalled",
+            details: expect.objectContaining({
+              component: "memory",
+              hook: "onSettled.reflection.reconcile",
+              handlerEvent: "agent_settled",
+              stage: "timeout",
+              sessionId: "session-1",
+            }),
+          }),
+        )
     } finally {
       release.resolve()
       await settled
@@ -462,20 +482,23 @@ describe("memory wiring reflection completion delivery", () => {
         })
         const completionsDir = join(identity.identityPaths.reflection, "completions")
         await mkdir(completionsDir, { recursive: true })
-        await writeFile(join(completionsDir, "run-notify.json"), `${JSON.stringify({
-          schemaVersion: 1,
-          runId: "run-notify",
-          identity: "agent-notify",
-          category: "quick",
-          conversationIds: ["past-session"],
-          trigger: "manual",
-          outcome: "failed",
-          reason: "child_exit",
-          detail: "fixture failure",
-          startedAt: "2026-08-12T00:00:00.000Z",
-          finishedAt: new Date().toISOString(),
-          delivery: { status: "pending" },
-        })}\n`)
+        await writeFile(
+          join(completionsDir, "run-notify.json"),
+          `${JSON.stringify({
+            schemaVersion: 1,
+            runId: "run-notify",
+            identity: "agent-notify",
+            category: "quick",
+            conversationIds: ["past-session"],
+            trigger: "manual",
+            outcome: "failed",
+            reason: "child_exit",
+            detail: "fixture failure",
+            startedAt: "2026-08-12T00:00:00.000Z",
+            finishedAt: new Date().toISOString(),
+            delivery: { status: "pending" },
+          })}\n`,
+        )
         const sessionId = "current-session"
         const notifications: Array<{ message: string; level: string }> = []
         const runtime = {
@@ -604,8 +627,16 @@ async function liveFooterHarness(): Promise<{
       }
     },
     async startReflection() {
-      await pi.dispatch("input", { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." }, eventCtx)
-      await pi.dispatch("input_disposition", { type: "input_disposition", inputId: "first-real-input", disposition: "started" }, eventCtx)
+      await pi.dispatch(
+        "input",
+        { type: "input", source: "rpc", inputId: "first-real-input", text: "Work on this." },
+        eventCtx,
+      )
+      await pi.dispatch(
+        "input_disposition",
+        { type: "input_disposition", inputId: "first-real-input", disposition: "started" },
+        eventCtx,
+      )
       await pi.dispatch("agent_end", { aborted: false, willRetry: false }, eventCtx)
       await pi.dispatch("agent_settled", {}, eventCtx)
     },
@@ -631,14 +662,18 @@ describe("facts shutdown wiring", () => {
       loadConfig: () => loadedMemoryConfig(memorySettings()),
       cwd: () => root,
       env: {},
-      createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+      createRuntime: () => ({ reconcile: async () => {} }) as unknown as MemoryIdentityRuntime,
       createFactsExtractor: () => ({
         launchPending: async () => undefined,
         reconcilePending: async () => undefined,
-        cancelActive: async () => { sequence.push("cancel") },
+        cancelActive: async () => {
+          sequence.push("cancel")
+        },
       }),
     })
-    wiring.registerShutdownEvaluator(async () => { sequence.push("drain") })
+    wiring.registerShutdownEvaluator(async () => {
+      sequence.push("drain")
+    })
     return { wiring, sessionId, sequence }
   }
 
@@ -680,7 +715,8 @@ describe("session shutdown pre-drain bounds", () => {
   const mockModel: SenpiModelPort = { provider: "omo-mock", id: "mock-1" }
   const mockRegistry = {
     getAvailable: () => [mockModel],
-    find: (provider: string, modelId: string) => (provider === mockModel.provider && modelId === mockModel.id ? mockModel : undefined),
+    find: (provider: string, modelId: string) =>
+      provider === mockModel.provider && modelId === mockModel.id ? mockModel : undefined,
     getProviderAuth: () => undefined,
   }
 
@@ -717,15 +753,20 @@ describe("session shutdown pre-drain bounds", () => {
     const memory = memorySettings()
     const wiring = createMemoryWiring({
       sessions: new Map([[sessionId, { context }]]),
-      loadConfig: () => ({ ...loadedMemoryConfig(memory), config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } } }),
+      loadConfig: () => ({
+        ...loadedMemoryConfig(memory),
+        config: { memory, categories: { quick: { model: "omo-mock/mock-1" } } },
+      }),
       cwd: () => root,
       env: {},
       logger: {
         info: () => {},
-        warn: (message, details) => { warnings.push({ message, details }) },
+        warn: (message, details) => {
+          warnings.push({ message, details })
+        },
         error: () => {},
       },
-      createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+      createRuntime: () => ({ reconcile: async () => {} }) as unknown as MemoryIdentityRuntime,
       ...overrides,
     })
     const pi = new MemoryFakeExtensionAPI()
@@ -745,7 +786,10 @@ describe("session shutdown pre-drain bounds", () => {
     }
   }
 
-  function budgetWarnings(warnings: readonly { readonly message: string; readonly details: unknown }[], step: string): unknown[] {
+  function budgetWarnings(
+    warnings: readonly { readonly message: string; readonly details: unknown }[],
+    step: string,
+  ): unknown[] {
     return warnings
       .filter((call) => call.message === "memory shutdown drain hit its budget")
       .map((call) => call.details)
@@ -766,19 +810,31 @@ describe("session shutdown pre-drain bounds", () => {
         }),
       },
     })
-    await f.pi.dispatch("input", { type: "input", source: "rpc", inputId: "real-prompt", text: "Read the rollout guide." }, f.eventCtx)
-    await f.pi.dispatch("input_disposition", { type: "input_disposition", inputId: "real-prompt", disposition: "started" }, f.eventCtx)
+    await f.pi.dispatch(
+      "input",
+      { type: "input", source: "rpc", inputId: "real-prompt", text: "Read the rollout guide." },
+      f.eventCtx,
+    )
+    await f.pi.dispatch(
+      "input_disposition",
+      { type: "input_disposition", inputId: "real-prompt", disposition: "started" },
+      f.eventCtx,
+    )
     await f.pi.dispatch("tool_call", { toolName: "read", input: { path: ROLLOUTS } }, f.eventCtx)
-    await withinMs(started.promise, "the resident child start", 10_000)
+    await withinMs(started.promise, "the resident child start", remainingTestTime())
 
     // when
     const startedAt = Date.now()
-    await withinMs(f.wiring.onSessionShutdown({
-      reason: "quit",
-      sessionId: f.sessionId,
-      deadlineAt: Date.now() + 300,
-      now: () => Date.now(),
-    }), "the bounded session shutdown", 10_000)
+    await withinMs(
+      f.wiring.onSessionShutdown({
+        reason: "quit",
+        sessionId: f.sessionId,
+        deadlineAt: Date.now() + 300,
+        now: () => Date.now(),
+      }),
+      "the bounded session shutdown",
+      remainingTestTime(),
+    )
     const elapsed = Date.now() - startedAt
 
     // then
@@ -804,16 +860,20 @@ describe("session shutdown pre-drain bounds", () => {
 
     // when
     const startedAt = Date.now()
-    await withinMs(f.wiring.onSessionShutdown({
-      reason: "quit",
-      sessionId: f.sessionId,
-      deadlineAt: Date.now() + 300,
-      now: () => Date.now(),
-    }), "the bounded session shutdown", 10_000)
+    await withinMs(
+      f.wiring.onSessionShutdown({
+        reason: "quit",
+        sessionId: f.sessionId,
+        deadlineAt: Date.now() + 300,
+        now: () => Date.now(),
+      }),
+      "the bounded session shutdown",
+      remainingTestTime(),
+    )
     const elapsed = Date.now() - startedAt
 
     // then
-    await withinMs(entered.promise, "the facts cancellation", 10_000)
+    await withinMs(entered.promise, "the facts cancellation", remainingTestTime())
     expect(elapsed).toBeLessThan(5_000)
     expect(budgetWarnings(f.warnings, "facts-cancel")).toHaveLength(1)
     expect(budgetWarnings(f.warnings, "facts-enqueue")).toHaveLength(1)
@@ -846,17 +906,21 @@ describe("session shutdown journal durability", () => {
         env: {},
         logger: {
           info: () => {},
-          warn: (message, details) => { budgetWarnings.push({ message, details }) },
+          warn: (message, details) => {
+            budgetWarnings.push({ message, details })
+          },
           error: () => {},
         },
-        createRuntime: () => ({ reconcile: async () => {} } as unknown as MemoryIdentityRuntime),
+        createRuntime: () => ({ reconcile: async () => {} }) as unknown as MemoryIdentityRuntime,
         // Pre-drain work stands in for every optional await the handler performs before the
         // drain: the facts cancellation burns the whole budget by advancing the clock past the
         // deadline fixed at handler entry.
         createFactsExtractor: () => ({
           launchPending: async () => undefined,
           reconcilePending: async () => undefined,
-          cancelActive: async () => { clock = 100_000 },
+          cancelActive: async () => {
+            clock = 100_000
+          },
         }),
       })
 

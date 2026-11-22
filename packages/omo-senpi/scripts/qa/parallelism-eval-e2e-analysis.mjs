@@ -40,8 +40,7 @@ export const EXPECTED_PARALLELISM_PROPERTY_KEYS = Object.freeze([
 ])
 
 export function analyzeParallelismRequests(requests) {
-  const captures = requests.flatMap((request) =>
-    Array.isArray(request.body?.batch) ? request.body.batch : [])
+  const captures = requests.flatMap((request) => (Array.isArray(request.body?.batch) ? request.body.batch : []))
   const summaries = captures.filter((capture) => capture?.event === "parallelism_summary")
   const properties = isRecord(summaries[0]?.properties) ? summaries[0].properties : {}
   const actualKeys = Object.keys(properties).sort()
@@ -53,20 +52,20 @@ export function analyzeParallelismRequests(requests) {
     schemaKindV2: properties.schema_kind === "parallelism_v2",
     eventBusObserved: properties.eval_execution_event_bus_available === true,
     nestedCountsExact:
-      properties.eval_execution_event_count === 1
-      && properties.eval_execution_event_rejected_count === 0
-      && properties.eval_execution_ok_count === 1
-      && properties.eval_nested_tool_call_count === 2
-      && properties.eval_nested_tool_call_ok_count === 2
-      && properties.eval_nested_tool_call_error_count === 0
-      && properties.eval_nested_tool_call_pending_count === 0,
+      properties.eval_execution_event_count === 1 &&
+      properties.eval_execution_event_rejected_count === 0 &&
+      properties.eval_execution_ok_count === 1 &&
+      properties.eval_nested_tool_call_count === 2 &&
+      properties.eval_nested_tool_call_ok_count === 2 &&
+      properties.eval_nested_tool_call_error_count === 0 &&
+      properties.eval_nested_tool_call_pending_count === 0,
     outerEvalExcludedFromNonEval:
-      properties.eval_outer_joined_calls === 1
-      && properties.eval_only_waves === 1
-      && properties.non_eval_joined_calls === 0
-      && properties.non_eval_saved_round_trips === 0
-      && properties.modeled_wallclock_saved_ms === 0
-      && properties.upper_bound_saved_ms === 0,
+      properties.eval_outer_joined_calls === 1 &&
+      properties.eval_only_waves === 1 &&
+      properties.non_eval_joined_calls === 0 &&
+      properties.non_eval_saved_round_trips === 0 &&
+      properties.modeled_wallclock_saved_ms === 0 &&
+      properties.upper_bound_saved_ms === 0,
     localhostOnlyTelemetry: requests.every((request) => isLoopback(request.remoteAddress)),
   }
 }
@@ -79,16 +78,11 @@ export function verdict(checks) {
 }
 
 function isScalar(value) {
-  return value === null
-    || typeof value === "string"
-    || typeof value === "number"
-    || typeof value === "boolean"
+  return value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean"
 }
 
 function isLoopback(value) {
-  return value === "127.0.0.1"
-    || value === "::1"
-    || value === "::ffff:127.0.0.1"
+  return value === "127.0.0.1" || value === "::1" || value === "::ffff:127.0.0.1"
 }
 
 function isRecord(value) {

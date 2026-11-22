@@ -9,9 +9,7 @@ type PathTools = Pick<typeof posix, "delimiter" | "join">
 function getCommandCandidates(platform: NodeJS.Platform): string[] {
   if (platform !== "win32") return [...OPENCODE_COMMANDS]
 
-  return OPENCODE_COMMANDS.flatMap((command) =>
-    WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`),
-  )
+  return OPENCODE_COMMANDS.flatMap((command) => WINDOWS_SUFFIXES.map((suffix) => `${command}${suffix}`))
 }
 
 function getPathTools(platform: NodeJS.Platform): PathTools {
@@ -82,9 +80,7 @@ export async function findWorkingOpencodeBinary(
 
 export function buildPathWithBinaryFirst(pathEnv: string | undefined, binaryPath: string): string {
   const preferredDir = dirname(binaryPath)
-  const existing = (pathEnv ?? "").split(delimiter).filter(
-    (entry) => entry.length > 0 && entry !== preferredDir,
-  )
+  const existing = (pathEnv ?? "").split(delimiter).filter((entry) => entry.length > 0 && entry !== preferredDir)
   return [preferredDir, ...existing].join(delimiter)
 }
 

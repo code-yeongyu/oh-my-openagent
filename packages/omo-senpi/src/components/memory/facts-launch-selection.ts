@@ -12,9 +12,7 @@ export interface FactsFailureReadPort {
   readFailures(): Promise<FactsFailuresFile>
 }
 
-export type FactsFailuresRead =
-  | { readonly ok: true; readonly failures: FactsFailuresFile }
-  | { readonly ok: false }
+export type FactsFailuresRead = { readonly ok: true; readonly failures: FactsFailuresFile } | { readonly ok: false }
 
 export function hasFailureReader(candidate: unknown): candidate is FactsFailureReadPort {
   return (

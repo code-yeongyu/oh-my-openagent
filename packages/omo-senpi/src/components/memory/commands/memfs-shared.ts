@@ -20,10 +20,7 @@ export function noRepoText(identity: MemoryCommandIdentity): string {
 }
 
 /** Returns the repo, or the actionable error text when the repository does not exist. */
-export function requireExistingRepo(
-  deps: MemoryCommandDeps,
-  identity: MemoryCommandIdentity,
-): GitMemoryRepo | string {
+export function requireExistingRepo(deps: MemoryCommandDeps, identity: MemoryCommandIdentity): GitMemoryRepo | string {
   if (!hasGitRepo(identity)) return noRepoText(identity)
   return openRepo(deps, identity)
 }

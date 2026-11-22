@@ -1,0 +1,42 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-codex/plugin/components/lsp": {
+      "includeEntryExports": true,
+      // Vitest is installed by this package's own npm ci, which the root install does not run, so knip cannot load vitest.config.ts; these are its config and test globs.
+      "vitest": {"config":[],"entry":["vitest.config.ts","test/**/*.test.ts"]},
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "scripts/build-lsp-tools.mjs",
+        "scripts/build-lsp-daemon.mjs",
+        "scripts/build-runtime.mjs",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+        "scripts/test.mjs",
+        "vitest.config.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "scripts/clean-dist.mjs",
+      ],
+      "ignoreDependencies": [
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@biomejs/biome",
+        // pre-existing at origin dev 4686e425b5: a declared devDependency nothing imports
+        "@vitest/coverage-v8",
+      ],
+      // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
+      "ignoreBinaries": ["biome", "vitest"],
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) runLspDiagnosticsText
+    "packages/omo-codex/plugin/components/lsp/src/codex-hook.ts": ["runLspDiagnosticsText"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) default
+    "packages/omo-codex/plugin/components/lsp/vitest.config.ts": ["default"]
+  }
+}
