@@ -5,7 +5,7 @@ import { INITIAL_SKILLS_CONTEXT_KEY } from "./initial-skills"
  * session's permission preset would ask about is refused with a reason the model reads, instead of waiting on a dialog
  * no client shows. thread_create sets it on every session it opens, on this device and on another one.
  */
-export const REFUSE_APPROVALS_CONTEXT = { approvals: "refuse" } as const
+const REFUSE_APPROVALS_CONTEXT = { approvals: "refuse" } as const
 
 export function openContext(
   initialSkills: readonly string[] | undefined,
