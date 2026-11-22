@@ -133,6 +133,7 @@ import type {
 } from "./types"
 import { describeStartFailure } from "./start-failure"
 import { settledWithin } from "./settled-within"
+import { persistSpawnRefusal, spawnFailureMessage } from "./spawn-failure"
 import { failStrandedHandoff, type StrandedHandoffFailure } from "./fail-stranded-handoff"
 
 type PreparedIsolation = Extract<IsolationPreparation, { readonly ok: true }>
@@ -714,7 +715,7 @@ class TaskManagerImpl implements TaskManager {
       this.#options.store.replace(finalRecord)
       if (isolation !== undefined) this.#isolation.bind(finalRecord.task_id, isolation.handle, isolation.baseline)
       if (spec.run_in_background === true) this.#background.add(finalRecord.task_id)
-    } catch {
+    } catch (cause) {
       if (isolation !== undefined) await this.#isolation.discard(claimed.task_id)
       return this.#failSpawn({
         claimed,
@@ -722,7 +723,8 @@ class TaskManagerImpl implements TaskManager {
         spec,
         executionMode,
         lease,
-        error_message: "spawn bookkeeping failed",
+        error_message: spawnFailureMessage(cause),
+        cause,
       })
     }
     releaseResidency?.()
@@ -1386,7 +1388,13 @@ class TaskManagerImpl implements TaskManager {
       isShuttingDown: () => this.#shutdownStarted,
       release: (context) =>
         this.#releaseSlot(context.record.task_id, context.model, context.record.notification.run_epoch),
-      settleWaiters: (taskId) => this.#settleWaiters(taskId),
+      settleWaiters: (taskId, terminal) => {
+        if (terminal !== undefined && isTerminalRecord(terminal)) {
+          this.#names.release(terminal.parent_session_id, terminal.name ?? taskId)
+          this.#background.delete(taskId)
+        }
+        this.#settleWaiters(taskId, terminal)
+      },
       dropPending: (taskId) => this.#steering.dropPending(taskId, "cancelled"),
       advance: (context, error) => this.#advanceStartFallback(context, error),
       failure: (record, error) => this.#recordStartFailure(record, error),
@@ -1593,6 +1601,7 @@ class TaskManagerImpl implements TaskManager {
     readonly executionMode: ExecutionMode
     readonly lease: { release(): void } | undefined
     readonly error_message: string
+    readonly cause?: unknown
     readonly failure_kind?: Extract<StartResult, { kind: "start_failed" }>["failure_kind"]
   }): StartResult {
     const { claimed, registration, spec, executionMode, lease } = input
@@ -1600,13 +1609,9 @@ class TaskManagerImpl implements TaskManager {
     if (registration.name !== claimed.name) this.#names.release(spec.parent_session_id, registration.name)
     this.#background.delete(claimed.task_id)
     const timestamp = nowIso(this.#now)
-    const started = this.#options.store.transition(claimed.task_id, { type: "start", timestamp })
-    const failed = this.#options.store.transition(claimed.task_id, {
-      type: "fail",
-      timestamp,
-      error_message: input.error_message,
-    })
-    if (!started.applied || !failed.applied) throw new Error("spawn bookkeeping failure transitions were not applied")
+    const errorMessage = persistSpawnRefusal(this.#options.store, claimed, timestamp, input.error_message, input.cause)
+    const terminal = this.#tryLoad(claimed.task_id)
+    if (terminal !== null && isTerminalRecord(terminal)) this.#names.release(spec.parent_session_id, registration.name)
     return {
       kind: "start_failed",
       task_id: claimed.task_id,
@@ -1617,7 +1622,7 @@ class TaskManagerImpl implements TaskManager {
       model: claimed.model,
       ...(claimed.resolved_model !== undefined ? { resolved_model: claimed.resolved_model } : {}),
       run_in_background: spec.run_in_background === true,
-      error_message: input.error_message,
+      error_message: errorMessage,
       ...(input.failure_kind === undefined ? {} : { failure_kind: input.failure_kind }),
     }
   }
