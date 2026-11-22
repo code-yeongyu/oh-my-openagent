@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { basename, join } from "node:path"
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { runWithRequestContext } from "../request-context.js"
@@ -24,6 +24,7 @@ const server: ResolvedServer = { id: "typescript", command: ["fake-ts-ls"], exte
 interface FakeBehavior {
   readonly start?: () => Promise<void>
   readonly diagnostics?: (file: string) => Promise<Diagnostic[]>
+  readonly stop?: () => Promise<void>
 }
 
 class FakeGroupClient extends LspClient {
@@ -44,6 +45,7 @@ class FakeGroupClient extends LspClient {
 
   override async stop(): Promise<void> {
     this.stopCount += 1
+    await this.behavior.stop?.()
   }
 
   override isAlive(): boolean {
@@ -170,7 +172,116 @@ describe("directory diagnostics scoped to each server group", () => {
     ])
   })
 
-  test("#given many groups #when the scan is aborted mid-way #then referenced clients stayed within the worker limit and all are released", async () => {
+  test("#given four groups whose clients never start ahead of a healthy group #when the start deadline passes #then the scan finishes at the deadline while the stalled clients' shutdown stays tracked", async () => {
+    // given: stopping a stalled client takes until `shutdown` resolves; a second start of a root succeeds
+    const { session, files } = sessionWithPackages(["s0", "s1", "s2", "s3", "fast"], 1)
+    const fastRoot = join(session, "fast")
+    const shutdown = deferred()
+    const log: string[] = []
+    const manager = newManager((root) => {
+      const name = basename(root)
+      const generation = log.filter((event) => event.startsWith(`spawn:${name}#`)).length + 1
+      log.push(`spawn:${name}#${generation}`)
+      if (root === fastRoot || generation > 1) return new FakeGroupClient(root, {})
+      return new FakeGroupClient(root, {
+        start: () => new Promise<void>(() => {}),
+        stop: async () => {
+          await shutdown.promise
+          log.push(`stopped:${name}`)
+        },
+      })
+    })
+    const clock = new ControlledClock()
+    const scan = runWithRequestContext(contextFor(session), () =>
+      aggregateDiagnosticsForDirectory(session, ".ts", "all", 50, {
+        manager,
+        server,
+        timers: clock,
+        listFiles: () => [...files.values()].flat(),
+      }),
+    )
+    await clock.waitForScheduled(4)
+
+    try {
+      // when
+      clock.advanceBy(INIT_TIMEOUT_MS)
+      let result: Awaited<typeof scan> | undefined
+      await within(
+        scan.then((value) => {
+          result = value
+        }),
+        "the scan did not finish at the start deadline while the stalled clients were still stopping",
+      )
+
+      // then: timeouts reported and the healthy group diagnosed at the deadline, no stop finished yet
+      expect(clock.now()).toBe(INIT_TIMEOUT_MS)
+      expect(result?.totalDiagnostics).toBe(1)
+      expect(result?.fileFailures.map((failure) => failure.error)).toEqual(
+        Array.from({ length: 4 }, () => `typescript did not start within ${INIT_TIMEOUT_MS}ms`),
+      )
+      expect(log.filter((event) => event.startsWith("stopped:"))).toEqual([])
+      expect(manager.getSnapshot().map((client) => [client.root, client.refCount])).toEqual([[fastRoot, 0]])
+
+      // then: the manager still tracks each stop, so a stalled root restarts only after it finished
+      const reacquired = manager.getClient(join(session, "s0"), server)
+      shutdown.resolve()
+      await reacquired
+      manager.releaseClient(join(session, "s0"), server)
+      expect(log.indexOf("stopped:s0")).toBeLessThan(log.indexOf("spawn:s0#2"))
+      await manager.stopAll()
+      expect(log.filter((event) => event.startsWith("stopped:")).toSorted()).toEqual(
+        ["s0", "s1", "s2", "s3"].map((name) => `stopped:${name}`),
+      )
+      expect(referencedClients(manager)).toBe(0)
+    } finally {
+      shutdown.resolve()
+    }
+  })
+
+  test("#given a scan and another caller waiting on one cold start #when the scan's start deadline passes #then the other caller still gets the started client", async () => {
+    // given
+    const shared = await coldStartSharedWithScan()
+    const other = shared.manager.getClient(shared.root, server)
+
+    // when
+    const scanError = await shared.passDeadline()
+    shared.started.resolve()
+    const client = await other
+
+    // then
+    expect(String(scanError)).toContain(`did not start within ${INIT_TIMEOUT_MS}ms`)
+    expect(shared.clients).toHaveLength(1)
+    expect<unknown>(client).toBe(shared.clients[0])
+    expect(shared.clients[0]?.stopCount).toBe(0)
+    expect(shared.manager.getSnapshot().map((entry) => [entry.root, entry.refCount, entry.isInitializing])).toEqual([
+      [shared.root, 1, false],
+    ])
+    shared.manager.releaseClient(shared.root, server)
+  })
+
+  test("#given a scan and another caller waiting on one cold start #when the deadline passes and then the other caller aborts #then the startup is stopped only once its last waiter left", async () => {
+    // given
+    const shared = await coldStartSharedWithScan()
+    const controller = new AbortController()
+    const other = shared.manager.getClient(shared.root, server, controller.signal)
+
+    // when: the scan's waiter leaves first
+    await shared.passDeadline()
+
+    // then
+    expect(shared.clients[0]?.stopCount).toBe(0)
+    expect(shared.manager.clientCount()).toBe(1)
+
+    // when: the last waiter leaves
+    controller.abort()
+
+    // then
+    await expect(other).rejects.toHaveProperty("name", "AbortError")
+    expect(shared.clients[0]?.stopCount).toBe(1)
+    expect(shared.manager.clientCount()).toBe(0)
+  })
+
+  test("#given many groups #when the scan is aborted while files are being checked #then it throws the abort after every client is released", async () => {
     // given
     const names = Array.from({ length: 10 }, (_, index) => `p${index}`)
     const { session, files } = sessionWithPackages(names, 2)
@@ -191,23 +302,58 @@ describe("directory diagnostics scoped to each server group", () => {
     )
 
     // when
-    const outcome = await runWithRequestContext(contextFor(session), () =>
+    const scan = runWithRequestContext(contextFor(session), () =>
       aggregateDiagnosticsForDirectory(session, ".ts", "all", 50, {
         manager,
         server,
         signal: controller.signal,
         listFiles: () => [...files.values()].flat(),
       }),
-    ).catch((error: unknown) => error)
+    )
 
     // then
-    expect(controller.signal.aborted).toBe(true)
+    const outcome = await scan.catch((error: unknown) => error)
+    expect(outcome).toBe(controller.signal.reason)
+    expect(controller.signal.reason).toHaveProperty("name", "AbortError")
     expect(checked).toBeLessThan(20)
     expect(maxReferenced).toBeLessThanOrEqual(4)
     expect(referencedClients(manager)).toBe(0)
-    if (outcome instanceof Error) expect(outcome.name).toBe("AbortError")
   })
 })
+
+/** One package whose client starts when `started` resolves; the scan is the first waiter on that start. */
+async function coldStartSharedWithScan() {
+  const { session, files } = sessionWithPackages(["shared"], 1)
+  const root = join(session, "shared")
+  const started = deferred()
+  const spawned = deferred()
+  const clients: FakeGroupClient[] = []
+  const manager = newManager((clientRoot) => {
+    const client = new FakeGroupClient(clientRoot, { start: () => started.promise })
+    clients.push(client)
+    spawned.resolve()
+    return client
+  })
+  const clock = new ControlledClock()
+  const scan = runWithRequestContext(contextFor(session), () =>
+    aggregateDiagnosticsForDirectory(session, ".ts", "all", 50, {
+      manager,
+      server,
+      timers: clock,
+      listFiles: () => files.get(root) ?? [],
+    }),
+  )
+  await within(spawned.promise, "the scan never started the shared client")
+  const passDeadline = async (): Promise<unknown> => {
+    await clock.waitForTimer(INIT_TIMEOUT_MS)
+    clock.advanceBy(INIT_TIMEOUT_MS)
+    return scan.then(
+      () => new Error("the scan succeeded without a started client"),
+      (error: unknown) => error,
+    )
+  }
+  return { root, started, clients, manager, passDeadline }
+}
 
 function diagnostic(message: string): Diagnostic {
   return { range: { start: { line: 0, character: 0 }, end: { line: 0, character: 1 } }, severity: 1, message }

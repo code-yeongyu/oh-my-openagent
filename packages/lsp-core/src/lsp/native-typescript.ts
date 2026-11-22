@@ -38,28 +38,32 @@ export function nativeTypescriptSearchDirectory(targetPath: string | undefined, 
  */
 export function nativeTypescriptCommand(server: ServerWithSource, searchDirectory: string): string[] | null {
   if (server.id !== "typescript" || !server.inheritsBuiltinCommand) return null
-  const tsc = findProjectTsc(searchDirectory)
-  if (tsc === null) return null
-  const packageDir = join(dirname(tsc), "..", "typescript")
-  const speaksLsp = existsSync(join(packageDir, "package.json")) && !existsSync(join(packageDir, "lib", "tsserver.js"))
-  return speaksLsp ? [tsc, "--lsp", "--stdio"] : null
+  const found = findProjectTsc(searchDirectory)
+  if (found === null) return null
+  const speaksLsp = !existsSync(join(found.packageDir, "lib", "tsserver.js"))
+  return speaksLsp ? [found.tsc, "--lsp", "--stdio"] : null
 }
 
 /**
  * Walks up from `searchDirectory` to the repository root (`.git`) and returns the nearest eligible
  * `tsc`: one in the `node_modules/.bin` of a directory with a Node project marker, where that bin
- * directory is real (see isRealDirectory). Unlike the generic local-bin walk, no `bin` or virtualenv
- * directory is probed, so a `bin/tsc` of another ecosystem never shadows a hoisted compiler, and an
- * ineligible candidate is passed over instead of ending the walk.
+ * directory is real (see isRealDirectory) and a `typescript` package sits beside it. Unlike the generic
+ * local-bin walk, no `bin` or virtualenv directory is probed, so a `bin/tsc` of another ecosystem never
+ * shadows a hoisted compiler, and an ineligible candidate (such as a stale `tsc` shim left without its
+ * package) is passed over instead of ending the walk. Any installed TypeScript ends it, so a package on
+ * TypeScript 5 keeps typescript-language-server even below a hoisted TypeScript 7.
  */
-function findProjectTsc(searchDirectory: string): string | null {
+function findProjectTsc(searchDirectory: string): { readonly tsc: string; readonly packageDir: string } | null {
   const suffixes = executableSuffixes(process.platform, undefined)
   let current = searchDirectory
   for (;;) {
     if (NODE_PROJECT_MARKERS.some((marker) => probe(join(current, marker)))) {
       const binDir = join(current, NODE_LOCAL_BIN_DIR)
       const tsc = probeWithSuffixes(binDir, "tsc", suffixes)
-      if (tsc !== null && isRealDirectory(binDir)) return tsc
+      const packageDir = join(binDir, "..", "typescript")
+      if (tsc !== null && isRealDirectory(binDir) && existsSync(join(packageDir, "package.json"))) {
+        return { tsc, packageDir }
+      }
     }
     if (probe(join(current, ".git"))) return null
     const parent = dirname(current)

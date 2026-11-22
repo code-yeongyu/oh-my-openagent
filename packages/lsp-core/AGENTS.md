@@ -11,6 +11,7 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 | File | Role |
 |------|------|
 | `src/lsp/manager.ts` | `LspManager`: ref-counted client pool, init timeout, idle reaper, abort signals |
+| `src/lsp/client-startup.ts` | `ClientStartups`: starts pooled clients and tracks their waiters; holds the startup lifecycle contract (a waiter's abort detaches it, the last waiter's leaving stops the startup) |
 | `src/lsp/client.ts` | `LspClient`: `openFile`, `definition`, `references`, `symbols`, `diagnostics`, `rename` |
 | `src/lsp/client-wrapper.ts` | `withLspClient()`: workspace root discovery, retry on dead connection, release |
 | `src/lsp/connection.ts` | `LspClientConnection`: `initialize` request with capabilities, settle delay |
@@ -40,4 +41,4 @@ Harness-neutral LSP engine (`@oh-my-opencode/lsp-core`). Manages language server
 - **Binary resolution:** `resolveServerBinary()` probes a path-shaped command, then marker-gated repo-local bin directories walking up from the request cwd, then `PATH`. A local bin directory is only trusted when a sibling project marker (`package.json`, `pyproject.toml`, `Gemfile`, `go.mod`, ...) proves it belongs to that ecosystem, so an unmarked `node_modules/.bin` is never trusted; the walk stops at a `.git` boundary. Results are cached per process, keyed by working directory and command. Live QA driver: `scripts/qa/local-binary-resolution-e2e.mjs`.
 - **Reaper:** `LspManager` reaps clients idle longer than `IDLE_TIMEOUT_MS` (default 5 min) or stuck initializing past `INIT_TIMEOUT_MS` (default 30 s).
 - **Workspace-edit safety:** paths are canonicalized, prevalidated, simulated, and lease-guarded before commit; client wrappers reject paths outside the request context (`outside-context-workspace.ts`).
-- **Directory diagnostics cancellation:** `aggregateDiagnosticsForDirectory()` accepts an `AbortSignal`; it throws if aborted before acquisition, threads the signal into `manager.getClient()` so a cold acquisition is cancellable, and checks it between files. An aborted cold start rejects with `AbortError` and leaves `clientCount()` at 0.
+- **Directory diagnostics cancellation:** `aggregateDiagnosticsForDirectory()` accepts an `AbortSignal`; it throws if aborted before acquisition, threads the signal into `manager.getClient()` so a cold acquisition is cancellable, and checks it between files. An aborted scan releases every client it holds and then throws the abort reason, whether the abort landed during acquisition or during file checks; it never returns partial output. An aborted cold start rejects with `AbortError` and leaves `clientCount()` at 0 when it was the only waiter; another caller still waiting on that start keeps it.

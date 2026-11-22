@@ -1,6 +1,7 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js"
 import { LspClient } from "./client.js"
 import { type ClientIdentity, lspClientKey } from "./client-key.js"
+import { awaitWithSignal, ClientStartups, type ManagedClient } from "./client-startup.js"
 import {
   CLIENT_RESPAWN_COOLDOWN_MS,
   CLIENT_RESPAWN_RETRY_LIMIT,
@@ -12,18 +13,6 @@ import {
 import { LspClientRespawnBudgetExceededError } from "./errors.js"
 import { installProcessSignalCleanup } from "./process-signal-cleanup.js"
 import type { ResolvedServer } from "./types.js"
-
-interface ManagedClient {
-  readonly root: string
-  readonly serverId: string
-  client: LspClient
-  refCount: number
-  pendingWaiters: number
-  lastUsedAt: number
-  initPromise: Promise<void> | null
-  isInitializing: boolean
-  initializingSince: number | null
-}
 
 interface RespawnBudget {
   deadGenerations: number
@@ -58,37 +47,6 @@ async function stopClientBestEffort(client: LspClient): Promise<void> {
   }
 }
 
-function awaitWithSignal<T>(promise: Promise<T>, signal: AbortSignal | undefined): Promise<T> {
-  if (!signal) return promise
-  return new Promise<T>((resolve, reject) => {
-    let settled = false
-    const onAbort = () => {
-      if (settled) return
-      settled = true
-      reject(new DOMException("Aborted", "AbortError"))
-    }
-    if (signal.aborted) {
-      onAbort()
-      return
-    }
-    signal.addEventListener("abort", onAbort, { once: true })
-    promise.then(
-      (value) => {
-        if (settled) return
-        settled = true
-        signal.removeEventListener("abort", onAbort)
-        resolve(value)
-      },
-      (err) => {
-        if (settled) return
-        settled = true
-        signal.removeEventListener("abort", onAbort)
-        reject(err)
-      },
-    )
-  })
-}
-
 export class LspManager {
   private readonly clients = new Map<string, ManagedClient>()
   /** In-flight stops per key; getClient awaits these instead of spawning a duplicate client. */
@@ -104,6 +62,7 @@ export class LspManager {
   private readonly reaperIntervalMs: number
   private readonly clientFactory: (root: string, server: ResolvedServer) => LspClient
   private readonly now: () => number
+  private readonly startups: ClientStartups
 
   constructor(options: LspManagerOptions = {}) {
     this.idleTimeoutMs = options.idleTimeoutMs ?? IDLE_TIMEOUT_MS
@@ -112,6 +71,7 @@ export class LspManager {
     this.reaperIntervalMs = options.reaperIntervalMs ?? REAPER_INTERVAL_MS
     this.clientFactory = options.clientFactory ?? ((root, server) => new LspClient(root, server))
     this.now = options.now ?? (() => Date.now())
+    this.startups = new ClientStartups(this.now, (managed) => this.discard(managed))
 
     this.startReaper()
     this.signalDisposer = installProcessSignalCleanup(() => this.stopAll())
@@ -171,28 +131,21 @@ export class LspManager {
     budget.exhaustedAt = null
   }
 
+  private startupExpired(managed: ManagedClient, t: number): boolean {
+    return (
+      managed.isInitializing && managed.initializingSince !== null && t - managed.initializingSince > this.initTimeoutMs
+    )
+  }
+
   private reapStale(): void {
     const t = this.now()
-    for (const [key, managed] of this.clients) {
-      if (
-        managed.isInitializing &&
-        managed.initializingSince !== null &&
-        t - managed.initializingSince > this.initTimeoutMs
-      ) {
-        this.clients.delete(key)
-        void this.tombstoneStop(key, managed.client)
-        continue
-      }
-
-      if (
+    for (const managed of [...this.clients.values()]) {
+      const idle =
         !managed.isInitializing &&
         managed.refCount === 0 &&
         managed.pendingWaiters === 0 &&
         t - managed.lastUsedAt > this.idleTimeoutMs
-      ) {
-        this.clients.delete(key)
-        void this.tombstoneStop(key, managed.client)
-      }
+      if (idle || this.startupExpired(managed, t)) this.discard(managed)
     }
   }
 
@@ -206,156 +159,77 @@ export class LspManager {
     while (this.clients.size >= this.maxResidentClients) {
       const victim = this.leastRecentlyUsedIdleClient()
       if (!victim) return
-      this.clients.delete(victim.key)
-      void this.tombstoneStop(victim.key, victim.managed.client)
+      this.discard(victim)
     }
   }
 
-  private leastRecentlyUsedIdleClient(): { readonly key: string; readonly managed: ManagedClient } | null {
-    let candidate: { readonly key: string; readonly managed: ManagedClient } | null = null
-    for (const [key, managed] of this.clients) {
+  private leastRecentlyUsedIdleClient(): ManagedClient | null {
+    let candidate: ManagedClient | null = null
+    for (const managed of this.clients.values()) {
       if (managed.refCount > 0 || managed.pendingWaiters > 0 || managed.isInitializing) continue
-      if (candidate === null || managed.lastUsedAt < candidate.managed.lastUsedAt) {
-        candidate = { key, managed }
-      }
+      if (candidate === null || managed.lastUsedAt < candidate.lastUsedAt) candidate = managed
     }
     return candidate
   }
 
-  private async tryDeleteIfOrphaned(key: string, managed: ManagedClient): Promise<void> {
-    if (
-      managed.refCount === 0 &&
-      managed.pendingWaiters === 0 &&
-      !managed.isInitializing &&
-      this.clients.get(key) === managed
-    ) {
-      this.clients.delete(key)
-      await this.tombstoneStop(key, managed.client)
-    }
+  /** Drops `managed` from the pool and stops it as a tracked tombstone, once; nothing here awaits the stop. */
+  private discard(managed: ManagedClient): void {
+    if (this.clients.get(managed.key) !== managed) return
+    this.clients.delete(managed.key)
+    void this.tombstoneStop(managed.key, managed.client)
+  }
+
+  private discardIfUnused(managed: ManagedClient): void {
+    if (managed.refCount === 0 && managed.pendingWaiters === 0 && !managed.isInitializing) this.discard(managed)
   }
 
   async getClient(root: string, server: ResolvedServer, signal?: AbortSignal): Promise<LspClient> {
-    if (this.disposed) {
-      throw new Error("LspManager has been disposed")
-    }
-    signal?.throwIfAborted()
-
     const key = lspClientKey(root, server)
+    let managed: ManagedClient | undefined
     for (;;) {
-      const pendingStop = this.pendingStops.get(key)
-      if (pendingStop === undefined) break
-      await awaitWithSignal(pendingStop, signal)
+      if (this.disposed) {
+        throw new Error("LspManager has been disposed")
+      }
       signal?.throwIfAborted()
-    }
-    if (this.disposed) {
-      throw new Error("LspManager has been disposed")
-    }
-
-    let managed = this.clients.get(key)
-
-    if (managed) {
-      const t = this.now()
-      if (
-        managed.isInitializing &&
-        managed.initializingSince !== null &&
-        t - managed.initializingSince > this.initTimeoutMs
-      ) {
-        this.clients.delete(key)
-        await this.tombstoneStop(key, managed.client)
-        managed = undefined
+      const pendingStop = this.pendingStops.get(key)
+      if (pendingStop !== undefined) {
+        await awaitWithSignal(pendingStop, signal)
+        continue
       }
+      managed = this.clients.get(key)
+      if (managed === undefined || !this.startupExpired(managed, this.now())) break
+      this.discard(managed)
     }
 
-    if (managed) {
-      if (managed.initPromise) {
-        managed.pendingWaiters++
-        try {
-          await awaitWithSignal(managed.initPromise, signal)
-        } catch (err) {
-          managed.pendingWaiters--
-          await this.tryDeleteIfOrphaned(key, managed)
-          throw err
-        }
-        managed.pendingWaiters--
-      }
-
-      if (signal?.aborted) {
-        await this.tryDeleteIfOrphaned(key, managed)
-        signal.throwIfAborted()
-      }
-
-      if (!managed.client.isAlive()) {
-        this.recordDeadGeneration(key)
-        if (this.clients.get(key) === managed) {
-          this.clients.delete(key)
-        }
-        await this.tombstoneStop(key, managed.client)
-        return this.getClient(root, server, signal)
-      }
-
-      this.markHealthyGeneration(key)
-      managed.refCount++
-      managed.lastUsedAt = this.now()
-      return managed.client
+    if (managed === undefined) {
+      this.evictForAdmission()
+      this.ensureRespawnAllowed(key, root, server.id)
+      managed = this.startClient(key, root, server, true)
     }
 
-    this.evictForAdmission()
-    this.ensureRespawnAllowed(key, root, server.id)
-
-    const client = this.clientFactory(root, server)
-    const initStartedAt = this.now()
-    const initPromise = (async () => {
-      await client.start()
-      await client.initialize()
-    })()
-
-    const newManaged: ManagedClient = {
-      root,
-      serverId: server.id,
-      client,
-      refCount: 0,
-      pendingWaiters: 1,
-      lastUsedAt: initStartedAt,
-      initPromise,
-      isInitializing: true,
-      initializingSince: initStartedAt,
-    }
-    this.clients.set(key, newManaged)
-
-    try {
-      await awaitWithSignal(initPromise, signal)
-    } catch (err) {
-      newManaged.pendingWaiters--
-      if (this.clients.get(key) === newManaged) {
-        this.clients.delete(key)
-      }
-      await this.tombstoneStop(key, client)
-      throw err
-    }
-
-    newManaged.pendingWaiters--
-    newManaged.isInitializing = false
-    newManaged.initializingSince = null
-    newManaged.initPromise = null
-
+    await this.startups.wait(managed, signal)
     if (signal?.aborted) {
-      await this.tryDeleteIfOrphaned(key, newManaged)
+      this.discardIfUnused(managed)
       signal.throwIfAborted()
     }
 
-    if (!client.isAlive()) {
+    if (!managed.client.isAlive()) {
       this.recordDeadGeneration(key)
-      if (this.clients.get(key) === newManaged) {
-        this.clients.delete(key)
-      }
-      await this.tombstoneStop(key, client)
+      this.discard(managed)
       return this.getClient(root, server, signal)
     }
 
     this.markHealthyGeneration(key)
-    newManaged.refCount++
-    newManaged.lastUsedAt = this.now()
-    return client
+    managed.refCount++
+    managed.lastUsedAt = this.now()
+    return managed.client
+  }
+
+  private startClient(key: string, root: string, server: ResolvedServer, heldByWaiters: boolean): ManagedClient {
+    const client = this.clientFactory(root, server)
+    const managed = this.startups.begin({ key, root, serverId: server.id, client, heldByWaiters })
+    this.clients.set(key, managed)
+    return managed
   }
 
   releaseClient(root: string, server: ClientIdentity): void {
@@ -368,12 +242,10 @@ export class LspManager {
   }
 
   invalidateClient(root: string, server: ClientIdentity, client?: LspClient): void {
-    const key = lspClientKey(root, server)
-    const managed = this.clients.get(key)
+    const managed = this.clients.get(lspClientKey(root, server))
     if (!managed) return
     if (client && managed.client !== client) return
-    this.clients.delete(key)
-    void this.tombstoneStop(key, managed.client)
+    this.discard(managed)
   }
 
   warmupClient(root: string, server: ResolvedServer): void {
@@ -387,41 +259,7 @@ export class LspManager {
     } catch {
       return
     }
-
-    const client = this.clientFactory(root, server)
-    const initStartedAt = this.now()
-    const initPromise = (async () => {
-      await client.start()
-      await client.initialize()
-    })()
-
-    const managed: ManagedClient = {
-      root,
-      serverId: server.id,
-      client,
-      refCount: 0,
-      pendingWaiters: 0,
-      lastUsedAt: initStartedAt,
-      initPromise,
-      isInitializing: true,
-      initializingSince: initStartedAt,
-    }
-    this.clients.set(key, managed)
-
-    initPromise.then(
-      () => {
-        managed.isInitializing = false
-        managed.initializingSince = null
-        managed.initPromise = null
-        managed.lastUsedAt = this.now()
-      },
-      () => {
-        if (this.clients.get(key) === managed) {
-          this.clients.delete(key)
-        }
-        void this.tombstoneStop(key, client)
-      },
-    )
+    this.startClient(key, root, server, false)
   }
 
   isServerInitializing(root: string, server: ClientIdentity): boolean {

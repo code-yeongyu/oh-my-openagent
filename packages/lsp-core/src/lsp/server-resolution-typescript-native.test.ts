@@ -265,6 +265,45 @@ describe("TypeScript server selection judged by real location", () => {
     expect(result.server.command).not.toContain(unrelated)
   })
 
+  test("#given a nearer node_modules/.bin/tsc without a typescript package beside it and a hoisted TypeScript 7 #when looking up a file of that package #then the hoisted compiler serves it", () => {
+    // given: packages/x keeps a stale tsc shim whose typescript package is gone
+    const { session } = sessionWithLanguageServer()
+    const hoisted = installTypescript(join(session, "node_modules"), 7)
+    const packageX = join(session, "packages", "x")
+    mkdirSync(packageX, { recursive: true })
+    writeFileSync(join(packageX, "package.json"), "{}\n")
+    const stale = writeExecutable(join(packageX, "node_modules", ".bin", "tsc"))
+
+    // when
+    const result = runWithRequestContext(contextFor(session), () =>
+      findServerForExtension(".ts", join(packageX, "a.ts")),
+    )
+
+    // then
+    if (result.status !== "found") throw new Error(`expected a found server, got ${result.status}`)
+    expect(result.server.command).toEqual([hoisted, "--lsp", "--stdio"])
+    expect(result.server.command).not.toContain(stale)
+  })
+
+  test("#given a nearer package on TypeScript 5 below a hoisted TypeScript 7 #when looking up a file of that package #then typescript-language-server keeps serving it", () => {
+    // given
+    const { session, languageServer } = sessionWithLanguageServer()
+    installTypescript(join(session, "node_modules"), 7)
+    const packageY = join(session, "packages", "y")
+    mkdirSync(packageY, { recursive: true })
+    writeFileSync(join(packageY, "package.json"), "{}\n")
+    installTypescript(join(packageY, "node_modules"), 5)
+
+    // when
+    const result = runWithRequestContext(contextFor(session), () =>
+      findServerForExtension(".ts", join(packageY, "a.ts")),
+    )
+
+    // then
+    if (result.status !== "found") throw new Error(`expected a found server, got ${result.status}`)
+    expect(result.server.command).toEqual([languageServer, "--stdio"])
+  })
+
   test("#given node_modules/.bin itself linked to an external TypeScript 7 project #when looking up #then the external tsc is not used", () => {
     // given
     const { session, languageServer } = sessionWithLanguageServer()

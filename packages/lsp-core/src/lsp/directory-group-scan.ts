@@ -22,8 +22,11 @@ export interface GroupScanOptions {
  * groups hold a client at once (the same bound as the file workers, below the manager's resident
  * target). A group still starting holds no file slot, so a slow group does not stop a healthy group
  * from checking files, and a group whose client does not start within the manager's init timeout
- * reports that for its own files. A caller abort settles every group, then rethrows; as before, the
- * scan also fails when no group got a client.
+ * reports that for its own files; that deadline detaches only this scan's wait (the manager owns the
+ * startup, see client-startup.ts), so the runner moves on at once. A caller abort, whether it lands
+ * while a client starts or while files are checked, lets every group settle and release its client,
+ * then throws the abort reason: an aborted scan never returns partial output. As before, the scan
+ * also fails when no group got a client.
  */
 export async function scanServedGroups(options: GroupScanOptions): Promise<void> {
   const { groups, signal } = options
@@ -32,7 +35,6 @@ export async function scanServedGroups(options: GroupScanOptions): Promise<void>
   let nextGroup = 0
   let startedGroups = 0
   let firstError: unknown
-  let abortError: unknown
 
   const runners = Array.from({ length: Math.min(limit, groups.length) }, async () => {
     for (;;) {
@@ -44,10 +46,7 @@ export async function scanServedGroups(options: GroupScanOptions): Promise<void>
       try {
         client = await acquireWithinInitTimeout(options, group)
       } catch (error) {
-        if (signal?.aborted) {
-          abortError ??= error
-          return
-        }
+        if (signal?.aborted) return
         firstError ??= error
         options.onGroupUnavailable(group, error instanceof Error ? error.message : String(error))
         continue
@@ -71,7 +70,7 @@ export async function scanServedGroups(options: GroupScanOptions): Promise<void>
   })
   await Promise.all(runners)
 
-  if (abortError !== undefined) throw abortError
+  signal?.throwIfAborted()
   if (startedGroups === 0 && firstError !== undefined) throw firstError
 }
 
