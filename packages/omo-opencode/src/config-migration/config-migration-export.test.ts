@@ -79,6 +79,19 @@ function resolveRelativeImport(sourcePath: string, specifier: string): string {
   return resolveModule(resolve(dirname(sourcePath), specifier), specifier, sourcePath)
 }
 
+// omo#11926: an exports value may nest condition objects (e.g. `import: { types, default }`);
+// walk them in Node's condition order (import before default), recursing into objects and
+// backtracking when a branch yields no active condition. Anything else fails closed (undefined).
+function resolveExportTarget(entry: unknown): string | undefined {
+  if (typeof entry === "string") return entry
+  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return undefined
+  for (const condition of ["import", "default"]) {
+    const target = resolveExportTarget(Reflect.get(entry, condition))
+    if (target !== undefined) return target
+  }
+  return undefined
+}
+
 function resolveWorkspaceImport(
   sourcePath: string,
   specifier: string,
@@ -111,11 +124,8 @@ function resolveWorkspaceImport(
         break
       }
     }
-    const target: unknown =
-      typeof entry === "object" && entry !== null
-        ? (Reflect.get(entry, "import") ?? Reflect.get(entry, "default"))
-        : entry
-    if (typeof target !== "string") throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
+    const target = resolveExportTarget(entry)
+    if (target === undefined) throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
     return resolveModule(
       resolve(workspace.directory, capture === undefined ? target : target.replaceAll("*", capture)),
       specifier,
@@ -187,6 +197,78 @@ describe("config-migration public subpath", () => {
       )
 
       expect(modules).toContain(NEGATIVE_FIXTURE_ENTRY_POINT)
+      expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("a nested conditional exports alias resolves to its real file and remains in the audited graph", () => {
+    const root = mkdtempSync(join(tmpdir(), "config-migration-exports-"))
+    try {
+      const packagePath = join(root, "fixture")
+      mkdirSync(join(packagePath, "src"), { recursive: true })
+      writeFileSync(
+        join(packagePath, "package.json"),
+        JSON.stringify({
+          name: "@audit/nested",
+          exports: {
+            "./alias": {
+              import: {
+                types: "./src/alias-types.ts",
+                default: "./src/alias.ts",
+              },
+            },
+          },
+        }),
+      )
+      writeFileSync(join(packagePath, "src", "alias-types.ts"), "export {}\n")
+      writeFileSync(join(packagePath, "src", "alias.ts"), 'import "./dep"\n')
+      writeFileSync(join(packagePath, "src", "dep.ts"), "export {}\n")
+      const entryPoint = join(root, "entry.ts")
+      writeFileSync(entryPoint, 'import "@audit/nested/alias"\n')
+      const packages = workspacePackages(root)
+      const aliasTarget = join(packagePath, "src", "alias.ts")
+
+      expect(resolveWorkspaceImport(entryPoint, "@audit/nested/alias", packages)).toBe(aliasTarget)
+      expect(moduleGraph(entryPoint, packages)).toEqual(
+        expect.arrayContaining([aliasTarget, join(packagePath, "src", "dep.ts")]),
+      )
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("a nested conditional exports alias targeting a forbidden graph still fails the audit", () => {
+    const root = mkdtempSync(join(tmpdir(), "config-migration-exports-"))
+    try {
+      const packagePath = join(root, "fixture")
+      mkdirSync(join(packagePath, "src"), { recursive: true })
+      writeFileSync(
+        join(packagePath, "package.json"),
+        JSON.stringify({
+          name: "@audit/nested-forbidden",
+          exports: {
+            "./alias": {
+              import: {
+                types: "./src/alias-types.ts",
+                default: relative(packagePath, NEGATIVE_FIXTURE_ENTRY_POINT),
+              },
+            },
+          },
+        }),
+      )
+      writeFileSync(join(packagePath, "src", "alias-types.ts"), "export {}\n")
+      const entryPoint = join(root, "entry.ts")
+      writeFileSync(entryPoint, 'import "@audit/nested-forbidden/alias"\n')
+
+      const modules = moduleGraph(entryPoint, workspacePackages(root))
+      const offenders = modules.flatMap((modulePath) =>
+        importSpecifiers(readFileSync(modulePath, "utf-8"))
+          .filter((specifier) => OPENCODE_IMPORT.test(specifier))
+          .map((specifier) => `${modulePath} imports ${specifier}`),
+      )
+
       expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
     } finally {
       rmSync(root, { recursive: true, force: true })
