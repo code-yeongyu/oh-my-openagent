@@ -12,12 +12,13 @@ const isolationParams = {
   apply: Type.Optional(
     Type.Boolean({
       description:
-        "Merge the child's changes into this checkout when it completes; false keeps the patch/branch artifacts only.",
+        "Merge the child's changes into this checkout when it completes; false keeps the patch/branch artifacts only. Without isolation, false is ignored and true is refused.",
     }),
   ),
   merge: Type.Optional(
     Type.Union([Type.Literal("patch"), Type.Literal("branch")], {
-      description: "Merge strategy for an isolated child; defaults to task.isolation.merge.",
+      description:
+        "Merge strategy for an isolated child; defaults to task.isolation.merge. Without isolation, the default is ignored and a different strategy is refused.",
     }),
   ),
 }

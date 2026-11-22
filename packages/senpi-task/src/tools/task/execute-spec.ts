@@ -2,9 +2,10 @@ import { resolveExecutionMode } from "../../manager"
 import type { ExecutionMode, ManagerStartSpec } from "../../manager"
 import type { KernelToolGrant } from "../../kernel-tools/resolve"
 import type { TaskToolParamsStatic } from "./params"
+import { DEFAULT_ISOLATION_MERGE } from "./validation"
 import { createFsSkillLoader } from "./skills"
 import { taskSkillSummary } from "./skill-result"
-import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolContext, TaskToolDeps } from "./types"
+import type { ResolvedSpawnItem, TaskSkillSummary, TaskToolDeps } from "./types"
 
 type SingleSpawnParams = Omit<TaskToolParamsStatic, "prompt" | "tasks"> & { readonly prompt: string }
 
@@ -36,7 +37,7 @@ export function buildStartSpec(
       ? {
           isolated,
           apply: params.apply ?? isolation?.apply ?? true,
-          merge: params.merge ?? isolation?.merge ?? "patch",
+          merge: params.merge ?? isolation?.merge ?? DEFAULT_ISOLATION_MERGE,
         }
       : params.isolated === undefined
         ? {}
