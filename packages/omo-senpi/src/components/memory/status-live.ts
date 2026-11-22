@@ -1,11 +1,11 @@
-import { LOADING_SPINNER_FRAME_MS, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
+import { delayToNextLoadingSpinnerFrame, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 
 import { MEMORY_STATUS_KEY } from "./status"
 
-type TimerHandle = ReturnType<typeof setInterval> | number
+type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface MemoryFooterTimers {
-  set(callback: () => void, intervalMs: number): TimerHandle
+  set(callback: () => void, delayMs: number): TimerHandle
   clear(handle: TimerHandle): void
 }
 
@@ -37,7 +37,7 @@ export interface MemoryFooterLive {
    * clears its footer can animate again. Used by clearStatus, which fires on every session start.
    */
   stop(): void
-  /** Stops the interval permanently; every later call becomes a no-op. */
+  /** Stops the animation permanently; every later call becomes a no-op. */
   dispose(): void
 }
 
@@ -66,11 +66,8 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
     timer = undefined
   }
 
-  function tick(): void {
-    if (disposed || activeIdentity === undefined) {
-      stopTimer()
-      return
-    }
+  function paintAndSchedule(): void {
+    timer = timers.set(paintAndSchedule, delayToNextLoadingSpinnerFrame(now()))
     publishFrame()
   }
 
@@ -97,8 +94,7 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
         activeIdentity = identity
         activeUi = ui
         if (timer !== undefined) return
-        publishFrame()
-        timer = timers.set(tick, LOADING_SPINNER_FRAME_MS)
+        paintAndSchedule()
         return
       }
       const restoreIdentity = activeIdentity ?? identity
@@ -140,12 +136,12 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
 }
 
 const defaultTimers: MemoryFooterTimers = {
-  set(callback, intervalMs) {
-    const handle = setInterval(callback, intervalMs)
+  set(callback, delayMs) {
+    const handle = setTimeout(callback, delayMs)
     handle.unref()
     return handle
   },
   clear(handle) {
-    clearInterval(handle)
+    clearTimeout(handle)
   },
 }

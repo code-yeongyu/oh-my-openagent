@@ -11,14 +11,14 @@ interface FakeTimers extends MemoryFooterTimers {
 
 /** Deterministic timer double: nothing here depends on the wall clock. */
 function fakeTimers(): FakeTimers {
-  const handles = new Map<number, { callback: () => void; intervalMs: number }>()
+  const handles = new Map<number, () => void>()
   let nextHandle = 1
   let now = 0
   return {
-    set(callback, intervalMs) {
+    set(callback) {
       const handle = nextHandle
       nextHandle += 1
-      handles.set(handle, { callback, intervalMs })
+      handles.set(handle, callback)
       return handle
     },
     clear(handle) {
@@ -29,7 +29,9 @@ function fakeTimers(): FakeTimers {
     advance(ticks) {
       for (let tick = 0; tick < ticks; tick += 1) {
         now += 90
-        for (const entry of [...handles.values()]) entry.callback()
+        for (const [handle, callback] of [...handles]) {
+          if (handles.delete(handle)) callback()
+        }
       }
     },
   }
@@ -70,21 +72,21 @@ describe("memory footer live", () => {
     live.dispose()
   })
 
-  test("#given the animation is running #when the interval is inspected #then it uses the 90ms cadence", () => {
-    const intervals: number[] = []
+  test("#given activation on a frame boundary #when the next repaint is scheduled #then it waits a full frame", () => {
+    const delays: number[] = []
     const timers: MemoryFooterTimers = {
-      set(_callback, intervalMs) {
-        intervals.push(intervalMs)
+      set(_callback, delayMs) {
+        delays.push(delayMs)
         return 1
       },
       clear() {},
     }
     const ui = recorder()
-    const live = createMemoryFooterLive({ timers })
+    const live = createMemoryFooterLive({ timers, now: () => 0 })
 
     live.setActive("agent-test", true, ui.ui)
 
-    expect(intervals).toEqual([90])
+    expect(delays).toEqual([90])
     live.dispose()
   })
 
@@ -111,7 +113,7 @@ describe("memory footer live", () => {
     live.dispose()
   })
 
-  test("#given an animating run #when dispose runs for a session shutdown #then no interval survives and no further status is published", () => {
+  test("#given an animating run #when dispose runs for a session shutdown #then no timer survives and no further status is published", () => {
     const timers = fakeTimers()
     const ui = recorder()
     const live = createMemoryFooterLive({ timers })
@@ -140,7 +142,7 @@ describe("memory footer live", () => {
     live.dispose()
   })
 
-  test("#given repeated activation for the same run #when setActive is called twice #then a single interval is live", () => {
+  test("#given repeated activation for the same run #when setActive is called twice #then a single timer is live", () => {
     const timers = fakeTimers()
     const ui = recorder()
     const live = createMemoryFooterLive({ timers })

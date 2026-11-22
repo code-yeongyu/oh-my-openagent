@@ -9,6 +9,7 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import { createMemoryFooterLive } from "../memory/status-live"
+import { createUlwLoopFooterStatus } from "../ulw-loop/footer-status"
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager, type StatusUiTimers } from "./status-ui"
 
@@ -196,11 +197,11 @@ describe("createTaskStatusUi.background progress", () => {
     expect(first).toStartWith("⠋ Idle child")
     expect(second).toStartWith("⠙ Idle child")
     expect(ui.widgetCalls.at(-1)?.content?.[1]).toStartWith("⠙ Earlier child")
-    expect(delays).toEqual([90, 90])
+    expect(delays).toEqual([90, 80])
     expect(listCalls).toBe(1)
   })
 
-  it("paints the same glyph in staggered task and memory timer repaints", () => {
+  it("repaints staggered task, memory, and ultrawork spinners at the same wall-clock boundaries", () => {
     let wallTime = 0
     const now = () => wallTime
     const pending = new Map<number, { callback: () => void; due: number }>()
@@ -215,8 +216,27 @@ describe("createTaskStatusUi.background progress", () => {
         if (typeof handle === "number") pending.delete(handle)
       },
     }
-    const taskUi = fakeUi()
-    const memoryUi = fakeUi()
+    function advanceTo(target: number): void {
+      for (;;) {
+        const next = [...pending].sort(([, a], [, b]) => a.due - b.due)[0]
+        if (next === undefined || next[1].due > target) break
+        const [handle, { callback, due }] = next
+        pending.delete(handle)
+        wallTime = due
+        callback()
+      }
+      wallTime = target
+    }
+
+    const frames: Record<"task" | "memory" | "loop", Array<[number, string | undefined]>> = {
+      task: [],
+      memory: [],
+      loop: [],
+    }
+    const taskUi: CapturedUi = {
+      ...fakeUi(),
+      setWidget: (_key, rows) => frames.task.push([now(), rows?.[0]?.split(" ")[0]]),
+    }
     const task = record({ task_id: "st_phase", name: "Phase child", status: "running" })
     const widget = createTaskStatusUi({
       manager: { list: () => listed([task]), wasBackground: () => true },
@@ -225,22 +245,33 @@ describe("createTaskStatusUi.background progress", () => {
       now,
     })
     const footer = createMemoryFooterLive({ timers, now })
-    const taskGlyph = () => taskUi.widgetCalls.at(-1)?.content?.[0]?.split(" ")[0]
-    const memoryGlyph = () => memoryUi.statusCalls.at(-1)?.split(" ")[1]
+    const loop = createUlwLoopFooterStatus({ timers, now, isGoalActive: () => true })
 
+    advanceTo(20)
     widget.syncNow()
-    wallTime = 100
-    footer.setActive("phase", true, memoryUi)
-    expect([taskGlyph(), memoryGlyph()]).toEqual(["⠋", "⠙"])
+    advanceTo(100)
+    footer.setActive("phase", true, {
+      setStatus: (_key, text) => frames.memory.push([now(), text?.split(" ")[1]]),
+    })
+    advanceTo(150)
+    loop.sync(
+      { ui: { setStatus: (_key: string, text?: string) => frames.loop.push([now(), text?.split(" ")[1]]) } },
+      true,
+    )
+    advanceTo(359)
 
-    // Both timers are now due: the widget's first callback was delayed by the host.
-    wallTime = 190
-    for (const { callback, due } of [...pending.values()]) {
-      if (due <= wallTime) callback()
-    }
-    expect([taskGlyph(), memoryGlyph()]).toEqual(["⠹", "⠹"])
+    const shared: typeof frames.task = [
+      [180, "⠹"],
+      [270, "⠸"],
+    ]
+    expect(frames).toEqual({
+      task: [[20, "⠋"], [90, "⠙"], ...shared],
+      memory: [[100, "⠙"], ...shared],
+      loop: [[150, "⠙"], ...shared],
+    })
     widget.dispose()
     footer.dispose()
+    loop.dispose()
   })
 
   it("#given a child before its first turn #when a host reattach resumes its turn #then both the footer progress line and the status row read running instead of starting", () => {

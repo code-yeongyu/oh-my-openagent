@@ -1,14 +1,14 @@
 import { readFileSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-import { LOADING_SPINNER_FRAME_MS, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
+import { delayToNextLoadingSpinnerFrame, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 
 const STATUS_KEY = "ulw-loop"
 
-type TimerHandle = ReturnType<typeof setInterval> | number
+type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface UlwLoopFooterTimers {
-  set(callback: () => void, intervalMs: number): TimerHandle
+  set(callback: () => void, delayMs: number): TimerHandle
   clear(handle: TimerHandle): void
 }
 
@@ -63,6 +63,11 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
       stop()
       return
     }
+    paintAndSchedule()
+  }
+
+  function paintAndSchedule(): void {
+    timer = timers.set(tick, delayToNextLoadingSpinnerFrame(now()))
     publish()
   }
 
@@ -76,8 +81,7 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
         return
       }
       if (timer !== undefined) return
-      publish()
-      timer = timers.set(tick, LOADING_SPINNER_FRAME_MS)
+      paintAndSchedule()
     },
     dispose() {
       ulwActive = false
@@ -89,13 +93,13 @@ export function createUlwLoopFooterStatus(options: UlwLoopFooterStatusOptions = 
 }
 
 const defaultTimers: UlwLoopFooterTimers = {
-  set(callback, intervalMs) {
-    const handle = setInterval(callback, intervalMs)
+  set(callback, delayMs) {
+    const handle = setTimeout(callback, delayMs)
     handle.unref()
     return handle
   },
   clear(handle) {
-    clearInterval(handle)
+    clearTimeout(handle)
   },
 }
 

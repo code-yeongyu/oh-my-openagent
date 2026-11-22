@@ -25,16 +25,18 @@ type FooterScenario = {
 
 function fakeTimers(): {
   readonly fire: () => void
-  readonly set: (callback: () => void, intervalMs: number) => number
+  readonly set: (callback: () => void, delayMs: number) => number
   readonly clear: (handle: number) => void
 } {
   const callbacks = new Map<number, () => void>()
   let nextHandle = 1
   return {
     fire: () => {
-      for (const callback of [...callbacks.values()]) callback()
+      for (const [handle, callback] of [...callbacks]) {
+        if (callbacks.delete(handle)) callback()
+      }
     },
-    set: (callback, _intervalMs) => {
+    set: (callback) => {
       const handle = nextHandle
       nextHandle += 1
       callbacks.set(handle, callback)

@@ -10,7 +10,7 @@ import {
   type TaskRecord,
   type TaskRunStats,
 } from "@oh-my-opencode/senpi-task"
-import { LOADING_SPINNER_FRAME_MS } from "@oh-my-opencode/utils/loading-spinner"
+import { delayToNextLoadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 
 import type { CapturedUi } from "./runtime-context"
 import { backgroundWidgetRows, buildWidgetRows, isSuspended, isTerminal } from "./status-row-format"
@@ -213,7 +213,7 @@ export function createTaskStatusUi(deps: TaskStatusUiDeps): TaskStatusUi {
       if (liveRefresh !== handle) return
       liveRefresh = undefined
       containRenderFault(renderCachedRecords)
-    }, LOADING_SPINNER_FRAME_MS)
+    }, delayToNextLoadingSpinnerFrame(now()))
     liveRefresh = handle
   }
 

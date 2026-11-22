@@ -9,7 +9,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus, type GitRepoForStatus } from "./status"
-import { type MemoryFooterTimers } from "./status-live"
+import type { MemoryFooterTimers } from "./status-live"
 import { createMemoryFooterStatusLive } from "./status-live-wiring"
 
 const roots: string[] = []
@@ -42,7 +42,9 @@ function fakeTimers(): FakeTimers {
     live: () => handles.size,
     advance(ticks) {
       for (let tick = 0; tick < ticks; tick += 1) {
-        for (const callback of [...handles.values()]) callback()
+        for (const [handle, callback] of [...handles]) {
+          if (handles.delete(handle)) callback()
+        }
       }
     },
   }

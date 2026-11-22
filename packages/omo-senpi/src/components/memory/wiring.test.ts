@@ -585,7 +585,7 @@ async function liveFooterHarness(): Promise<{
       handles.set(handle, callback)
       return handle
     },
-    clear(handle: number | ReturnType<typeof setInterval>) {
+    clear(handle: number | ReturnType<typeof setTimeout>) {
       handles.delete(handle as number)
     },
   }
@@ -623,7 +623,9 @@ async function liveFooterHarness(): Promise<{
     liveTimers: () => handles.size,
     advanceFrames(ticks) {
       for (let tick = 0; tick < ticks; tick += 1) {
-        for (const callback of [...handles.values()]) callback()
+        for (const [handle, callback] of [...handles]) {
+          if (handles.delete(handle)) callback()
+        }
       }
     },
     async startReflection() {
@@ -949,7 +951,7 @@ describe("session shutdown journal durability", () => {
 })
 
 describe("memory footer live wiring", () => {
-  test("#given a spinner animating mid-session #when the footer is cleared #then the interval is released and nothing repaints", async () => {
+  test("#given a spinner animating mid-session #when the footer is cleared #then the timer is released and nothing repaints", async () => {
     const harness = await liveFooterHarness()
 
     await harness.startReflection()
@@ -968,7 +970,7 @@ describe("memory footer live wiring", () => {
     expect(harness.statusCalls.at(-1)).toEqual({ key: "memory", text: undefined })
   })
 
-  test("#given a spinner animating mid-session #when the session shuts down #then the animation interval is released", async () => {
+  test("#given a spinner animating mid-session #when the session shuts down #then the animation timer is released", async () => {
     const harness = await liveFooterHarness()
 
     await harness.startReflection()

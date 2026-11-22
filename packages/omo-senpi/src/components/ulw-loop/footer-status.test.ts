@@ -26,26 +26,28 @@ function recordingUi(): {
 
 function fakeTimers(): {
   readonly activeCount: () => number
-  readonly intervals: number[]
+  readonly delays: number[]
   readonly now: () => number
   readonly fire: () => void
-  readonly set: (callback: () => void, intervalMs: number) => number
+  readonly set: (callback: () => void, delayMs: number) => number
   readonly clear: (handle: number) => void
 } {
   const callbacks = new Map<number, () => void>()
-  const intervals: number[] = []
+  const delays: number[] = []
   let nextHandle = 1
   let now = 0
   return {
     activeCount: () => callbacks.size,
-    intervals,
+    delays,
     now: () => now,
     fire: () => {
       now += 90
-      for (const callback of [...callbacks.values()]) callback()
+      for (const [handle, callback] of [...callbacks]) {
+        if (callbacks.delete(handle)) callback()
+      }
     },
-    set: (callback, intervalMs) => {
-      intervals.push(intervalMs)
+    set: (callback, delayMs) => {
+      delays.push(delayMs)
       const handle = nextHandle
       nextHandle += 1
       callbacks.set(handle, callback)
@@ -128,7 +130,7 @@ describe("omo-senpi ulw-loop footer status", () => {
 
       const frames = scenario.ui.calls.filter((call) => call.key === "ulw-loop").map((call) => call.text)
       expect(frames).toEqual([..."⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏⠋"].map((glyph) => `⚡ ${glyph} ultraworking`))
-      expect(scenario.timers.intervals).toEqual([90])
+      expect(scenario.timers.delays).toEqual(Array(11).fill(90))
       expect(scenario.timers.activeCount()).toBe(1)
     } finally {
       scenario.cleanup()
