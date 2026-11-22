@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { posixSecureFile, type SecureFile } from "../local-api/access.ts"
 import { refuseIfLocalOnly } from "../local-only.ts"
 import { currentUserSid } from "../local-api/dacl.ts"
+import { realTimers, type Timers } from "../timers.ts"
 import { windowsSecureFile } from "./windows-dacl.ts"
 import {
   BINARY_MAX_BYTES,
@@ -31,6 +32,10 @@ export { DEVICE_SERVICE_RELEASE_KEYS, verifyReleaseSignature } from "./release-s
 
 export const DEVICE_SERVICE_ORIGIN = "https://get.omo.dev"
 
+// A download is bounded by a stall, not a total budget (#13224): a slow link may take as long as it needs for the
+// ~90 MB binary while bytes keep arriving, but a connection that delivers nothing for this long is dead.
+const STALL_TIMEOUT_MS = 120_000
+
 export type FetchRelease = (url: string, init?: { readonly signal?: AbortSignal }) => Promise<Response>
 
 export type AcquireOptions = {
@@ -45,6 +50,8 @@ export type AcquireOptions = {
   /** Hex release key set, verified any-of; the compiled-in DEVICE_SERVICE_RELEASE_KEYS by default. */
   readonly releaseKeys?: readonly string[]
   readonly fetch?: FetchRelease
+  /** Clock the download stall watchdog runs on (design v6 §9); tests drive a fake clock instead of real time. */
+  readonly timers?: Timers
   readonly verifyCodeSignature?: (path: string) => boolean
   readonly secure?: SecureFile
 }
@@ -75,24 +82,67 @@ const platformSecure: SecureFile =
     ? async (path, kind) => windowsSecureFile(await currentUserSid())(path, kind)
     : posixSecureFile
 
-// "not_found" is an HTTP 404; "missing" is every other failed fetch (a throw, a timeout, a 5xx, another status).
+// "not_found" is an HTTP 404; "missing" is every other failed transfer (a throw or a timeout, before or during the
+// body, a body short of its content-length, a 5xx, another status).
 type Download = Uint8Array | "not_found" | "missing" | "too_large"
 
 const downloader =
-  (fetchRelease: FetchRelease, base: string) =>
+  (fetchRelease: FetchRelease, base: string, timers: Timers) =>
   async (name: string, maxBytes: number): Promise<Download> => {
-    let response: Response
+    // The watchdog bounds a stall, not the transfer (#13224): armed before the request — a server that never answers
+    // is a stall too — and re-armed on every received chunk, so a slow-but-steady link is never cut off mid-body. The
+    // whole transfer, body read included, sits in the guarded section (#13223): any failure maps to "missing".
+    const stall = new AbortController()
+    let cancelWatchdog: () => void = () => undefined
+    const rearmWatchdog = (): void => {
+      cancelWatchdog()
+      cancelWatchdog = timers.after(STALL_TIMEOUT_MS, () => stall.abort())
+    }
     try {
-      response = await fetchRelease(`${base}${name}`, { signal: AbortSignal.timeout(120_000) })
+      rearmWatchdog()
+      const response = await fetchRelease(`${base}${name}`, { signal: stall.signal })
+      if (response.status === 404) return "not_found"
+      if (!response.ok) return "missing"
+      const declared = Number(response.headers.get("content-length") ?? "0")
+      if (declared > maxBytes) return "too_large"
+      const reader = response.body?.getReader()
+      if (reader === undefined) return declared === 0 ? new Uint8Array() : "missing"
+      stall.signal.addEventListener(
+        "abort",
+        () => {
+          void reader.cancel().catch(() => undefined)
+        },
+        { once: true },
+      )
+      const chunks: Uint8Array[] = []
+      let received = 0
+      while (true) {
+        const part = await reader.read()
+        if (part.done) break
+        const chunk: Uint8Array = part.value
+        received += chunk.byteLength
+        if (received > maxBytes) {
+          void reader.cancel().catch(() => undefined)
+          return "too_large"
+        }
+        chunks.push(chunk)
+        rearmWatchdog()
+      }
+      // A short body is a broken transfer, not a broken artifact (#13224): it never reaches the checksum step, so it
+      // can never be reported as failed verification.
+      if (stall.signal.aborted || (declared > 0 && received < declared)) return "missing"
+      const bytes = new Uint8Array(received)
+      let offset = 0
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset)
+        offset += chunk.byteLength
+      }
+      return bytes
     } catch {
       return "missing"
+    } finally {
+      cancelWatchdog()
     }
-    if (response.status === 404) return "not_found"
-    if (!response.ok) return "missing"
-    const declared = Number(response.headers.get("content-length") ?? "0")
-    if (declared > maxBytes) return "too_large"
-    const bytes = new Uint8Array(await response.arrayBuffer())
-    return bytes.length > maxBytes ? "too_large" : bytes
   }
 
 const downloadRefusal = (download: "not_found" | "missing" | "too_large"): AcquireResult =>
@@ -149,6 +199,7 @@ export const acquireDeviceService = async (options: AcquireOptions): Promise<Acq
   const get = downloader(
     options.fetch ?? globalThis.fetch,
     `${options.origin ?? DEVICE_SERVICE_ORIGIN}/${options.channel ?? "stable"}/device-service/${options.version}/`,
+    options.timers ?? realTimers,
   )
   const [checksums, signature] = await Promise.all([
     get(CHECKSUMS, CHECKSUMS_MAX_BYTES),
