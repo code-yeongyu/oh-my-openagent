@@ -253,8 +253,7 @@ function streamMockResponse(streamModel: Model<Api>, context: Context, options?:
   }
   const dumpTarget = env.MOCK_DUMP_SYSTEM
   if (typeof dumpTarget === "string" && dumpTarget.length > 0) {
-    const systemPrompt = (context as { systemPrompt?: unknown }).systemPrompt
-    const rendered = typeof systemPrompt === "string" ? systemPrompt : JSON.stringify(systemPrompt ?? null)
+    const rendered = JSON.stringify(context.messages?.filter((message) => message.role === "system") ?? [])
     appendFileSync(dumpTarget, `\n=== model=${streamModel.id} cwd=${context.cwd ?? process.cwd()} ===\n${rendered}\n`)
   }
   // Tool descriptions exist only on the model request, so a driver that asserts on wording

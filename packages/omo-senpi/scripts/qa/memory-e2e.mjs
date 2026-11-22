@@ -1,20 +1,22 @@
-#!/usr/bin/env node
+#!/usr/bin/env bun
 // Live end-to-end QA for the omo-senpi memory component (plan todo 37).
-// Drives the REAL senpi binary in an isolated agent dir + OMO_MEMORY_HOME, then asserts:
-//   S1 memory tool commit -> git repo created + commit, next-run system prompt carries the sentinel block
+// Drives the REAL senpi binary in an isolated HOME, agent dir and OMO_MEMORY_HOME, then asserts:
+//   S1 memory tool commit -> git repo created + commit; a durable fixture projects on the next run
 //   S2 step-count reflection spawns a quick-category child (shimmed SENPI_BIN) and merges a reflection commit
 //   S3 /search finds a prior message across sessions
 //   S4 /palace generates a self-contained 0600 HTML with machine-checkable payload
 //   S5 memory.enabled=false leaves the host byte-identical (no tools, no sentinel, no dirs)
-// Real ~/.senpi/agent and ~/.omo/memory are hashed before/after as the isolation proof.
-import { spawn, spawnSync } from "node:child_process"
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
-import { createHash } from "node:crypto"
-import { homedir, tmpdir } from "node:os"
-import { delimiter, dirname, join, resolve } from "node:path"
+import { spawnSync } from "node:child_process"
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from "node:fs"
+import { basename, delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { createSandbox, seedSandbox } from "./drive.mjs"
-import { isolatedChildEnv } from "./sandbox-child-env.mjs"
+
+if (process.versions.bun === undefined) {
+  console.error("memory-e2e requires Bun: run bun packages/omo-senpi/scripts/qa/memory-e2e.mjs")
+  process.exit(1)
+}
+const { createSandbox, seedSandbox } = await import("./drive.mjs")
+const { isolatedChildEnv } = await import("./sandbox-child-env.mjs")
 
 const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "task-e2e-mock-provider.ts")
@@ -43,48 +45,17 @@ function findOnPath(bin) {
 const senpiBin = process.env.SENPI_BIN ?? findOnPath("senpi")
 if (senpiBin === null) fail("senpi binary not found (set SENPI_BIN)")
 
-const ISOLATION_EXCLUDE = new Set([
-  "sessions",
-  "senpi-debug.log",
-  "mcp-cache.json",
-  "mcp-auth",
-  "settings.json",
-  "telemetry.log",
-  "goals",
-])
-
-function hashDir(root, exclude = undefined) {
-  if (!existsSync(root)) return "absent"
-  const hash = createHash("sha256")
-  const walk = (dir) => {
-    for (const name of readdirSync(dir).toSorted()) {
-      if (exclude !== undefined && exclude(name)) continue
-      const full = join(dir, name)
-      const st = statSync(full)
-      if (st.isDirectory()) {
-        walk(full)
-        continue
-      }
-      hash.update(name)
-      hash.update(readFileSync(full))
-    }
-  }
-  walk(root)
-  return hash.digest("hex")
-}
-
-const isolationExclude = (name) => ISOLATION_EXCLUDE.has(name)
-
-const realSenpiBefore = hashDir(join(homedir(), ".senpi", "agent"), isolationExclude)
-const realOmoMemoryBefore = hashDir(join(homedir(), ".omo", "memory"))
+const sandboxes = []
 
 function baseEnv(sandbox, extra = {}) {
   return {
     ...isolatedChildEnv(process.env, sandbox.agentDir),
-    SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+    HOME: sandbox.homeDir,
+    USERPROFILE: sandbox.homeDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-    OMO_MEMORY_HOME: join(sandbox.root, "memory"),
-    PATH: process.env.PATH ?? "",
+    XDG_DATA_HOME: sandbox.xdgDataHome,
+    XDG_CACHE_HOME: sandbox.xdgCacheHome,
+    XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
     ...extra,
   }
 }
@@ -114,29 +85,9 @@ function runSenpi(sandbox, { prompt, env = {}, args = [], cwd }) {
   return { status: run.status, stdout: run.stdout ?? "", stderr: run.stderr ?? "" }
 }
 
-function waitFor(predicate, { timeoutMs = 90_000, intervalMs = 500, description } = {}) {
-  return new Promise((resolvePromise, rejectPromise) => {
-    const start = Date.now()
-    const poll = () => {
-      try {
-        const value = predicate()
-        if (value) {
-          resolvePromise(value)
-          return
-        }
-      } catch {}
-      if (Date.now() - start > timeoutMs) {
-        rejectPromise(new Error(`timeout waiting for ${description}`))
-        return
-      }
-      setTimeout(poll, intervalMs)
-    }
-    poll()
-  })
-}
-
 function scenarioSandbox() {
   const sandbox = createSandbox()
+  sandboxes.push(sandbox)
   seedSandbox(sandbox)
   mkdirSync(join(sandbox.agentDir, "sessions"), { recursive: true })
   mkdirSync(join(sandbox.cwd, ".omo"), { recursive: true })
@@ -154,6 +105,7 @@ function writeOmoConfig(sandbox, memoryOverrides = {}) {
     categories: { quick: { description: "QA mock quick category", model: "omo-mock/mock-1" } },
     memory: {
       enabled: true,
+      facts: { enabled: false },
       reflection: { trigger: { step_count: 0, on_compaction: false }, ...memoryOverrides },
     },
   }
@@ -167,11 +119,64 @@ function writeMockScript(sandbox, script, name = "mock-script.json") {
 }
 
 function memoryRepos(memoryHome) {
-  const agentsDir = join(memoryHome, "agents")
-  if (!existsSync(agentsDir)) return []
-  return readdirSync(agentsDir)
-    .map((name) => join(agentsDir, name, "repo"))
-    .filter(existsSync)
+  const repos = []
+  const collect = (agentsDir) => {
+    if (!existsSync(agentsDir)) return
+    for (const name of readdirSync(agentsDir)) {
+      const repo = join(agentsDir, name, "repo")
+      if (existsSync(join(repo, ".git"))) repos.push(repo)
+    }
+  }
+  collect(join(memoryHome, "agents"))
+  // A first-write one-shot can leave its repo in the transient run until the sweep promotes it.
+  const transientDir = join(memoryHome, "transient-runs")
+  if (existsSync(transientDir)) {
+    for (const token of readdirSync(transientDir)) collect(join(transientDir, token, "agents"))
+  }
+  return repos
+}
+
+function stageExistingProject(sandbox, repo) {
+  // These follow-up scenarios need an existing project repo. Stage the first write at the same
+  // identity's durable path instead of depending on when transient memory becomes visible (#13583).
+  const identity = basename(dirname(repo))
+  const target = join(sandbox.root, "memory", "agents", identity, "repo")
+  if (repo !== target) {
+    mkdirSync(dirname(target), { recursive: true })
+    renameSync(repo, target)
+  }
+  return target
+}
+
+function waitForCompletion(dir, existing) {
+  return new Promise((resolveCompletion, reject) => {
+    function finish() {
+      clearTimeout(timer)
+      subscription.close()
+    }
+    function inspect() {
+      try {
+        const file = readdirSync(dir).find((name) => name.endsWith(".json") && !existing.has(name))
+        if (file === undefined) return
+        const completion = JSON.parse(readFileSync(join(dir, file), "utf8"))
+        finish()
+        resolveCompletion(completion)
+      } catch (error) {
+        finish()
+        reject(error)
+      }
+    }
+    const subscription = watch(dir, inspect)
+    subscription.on("error", (error) => {
+      finish()
+      reject(error)
+    })
+    const timer = setTimeout(() => {
+      finish()
+      reject(new Error(`timeout waiting for reflection completion in ${dir}`))
+    }, 90_000)
+    inspect()
+  })
 }
 
 function gitLog(repo) {
@@ -199,12 +204,12 @@ async function scenario1() {
     ],
     childSteps: [{ type: "text", text: "unused" }],
   })
-  const dumpLog = join(sandbox.root, "sysdump.log")
-  const first = runSenpi(sandbox, { prompt: "remember that senpi is a pi harness", env: { MOCK_DUMP_SYSTEM: dumpLog } })
+  const first = runSenpi(sandbox, { prompt: "remember that senpi is a pi harness" })
   if (first.status !== 0) return record("S1 first senpi run", false, first.stderr.slice(-400))
 
   const repos = memoryRepos(join(sandbox.root, "memory"))
-  if (repos.length === 0) return record("S1 repo created", false, "no identity repo under OMO_MEMORY_HOME")
+  record("S1 repo created", repos.length === 1, repos.join(", ") || "no identity repo under OMO_MEMORY_HOME")
+  if (repos.length !== 1) return
   const log = gitLog(repos[0])
   record("S1 commit landed", log.includes("seed harness fact for QA"), log || "<empty git log>")
   record("S1 author is identity", log.includes("@omo.local"), log.split("\n")[0] ?? "")
@@ -213,17 +218,19 @@ async function scenario1() {
     parentSteps: [{ type: "text", text: "answer" }],
     childSteps: [{ type: "text", text: "unused" }],
   })
-  const second = runSenpi(sandbox, { prompt: "what do you remember", env: { MOCK_DUMP_SYSTEM: dumpLog } })
+  stageExistingProject(sandbox, repos[0])
+  const readbackLog = join(sandbox.root, "sysdump-readback.log")
+  const second = runSenpi(sandbox, { prompt: "what do you remember", env: { MOCK_DUMP_SYSTEM: readbackLog } })
   if (second.status !== 0) return record("S1 second senpi run", false, second.stderr.slice(-400))
-  const dump = readFileSync(dumpLog, "utf8")
-  record("S1 sentinel in next-run prompt", dump.includes("<!-- senpi-memory:"), dumpLog)
-  record("S1 memory body in next-run prompt", dump.includes("senpi is a pi harness"), dumpLog)
-  return { sandbox }
+  const dump = readFileSync(readbackLog, "utf8")
+  const identity = basename(dirname(repos[0]))
+  record("S1 sentinel in next-run prompt", dump.includes(`<!-- senpi-memory:${identity}:begin -->`), readbackLog)
+  record("S1 memory body in next-run prompt", dump.includes("senpi is a pi harness"), readbackLog)
 }
 
 async function scenario2() {
   const sandbox = scenarioSandbox()
-  writeOmoConfig(sandbox, { trigger: { step_count: 1, on_compaction: false } })
+  writeOmoConfig(sandbox)
   const shimPath = join(sandbox.root, "senpi-shim")
   writeFileSync(shimPath, `#!/bin/sh\nexec ${JSON.stringify(senpiBin)} -e ${JSON.stringify(mockProviderEntry)} "$@"\n`)
   spawnSync("chmod", ["+x", shimPath])
@@ -250,8 +257,9 @@ async function scenario2() {
 
   const memoryHome = join(sandbox.root, "memory")
   const repos = memoryRepos(memoryHome)
-  if (repos.length === 0) return record("S2 repo exists", false, "no repo")
-  const repo = repos[0]
+  record("S2 repo exists", repos.length === 1, repos.join(", ") || "no repo")
+  if (repos.length !== 1) return
+  const repo = stageExistingProject(sandbox, repos[0])
 
   const childScript = {
     parentSteps: [
@@ -280,45 +288,24 @@ async function scenario2() {
     return record("S2 child script commit", false, scriptCommitResult.stderr?.toString() ?? "")
 
   writeMockScript(sandbox, { parentSteps: [{ type: "text", text: "triggering turn" }], childSteps: [] })
+  writeOmoConfig(sandbox, { trigger: { step_count: 1, on_compaction: false } })
+  const completionsDir = join(dirname(repo), "runtime", "reflection", "completions")
+  mkdirSync(completionsDir, { recursive: true })
+  const existing = new Set(readdirSync(completionsDir))
   const run = runSenpi(sandbox, { prompt: "trigger one reflection", env: { SENPI_BIN: shimPath } })
   if (run.status !== 0) {
     console.error("S2 parent stderr:", run.stderr.slice(-1200))
     return record("S2 parent senpi run", false, run.stderr.slice(-400))
   }
-  console.error("S2 parent stderr (rc0):", run.stderr.slice(-600))
-
-  const completion = await waitFor(
-    () => {
-      const agentsDir = join(memoryHome, "agents")
-      for (const agent of readdirSync(agentsDir)) {
-        const completionsDir = join(agentsDir, agent, "runtime", "reflection", "completions")
-        if (!existsSync(completionsDir)) continue
-        const files = readdirSync(completionsDir).filter((name) => name.endsWith(".json"))
-        if (files.length === 0) continue
-        const record_ = JSON.parse(readFileSync(join(completionsDir, files[0]), "utf8"))
-        return { record: record_, completionsDir }
-      }
-      return undefined
-    },
-    { timeoutMs: 90_000, description: "reflection completion record" },
-  ).catch((error) => error)
-
-  if (completion instanceof Error) {
-    console.error(
-      "S2 completion wait failed. reflection dirs:",
-      existsSync(join(memoryHome, "agents"))
-        ? readdirSync(join(memoryHome, "agents")).map((a) =>
-            readdirSync(join(memoryHome, "agents", a, "runtime"), { withFileTypes: true })
-              .map((d) => d.name)
-              .join(","),
-          )
-        : "none",
-    )
-    return record("S2 completion record", false, completion.message)
-  }
-  record("S2 completion record", true, String(completion.record.outcome))
-  record("S2 outcome merged", completion.record.outcome === "merged", JSON.stringify(completion.record))
-  record("S2 quick category recorded", completion.record.category === "quick", completion.record.category)
+  const completion = await waitForCompletion(completionsDir, existing).catch((error) => error)
+  if (completion instanceof Error) return record("S2 completion record", false, completion.message)
+  record(
+    "S2 completion record",
+    completion.identity === basename(dirname(repo)),
+    join(completionsDir, `${completion.runId}.json`),
+  )
+  record("S2 outcome merged", completion.outcome === "merged", JSON.stringify(completion))
+  record("S2 quick category recorded", completion.category === "quick", completion.category)
   const log = gitLog(repo)
   record("S2 merge commit landed", /merge\(reflection\)/.test(log), log.split("\n").slice(0, 3).join(" || "))
   record(
@@ -361,19 +348,28 @@ async function scenario3And4() {
   })
   const run = runSenpi(sandbox, { prompt: "say the unique phrase" })
   if (run.status !== 0) return record("S3 seeding senpi run", false, run.stderr.slice(-400))
+  const repos = memoryRepos(join(sandbox.root, "memory"))
+  if (repos.length !== 1) return record("S4 seed project repo", false, repos.join(", ") || "no repo")
+  stageExistingProject(sandbox, repos[0])
 
-  const bundleModule = await import("../../src/extension/index.ts")
-  const { MemoryFakeExtensionAPI } = await import("../../src/components/memory/memory.test-support.ts")
-  const pi = new MemoryFakeExtensionAPI()
-  // An inherited OMO_/PI_CODING_AGENT_DIR outranks SENPI_CODING_AGENT_DIR in the in-process extension.
-  delete process.env.OMO_CODING_AGENT_DIR
-  delete process.env.PI_CODING_AGENT_DIR
-  process.env.SENPI_CODING_AGENT_DIR = sandbox.agentDir
-  process.env.OMO_MEMORY_HOME = join(sandbox.root, "memory")
-  process.env.XDG_CONFIG_HOME = sandbox.xdgConfigHome
+  const sandboxEnv = baseEnv(sandbox)
+  const changedEnv = [...new Set([...Object.keys(process.env), ...Object.keys(sandboxEnv)])].filter(
+    (key) => process.env[key] !== sandboxEnv[key],
+  )
+  const originalEnv = changedEnv.map((key) => [key, process.env[key]])
+  const applyEnv = (entries) => {
+    for (const [key, value] of entries) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
   const originalCwd = process.cwd()
+  applyEnv(changedEnv.map((key) => [key, sandboxEnv[key]]))
   process.chdir(sandbox.cwd)
   try {
+    const bundleModule = await import("../../src/extension/index.ts")
+    const { MemoryFakeExtensionAPI } = await import("../../src/components/memory/memory.test-support.ts")
+    const pi = new MemoryFakeExtensionAPI()
     const composed = bundleModule.default
     await composed(pi, {})
     const searchCommand = pi.commands.find((command) => command.name === "search")
@@ -422,6 +418,7 @@ async function scenario3And4() {
     record("S4 palace persona entry", html.includes("system/persona.md"), htmlPath)
   } finally {
     process.chdir(originalCwd)
+    applyEnv(originalEnv)
   }
 }
 
@@ -437,12 +434,13 @@ async function scenario5() {
   const run = runSenpi(sandbox, { prompt: "hello", env: { MOCK_DUMP_SYSTEM: dumpLog } })
   if (run.status !== 0) return record("S5 disabled run", false, run.stderr.slice(-400))
   const dump = existsSync(dumpLog) ? readFileSync(dumpLog, "utf8") : ""
-  record("S5 no sentinel when disabled", !dump.includes("<!-- senpi-memory:"), dumpLog)
   record(
-    "S5 no memory dirs when disabled",
-    memoryRepos(join(sandbox.root, "memory")).length === 0,
-    join(sandbox.root, "memory"),
+    "S5 no sentinel when disabled",
+    dump.includes('"role":"system"') && !dump.includes("<!-- senpi-memory:"),
+    dumpLog,
   )
+  const memoryHome = join(sandbox.root, "memory")
+  record("S5 no memory dirs when disabled", !existsSync(memoryHome), memoryHome)
 }
 
 async function main() {
@@ -452,18 +450,15 @@ async function main() {
   await scenario3And4()
   await scenario5()
 
-  const realSenpiAfter = hashDir(join(homedir(), ".senpi", "agent"), isolationExclude)
-  const realOmoMemoryAfter = hashDir(join(homedir(), ".omo", "memory"))
-  record(
-    "isolation: real ~/.senpi/agent untouched (volatile paths excluded)",
-    realSenpiBefore === realSenpiAfter,
-    `${realSenpiBefore.slice(0, 12)} vs ${realSenpiAfter.slice(0, 12)}`,
-  )
-  record(
-    "isolation: real ~/.omo/memory untouched",
-    realOmoMemoryBefore === realOmoMemoryAfter,
-    `${realOmoMemoryBefore.slice(0, 12)} vs ${realOmoMemoryAfter.slice(0, 12)}`,
-  )
+  for (const sandbox of sandboxes) {
+    const defaultAgent = join(sandbox.homeDir, ".senpi", "agent")
+    const defaultMemory = join(sandbox.homeDir, ".omo", "memory")
+    record(
+      "isolation: sandbox HOME defaults unused",
+      !existsSync(defaultAgent) && !existsSync(defaultMemory),
+      sandbox.homeDir,
+    )
+  }
 
   console.log(JSON.stringify({ ok: failures.length === 0, total: results.length, failures }, null, 2))
   process.exit(failures.length === 0 ? 0 : 1)
