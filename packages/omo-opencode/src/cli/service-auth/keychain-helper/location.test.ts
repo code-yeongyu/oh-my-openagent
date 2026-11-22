@@ -75,4 +75,12 @@ describe("keychain helper location (#11262 design 1, addendum rows 9-10)", () =>
     })
     expect(candidates[0]).toBe("/entry/omo-keychain")
   })
+
+  test("an ordinary package install does not search beside the Node interpreter", () => {
+    const moduleUrl = pathToFileURL(join(tmpdir(), "pkg", "bin", "lib", "service-auth.generated.js")).href
+    expect(storeCandidates({ registered: [], moduleUrl, execPath: "/opt/node/bin/node", home: "/h" })).toEqual([
+      ...bundleCandidates(moduleUrl),
+      ...machineCandidates("/h"),
+    ])
+  })
 })

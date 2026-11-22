@@ -17,15 +17,6 @@ export function bundleCandidates(moduleUrl: string): readonly string[] {
   return [join(root, "bin", "darwin", "omo-keychain"), join(root, "omo-keychain")]
 }
 
-/**
- * The copy beside the running executable: in a compiled binary `import.meta.url` is a virtual `/$bunfs` path, so
- * `bundleCandidates` never exist on disk and an entry that did not register its own layout would otherwise fall through
- * to the machine-wide copies (#13102). Under bun or node this names a file that is simply missing and skipped.
- */
-export function executableCandidates(execPath: string): readonly string[] {
-  return [join(dirname(execPath), "omo-keychain")]
-}
-
 /** Every candidate in trust-neutral search order; each one is still pinned and signature-verified by `locateHelper`. */
 export function storeCandidates(input: {
   readonly registered: readonly string[]
@@ -36,7 +27,7 @@ export function storeCandidates(input: {
   return [
     ...input.registered,
     ...bundleCandidates(input.moduleUrl),
-    ...executableCandidates(input.execPath),
+    ...(new URL(input.moduleUrl).pathname.startsWith("/$bunfs/") ? [join(dirname(input.execPath), "omo-keychain")] : []),
     ...machineCandidates(input.home),
   ]
 }
