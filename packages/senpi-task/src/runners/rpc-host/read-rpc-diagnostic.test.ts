@@ -29,7 +29,7 @@ test("only explicitly traced read RPC failures log fixed fields and preserve the
     await expect(run("list_sessions")).rejects.toBe(error)
     expect(log.mock.calls).toHaveLength(1)
     expect(log.mock.calls[0]?.[0]).toMatch(
-      /^\[thread-read-rpc\] command=list_sessions phase=connect elapsed_ms=\d+ code=EPIPE$/,
+      /^\[thread-read-rpc\] command=list_sessions phase=connect elapsed_ms=\d+ code=EPIPE caller_stall_ms=\d+ attempts=1$/,
     )
   } finally {
     log.mockRestore()
@@ -62,7 +62,7 @@ test("a connected socket without an auth exchange never reports a handshake", as
     )
     await expect(call).rejects.toBe(error)
     expect(log.mock.calls[0]?.[0]).toMatch(
-      /^\[thread-read-rpc\] command=get_messages phase=connected elapsed_ms=\d+ code=ECONNRESET$/,
+      /^\[thread-read-rpc\] command=get_messages phase=connected elapsed_ms=\d+ code=ECONNRESET caller_stall_ms=\d+ attempts=1$/,
     )
   } finally {
     log.mockRestore()
@@ -128,7 +128,7 @@ test("a partial response identifies a byte-stage deadline without logging respon
     await expect(call).rejects.toThrow("thread RPC request timed out")
     expect(log.mock.calls).toHaveLength(1)
     expect(log.mock.calls[0]?.[0]).toMatch(
-      /^\[thread-read-rpc\] command=get_messages phase=response-bytes elapsed_ms=\d+ code=DEADLINE$/,
+      /^\[thread-read-rpc\] command=get_messages phase=response-bytes elapsed_ms=\d+ code=DEADLINE caller_stall_ms=\d+ attempts=1$/,
     )
   } finally {
     write.mockRestore()
