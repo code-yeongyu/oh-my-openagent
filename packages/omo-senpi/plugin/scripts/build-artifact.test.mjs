@@ -4,7 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { expect, test } from "bun:test"
 
+import { spawnSync } from "node:child_process"
+
 import { artifactsMatch, closeNodeMinifier, minifyBundle, normalizeBuiltinImports } from "./build-artifact.mjs"
+
+// The shared minifier is this process's `--minify-server` child; find it the way a runner's timeout would.
+function minifierChildPids() {
+  const found = spawnSync("pgrep", ["-P", String(process.pid), "-f", "minify-server"], { encoding: "utf8" })
+  return found.stdout.split("\n").filter(Boolean).map(Number)
+}
 
 test("#given Node and Bun builtin catalogs #when imports are normalized #then Bun namespaces stay unchanged and both outputs match", async () => {
   const root = await mkdtemp(join(tmpdir(), "omo-builtin-normalize-"))
@@ -55,6 +63,31 @@ test("#given the Node minifier starts closing #when another bundle is queued #th
     await minifyBundle(second)
 
     expect(await readFile(second, "utf8")).toBe(await readFile(first, "utf8"))
+  } finally {
+    closeNodeMinifier()
+    await rm(root, { recursive: true, force: true })
+  }
+}, 30_000)
+
+test("#given a bundle is queued on the shared minifier #when that child is killed before it answers #then the build still completes on a fresh child (#13965)", async () => {
+  const root = await mkdtemp(join(tmpdir(), "omo-minifier-killed-"))
+  const reference = join(root, "reference.js")
+  const queued = join(root, "queued.js")
+  const source = "export const value = 1 + 1\n"
+  try {
+    await Promise.all([writeFile(reference, source), writeFile(queued, source)])
+    await minifyBundle(reference)
+
+    // when: the request is queued on the live child, which is then killed the way a test runner's timeout kills it
+    const pending = minifyBundle(queued)
+    const [pid] = minifierChildPids()
+    expect(pid).toBeNumber()
+    process.kill(pid, "SIGTERM")
+
+    // then
+    await pending
+    expect(await readFile(queued, "utf8")).toBe(await readFile(reference, "utf8"))
+    expect(minifierChildPids()).not.toContain(pid)
   } finally {
     closeNodeMinifier()
     await rm(root, { recursive: true, force: true })

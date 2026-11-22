@@ -46,16 +46,23 @@ async function minifyBundleInProcess(output) {
 }
 
 function minifyBundleWithNode(output) {
-  const minifier = getNodeMinifier()
-  clearTimeout(minifier.idleTimer)
   const id = ++minifierRequestId
   return new Promise((resolvePromise, reject) => {
-    minifier.pending.set(id, { resolve: resolvePromise, reject })
-    minifier.child.stdin.write(`${JSON.stringify({ id, output })}\n`, (error) => {
-      if (error === null || error === undefined) return
-      minifier.pending.delete(id)
-      reject(error)
-    })
+    sendMinifyRequest({ id, output, resolve: resolvePromise, reject, resent: false })
+  })
+}
+
+// #13965: the shared child is process-wide, but a test runner's per-test timeout kills the processes that test
+// started, and the first build to spawn the child is inside some test. One lost child used to reject every queued
+// build. A request the lost child did not answer is now sent once to a fresh child; a request that loses a second
+// child fails with that child's exit, so a minifier that dies for its own reasons is still reported.
+function sendMinifyRequest(request) {
+  const minifier = getNodeMinifier()
+  clearTimeout(minifier.idleTimer)
+  minifier.pending.set(request.id, request)
+  minifier.child.stdin.write(`${JSON.stringify({ id: request.id, output: request.output })}\n`, (error) => {
+    if (error === null || error === undefined) return
+    if (minifier.pending.delete(request.id)) request.reject(error)
   })
 }
 
@@ -91,8 +98,12 @@ function getNodeMinifier() {
     const reason = new Error(
       `Node minifier exited before completing requests: code=${String(code)} signal=${String(signal)}`,
     )
-    for (const request of pending.values()) request.reject(reason)
+    const unanswered = [...pending.values()]
     pending.clear()
+    for (const request of unanswered) {
+      if (request.resent) request.reject(reason)
+      else sendMinifyRequest({ ...request, resent: true })
+    }
   })
   return minifier
 }
