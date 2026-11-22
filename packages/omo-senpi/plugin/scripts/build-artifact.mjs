@@ -58,7 +58,16 @@ function minifyBundleWithNode(output) {
 // #13965: the shared child is process-wide, but a test runner's per-test timeout kills the processes that test
 // started, and the first build to spawn the child is inside some test. One lost child used to reject every queued
 // build. A request the lost child did not answer is now sent once to a fresh child; a request that loses a second
-// child fails with that child's exit, so a minifier that dies for its own reasons is still reported.
+// child fails with that child's exit, so a minifier that dies for its own reasons is still reported. A request is lost
+// either when the child exits before answering or when writing it to the child fails (a broken pipe can surface before
+// the exit event); whichever path removes it from `pending` first recovers it, once.
+function recoverUnanswered(request, reason) {
+  rm(request.minified, { force: true }).then(() => {
+    if (request.resent) request.reject(reason)
+    else sendMinifyRequest({ ...request, resent: true })
+  }, request.reject)
+}
+
 function sendMinifyRequest(request) {
   const minifier = getNodeMinifier()
   clearTimeout(minifier.idleTimer)
@@ -67,7 +76,7 @@ function sendMinifyRequest(request) {
     `${JSON.stringify({ id: request.id, output: request.output, minified: request.minified })}\n`,
     (error) => {
       if (error === null || error === undefined) return
-      if (minifier.pending.delete(request.id)) request.reject(error)
+      if (minifier.pending.delete(request.id)) recoverUnanswered(request, error)
     },
   )
 }
@@ -86,6 +95,8 @@ function getNodeMinifier() {
     windowsHide: true,
   })
   const pending = new Map()
+  // A failed write is handled by its callback; without a listener the stream's own error event would be thrown.
+  child.stdin.on("error", () => {})
   const lines = createInterface({ input: child.stdout })
   const minifier = { child, pending, idleTimer: undefined }
   nodeMinifier = minifier
@@ -106,12 +117,7 @@ function getNodeMinifier() {
     )
     const unanswered = [...pending.values()]
     pending.clear()
-    for (const request of unanswered) {
-      rm(request.minified, { force: true }).then(() => {
-        if (request.resent) request.reject(reason)
-        else sendMinifyRequest({ ...request, resent: true })
-      }, request.reject)
-    }
+    for (const request of unanswered) recoverUnanswered(request, reason)
   })
   return minifier
 }
@@ -196,6 +202,7 @@ export function toPortableBuildPath(path) {
 
 // Test seam (#13965): with OMO_MINIFY_SERVER_HOLD_REPLY set to a path, the server writes its pid there after
 // minifying and never answers, so a test can kill a child that holds a finished but unanswered request on any OS.
+// Unset or empty, it does nothing; only build-artifact.test.mjs sets it.
 async function holdReplyForTest() {
   const holdPath = process.env.OMO_MINIFY_SERVER_HOLD_REPLY
   if (holdPath === undefined || holdPath === "") return
