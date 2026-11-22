@@ -196,6 +196,27 @@ describe("telemetry is off by default for automated runs that cannot hold a stab
     }
   })
 
+  it("#given a darwin HOME lexically under /home that resolves into a temp root #when the automation check runs #then it still counts as ephemeral (#11891)", () => {
+    const deps = {
+      platform: "darwin" as const,
+      realpath: (p: string) => (p === "/home/x" ? "/var/folders/ab/T/omo-x" : p),
+      tmpdir: () => "/var/folders/ab/T",
+      posixTempRoots: [],
+    }
+    expect(automatedRunReason({ HOME: "/home/x" }, deps)).toBe("ephemeral_home")
+  })
+
+  it("#given a darwin HOME written with different case under a users dir #when the automation check runs #then the answer matches the same path in canonical case (#11891)", () => {
+    const deps = {
+      platform: "darwin" as const,
+      realpath: (p: string) => p,
+      tmpdir: () => "/var/folders/ab/T",
+      posixTempRoots: [],
+    }
+    expect(automatedRunReason({ HOME: "/HOME/me" }, deps)).toBe(automatedRunReason({ HOME: "/home/me" }, deps))
+    expect(automatedRunReason({ HOME: "/home/me" }, deps)).toBeUndefined()
+  })
+
   it("#given a darwin HOME inside a temp dir under an automount trigger #then only that HOME itself is resolved and the run still counts as ephemeral", () => {
     const resolved: string[] = []
     const deps = {

@@ -334,12 +334,30 @@ function isInsideTempDir(path: string, env: TelemetryEnv, deps: TempDirDeps): bo
   const usersDirs = windows ? [win32.join(`${env["SystemDrive"]?.trim() || "C:"}\\`, "Users")] : POSIX_USERS_DIRS
   const rootHomes = windows ? [] : POSIX_ROOT_HOMES
   const parent = paths.dirname(target)
-  // A trigger is compared lexically, on both the resolved parent and the HOME's own lexical parent: on darwin a home
-  // under /home resolves to /System/Volumes/Data/home/<name>, whose parent never equals "/home" (#11547).
-  const isUsersDir = (dir: string): boolean =>
-    trigger(dir) || trigger(parent) ? parent === dir || paths.dirname(lexical) === dir : same(parent, dir)
-  if (usersDirs.some(isUsersDir) || rootHomes.some((home) => same(target, home))) return false
   const candidates = [(deps.tmpdir ?? os.tmpdir)(), ...(windows ? [] : (deps.posixTempRoots ?? POSIX_TEMP_ROOTS))]
+  // True when the HOME's resolved target itself sits inside a temp root (never resolving a trigger path): that HOME
+  // cannot hold a stable id even when its spelling puts it in a users dir (#11891: /home/x symlinked into
+  // /var/folders/... was counted as a real profile because of its lexical parent alone).
+  const resolvesIntoTempRoot = (): boolean =>
+    candidates.some((candidate) => {
+      if (trigger(candidate)) return false
+      const root = resolve(candidate)
+      if (root === undefined || paths.dirname(root) === root) return false
+      try {
+        return isPathInside(target, candidate, options) && !isPathInside(candidate, target, options)
+      } catch {
+        return false
+      }
+    })
+  const sameWords = (left: string, right: string): boolean => left.toLowerCase() === right.toLowerCase()
+  // A trigger is compared lexically, on both the resolved parent and the HOME's own lexical parent: on darwin a home
+  // under /home resolves to /System/Volumes/Data/home/<name>, whose parent never equals "/home" (#11547). Trigger
+  // matching itself is case-insensitive on darwin APFS, so these lexical comparisons fold case the same way (#11891).
+  const isUsersDir = (dir: string): boolean =>
+    trigger(dir) || trigger(parent)
+      ? (parent === dir || sameWords(paths.dirname(lexical), dir)) && !resolvesIntoTempRoot()
+      : same(parent, dir)
+  if (usersDirs.some(isUsersDir) || rootHomes.some((home) => same(target, home))) return false
   return candidates.some((candidate) => {
     if (trigger(candidate)) return lexicallyInside(candidate)
     const root = resolve(candidate)
