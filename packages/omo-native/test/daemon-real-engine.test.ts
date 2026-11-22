@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { lstatSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
+import { lstatSync, mkdirSync, readFileSync, readdirSync, type Stats, writeFileSync } from "node:fs"
 import { join, relative } from "node:path"
 
 import { daemonDirectoryName } from "@code-yeongyu/senpi"
@@ -22,7 +22,7 @@ function snapshotState(agentDir: string): string {
 }
 
 function walk(root: string, path: string, hash: ReturnType<typeof createHash>): void {
-  let stat
+  let stat: Stats
   try {
     stat = lstatSync(path)
   } catch (error) {
