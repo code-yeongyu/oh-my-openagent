@@ -2,7 +2,7 @@
 import { type ChildProcess, spawn } from "node:child_process"
 import { mkdtempSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { basename, join } from "node:path"
+import { basename, dirname, join } from "node:path"
 import { removeTestRootBestEffort, skippedTestRoots } from "./test-support/held-test-root.mjs"
 import reportOnlyPrefixesByOwner from "./test-temp-leak-report-only.json"
 import { isOsCreatedTempEntry, reportOnlyOwner as ownerIn } from "./test-temp-leak-match"
@@ -130,38 +130,60 @@ function reportKnownLeaks(entries: readonly string[]): void {
 }
 
 /**
- * Removes a run root without holding the caller for as long as the tree takes to delete (#11630).
+ * Removes a run root without holding the caller for as long as the tree takes to delete (#11630, #12209).
  *
  * The root collects everything the run's processes wrote under the OS temp dir, child bun caches included,
  * and a synchronous recursive remove of a large one overran the end-of-run hook budget (43 s for 1.2 GB on a
- * loaded machine) as an unnamed hook failure. The root is renamed aside in one step, which empties its path
- * at once, and a detached `rm` deletes the renamed tree after this process has gone. The aside name keeps
- * the run-root prefix and the owner pid file, so a remover that dies is swept by the next run like any
- * abandoned root. Only this run's own root is touched; nothing else in the OS temp dir is read or removed.
+ * loaded machine, 95 s for a full shard's root on a windows-latest runner) as an unnamed hook failure. The
+ * root is renamed aside in one step, which empties its path at once, and a detached remover deletes the
+ * renamed tree after this process has gone. The aside name keeps the run-root prefix and the owner pid file,
+ * so a remover that dies is swept by the next run like any abandoned root. Only this run's own root is
+ * touched; nothing else in the OS temp dir is read or removed.
  *
- * Windows, or a root that cannot be renamed (a held handle), keeps the synchronous best-effort removal.
+ * A root that cannot be renamed (a held handle) goes to the remover where it stands, so the run never waits
+ * for the handle to close: the remover retries transient failures for a bounded interval.
  */
 export function removeRunRootAside(
   root: string,
   spawnRemover: (path: string) => ChildProcess = spawnDetachedRemover,
 ): ChildProcess | undefined {
-  if (process.platform === "win32") {
-    removeTestRootBestEffort(root)
-    return undefined
-  }
   if (root.endsWith(ASIDE_SUFFIX)) return spawnRemover(root)
   const aside = `${root}${ASIDE_SUFFIX}`
   try {
     renameSync(root, aside)
-  } catch {
-    removeTestRootBestEffort(root)
-    return undefined
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    // Windows kept the synchronous best-effort removal here, and that walk is the hook failure above.
+    if (process.platform !== "win32") {
+      removeTestRootBestEffort(root)
+      return undefined
+    }
+    return spawnRemover(root)
   }
   return spawnRemover(aside)
 }
 
+const DETACHED_STDIO = { detached: true, stdio: "ignore" } as const
+
 function spawnDetachedRemover(path: string): ChildProcess {
-  const remover = spawn("/bin/rm", ["-rf", path], { detached: true, stdio: "ignore" })
+  // Use the existing removal policy for sharing failures and partial deletes. The helper's cwd must not
+  // hold its target open. If the runner ends the detached process, the next run still sweeps the aside.
+  const remover =
+    process.platform === "win32"
+      ? spawn(
+          process.execPath,
+          [
+            "-e",
+            `import(${JSON.stringify(new URL("./test-support/remove-tree.ts", import.meta.url).href)}).then(({ removeTree }) => removeTree(process.argv[1], { maxRetries: 15, retryDelay: 250 }))`,
+            path,
+          ],
+          {
+            ...DETACHED_STDIO,
+            windowsHide: true,
+            cwd: dirname(process.execPath),
+          },
+        )
+      : spawn("/bin/rm", ["-rf", path], DETACHED_STDIO)
   remover.unref()
   return remover
 }
