@@ -127,4 +127,20 @@ describe("omo-senpi post-edit not-installed guidance (#9223)", () => {
     expect(await appendedTexts(pi, "a.ts", context)).toHaveLength(1)
     expect(await appendedTexts(pi, "b.ts", context)).toHaveLength(1)
   })
+
+  it("#given a missing server #when its guidance is appended #then it reads as a non-blocking note, never 'please fix' (#13126)", async () => {
+    const root = tempRoot("senpi-13126-")
+    const project = join(root, "project")
+    touch(join(project, "package.json"))
+    const pi = setup(project)
+    const texts = await appendedTexts(
+      pi,
+      "src/a.ts",
+      eventContext("session-13126", join(root, "home", ".omo", "agent")),
+    )
+    expect(texts).toHaveLength(1)
+    expect(texts[0]).toContain("LSP note for")
+    expect(texts[0]).toContain("the edit itself is not affected")
+    expect(texts[0]).not.toContain("please fix")
+  })
 })
