@@ -974,6 +974,7 @@
     "packages/omo-senpi/src/components/device-service/registrant-start.ts",
     "packages/omo-senpi/src/components/device-service/runner.ts",
     "packages/omo-senpi/src/components/device-service/runtime.ts",
+    "packages/omo-senpi/src/components/device-service/start-eligibility.ts",
     "packages/omo-senpi/src/components/fallback-architect/architect-gate.ts",
     "packages/omo-senpi/src/components/fallback-architect/detection.ts",
     "packages/omo-senpi/src/components/fallback-architect/directive.ts",

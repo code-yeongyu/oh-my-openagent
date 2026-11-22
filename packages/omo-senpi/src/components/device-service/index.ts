@@ -84,7 +84,8 @@ export function createDeviceServiceComponent(options: DeviceServiceComponentOpti
         if (mode !== "tui" && mode !== "rpc") return undefined
         // Bare engines still register a resolved agent directory even when they cannot bootstrap.
         const canRegister = absolutePath(Reflect.get(Object(eventCtx), "agentDir"))
-        const canBootstrap = mode === "tui" && Reflect.get(Object(eventCtx), "hasUI") === true && absolutePath(env.OMO_BIN)
+        const canBootstrap =
+          mode === "tui" && Reflect.get(Object(eventCtx), "hasUI") === true && absolutePath(env.OMO_BIN)
         if (!canRegister && !canBootstrap) return undefined
         deferUntilAfterFirstPaint(ctx, "device service start", () =>
           loadRuntime().then((runtime) =>

@@ -68,13 +68,7 @@ export async function bootstrapAtStart(
   const omoBin = env.OMO_BIN
   const notify = notifierOf(eventCtx)
   const latch = options.latch ?? processLatch()
-  if (
-    latch.claimed ||
-    omoBin === undefined ||
-    !isAbsolute(omoBin) ||
-    skipsDeviceService(env) ||
-    notify === undefined
-  )
+  if (latch.claimed || omoBin === undefined || !isAbsolute(omoBin) || skipsDeviceService(env) || notify === undefined)
     return
   latch.claimed = true
   const cwd = isRecord(eventCtx) && typeof eventCtx.cwd === "string" ? eventCtx.cwd : process.cwd()
