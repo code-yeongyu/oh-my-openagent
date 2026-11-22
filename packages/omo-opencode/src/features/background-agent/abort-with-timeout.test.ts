@@ -5,11 +5,12 @@ const logMock = mock((..._args: unknown[]) => {})
 mock.module("../../shared/logger", () => ({
   log: logMock,
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 import type { OpencodeClient } from "./opencode-client"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const { abortWithTimeout } = await import("./abort-with-timeout")
-mock.restore()
 
 function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): OpencodeClient {
   return {
