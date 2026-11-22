@@ -17,9 +17,9 @@
  * Everything is bounded and synchronous: a tail read (and the pages of its
  * window) reads the file backward from its end in fixed-size chunks and stops
  * once it holds the window, so its cost follows the window and never the file
- * (a seat transcript reaches hundreds of MB, #14418); status and forward page
- * reads take the whole file line by line, the way the host's own loader reads
- * it. Entries are encoded until the byte budget is spent, and the caller
+ * (a seat transcript reaches hundreds of MB, #14418). Tail windows scan at most
+ * 1 MiB, chosen before opening the file; status only stats it. Forward pages
+ * retain the whole-file loader. Entries are encoded until the byte budget is spent, and the caller
  * receives ONE payload plus an opaque cursor. Nothing streams into the caller.
  *
  * Failures are data (authoring rules R6/R7): every error branch is
@@ -28,7 +28,8 @@
  * this module throws for an expected failure.
  */
 
-import { closeSync, fstatSync, openSync, readSync } from "node:fs"
+import { createHash } from "node:crypto"
+import { closeSync, fstatSync, openSync, readSync, statSync } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
@@ -84,7 +85,7 @@ export type ThreadTranscriptReadOk = {
   readonly items: readonly ThreadTranscriptEntry[]
   /**
    * Entries the source holds in total, independent of the returned slice; null when a tail read of the session file
-   * stopped before the file's start, so the older entries were never counted.
+   * stopped before the file's start, or status did not load the entries.
    */
   readonly total_items: number | null
   readonly truncated: boolean
@@ -196,6 +197,8 @@ function loadJsonlFile(path: string): LoadedSource | "missing" {
 type LoadedTail = LoadedSource & {
   /** The file's size when it was read: every append, truncation or rewrite of another length changes it. */
   readonly size: number
+  /** File identity and the exact lines examined, including skipped lines. */
+  readonly hash: string
   /** Whether the read reached the file's first line, so `entries` is the whole transcript. */
   readonly whole: boolean
 }
@@ -204,22 +207,34 @@ type LoadedTail = LoadedSource & {
  * The file's last `count` entries, read backward from its end in fixed-size chunks (#14418): the bytes read and the
  * entries parsed follow the window, never the file, so an 840 MB transcript answers like a small one. Lines are split
  * on the newline byte, which never occurs inside a UTF-8 sequence, and each is decoded on its own; a line longer than a
- * chunk is assembled once from its chunks. Only the bytes present when the read starts are read, so an append racing
+ * chunk is assembled once from its chunks, up to the 1 MiB scan ceiling. An incomplete line at that ceiling is omitted.
+ * Only the bytes present when the read starts are read, so an append racing
  * the read is the next read's.
  */
-function loadJsonlTail(path: string, count: number): LoadedTail | "missing" {
+function loadJsonlTail(path: string, count: number): LoadedTail | "missing" | "changed" {
+  let snapshot: ReturnType<typeof statSync>
+  try {
+    snapshot = statSync(path)
+  } catch {
+    return "missing"
+  }
+  if (!snapshot.isFile()) return "missing"
+  const size = snapshot.size
+  const floor = Math.max(0, size - THREAD_READ_MAX_BYTES)
+  const hash = createHash("sha256").update(`${snapshot.dev}:${snapshot.ino}:`)
   let descriptor: number | undefined
   try {
     descriptor = openSync(path, "r")
   } catch {
     return "missing"
   }
-  let size = 0
   try {
-    size = fstatSync(descriptor).size
+    const opened = fstatSync(descriptor)
+    if (opened.size !== size || opened.dev !== snapshot.dev || opened.ino !== snapshot.ino) return "changed"
     const newestFirst: ThreadTranscriptEntry[] = []
     let skippedLines = 0
     const take = (line: Buffer): void => {
+      hash.update(line).update("\n")
       const entry = parseLine(line.toString("utf8"))
       if (entry === "skipped") skippedLines += 1
       else if (entry !== "blank") newestFirst.push(entry)
@@ -227,8 +242,8 @@ function loadJsonlTail(path: string, count: number): LoadedTail | "missing" {
     // The bytes after the newest newline found so far that belong to a line whose start is not read yet, oldest first.
     let pending: Buffer[] = []
     let position = size
-    while (newestFirst.length < count && position > 0) {
-      const length = Math.min(READ_CHUNK_BYTES, position)
+    while (newestFirst.length < count && position > floor) {
+      const length = Math.min(READ_CHUNK_BYTES, position - floor)
       position -= length
       const chunk = Buffer.allocUnsafe(length)
       let read = 0
@@ -250,9 +265,9 @@ function loadJsonlTail(path: string, count: number): LoadedTail | "missing" {
     }
     const whole = position === 0 && newestFirst.length < count
     if (whole) take(Buffer.concat(pending))
-    return { entries: newestFirst.reverse(), skippedLines, size, whole }
+    return { entries: newestFirst.reverse(), skippedLines, size, whole, hash: hash.digest("hex") }
   } catch {
-    return { entries: [], skippedLines: 0, size, whole: true }
+    return "changed"
   } finally {
     if (descriptor !== undefined) closeSync(descriptor)
   }
@@ -286,18 +301,18 @@ function revisionOf(entries: readonly ThreadTranscriptEntry[]): string {
 }
 
 /**
- * The revision of a window read from the file's end: the file's size plus the hash of the window's identities. An
- * append or a truncation changes the size, a rewrite inside the window an identity; a same-length rewrite of older
- * entries leaves the window, and so every position the cursor names, unchanged.
+ * The revision binds the file size and identity to every examined line in the bounded window. Content, parent links
+ * and malformed lines participate, so unchanged entry ids cannot hide a rewrite. Same-length edits outside the window
+ * leave the cursor valid.
  */
 function tailRevisionOf(tail: LoadedTail): string {
-  return `${tail.size}.${identityHash(tail.entries)}`
+  return `${tail.size}.${tail.hash}`
 }
 
 /**
  * `forward` continues after `offset` (page mode); `older` pages the entries of a tail window before `before`, down to
  * the window's first entry `floor` (the cursor a tail read issues, #14173); `file_tail` does the same for a window
- * read from the session file's end, whose `count` entries the next page reads again and whose positions count from
+ * read from the session file's end, whose requested `count` the next page reuses and whose positions count from
  * that window's first entry (#14418).
  */
 type Cursor =
@@ -325,13 +340,20 @@ function decodeCursor(raw: string): Cursor | null {
   }
   const [version, revision = "", ...positions] = decoded.split(":")
   if (!/^\d+\.[0-9a-z]+$/.test(revision)) return null
+  if (positions.some((position) => !/^\d+$/.test(position))) return null
   const offsets = positions.map(Number)
   if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
   const [first = 0, second = 0] = offsets
   if (version === CURSOR_VERSION && offsets.length === 1) return { direction: "forward", revision, offset: first }
   if (version === OLDER_CURSOR_VERSION && offsets.length === 2 && second <= first)
     return { direction: "older", revision, before: first, floor: second }
-  if (version === FILE_TAIL_CURSOR_VERSION && offsets.length === 2 && first <= second && second > 0)
+  if (
+    version === FILE_TAIL_CURSOR_VERSION &&
+    offsets.length === 2 &&
+    first <= second &&
+    second > 0 &&
+    second <= THREAD_TAIL_MAX_ITEMS
+  )
     return { direction: "file_tail", revision, before: first, count: second }
   return null
 }
@@ -421,14 +443,49 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       "Call thread_list (tool.thread_list() in an eval cell) to get a current thread value, then read that thread instead.",
     )
 
+  // Status must never open a transcript, even when a cursor is supplied.
+  if (mode === "status") {
+    let totalItems: number | null = null
+    if (source.kind === "jsonl") {
+      try {
+        const metadata = statSync(source.path)
+        if (!metadata.isFile()) return missing(source.path)
+        if (metadata.size === 0) totalItems = 0
+      } catch {
+        return missing(source.path)
+      }
+    }
+    return {
+      kind: "ok",
+      source: source.kind === "jsonl" ? "session_jsonl" : "live_host",
+      source_incomplete: source.kind === "jsonl" && source.live_host_present !== true,
+      mode,
+      items: [],
+      total_items: totalItems,
+      truncated: false,
+      next_cursor: null,
+      encoded_bytes: 0,
+      max_bytes: maxBytes,
+      skipped_lines: 0,
+    }
+  }
+
   // A session file's tail window, or a page of one, reads only the window from the file's end (#14418).
   const fileTail = cursor?.direction === "file_tail" ? cursor : undefined
   if (source.kind === "jsonl" && (mode === "tail" || fileTail !== undefined)) {
-    const tail = loadJsonlTail(source.path, fileTail?.count ?? tailItems)
+    const count = fileTail?.count ?? tailItems
+    const tail = loadJsonlTail(source.path, count)
     if (tail === "missing") return missing(source.path)
+    if (tail === "changed") return stale()
     const revision = tailRevisionOf(tail)
-    if (fileTail !== undefined && (fileTail.revision !== revision || tail.entries.length !== fileTail.count))
+    if (fileTail !== undefined && (fileTail.revision !== revision || fileTail.before > tail.entries.length))
       return stale()
+    if (!tail.whole && tail.entries.length === 0)
+      return fail(
+        "message_too_large",
+        "No complete entry fits in the 1 MiB tail scan window.",
+        'Read with mode "page" and no cursor to start from the file beginning.',
+      )
     const end = fileTail?.before ?? tail.entries.length
     const { selected, encodedBytes } = takeWithinBudget(tail.entries.slice(0, end), maxBytes, "end")
     const start = end - selected.length
@@ -440,10 +497,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       items: selected,
       total_items: tail.whole ? tail.entries.length : null,
       truncated: start > 0,
-      next_cursor:
-        start > 0
-          ? encodeCursor({ direction: "file_tail", revision, before: start, count: tail.entries.length })
-          : null,
+      next_cursor: start > 0 ? encodeCursor({ direction: "file_tail", revision, before: start, count }) : null,
       encoded_bytes: encodedBytes,
       max_bytes: maxBytes,
       skipped_lines: tail.skippedLines,
@@ -480,10 +534,6 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     total_items: entries.length,
     max_bytes: maxBytes,
     skipped_lines: loaded.skippedLines,
-  }
-
-  if (mode === "status") {
-    return { ...base, items: [], truncated: false, next_cursor: null, encoded_bytes: 0 }
   }
 
   const older = mode === "page" && cursor?.direction === "older" ? cursor : undefined
