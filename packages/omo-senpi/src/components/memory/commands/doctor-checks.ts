@@ -8,6 +8,7 @@ import { hostname } from "node:os"
 import { join } from "node:path"
 
 import {
+  GitTimeoutError,
   V1_PERSONA_SEED_SHA256,
   auditMemoryRepo,
   countRuntimePastRetention,
@@ -79,6 +80,56 @@ export function checkRepository(identity: MemoryCommandIdentity): DoctorCheck {
     }
   }
   return { name: "repository", level: "ok", detail: identity.identityPaths.repo }
+}
+
+const INTEGRITY_TIMEOUT_MS = 5_000
+
+export async function checkRepositoryIntegrity(deps: MemoryCommandDeps, repoDir: string): Promise<DoctorCheck> {
+  const name = "repository-integrity"
+  const repairs =
+    `Back up ${repoDir}, including .git and uncommitted files, before attempting repairs. ` +
+    "Recover missing Git metadata or objects from a known-good backup if available. " +
+    "Otherwise, verify the last good commit and run git reset --mixed <last-good-commit> in the repository " +
+    "to keep the working tree. Do not use git reset --hard."
+  const fail = (diagnostic: string): DoctorCheck => ({
+    name,
+    level: "fail",
+    detail: `${diagnostic}; ${repairs}`,
+  })
+  const diagnostic = (result: Awaited<ReturnType<typeof runGit>>): string =>
+    [result.stderr.trim(), result.stdout.trim()].filter(Boolean).join("; ").replace(/\r?\n/g, "; ").slice(0, 2_000) ||
+    `exit ${result.code}`
+  const fsckArgs = ["fsck", "--full", "--no-dangling", "--no-progress"]
+  try {
+    const tree = await runGit(deps, repoDir, ["ls-tree", "-r", "--name-only", "HEAD^{commit}"], INTEGRITY_TIMEOUT_MS)
+    const fsck = await runGit(deps, repoDir, fsckArgs, INTEGRITY_TIMEOUT_MS).catch((error: unknown) => {
+      if (!(error instanceof GitTimeoutError)) throw error
+      return undefined
+    })
+    if (tree.code !== 0) {
+      const fsckDetail = fsck !== undefined && fsck.code !== 0 ? `; git fsck: ${diagnostic(fsck)}` : ""
+      return fail(`HEAD or its tree is unreadable: ${diagnostic(tree)}${fsckDetail}`)
+    }
+    if (fsck !== undefined) {
+      return fsck.code === 0
+        ? { name, level: "ok", detail: "HEAD and its tree are readable; git fsck passed" }
+        : fail(`git fsck: ${diagnostic(fsck)}`)
+    }
+    const connectivity = await runGit(deps, repoDir, [...fsckArgs, "--connectivity-only"], INTEGRITY_TIMEOUT_MS)
+    return connectivity.code === 0
+      ? {
+          name,
+          level: "warn",
+          detail: "HEAD and its tree are readable; connectivity passed, but full git fsck timed out",
+        }
+      : fail(`git fsck --connectivity-only: ${diagnostic(connectivity)}`)
+  } catch (error) {
+    return {
+      name,
+      level: "warn",
+      detail: `could not complete the Git integrity check: ${error instanceof Error ? error.message : String(error)}`,
+    }
+  }
 }
 
 export async function checkFrontmatter(repoDir: string, audit?: MemoryAuditReport): Promise<DoctorCheck[]> {

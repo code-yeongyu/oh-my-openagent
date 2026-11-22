@@ -51,6 +51,11 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
   pi.registerCommand("memory", {
     ...LAZY_MEMORY_COMMANDS.memory,
     handler: async (args: string, ctx: MemoryCommandContext): Promise<string> => {
+      const doctor = args.trimStart().match(/^doctor(?:\s+|$)(.*)$/s)
+      if (doctor?.[1] !== undefined) {
+        const { runDoctor } = await import("#omo-memory-doctor-runtime")
+        return runDoctor(deps, ctx, doctor[1])
+      }
       const identity = requireIdentity(deps, ctx)
       if (typeof identity === "string") return respond(ctx, identity, "error")
 
@@ -61,7 +66,7 @@ export function registerMemoryCommand(pi: MemoryCommandPort, deps: MemoryCommand
       if (parsed.positionals.length > 0) {
         return respond(
           ctx,
-          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory or /memory unlock <lock path>`,
+          `unknown /memory subcommand "${parsed.positionals[0]}"; use /memory, /memory doctor, or /memory unlock <lock path>`,
           "error",
         )
       }

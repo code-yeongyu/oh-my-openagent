@@ -1,12 +1,15 @@
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
+import { join } from "node:path"
 import {
   GitMemoryRepo,
   MemoryBlockCache,
   markMemoryBlock,
   replaceMemoryBlock,
+  stripMemoryBlock,
   type AgreementItem,
   type ExternalProjectionLimits,
 } from "@oh-my-opencode/memory-core"
+import { existsSync } from "@oh-my-opencode/memory-core/fs"
 
 import type { MemoryIdentityContext } from "./context"
 import { newlyExpired } from "./projection-expiry"
@@ -19,6 +22,7 @@ import {
 } from "./projection-pin"
 import { renderMemoryNotice } from "./prompt-notice"
 import { estimateSystemTokensCached, MEMORY_PRESSURE_SOFT_RATIO } from "./status"
+import { readUi } from "./wiring-context"
 
 export {
   MEMORY_AGREEMENT_METADATA_TOKEN,
@@ -84,6 +88,7 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
   const pins = options.pins ?? createProjectionPins()
   const recordPin = options.recordPin ?? (() => undefined)
   const createRepo = options.createRepo ?? defaultCreateRepo
+  const repositoryNoticeSessions = new Set<string>()
   // The pressure estimate is a pure function of the commit, like the compiled block above it. Without
   // this memo every prompt listed the tree and read every system blob again (one git process each):
   // 45 git spawns between Enter and the provider request in a 2.7k-commit identity.
@@ -128,6 +133,32 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     const projection = options.resolveProjectionLimits?.(context.identity)
     return { agentId: context.identity, ...(projection === undefined ? {} : { projection }) }
   }
+  async function project(
+    repo: GitMemoryRepo,
+    session: MemoryPromptSession,
+    context: MemoryIdentityContext,
+    preview: boolean,
+  ) {
+    const head = await repo.head()
+    // A not-yet-initialized identity is normal; a Git repository without HEAD is not.
+    if (head === null && existsSync(join(repo.dir, ".git"))) return undefined
+    const pinInput = { repo, sessionId: session.id, branch: session.branch, head }
+    const turn = preview ? await previewTurn(pins, pinInput) : await pins.advance({ ...pinInput, record: recordPin })
+    const { block, expiries } = await cache.compileWithExpiries(
+      repo,
+      `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`,
+      blockOptions(context),
+      turn.revision,
+      turn.asOfMs,
+    )
+    const pressureBlock = await addMemoryPressureMetadata(
+      block,
+      turn.revision,
+      options.resolveCompileWarnTokens?.(context.identity),
+      (revision) => estimatePressure(repo, revision),
+    )
+    return { turn, expiries, pressureBlock }
+  }
   const handler = async (payload: unknown, eventCtx?: unknown): Promise<BeforeAgentStartEventResult | undefined> => {
     const preview = isRecord(payload) && payload.preview === true
     const systemPrompt = readSystemPrompt(payload)
@@ -137,10 +168,23 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
     const context = options.resolveContext(session.id)
     if (context === undefined) return undefined
 
-    // One HEAD read per prompt: the nudge count, the soul notice and the pin all ask for it, and each read is
-    // a git process (about 10 ms). Each consumer bounds its git ranges by this HEAD, so a commit that lands
-    // during the prompt is seen by the next prompt instead of half-seen by this one.
+    // The projection and notice inputs share one HEAD read. A commit that lands during the
+    // prompt is seen by the next prompt instead of half-seen by this one.
     const repo = withHeadReadOnce(createRepo(context))
+    const ui = !preview && !repositoryNoticeSessions.has(session.id) ? readUi(eventCtx) : undefined
+    // Like the nudge reads (#9667), projection failures must not cross the extension boundary.
+    const projection = await project(repo, session, context, preview).catch(() => undefined)
+    if (projection === undefined) {
+      if (ui !== undefined && !repositoryNoticeSessions.has(session.id)) {
+        repositoryNoticeSessions.add(session.id)
+        ui.notify(
+          `Memory is unavailable: the repository at ${repo.dir} could not be read. Run /memory doctor for repair guidance.`,
+          "warning",
+        )
+      }
+      return { systemPrompt: stripMemoryBlock(systemPrompt) }
+    }
+    const { turn, expiries, pressureBlock } = projection
     // A preview (senpi's prompt-cache prewarm) keeps only the systemPrompt: compose at the revision the
     // real turn will use, and record no pin, consume no watermark, announce no repin. The notice inputs
     // only feed the message a preview discards, so their reads (a git log each) are skipped too.
@@ -155,18 +199,7 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
       : await noticeInput("agreements", session.id, () =>
           options.resolveAgreementsNotice?.(repo, session.id, context.identity),
         )
-    const pinInput = { repo, sessionId: session.id, branch: session.branch, head: await repo.head() }
-    const turn: ProjectionTurn = preview
-      ? await previewTurn(pins, pinInput)
-      : await pins.advance({ ...pinInput, record: recordPin })
     if (turn.repinned !== undefined && turn.repinned !== "first-turn") options.onRepin?.(session.id, turn.repinned)
-    const { block, expiries } = await cache.compileWithExpiries(
-      repo,
-      `${MEMORY_PROMPT_TEMPLATE}:${context.identity}`,
-      blockOptions(context),
-      turn.revision,
-      turn.asOfMs,
-    )
     const expired = preview
       ? []
       : newlyExpired(expiries, {
@@ -175,12 +208,6 @@ export function createMemoryPromptHandler(options: MemoryPromptInjectionOptions)
           nowMs: turn.nowMs,
         })
     if (expired.length > 0) pins.noticeExpiries({ sessionId: session.id, throughMs: turn.nowMs, record: recordPin })
-    const pressureBlock = await addMemoryPressureMetadata(
-      block,
-      turn.revision,
-      options.resolveCompileWarnTokens?.(context.identity),
-      (revision) => estimatePressure(repo, revision),
-    )
     const notice = renderMemoryNotice({
       compactedMessageCount: session.compactedMessageCount,
       nudgeTurns,
