@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { AsyncLocalStorage } from "node:async_hooks"
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -217,6 +218,49 @@ process.stdout.write("builtin/fallback\\n")
 
     // then: the omitted candidate probes both catalogs on each run
     expect((await Bun.file(probeLog).text()).trim().split("\n")).toHaveLength(4)
+  })
+
+  test("a hung catalog still reaches its kill deadline after the triggering session releases its timers", async () => {
+    const item = await fixture(`
+import { writeFileSync } from "node:fs"
+writeFileSync(process.env.PID_FILE, String(process.pid))
+setInterval(() => {}, 60_000)
+`)
+    const pidFile = join(item.root, "catalog.pid")
+    const scope = new AsyncLocalStorage<Set<ReturnType<typeof setTimeout>>>()
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    const original = globalThis.setTimeout
+    globalThis.setTimeout = new Proxy(original, {
+      apply(target, receiver, args) {
+        const timer = Reflect.apply(target, receiver, args)
+        scope.getStore()?.add(timer)
+        return timer
+      },
+    })
+    let identity: Awaited<ReturnType<typeof readPidWhenWritten>> | undefined
+    const warnings: unknown[] = []
+    const probe = scope.run(timers, () =>
+      preflightMemoryModels({
+        candidates,
+        launch: item.launch,
+        env: { PATH: process.env.PATH, PID_FILE: pidFile },
+        configSources: [],
+        timeoutMs: 1_000,
+        warn: (_message, details) => warnings.push(details),
+      }),
+    )
+    try {
+      identity = await readPidWhenWritten(pidFile, 3_000, "fake-senpi.mjs")
+      for (const timer of timers) clearTimeout(timer)
+      expect(timers.size).toBe(0)
+      expect(await probe).toEqual({ kind: "unavailable", candidates })
+      expect(warnings).toContainEqual({ error: "model catalog probe timed out after 1000ms" })
+      expect(pidAlive(identity.pid)).toBe(false)
+    } finally {
+      globalThis.setTimeout = original
+      if (identity !== undefined) killIfAlive(identity)
+      await probe
+    }
   })
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {
