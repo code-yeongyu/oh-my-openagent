@@ -18,6 +18,7 @@ import { reflectionRemediation } from "./remediation"
 import type { ReflectionLauncher } from "./launcher-identity"
 
 export const REFLECTION_HEALTH_ENTRY_TYPE = "senpi-memory.health"
+const REFLECTION_HEALTH_ALERT_THRESHOLD = 3
 
 export interface ReflectionHealthEntry {
   readonly schemaVersion: 1
@@ -98,7 +99,15 @@ export async function emitReflectionHealthAlert(
     includeStreakRunIds: true,
     ...(context?.now === undefined ? {} : { now: context.now }),
   })
-  if (health.streak < 3 || health.fingerprint.length === 0) return false
+  if (
+    health.allDroppedStreak >= REFLECTION_HEALTH_ALERT_THRESHOLD &&
+    (context === undefined || context.observedRunIds.some((runId) => health.allDroppedRunIds?.includes(runId))) &&
+    once(`${live.sessionId}:${identity}:all-dropped`)
+  ) {
+    safeNotify(live, `Memory reflection dropped every entry in ${health.allDroppedStreak} runs in a row.`, "warning")
+    return true
+  }
+  if (health.streak < REFLECTION_HEALTH_ALERT_THRESHOLD || health.fingerprint.length === 0) return false
   if (health.recentFailureFingerprints.filter((item) => item === health.fingerprint).length < 2) return false
   if (context !== undefined && !context.observedRunIds.some((runId) => (health.streakRunIds ?? []).includes(runId)))
     return false

@@ -24,6 +24,7 @@ export async function settleReservationRun(
   const current = parseReservationRunLedger(await readRunJson<unknown>(ledgerPath))
   if (current.runId !== inputLedger.runId) throw new Error("Finalization ledger run id changed")
   const finalizedAt = current.finalizedAt ?? new Date(context.now()).toISOString()
+  const allEntriesDropped = decision.outcome === "no_changes" && (decision.droppedCount ?? 0) > 0
   await updateRunLedger(ledgerPath, {
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
@@ -51,7 +52,7 @@ export async function settleReservationRun(
     const transition = await context.reservation.complete(
       current.runId,
       decision.outcome,
-      failure === undefined ? undefined : { failure },
+      allEntriesDropped ? { allEntriesDropped } : failure === undefined ? undefined : { failure },
     )
     if (transition.launch !== undefined) context.launch?.(transition.launch)
     launch = transition.launch
@@ -86,7 +87,13 @@ export async function settleReservationRun(
         ? { mergedCommitSha: decision.integrationSha }
         : {}),
       ...(current.validatedChangedPaths === undefined ? {} : { filesChanged: current.validatedChangedPaths.length }),
-      consecutiveFailures: decision.outcome === "failed" ? (healthBefore?.streak ?? 0) + 1 : 0,
+      ...(decision.droppedCount === undefined ? {} : { droppedCount: decision.droppedCount }),
+      ...(decision.dropReason === undefined ? {} : { dropReason: decision.dropReason }),
+      consecutiveFailures: allEntriesDropped
+        ? (healthBefore?.streak ?? 0)
+        : decision.outcome === "failed"
+          ? (healthBefore?.streak ?? 0) + 1
+          : 0,
       ...(current.launcher === undefined ? {} : { launcher: current.launcher }),
       delivery: { status: "pending" },
     }))

@@ -1,8 +1,9 @@
 import type {
   MemoryIdentity,
-  ReflectionFailureSignal,
+  ReflectionCompletionOptions,
   ReflectionOutcome,
   ReflectionParkTransition,
+  ReflectionReservationLockOptions,
   ReflectionTranscriptState,
   ReservedRun,
 } from "@oh-my-opencode/memory-core"
@@ -15,20 +16,12 @@ import type { ResolveAndPreflightMemoryLaunch } from "./memory-launch-preflight"
 import type { ReflectionSessionModel, ReflectionThinkingLevel } from "./resolve-model"
 import type { ReflectionSandbox } from "./spawn"
 
-export interface ReflectionReservationLockOptions {
-  readonly waitTimeoutMs?: number
-}
-
-export interface ReflectionReservationCompleteOptions extends ReflectionReservationLockOptions {
-  readonly failure?: ReflectionFailureSignal
-}
-
 export interface ReflectionReservationPort {
   readState(options?: ReflectionReservationLockOptions): Promise<{ readonly active?: ReservedRun }>
   complete(
     runId: string,
     outcome: ReflectionOutcome,
-    options?: ReflectionReservationCompleteOptions,
+    options?: ReflectionCompletionOptions,
   ): Promise<{
     readonly outcome: ReflectionOutcome
     readonly launch?: ReservedRun

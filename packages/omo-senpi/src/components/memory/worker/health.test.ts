@@ -35,6 +35,7 @@ describe("reflection health", () => {
         // then
         expect(health).toEqual({
           streak: 4,
+          allDroppedStreak: 0,
           fingerprint: "child_exit:same detail suffix one",
           lastFailure: {
             runId: "four",
@@ -140,6 +141,7 @@ describe("reflection health", () => {
     // then
     expect(health).toEqual({
       streak: 0,
+      allDroppedStreak: 0,
       fingerprint: "",
       counts: { merged: 0, no_changes: 0, failed: 0, timed_out: 0 },
       pendingCount: 0,

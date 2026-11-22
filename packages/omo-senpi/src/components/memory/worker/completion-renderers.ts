@@ -12,7 +12,7 @@ import { joinFields } from "./entry-renderers"
 import { sanitizeReflectionReport, type ReflectionRecap } from "./reflection-recap"
 
 // Reflection is background housekeeping: the transcript shows it only when memory actually
-// changed, as the same "Remembered" notice a memory tool write draws. Launch, no-change, per-run
+// changed or the completion gate dropped entries. Launch, empty, per-run
 // failure and collapsed-summary entries are still journaled (the data and its RPC events are
 // unchanged) but have no renderer, so they never draw. Repeated failures surface through the
 // health and park alerts instead.
@@ -21,8 +21,39 @@ type ReflectionCompletionEntry = ReflectionCompletionRecord & { readonly recap?:
 
 export const renderReflectionCompletionEntry: EntryRenderer<ReflectionCompletionEntry> = (entry, options, theme) => {
   const record = entry.data
-  if (record?.outcome !== "merged") return undefined
-  return buildNoticeBox(reflectionNoticeSpec(record), options, theme)
+  if (record === undefined) return undefined
+  const droppedCount = record.droppedCount ?? 0
+  const drop =
+    droppedCount > 0
+      ? {
+          title: `Reflection dropped ${droppedCount} memory ${droppedCount === 1 ? "entry" : "entries"}`,
+          why: dropWhy(record.dropReason),
+        }
+      : undefined
+  if (record.outcome !== "merged") {
+    return drop === undefined ? undefined : buildNoticeBox({ ...drop, tone: "warning" }, options, theme)
+  }
+  const spec = reflectionNoticeSpec(record)
+  return buildNoticeBox(
+    drop === undefined
+      ? spec
+      : { ...spec, extra: [...(spec.extra ?? []), { text: `${drop.title}: ${drop.why}`, tone: "warning" }] },
+    options,
+    theme,
+  )
+}
+
+function dropWhy(reason: string | undefined): string {
+  switch (reason) {
+    case "frontmatter":
+      return "The completion gate found invalid frontmatter."
+    case "secret_like_content":
+      return "The completion gate flagged secret-like material or an unsupported file type."
+    case "mixed":
+      return "The completion gate flagged invalid frontmatter and possible secrets or unsupported file types."
+    default:
+      return "The entries did not pass completion validation."
+  }
 }
 
 export function registerReflectionCompletionRenderer(api: ReflectionCompletionApi): void {

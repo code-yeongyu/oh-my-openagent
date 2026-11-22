@@ -65,9 +65,12 @@ export class ReflectionParkFile {
     active: ReservedRun | undefined,
     runId: string,
     outcome: ReflectionOutcome,
-    failure: ReflectionFailureSignal | undefined,
+    options: { readonly failure?: ReflectionFailureSignal; readonly allEntriesDropped?: boolean } | undefined,
   ): Promise<ReflectionParkTransition> {
     const before = await this.read()
+    if (outcome === "no_changes" && options?.allEntriesDropped === true) {
+      return { state: before, parked: isReflectionParked(before), justParked: false }
+    }
     if (outcome === "merged" || outcome === "no_changes") {
       const cleared = clearReflectionPark()
       if (isReflectionParked(before) || before.streak > 0) await this.write(cleared)
@@ -79,7 +82,7 @@ export class ReflectionParkFile {
     const after = applyReflectionParkFailure(before, {
       runId,
       at: this.now().toISOString(),
-      ...(failure ?? { fingerprint: `${outcome}:`, retryable: true }),
+      ...(options?.failure ?? { fingerprint: `${outcome}:`, retryable: true }),
     })
     await this.write(after)
     return {

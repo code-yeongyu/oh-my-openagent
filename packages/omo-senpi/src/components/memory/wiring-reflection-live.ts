@@ -157,6 +157,7 @@ export function createMemoryReflectionLiveWiring(
               pid: process.pid,
               sessionId,
             }),
+            (options.now ?? Date.now)(),
           )
           footerLive.syncActive(sessionId, ui)
           await footerLive.refresh(sessionId, ui)
@@ -260,16 +261,15 @@ async function drainCompletions(
   settle: (identity: string, runId: string) => void,
   healthAlertOnce: (key: string) => boolean,
   currentLauncher: ReturnType<typeof describeReflectionLauncher>,
+  now: number,
 ): Promise<void> {
   const completionsDir = join(identity.identityPaths.reflection, "completions")
-  const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession)
+  const consumed = await consumePendingReflectionCompletions(completionsDir, identity.identity, liveSession, now)
   for (const record of consumed) settle(identity.identity, record.runId)
-  const observedRunIds = consumed
-    .filter((record) => record.outcome !== "merged" && record.outcome !== "no_changes")
-    .map((record) => record.runId)
   await emitReflectionHealthAlert(completionsDir, identity.identity, liveSession, healthAlertOnce, {
-    observedRunIds,
+    observedRunIds: consumed.map((record) => record.runId),
     currentLauncher,
+    now,
   })
   await emitReflectionParkAlert(identity.identityPaths.reflection, identity.identity, liveSession, healthAlertOnce)
 }

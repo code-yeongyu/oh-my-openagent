@@ -21,6 +21,7 @@ import {
 } from "@oh-my-opencode/memory-core"
 
 import { estimateSystemTokens } from "../commands/tokens"
+import { childFailureCause } from "./failure-detail"
 import { readRunJson, readRunTextTail, updateRunLedger, type RunOutcome } from "./run-artifacts"
 import type { DurableFinalizationDecision, RunFinalizationContext } from "./run-finalization-types"
 import { parseReservationRunLedger, worktreeFromLedger, type ReservationRunLedger } from "./reservation-run-ledger"
@@ -59,6 +60,8 @@ export async function resolveFinalizationDecision(
   if (validated === undefined && existsSync(worktree.dir)) {
     await preflightReflectionDescriptions(worktree, ledger.baseSha, worktree.exec, context.warn)
     const validation = await validateCompletion(worktree, ledger.baseSha, worktree.exec)
+    const dropped = "dropped" in validation ? (validation.dropped ?? []) : []
+    const drop = dropMetadata(dropped)
     if (validation.status === "valid") {
       maybeKillAt("after-validate")
       if (ledger.targetDoc !== undefined && pathsOutsideTarget(validation, [ledger.targetDoc]).length > 0) {
@@ -76,16 +79,18 @@ export async function resolveFinalizationDecision(
         finalizePhase: "validated",
         validatedTipSha: validated.tipSha,
         validatedChangedPaths: validated.changedPaths,
+        ...drop,
       })
     } else if (validation.status === "no_changes") {
       // Every entry the run wrote was refused: say so instead of reading as "nothing to do".
       const note = validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
-      const decision = { outcome: "no_changes" as const, ...(note === undefined ? {} : { detail: note }) }
+      const decision = { outcome: "no_changes" as const, ...drop, ...(note === undefined ? {} : { detail: note }) }
       await updateRunLedger(ledgerPath, {
         finalizePhase: "validated",
         validatedTipSha: validation.tipSha,
         validatedChangedPaths: [],
         finalizeOutcome: decision.outcome,
+        ...drop,
         ...(note === undefined ? {} : { finalizeDetail: note }),
       })
       await cleanupAndRecord(context, ledger, runDir)
@@ -134,7 +139,12 @@ export async function resolveFinalizationDecision(
   })
   if (probe.status === "integrated") {
     const budget = await validateIntegratedDreamBudget(context, ledger)
-    const decision = { outcome: "merged" as const, integrationSha: probe.integrationSha, ...budget }
+    const decision = {
+      outcome: "merged" as const,
+      integrationSha: probe.integrationSha,
+      ...ledgerDrop(ledger),
+      ...budget,
+    }
     await checkpointIntegrated(ledgerPath, decision)
     await cleanupAndRecord(context, ledger, runDir)
     return decision
@@ -144,7 +154,7 @@ export async function resolveFinalizationDecision(
     await checkpointDecision(ledgerPath, decision)
     return decision
   }
-  // Read from the validated commit's trailers, so a run resumed after the validated checkpoint still reports them.
+  // Keep the existing diagnostic detail for a partial drop, including for older validated checkpoints.
   const dropped = await readDroppedTrailers(worktree.exec, worktree.dir, ledger.baseSha, validated.tipSha)
   const droppedNote = dropped.length > 0 ? describeDroppedEntries(dropped) : undefined
   const integrated = await integrateValidatedReflection(worktree, {
@@ -158,6 +168,8 @@ export async function resolveFinalizationDecision(
   const budget = integrated.outcome === "merged" ? await validateIntegratedDreamBudget(context, ledger) : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
+    ...dropMetadata(dropped),
+    ...ledgerDrop(ledger),
     ...(integrated.detail === undefined && droppedNote === undefined
       ? {}
       : { detail: [integrated.detail, droppedNote].filter(Boolean).join("; ") }),
@@ -170,6 +182,27 @@ export async function resolveFinalizationDecision(
   return decision
 }
 
+function dropMetadata(
+  entries: readonly { readonly reason: string }[],
+): Pick<DurableFinalizationDecision, "droppedCount" | "dropReason"> {
+  if (entries.length === 0) return {}
+  const causes = entries.map((entry) => childFailureCause(entry.reason))
+  const frontmatter = causes.some((cause) => cause?.startsWith("invalid frontmatter:"))
+  const secret = causes.some((cause) => cause?.startsWith("secret_like_content:"))
+  return {
+    droppedCount: entries.length,
+    dropReason:
+      frontmatter && secret ? "mixed" : frontmatter ? "frontmatter" : secret ? "secret_like_content" : "validation",
+  }
+}
+
+function ledgerDrop(ledger: ReservationRunLedger): Pick<DurableFinalizationDecision, "droppedCount" | "dropReason"> {
+  return {
+    ...(ledger.droppedCount === undefined ? {} : { droppedCount: ledger.droppedCount }),
+    ...(ledger.dropReason === undefined ? {} : { dropReason: ledger.dropReason }),
+  }
+}
+
 function validatedFromLedger(ledger: ReservationRunLedger): ValidatedReflectionTip | undefined {
   return ledger.validatedTipSha === undefined
     ? undefined
@@ -180,6 +213,7 @@ function decisionFromLedger(ledger: ReservationRunLedger): DurableFinalizationDe
   if (ledger.finalizeOutcome === undefined) return undefined
   return {
     outcome: ledger.finalizeOutcome,
+    ...ledgerDrop(ledger),
     ...(ledger.finalizeReason === undefined ? {} : { reason: ledger.finalizeReason }),
     ...(ledger.finalizeDetail === undefined ? {} : { detail: ledger.finalizeDetail }),
     ...(ledger.integrationSha === undefined ? {} : { integrationSha: ledger.integrationSha }),
@@ -189,6 +223,8 @@ function decisionFromLedger(ledger: ReservationRunLedger): DurableFinalizationDe
 async function checkpointDecision(path: string, decision: DurableFinalizationDecision): Promise<void> {
   await updateRunLedger(path, {
     finalizeOutcome: decision.outcome,
+    droppedCount: decision.droppedCount,
+    dropReason: decision.dropReason,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
   })
@@ -198,6 +234,8 @@ async function checkpointIntegrated(path: string, decision: DurableFinalizationD
   await updateRunLedger(path, {
     finalizePhase: "integrated",
     finalizeOutcome: decision.outcome,
+    droppedCount: decision.droppedCount,
+    dropReason: decision.dropReason,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
     integrationSha: decision.integrationSha,
