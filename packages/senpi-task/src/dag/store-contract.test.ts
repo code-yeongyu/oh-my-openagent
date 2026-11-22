@@ -9,6 +9,7 @@ import { join } from "node:path"
 import { createInMemoryDagStore } from "./__fixtures__/in-memory-store"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const projects: string[] = []
 afterAll(() => {
@@ -22,7 +23,7 @@ function fileStore(): DagFileStore {
   // store's stall bound (30 s behind one unchanged holder, #14129) elapses on the next check instead of
   // in real time.
   let virtualNow = 0
-  return createDagFileStore({ project_dir: project }, { fsync: false, now: () => (virtualNow += 3_600_000) })
+  return createDagFileStore(ownedTaskState(project), { fsync: false, now: () => (virtualNow += 3_600_000) })
 }
 
 const RUN_ID = "dag_contract" as DagRunId

@@ -20,6 +20,9 @@ import {
 import * as senpiTask from "./index"
 import { createMinimalSenpiResourceLoader } from "./index"
 import type { AgentResolutionResult, ResolveAgentOptions } from "./index"
+import { useOwnedAgentDir } from "./store/__fixtures__/owned-agent-dir"
+
+useOwnedAgentDir()
 
 function acceptRpcTypes(command: RpcCommand, response: RpcResponse, event: AgentSessionEvent): readonly string[] {
   return [typeof command, typeof response, event.type]

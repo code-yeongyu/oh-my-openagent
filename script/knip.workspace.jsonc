@@ -24,6 +24,7 @@
         "script/check-temp-leak-report-only.mjs",
         "script/ci-fast-path.mjs",
         "script/ci-leg-tests-guard.mjs",
+        "script/ci-shard-coverage.ts",
         "script/desktop-engine-ci-proof.ts",
         "script/desktop-engine-release.ts",
         "script/engine-trust-helper-smoke.ts",
