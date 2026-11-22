@@ -251,11 +251,7 @@ describe("event-bridge task RPC security and bounds", () => {
       }),
     ).resolves.toMatchObject({ kind: "unavailable" })
 
-    await pi.dispatch(
-      "session_shutdown",
-      { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent,
-      {},
-    )
+    await pi.dispatch("session_shutdown", { type: "session_shutdown", reason: "quit" } as SessionShutdownEvent, {})
     await expect(
       invokeRpc("omo.task.send", {
         to: running.task_id,

@@ -41,6 +41,14 @@ export const FULL_DEFAULTS: OmoMemorySettings = {
   },
   project_scope: { nudge: true, recall: true },
   projection: { max_entries_per_directory: 0, max_bytes: 40960 },
+  runtime: {
+    retention_days: 7,
+    abandoned_journal_days: 14,
+    completions_days: 30,
+    pass_budget_ms: 60000,
+    discard_unreflected_journals: false,
+    max_bytes: 2 * 1024 * 1024 * 1024,
+  },
   compile_warn_tokens: 30000,
   agents: {},
 }

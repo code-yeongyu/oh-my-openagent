@@ -26,8 +26,10 @@ ulid.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }
 
-[target.'cfg(target_os = "macos")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
 senpi-desktop-backend-macos = { path = "../senpi-desktop-backend-macos" }
 senpi-desktop-xpc = { path = "../senpi-desktop-xpc" }
 

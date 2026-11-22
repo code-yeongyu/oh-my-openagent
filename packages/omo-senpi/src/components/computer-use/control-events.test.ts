@@ -4,21 +4,17 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { type ChildProcessWithoutNullStreams, spawn } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { join } from "node:path"
 import { createInterface } from "node:readline"
-import { fileURLToPath } from "node:url"
 
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createComputerUseComponent } from "./index"
 
-const FAKE_ENGINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../senpi-desktop-service/test/fake-engine.mjs",
-)
 const RECEIVED = "recv "
 
 class HostApi extends FakeExtensionAPI {
@@ -56,12 +52,16 @@ function homeWith(config: Record<string, unknown> = {}): string {
 /** The method the fake engine reports receiving, from one of its `engine.log` lines. */
 function receivedMethod(line: string): string | undefined {
   const message: unknown = JSON.parse(line)
-  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log") return undefined
+  if (typeof message !== "object" || message === null || !("method" in message) || message.method !== "engine.log")
+    return undefined
   if (!("params" in message) || typeof message.params !== "object" || message.params === null) return undefined
   const text = "message" in message.params ? message.params.message : undefined
   if (typeof text !== "string" || !text.startsWith(RECEIVED)) return undefined
   const received: unknown = JSON.parse(text.slice(RECEIVED.length))
-  return typeof received === "object" && received !== null && "method" in received && typeof received.method === "string"
+  return typeof received === "object" &&
+    received !== null &&
+    "method" in received &&
+    typeof received.method === "string"
     ? received.method
     : undefined
 }
@@ -69,7 +69,7 @@ function receivedMethod(line: string): string | undefined {
 function fakeEngine(): { readonly factory: ChildFactory; readonly methods: string[] } {
   const methods: string[] = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+    const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
       env: { ...process.env, FAKE_ENGINE_DESKTOP: "1" },
       stdio: "pipe",
     })

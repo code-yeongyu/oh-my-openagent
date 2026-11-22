@@ -7,23 +7,32 @@ import type { PluginContext } from "./types"
 type ToolPermissions = NonNullable<NativePromptContext["toolPermissions"]>
 
 const sessionToolPermissionsSchema = z.object({
-  permission: z.array(z.object({
-    permission: z.string(),
-    pattern: z.string(),
-    action: z.enum(["allow", "ask", "deny"]),
-  })).optional(),
+  permission: z
+    .array(
+      z.object({
+        permission: z.string(),
+        pattern: z.string(),
+        action: z.enum(["allow", "ask", "deny"]),
+      }),
+    )
+    .optional(),
 })
 
 const sessionEventSchema = z.object({
   type: z.string(),
-  properties: z.object({ info: z.object({ id: z.string() }).passthrough() }).passthrough().optional(),
+  properties: z
+    .object({ info: z.object({ id: z.string() }).passthrough() })
+    .passthrough()
+    .optional(),
 })
 
 function toToolPermissions(data: unknown): ToolPermissions | undefined {
   const session = sessionToolPermissionsSchema.safeParse(data)
   if (!session.success) return undefined
   return (session.data.permission ?? []).map((rule) => ({
-    pattern: rule.permission, permission: rule.action, scope: rule.pattern,
+    pattern: rule.permission,
+    permission: rule.action,
+    scope: rule.pattern,
   }))
 }
 
@@ -36,14 +45,16 @@ export function createSessionToolPermissionLookup(ctx: PluginContext) {
     if (cached) return cached
     const sessionsApi = ctx.client.session
     if (!sessionsApi?.get) return undefined
-    const response = await sessionsApi.get({
-      path: { id: sessionID },
-      query: { directory: ctx.directory },
-      signal: AbortSignal.timeout(3000),
-    }).catch((error: unknown) => {
-      log("[native-prompt] Could not refresh session tool permissions", { sessionID, error })
-      return undefined
-    })
+    const response = await sessionsApi
+      .get({
+        path: { id: sessionID },
+        query: { directory: ctx.directory },
+        signal: AbortSignal.timeout(3000),
+      })
+      .catch((error: unknown) => {
+        log("[native-prompt] Could not refresh session tool permissions", { sessionID, error })
+        return undefined
+      })
     if (!response?.data) return undefined
     const permissions = toToolPermissions(response.data)
     if (permissions) bySession.set(sessionID, permissions)

@@ -5,7 +5,14 @@ import { dirname, join } from "node:path"
 import { getTelemetryDiagnosticsFilePath, writeTelemetryDiagnostic } from "./diagnostics"
 import { createOtlpTelemetryTransport } from "./otlp-entry"
 import { createBatchId } from "./otlp-spool-dir"
-import { createSpoolRoot, spoolNames, TEST_SCOPE, testResource, testWireProjection, TEST_SPANS } from "./otlp-test-support"
+import {
+  createSpoolRoot,
+  spoolNames,
+  TEST_SCOPE,
+  testResource,
+  testWireProjection,
+  TEST_SPANS,
+} from "./otlp-test-support"
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -36,7 +43,9 @@ describe("an opt-out purge that cannot delete its own spool file reports it as a
         spoolDir,
         spoolRoot: dirname(spoolDir),
         resource: testResource(),
-        scope: TEST_SCOPE, project: testWireProjection, spans: TEST_SPANS,
+        scope: TEST_SCOPE,
+        project: testWireProjection,
+        spans: TEST_SPANS,
         env: { DO_NOT_TRACK: "1" },
         diagnostics: (input) => writeTelemetryDiagnostic(input, { diagnosticsDir }),
         autoStart: false,

@@ -34,7 +34,10 @@ setDefaultTimeout(packageLayoutTestTimeoutMs)
 let fixtureRoot = ""
 
 class PackDryRunError extends Error {
-  constructor(readonly exitCode: number, readonly stderr: string) {
+  constructor(
+    readonly exitCode: number,
+    readonly stderr: string,
+  ) {
     super(`bun pm pack --dry-run --ignore-scripts failed with exit code ${exitCode}: ${stderr}`)
     this.name = "PackDryRunError"
   }
@@ -91,7 +94,9 @@ function writeFixtureFile(packagePath: string, content: string): void {
 }
 
 function skillContent(name: string): string {
-  return ["---", `name: ${name}`, "description: Fixture skill for package layout exclusion tests.", "---", ""].join("\n")
+  return ["---", `name: ${name}`, "description: Fixture skill for package layout exclusion tests.", "---", ""].join(
+    "\n",
+  )
 }
 
 function writePackageFixture(): void {
@@ -125,30 +130,42 @@ describe("published package layout exclusions", () => {
     rmSync(fixtureRoot, { recursive: true, force: true })
   })
 
-  test("#given internal-only skill assets #when packing package #then forbidden skill assets do not ship", async () => {
-    // given
-    for (const packagePath of fakeInternalSkillArtifactPaths) {
-      expect(readFileSync(join(fixtureRoot, packagePath), "utf8")).toStartWith("---\n")
-    }
+  test(
+    "#given internal-only skill assets #when packing package #then forbidden skill assets do not ship",
+    async () => {
+      // given
+      for (const packagePath of fakeInternalSkillArtifactPaths) {
+        expect(readFileSync(join(fixtureRoot, packagePath), "utf8")).toStartWith("---\n")
+      }
 
-    // when
-    const packedPaths = await packDryRunPaths()
+      // when
+      const packedPaths = await packDryRunPaths()
 
-    // then
-    const packedInternalSkillPaths = fakeInternalSkillArtifactPaths.filter((packagePath) => packedPaths.has(packagePath))
-    expect(packedInternalSkillPaths).toEqual([])
-    const missingControlPaths = shippedControlArtifactPaths.filter((packagePath) => !packedPaths.has(packagePath))
-    expect(missingControlPaths).toEqual([])
-  }, { timeout: 20_000 })
+      // then
+      const packedInternalSkillPaths = fakeInternalSkillArtifactPaths.filter((packagePath) =>
+        packedPaths.has(packagePath),
+      )
+      expect(packedInternalSkillPaths).toEqual([])
+      const missingControlPaths = shippedControlArtifactPaths.filter((packagePath) => !packedPaths.has(packagePath))
+      expect(missingControlPaths).toEqual([])
+    },
+    { timeout: 20_000 },
+  )
 
-  test("#given internal-only command assets #when packing package #then forbidden command assets do not ship", async () => {
-    // when
-    const packedPaths = await packDryRunPaths()
+  test(
+    "#given internal-only command assets #when packing package #then forbidden command assets do not ship",
+    async () => {
+      // when
+      const packedPaths = await packDryRunPaths()
 
-    // then
-    const packedInternalCommandPaths = fakeInternalCommandArtifactPaths.filter((packagePath) => packedPaths.has(packagePath))
-    expect(packedInternalCommandPaths).toEqual([])
-    const missingControlPaths = shippedControlArtifactPaths.filter((packagePath) => !packedPaths.has(packagePath))
-    expect(missingControlPaths).toEqual([])
-  }, { timeout: 20_000 })
+      // then
+      const packedInternalCommandPaths = fakeInternalCommandArtifactPaths.filter((packagePath) =>
+        packedPaths.has(packagePath),
+      )
+      expect(packedInternalCommandPaths).toEqual([])
+      const missingControlPaths = shippedControlArtifactPaths.filter((packagePath) => !packedPaths.has(packagePath))
+      expect(missingControlPaths).toEqual([])
+    },
+    { timeout: 20_000 },
+  )
 })

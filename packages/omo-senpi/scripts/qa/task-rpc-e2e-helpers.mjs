@@ -62,7 +62,9 @@ export function childSessionJsonlExists(stateDir, taskId) {
   const dir = join(stateDir, "children", taskId, "sessions", taskId)
   if (!existsSync(dir)) return false
   const walk = (root) =>
-    readdirSync(root, { withFileTypes: true }).some((e) => (e.isDirectory() ? walk(join(root, e.name)) : e.name.endsWith(".jsonl")))
+    readdirSync(root, { withFileTypes: true }).some((e) =>
+      e.isDirectory() ? walk(join(root, e.name)) : e.name.endsWith(".jsonl"),
+    )
   return walk(dir)
 }
 
@@ -82,7 +84,11 @@ export function analyzeRpcRouting(records) {
   const reason = routed
     ? undefined
     : `execution_mode=${record.execution_mode} pid=${hasPid} spawnPathFailure=${spawnPathFailure} status=${record.status}`
-  return { routed, reason, facts: { task_id: record.task_id, pid: record.pid, status: record.status, error_excerpt: message.slice(0, 160) } }
+  return {
+    routed,
+    reason,
+    facts: { task_id: record.task_id, pid: record.pid, status: record.status, error_excerpt: message.slice(0, 160) },
+  }
 }
 
 // The forward-correct spawn assertion (plan todo-27 scenario 1): a real rpc-process child is proven when
@@ -101,7 +107,18 @@ export function analyzeSpawn(records, stateDir) {
   const reason = pass
     ? undefined
     : `execution_mode=${record.execution_mode} pid=${pid ?? "absent"} sessionJsonl=${sessionJsonl} residency=${record.residency_state}`
-  return { pass, reason, facts: { task_id: record.task_id, execution_mode: record.execution_mode, pid, sessionJsonl, residency_state: record.residency_state }, record }
+  return {
+    pass,
+    reason,
+    facts: {
+      task_id: record.task_id,
+      execution_mode: record.execution_mode,
+      pid,
+      sessionJsonl,
+      residency_state: record.residency_state,
+    },
+    record,
+  }
 }
 
 export function eventsMentionSteerAck(events) {
@@ -120,14 +137,32 @@ export function statusSnapshots(events) {
   return snaps
 }
 
+const isRpcChildRecord = (record) => record.execution_mode === "process" && typeof record.pid === "number"
+
 export function recordRpcChildPids(records) {
-  return records
-    .filter((record) => record.execution_mode === "process" && typeof record.pid === "number")
-    .map((record) => record.pid)
+  return records.filter(isRpcChildRecord).map((record) => record.pid)
 }
 
-export function liveRecordRpcChildPids(records) {
-  return recordRpcChildPids(records).filter(pidAlive)
+/**
+ * Splits the live recorded RPC child pids into `survivors` (still our child: a leak) and `reused` (#14529). A record's
+ * `updated_at` is the last moment its owner wrote it while holding the child (the park after teardown), so a process
+ * created AFTER it cannot be that child: the pid was freed and handed to an unrelated process, which is neither a
+ * leak nor ours to kill. A live pid whose start time cannot be read counts as a survivor, so a real leak is never
+ * explained away.
+ */
+export async function survivingRecordedChildren(records, { isAlive = pidAlive, startMs } = {}) {
+  const readStartMs = startMs ?? (await import("./task-rpc-process-start.mjs")).readProcessStartMs
+  const survivors = []
+  const reused = []
+  for (const record of records.filter(isRpcChildRecord)) {
+    if (!isAlive(record.pid)) continue
+    const parkedAtMs = Date.parse(record.updated_at)
+    const startedAtMs = await readStartMs(record.pid)
+    const fact = { pid: record.pid, task_id: record.task_id, startedAtMs, parkedAtMs }
+    if (startedAtMs !== null && startedAtMs > parkedAtMs) reused.push(fact)
+    else survivors.push(fact)
+  }
+  return { survivors, reused }
 }
 
 export function pidAlive(pid) {

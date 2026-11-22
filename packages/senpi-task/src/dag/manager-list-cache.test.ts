@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { createDagManager, type DagRunRecordV1 } from "./manager"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "ses_parent"
@@ -39,10 +40,20 @@ function countingStore(base: DagFileStore): CountingStore {
       return base.readCheckpoint<T>(runId)
     },
   }
-  return { store, reads: () => reads, reset: () => { reads = 0 } }
+  return {
+    store,
+    reads: () => reads,
+    reset: () => {
+      reads = 0
+    },
+  }
 }
 
-async function seedRuns(dag: ReturnType<typeof createDagManager>, sessionId: string, count: number): Promise<DagRunId[]> {
+async function seedRuns(
+  dag: ReturnType<typeof createDagManager>,
+  sessionId: string,
+  count: number,
+): Promise<DagRunId[]> {
   const ids: DagRunId[] = []
   for (let index = 0; index < count; index += 1) {
     const started = await dag.start({
@@ -61,7 +72,7 @@ async function seedRuns(dag: ReturnType<typeof createDagManager>, sessionId: str
 
 test("list() serves unchanged checkpoints without re-parsing the runs directory", async () => {
   const project = tempProject()
-  const base = createDagFileStore({ project_dir: project })
+  const base = createDagFileStore(ownedTaskState(project))
   const counting = countingStore(base)
   const dag = createDagManager({ store: counting.store })
   await seedRuns(dag, parentSessionId, 4)
@@ -78,7 +89,7 @@ test("list() serves unchanged checkpoints without re-parsing the runs directory"
 
 test("list() re-reads only the checkpoint whose file changed and reports its new status", async () => {
   const project = tempProject()
-  const base = createDagFileStore({ project_dir: project })
+  const base = createDagFileStore(ownedTaskState(project))
   const counting = countingStore(base)
   const dag = createDagManager({ store: counting.store })
   const [first, second] = await seedRuns(dag, parentSessionId, 2)
@@ -98,7 +109,7 @@ test("list() re-reads only the checkpoint whose file changed and reports its new
 
 test("list() drops a run whose checkpoint was pruned from the directory", async () => {
   const project = tempProject()
-  const base = createDagFileStore({ project_dir: project })
+  const base = createDagFileStore(ownedTaskState(project))
   const counting = countingStore(base)
   const dag = createDagManager({ store: counting.store })
   const [kept, pruned] = await seedRuns(dag, parentSessionId, 2)

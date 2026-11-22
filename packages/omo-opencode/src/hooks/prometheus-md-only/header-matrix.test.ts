@@ -46,14 +46,20 @@ describe("B1 320 executor header combinations", () => {
                   ...(mixed ? [`*** Add File:${allowed}`, "+plan"] : []),
                   ...(operation === "Move to" ? [`*** Update File:${source}`] : []),
                   `*** ${operation}:${space}${target}${suffix}`,
-                  ...(operation === "Delete File" ? [] : operation === "Add File" ? ["+after"] : ["@@", "-before", "+after"]),
+                  ...(operation === "Delete File"
+                    ? []
+                    : operation === "Add File"
+                      ? ["+after"]
+                      : ["@@", "-before", "+after"]),
                   "*** End Patch",
                 ].join(newline)
                 const hunks = parsePatch(patchText).hunks
                 expect(hunks).toHaveLength(mixed ? 2 : 1)
-                expect(hunks.at(-1)).toMatchObject(operation === "Move to"
-                  ? { type: "update", path: source, move_path: target }
-                  : { type: operation.split(" ")[0].toLowerCase(), path: target })
+                expect(hunks.at(-1)).toMatchObject(
+                  operation === "Move to"
+                    ? { type: "update", path: source, move_path: target }
+                    : { type: operation.split(" ")[0].toLowerCase(), path: target },
+                )
                 const output = { args: { patchText } }
                 const hook = createPrometheusMdOnlyHook({ directory: root, client: {} } as never)
                 let permitted = false
@@ -71,8 +77,7 @@ describe("B1 320 executor header combinations", () => {
                 if (permitted) {
                   const executed = parsePatch(output.args.patchText).hunks.at(-1)
                   const expected = join(realpathSync.native(root), allowed)
-                  expect(executed).toMatchObject(operation === "Move to"
-                    ? { move_path: expected } : { path: expected })
+                  expect(executed).toMatchObject(operation === "Move to" ? { move_path: expected } : { path: expected })
                 }
               })
             }
@@ -89,16 +94,21 @@ describe("B1 320 executor header combinations", () => {
         mkdirSync(join(root, "src/deep"), { recursive: true })
         symlinkSync(relative(join(root, planning), join(root, "src/deep")), join(root, planning, "redirect"), "dir")
         const patchText = [
-          "*** Begin Patch", `*** Add File:${allowed}`, "+plan",
+          "*** Begin Patch",
+          `*** Add File:${allowed}`,
+          "+plan",
           `*** Update File:${planning}/source.md`,
           `*** Move to:${planning}/redirect/../escaped.md${suffix}`,
-          "@@", "-before", "+after", "*** End Patch",
+          "@@",
+          "-before",
+          "+after",
+          "*** End Patch",
         ].join("\n")
         expect(parsePatch(patchText).hunks).toHaveLength(2)
         const hook = createPrometheusMdOnlyHook({ directory: root, client: {} } as never)
-        await expect(invokeBefore(hook,
-          { tool: "apply_patch", sessionID, callID: "mixed-move" }, { args: { patchText } },
-        )).rejects.toThrow("File operations restricted")
+        await expect(
+          invokeBefore(hook, { tool: "apply_patch", sessionID, callID: "mixed-move" }, { args: { patchText } }),
+        ).rejects.toThrow("File operations restricted")
       })
     }
   }

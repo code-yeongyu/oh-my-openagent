@@ -91,11 +91,7 @@ describe("resolveSkillContent — nativeSkills integration", () => {
   })
 
   it("#given runtime/base misses and native has a user normal-path skill #when delegate load_skills resolves #then returns native content", async () => {
-    const native = makeNativeSkill(
-      "user-normal-skill",
-      "User normal-path skill",
-      "USER_NORMAL_BODY",
-    )
+    const native = makeNativeSkill("user-normal-skill", "User normal-path skill", "USER_NORMAL_BODY")
     const nativeSkills = makeNativeAccessor([native])
 
     const result = await resolveSkillContent(["user-normal-skill"], {
@@ -117,11 +113,7 @@ describe("resolveSkillContent — nativeSkills integration", () => {
       join(skillsDir, "SKILL.md"),
       "---\nname: shared-name-test-skill\ndescription: from disk\n---\nOMO_DISK_BODY",
     )
-    const native = makeNativeSkill(
-      "shared-name-test-skill",
-      "from native",
-      "NATIVE_BODY",
-    )
+    const native = makeNativeSkill("shared-name-test-skill", "from native", "NATIVE_BODY")
     const nativeSkills = makeNativeAccessor([native])
 
     // when
@@ -177,11 +169,7 @@ describe("resolveSkillContent — nativeSkills integration", () => {
 
   it("#given preloaded native skill entries #when resolved #then uses them without calling nativeSkills again", async () => {
     // given
-    const native = makeNativeSkill(
-      "preloaded-native-skill",
-      "preloaded desc",
-      "PRELOADED_NATIVE_BODY",
-    )
+    const native = makeNativeSkill("preloaded-native-skill", "preloaded desc", "PRELOADED_NATIVE_BODY")
     const nativeSkills = {
       all: mock(() => {
         throw new Error("nativeSkills.all should not be called")
@@ -205,11 +193,7 @@ describe("resolveSkillContent — nativeSkills integration", () => {
 
   it("#given a disabled native skill #when delegate load_skills requests it #then it is unavailable", async () => {
     // given
-    const native = makeNativeSkill(
-      "blocked-native-skill",
-      "blocked desc",
-      "DELEGATE_BYPASS_CONFIRMED",
-    )
+    const native = makeNativeSkill("blocked-native-skill", "blocked desc", "DELEGATE_BYPASS_CONFIRMED")
     const nativeSkills = makeNativeAccessor([native])
 
     // when

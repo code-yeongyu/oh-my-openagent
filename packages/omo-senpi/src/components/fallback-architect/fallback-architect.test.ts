@@ -37,7 +37,8 @@ function policyRejectionMessage(): Record<string, unknown> {
   return {
     role: "assistant",
     stopReason: "error",
-    errorMessage: "This request triggered restrictions on request content and was blocked under Anthropic's Usage Policy.",
+    errorMessage:
+      "This request triggered restrictions on request content and was blocked under Anthropic's Usage Policy.",
   }
 }
 
@@ -111,7 +112,9 @@ describe("fallback-architect component", () => {
 
       it("#then it registers a renderer for the visible notice message", async () => {
         const pi = await setup()
-        expect(pi.messageRenderers.map((registration) => registration.customType)).toContain(FALLBACK_ARCHITECT_NOTICE_TYPE)
+        expect(pi.messageRenderers.map((registration) => registration.customType)).toContain(
+          FALLBACK_ARCHITECT_NOTICE_TYPE,
+        )
       })
     })
   })

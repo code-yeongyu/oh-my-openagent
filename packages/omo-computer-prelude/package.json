@@ -1,0 +1,22 @@
+{
+	"name": "@oh-my-opencode/omo-computer-prelude",
+	"version": "0.1.0",
+	"type": "module",
+	"private": true,
+	"description": "Generated JS and Python kernel globals of the computer-use v3 SDK",
+	"exports": {
+		".": {
+			"types": "./src/index.ts",
+			"import": "./src/index.ts"
+		}
+	},
+	"types": "./src/index.ts",
+	"scripts": {
+		"typecheck": "tsgo --noEmit -p tsconfig.json",
+		"test": "vitest --run test"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.2",
+		"vitest": "5.0.1"
+	}
+}

@@ -27,15 +27,21 @@ const TRACE_FILE_PID = /-P([0-9a-f]+)$/i
 let gitTrace: { readonly dir: string; readonly previous: string | undefined; depth: number } | undefined
 
 export async function cleanupReconciliationFixtures(): Promise<void> {
-  await Promise.all(roots.splice(0).map((root) =>
-    rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })
-  ))
+  await Promise.all(
+    roots
+      .splice(0)
+      .map((root) => rmEfaultTolerant(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 })),
+  )
 }
 
 export async function reconciliationFixture(trigger: "step-count" | "dream" = "step-count") {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reconcile-")))
   roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
   const repo = new GitMemoryRepo({ dir: identity.paths.repo, agentId: identity.id })
   await repo.init({ seedFiles: [{ relativePath: "system/base.md", content: "---\ndescription: Base\n---\nbase\n" }] })
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
@@ -74,7 +80,7 @@ export async function reconciliationFixture(trigger: "step-count" | "dream" = "s
     runId: reserved.run.runId,
     category: "quick",
     conversationIds: ["conversation-a"],
-    kind: trigger === "dream" ? "dream" as const : "reflection" as const,
+    kind: trigger === "dream" ? ("dream" as const) : ("reflection" as const),
     trigger,
     ...(trigger === "dream" ? { origin: "shutdown" as const } : {}),
     startedAt: "2026-08-10T00:00:00.000Z",
@@ -108,11 +114,13 @@ export async function retireRunGeneration(
   await writeRunJsonAtomic(join(item.runDir, "ledger.json"), {
     ...item.ledger,
     startedAt: new Date(Date.parse(finishedAt) - 1_000).toISOString(),
-    ...(terminal === "final" ? {
-      finalizePhase: "settled",
-      finalizeOutcome: "merged",
-      finalizedAt: finishedAt,
-    } : {}),
+    ...(terminal === "final"
+      ? {
+          finalizePhase: "settled",
+          finalizeOutcome: "merged",
+          finalizedAt: finishedAt,
+        }
+      : {}),
   })
   await writeRunJsonAtomic(join(item.runDir, `${terminal}.json`), {
     version: 1,
@@ -124,23 +132,18 @@ export async function retireRunGeneration(
 }
 
 /** Queues a second request so a reclaimed reservation has something to promote. */
-export async function queuePendingReservation(
-  item: Awaited<ReturnType<typeof reconciliationFixture>>,
-): Promise<void> {
+export async function queuePendingReservation(item: Awaited<ReturnType<typeof reconciliationFixture>>): Promise<void> {
   const pending: ReservedRun = {
     runId: "run-pending",
     request: { trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] },
   }
-  await writeFile(
-    join(item.identity.paths.reflection, "pending.json"),
-    `${JSON.stringify(pending, null, 2)}\n`,
-    { encoding: "utf8", mode: 0o600 },
-  )
+  await writeFile(join(item.identity.paths.reflection, "pending.json"), `${JSON.stringify(pending, null, 2)}\n`, {
+    encoding: "utf8",
+    mode: 0o600,
+  })
 }
 
-export async function commitOrphanWorktree(
-  item: Awaited<ReturnType<typeof reconciliationFixture>>,
-): Promise<void> {
+export async function commitOrphanWorktree(item: Awaited<ReturnType<typeof reconciliationFixture>>): Promise<void> {
   await mkdir(join(item.worktree.dir, "system"), { recursive: true })
   await writeFile(join(item.worktree.dir, "system", "orphan.md"), "---\ndescription: Orphan\n---\nrecovered\n")
   await item.worktree.exec.run(["add", "system/orphan.md"], { cwd: item.worktree.dir, timeoutMs: 30_000 })
@@ -176,9 +179,11 @@ export async function withinPhase<T>(phase: string, operation: () => Promise<T>)
           schedule()
           return
         }
-        reject(new Error(
-          `${phase} stalled: no git progress for ${PHASE_IDLE_MS} ms (${Math.round(performance.now() - startedAt)} ms elapsed)`,
-        ))
+        reject(
+          new Error(
+            `${phase} stalled: no git progress for ${PHASE_IDLE_MS} ms (${Math.round(performance.now() - startedAt)} ms elapsed)`,
+          ),
+        )
       }
       // A check that throws (the trace directory removed under it) fails the phase, never the process.
       const schedule = (): void => {

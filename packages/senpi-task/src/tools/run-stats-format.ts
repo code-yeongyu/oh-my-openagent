@@ -16,7 +16,10 @@ export function formatRunDuration(durationMs: number): string {
 // Spend reads immediately before throughput so the money fact and the speed fact stay adjacent.
 export function runStatsSuffix(stats: TaskRunStats | undefined): string {
   if (stats === undefined) return ""
-  const parts = [`ran ${formatRunDuration(stats.runtime_ms)}`, `${stats.tool_calls} ${stats.tool_calls === 1 ? "tool" : "tools"}`]
+  const parts = [
+    `ran ${formatRunDuration(stats.runtime_ms)}`,
+    `${stats.tool_calls} ${stats.tool_calls === 1 ? "tool" : "tools"}`,
+  ]
   const spend = formatRunSpend(stats)
   if (spend !== undefined) parts.push(spend)
   if (stats.tokens_per_second !== undefined) parts.push(`${stats.tokens_per_second} tok/s`)
@@ -27,7 +30,10 @@ export function runStatsSuffix(stats: TaskRunStats | undefined): string {
 // Same grammar as runStatsSuffix but without throughput: a result card reads as a result, not a debug row.
 export function runStatsCardSummary(stats: TaskRunStats | undefined): string {
   if (stats === undefined) return ""
-  const parts = [`ran ${formatRunDuration(stats.runtime_ms)}`, `${stats.tool_calls} ${stats.tool_calls === 1 ? "tool" : "tools"}`]
+  const parts = [
+    `ran ${formatRunDuration(stats.runtime_ms)}`,
+    `${stats.tool_calls} ${stats.tool_calls === 1 ? "tool" : "tools"}`,
+  ]
   const spend = stats.cost_usd === 0 ? undefined : formatRunSpend(stats)
   if (spend !== undefined) parts.push(spend)
   return parts.map((part) => ` · ${part}`).join("")

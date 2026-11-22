@@ -90,8 +90,9 @@ Start from this, not from memory. It is engine-agnostic and carries the packages
 
 ```latex
 \usepackage{fontspec}
-\setmainfont{Noto Serif CJK KR}      % or Pretendard, Noto Sans CJK KR — whatever fc-list proves exists
+\usepackage{xeCJK}
 \setmainfont{Latin Modern Roman}     % optional: keep Latin in the report's serif
+\setCJKmainfont{Noto Serif CJK KR}   % or Pretendard, Noto Sans CJK KR — whatever fc-list proves exists
 ```
 
 Fonts, colors, and heading style come from `design-spec.md` when one exists — one palette and one font family govern prose, charts, and diagrams alike; a figure in a random default font inside a styled report is a defect.

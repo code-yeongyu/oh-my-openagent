@@ -59,7 +59,7 @@ HTTPS_PROXY=http://127.0.0.1:8888 SSL_CERT_FILE=~/.mitmproxy/mitmproxy-ca-cert.p
 ```bash
 # DYLD_INSERT_LIBRARIES / LD_PRELOAD shim approach
 # Wrap the network call to log payload, return a fake 200
-# See pwntools.md for shim examples
+# See ../runtimes/native-binary.md (DYLD_INSERT_LIBRARIES interception; "Option C: Wrap / shim") for shim examples
 ```
 
 **Strength**: Wire-level ground truth, but requires the target to honor your proxy / preload.

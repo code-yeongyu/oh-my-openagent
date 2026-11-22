@@ -48,17 +48,19 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
     const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
     const client = {
       session: {
-        messages: mock(() => Promise.resolve({
-          data: [
-            {
-              info: { id: "msg-1" },
-              parts: [
-                { type: "tool_result", text: "done" },
-                { type: "text", text: "" },
-              ],
-            },
-          ],
-        })),
+        messages: mock(() =>
+          Promise.resolve({
+            data: [
+              {
+                info: { id: "msg-1" },
+                parts: [
+                  { type: "tool_result", text: "done" },
+                  { type: "text", text: "" },
+                ],
+              },
+            ],
+          }),
+        ),
       },
     } as never
     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-1"])
@@ -75,17 +77,19 @@ describe("sanitizeEmptyMessagesBeforeSummarize", () => {
     const { sanitizeEmptyMessagesBeforeSummarize, PLACEHOLDER_TEXT } = await messageBuilderModulePromise
     const client = {
       session: {
-        messages: mock(() => Promise.resolve({
-          data: [
-            {
-              info: { id: "msg-2" },
-              parts: [
-                { type: "tool_use", text: "call" },
-                { type: "text", text: "" },
-              ],
-            },
-          ],
-        })),
+        messages: mock(() =>
+          Promise.resolve({
+            data: [
+              {
+                info: { id: "msg-2" },
+                parts: [
+                  { type: "tool_use", text: "call" },
+                  { type: "text", text: "" },
+                ],
+              },
+            ],
+          }),
+        ),
       },
     } as never
     findMessagesWithEmptyTextPartsFromSDK.mockResolvedValue(["msg-2"])

@@ -3,12 +3,7 @@ import { dirname, join, resolve } from "node:path"
 import { escapeRegExp, findTomlSection, removeSetting } from "./toml-section-editor"
 
 const LEGACY_AGENT_CONFLICT_KEYS = ["max_threads"] as const
-const PROJECT_LOCAL_ARTIFACT_PATHS = [
-  ".codex/hooks.json",
-  ".codex/agents",
-  ".codex/prompts",
-  ".codex/skills",
-] as const
+const PROJECT_LOCAL_ARTIFACT_PATHS = [".codex/hooks.json", ".codex/agents", ".codex/prompts", ".codex/skills"] as const
 
 type LegacyAgentConflictKey = (typeof LEGACY_AGENT_CONFLICT_KEYS)[number]
 
@@ -112,7 +107,7 @@ function uniqueRemovedKeys(configs: readonly ProjectLocalCodexConfigCleanup[]): 
 }
 
 function lastValue<T>(values: readonly T[]): T | null {
-  return values.length > 0 ? values[values.length - 1] ?? null : null
+  return values.length > 0 ? (values[values.length - 1] ?? null) : null
 }
 
 export function repairProjectLocalCodexConfigText(config: string): {
@@ -205,7 +200,9 @@ function artifactRootsForConfigPaths(configPaths: readonly string[]): readonly s
   return roots.reverse()
 }
 
-async function collectProjectLocalArtifacts(projectRoots: readonly string[]): Promise<readonly ProjectLocalCodexArtifact[]> {
+async function collectProjectLocalArtifacts(
+  projectRoots: readonly string[],
+): Promise<readonly ProjectLocalCodexArtifact[]> {
   const artifacts: ProjectLocalCodexArtifact[] = []
   const seenPaths = new Set<string>()
   for (const projectRoot of projectRoots) {

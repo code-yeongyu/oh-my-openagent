@@ -64,7 +64,10 @@ export async function registerStoreIndex(input: RegisterStoreIndexInput): Promis
   const key = resolve(input.indexPath)
   const previous = inProcessAdmissions.get(key) ?? Promise.resolve()
   const admission = previous.then(() => admitToStoreIndex(input))
-  const settled = admission.then(() => undefined, () => undefined)
+  const settled = admission.then(
+    () => undefined,
+    () => undefined,
+  )
   inProcessAdmissions.set(key, settled)
   try {
     await admission
@@ -77,21 +80,25 @@ async function admitToStoreIndex(input: RegisterStoreIndexInput): Promise<void> 
   const fs = input.fs ?? DURABLE_JSON_FS_ASYNC
   const storeDir = resolve(input.storeDir)
   try {
-    await withTaskRecordLockAsync(input.indexPath, async () => {
-      const current = parseStoreIndex(await fs.read(input.indexPath))
-      // Already registered: the entry is durable (it read back under this lock), so an admission for a
-      // known store costs one read and never a rewrite and fsync of the whole index.
-      if (current.stores[storeDir] !== undefined) return
-      const seenAt = new Date(input.now()).toISOString()
-      const next: TaskStoreIndex = {
-        version: TASK_STORE_INDEX_VERSION,
-        stores: { ...current.stores, [storeDir]: { first_seen: seenAt, last_seen: seenAt } },
-      }
-      await fs.write(input.indexPath, `${JSON.stringify(next, null, 2)}\n`)
-      if (parseStoreIndex(await fs.read(input.indexPath)).stores[storeDir] === undefined) {
-        throw new Error("the written index does not read back the store")
-      }
-    }, DURABLE_JSON_LOCK_OPTIONS)
+    await withTaskRecordLockAsync(
+      input.indexPath,
+      async () => {
+        const current = parseStoreIndex(await fs.read(input.indexPath))
+        // Already registered: the entry is durable (it read back under this lock), so an admission for a
+        // known store costs one read and never a rewrite and fsync of the whole index.
+        if (current.stores[storeDir] !== undefined) return
+        const seenAt = new Date(input.now()).toISOString()
+        const next: TaskStoreIndex = {
+          version: TASK_STORE_INDEX_VERSION,
+          stores: { ...current.stores, [storeDir]: { first_seen: seenAt, last_seen: seenAt } },
+        }
+        await fs.write(input.indexPath, `${JSON.stringify(next, null, 2)}\n`)
+        if (parseStoreIndex(await fs.read(input.indexPath)).stores[storeDir] === undefined) {
+          throw new Error("the written index does not read back the store")
+        }
+      },
+      DURABLE_JSON_LOCK_OPTIONS,
+    )
   } catch (error) {
     throw new StoreIndexUnavailableError(input.indexPath, error)
   }
@@ -114,20 +121,24 @@ export async function pruneMissingStoreIndexEntries(
 ): Promise<readonly string[]> {
   const exists = options.exists ?? existsSync
   const fs = options.fs ?? DURABLE_JSON_FS
-  return withTaskRecordLockAsync(indexPath, async () => {
-    await options._test?.afterLockAcquired?.()
-    const current = parseStoreIndex(fs.read(indexPath))
-    await options._test?.afterRead?.()
-    const retained: Record<string, StoreIndexEntry> = {}
-    const removed: string[] = []
-    for (const [storeDir, entry] of Object.entries(current.stores)) {
-      if (exists(storeDir)) retained[storeDir] = entry
-      else removed.push(storeDir)
-    }
-    if (removed.length === 0) return []
-    fs.write(indexPath, `${JSON.stringify({ ...current, stores: retained }, null, 2)}\n`)
-    return removed
-  }, DURABLE_JSON_LOCK_OPTIONS)
+  return withTaskRecordLockAsync(
+    indexPath,
+    async () => {
+      await options._test?.afterLockAcquired?.()
+      const current = parseStoreIndex(fs.read(indexPath))
+      await options._test?.afterRead?.()
+      const retained: Record<string, StoreIndexEntry> = {}
+      const removed: string[] = []
+      for (const [storeDir, entry] of Object.entries(current.stores)) {
+        if (exists(storeDir)) retained[storeDir] = entry
+        else removed.push(storeDir)
+      }
+      if (removed.length === 0) return []
+      fs.write(indexPath, `${JSON.stringify({ ...current, stores: retained }, null, 2)}\n`)
+      return removed
+    },
+    DURABLE_JSON_LOCK_OPTIONS,
+  )
 }
 
 export function pruneMissingStoreIndexEntriesSync(
@@ -139,18 +150,22 @@ export function pruneMissingStoreIndexEntriesSync(
 ): readonly string[] {
   const exists = options.exists ?? existsSync
   const fs = options.fs ?? DURABLE_JSON_FS
-  return withTaskRecordLock(indexPath, () => {
-    const current = parseStoreIndex(fs.read(indexPath))
-    const retained: Record<string, StoreIndexEntry> = {}
-    const removed: string[] = []
-    for (const [storeDir, entry] of Object.entries(current.stores)) {
-      if (exists(storeDir)) retained[storeDir] = entry
-      else removed.push(storeDir)
-    }
-    if (removed.length === 0) return []
-    fs.write(indexPath, `${JSON.stringify({ ...current, stores: retained }, null, 2)}\n`)
-    return removed
-  }, DURABLE_JSON_LOCK_OPTIONS)
+  return withTaskRecordLock(
+    indexPath,
+    () => {
+      const current = parseStoreIndex(fs.read(indexPath))
+      const retained: Record<string, StoreIndexEntry> = {}
+      const removed: string[] = []
+      for (const [storeDir, entry] of Object.entries(current.stores)) {
+        if (exists(storeDir)) retained[storeDir] = entry
+        else removed.push(storeDir)
+      }
+      if (removed.length === 0) return []
+      fs.write(indexPath, `${JSON.stringify({ ...current, stores: retained }, null, 2)}\n`)
+      return removed
+    },
+    DURABLE_JSON_LOCK_OPTIONS,
+  )
 }
 
 // A missing index is empty; an index that does not parse is NOT - rewriting it would drop every

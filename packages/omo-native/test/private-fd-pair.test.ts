@@ -23,7 +23,12 @@ type Inspection = {
 function inspect(input: Inspection) {
   const node = Bun.which("node")
   if (node === null) throw new Error("private-fd contract tests require Node")
-  const result = spawnSync(node, ["--input-type=module", "-e", `
+  const result = spawnSync(
+    node,
+    [
+      "--input-type=module",
+      "-e",
+      `
 import fs from "node:fs"
 import childProcess from "node:child_process"
 import { EventEmitter } from "node:events"
@@ -73,7 +78,10 @@ if (input.spawn) {
   } catch (error) { failure = error.message }
 } else handoff?.onSpawn?.()
 console.log(JSON.stringify({ inspected, handoff, closed, spawned, failure, helperTable }))
-`], { encoding: "utf8" })
+`,
+    ],
+    { encoding: "utf8" },
+  )
   expect(result.status, result.stderr).toBe(0)
   return JSON.parse(result.stdout)
 }
@@ -128,7 +136,9 @@ describe("Windows private descriptor pair contract (#11955)", () => {
   ] as const) {
     test(`refuses ${label} atomically while preserving declarations`, () => {
       const result = inspect({ table })
-      expect(JSON.parse(result.inspected.table)).toEqual(Object.fromEntries(Object.keys(table).map(name => [name, null])))
+      expect(JSON.parse(result.inspected.table)).toEqual(
+        Object.fromEntries(Object.keys(table).map((name) => [name, null])),
+      )
       expect(result.inspected.fds).toEqual([])
       expect(result.inspected.discard).toEqual(discard)
       expect(result.handoff.stdio).toEqual(["inherit", "inherit", "inherit"])

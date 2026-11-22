@@ -25,7 +25,8 @@ export class TmuxPollingManager {
     private retryPendingCloses?: () => Promise<void>,
     private getWindowState?: () => Promise<WindowState | null>,
     private activateSessionPane?: (tracked: TrackedSession) => Promise<boolean>,
-    private canActivatePane: (state: WindowState) => boolean = (state) => state.windowActive !== false && state.sessionAttached !== false,
+    private canActivatePane: (state: WindowState) => boolean = (state) =>
+      state.windowActive !== false && state.sessionAttached !== false,
   ) {}
 
   handleEvent(event: { type: string; properties?: Record<string, unknown> }): void {
@@ -102,10 +103,13 @@ export class TmuxPollingManager {
           continue
         }
 
-        const attachElapsedMs = tracked.attachActivatedAt
-          ? now - tracked.attachActivatedAt.getTime()
-          : undefined
-        if (tracked.attachActivated && !status && attachElapsedMs !== undefined && attachElapsedMs < SESSION_READY_TIMEOUT_MS) {
+        const attachElapsedMs = tracked.attachActivatedAt ? now - tracked.attachActivatedAt.getTime() : undefined
+        if (
+          tracked.attachActivated &&
+          !status &&
+          attachElapsedMs !== undefined &&
+          attachElapsedMs < SESSION_READY_TIMEOUT_MS
+        ) {
           log("[tmux-session-manager] waiting for first post-activation session status", {
             sessionId,
             paneId: tracked.paneId,
@@ -216,10 +220,10 @@ export class TmuxPollingManager {
     }
 
     if (
-      event.type === "message.part.updated"
-      || event.type === "message.part.delta"
-      || event.type === "message.part.removed"
-      || event.type === "message.removed"
+      event.type === "message.part.updated" ||
+      event.type === "message.part.delta" ||
+      event.type === "message.part.removed" ||
+      event.type === "message.removed"
     ) {
       return resolveMessageEventSessionID(properties)
     }
@@ -242,7 +246,9 @@ export class TmuxPollingManager {
       return
     }
 
-    const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> => Boolean(pane))
+    const panes = [state.mainPane, ...state.agentPanes].filter((pane): pane is NonNullable<typeof pane> =>
+      Boolean(pane),
+    )
     const activePaneIds = new Set(panes.filter((pane) => pane.isActive).map((pane) => pane.paneId))
     const now = Date.now()
 

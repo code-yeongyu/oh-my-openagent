@@ -59,11 +59,14 @@ describe("background_output blocking poll interval", () => {
     const startedAt = Date.now()
 
     // when
-    const output = await tool.execute({
-      task_id: task.id,
-      block: true,
-      timeout: 30,
-    }, mockContext)
+    const output = await tool.execute(
+      {
+        task_id: task.id,
+        block: true,
+        timeout: 30,
+      },
+      mockContext,
+    )
 
     // then
     expect(Date.now() - startedAt).toBeLessThan(LEGACY_BACKGROUND_OUTPUT_POLL_INTERVAL_MS)

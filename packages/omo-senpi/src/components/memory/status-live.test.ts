@@ -1,10 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  MEMORY_REFLECTING_FRAMES,
-  createMemoryFooterLive,
-  type MemoryFooterTimers,
-} from "./status-live"
+import { MEMORY_REFLECTING_FRAMES, createMemoryFooterLive, type MemoryFooterTimers } from "./status-live"
 import { MEMORY_STATUS_KEY } from "./status"
 
 interface FakeTimers extends MemoryFooterTimers {
@@ -186,10 +182,7 @@ describe("memory footer live", () => {
     head = "sha-2"
     await live.refresh("agent-test", ui.ui)
 
-    expect(ui.calls.map((call) => call.text)).toEqual([
-      "mem:agent-test sha-1",
-      "mem:agent-test sha-2",
-    ])
+    expect(ui.calls.map((call) => call.text)).toEqual(["mem:agent-test sha-1", "mem:agent-test sha-2"])
     live.dispose()
   })
 

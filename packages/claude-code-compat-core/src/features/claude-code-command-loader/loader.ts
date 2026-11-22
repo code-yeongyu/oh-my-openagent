@@ -3,12 +3,7 @@ import { join, basename } from "path"
 import { parseFrontmatter } from "../../shared/frontmatter"
 import { sanitizeModelField } from "../../shared/model-sanitizer"
 import { isMarkdownFile } from "../../shared/file-utils"
-import {
-  EXCLUDED_DIRS,
-  findProjectOpencodeCommandDirs,
-  getClaudeConfigDir,
-  getOpenCodeCommandDirs,
-} from "../../shared"
+import { EXCLUDED_DIRS, findProjectOpencodeCommandDirs, getClaudeConfigDir, getOpenCodeCommandDirs } from "../../shared"
 import { log } from "../../shared/logger"
 import {
   clearCommandLoaderCache,
@@ -25,7 +20,7 @@ async function loadCommandsFromDir(
   commandsDir: string,
   scope: CommandScope,
   visited: Set<string> = new Set(),
-  prefix: string = ""
+  prefix: string = "",
 ): Promise<LoadedCommand[]> {
   try {
     await fs.access(commandsDir)
@@ -177,9 +172,7 @@ export async function loadOpencodeGlobalCommands(): Promise<Record<string, Comma
 export async function loadOpencodeProjectCommands(directory?: string): Promise<Record<string, CommandDefinition>> {
   const opencodeProjectDirs = findProjectOpencodeCommandDirs(directory ?? process.cwd())
   const allCommands = await Promise.all(
-    opencodeProjectDirs.map((commandsDir) =>
-      loadCommandsFromDir(commandsDir, "opencode-project"),
-    ),
+    opencodeProjectDirs.map((commandsDir) => loadCommandsFromDir(commandsDir, "opencode-project")),
   )
   return commandsToRecord(allCommands.flat())
 }

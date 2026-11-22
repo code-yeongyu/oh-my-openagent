@@ -54,11 +54,7 @@ describe("BackgroundManager session created callback", () => {
     await waitForEvent(events, "promptAsync")
 
     //#then
-    expect(events).toEqual([
-      "session.create",
-      "onSessionCreated:child-session",
-      "promptAsync",
-    ])
+    expect(events).toEqual(["session.create", "onSessionCreated:child-session", "promptAsync"])
 
     manager.shutdown()
   })

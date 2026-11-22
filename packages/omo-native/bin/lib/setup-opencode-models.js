@@ -67,7 +67,9 @@ function editionFile(path, home, notices) {
     .map((name) => join(root, name, inHome))
     .find((candidate) => existsSync(candidate))
   if (moved === undefined) return path
-  notices.push(`NOTICE opencode: ${path} was moved to ${moved} by the omo config migration; its model routing is read from there`)
+  notices.push(
+    `NOTICE opencode: ${path} was moved to ${moved} by the omo config migration; its model routing is read from there`,
+  )
   return moved
 }
 
@@ -118,8 +120,11 @@ function hasModelChoice(entry) {
 }
 
 export function hasModelChoices(raw) {
-  return raw.model !== undefined || raw.smallModel !== undefined
-    || [raw.opencodeAgents, raw.categories, raw.agents].some((entries) => Object.values(entries).some(hasModelChoice))
+  return (
+    raw.model !== undefined ||
+    raw.smallModel !== undefined ||
+    [raw.opencodeAgents, raw.categories, raw.agents].some((entries) => Object.values(entries).some(hasModelChoice))
+  )
 }
 
 function engineProvider(provider, modelId, context) {
@@ -127,7 +132,10 @@ function engineProvider(provider, modelId, context) {
   // A provider opencode signed in to with OAuth (`openai` through a ChatGPT plan) is served here by
   // the provider the credential stage says to `/login` to (provider-map.json `oauthLogins`), not by
   // the same id, which would need an API key the user never had.
-  const login = oauthProviders.has(provider) && Object.hasOwn(providerMap.oauthLogins, provider) ? providerMap.oauthLogins[provider] : undefined
+  const login =
+    oauthProviders.has(provider) && Object.hasOwn(providerMap.oauthLogins, provider)
+      ? providerMap.oauthLogins[provider]
+      : undefined
   if (login !== undefined && registry?.models.get(login)?.has(modelId)) return login
   if (providerMap.builtinProviderIds.includes(provider)) return provider
   return providerMap.providers[provider] ?? provider
@@ -137,10 +145,12 @@ function engineProvider(provider, modelId, context) {
 // model-id ending, so it only counts as a suffix on a provider-qualified id (reasoning-vocabulary.ts).
 function splitSuffix(text) {
   const paren = /^(.*\S)\s*\(([^()]+)\)$/.exec(text)
-  if (paren && REASONING.has(paren[2].trim().toLowerCase())) return { selector: paren[1], suffix: `:${paren[2].trim().toLowerCase()}` }
+  if (paren && REASONING.has(paren[2].trim().toLowerCase()))
+    return { selector: paren[1], suffix: `:${paren[2].trim().toLowerCase()}` }
   const colon = text.lastIndexOf(":")
   const token = text.slice(colon + 1).toLowerCase()
-  if (colon <= 0 || !REASONING.has(token) || (token === "max" && !text.slice(0, colon).includes("/"))) return { selector: text, suffix: "" }
+  if (colon <= 0 || !REASONING.has(token) || (token === "max" && !text.slice(0, colon).includes("/")))
+    return { selector: text, suffix: "" }
   return { selector: text.slice(0, colon), suffix: `:${token}` }
 }
 
@@ -157,7 +167,9 @@ export function translateModelRef(raw, context) {
   if (slash <= 0) {
     // A bare id is matched against every provider by the native resolver, so any provider serving it will do.
     const served = registry === undefined || [...registry.models.values()].some((ids) => ids.has(selector))
-    return served ? { ref: `${selector}${suffix}`, modelId: selector } : { reason: `no omo provider serves a model named ${selector}` }
+    return served
+      ? { ref: `${selector}${suffix}`, modelId: selector }
+      : { reason: `no omo provider serves a model named ${selector}` }
   }
   const source = selector.slice(0, slash)
   const modelId = selector.slice(slash + 1)
@@ -187,7 +199,9 @@ function reasoningOf(entry) {
 }
 
 function temperatureOf(entry) {
-  return typeof entry.temperature === "number" && entry.temperature >= 0 && entry.temperature <= 2 ? entry.temperature : undefined
+  return typeof entry.temperature === "number" && entry.temperature >= 0 && entry.temperature <= 2
+    ? entry.temperature
+    : undefined
 }
 
 function tuning(entry) {
@@ -218,7 +232,9 @@ function convertEntry(label, entry, context, dropped, target) {
   const folded = !Array.isArray(entry.models) && entry.fallback_models !== undefined
   const chain = Array.isArray(entry.models)
     ? entry.models
-    : folded ? [entry.model, ...[entry.fallback_models].flat()].filter((item) => item !== undefined) : []
+    : folded
+      ? [entry.model, ...[entry.fallback_models].flat()].filter((item) => item !== undefined)
+      : []
   const model = !folded && entry.model !== undefined ? take(entry.model) : undefined
   const models = chain.map((item) => chainItem(item, take)).filter((item) => item !== undefined)
   if (hasModelChoice(entry) && model === undefined && models.length === 0) return undefined
@@ -234,26 +250,35 @@ function convertAgents(raw, context, dropped) {
   const agents = new Map()
   const native = new Set(NATIVE_AGENT_NAMES)
   // opencode.json `agent.<name>` first, so the OpenCode edition's own `agents.<name>` wins over it.
-  for (const [origin, entries] of [["opencode agent", raw.opencodeAgents], ["agent", raw.agents]]) {
+  for (const [origin, entries] of [
+    ["opencode agent", raw.opencodeAgents],
+    ["agent", raw.agents],
+  ]) {
     for (const [name, entry] of Object.entries(entries)) {
       if (!hasModelChoice(entry)) continue
       const target = Object.hasOwn(AGENT_ALIASES, name) ? AGENT_ALIASES[name] : name
       // A native name beside its alias in the same source wins, as categories resolve the pair.
       if (target !== name && Object.hasOwn(entries, target) && hasModelChoice(entries[target])) continue
       if (!native.has(target)) {
-        dropped.push(OPENCODE_PRIMARY_AGENTS.has(name) && origin === "opencode agent"
-          ? { text: `${origin} ${name}: the OpenCode primary agent; omo's main session runs the default model instead` }
-          : {
-            text: `${origin} ${name}: omo has no agent of that name (its agents: ${NATIVE_AGENT_NAMES.join(", ")}); route that work through a category instead`,
-            target: { section: "categories", name: "<category>", model: firstModel(entry, context) },
-          })
+        dropped.push(
+          OPENCODE_PRIMARY_AGENTS.has(name) && origin === "opencode agent"
+            ? {
+                text: `${origin} ${name}: the OpenCode primary agent; omo's main session runs the default model instead`,
+              }
+            : {
+                text: `${origin} ${name}: omo has no agent of that name (its agents: ${NATIVE_AGENT_NAMES.join(", ")}); route that work through a category instead`,
+                target: { section: "categories", name: "<category>", model: firstModel(entry, context) },
+              },
+        )
         continue
       }
       const converted = convertEntry(`${origin} ${name}`, entry, context, dropped, { section: "agents", name: target })
       if (converted !== undefined) agents.set(target, { entry: converted, from: name })
     }
   }
-  return [...agents].map(([name, { entry, from }]) => ({ name, entry, from })).sort((left, right) => left.name.localeCompare(right.name))
+  return [...agents]
+    .map(([name, { entry, from }]) => ({ name, entry, from }))
+    .sort((left, right) => left.name.localeCompare(right.name))
 }
 
 // The model an unmappable agent named, as the native harness would spell it when it can.
@@ -274,7 +299,9 @@ function convertCategories(raw, context, dropped) {
     const converted = convertEntry(`category ${name}`, entry, context, dropped, { section: "categories", name: target })
     if (converted !== undefined) categories.set(target, { entry: converted, from: name })
   }
-  return [...categories].map(([name, { entry, from }]) => ({ name, entry, from })).sort((left, right) => left.name.localeCompare(right.name))
+  return [...categories]
+    .map(([name, { entry, from }]) => ({ name, entry, from }))
+    .sort((left, right) => left.name.localeCompare(right.name))
 }
 
 function convertDefault(model, context, dropped) {
@@ -288,7 +315,12 @@ function convertDefault(model, context, dropped) {
     dropped.push({ text: `default model ${model}: names no provider, and omo's default model needs one` })
     return undefined
   }
-  return { source: model, provider: result.provider, modelId: result.modelId, ref: `${result.provider}/${result.modelId}` }
+  return {
+    source: model,
+    provider: result.provider,
+    modelId: result.modelId,
+    ref: `${result.provider}/${result.modelId}`,
+  }
 }
 
 /**
@@ -299,7 +331,8 @@ export function convertModelChoices(raw, registry, oauthProviders = new Set()) {
   const context = { registry, oauthProviders }
   const dropped = []
   const defaultModel = convertDefault(raw.model, context, dropped)
-  if (raw.smallModel !== undefined) dropped.push({ text: `small_model ${raw.smallModel}: omo has no small-model setting` })
+  if (raw.smallModel !== undefined)
+    dropped.push({ text: `small_model ${raw.smallModel}: omo has no small-model setting` })
   const categories = convertCategories(raw, context, dropped)
   const agents = convertAgents(raw, context, dropped)
   return { defaultModel, categories, agents, dropped: dropped.map((item) => item.text) }
@@ -310,7 +343,9 @@ const NATIVE_BLOCKS = ["[senpi]", "[native]"]
 
 /** The omo.jsonc member that sets `value` for `section.name` in the native harness. */
 export function nativeRoutingLine(section, name, value) {
-  const members = Object.entries(value).map(([key, member]) => `"${key}": ${JSON.stringify(member)}`).join(", ")
+  const members = Object.entries(value)
+    .map(([key, member]) => `"${key}": ${JSON.stringify(member)}`)
+    .join(", ")
   return `"[native]": { "${section}": { "${name}": { ${members} } } }`
 }
 
@@ -327,15 +362,25 @@ export function openCodeRoutingGap(document, edition) {
   const raw = { opencodeAgents: {}, ...editionChoices(edition, record(document)["[opencode]"]) }
   const context = { registry: undefined, oauthProviders: new Set() }
   const dropped = []
-  const converted = { categories: convertCategories(raw, context, dropped), agents: convertAgents(raw, context, dropped) }
-  const carriable = ["agents", "categories"].flatMap((section) => converted[section]
-    .filter(({ name }) => !isConfigured(document, section, name))
-    .map(({ name, entry, from }) => `${section === "agents" ? "agent" : "category"} ${from}: add ${nativeRoutingLine(section, name, entry)}`))
+  const converted = {
+    categories: convertCategories(raw, context, dropped),
+    agents: convertAgents(raw, context, dropped),
+  }
+  const carriable = ["agents", "categories"].flatMap((section) =>
+    converted[section]
+      .filter(({ name }) => !isConfigured(document, section, name))
+      .map(
+        ({ name, entry, from }) =>
+          `${section === "agents" ? "agent" : "category"} ${from}: add ${nativeRoutingLine(section, name, entry)}`,
+      ),
+  )
   const unmapped = dropped
     .filter(({ target }) => target === undefined || !isConfigured(document, target.section, target.name))
-    .map(({ text, target }) => target === undefined
-      ? text
-      : `${text}: add ${nativeRoutingLine(target.section, target.name, { model: target.model ?? "<provider>/<model>" })}`)
+    .map(({ text, target }) =>
+      target === undefined
+        ? text
+        : `${text}: add ${nativeRoutingLine(target.section, target.name, { model: target.model ?? "<provider>/<model>" })}`,
+    )
   return [...carriable, ...unmapped]
 }
 
@@ -345,6 +390,7 @@ export function openCodeRoutingNotice(lines) {
 }
 
 function isConfigured(document, section, name) {
-  return [record(document)[section], ...NATIVE_BLOCKS.map((key) => record(record(document)[key])[section])]
-    .some((entries) => Object.hasOwn(record(entries), name))
+  return [record(document)[section], ...NATIVE_BLOCKS.map((key) => record(record(document)[key])[section])].some(
+    (entries) => Object.hasOwn(record(entries), name),
+  )
 }

@@ -120,7 +120,7 @@ export function createSkillMcpTool(options: SkillMcpToolOptions): ToolDefinition
         .string()
         .optional()
         .describe(
-          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL."
+          "CDP endpoint URL to connect Playwright to an existing browser (e.g. http://localhost:9222). Creates a separate MCP instance per unique URL.",
         ),
     },
     async execute(args: SkillMcpArgs, toolContext: ToolContext) {

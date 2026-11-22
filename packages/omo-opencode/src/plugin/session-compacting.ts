@@ -1,6 +1,7 @@
 import type { Hooks } from "@opencode-ai/plugin"
 
 import { isCompactionAgent } from "../shared/compaction-marker"
+import { recordCompactionStart } from "../shared/compaction-in-flight"
 import { log } from "../shared/logger"
 
 type SessionCompactingHook = NonNullable<Hooks["experimental.session.compacting"]>
@@ -50,11 +51,7 @@ type CompactionHookDependencies = {
 
 const DEFAULT_AUTOCONTINUE_DUPLICATE_GUARD_MS = 10_000
 
-async function runCompactionStep(
-  hook: string,
-  sessionID: string,
-  action: () => Promise<void> | void,
-): Promise<void> {
+async function runCompactionStep(hook: string, sessionID: string, action: () => Promise<void> | void): Promise<void> {
   try {
     await action()
   } catch (error) {
@@ -94,13 +91,9 @@ function unrefTimer(timer: TimerHandleWithOptionalUnref, sessionID: string): voi
   }
 }
 
-export function createSessionCompactingHandler(
-  hooks: CompactionHookDependencies,
-): SessionCompactingHook {
-  return async (
-    input: SessionCompactingInput,
-    output: SessionCompactingOutput,
-  ): Promise<void> => {
+export function createSessionCompactingHandler(hooks: CompactionHookDependencies): SessionCompactingHook {
+  return async (input: SessionCompactingInput, output: SessionCompactingOutput): Promise<void> => {
+    recordCompactionStart(input.sessionID)
     await runCompactionStep("compactionContextInjector.capture", input.sessionID, async () => {
       const capture = hooks.compactionContextInjector?.capture
       if (capture) {
@@ -146,10 +139,7 @@ export function createCompactionAutocontinueHandler(
     unrefTimer(timer, sessionID)
   }
 
-  return async (
-    input: CompactionAutocontinueInput,
-    output: CompactionAutocontinueOutput,
-  ): Promise<void> => {
+  return async (input: CompactionAutocontinueInput, output: CompactionAutocontinueOutput): Promise<void> => {
     if (isCompactionAgent(input.agent)) {
       output.enabled = false
       return

@@ -43,9 +43,7 @@ export {
 
 declare const OMO_SENPI_PACKAGE_VERSION: string
 
-const PACKAGE_VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "string"
-  ? OMO_SENPI_PACKAGE_VERSION
-  : readPackageVersion()
+const PACKAGE_VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "string" ? OMO_SENPI_PACKAGE_VERSION : readPackageVersion()
 const SALT_FILE_NAME = "session-id-salt"
 const SALT_LENGTH = 32
 const fallbackSalts = new Map<string, Buffer>()
@@ -211,7 +209,12 @@ function resolveUserInstallId(env: TelemetryEnv): string {
   const canonical = getOmoNativeInstallIdPath(env)
   // The legacy id is the one the user's own install wrote, so an orchestrator's agent-dir override is ignored here:
   // otherwise its first post-upgrade run would mint the permanent id instead of adopting the real one.
-  const legacy = join(resolveAgentHome({ env: withoutAgentDirOverrides(env), homeDir: userHome(env) }), "omo-senpi", "omo-native", INSTALL_ID_FILE_NAME)
+  const legacy = join(
+    resolveAgentHome({ env: withoutAgentDirOverrides(env), homeDir: userHome(env) }),
+    "omo-senpi",
+    "omo-native",
+    INSTALL_ID_FILE_NAME,
+  )
   if (legacy === canonical) return readOrCreateInstallId(canonical)
   const shared = readInstallId(canonical)
   if (shared !== undefined) return shared

@@ -30,8 +30,7 @@ export interface FakeHostOpenFailure {
  * reads any unknown session-less command as a session command), a draining host `host_draining`.
  */
 export type FakeHostWarmAnswer =
-  | { readonly state: "warmed" | "already_warm" | "unsupported" }
-  | { readonly refuse: string }
+  { readonly state: "warmed" | "already_warm" | "unsupported" } | { readonly refuse: string }
 
 export interface FakeHostWirePorts {
   readonly admissions: FakeInputAdmissions
@@ -67,12 +66,18 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     return
   }
   if (["prompt", "steer", "follow_up"].includes(type) && typeof payload.clientMessageId === "string") {
-    const session = ports.table.view().find(candidate => candidate.routingId === routingId)
+    const session = ports.table.view().find((candidate) => candidate.routingId === routingId)
     const answer = ports.admissions.admit(session?.sessionPath ?? "", payload)
     if (answer === "conflict") {
       if (ports.withheld.has(type)) return
-      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
-        error: "client_message_id_conflict: different payload", errorCode: "client_message_id_conflict" })
+      return writeFrame(socket, {
+        type: "response",
+        id: payload.id,
+        command: type,
+        success: false,
+        error: "client_message_id_conflict: different payload",
+        errorCode: "client_message_id_conflict",
+      })
     }
     if (!answer.replayed && routingId !== undefined && typeof payload.message === "string") {
       ports.table.appendTranscript(routingId, { role: "user", content: payload.message })
@@ -80,9 +85,15 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
     }
     if (ports.withheld.has(type)) return
     const failure = ports.failed.get(type)
-    if (failure !== undefined) return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
-    return writeFrame(socket, { type: "response", id: payload.id, command: type, success: true,
-      data: { disposition: answer.disposition, replayed: answer.replayed } })
+    if (failure !== undefined)
+      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: failure })
+    return writeFrame(socket, {
+      type: "response",
+      id: payload.id,
+      command: type,
+      success: true,
+      data: { disposition: answer.disposition, replayed: answer.replayed },
+    })
   }
   if (ports.withheld.has(type)) return
   const failure = ports.failed.get(type)
@@ -118,10 +129,19 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       })
     }
     case "set_session_context": {
-      const patch = typeof payload.patch === "object" && payload.patch !== null ? Object.fromEntries(Object.entries(payload.patch)) : {}
+      const patch =
+        typeof payload.patch === "object" && payload.patch !== null
+          ? Object.fromEntries(Object.entries(payload.patch))
+          : {}
       if (ports.table.patchContext(socket, routingId ?? "", patch)) return ok({})
-      return writeFrame(socket, { type: "response", id: payload.id, command: type, success: false,
-        error: "session_not_attached", errorCode: "session_not_attached" })
+      return writeFrame(socket, {
+        type: "response",
+        id: payload.id,
+        command: type,
+        success: false,
+        error: "session_not_attached",
+        errorCode: "session_not_attached",
+      })
     }
     case "get_entries":
       return ok({ entries: [], leafId: null })
@@ -131,7 +151,13 @@ export function handleWireLine(ports: FakeHostWirePorts, socket: Socket, line: s
       return ok({ cancelled: false })
     case "warm":
       return "refuse" in ports.warm
-        ? writeFrame(socket, { type: "response", id: payload.id, command: type, success: false, error: ports.warm.refuse })
+        ? writeFrame(socket, {
+            type: "response",
+            id: payload.id,
+            command: type,
+            success: false,
+            error: ports.warm.refuse,
+          })
         : ok({ state: ports.warm.state })
     case "extension_ui_response":
     case "extension_ui_progress":
@@ -180,7 +206,11 @@ function openSession(ports: FakeHostWirePorts, socket: Socket, payload: Readonly
 // open with provider and modelId sets; a re-joined session keeps the model it already runs.
 const openedModels = new WeakMap<FakeHostWirePorts, Map<string, { readonly provider: string; readonly id: string }>>()
 
-function rememberOpenedModel(ports: FakeHostWirePorts, routingId: string, payload: Readonly<Record<string, unknown>>): void {
+function rememberOpenedModel(
+  ports: FakeHostWirePorts,
+  routingId: string,
+  payload: Readonly<Record<string, unknown>>,
+): void {
   const models = openedModels.get(ports) ?? new Map<string, { readonly provider: string; readonly id: string }>()
   openedModels.set(ports, models)
   if (models.has(routingId)) return

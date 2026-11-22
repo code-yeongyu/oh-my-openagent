@@ -1,0 +1,326 @@
+{
+  "description": "8 ref generations per target: after nine snapshots of one window, a ref of the first (g-8) is StaleRef and a ref of the second (g-7) still resolves.",
+  "scenario": "crates/senpi-desktop-backend-fake/fixtures/two-displays-one-window.json",
+  "env": {},
+  "steps": [
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "session.open",
+        "params": {}
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "result": {
+              "capabilities": {
+                "backend": "fake",
+                "displayServer": null,
+                "capture": true,
+                "input": true,
+                "ax": true,
+                "backgroundWindowInput": true,
+                "cursorOverlay": false,
+                "deliveryModes": [
+                  "background",
+                  "foreground"
+                ],
+                "capturePermission": "granted",
+                "inputPermission": "granted",
+                "axPermission": "granted",
+                "displayCount": 2,
+                "focusGuard": true,
+                "stopPath": "none",
+                "stopReason": "no-global-listener",
+                "integrityLevel": null,
+                "screenLocked": false,
+                "displayAsleep": false
+              },
+              "resumeToken": "per-process-random"
+            }
+          },
+          "variable": [
+            "/result/capabilities",
+            "/result/resumeToken"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e1] app=Notes (focused)\n  - textarea [ref=e2] (focused)\n  - button \"Save\" [ref=e3]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e4] app=Notes (focused)\n  - textarea [ref=e5] (focused)\n  - button \"Save\" [ref=e6]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 4,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e7] app=Notes (focused)\n  - textarea [ref=e8] (focused)\n  - button \"Save\" [ref=e9]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 5,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 5,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e10] app=Notes (focused)\n  - textarea [ref=e11] (focused)\n  - button \"Save\" [ref=e12]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 6,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 6,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e13] app=Notes (focused)\n  - textarea [ref=e14] (focused)\n  - button \"Save\" [ref=e15]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 7,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e16] app=Notes (focused)\n  - textarea [ref=e17] (focused)\n  - button \"Save\" [ref=e18]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 8,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 8,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e19] app=Notes (focused)\n  - textarea [ref=e20] (focused)\n  - button \"Save\" [ref=e21]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 9,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 9,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e22] app=Notes (focused)\n  - textarea [ref=e23] (focused)\n  - button \"Save\" [ref=e24]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 10,
+        "method": "ax.snapshot",
+        "params": {
+          "target": "101"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 10,
+            "result": {
+              "text": "- window \"Untitled - Notes\" [ref=e25] app=Notes (focused)\n  - textarea [ref=e26] (focused)\n  - button \"Save\" [ref=e27]",
+              "nodeCount": 3,
+              "truncated": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 11,
+        "method": "ax.node",
+        "params": {
+          "ref": "e3"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 11,
+            "error": {
+              "code": -32008,
+              "message": "e3 expired; re-run ax()/find()",
+              "data": {
+                "code": "StaleRef",
+                "hint": null
+              }
+            }
+          },
+          "variable": [
+            "/error/message",
+            "/error/data/hint"
+          ]
+        }
+      ]
+    },
+    {
+      "send": {
+        "jsonrpc": "2.0",
+        "id": 12,
+        "method": "ax.node",
+        "params": {
+          "ref": "e6"
+        }
+      },
+      "expect": [
+        {
+          "message": {
+            "jsonrpc": "2.0",
+            "id": 12,
+            "result": {
+              "ref": "e6",
+              "role": "button",
+              "nativeRole": "AXButton",
+              "title": "Save",
+              "value": null,
+              "description": null,
+              "enabled": true,
+              "focused": false,
+              "x": 800.0,
+              "y": 680.0,
+              "width": 80.0,
+              "height": 30.0,
+              "actions": [
+                "press"
+              ],
+              "childCount": 0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -24,8 +24,12 @@ test("withdrawn admission keeps its lane and FIFO position when explicitly reque
 test("a restarted allocator orders saved admissions without reconstructing parked tokens", () => {
   const prior = new TaskConcurrency({ default_concurrency: 1 })
   prior.tryAcquire("test/model", "old-owner", 0)
-  prior.enqueue("test/model", "a", 3, () => { throw new Error("old admission must stay withdrawn") })
-  prior.enqueue("test/model", "b", 4, () => { throw new Error("old admission must stay withdrawn") })
+  prior.enqueue("test/model", "a", 3, () => {
+    throw new Error("old admission must stay withdrawn")
+  })
+  prior.enqueue("test/model", "b", 4, () => {
+    throw new Error("old admission must stay withdrawn")
+  })
   const a = prior.withdraw("test/model", "a", 3)
   const b = prior.withdraw("test/model", "b", 4)
   if (a === undefined || b === undefined) throw new Error("missing admission metadata")

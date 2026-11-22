@@ -4,23 +4,21 @@ import { createEventState } from "./events"
 import { pollForCompletion } from "./poll-for-completion"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-const createMockContext = (overrides: {
-  todo?: Todo[]
-  childrenBySession?: Record<string, ChildSession[]>
-  statuses?: Record<string, SessionStatus>
-} = {}): RunContext => {
-  const {
-    todo = [],
-    childrenBySession = { "test-session": [] },
-    statuses = {},
-  } = overrides
+const createMockContext = (
+  overrides: {
+    todo?: Todo[]
+    childrenBySession?: Record<string, ChildSession[]>
+    statuses?: Record<string, SessionStatus>
+  } = {},
+): RunContext => {
+  const { todo = [], childrenBySession = { "test-session": [] }, statuses = {} } = overrides
 
   return {
     client: unsafeTestValue<RunContext["client"]>({
       session: {
         todo: mock(() => Promise.resolve({ data: todo })),
         children: mock((opts: { path: { id: string } }) =>
-          Promise.resolve({ data: childrenBySession[opts.path.id] ?? [] })
+          Promise.resolve({ data: childrenBySession[opts.path.id] ?? [] }),
         ),
         status: mock(() => Promise.resolve({ data: statuses })),
       },
@@ -169,19 +167,15 @@ describe("pollForCompletion", () => {
       }
     })
 
-    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
+    unsafeTestValue(ctx.client.session).todo = mock(async () => {
       todoCallCount++
       if (todoCallCount === 1) {
         eventState.mainSessionIdle = false
       }
       return { data: [] }
     })
-    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
-      Promise.resolve({ data: [] })
-    )
-    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
-      Promise.resolve({ data: {} })
-    )
+    unsafeTestValue(ctx.client.session).children = mock(() => Promise.resolve({ data: [] }))
+    unsafeTestValue(ctx.client.session).status = mock(() => Promise.resolve({ data: {} }))
 
     //#when
     const pollIntervalMs = 10
@@ -314,7 +308,7 @@ describe("pollForCompletion", () => {
     eventState.mainSessionIdle = false
     eventState.hasReceivedMeaningfulWork = true
     const abortController = new AbortController()
-    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+    unsafeTestValue(ctx.client.session).status = mock(async () => {
       throw thrown
     })
     // Virtual clock: a slow real first sleep must not let the safety abort win
@@ -326,13 +320,15 @@ describe("pollForCompletion", () => {
     })
 
     //#when & then
-    await expect(pollForCompletion(ctx, eventState, abortController, {
-      pollIntervalMs: 5,
-      requiredConsecutive: 1,
-      minStabilizationMs: 10,
-      now: clock.now,
-      sleep: clock.sleep,
-    })).rejects.toBe(thrown)
+    await expect(
+      pollForCompletion(ctx, eventState, abortController, {
+        pollIntervalMs: 5,
+        requiredConsecutive: 1,
+        minStabilizationMs: 10,
+        now: clock.now,
+        sleep: clock.sleep,
+      }),
+    ).rejects.toBe(thrown)
   })
 
   it("allows silent completion after stabilization when no meaningful work is received", async () => {
@@ -410,19 +406,15 @@ describe("pollForCompletion", () => {
     const abortController = new AbortController()
     let pollTick = 0
 
-    ;(unsafeTestValue(ctx.client.session)).todo = mock(async () => {
+    unsafeTestValue(ctx.client.session).todo = mock(async () => {
       pollTick++
       if (pollTick === 2) {
         eventState.currentTool = "task"
       }
       return { data: [] }
     })
-    ;(unsafeTestValue(ctx.client.session)).children = mock(() =>
-      Promise.resolve({ data: [] })
-    )
-    ;(unsafeTestValue(ctx.client.session)).status = mock(() =>
-      Promise.resolve({ data: {} })
-    )
+    unsafeTestValue(ctx.client.session).children = mock(() => Promise.resolve({ data: [] }))
+    unsafeTestValue(ctx.client.session).status = mock(() => Promise.resolve({ data: {} }))
 
     //#when - abort after tool stays in-flight
     abortAfter(abortController, 200)
@@ -487,7 +479,7 @@ describe("pollForCompletion", () => {
     eventState.lastError = "kimi usage limit reached"
     eventState.hasReceivedMeaningfulWork = true
     let statusCalls = 0
-    ;(unsafeTestValue(ctx.client.session)).status = mock(async () => {
+    unsafeTestValue(ctx.client.session).status = mock(async () => {
       statusCalls++
       if (statusCalls <= 3) {
         return { data: { "test-session": { type: "retry" } } }
@@ -553,9 +545,9 @@ describe("pollForCompletion", () => {
     //#then
     expect(result).toBe(1)
     const errorCalls = (console.error as ReturnType<typeof mock>).mock.calls
-    expect(errorCalls.some((call: unknown[]) =>
-      String(call[0] ?? "").includes("Session never produced assistant output")
-    )).toBe(true)
+    expect(
+      errorCalls.some((call: unknown[]) => String(call[0] ?? "").includes("Session never produced assistant output")),
+    ).toBe(true)
   })
 
   it("keeps waiting when meaningful work is required and active child work exists", async () => {
@@ -585,5 +577,4 @@ describe("pollForCompletion", () => {
     //#then
     expect(result).toBe(130)
   })
-
 })

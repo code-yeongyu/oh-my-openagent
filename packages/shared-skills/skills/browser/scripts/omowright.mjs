@@ -9,10 +9,16 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const skillRoot = dirname(scriptDir)
 
 export function resolveOmowrightEntry(env = process.env) {
+  const packageRoot = join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright")
+  // Same order as stage-omowright-runtime.mjs: sources before the build, `.ts` before `.js`. A git
+  // install carries the sources (TypeScript since omowright's strict port, which only Bun imports);
+  // a package built for its `exports` carries `dist/` only.
   const candidates = [
     env.OMOWRIGHT_ROOT ? join(env.OMOWRIGHT_ROOT, "index.js") : undefined,
     join(skillRoot, "runtime", "omowright", "index.js"),
-    join(skillRoot, "..", "..", "..", "..", "node_modules", "omowright", "src", "index.js"),
+    join(packageRoot, "src", "index.ts"),
+    join(packageRoot, "src", "index.js"),
+    join(packageRoot, "dist", "index.js"),
   ].filter((candidate) => candidate !== undefined)
   return candidates.find((candidate) => existsSync(candidate))
 }

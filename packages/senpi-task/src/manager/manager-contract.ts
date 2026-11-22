@@ -2,7 +2,14 @@ import type { DagTaskOwner, DagTaskOwnerKey, OwnedStartResult } from "../dag/own
 import type { ResumeCredential } from "../pause/admission-barrier"
 import type { PauseParticipant } from "../pause/registry"
 import type { LiveRunStats, TaskRecord, TaskRunStats } from "../state"
-import type { CancelOptions, CancelOutcome, InterruptOutcome, RedispatchOutcome, SendInput, SendOutcome } from "../steering"
+import type {
+  CancelOptions,
+  CancelOutcome,
+  InterruptOutcome,
+  RedispatchOutcome,
+  SendInput,
+  SendOutcome,
+} from "../steering"
 import type { WorkpoolEngine } from "../workpool/engine"
 import type { ManagedChildHandle, ManagedChildListener } from "./child-handle"
 import type { TaskConcurrency } from "./concurrency"

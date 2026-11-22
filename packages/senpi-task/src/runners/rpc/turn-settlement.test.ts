@@ -294,7 +294,11 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     // given - the probe flight is held by the test so disposal lands mid-flight
     const flight = deferred<TurnSettlementProbe>()
     let tornDown = false
-    const fixture = createFixture({ probe: () => flight.promise, disposed: () => tornDown, wakeSourcesLive: () => false })
+    const fixture = createFixture({
+      probe: () => flight.promise,
+      disposed: () => tornDown,
+      wakeSourcesLive: () => false,
+    })
     fixture.settlement.observe(agentEnd(PROVIDER_TIMEOUT) as never)
     fixture.scheduler.runNext()
     await flushSettlement()
@@ -312,7 +316,11 @@ describe("createTurnSettlement terminal provider error (senpi#3262)", () => {
     // given
     const flight = deferred<TurnSettlementProbe>()
     let tornDown = false
-    const fixture = createFixture({ probe: () => flight.promise, disposed: () => tornDown, wakeSourcesLive: () => false })
+    const fixture = createFixture({
+      probe: () => flight.promise,
+      disposed: () => tornDown,
+      wakeSourcesLive: () => false,
+    })
     fixture.settlement.observe(agentEnd(PROVIDER_TIMEOUT) as never)
     fixture.scheduler.runNext()
     await flushSettlement()

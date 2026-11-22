@@ -15,8 +15,14 @@ import {
 
 function writeInventory(agentDir: string): void {
   mkdirSync(agentDir, { recursive: true })
-  writeFileSync(join(agentDir, "models.json"), JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }))
-  writeFileSync(join(agentDir, "settings.json"), JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-5.6-sol" }))
+  writeFileSync(
+    join(agentDir, "models.json"),
+    JSON.stringify({ providers: { openai: { models: [{ id: "gpt-5.6-sol" }] } } }),
+  )
+  writeFileSync(
+    join(agentDir, "settings.json"),
+    JSON.stringify({ defaultProvider: "openai", defaultModel: "gpt-5.6-sol" }),
+  )
 }
 
 function context(sessionId: string): Record<string, unknown> {

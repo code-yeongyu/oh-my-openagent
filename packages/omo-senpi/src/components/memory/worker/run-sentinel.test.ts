@@ -6,6 +6,7 @@ import { join } from "node:path"
 
 import { writeRunJsonAtomic } from "./run-artifacts"
 import { waitForRunCompletion, waitForRunSentinel } from "./run-sentinel"
+import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const roots: string[] = []
 afterEach(async () => Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true }))))
@@ -44,7 +45,7 @@ describe("run completion sentinel", () => {
       outcomePath,
       launchPath,
       () => (JSON.parse(readFileSync(outcomePath, "utf8")) as { attempt?: number }).attempt === 2,
-      Date.now() + 5_000,
+      Date.now() + remainingTestTime(),
       Date.now,
     )
     await writeRunJsonAtomic(outcomePath, { version: 1, runId: "run-1", attempt: 2 })

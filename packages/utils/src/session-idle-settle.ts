@@ -28,8 +28,6 @@ type SessionStatusClient = {
 
 const ACTIVE_SESSION_STATUSES = new Set(["busy", "retry", "running"])
 
-
-
 function getSessionStatusPayload(response: unknown): Record<string, unknown> {
   if (isRecord(response) && isRecord(response.data)) {
     return response.data
@@ -56,10 +54,7 @@ export async function isSessionActive(
   }
 
   try {
-    const statusResult = await withStatusTimeout(
-      client.session.status(),
-      statusTimeoutMs,
-    )
+    const statusResult = await withStatusTimeout(client.session.status(), statusTimeoutMs)
     const status = getSessionStatusPayload(statusResult)[sessionID]
     if (!isRecord(status)) {
       return false

@@ -3,7 +3,7 @@ export function shellEscapeForDoubleQuotedCommand(value: string): string {
     .replace(/\\/g, "\\\\")
     .replace(/\$/g, "\\$")
     .replace(/`/g, "\\`")
-    .replace(/"/g, "\\\"")
+    .replace(/"/g, '\\"')
     .replace(/;/g, "\\;")
     .replace(/\|/g, "\\|")
     .replace(/&/g, "\\&")

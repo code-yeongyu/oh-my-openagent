@@ -34,7 +34,10 @@ function aliveSignaller(alive: Set<number>): ProcessSignaller {
 
 // Create the durable artifacts a suspended-era child leaves behind: event log, child session dir,
 // and completion spill file.
-function seedChildArtifacts(store: TaskRecordStore, taskId: string): { childDir: string; spillPath: string; logPath: string } {
+function seedChildArtifacts(
+  store: TaskRecordStore,
+  taskId: string,
+): { childDir: string; spillPath: string; logPath: string } {
   store.appendEvent(taskId, { type: "seed", payload: {} })
   const childDir = join(store.stateDir, "children", taskId)
   mkdirSync(join(childDir, "sessions", taskId), { recursive: true })
@@ -52,7 +55,13 @@ describe("cleanupExpiredRecords (TTL)", () => {
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000001", status: "completed", updated_at: iso(TTL + 1) })
     store.appendEvent("st_00000001", { type: "seed", payload: {} })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -67,7 +76,13 @@ describe("cleanupExpiredRecords (TTL)", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000002", status: "completed", updated_at: iso(TTL - 1) })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -81,7 +96,13 @@ describe("cleanupExpiredRecords (TTL)", () => {
     // given
     const store = tempStore()
     seedRecord(store, { task_id: "st_00000003", status: "running", updated_at: iso(TTL + 1000) })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -113,8 +134,21 @@ describe("cleanupExpiredRecords (TTL)", () => {
   test("#given an old lost RPC record with a LIVE pid #when cleaning #then it is retained (no pid-dead proof)", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000004", status: "lost", execution_mode: "process", pid: 700, updated_at: iso(TTL + 1000) })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now, signaller: aliveSignaller(new Set([700])) })
+    seedRecord(store, {
+      task_id: "st_00000004",
+      status: "lost",
+      execution_mode: "process",
+      pid: 700,
+      updated_at: iso(TTL + 1000),
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+      signaller: aliveSignaller(new Set([700])),
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -127,8 +161,21 @@ describe("cleanupExpiredRecords (TTL)", () => {
   test("#given an old lost RPC record with a DEAD pid #when cleaning #then it is deleted (pid-dead proven)", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000005", status: "lost", execution_mode: "process", pid: 701, updated_at: iso(TTL + 1000) })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now, signaller: aliveSignaller(new Set()) })
+    seedRecord(store, {
+      task_id: "st_00000005",
+      status: "lost",
+      execution_mode: "process",
+      pid: 701,
+      updated_at: iso(TTL + 1000),
+    })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+      signaller: aliveSignaller(new Set()),
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -143,7 +190,13 @@ describe("cleanupExpiredRecords (TTL)", () => {
     seedRecord(store, { task_id: "st_00000006", status: "completed", updated_at: iso(TTL + 1) })
     const registry = new FakeRegistry()
     registry.add(fakeHandle("st_00000006", "in-process", []))
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry,
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const retained = await lifecycle.cleanupExpiredRecords()
@@ -166,7 +219,13 @@ describe("cleanupExpiredRecords (TTL) cross-process ownership", () => {
   test("#given an expired resident record owned by a LIVE foreign process #when cleaning #then it is retained", async () => {
     // given a sibling senpi process still holds this child resident (revivable)
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000010", status: "completed", residency_state: "resident", updated_at: iso(TTL + 1000), host_pid: 4242 })
+    seedRecord(store, {
+      task_id: "st_00000010",
+      status: "completed",
+      residency_state: "resident",
+      updated_at: iso(TTL + 1000),
+      host_pid: 4242,
+    })
     const lifecycle = createTaskLifecycle({
       hostEndpoint: NO_HOST_ENDPOINT,
       store,
@@ -188,7 +247,13 @@ describe("cleanupExpiredRecords (TTL) cross-process ownership", () => {
   test("#given an expired resident record whose foreign owner is DEAD #when cleaning #then it is deleted", async () => {
     // given
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000011", status: "completed", residency_state: "resident", updated_at: iso(TTL + 1000), host_pid: 4242 })
+    seedRecord(store, {
+      task_id: "st_00000011",
+      status: "completed",
+      residency_state: "resident",
+      updated_at: iso(TTL + 1000),
+      host_pid: 4242,
+    })
     const lifecycle = createTaskLifecycle({
       hostEndpoint: NO_HOST_ENDPOINT,
       store,
@@ -211,9 +276,20 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
   test("#given an expired terminal persisted_only record with child artifacts #when cleaning #then record, children dir, spill, and log are all deleted", async () => {
     // given a suspended child that finished and aged out - every durable artifact must go
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000020", status: "completed", residency_state: "persisted_only", updated_at: iso(TTL + 1) })
+    seedRecord(store, {
+      task_id: "st_00000020",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(TTL + 1),
+    })
     const artifacts = seedChildArtifacts(store, "st_00000020")
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -229,9 +305,20 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
   test("#given an expired NON-terminal suspended record #when cleaning #then it and its child artifacts are retained", async () => {
     // given a suspended child whose work is still in flight - TTL must never reap it
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000021", status: "running", residency_state: "persisted_only", updated_at: iso(TTL + 1000) })
+    seedRecord(store, {
+      task_id: "st_00000021",
+      status: "running",
+      residency_state: "persisted_only",
+      updated_at: iso(TTL + 1000),
+    })
     const artifacts = seedChildArtifacts(store, "st_00000021")
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const result = await lifecycle.cleanupExpiredRecords()
@@ -246,7 +333,12 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
   test("#given a record claimed by revival between the scan and the delete #when cleaning #then the claimed record is retained", async () => {
     // given an expired suspended record that a revival claims at the exact deletion boundary
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000022", status: "completed", residency_state: "persisted_only", updated_at: iso(TTL + 1000) })
+    seedRecord(store, {
+      task_id: "st_00000022",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(TTL + 1000),
+    })
     const HOST = 1111
     let claimed = false
     const racingStore: TaskRecordStore = {
@@ -295,7 +387,13 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
       run_epoch: 2,
       notified_epoch: 0,
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const first = await lifecycle.cleanupExpiredRecords()
@@ -305,7 +403,10 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
     expect(existsSync(recordPath(store, "st_00000023"))).toBe(true)
 
     // when the notification is delivered for the current epoch and the sweep runs again
-    store.mutate("st_00000023", (record) => ({ ...record, notification: { ...record.notification, notified_epoch: 2 } }))
+    store.mutate("st_00000023", (record) => ({
+      ...record,
+      notification: { ...record.notification, notified_epoch: 2 },
+    }))
     const second = await lifecycle.cleanupExpiredRecords()
 
     // then TTL may finally expunge it
@@ -325,7 +426,13 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
       notified_epoch: 0,
       notification_failed_epoch: 2,
     })
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const first = await lifecycle.cleanupExpiredRecords()
@@ -335,7 +442,10 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
     expect(existsSync(recordPath(store, "st_00000024"))).toBe(true)
 
     // when the retry finally delivers the epoch and the sweep runs again
-    store.mutate("st_00000024", (record) => ({ ...record, notification: { ...record.notification, notified_epoch: 2 } }))
+    store.mutate("st_00000024", (record) => ({
+      ...record,
+      notification: { ...record.notification, notified_epoch: 2 },
+    }))
     const second = await lifecycle.cleanupExpiredRecords()
 
     // then
@@ -346,11 +456,22 @@ describe("cleanupExpiredRecords (TTL) suspended-era artifacts", () => {
   test("#given a sweep crashed after tombstoning #when the next sweep runs #then it finishes deleting the artifacts idempotently", async () => {
     // given a leftover tombstone plus the not-yet-deleted artifacts of an interrupted expunge
     const store = tempStore()
-    seedRecord(store, { task_id: "st_00000025", status: "completed", residency_state: "persisted_only", updated_at: iso(TTL + 1000) })
+    seedRecord(store, {
+      task_id: "st_00000025",
+      status: "completed",
+      residency_state: "persisted_only",
+      updated_at: iso(TTL + 1000),
+    })
     const artifacts = seedChildArtifacts(store, "st_00000025")
     const tombstonePath = `${recordPath(store, "st_00000025")}.expunging`
     renameSync(recordPath(store, "st_00000025"), tombstonePath)
-    const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry: new FakeRegistry(), config: settings({ ttl_ms: TTL }), now })
+    const lifecycle = createTaskLifecycle({
+      hostEndpoint: NO_HOST_ENDPOINT,
+      store,
+      registry: new FakeRegistry(),
+      config: settings({ ttl_ms: TTL }),
+      now,
+    })
 
     // when
     const first = await lifecycle.cleanupExpiredRecords()

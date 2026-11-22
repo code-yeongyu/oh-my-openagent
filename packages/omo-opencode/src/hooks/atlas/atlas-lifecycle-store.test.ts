@@ -44,7 +44,9 @@ describe("AtlasLifecycleStore", () => {
     // given
     const store = new AtlasLifecycleStore()
     const state = store.getOrCreateState("session-1")
-    state.pendingRetryTimer = scheduleRetryWithTimer(async () => { store.getOrCreateState("session-1") }, 60_000)
+    state.pendingRetryTimer = scheduleRetryWithTimer(async () => {
+      store.getOrCreateState("session-1")
+    }, 60_000)
     store.trackFileCall("call-1", "session-1", "plan.md")
 
     // when

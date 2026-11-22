@@ -9,7 +9,8 @@ export type ClaudeCodePin = {
   readonly claudeCodeVersion?: string
 }
 
-export type ClaudeCodeAcquired = { readonly path: string; readonly downloaded: boolean } | { readonly path: null; readonly error: string }
+export type ClaudeCodeAcquired =
+  { readonly path: string; readonly downloaded: boolean } | { readonly path: null; readonly error: string }
 
 export type ClaudeCodeDownloadProgress = { readonly receivedBytes: number; readonly totalBytes: number | undefined }
 
@@ -35,7 +36,10 @@ function matchesIntegrity(bytes: Uint8Array, integrity: string): boolean {
   return createHash("sha512").update(bytes).digest("base64") === expected
 }
 
-async function readWithProgress(response: Response, onProgress: ((progress: ClaudeCodeDownloadProgress) => void) | undefined): Promise<Uint8Array> {
+async function readWithProgress(
+  response: Response,
+  onProgress: ((progress: ClaudeCodeDownloadProgress) => void) | undefined,
+): Promise<Uint8Array> {
   if (onProgress === undefined || response.body === null) return new Uint8Array(await response.arrayBuffer())
   const header = Number.parseInt(response.headers.get("content-length") ?? "", 10)
   const totalBytes = Number.isFinite(header) && header > 0 ? header : undefined
@@ -65,22 +69,33 @@ export async function acquireClaudeCode(options: {
   const platform = options.platform ?? process.platform
   const target = cachedExecutablePath(options.cacheRoot, options.pin, platform)
   if (existsSync(target) && statSync(target).size > 0) return { path: target, downloaded: false }
-  options.onDownloadStart?.(`Downloading Claude Code ${options.pin.claudeCodeVersion ?? options.pin.version} (${options.pin.name}), needed once for the anthropic-subscription lane...`)
+  options.onDownloadStart?.(
+    `Downloading Claude Code ${options.pin.claudeCodeVersion ?? options.pin.version} (${options.pin.name}), needed once for the anthropic-subscription lane...`,
+  )
   let bytes: Uint8Array
   try {
-    const response = await (options.fetch ?? globalThis.fetch)(tarballUrl(options.pin, options.registry), { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
+    const response = await (options.fetch ?? globalThis.fetch)(tarballUrl(options.pin, options.registry), {
+      signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS),
+    })
     if (!response.ok) return { path: null, error: offlineMessage(options.pin, `HTTP ${response.status}`) }
     bytes = await readWithProgress(response, options.onProgress)
   } catch (error) {
     return { path: null, error: offlineMessage(options.pin, error instanceof Error ? error.message : String(error)) }
   }
   if (!matchesIntegrity(bytes, options.pin.integrity)) {
-    return { path: null, error: `Claude Code package ${options.pin.name}@${options.pin.version} failed its integrity check; nothing was installed.` }
+    return {
+      path: null,
+      error: `Claude Code package ${options.pin.name}@${options.pin.version} failed its integrity check; nothing was installed.`,
+    }
   }
   const entryName = `package/${executableName(platform)}`
   const files = await new Bun.Archive(bytes).files(entryName)
   const entry = files.get(entryName)
-  if (entry === undefined) return { path: null, error: `Claude Code package ${options.pin.name}@${options.pin.version} has no ${executableName(platform)}.` }
+  if (entry === undefined)
+    return {
+      path: null,
+      error: `Claude Code package ${options.pin.name}@${options.pin.version} has no ${executableName(platform)}.`,
+    }
   const directory = join(target, "..")
   mkdirSync(directory, { recursive: true })
   const staged = join(directory, `.${executableName(platform)}.${randomUUID()}`)

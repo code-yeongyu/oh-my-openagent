@@ -1,6 +1,12 @@
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs"
 
-import type { AdmitExternalMessageInput, ExternalAdmissionKind, RuntimePhase, SessionAdmissionGate, SessionRuntimePort } from "../adapter"
+import type {
+  AdmitExternalMessageInput,
+  ExternalAdmissionKind,
+  RuntimePhase,
+  SessionAdmissionGate,
+  SessionRuntimePort,
+} from "../adapter"
 import { SESSION_CONTROL_DELIVERY_TYPE, SESSION_RELEASED_ENTRY_TYPE } from "../constants"
 
 type Lane = "start" | "steer" | "followUp"
@@ -17,6 +23,8 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   phaseValue: RuntimePhase = "idle"
   epoch = 0
   editorHold: "draft" | undefined = undefined
+  /** senpi#7014: an idle session under these holds keeps a delivery as a held notice and answers `held`. */
+  sessionHolds: readonly string[] = []
   editorRevision = 0
   closedReason: string | undefined
   readonly enqueueCalls: { readonly lane: Lane; readonly delivery_id: string }[] = []
@@ -33,7 +41,10 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   constructor(sessionPath: string, durableId: string, cwd: string, options: { readonly reopen?: boolean } = {}) {
     this.sessionPath = sessionPath
     if (options.reopen === true) return
-    writeFileSync(sessionPath, `${JSON.stringify({ type: "session", id: durableId, timestamp: new Date(0).toISOString(), cwd })}\n`)
+    writeFileSync(
+      sessionPath,
+      `${JSON.stringify({ type: "session", id: durableId, timestamp: new Date(0).toISOString(), cwd })}\n`,
+    )
   }
 
   phase = (): RuntimePhase => this.phaseValue
@@ -45,15 +56,22 @@ export class FakeSessionRuntime implements SessionRuntimePort {
     turn_epoch: this.epoch,
   })
 
-  admitExternalMessage = (input: AdmitExternalMessageInput): { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number } => {
+  admitExternalMessage = (
+    input: AdmitExternalMessageInput,
+  ): { readonly kind: ExternalAdmissionKind; readonly turn_epoch: number } => {
     if (this.closedReason !== undefined) throw new Error(this.closedReason)
     const turnEpoch = this.epoch
     const id = input.delivery_id
     if (this.pending.has(id) || this.emitted.has(id)) return { kind: "already_admitted", turn_epoch: turnEpoch }
     if (this.editorHold !== undefined) return { kind: "held_draft", turn_epoch: turnEpoch }
-    if (input.expected_turn_id !== undefined && input.expected_turn_id !== turnEpoch) return { kind: "turn_conflict", turn_epoch: turnEpoch }
+    if (input.expected_turn_id !== undefined && input.expected_turn_id !== turnEpoch)
+      return { kind: "turn_conflict", turn_epoch: turnEpoch }
     this.texts.set(id, input.text)
     this.inputs.set(id, input)
+    if (!this.isBusy() && this.sessionHolds.length > 0) {
+      this.pending.set(id, "followUp")
+      return { kind: "held", turn_epoch: turnEpoch }
+    }
     if (!this.isBusy()) {
       this.pending.set(id, "start")
       this.enqueueCalls.push({ lane: "start", delivery_id: id })
@@ -106,7 +124,10 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   submitDraft(): void {
     this.editorHold = undefined
     this.editorRevision++
-    appendFileSync(this.sessionPath, `${JSON.stringify({ type: "message", message: { role: "user", content: "draft" } })}\n`)
+    appendFileSync(
+      this.sessionPath,
+      `${JSON.stringify({ type: "message", message: { role: "user", content: "draft" } })}\n`,
+    )
     if (this.phaseValue === "idle") this.beginTurn()
   }
 
@@ -131,7 +152,12 @@ export class FakeSessionRuntime implements SessionRuntimePort {
       .split("\n")
       .filter((line) => line.length > 0)
       .map((line) => JSON.parse(line) as { type?: string; customType?: string; details?: { delivery_id?: string } })
-      .filter((entry) => entry.type === "custom_message" && entry.customType === SESSION_CONTROL_DELIVERY_TYPE && entry.details?.delivery_id === deliveryId).length
+      .filter(
+        (entry) =>
+          entry.type === "custom_message" &&
+          entry.customType === SESSION_CONTROL_DELIVERY_TYPE &&
+          entry.details?.delivery_id === deliveryId,
+      ).length
   }
 
   enqueueCount(deliveryId: string): number {
@@ -151,11 +177,20 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   /** senpi `release_session`: admission closes and the file records `session_released` before teardown. */
   release(releasedAt: number, hostInstance: string): void {
     this.closedReason = "session released"
-    appendFileSync(this.sessionPath, `${JSON.stringify({
-      type: "custom",
-      customType: SESSION_RELEASED_ENTRY_TYPE,
-      data: { reason: "takeover", interrupted: false, attachments: 0, host_instance: hostInstance, released_at: new Date(releasedAt).toISOString() },
-    })}\n`)
+    appendFileSync(
+      this.sessionPath,
+      `${JSON.stringify({
+        type: "custom",
+        customType: SESSION_RELEASED_ENTRY_TYPE,
+        data: {
+          reason: "takeover",
+          interrupted: false,
+          attachments: 0,
+          host_instance: hostInstance,
+          released_at: new Date(releasedAt).toISOString(),
+        },
+      })}\n`,
+    )
   }
 
   dropQueues(): readonly string[] {
@@ -178,13 +213,16 @@ export class FakeSessionRuntime implements SessionRuntimePort {
   private persist(id: string): void {
     if (this.emitted.has(id)) return
     const lane = this.pending.get(id) ?? "followUp"
-    appendFileSync(this.sessionPath, `${JSON.stringify({
-      type: "custom_message",
-      customType: SESSION_CONTROL_DELIVERY_TYPE,
-      content: this.texts.get(id) ?? "",
-      display: true,
-      details: { delivery_id: id, source: "session_control", deliverAs: lane === "steer" ? "steer" : "followUp" },
-    })}\n`)
+    appendFileSync(
+      this.sessionPath,
+      `${JSON.stringify({
+        type: "custom_message",
+        customType: SESSION_CONTROL_DELIVERY_TYPE,
+        content: this.texts.get(id) ?? "",
+        display: true,
+        details: { delivery_id: id, source: "session_control", deliverAs: lane === "steer" ? "steer" : "followUp" },
+      })}\n`,
+    )
     this.pending.delete(id)
     this.emitted.add(id)
     for (const listener of this.emittedListeners) listener(id)

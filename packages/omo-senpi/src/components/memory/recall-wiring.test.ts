@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { BeforeAgentStartEventResult } from "@code-yeongyu/senpi"
-import {
-  GitMemoryRepo,
-  RecallLedger,
-} from "@oh-my-opencode/memory-core"
+import { GitMemoryRepo, RecallLedger } from "@oh-my-opencode/memory-core"
 
 import { MemoryFakeExtensionAPI, memorySettings } from "./memory.test-support"
 import { MEMORY_NOTICE_CUSTOM_TYPE } from "./prompt"
@@ -90,7 +87,10 @@ describe("resolveAgentRecallSettings", () => {
   test("#given a per-agent recall override with a partial event_caps #when resolved for that agent #then the sidecar settings merge per field and the other agents keep the root values", () => {
     // given
     const settings = memorySettings({
-      recall: { ...memorySettings().recall, event_caps: { tool_args: 300, result_head: 900, assistant: 1500, prompt: 4000 } },
+      recall: {
+        ...memorySettings().recall,
+        event_caps: { tool_args: 300, result_head: 900, assistant: 1500, prompt: 4000 },
+      },
       agents: { research: { recall: { category: "deep", tool_budget: 4, event_caps: { tool_args: 200 } } } },
     })
 
@@ -142,39 +142,62 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     {
       channel: "tool call arguments",
       entry: {
-        type: "message", id: "seen",
-        message: { role: "assistant", content: [{ type: "toolCall", id: "read-1", name: "read", arguments: { path: `/memory/${ROLLOUTS_PATH}` } }] },
+        type: "message",
+        id: "seen",
+        message: {
+          role: "assistant",
+          content: [{ type: "toolCall", id: "read-1", name: "read", arguments: { path: `/memory/${ROLLOUTS_PATH}` } }],
+        },
       },
     },
     {
       channel: "tool result text",
       entry: {
-        type: "message", id: "seen",
-        message: { role: "toolResult", toolCallId: "read-1", toolName: "read", content: [{ type: "text", text: `Read ${ROLLOUTS_PATH}` }] },
+        type: "message",
+        id: "seen",
+        message: {
+          role: "toolResult",
+          toolCallId: "read-1",
+          toolName: "read",
+          content: [{ type: "text", text: `Read ${ROLLOUTS_PATH}` }],
+        },
       },
     },
     {
       channel: "nested tool result details",
       entry: {
-        type: "message", id: "seen",
-        message: { role: "toolResult", toolCallId: "read-1", toolName: "read", content: [], details: { files: [{ path: ROLLOUTS_PATH }] } },
+        type: "message",
+        id: "seen",
+        message: {
+          role: "toolResult",
+          toolCallId: "read-1",
+          toolName: "read",
+          content: [],
+          details: { files: [{ path: ROLLOUTS_PATH }] },
+        },
       },
     },
     { channel: "custom message", entry: customMessageEntry("seen", RECALL_CUSTOM_TYPE, ROLLOUTS_PATH) },
-  ])("#given a transcript-visible path in $channel #when candidates are collected #then only the absent control remains", async ({ entry }) => {
-    // given
-    const { repo, context } = await fixture(tempDirs, [{
-      relativePath: DRAINS_PATH,
-      content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
-    }])
-    const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2 } })
+  ])(
+    "#given a transcript-visible path in $channel #when candidates are collected #then only the absent control remains",
+    async ({ entry }) => {
+      // given
+      const { repo, context } = await fixture(tempDirs, [
+        {
+          relativePath: DRAINS_PATH,
+          content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
+        },
+      ])
+      const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2 } })
 
-    // when
-    const collected = await wiring.collectCandidates(eventContext([entry, userEntry("m1", KUBERNETES_PROMPT)]))
+      // when
+      const collected = await wiring.collectCandidates(eventContext([entry, userEntry("m1", KUBERNETES_PROMPT)]))
 
-    // then
-    expect(collected?.candidates.map((candidate) => candidate.path)).toEqual([DRAINS_PATH])
-  }, 30_000)
+      // then
+      expect(collected?.candidates.map((candidate) => candidate.path)).toEqual([DRAINS_PATH])
+    },
+    30_000,
+  )
 
   test.each([
     { suffix: ".bak", excluded: false },
@@ -187,41 +210,62 @@ describe("createMemoryRecallWiring collectCandidates", () => {
     { suffix: "`", excluded: true },
     { suffix: ")", excluded: true },
     { suffix: "\nnext line", excluded: true },
-  ])("#given a path with suffix $suffix #when candidates are collected #then filename boundaries determine exclusion", async ({ suffix, excluded }) => {
-    // given
-    const { repo, context } = await fixture(tempDirs, [{
-      relativePath: DRAINS_PATH,
-      content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
-    }])
-    const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2 } })
+  ])(
+    "#given a path with suffix $suffix #when candidates are collected #then filename boundaries determine exclusion",
+    async ({ suffix, excluded }) => {
+      // given
+      const { repo, context } = await fixture(tempDirs, [
+        {
+          relativePath: DRAINS_PATH,
+          content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
+        },
+      ])
+      const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2 } })
 
-    // when
-    const collected = await wiring.collectCandidates(eventContext([
-      assistantEntry("seen", `[[${ROLLOUTS_PATH}${suffix}`),
-      userEntry("m1", KUBERNETES_PROMPT),
-    ]))
+      // when
+      const collected = await wiring.collectCandidates(
+        eventContext([assistantEntry("seen", `[[${ROLLOUTS_PATH}${suffix}`), userEntry("m1", KUBERNETES_PROMPT)]),
+      )
 
-    // then
-    expect(collected?.candidates.map((candidate) => candidate.path).sort()).toEqual(
-      (excluded ? [DRAINS_PATH] : [DRAINS_PATH, ROLLOUTS_PATH]).sort(),
-    )
-  }, 30_000)
+      // then
+      expect(collected?.candidates.map((candidate) => candidate.path).sort()).toEqual(
+        (excluded ? [DRAINS_PATH] : [DRAINS_PATH, ROLLOUTS_PATH]).sort(),
+      )
+    },
+    30_000,
+  )
 
   test("#given a real absolute memory path in tool arguments #when candidates are collected #then only the absent control remains", async () => {
     // given
-    const { repo, context } = await fixture(tempDirs, [{
-      relativePath: DRAINS_PATH,
-      content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
-    }])
+    const { repo, context } = await fixture(tempDirs, [
+      {
+        relativePath: DRAINS_PATH,
+        content: `---\ndescription: ${DRAINS_DESCRIPTION}\n---\n${DRAINS_BODY}`,
+      },
+    ])
     const wiring = wiringFor({ repo, identity: context, recall: { max_items: 2 } })
 
     // when
-    const collected = await wiring.collectCandidates(eventContext([
-      { type: "message", id: "seen", message: { role: "assistant", content: [
-        { type: "toolCall", id: "read-absolute", name: "read", arguments: { path: `${repo.dir}/${ROLLOUTS_PATH}` } },
-      ] } },
-      userEntry("m1", KUBERNETES_PROMPT),
-    ]))
+    const collected = await wiring.collectCandidates(
+      eventContext([
+        {
+          type: "message",
+          id: "seen",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "toolCall",
+                id: "read-absolute",
+                name: "read",
+                arguments: { path: `${repo.dir}/${ROLLOUTS_PATH}` },
+              },
+            ],
+          },
+        },
+        userEntry("m1", KUBERNETES_PROMPT),
+      ]),
+    )
 
     // then
     expect(collected?.candidates.map((candidate) => candidate.path)).toEqual([DRAINS_PATH])
@@ -230,39 +274,53 @@ describe("createMemoryRecallWiring collectCandidates", () => {
   test.each([
     { newerEntries: 199, excluded: true },
     { newerEntries: 200, excluded: false },
-  ])("#given a transcript-visible path with $newerEntries newer entries #when collected #then the last 200 entries bound exclusion", async ({ newerEntries, excluded }) => {
-    // given: filler exceeds the judge's six-turn window without relying on elapsed time
-    const { repo, context } = await fixture(tempDirs)
-    const wiring = wiringFor({ repo, identity: context })
-    const entries = [
-      assistantEntry("seen", ROLLOUTS_PATH),
-      ...Array.from({ length: newerEntries - 1 }, (_, index) => assistantEntry(`filler-${index}`, "Continuing the investigation")),
-      userEntry("m1", KUBERNETES_PROMPT),
-    ]
+  ])(
+    "#given a transcript-visible path with $newerEntries newer entries #when collected #then the last 200 entries bound exclusion",
+    async ({ newerEntries, excluded }) => {
+      // given: filler exceeds the judge's six-turn window without relying on elapsed time
+      const { repo, context } = await fixture(tempDirs)
+      const wiring = wiringFor({ repo, identity: context })
+      const entries = [
+        assistantEntry("seen", ROLLOUTS_PATH),
+        ...Array.from({ length: newerEntries - 1 }, (_, index) =>
+          assistantEntry(`filler-${index}`, "Continuing the investigation"),
+        ),
+        userEntry("m1", KUBERNETES_PROMPT),
+      ]
 
-    // when
-    const collected = await wiring.collectCandidates(eventContext(entries))
+      // when
+      const collected = await wiring.collectCandidates(eventContext(entries))
 
-    // then
-    expect(collected?.candidates.map((candidate) => candidate.path) ?? []).toEqual(excluded ? [] : [ROLLOUTS_PATH])
-  }, 30_000)
+      // then
+      expect(collected?.candidates.map((candidate) => candidate.path) ?? []).toEqual(excluded ? [] : [ROLLOUTS_PATH])
+    },
+    30_000,
+  )
 
   test("#given a transcript-visible path in a captured snapshot #when collected twice #then exclusion is deterministic and session-local", async () => {
     // given
     const { repo, context } = await fixture(tempDirs)
     const wiring = wiringFor({ repo, identity: context })
-    const snapshot = { id: SESSION_ID, entries: [userEntry("m1", KUBERNETES_PROMPT), assistantEntry("seen", ROLLOUTS_PATH)] }
+    const snapshot = {
+      id: SESSION_ID,
+      entries: [userEntry("m1", KUBERNETES_PROMPT), assistantEntry("seen", ROLLOUTS_PATH)],
+    }
 
     // when
     const first = await wiring.collectCandidatesFromSnapshot(snapshot)
     const second = await wiring.collectCandidatesFromSnapshot(snapshot)
-    const unseen = await wiring.collectCandidatesFromSnapshot({ id: SESSION_ID, entries: [userEntry("m1", KUBERNETES_PROMPT)] })
+    const unseen = await wiring.collectCandidatesFromSnapshot({
+      id: SESSION_ID,
+      entries: [userEntry("m1", KUBERNETES_PROMPT)],
+    })
 
     // then
     expect(first).toBeUndefined()
     expect(second).toBeUndefined()
     expect(unseen?.candidates.map((candidate) => candidate.path)).toEqual([ROLLOUTS_PATH])
-    expect(await new RecallLedger(context.identityPaths.recallLedger).surfacedPaths(SESSION_ID)).toEqual(new Set<string>())
+    expect(await new RecallLedger(context.identityPaths.recallLedger).surfacedPaths(SESSION_ID)).toEqual(
+      new Set<string>(),
+    )
   }, 30_000)
 
   test("#given only assistant prose mentioning the corpus #when candidates are collected #then nothing is collected", async () => {
@@ -406,10 +464,7 @@ describe("createMemoryRecallWiring collectCandidates", () => {
 
     // when
     const collected = await wiring.collectCandidates(
-      eventContext([
-        userEntry("m1", KUBERNETES_PROMPT),
-        assistantEntry("a1", "I will check the rollout runbook"),
-      ]),
+      eventContext([userEntry("m1", KUBERNETES_PROMPT), assistantEntry("a1", "I will check the rollout runbook")]),
     )
 
     // then

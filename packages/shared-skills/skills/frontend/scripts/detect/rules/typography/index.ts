@@ -15,7 +15,18 @@ import { undersizedUiText } from "./undersized-ui-text"
 import { wideTracking } from "./wide-tracking"
 
 export const TYPOGRAPHY_RULES: readonly Rule[] = [
-	overusedFont, flatTypeHierarchy, italicSerifDisplay, oversizedH1, extremeNegativeTracking,
-	tinyText, undersizedUiText, allCapsBody, wideTracking, tightLeading, justifiedText,
-	lineLength, designSystemFont, designSystemFontSize,
+  overusedFont,
+  flatTypeHierarchy,
+  italicSerifDisplay,
+  oversizedH1,
+  extremeNegativeTracking,
+  tinyText,
+  undersizedUiText,
+  allCapsBody,
+  wideTracking,
+  tightLeading,
+  justifiedText,
+  lineLength,
+  designSystemFont,
+  designSystemFontSize,
 ]

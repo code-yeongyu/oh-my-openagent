@@ -3,7 +3,8 @@ import { readFile } from "node:fs/promises"
 import type { ToolkitGrant } from "./index"
 
 function object(value: unknown): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error("invalid desktop toolkit response")
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    throw new Error("invalid desktop toolkit response")
   return value as Record<string, unknown>
 }
 
@@ -14,7 +15,8 @@ async function responseMessage(response: Response, id: number): Promise<Record<s
     if (message.jsonrpc !== "2.0" || message.id !== id) throw new Error("invalid desktop toolkit response id")
     return message
   }
-  if (mediaType !== "text/event-stream" || response.body === null) throw new Error("invalid desktop toolkit response type")
+  if (mediaType !== "text/event-stream" || response.body === null)
+    throw new Error("invalid desktop toolkit response type")
   const reader = response.body.getReader()
   const decoder = new TextDecoder()
   let buffer = ""
@@ -63,10 +65,17 @@ async function withClient<T>(
     Accept: "application/json, text/event-stream",
   })
   let nextId = 0
-  async function request(method: string, params?: Record<string, unknown>, notification = false): Promise<Record<string, unknown>> {
+  async function request(
+    method: string,
+    params?: Record<string, unknown>,
+    notification = false,
+  ): Promise<Record<string, unknown>> {
     const id = nextId++
     const response = await fetch(grant.endpoint, {
-      method: "POST", headers, redirect: "error", signal,
+      method: "POST",
+      headers,
+      redirect: "error",
+      signal,
       body: JSON.stringify({ jsonrpc: "2.0", ...(notification ? {} : { id }), method, params }),
     })
     if (!response.ok) {
@@ -101,7 +110,12 @@ async function withClient<T>(
   } finally {
     if (headers.has("Mcp-Session-Id")) {
       try {
-        const response = await fetch(grant.endpoint, { method: "DELETE", headers, redirect: "error", signal: AbortSignal.timeout(2_000) })
+        const response = await fetch(grant.endpoint, {
+          method: "DELETE",
+          headers,
+          redirect: "error",
+          signal: AbortSignal.timeout(2_000),
+        })
         await response.body?.cancel()
       } catch {
         // Best-effort session cleanup must not replace the operation's outcome.
@@ -129,15 +143,27 @@ function hostAttachment(value: unknown): DesktopTool["attachment"] {
   if (typeof name !== "string" || !/^[a-zA-Z0-9_-]{1,64}$/.test(name) || typeof label !== "string") {
     throw new Error("invalid host tool identity")
   }
-  if (exposure !== undefined && exposure !== "direct" && exposure !== "search" && exposure !== "eval" && exposure !== "model-only" && exposure !== "hidden") {
+  if (
+    exposure !== undefined &&
+    exposure !== "direct" &&
+    exposure !== "search" &&
+    exposure !== "eval" &&
+    exposure !== "model-only" &&
+    exposure !== "hidden"
+  ) {
     throw new Error("invalid host tool exposure")
   }
-  if (allowLazyActivation !== undefined && typeof allowLazyActivation !== "boolean") throw new Error("invalid host tool activation")
-  if (searchKeywords !== undefined && (!Array.isArray(searchKeywords) || !searchKeywords.every((word): word is string => typeof word === "string"))) {
+  if (allowLazyActivation !== undefined && typeof allowLazyActivation !== "boolean")
+    throw new Error("invalid host tool activation")
+  if (
+    searchKeywords !== undefined &&
+    (!Array.isArray(searchKeywords) || !searchKeywords.every((word): word is string => typeof word === "string"))
+  ) {
     throw new Error("invalid host tool search keywords")
   }
   return {
-    name, label,
+    name,
+    label,
     ...(exposure === undefined ? {} : { exposure }),
     ...(allowLazyActivation === undefined ? {} : { allowLazyActivation }),
     ...(searchKeywords === undefined ? {} : { searchKeywords }),
@@ -150,48 +176,69 @@ export function listThreadTools(
   signal?: AbortSignal,
   onInvalid?: (reason: "invalid_descriptor" | "invalid_name" | "invalid_schema") => void,
 ) {
-  return withClient(grant, timeoutMs, async (request) => {
-    const tools: DesktopTool[] = []
-    let cursor: string | undefined
-    do {
-      const page = await request("tools/list", cursor === undefined ? undefined : { cursor })
-      if (!Array.isArray(page.tools)) throw new Error("invalid desktop toolkit tools")
-      for (const value of page.tools) {
-        if (typeof value !== "object" || value === null || Array.isArray(value)) {
-          onInvalid?.("invalid_descriptor")
-          continue
+  return withClient(
+    grant,
+    timeoutMs,
+    async (request) => {
+      const tools: DesktopTool[] = []
+      let cursor: string | undefined
+      do {
+        const page = await request("tools/list", cursor === undefined ? undefined : { cursor })
+        if (!Array.isArray(page.tools)) throw new Error("invalid desktop toolkit tools")
+        for (const value of page.tools) {
+          if (typeof value !== "object" || value === null || Array.isArray(value)) {
+            onInvalid?.("invalid_descriptor")
+            continue
+          }
+          const tool = object(value)
+          let attachment: DesktopTool["attachment"]
+          try {
+            attachment =
+              typeof tool._meta === "object" && tool._meta !== null && "senpi/host-tool" in tool._meta
+                ? hostAttachment(tool._meta)
+                : undefined
+          } catch {
+            onInvalid?.("invalid_descriptor")
+            continue
+          }
+          if (
+            typeof tool.name !== "string" ||
+            tool.name.length === 0 ||
+            !/^[a-zA-Z0-9_-]{1,64}$/.test(attachment === undefined ? `desktop_${tool.name}` : tool.name)
+          ) {
+            onInvalid?.("invalid_name")
+            continue
+          }
+          if (
+            typeof tool.inputSchema !== "object" ||
+            tool.inputSchema === null ||
+            Array.isArray(tool.inputSchema) ||
+            !("type" in tool.inputSchema) ||
+            tool.inputSchema.type !== "object"
+          ) {
+            onInvalid?.("invalid_schema")
+            continue
+          }
+          if (tool.description !== undefined && typeof tool.description !== "string") {
+            onInvalid?.("invalid_descriptor")
+            continue
+          }
+          const inputSchema = object(tool.inputSchema)
+          tools.push({
+            name: tool.name,
+            inputSchema,
+            ...(tool.description === undefined ? {} : { description: tool.description }),
+            ...(attachment === undefined ? {} : { attachment }),
+          })
         }
-        const tool = object(value)
-        let attachment: DesktopTool["attachment"]
-        try {
-          attachment = typeof tool._meta === "object" && tool._meta !== null && "senpi/host-tool" in tool._meta
-            ? hostAttachment(tool._meta)
-            : undefined
-        } catch {
-          onInvalid?.("invalid_descriptor")
-          continue
-        }
-        if (typeof tool.name !== "string" || tool.name.length === 0 || !/^[a-zA-Z0-9_-]{1,64}$/.test(attachment === undefined ? `desktop_${tool.name}` : tool.name)) {
-          onInvalid?.("invalid_name")
-          continue
-        }
-        if (typeof tool.inputSchema !== "object" || tool.inputSchema === null || Array.isArray(tool.inputSchema) ||
-          !("type" in tool.inputSchema) || tool.inputSchema.type !== "object") {
-          onInvalid?.("invalid_schema")
-          continue
-        }
-        if (tool.description !== undefined && typeof tool.description !== "string") {
-          onInvalid?.("invalid_descriptor")
-          continue
-        }
-        const inputSchema = object(tool.inputSchema)
-        tools.push({ name: tool.name, inputSchema, ...(tool.description === undefined ? {} : { description: tool.description }), ...(attachment === undefined ? {} : { attachment }) })
-      }
-      if (page.nextCursor !== undefined && typeof page.nextCursor !== "string") throw new Error("invalid desktop toolkit cursor")
-      cursor = page.nextCursor
-    } while (cursor !== undefined)
-    return tools
-  }, signal)
+        if (page.nextCursor !== undefined && typeof page.nextCursor !== "string")
+          throw new Error("invalid desktop toolkit cursor")
+        cursor = page.nextCursor
+      } while (cursor !== undefined)
+      return tools
+    },
+    signal,
+  )
 }
 
 /** senpi's event-bus channel that routes one host tool (`{ name, execute? }`). */
@@ -214,13 +261,21 @@ export async function callThreadTool(
   if (attachment && signal?.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
   if (grant === undefined) {
     if (attachment) throw routeUnavailable()
-    return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit is not granted to the calling session." }], details: { reason: "no_session_grant" } }
+    return {
+      isError: true,
+      content: [{ type: "text", text: "Desktop thread toolkit is not granted to the calling session." }],
+      details: { reason: "no_session_grant" },
+    }
   }
   const deadline = AbortSignal.timeout(timeoutMs)
   const callSignal = signal === undefined ? deadline : AbortSignal.any([deadline, signal])
   try {
-    const result = await withClient(grant, timeoutMs, (request) =>
-      request("tools/call", { name, arguments: args }), callSignal)
+    const result = await withClient(
+      grant,
+      timeoutMs,
+      (request) => request("tools/call", { name, arguments: args }),
+      callSignal,
+    )
     if (!Array.isArray(result.content) || (result.isError !== undefined && typeof result.isError !== "boolean")) {
       throw new Error("invalid desktop toolkit content")
     }
@@ -235,6 +290,10 @@ export async function callThreadTool(
     // Neither transport errors nor server replies may disclose the file's bearer.
     if (attachment && callSignal.aborted) throw new DOMException("Desktop toolkit call aborted.", "AbortError")
     if (attachment) throw routeUnavailable()
-    return { isError: true, content: [{ type: "text", text: "Desktop thread toolkit call failed." }], details: { reason: "call_failed" } }
+    return {
+      isError: true,
+      content: [{ type: "text", text: "Desktop thread toolkit call failed." }],
+      details: { reason: "call_failed" },
+    }
   }
 }

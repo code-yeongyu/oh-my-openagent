@@ -11,12 +11,31 @@ import { createHash } from "node:crypto"
 import { existsSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 import { detectHarnesses } from "./setup-detect.js"
-import { applyCredentials, credentialCounts, credentialPlanLines, credentialQuestion, opencodeOauthProviders, planCredentials } from "./setup-credentials.js"
+import {
+  applyCredentials,
+  credentialCounts,
+  credentialPlanLines,
+  credentialQuestion,
+  opencodeOauthProviders,
+  planCredentials,
+} from "./setup-credentials.js"
 import { applyAssets, assetCounts, assetPlanLines, assetQuestion, planAssets } from "./setup-assets-import.js"
 import { planOpencodeProviders } from "./setup-opencode-providers.js"
 import { withCommandCodeProvider } from "./setup-commandcode.js"
-import { applyProviders, planProviders, providerCounts, providerPlanLines, providerQuestion } from "./setup-providers-import.js"
-import { applyModelChoices, modelChoiceCounts, modelChoicePlanLines, modelChoiceQuestion, planModelChoices } from "./setup-model-choices-import.js"
+import {
+  applyProviders,
+  planProviders,
+  providerCounts,
+  providerPlanLines,
+  providerQuestion,
+} from "./setup-providers-import.js"
+import {
+  applyModelChoices,
+  modelChoiceCounts,
+  modelChoicePlanLines,
+  modelChoiceQuestion,
+  planModelChoices,
+} from "./setup-model-choices-import.js"
 import { setupStageItems } from "./setup-stream-items.js"
 
 export { canonicalAgentDir } from "./agent-dir.js"
@@ -37,7 +56,13 @@ async function settle(work) {
 function stageResult(source, settled, disabled = false) {
   if (settled.error !== undefined) return { source, items: [], notices: [], plan: { pending: 0 }, error: settled.error }
   const plan = settled.plan
-  return { source, items: disabled ? [] : setupStageItems(source, plan), notices: plan.notices ?? [], plan, ...(disabled ? { disabled: true } : {}) }
+  return {
+    source,
+    items: disabled ? [] : setupStageItems(source, plan),
+    notices: plan.notices ?? [],
+    plan,
+    ...(disabled ? { disabled: true } : {}),
+  }
 }
 
 /**
@@ -108,10 +133,42 @@ export async function collectSetupPlans(stream) {
  */
 export function setupStages(plans) {
   return [
-    { id: "credentials", plan: plans.credentials, present: plans.credentials !== undefined && !plans.credentials.malformed, lines: credentialPlanLines, counts: credentialCounts, question: credentialQuestion, apply: (plan, options) => applyCredentials(plan, options) },
-    { id: "assets", plan: plans.assets, present: plans.assets?.present === true, lines: assetPlanLines, counts: assetCounts, question: assetQuestion, apply: (plan) => applyAssets(plan) },
-    { id: "providers", plan: plans.providers, present: plans.providers?.present === true, lines: providerPlanLines, counts: providerCounts, question: providerQuestion, apply: (plan, options) => applyProviders(plan, options) },
-    { id: "model-choices", plan: plans.modelChoices, present: plans.modelChoices?.present === true, lines: modelChoicePlanLines, counts: modelChoiceCounts, question: modelChoiceQuestion, apply: (plan, options) => applyModelChoices(plan, options) },
+    {
+      id: "credentials",
+      plan: plans.credentials,
+      present: plans.credentials !== undefined && !plans.credentials.malformed,
+      lines: credentialPlanLines,
+      counts: credentialCounts,
+      question: credentialQuestion,
+      apply: (plan, options) => applyCredentials(plan, options),
+    },
+    {
+      id: "assets",
+      plan: plans.assets,
+      present: plans.assets?.present === true,
+      lines: assetPlanLines,
+      counts: assetCounts,
+      question: assetQuestion,
+      apply: (plan) => applyAssets(plan),
+    },
+    {
+      id: "providers",
+      plan: plans.providers,
+      present: plans.providers?.present === true,
+      lines: providerPlanLines,
+      counts: providerCounts,
+      question: providerQuestion,
+      apply: (plan, options) => applyProviders(plan, options),
+    },
+    {
+      id: "model-choices",
+      plan: plans.modelChoices,
+      present: plans.modelChoices?.present === true,
+      lines: modelChoicePlanLines,
+      counts: modelChoiceCounts,
+      question: modelChoiceQuestion,
+      apply: (plan, options) => applyModelChoices(plan, options),
+    },
   ]
 }
 
@@ -129,7 +186,9 @@ export class SetupStaleError extends Error {
 // matches would be overwritten with the scan-time copy, so it counts as stale; an absent file is its
 // own expected state, and mtime alone never decides anything.
 function targetDigest(bytes) {
-  return createHash("sha256").update(bytes === undefined ? "\0absent" : bytes).digest("hex")
+  return createHash("sha256")
+    .update(bytes === undefined ? "\0absent" : bytes)
+    .digest("hex")
 }
 
 function staleTarget(path, expectedBytes) {
@@ -192,16 +251,28 @@ export function staleSetupTargets(plans, stageIds, written = new Set()) {
 /** The files a stage writes when it applies (resolved), so later stages of one apply can tell them apart. */
 function stageWrittenPaths(plans, id) {
   if (id === "credentials") return plans.credentials?.target === undefined ? [] : [plans.credentials.target]
-  if (id === "assets") return plans.assets?.paths?.mcp === undefined ? [] : [plans.assets.paths.mcp, ...(plans.assets.result?.skills?.added ?? []).map((skill) => join(plans.assets.paths.skills, skill.name))]
-  if (id === "providers") return [plans.providers?.paths?.models, plans.providers?.paths?.auth].filter((path) => path !== undefined)
-  if (id === "model-choices") return (plans.modelChoices?.items ?? []).map((item) => item.target?.path).filter((path) => path !== undefined)
+  if (id === "assets")
+    return plans.assets?.paths?.mcp === undefined
+      ? []
+      : [
+          plans.assets.paths.mcp,
+          ...(plans.assets.result?.skills?.added ?? []).map((skill) => join(plans.assets.paths.skills, skill.name)),
+        ]
+  if (id === "providers")
+    return [plans.providers?.paths?.models, plans.providers?.paths?.auth].filter((path) => path !== undefined)
+  if (id === "model-choices")
+    return (plans.modelChoices?.items ?? []).map((item) => item.target?.path).filter((path) => path !== undefined)
   return []
 }
 
 /** True when any of the given stages would write into a credential store. */
 export function authWritesPending(plans, stageIds) {
   const ids = new Set(stageIds)
-  const credentials = ids.has("credentials") && plans.credentials !== undefined && !plans.credentials.malformed && plans.credentials.pending > 0
+  const credentials =
+    ids.has("credentials") &&
+    plans.credentials !== undefined &&
+    !plans.credentials.malformed &&
+    plans.credentials.pending > 0
   const keys = ids.has("providers") && plans.providers !== undefined && (plans.providers.result?.keys?.length ?? 0) > 0
   return credentials || keys
 }
@@ -220,14 +291,20 @@ export async function applySetupStages(plans, confirm, report = () => {}, option
   // user's change (the credentials stage and the provider keys share auth.json; #10496 review).
   const written = new Set()
   for (const stage of setupStages(plans)) {
-    if (stage.id === "model-choices" && stage.plan !== undefined && plans.planChoices !== undefined && (plans.providers?.pending ?? 0) > 0 && !applied.has("providers")) {
+    if (
+      stage.id === "model-choices" &&
+      stage.plan !== undefined &&
+      plans.planChoices !== undefined &&
+      (plans.providers?.pending ?? 0) > 0 &&
+      !applied.has("providers")
+    ) {
       const shown = new Set(plans.modelChoices.notices)
       plans.modelChoices = await plans.planChoices([])
       stage.plan = plans.modelChoices
       for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
     }
     if (stage.plan === undefined || stage.plan.pending === 0) continue
-    if (!await confirm(stage)) continue
+    if (!(await confirm(stage))) continue
     if (options.staleGuard !== undefined) {
       const stale = options.staleGuard(stage.id, written)
       if (stale !== undefined && stale.length > 0) throw new SetupStaleError(stale, [...applied])

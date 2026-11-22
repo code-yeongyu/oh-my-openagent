@@ -65,7 +65,10 @@ export interface KibitzerSidecarOptions {
    * Hands re-validated nudges to the unchanged delivery path (ledger mark, hold, steer at the next
    * tool_result / passive coordinator / prompt drain).
    */
-  readonly deliver: (nudges: readonly RecallNudge[], outcome: Pick<KibitzerWakeOutcome, "wake" | "generation">) => Promise<void>
+  readonly deliver: (
+    nudges: readonly RecallNudge[],
+    outcome: Pick<KibitzerWakeOutcome, "wake" | "generation">,
+  ) => Promise<void>
   /** Every settled wake, including failures and aborts; the observability lane persists these. */
   readonly onWake?: (outcome: KibitzerWakeOutcome) => void
   /** The machine-wide wake lease; one lease is held for the whole of every provider turn. */

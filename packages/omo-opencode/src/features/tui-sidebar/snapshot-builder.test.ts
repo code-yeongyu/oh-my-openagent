@@ -140,9 +140,7 @@ describe("buildTuiRuntimeSnapshot", () => {
       { name: "sisyphus", status: "busy" },
       { name: "atlas", status: "retry" },
     ])
-    expect(snapshot.jobBoard).toEqual([
-      { title: "Explore runtime", status: "running", toolCalls: 3, lastTool: "grep" },
-    ])
+    expect(snapshot.jobBoard).toEqual([{ title: "Explore runtime", status: "running", toolCalls: 3, lastTool: "grep" }])
     expect(snapshot.loop).toEqual({
       kind: "live",
       goalsDone: 0,

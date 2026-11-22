@@ -43,13 +43,17 @@ function countLines(lines: readonly string[]): Map<string, number> {
   return counts
 }
 
-type ResultFact = { readonly kind: "reg"; readonly values: readonly string[] } | { readonly kind: "set"; readonly elements: readonly string[] }
+type ResultFact =
+  | { readonly kind: "reg"; readonly values: readonly string[] }
+  | { readonly kind: "set"; readonly elements: readonly string[] }
 
 function valueSurvives(wanted: FmValue, actual: ResultFact): boolean {
   const held = actual.kind === "reg" ? actual.values : actual.elements
   switch (wanted.kind) {
     case "set":
-      return actual.kind === "set" ? wanted.elements.every((element) => held.includes(element)) : held.includes(wanted.flow)
+      return actual.kind === "set"
+        ? wanted.elements.every((element) => held.includes(element))
+        : held.includes(wanted.flow)
     case "reg":
       return held.includes(wanted.value)
     case "remove":
@@ -126,7 +130,11 @@ function heldLines(rendered: string, registers: ReadonlyMap<string, readonly str
  * components per register key; a caller with no doc passes an empty map, which reads every
  * rendered register as one whole value.
  */
-export function firstMissingFact(rendered: string, source: string, registers: ReadonlyMap<string, readonly string[]>): string | null {
+export function firstMissingFact(
+  rendered: string,
+  source: string,
+  registers: ReadonlyMap<string, readonly string[]>,
+): string | null {
   const sourceLines = linesOf(source)
   const have = countLines(heldLines(rendered, registers))
   const allowance = droppableAllowance(sourceLines, splitItem(source).fm !== null)

@@ -60,9 +60,10 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "build",
 ])
 
-export function migrateAgentNames(
-  agents: Record<string, unknown>
-): { migrated: Record<string, unknown>; changed: boolean } {
+export function migrateAgentNames(agents: Record<string, unknown>): {
+  migrated: Record<string, unknown>
+  changed: boolean
+} {
   const migrated: Record<string, unknown> = {}
   let changed = false
 

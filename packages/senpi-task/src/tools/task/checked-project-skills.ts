@@ -3,7 +3,10 @@ import { basename, dirname, join } from "node:path"
 import { parseFrontmatter } from "@oh-my-opencode/utils"
 import { readSkillFileChecked } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/checked-skill-read"
 import {
-  checkSkillPath, SkillLinkBlockedError, reportSkillLoadError, type SkillProvenance,
+  checkSkillPath,
+  SkillLinkBlockedError,
+  reportSkillLoadError,
+  type SkillProvenance,
 } from "@oh-my-opencode/skills-loader-core/opencode-skill-loader/skill-provenance"
 import type { LoadedSkill } from "./types"
 

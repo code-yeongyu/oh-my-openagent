@@ -83,7 +83,10 @@ async function runSupervisor(runDir: string): Promise<void> {
   let timedOut = false
   let hardKillFinished = Promise.resolve()
   let finishHardKill: (() => void) | undefined
-  if (platform === "win32") hardKillFinished = new Promise<void>((resolve) => { finishHardKill = resolve })
+  if (platform === "win32")
+    hardKillFinished = new Promise<void>((resolve) => {
+      finishHardKill = resolve
+    })
   const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
     timedOut = true
     if (platform === "win32") recordSupervisorGracefulDeadline(bootstrap.pid)
@@ -147,6 +150,6 @@ try {
     await runSupervisor(args[0])
   }
 } catch (error) {
-  process.stderr.write(`${error instanceof Error ? error.stack ?? error.message : String(error)}\n`)
+  process.stderr.write(`${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`)
   process.exit(1)
 }

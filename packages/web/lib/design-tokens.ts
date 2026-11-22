@@ -16,9 +16,10 @@ const STYLESHEET = new URL("../app/styles/design-system.css", import.meta.url)
 
 export function readRootTokens(
   css: string = readFileSync(STYLESHEET, "utf8"),
+  selector = ":root",
 ): ReadonlyMap<string, string> {
-  const start = css.indexOf(":root {")
-  if (start === -1) throw new Error("design-system.css has no :root block")
+  const start = css.indexOf(`${selector} {`)
+  if (start === -1) throw new Error(`design-system.css has no ${selector} block`)
   const block = css.slice(start, css.indexOf("}", start))
   const tokens = new Map<string, string>()
   for (const match of block.matchAll(/(?<name>--[\w-]+)\s*:\s*(?<value>[^;]+);/g)) {

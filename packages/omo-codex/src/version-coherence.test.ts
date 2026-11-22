@@ -19,9 +19,7 @@ function rootVersion(): string {
 
 function pluginWorkspaceManifests(): string[] {
   const manifest: unknown = JSON.parse(readFileSync(join(pluginRoot, "package.json"), "utf8"))
-  const workspaces = typeof manifest === "object" && manifest !== null
-    ? Reflect.get(manifest, "workspaces")
-    : undefined
+  const workspaces = typeof manifest === "object" && manifest !== null ? Reflect.get(manifest, "workspaces") : undefined
 
   if (!Array.isArray(workspaces)) {
     throw new Error("Codex plugin package.json has no workspaces array")
@@ -57,7 +55,9 @@ describe("OMO Codex version coherence", () => {
     // when / then
     for (const manifest of versionedManifests()) {
       const actual = readJson(manifest).version
-      expect(`${relative(repoRoot, manifest)} -> ${String(actual)}`).toBe(`${relative(repoRoot, manifest)} -> ${expected}`)
+      expect(`${relative(repoRoot, manifest)} -> ${String(actual)}`).toBe(
+        `${relative(repoRoot, manifest)} -> ${expected}`,
+      )
     }
   })
 
@@ -66,9 +66,7 @@ describe("OMO Codex version coherence", () => {
     const expected = rootVersion()
     const hookManifests = [
       join(pluginRoot, "hooks", "hooks.json"),
-      ...pluginWorkspaceManifests().map((manifest) =>
-        join(manifest, "..", "hooks", "hooks.json"),
-      ),
+      ...pluginWorkspaceManifests().map((manifest) => join(manifest, "..", "hooks", "hooks.json")),
     ]
 
     // when / then
@@ -81,7 +79,9 @@ describe("OMO Codex version coherence", () => {
       }
       const labels = [...raw.matchAll(/LazyCodex\(([^)]*)\):/g)].map((match) => match[1])
       for (const label of labels) {
-        expect(`${relative(repoRoot, manifest)} -> LazyCodex(${label})`).toBe(`${relative(repoRoot, manifest)} -> LazyCodex(${expected})`)
+        expect(`${relative(repoRoot, manifest)} -> LazyCodex(${label})`).toBe(
+          `${relative(repoRoot, manifest)} -> LazyCodex(${expected})`,
+        )
       }
     }
   })

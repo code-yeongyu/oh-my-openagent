@@ -1,31 +1,14 @@
-import { afterEach, describe, expect, test } from "bun:test"
-import {
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs"
-import { createRequire } from "node:module"
+import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { tmpdir } from "node:os"
 import { spawnSync } from "node:child_process"
 import { pathToFileURL } from "node:url"
+import { spawnTimeout } from "../test-support/spawn-timeout"
 
 const packageRoot = join(import.meta.dir, "..")
 const pluginRoot = join(packageRoot, "plugin")
 const extensionPath = join(pluginRoot, "extensions", "omo.js")
-const requireFromPackage = createRequire(join(packageRoot, "package.json"))
-const temporaryRoots: string[] = []
-
-afterEach(() => {
-  for (const root of temporaryRoots.splice(0)) {
-    rmSync(root, { recursive: true, force: true })
-  }
-})
 
 describe("omo-senpi local-path runtime dependencies", () => {
   test("packageNameOf resolves package names from subpath imports", () => {
@@ -44,39 +27,46 @@ describe("omo-senpi local-path runtime dependencies", () => {
     expect(runtimeImports.length).toBeGreaterThan(0)
 
     const root = mkdtempSync(join(tmpdir(), "omo-senpi-symlink-"))
-    temporaryRoots.push(root)
-    const isolatedPackageRoot = join(root, "checkout", "packages", "omo-senpi")
-    const isolatedPluginRoot = join(isolatedPackageRoot, "plugin")
-    const isolatedProbePath = join(isolatedPluginRoot, "extensions", "runtime-dependency-probe.mjs")
-    mkdirSync(dirname(isolatedProbePath), { recursive: true })
-    writeFileSync(
-      isolatedProbePath,
-      `${runtimeImports.map((specifier) => `await import(${JSON.stringify(specifier)})`).join("\n")}\nconsole.log("runtime-dependencies-loaded")\n`,
-    )
+    try {
+      const isolatedPackageRoot = join(root, "checkout", "packages", "omo-senpi")
+      const isolatedPluginRoot = join(isolatedPackageRoot, "plugin")
+      const isolatedProbePath = join(isolatedPluginRoot, "extensions", "runtime-dependency-probe.mjs")
+      mkdirSync(dirname(isolatedProbePath), { recursive: true })
+      writeFileSync(
+        isolatedProbePath,
+        `${runtimeImports.map((specifier) => `await import(${JSON.stringify(specifier)})`).join("\n")}\nconsole.log("runtime-dependencies-loaded")\n`,
+      )
 
-    for (const packageName of new Set(runtimeImports.map(packageNameOf))) {
-      const dependencyRoot = findPackageRoot(packageName)
-      const linkPath = join(isolatedPackageRoot, "node_modules", ...packageName.split("/"))
-      mkdirSync(dirname(linkPath), { recursive: true })
-      symlinkSync(dependencyRoot, linkPath, "dir")
+      for (const packageName of new Set(runtimeImports.map(packageNameOf))) {
+        // The host's virtual module registry can make Bun resolve a bare name to itself.
+        // Link the installed package on disk; the Node probe owns import resolution.
+        const dependencyRoot = realpathSync(join(packageRoot, "node_modules", ...packageName.split("/")))
+        const linkPath = join(isolatedPackageRoot, "node_modules", ...packageName.split("/"))
+        mkdirSync(dirname(linkPath), { recursive: true })
+        symlinkSync(dependencyRoot, linkPath, "dir")
+      }
+
+      const hostPluginPath = join(root, "host", "node_modules", "@code-yeongyu", "omo-senpi")
+      mkdirSync(dirname(hostPluginPath), { recursive: true })
+      symlinkSync(isolatedPluginRoot, hostPluginPath, "dir")
+      expect(realpathSync(hostPluginPath)).toBe(realpathSync(isolatedPluginRoot))
+
+      const importedExtensionUrl = pathToFileURL(
+        join(hostPluginPath, "extensions", "runtime-dependency-probe.mjs"),
+      ).href
+      const result = spawnSync(
+        "node",
+        ["--input-type=module", "-e", `await import(${JSON.stringify(importedExtensionUrl)})`],
+        { cwd: join(root, "host"), encoding: "utf8", timeout: spawnTimeout() },
+      )
+
+      expect(result.error).toBeUndefined()
+      expect(result.stderr).toBe("")
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain("runtime-dependencies-loaded")
+    } finally {
+      rmSync(root, { recursive: true, force: true })
     }
-
-    const hostPluginPath = join(root, "host", "node_modules", "@code-yeongyu", "omo-senpi")
-    mkdirSync(dirname(hostPluginPath), { recursive: true })
-    symlinkSync(isolatedPluginRoot, hostPluginPath, "dir")
-    expect(realpathSync(hostPluginPath)).toBe(realpathSync(isolatedPluginRoot))
-
-    const importedExtensionUrl = pathToFileURL(join(hostPluginPath, "extensions", "runtime-dependency-probe.mjs")).href
-    const result = spawnSync(
-      "node",
-      ["--input-type=module", "-e", `await import(${JSON.stringify(importedExtensionUrl)})`],
-      { cwd: join(root, "host"), encoding: "utf8", timeout: 10_000 },
-    )
-
-    expect(result.error).toBeUndefined()
-    expect(result.stderr).toBe("")
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain("runtime-dependencies-loaded")
   })
 })
 
@@ -115,28 +105,4 @@ function readPackageManifest(): Record<string, unknown> {
 function collectPackageNames(value: unknown): Set<string> {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return new Set()
   return new Set(Object.keys(value))
-}
-
-// An `npm:<name>@<version>` alias installs <name>'s manifest under the alias directory.
-function installedPackageNameOf(packageName: string): string {
-  const dependencies = readPackageManifest().dependencies as Record<string, string> | undefined
-  const spec = dependencies?.[packageName]
-  if (spec === undefined || !spec.startsWith("npm:")) return packageName
-  return spec.slice("npm:".length, spec.lastIndexOf("@"))
-}
-
-function findPackageRoot(specifier: string): string {
-  const packageName = installedPackageNameOf(packageNameOf(specifier))
-  let current = dirname(requireFromPackage.resolve(specifier))
-  for (;;) {
-    const manifestPath = join(current, "package.json")
-    if (existsSync(manifestPath)) {
-      const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as { name?: unknown }
-      if (manifest.name === packageName) return current
-    }
-
-    const parent = dirname(current)
-    if (parent === current) throw new Error(`Could not locate package root for ${specifier}`)
-    current = parent
-  }
 }

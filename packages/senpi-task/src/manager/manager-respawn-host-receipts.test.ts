@@ -6,13 +6,20 @@ import { childIdentityOf } from "./manager-helpers"
 
 async function assertRenderedReason(f: Awaited<ReturnType<typeof stoppedChild>>): Promise<void> {
   const record = f.store.load(f.record.task_id)
-  const result = await runTaskOutput({ manager: f.manager, stateDir: f.store.stateDir }, { task_id: f.record.task_id }, "parent")
+  const result = await runTaskOutput(
+    { manager: f.manager, stateDir: f.store.stateDir },
+    { task_id: f.record.task_id },
+    "parent",
+  )
   const rendered = result.content[0]
   if (rendered?.type !== "text" || record?.error_message === undefined) throw new Error("missing reason")
   expect(rendered.text).toContain(record.error_message)
 }
 
-afterEach(async () => { await reconciliationHarness.release(); cleanupProjects() })
+afterEach(async () => {
+  await reconciliationHarness.release()
+  cleanupProjects()
+})
 
 describe("receipt-driven host respawn lifecycle", () => {
   for (const kind of ["aborted", "interrupted_by_reopen"] as const) {
@@ -64,16 +71,30 @@ describe("receipt-driven host respawn lifecycle", () => {
     await assertRenderedReason(f)
     expect(f.host.commands.filter((command) => command.type === "prompt")).toHaveLength(1)
     const before = f.host.commands.length
-    const sent = await f.manager.sendToTask({ idOrName: f.record.task_id, message: "continue", callerSessionId: "parent" })
+    const sent = await f.manager.sendToTask({
+      idOrName: f.record.task_id,
+      message: "continue",
+      callerSessionId: "parent",
+    })
     expect(sent.kind).toBe("revived")
-    const inputs = f.host.commands.slice(before).filter((command) => ["prompt", "steer", "follow_up"].includes(command.type))
+    const inputs = f.host.commands
+      .slice(before)
+      .filter((command) => ["prompt", "steer", "follow_up"].includes(command.type))
     expect(inputs).toHaveLength(1)
     expect(f.store.load(f.record.task_id)?.stop_reason).toBeUndefined()
     await f.result.handle.dispose()
   })
 
   test("a failed turn receipt enters the existing child-turn failure path and renders its reason", async () => {
-    const f = await stoppedChild({ state: "done", outcome: { kind: "error", reason: "provider_unavailable", detail: "Synthetic provider was unavailable.", action: "Retry the child after the provider recovers." } })
+    const f = await stoppedChild({
+      state: "done",
+      outcome: {
+        kind: "error",
+        reason: "provider_unavailable",
+        detail: "Synthetic provider was unavailable.",
+        action: "Retry the child after the provider recovers.",
+      },
+    })
     await f.manager.reattach(f.record, f.result.handle)
     const failed = await f.manager.waitFor(f.record.task_id, { signal: AbortSignal.timeout(5_000) })
     expect(failed.status).toBe("error")
@@ -87,7 +108,9 @@ describe("receipt-driven host respawn lifecycle", () => {
     const f = await stoppedChild({ state: "done", outcome: { kind: "deadline", deadline: { kind: "inactivity" } } })
     await f.manager.reattach(f.record, f.result.handle)
     const started = Promise.withResolvers<void>()
-    const unsubscribe = f.result.handle.subscribe(event => { if (event.type === "agent_start") started.resolve() })
+    const unsubscribe = f.result.handle.subscribe((event) => {
+      if (event.type === "agent_start") started.resolve()
+    })
     await f.manager.sendToTask({ idOrName: f.record.task_id, message: "continue", callerSessionId: "parent" })
     f.startContinuation()
     await started.promise
@@ -98,7 +121,7 @@ describe("receipt-driven host respawn lifecycle", () => {
     const result = await completed
     expect(result.final_response).toBe("EXPLICIT ANSWER")
     expect(f.store.load(f.record.task_id)?.notification.run_epoch).toBe(result.notification.run_epoch)
-    expect(f.events.filter(type => type === "task_self_resumed")).toEqual([])
+    expect(f.events.filter((type) => type === "task_self_resumed")).toEqual([])
     unsubscribe()
     await f.result.handle.dispose()
   })
@@ -107,12 +130,14 @@ describe("receipt-driven host respawn lifecycle", () => {
     const f = await stoppedChild({ state: "done", outcome: { kind: "deadline", deadline: { kind: "inactivity" } } })
     await f.manager.reattach(f.record, f.result.handle)
     const started = Promise.withResolvers<void>()
-    const unsubscribe = f.result.handle.subscribe(event => { if (event.type === "agent_start") started.resolve() })
+    const unsubscribe = f.result.handle.subscribe((event) => {
+      if (event.type === "agent_start") started.resolve()
+    })
     f.startContinuation()
     await started.promise
     expect(f.store.load(f.record.task_id)?.status).toBe("interrupted")
     expect(f.store.load(f.record.task_id)?.notification.run_epoch).toBe(0)
-    expect(f.events.filter(type => type === "task_self_resumed")).toEqual([])
+    expect(f.events.filter((type) => type === "task_self_resumed")).toEqual([])
     unsubscribe()
     await f.result.handle.dispose()
   })

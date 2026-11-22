@@ -197,10 +197,7 @@ export function isTomlTableHeaderLine(line: string): boolean {
   return normalizedLine.startsWith("[") && normalizedLine.endsWith("]")
 }
 
-export function scanTomlMultilineLine(
-  line: string,
-  currentQuote: TomlMultilineQuote | null,
-): TomlMultilineLineScan {
+export function scanTomlMultilineLine(line: string, currentQuote: TomlMultilineQuote | null): TomlMultilineLineScan {
   if (currentQuote) {
     return {
       wasInside: true,
@@ -368,7 +365,10 @@ export function parseTomlDottedKey(input: string): readonly string[] | null {
   return parts.length > 0 ? parts : null
 }
 
-function parseTomlKeyPart(input: string, startIndex: number): { readonly value: string; readonly nextIndex: number } | null {
+function parseTomlKeyPart(
+  input: string,
+  startIndex: number,
+): { readonly value: string; readonly nextIndex: number } | null {
   const quote = input[startIndex]
   if (quote === "'") return parseLiteralTomlString(input, startIndex)
   if (quote === '"') return parseBasicTomlString(input, startIndex)
@@ -442,7 +442,10 @@ function parseUnicodeEscape(
   return { value: String.fromCodePoint(codePoint), nextIndex: digitsStart + digitCount }
 }
 
-function parseBareTomlKey(input: string, startIndex: number): { readonly value: string; readonly nextIndex: number } | null {
+function parseBareTomlKey(
+  input: string,
+  startIndex: number,
+): { readonly value: string; readonly nextIndex: number } | null {
   let index = startIndex
   while (index < input.length && /[A-Za-z0-9_-]/.test(input[index])) index += 1
   if (index === startIndex) return null

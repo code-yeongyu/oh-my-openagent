@@ -34,36 +34,49 @@ async function answeringEndpoint(socketPath: string, kind: GatewayEndpointKind, 
   // An rpc_host listens on the transport its logical path names (a hashed pipe behind a raw secret on win32);
   // a terminal keeps its own secret on the logical path.
   const transport = kind === "rpc_host" ? fakeHostTransport(socketPath) : undefined
-  const admit = (socket: Socket, accept: () => void) => (transport === undefined ? accept() : transport.authenticate(socket, accept))
-  const server = createServer((socket) => admit(socket, () => {
-    sockets.add(socket)
-    socket.once("close", () => sockets.delete(socket))
-    let authenticated = kind === "rpc_host"
-    let buffer = Buffer.alloc(0)
-    socket.on("data", (chunk: Buffer) => {
-      buffer = Buffer.concat([buffer, chunk])
-      if (!authenticated) {
-        if (buffer.length < SECRET.length) return
-        if (!buffer.subarray(0, SECRET.length).equals(SECRET)) { socket.destroy(); return }
-        authenticated = true
-        buffer = buffer.subarray(SECRET.length)
-      }
-      const newline = buffer.indexOf(10)
-      if (newline < 0) return
-      const frame = JSON.parse(buffer.subarray(0, newline).toString("utf8")) as Frame
-      buffer = buffer.subarray(newline + 1)
-      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
-      frames.push(frame)
-      const reply = (body: Frame) => socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...body })}\n`)
-      if (frame.type !== "extension_ui_response") return reply({ success: true, data: {} })
-      const request = typeof frame.uiRequestId === "string" ? frame.uiRequestId : frame.id
-      const shaped = typeof frame.answers === "object" && frame.answers !== null && !Array.isArray(frame.answers)
-      if (typeof request !== "string" || !pending.has(request)) return reply({ success: false, error: kind === "tui" ? "unknown_request" : "question_already_resolved" })
-      if (kind === "tui" && !shaped) return reply({ success: false, error: "invalid_response" })
-      pending.delete(request)
-      return reply({ success: true })
-    })
-  }))
+  const admit = (socket: Socket, accept: () => void) =>
+    transport === undefined ? accept() : transport.authenticate(socket, accept)
+  const server = createServer((socket) =>
+    admit(socket, () => {
+      sockets.add(socket)
+      socket.once("close", () => sockets.delete(socket))
+      let authenticated = kind === "rpc_host"
+      let buffer = Buffer.alloc(0)
+      socket.on("data", (chunk: Buffer) => {
+        buffer = Buffer.concat([buffer, chunk])
+        if (!authenticated) {
+          if (buffer.length < SECRET.length) return
+          if (!buffer.subarray(0, SECRET.length).equals(SECRET)) {
+            socket.destroy()
+            return
+          }
+          authenticated = true
+          buffer = buffer.subarray(SECRET.length)
+        }
+        const newline = buffer.indexOf(10)
+        if (newline < 0) return
+        const frame = JSON.parse(buffer.subarray(0, newline).toString("utf8")) as Frame
+        buffer = buffer.subarray(newline + 1)
+        if (frame.type === "get_protocol_info") {
+          socket.write(
+            `${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`,
+          )
+          return
+        }
+        frames.push(frame)
+        const reply = (body: Frame) =>
+          socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...body })}\n`)
+        if (frame.type !== "extension_ui_response") return reply({ success: true, data: {} })
+        const request = typeof frame.uiRequestId === "string" ? frame.uiRequestId : frame.id
+        const shaped = typeof frame.answers === "object" && frame.answers !== null && !Array.isArray(frame.answers)
+        if (typeof request !== "string" || !pending.has(request))
+          return reply({ success: false, error: kind === "tui" ? "unknown_request" : "question_already_resolved" })
+        if (kind === "tui" && !shaped) return reply({ success: false, error: "invalid_response" })
+        pending.delete(request)
+        return reply({ success: true })
+      })
+    }),
+  )
   const listening = once(server, "listening")
   server.listen(transport?.listenAddress ?? socketPath)
   await listening
@@ -89,14 +102,36 @@ async function questionRelayedFrom(kind: GatewayEndpointKind, pending: readonly 
     registry: async () => [],
     readSecret: () => SECRET,
   })
-  const ref: GatewayEndpointRef = { kind, socket, routing_id: kind === "rpc_host" ? "rpc-1" : null, durable_session_id: "B" }
+  const ref: GatewayEndpointRef = {
+    kind,
+    socket,
+    routing_id: kind === "rpc_host" ? "rpc-1" : null,
+    durable_session_id: "B",
+  }
   const store = h.store()
-  const relay = createGatewayRelay({ store, engine: h.engineFor(store), endpoints: surface.gateway, locate: async () => ref, now: () => h.clock.now })
-  const bound = await relay.bind({ principal: "session:A", binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: "B" } })
+  const relay = createGatewayRelay({
+    store,
+    engine: h.engineFor(store),
+    endpoints: surface.gateway,
+    locate: async () => ref,
+    now: () => h.clock.now,
+  })
+  const bound = await relay.bind({
+    principal: "session:A",
+    binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", session_durable_id: "B" },
+  })
   if (bound.kind !== "ok") throw new Error(`bind failed: ${JSON.stringify(bound)}`)
   const bindingId = bound.binding.binding_id
-  const asked = await relay.report({ principal: "session:B", session_durable_id: "B", binding_id: bindingId, event: "question", text: "ship it?", request_id: "ui-7" })
-  if (asked.kind !== "ok" || typeof asked.reply_token !== "string") throw new Error(`report failed: ${JSON.stringify(asked)}`)
+  const asked = await relay.report({
+    principal: "session:B",
+    session_durable_id: "B",
+    binding_id: bindingId,
+    event: "question",
+    text: "ship it?",
+    request_id: "ui-7",
+  })
+  if (asked.kind !== "ok" || typeof asked.reply_token !== "string")
+    throw new Error(`report failed: ${JSON.stringify(asked)}`)
   const questionState = async () => {
     const outbox = await relay.outbox({ binding_id: bindingId })
     if (outbox.kind !== "ok") throw new Error(`outbox failed: ${JSON.stringify(outbox)}`)
@@ -118,7 +153,13 @@ describe.each(["rpc_host", "tui"] as const)("thread_answer against a %s endpoint
     expect(first).toMatchObject({ kind: "ok", binding_id: bindingId, session_durable_id: "B" })
     const [frame, ...more] = endpoint.answers()
     expect(more).toEqual([])
-    expect(frame).toMatchObject({ type: "extension_ui_response", uiRequestId: "ui-7", value: "yes", answers: {}, comment: "yes" })
+    expect(frame).toMatchObject({
+      type: "extension_ui_response",
+      uiRequestId: "ui-7",
+      value: "yes",
+      answers: {},
+      comment: "yes",
+    })
     expect(typeof frame?.id === "string" && frame.id !== "ui-7").toBe(true)
     expect(frame?.sessionId).toBe(kind === "rpc_host" ? "rpc-1" : undefined)
     expect(await questionState()).toEqual(["answered"])
@@ -133,7 +174,13 @@ describe.each(["rpc_host", "tui"] as const)("thread_answer against a %s endpoint
     const answered = await relay.answer({ binding_id: bindingId, reply_token: token, answer: "yes" })
 
     // then
-    expect(answered).toMatchObject({ kind: "error", error: { code: "stale_token", details: { session: "B", reason: kind === "tui" ? "unknown_request" : "question_already_resolved" } } })
+    expect(answered).toMatchObject({
+      kind: "error",
+      error: {
+        code: "stale_token",
+        details: { session: "B", reason: kind === "tui" ? "unknown_request" : "question_already_resolved" },
+      },
+    })
     expect(endpoint.answers()).toHaveLength(1)
     expect(await questionState()).toEqual(["pending"])
   })

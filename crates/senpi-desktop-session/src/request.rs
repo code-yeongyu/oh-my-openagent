@@ -10,6 +10,7 @@ use senpi_desktop_core::protocol_results::{AxInputResult, ControlStateResult};
 use senpi_desktop_core::types::{
     AxNode, AxSnapshot, CaptureResult, DesktopCapabilities, DesktopDisplay, DesktopWindow, ObserveResult,
 };
+use senpi_desktop_core::report::ActionReport;
 use serde::Serialize;
 
 /// One backend request of an open session, carrying its engine method's
@@ -72,4 +73,6 @@ pub enum Response {
     Clipboard(ClipboardText),
     ControlState(ControlStateResult),
     MenuItems(Vec<MenuItem>),
+    /// A mutating request's report in a `reportMode: "object"` session.
+    Action(Box<ActionReport>),
 }

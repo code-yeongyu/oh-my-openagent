@@ -13,7 +13,12 @@ export async function runDetachedProbe(scenario: string): Promise<{
 }> {
   const sandbox = mkdtempSync(join(tmpdir(), "omo-detached-probe-"))
   const env: NodeJS.ProcessEnv = {
-    ...process.env, HOME: sandbox, USERPROFILE: sandbox, TMPDIR: sandbox, TMP: sandbox, TEMP: sandbox,
+    ...process.env,
+    HOME: sandbox,
+    USERPROFILE: sandbox,
+    TMPDIR: sandbox,
+    TMP: sandbox,
+    TEMP: sandbox,
     // The sandboxed profile is a cold transpiler-cache location; writing it blocks a Windows child for
     // seconds (#9029). The probe measures heartbeat/teardown containment, not Bun's cache.
     BUN_RUNTIME_TRANSPILER_CACHE_PATH: "0",
@@ -24,12 +29,20 @@ export async function runDetachedProbe(scenario: string): Promise<{
     env[`${prefix}_CODING_AGENT_DIR`] = dir
   }
   for (const key of [
-    "SENPI_PACKAGE_DIR", "OMO_PACKAGE_DIR", "PI_PACKAGE_DIR", "OMO_BIN", "SENPI_BIN",
-    "PI_SESSION_FILE", "OMO_RPC_SOCKET_PATH",
-  ]) delete env[key]
+    "SENPI_PACKAGE_DIR",
+    "OMO_PACKAGE_DIR",
+    "PI_PACKAGE_DIR",
+    "OMO_BIN",
+    "SENPI_BIN",
+    "PI_SESSION_FILE",
+    "OMO_RPC_SOCKET_PATH",
+  ])
+    delete env[key]
   const probePath = fileURLToPath(new URL("./detached-process.test-support.ts", import.meta.url))
   const child = spawn(process.execPath, [probePath, scenario], {
-    env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+    windowsHide: true,
   })
   const exited = new Promise<number>((resolve, reject) => {
     child.once("error", reject)
@@ -37,9 +50,7 @@ export async function runDetachedProbe(scenario: string): Promise<{
   })
   const timeout = setTimeout(() => child.kill(), 10_000)
   try {
-    const [exitCode, stdout, stderr] = await Promise.all([
-      exited, text(child.stdout), text(child.stderr),
-    ])
+    const [exitCode, stdout, stderr] = await Promise.all([exited, text(child.stdout), text(child.stderr)])
     return { exitCode, stdout, stderr, sandboxRemoved: true }
   } finally {
     clearTimeout(timeout)

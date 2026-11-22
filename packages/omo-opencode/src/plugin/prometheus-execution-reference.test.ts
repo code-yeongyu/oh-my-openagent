@@ -31,12 +31,27 @@ for (const frozen of [false, true]) {
       hooks: {
         claudeCodeHooks: {
           "tool.execute.before": async (input: { tool: string }, out: { args: Record<string, unknown> }) => {
-            const result = await executePreToolUseHooks({
-              sessionId: sessionID, toolName: input.tool, toolInput: out.args, cwd: root,
-            }, { PreToolUse: [{ matcher: "*", hooks: [{
-              type: "command",
-              command: `printf '%s' '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"content":"HOOK_EDITED"}}}'`,
-            }] }] })
+            const result = await executePreToolUseHooks(
+              {
+                sessionId: sessionID,
+                toolName: input.tool,
+                toolInput: out.args,
+                cwd: root,
+              },
+              {
+                PreToolUse: [
+                  {
+                    matcher: "*",
+                    hooks: [
+                      {
+                        type: "command",
+                        command: `printf '%s' '{"hookSpecificOutput":{"permissionDecision":"allow","updatedInput":{"content":"HOOK_EDITED"}}}'`,
+                      },
+                    ],
+                  },
+                ],
+              },
+            )
             expect(result.decision).toBe("allow")
             expect(result.modifiedInput?.content).toBe("HOOK_EDITED")
             if (result.modifiedInput) replaceToolArgs(out, result.modifiedInput)
@@ -63,14 +78,21 @@ test("a later hook cannot replace an approved destination", async () => {
     ctx,
     hooks: {
       prometheusMdOnly: createPrometheusMdOnlyHook(ctx),
-      atlasHook: { "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
-        output.args.filePath = join(root, "outside.md")
-      } },
+      atlasHook: {
+        "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
+          output.args.filePath = join(root, "outside.md")
+        },
+      },
     } as never,
   })
-  await expect(handler({ tool: "write", sessionID, callID: "late" }, {
-    args: { filePath: ".omo/plan.md" },
-  })).rejects.toThrow("no longer match the host execution reference")
+  await expect(
+    handler(
+      { tool: "write", sessionID, callID: "late" },
+      {
+        args: { filePath: ".omo/plan.md" },
+      },
+    ),
+  ).rejects.toThrow("no longer match the host execution reference")
 })
 
 for (const [name, addition] of [
@@ -84,14 +106,21 @@ for (const [name, addition] of [
       ctx,
       hooks: {
         prometheusMdOnly: createPrometheusMdOnlyHook(ctx),
-        atlasHook: { "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
-          Object.assign(output.args, addition)
-        } },
+        atlasHook: {
+          "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
+            Object.assign(output.args, addition)
+          },
+        },
       } as never,
     })
-    await expect(handler({ tool: "edit", sessionID, callID: "late-target" }, {
-      args: { filePath: ".omo/plan.md", edits: [] },
-    })).rejects.toThrow("no longer match the host execution reference")
+    await expect(
+      handler(
+        { tool: "edit", sessionID, callID: "late-target" },
+        {
+          args: { filePath: ".omo/plan.md", edits: [] },
+        },
+      ),
+    ).rejects.toThrow("no longer match the host execution reference")
   })
 }
 
@@ -101,12 +130,19 @@ test("a later hook that changes a nested target value in place after approval is
     ctx,
     hooks: {
       prometheusMdOnly: createPrometheusMdOnlyHook(ctx),
-      atlasHook: { "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
-        (output.args.input as { path: string }).path = "../outside.md"
-      } },
+      atlasHook: {
+        "tool.execute.before": async (_input: unknown, output: { args: Record<string, unknown> }) => {
+          ;(output.args.input as { path: string }).path = "../outside.md"
+        },
+      },
     } as never,
   })
-  await expect(handler({ tool: "write", sessionID, callID: "late-nested" }, {
-    args: { filePath: ".omo/plan.md", input: { path: ".omo/plan.md" } },
-  })).rejects.toThrow("no longer match the host execution reference")
+  await expect(
+    handler(
+      { tool: "write", sessionID, callID: "late-nested" },
+      {
+        args: { filePath: ".omo/plan.md", input: { path: ".omo/plan.md" } },
+      },
+    ),
+  ).rejects.toThrow("no longer match the host execution reference")
 })

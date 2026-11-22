@@ -4,7 +4,11 @@ import { describe, expect, test } from "bun:test"
 
 import type { EventTelemetryProperties } from "@oh-my-opencode/telemetry-core"
 
-import { emitFakeExtensionEvent, enableFakeExtensionEvents, FakeExtensionAPI } from "../../../test-support/fake-extension-api"
+import {
+  emitFakeExtensionEvent,
+  enableFakeExtensionEvents,
+  FakeExtensionAPI,
+} from "../../../test-support/fake-extension-api"
 import { registerOmoNativeHandoffHintTelemetry, SENPI_HANDOFF_HINT_EVENT } from "./omo-native-handoff-hint"
 import { OMO_NATIVE_PROPERTY_ALLOWLISTS, type OmoNativeEventName } from "./product-identity"
 
@@ -33,7 +37,8 @@ describe("OmO Native handoff-hint telemetry (senpi#3230)", () => {
     })
 
     // when
-    for (const action of ["shown", "accepted", "dismissed"]) emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action })
+    for (const action of ["shown", "accepted", "dismissed"])
+      emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action })
     emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action: "clicked" })
     const { savingUsd: _omitted, ...missingField } = payload
     for (const malformed of [
@@ -41,8 +46,14 @@ describe("OmO Native handoff-hint telemetry (senpi#3230)", () => {
       { ...payload, action: "shown", savingUsd: Number.NaN },
       { ...payload, action: "shown", contextTokens: Number.POSITIVE_INFINITY },
       { ...payload, action: "shown", subscription: "false" },
-    ]) emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, malformed)
-    emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, { ...payload, action: "shown", model: "my-private-finetune", provider: "my-gateway" })
+    ])
+      emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, malformed)
+    emitFakeExtensionEvent(pi, SENPI_HANDOFF_HINT_EVENT, {
+      ...payload,
+      action: "shown",
+      model: "my-private-finetune",
+      provider: "my-gateway",
+    })
 
     // then
     expect(captured.map(({ properties }) => properties.action)).toEqual(["shown", "accepted", "dismissed", "shown"])
@@ -51,9 +62,15 @@ describe("OmO Native handoff-hint telemetry (senpi#3230)", () => {
       expect(Object.keys(event.properties).sort()).toEqual([...OMO_NATIVE_PROPERTY_ALLOWLISTS.handoff_hint].sort())
       expect(event.properties.$session_id).toBe("hashed:private-session")
     }
-    expect(captured[0].properties).toMatchObject({ context_tokens: 512_340, next_reply_usd: 2.56, fresh_usd: 0.47, saving_usd: 2.09, model_id: "claude-opus-5-5" })
+    expect(captured[0].properties).toMatchObject({
+      context_tokens: 512_340,
+      next_reply_usd: 2.56,
+      fresh_usd: 0.47,
+      saving_usd: 2.09,
+      model_id: "claude-opus-5-5",
+    })
     expect(captured[3].properties).toMatchObject({ model_id: "custom", provider: "custom" })
-    expect(JSON.stringify(captured)).not.toContain("\"private-session\"")
+    expect(JSON.stringify(captured)).not.toContain('"private-session"')
     expect(JSON.stringify(captured)).not.toContain("my-private-finetune")
 
     // and: session teardown detaches the bus listener

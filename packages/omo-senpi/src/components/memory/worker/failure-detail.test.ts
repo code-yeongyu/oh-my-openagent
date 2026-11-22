@@ -44,7 +44,7 @@ describe("childFailureCause", () => {
 
   test("#given prose above a named error #when it is distilled #then the named error wins over line order", () => {
     // given
-    const detail = ["Resolving the model catalog", "Error: Model \"fake/one\" not found."].join("\n")
+    const detail = ["Resolving the model catalog", 'Error: Model "fake/one" not found.'].join("\n")
 
     // when / then
     expect(childFailureCause(detail)).toBe('Error: Model "fake/one" not found.')
@@ -52,7 +52,12 @@ describe("childFailureCause", () => {
 
   test("#given only machinery #when it is distilled #then there is no cause to show", () => {
     // given
-    const detail = ['345 |   dark: JSON.parse(x),', "      ^", "  at loadTheme (theme.js:513:23)", "Bun v1.4.2 (macOS arm64)"].join("\n")
+    const detail = [
+      "345 |   dark: JSON.parse(x),",
+      "      ^",
+      "  at loadTheme (theme.js:513:23)",
+      "Bun v1.4.2 (macOS arm64)",
+    ].join("\n")
 
     // when / then
     expect(childFailureCause(detail)).toBeUndefined()

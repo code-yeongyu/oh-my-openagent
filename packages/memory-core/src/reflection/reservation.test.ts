@@ -16,7 +16,11 @@ afterEach(async () => Promise.all(roots.splice(0).map((root) => removeTree(root,
 async function fixture(stepCount = 2, createRunId?: () => string | Promise<string>) {
   const root = realpathSync.native(await mkdtemp(join(tmpdir(), "reflection-reservation-")))
   roots.push(root)
-  const identity: MemoryIdentity = { id: "agent-test", safeSlug: "agent-test", paths: buildIdentityPaths(root, "agent-test") }
+  const identity: MemoryIdentity = {
+    id: "agent-test",
+    safeSlug: "agent-test",
+    paths: buildIdentityPaths(root, "agent-test"),
+  }
   const journals = new Map<string, TranscriptJournal>()
   const journal = new TranscriptJournal({ journalDir: join(identity.paths.transcripts, "conversation-a") })
   journals.set("conversation-a", journal)
@@ -55,23 +59,26 @@ function runOf(result: ReservationResult | null | undefined): ReservedRun {
 }
 
 describe("persisted reflection reservation", () => {
-  it.each(["active.lock", "pending.json"])("#given %s rename fails #when reserving #then the temporary is removed and the error propagates", async (target) => {
-    const { identity, journal, store } = await fixture()
-    const request = await captured(journal, "manual")
-    if (target === "pending.json") await store.tryReserve(request)
-    const rename = fs.rename
-    const failure = new Error("injected reservation rename failure")
-    const intercepted = spyOn(fs, "rename").mockImplementation(async (source, destination) => {
-      if (String(destination) === join(identity.paths.reflection, target)) throw failure
-      await rename(source, destination)
-    })
-    try {
-      await expect(store.tryReserve(request)).rejects.toBe(failure)
-    } finally {
-      intercepted.mockRestore()
-    }
-    expect((await readdir(identity.paths.reflection)).filter((name) => name.includes(".tmp-"))).toEqual([])
-  })
+  it.each(["active.lock", "pending.json"])(
+    "#given %s rename fails #when reserving #then the temporary is removed and the error propagates",
+    async (target) => {
+      const { identity, journal, store } = await fixture()
+      const request = await captured(journal, "manual")
+      if (target === "pending.json") await store.tryReserve(request)
+      const rename = fs.rename
+      const failure = new Error("injected reservation rename failure")
+      const intercepted = spyOn(fs, "rename").mockImplementation(async (source, destination) => {
+        if (String(destination) === join(identity.paths.reflection, target)) throw failure
+        await rename(source, destination)
+      })
+      try {
+        await expect(store.tryReserve(request)).rejects.toBe(failure)
+      } finally {
+        intercepted.mockRestore()
+      }
+      expect((await readdir(identity.paths.reflection)).filter((name) => name.includes(".tmp-"))).toEqual([])
+    },
+  )
 
   it("#given crashed reservation writers #when startup reads state under the scheduler lock #then only their temporary siblings are swept", async () => {
     const { identity, store } = await fixture()
@@ -82,7 +89,10 @@ describe("persisted reflection reservation", () => {
     await mkdir(join(identity.paths.reflection, "pending.json.tmp-directory"))
 
     expect(await store.readState()).toEqual({})
-    expect((await readdir(identity.paths.reflection)).sort()).toEqual(["pending.json.tmp-directory", "unrelated.tmp-keep"])
+    expect((await readdir(identity.paths.reflection)).sort()).toEqual([
+      "pending.json.tmp-directory",
+      "unrelated.tmp-keep",
+    ])
   })
 
   it("#given many large pending captures #when reservations merge on disk #then pending.json stays bounded and no journal cursor advances", async () => {
@@ -90,13 +100,25 @@ describe("persisted reflection reservation", () => {
     await store.tryReserve(await captured(journal, "manual"))
     const snapshot = await journal.captureReflectionSnapshot()
     if (snapshot === null) throw new Error("expected snapshot")
-    const large: ReflectionSnapshot = { ...snapshot, entries: [{
-      kind: "assistant", text: "x".repeat(512 * 1024), captured_at: "2026-08-10T00:00:00.000Z",
-      source_line_id: "line", source_message_id: "message",
-    }] }
+    const large: ReflectionSnapshot = {
+      ...snapshot,
+      entries: [
+        {
+          kind: "assistant",
+          text: "x".repeat(512 * 1024),
+          captured_at: "2026-08-10T00:00:00.000Z",
+          source_line_id: "line",
+          source_message_id: "message",
+        },
+      ],
+    }
     for (let index = 0; index < 12; index += 1) {
       const conversationId = `conversation-${index}`
-      await store.tryReserve({ trigger: "manual", conversationIds: [conversationId], snapshots: [{ conversationId, snapshot: large }] })
+      await store.tryReserve({
+        trigger: "manual",
+        conversationIds: [conversationId],
+        snapshots: [{ conversationId, snapshot: large }],
+      })
     }
 
     const persisted = await readFile(join(identity.paths.reflection, "pending.json"), "utf8")
@@ -114,11 +136,14 @@ describe("persisted reflection reservation", () => {
     controller.abort()
 
     // when
-    const reservation = store.tryReserve({
-      trigger: "step-count",
-      conversationIds: ["conversation-a"],
-      snapshots: [],
-    }, controller.signal)
+    const reservation = store.tryReserve(
+      {
+        trigger: "step-count",
+        conversationIds: ["conversation-a"],
+        snapshots: [],
+      },
+      controller.signal,
+    )
 
     // then
     await expect(reservation).rejects.toThrow()
@@ -191,7 +216,13 @@ describe("persisted reflection reservation", () => {
     const first = await store.tryReserve(base)
     const [second, third] = await Promise.all([
       store.tryReserve({ ...base, trigger: "compaction", conversationIds: ["conversation-c"] }),
-      store.tryReserve({ ...base, trigger: "manual", conversationIds: ["conversation-b"], focus: "remember names", recentN: 5 }),
+      store.tryReserve({
+        ...base,
+        trigger: "manual",
+        conversationIds: ["conversation-b"],
+        focus: "remember names",
+        recentN: 5,
+      }),
     ])
     const state = await store.readState()
     expect(first.status).toBe("active")
@@ -278,11 +309,20 @@ describe("persisted reflection reservation", () => {
       entries: [],
     }
     const active = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [] })
-    await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [{ conversationId: "conversation-a", snapshot }] })
+    await store.tryReserve({
+      trigger: "step-count",
+      conversationIds: ["conversation-a"],
+      snapshots: [{ conversationId: "conversation-a", snapshot }],
+    })
     expect((await store.complete(runOf(active).runId, "failed")).launch).toBeUndefined()
 
     const next = await store.tryReserve({ trigger: "step-count", conversationIds: ["conversation-a"], snapshots: [] })
-    const manual = await store.tryReserve({ trigger: "manual", conversationIds: ["conversation-a"], snapshots: [], focus: "always" })
+    const manual = await store.tryReserve({
+      trigger: "manual",
+      conversationIds: ["conversation-a"],
+      snapshots: [],
+      focus: "always",
+    })
     expect((await store.complete(runOf(next).runId, "failed")).launch?.runId).toBe(runOf(manual).runId)
     expect((await journal.getState()).reflected_completed_steps).toBe(0)
   })

@@ -85,7 +85,8 @@ export function classifyRealSenpiChanges(changedPaths, sandboxTokens) {
   const qaAttributedPaths = []
   const concurrentSessionPaths = []
   for (const path of changedPaths) {
-    const unrelatedSession = tokens.length > 0 && path.startsWith("sessions/") && !tokens.some((token) => path.includes(token))
+    const unrelatedSession =
+      tokens.length > 0 && path.startsWith("sessions/") && !tokens.some((token) => path.includes(token))
     if (unrelatedSession) concurrentSessionPaths.push(path)
     else qaAttributedPaths.push(path)
   }

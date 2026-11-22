@@ -240,9 +240,11 @@ Capture the returned `team_run_id`. You pass it to every subsequent `task_send` 
 
 If `team_create` rejects `deep-low` as unresolvable, retry once without the `researcher` member. Do not drop `unspecified-low`, `unspecified-high`, `ultrabrain`, or `artistry`.
 
+From here on, "every member" means the roster `team_create` accepted: 5 members, or 4 when `researcher` was dropped. Every send, reply count, bundle section, and provenance line below follows that roster; leave out every `researcher` line on a 4-member run.
+
 ### Phase 2: Round 1 — Independent analysis
 
-Send the same task to all 5 members via 5 `task_send` calls (one per member). Each call is `task_send({ to: "<member>", team_run_id, message })` where message is:
+Send the same task to every member via one `task_send` call per member. Each call is `task_send({ to: "<member>", team_run_id, message })` where message is:
 
 ```
 <hyperplan-round-1-task>
@@ -261,11 +263,11 @@ When done, reply with your findings via task_send to "lead".
 </hyperplan-round-1-task>
 ```
 
-Then collect the replies: each member's reply arrives as an injected notification — end your turn or do independent lead work until all 5 have landed. Give slow members room; if one stays silent past its expected window, nudge it once with `task_send` before treating the lane as stalled.
+Then collect the replies: each member's reply arrives as an injected notification — end your turn or do independent lead work until every member's reply has landed. Give slow members room; if one stays silent past its expected window, nudge it once with `task_send` before treating the lane as stalled.
 
 ### Phase 3: Round 2 — Cross-attack
 
-When all 5 Round 1 replies have arrived, aggregate them into one bundle:
+When every member's Round 1 reply has arrived, aggregate them into one bundle:
 
 ```
 === Round 1 Findings Bundle ===
@@ -287,18 +289,18 @@ When all 5 Round 1 replies have arrived, aggregate them into one bundle:
 === End ===
 ```
 
-Send this bundle to all 5 members via 5 `task_send` calls. Each receives the SAME bundle, but the task is:
+Send this bundle to every member via one `task_send` call per member. Each receives the SAME bundle, but the task is:
 
 ```
 <hyperplan-round-2-task>
-Here are the Round 1 findings from the OTHER 4 members of this team (and your own findings, for reference):
+Here are the Round 1 findings from the OTHER members of this team (and your own findings, for reference):
 
 [insert Round 1 Findings Bundle]
 
 YOUR TASK (Round 2 - Cross-Attack):
-ATTACK the OTHER 4 members' findings ruthlessly from your adversarial role. Do NOT critique your own findings.
+ATTACK the OTHER members' findings ruthlessly from your adversarial role. Do NOT critique your own findings.
 
-Output format - for each of the 4 other members:
+Output format - for each of the other members:
 - [member-name] Finding #N: [their claim]
   ATTACK: [your specific attack — <=3 sentences. Concrete. Backed by evidence/reasoning per your role.]
 
@@ -308,7 +310,7 @@ When done, reply with your attacks via task_send to "lead".
 </hyperplan-round-2-task>
 ```
 
-Collect all 5 cross-attack replies as injected notifications before continuing.
+Collect every member's cross-attack reply as an injected notification before continuing.
 
 ### Phase 4: Round 3 — Defense and refinement
 
@@ -337,7 +339,7 @@ When done, reply via task_send to "lead".
 </hyperplan-round-3-task>
 ```
 
-Collect all 5 refinement replies as injected notifications before continuing.
+Collect every member's refinement reply as an injected notification before continuing.
 
 ### Phase 5: Insight distillation (the Lead's job — YOU)
 
@@ -398,10 +400,11 @@ task({
   load_skills: ["ulw-plan"],
   run_in_background: false,
   description: "Formalize hyperplan-distilled insights into an executable plan",
-  prompt: `<hyperplan-handoff>
-The following insight bundle survived an adversarial 5-member cross-critique debate (skeptic/validator/researcher/architect/creative). Every claim here was either uncontested OR defended/refined under attack — conceded findings were already filtered out.
-
-Your task: produce an EXECUTABLE work plan from these insights. You do NOT need to re-explore the codebase or re-derive the constraints — they are already battle-tested. Your value is plan structure, sequencing, dependency analysis, parallelization opportunities, and explicit verification criteria per task. Return the executable plan as your final response so the lead can present it directly.
+  prompt: `TASK: Produce an EXECUTABLE work plan from the hyperplan insight bundle below. This is an executable assignment, not a context handoff.
+DELIVERABLE: the executable plan, returned as your final response so the lead can present it directly; or, when the bundle's Open Questions block it, the clarifying questions instead.
+SCOPE: the insight bundle below is your input. It survived an adversarial cross-critique debate (skeptic/validator/architect/creative, plus researcher when the roster had it). Every claim here was either uncontested OR defended/refined under attack — conceded findings were already filtered out. You do NOT need to re-explore the codebase or re-derive the constraints — they are already battle-tested. Your value is plan structure, sequencing, dependency analysis, parallelization opportunities, and explicit verification criteria per task.
+VERIFY: check the plan against every hard rule below before returning it.
+STOP WHEN: the plan satisfies every hard rule below, or you have returned the clarifying questions.
 
 Hard rules for your plan:
 - Every Hard Constraint MUST be respected by the plan.
@@ -409,8 +412,7 @@ Hard rules for your plan:
 - Every Open Question MUST surface as a user-input gate BEFORE the dependent tasks can start.
 - Every task MUST have explicit success criteria.
 
-[paste the full Insight Bundle from Phase 5 here]
-</hyperplan-handoff>`
+[paste the full Insight Bundle from Phase 5 here]`
 })
 ```
 
@@ -419,7 +421,7 @@ Hard rules for your plan:
 3. **Present the planner's output to the user verbatim**, prefixed with one provenance line:
 
 ```
-*Plan derived from hyperplan adversarial review (5 members, 3 rounds) and formalized by the ulw-plan planner.*
+*Plan derived from hyperplan adversarial review (<member count> members, 3 rounds) and formalized by the ulw-plan planner.*
 
 [planner task output]
 ```
@@ -430,7 +432,7 @@ Hard rules for your plan:
 
 After the planner's output has been presented to the user:
 
-1. Call `team_delete({ team_run_id, force: true })` to cancel all 5 members and remove the team's runtime state in one call. `force: true` is correct here — the debate is over, so you tear the run down even though members may still be resident.
+1. Call `team_delete({ team_run_id, force: true })` to cancel every member and remove the team's runtime state in one call. `force: true` is correct here — the debate is over, so you tear the run down even though members may still be resident.
 2. Confirm cleanup to the user with one line: "Hyperplan team disbanded."
 
 If `team_delete` fails, surface the error and suggest the user retry `team_delete({ team_run_id, force: true })` manually.

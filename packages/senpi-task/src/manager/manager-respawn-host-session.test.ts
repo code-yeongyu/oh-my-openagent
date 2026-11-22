@@ -71,8 +71,18 @@ function transcriptOf(project: string, name: string, entries: readonly unknown[]
 
 const TOOL_TURN_IN_FLIGHT = [
   { type: "message", message: { role: "user", content: "do the work" } },
-  { type: "message", message: { role: "assistant", content: [{ type: "toolCall", id: "call-1", name: "eval", arguments: {} }], stopReason: "toolUse" } },
-  { type: "message", message: { role: "toolResult", toolCallId: "call-1", content: [{ type: "text", text: "partial" }] } },
+  {
+    type: "message",
+    message: {
+      role: "assistant",
+      content: [{ type: "toolCall", id: "call-1", name: "eval", arguments: {} }],
+      stopReason: "toolUse",
+    },
+  },
+  {
+    type: "message",
+    message: { role: "toolResult", toolCallId: "call-1", content: [{ type: "text", text: "partial" }] },
+  },
 ]
 
 const TURN_ANSWERED = [
@@ -158,7 +168,10 @@ describe("respawn of a daemon-hosted child", () => {
       record,
       sessionPath: transcript,
       stateDir: project,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: hostRunner(calls, "attached"),
     })
 
@@ -187,7 +200,10 @@ describe("respawn of a daemon-hosted child", () => {
       record: hostRecord(project, identity),
       sessionPath: transcript,
       stateDir: project,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: hostRunner(calls, "reopened"),
     })
 
@@ -215,13 +231,18 @@ describe("respawn of a daemon-hosted child", () => {
       record: hostRecord(project, identity),
       sessionPath: missing,
       stateDir: project,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: hostRunner(calls, "reopened"),
     })
 
     // then
     expect(result).toMatchObject({ ok: false, disposition: "unrecoverable", code: "session_unavailable" })
-    expect(result.ok ? "" : result.reason).toContain(`recorded session transcript is missing: ${join(project, "deleted")}`)
+    expect(result.ok ? "" : result.reason).toContain(
+      `recorded session transcript is missing: ${join(project, "deleted")}`,
+    )
     expect(calls.switched).toEqual([])
     expect(calls.followUps).toEqual([])
   })
@@ -273,7 +294,10 @@ describe("respawn of a daemon-hosted child", () => {
     const runner = hostRunner(calls, "reopened", (text) => {
       const entries = [
         { type: "message", message: { role: "user", content: text } },
-        { type: "message", message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" } },
+        {
+          type: "message",
+          message: { role: "assistant", content: [{ type: "text", text: "" }], stopReason: "aborted" },
+        },
         { type: "custom", customType: "senpi.hooks.stop-state", data: {} },
       ]
       appendFileSync(transcript, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""))
@@ -311,7 +335,10 @@ describe("respawn of a daemon-hosted child", () => {
     const runner = hostRunner(calls, "reopened", (text) => {
       const entries = [
         { type: "message", message: { role: "user", content: text } },
-        { type: "message", message: { role: "assistant", content: [{ type: "text", text: "finished" }], stopReason: "stop" } },
+        {
+          type: "message",
+          message: { role: "assistant", content: [{ type: "text", text: "finished" }], stopReason: "stop" },
+        },
       ]
       appendFileSync(transcript, entries.map((entry) => `${JSON.stringify(entry)}\n`).join(""))
     })
@@ -366,7 +393,10 @@ describe("respawn of a daemon-hosted child", () => {
     const runner = recordingRunner(host)
     const first = await runner.start(childSpec({ state_dir: project }))
     const sessionPath = host.sessions()[0]?.sessionPath ?? ""
-    writeFileSync(sessionPath, `${JSON.stringify({ type: "message", message: { role: "user", content: "keep going" } })}\n`)
+    writeFileSync(
+      sessionPath,
+      `${JSON.stringify({ type: "message", message: { role: "user", content: "keep going" } })}\n`,
+    )
     await first.dispose()
 
     // when
@@ -428,7 +458,10 @@ describe("respawn of a daemon-hosted child", () => {
 
     // then
     if (!result.ok) throw new Error("respawn failed")
-    const settled = await Promise.race([result.handle.waitForOutcome(), Bun.sleep(2_000).then(() => "unsettled" as const)])
+    const settled = await Promise.race([
+      result.handle.waitForOutcome(),
+      Bun.sleep(2_000).then(() => "unsettled" as const),
+    ])
     expect(settled).toEqual({ status: "completed", finalResponse: "done" })
     expect(prompts(host)).toEqual([])
   })
@@ -850,7 +883,10 @@ describe("respawn of a daemon-hosted child", () => {
       record: hostRecord(project, identity),
       sessionPath: identity.session_path,
       stateDir: project,
-      runners: { "in-process": { start: () => Promise.reject(new Error("unused")) }, process: { start: () => Promise.reject(new Error("unused")) } },
+      runners: {
+        "in-process": { start: () => Promise.reject(new Error("unused")) },
+        process: { start: () => Promise.reject(new Error("unused")) },
+      },
       rpcRunner: { start: () => Promise.reject(held) },
     })
 
@@ -900,7 +936,11 @@ function recordingRunner(host: FakeHost) {
 async function continuationsOverTwoReopens(afterContinuation: readonly unknown[]): Promise<number> {
   const project = tempProject()
   const reopenRows = BOOKKEEPING_ROWS.slice(1)
-  const path = transcriptOf(project, "reopened-twice.jsonl", [...TOOL_TURN_IN_FLIGHT, BOOKKEEPING_ROWS[0], ...reopenRows])
+  const path = transcriptOf(project, "reopened-twice.jsonl", [
+    ...TOOL_TURN_IN_FLIGHT,
+    BOOKKEEPING_ROWS[0],
+    ...reopenRows,
+  ])
   const host = await harness.fakeHost({ transcripts: true })
   const input = {
     beforeLaunch: () => undefined,

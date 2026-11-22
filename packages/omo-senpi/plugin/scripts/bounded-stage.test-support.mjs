@@ -8,20 +8,26 @@ import { windowsTreeKillArgs } from "../../../memory-core/src/concurrency/window
 // naming the stage. A `spawnSync` stage that stalls gives no clue which step hung, and a shell-launched
 // child of a killed `cmd.exe` keeps files open so the scratch directory cannot be removed. The last argument swaps
 // the process seams so a test can play out the Windows kill path on any OS.
-export function runBoundedStage(stage, command, args, options, capMs, {
-  platform = process.platform,
-  spawnChild = spawn,
-  treeKillArgs = windowsTreeKillArgs,
-  runSync = spawnSync,
-} = {}) {
+export function runBoundedStage(
+  stage,
+  command,
+  args,
+  options,
+  capMs,
+  { platform = process.platform, spawnChild = spawn, treeKillArgs = windowsTreeKillArgs, runSync = spawnSync } = {},
+) {
   return new Promise((resolve, reject) => {
     // FILETIME lower bound captured before spawn, including when a short-lived launcher exits.
     const rootStartedAt = BigInt(Date.now()) * 10_000n + 116_444_736_000_000_000n
     const child = spawnChild(command, args, { ...options, windowsHide: true })
     let stdout = ""
     let stderr = ""
-    child.stdout?.setEncoding("utf8").on("data", (chunk) => { stdout += chunk })
-    child.stderr?.setEncoding("utf8").on("data", (chunk) => { stderr += chunk })
+    child.stdout?.setEncoding("utf8").on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr?.setEncoding("utf8").on("data", (chunk) => {
+      stderr += chunk
+    })
     let stalled = false
     const cap = setTimeout(() => {
       stalled = true
@@ -42,7 +48,11 @@ export function runBoundedStage(stage, command, args, options, capMs, {
     child.once("close", (status) => {
       clearTimeout(cap)
       if (stalled) {
-        reject(new Error(`${stage} did not finish within ${capMs} ms; stdout: ${stdout.slice(-500)} stderr: ${stderr.slice(-500)}`))
+        reject(
+          new Error(
+            `${stage} did not finish within ${capMs} ms; stdout: ${stdout.slice(-500)} stderr: ${stderr.slice(-500)}`,
+          ),
+        )
         return
       }
       resolve({ status, stdout, stderr })
@@ -63,25 +73,32 @@ function isFile(path) {
 //    node.exe beside it as npm.cmd would; elsewhere the real path of the first npm, run by the node of that install
 //    (or, without one, the node on PATH, which npm's shebang would pick);
 // 2. otherwise (a version-manager shim or wrapper script) the npm bundled with the node on PATH, run by that node.
-export function resolveNpm({ platform = process.platform, pathValue = process.env.PATH ?? process.env.Path ?? "", isFile: exists = isFile, realpath = realpathSync } = {}) {
+export function resolveNpm({
+  platform = process.platform,
+  pathValue = process.env.PATH ?? process.env.Path ?? "",
+  isFile: exists = isFile,
+  realpath = realpathSync,
+} = {}) {
   const path = platform === "win32" ? win32 : posix
   const dirs = pathValue.split(path.delimiter).filter(Boolean)
   const onPath = (name) => dirs.map((dir) => path.join(dir, name)).find((candidate) => exists(candidate))
   const node = onPath(platform === "win32" ? "node.exe" : "node")
-  const owner = (beside) => exists(beside) ? beside : node ?? "node"
+  const owner = (beside) => (exists(beside) ? beside : (node ?? "node"))
   const npm = onPath(platform === "win32" ? "npm.cmd" : "npm")
   if (npm !== undefined && platform === "win32") {
     const cli = path.join(path.dirname(npm), "node_modules", "npm", "bin", "npm-cli.js")
     if (exists(cli)) return { node: owner(path.join(path.dirname(npm), "node.exe")), cli }
   } else if (npm !== undefined) {
     const cli = realpath(npm)
-    if (/\.[cm]?js$/.test(cli)) return { node: owner(path.join(path.dirname(cli), "..", "..", "..", "..", "bin", "node")), cli }
+    if (/\.[cm]?js$/.test(cli))
+      return { node: owner(path.join(path.dirname(cli), "..", "..", "..", "..", "bin", "node")), cli }
   }
   if (node === undefined) return null
   const realNode = realpath(node)
-  const bundled = platform === "win32"
-    ? path.join(path.dirname(realNode), "node_modules", "npm", "bin", "npm-cli.js")
-    : path.join(path.dirname(realNode), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")
+  const bundled =
+    platform === "win32"
+      ? path.join(path.dirname(realNode), "node_modules", "npm", "bin", "npm-cli.js")
+      : path.join(path.dirname(realNode), "..", "lib", "node_modules", "npm", "bin", "npm-cli.js")
   return exists(bundled) ? { node: realNode, cli: bundled } : null
 }
 
@@ -93,13 +110,14 @@ export function resolveNpm({ platform = process.platform, pathValue = process.en
 // JavaScript entry is found, npm is started by name as before (through cmd.exe on Windows, where npm.cmd needs it).
 // Either way it runs from the filesystem root: Windows cannot remove a directory that is a live process's current
 // directory.
-export function npmPackStage(pkg, destination, {
-  platform = process.platform,
-  npm = resolveNpm({ platform }),
-  cwd = parse(process.cwd()).root,
-} = {}) {
+export function npmPackStage(
+  pkg,
+  destination,
+  { platform = process.platform, npm = resolveNpm({ platform }), cwd = parse(process.cwd()).root } = {},
+) {
   const pack = ["pack", pkg, "--silent", "--pack-destination", destination]
-  if (npm === null) return { command: "npm", args: pack, options: { cwd, ...(platform === "win32" && { shell: true }) } }
+  if (npm === null)
+    return { command: "npm", args: pack, options: { cwd, ...(platform === "win32" && { shell: true }) } }
   return { command: npm.node, args: ["--single-threaded", npm.cli, ...pack], options: { cwd } }
 }
 

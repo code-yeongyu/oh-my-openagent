@@ -93,8 +93,7 @@ describe("/people --ask", () => {
       config: { categories: { quick: { model: "omo-mock/mock-1" } } },
       registry: {
         getAvailable: () => [model],
-        find: (provider, modelId) =>
-          provider === model.provider && modelId === model.id ? model : undefined,
+        find: (provider, modelId) => (provider === model.provider && modelId === model.id ? model : undefined),
       },
       senpiCommand: process.execPath,
       senpiPrefixArgs: [printer, "PEOPLE-PREFIX-MARKER"],

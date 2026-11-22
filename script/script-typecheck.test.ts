@@ -68,9 +68,9 @@ describe("script TypeScript project", () => {
     const scriptTsconfig = parseScriptTsconfig(readFileSync(join(scriptRoot, "tsconfig.json"), "utf8"))
 
     // when
-    const missingFiles = scriptFiles.filter((scriptFile) => (
-      !scriptTsconfig.include.includes("./*.ts") && !scriptTsconfig.include.includes(scriptFile)
-    ))
+    const missingFiles = scriptFiles.filter(
+      (scriptFile) => !scriptTsconfig.include.includes("./*.ts") && !scriptTsconfig.include.includes(scriptFile),
+    )
 
     // then
     expect(scriptFiles).toContain("./build-binaries.ts")

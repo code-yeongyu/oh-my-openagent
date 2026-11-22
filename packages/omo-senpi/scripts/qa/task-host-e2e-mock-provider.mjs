@@ -1,8 +1,6 @@
 import { createHash } from "node:crypto"
 import { observeMockSignal, recordMockEvent } from "./task-host-e2e-audit.mjs"
-import registerBase, {
-  loadMockScript, messagesContainChild, stepToAssistantMessage,
-} from "./task-e2e-mock-provider.ts"
+import registerBase, { loadMockScript, messagesContainChild, stepToAssistantMessage } from "./task-e2e-mock-provider.ts"
 
 let requestNumber = 0 // Correlation only; this never chooses a script step.
 // A daemon shares extension modules across sessions. Advance from this conversation's receipts,
@@ -42,7 +40,8 @@ function scriptedStream(model, context, steps, options) {
   const message = stepToAssistantMessage(step, index + 1, model.id)
   observeMockSignal(context.cwd ?? process.cwd(), step.id, options?.signal)
   const result = emissionReady(step.delayMs, options?.signal).then(() =>
-    options?.signal?.aborted ? { ...message, stopReason: "aborted" } : message)
+    options?.signal?.aborted ? { ...message, stopReason: "aborted" } : message,
+  )
   return {
     result: () => result,
     async *[Symbol.asyncIterator]() {
@@ -69,14 +68,19 @@ function scriptedStream(model, context, steps, options) {
 export default function registerTaskHostMock(pi) {
   pi.on?.("agent_end", (event, context) => {
     recordMockEvent(context.cwd, {
-      type: "agent_end", sessionId: context.sessionManager.getSessionId(),
-      aborted: event.aborted ?? null, abortSource: event.abortSource ?? null, willRetry: event.willRetry ?? null,
+      type: "agent_end",
+      sessionId: context.sessionManager.getSessionId(),
+      aborted: event.aborted ?? null,
+      abortSource: event.abortSource ?? null,
+      willRetry: event.willRetry ?? null,
       stopReason: event.messages.findLast((message) => message.role === "assistant")?.stopReason ?? null,
     })
   })
   pi.on?.("session_shutdown", (event, context) => {
     recordMockEvent(context.cwd, {
-      type: "session_shutdown", sessionId: context.sessionManager.getSessionId(), reason: event.reason,
+      type: "session_shutdown",
+      sessionId: context.sessionManager.getSessionId(),
+      reason: event.reason,
     })
   })
   registerBase({

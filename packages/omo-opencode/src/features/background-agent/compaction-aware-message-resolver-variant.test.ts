@@ -104,17 +104,26 @@ describe("compaction-aware message resolver variants", () => {
 
   test("#given newest model A omits variant between model B and older model A xhigh files #when filesystem history resolves #then same-model variant backfills past model B", () => {
     // given
-    writeFileSync(join(tempDir, "001.json"), JSON.stringify({
-      model: { providerID: "provider-a", modelID: "model-a", variant: "xhigh" },
-    }))
-    writeFileSync(join(tempDir, "002.json"), JSON.stringify({
-      model: { providerID: "provider-b", modelID: "model-b", variant: "high" },
-    }))
-    writeFileSync(join(tempDir, "003.json"), JSON.stringify({
-      agent: "atlas",
-      model: { providerID: "provider-a", modelID: "model-a" },
-      tools: { read: true },
-    }))
+    writeFileSync(
+      join(tempDir, "001.json"),
+      JSON.stringify({
+        model: { providerID: "provider-a", modelID: "model-a", variant: "xhigh" },
+      }),
+    )
+    writeFileSync(
+      join(tempDir, "002.json"),
+      JSON.stringify({
+        model: { providerID: "provider-b", modelID: "model-b", variant: "high" },
+      }),
+    )
+    writeFileSync(
+      join(tempDir, "003.json"),
+      JSON.stringify({
+        agent: "atlas",
+        model: { providerID: "provider-a", modelID: "model-a" },
+        tools: { read: true },
+      }),
+    )
 
     // when
     const result = findNearestMessageExcludingCompaction(tempDir)

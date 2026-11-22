@@ -3,7 +3,7 @@ import type { ExecutorContext } from "./executor-types"
 export async function cancelUnstableAgentTask(
   manager: ExecutorContext["manager"],
   taskID: string | undefined,
-  reason: string
+  reason: string,
 ): Promise<void> {
   if (!taskID || typeof manager.cancelTask !== "function") {
     return

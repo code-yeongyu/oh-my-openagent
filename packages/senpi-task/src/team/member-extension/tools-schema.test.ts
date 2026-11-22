@@ -6,8 +6,15 @@ test("#given member task_send parameters #when validated by the runtime #then re
   expect(Check(MemberTaskSendParams, { to: "lead", message: "hello" })).toBe(true)
   expect(Check(MemberTaskSendParams, { to: "alice", message: "hello", summary: "note" })).toBe(true)
   expect(Check(MemberTaskSendParams, { to: "lead", message: "hello", extra: true })).toBe(true)
-  for (const input of [null, {}, { to: "lead" }, { message: "hello" }, { to: 1, message: "hello" },
-    { to: "lead", message: false }, { to: "lead", message: "hello", summary: 1 }]) {
+  for (const input of [
+    null,
+    {},
+    { to: "lead" },
+    { message: "hello" },
+    { to: 1, message: "hello" },
+    { to: "lead", message: false },
+    { to: "lead", message: "hello", summary: 1 },
+  ]) {
     expect(Check(MemberTaskSendParams, input)).toBe(false)
   }
 })

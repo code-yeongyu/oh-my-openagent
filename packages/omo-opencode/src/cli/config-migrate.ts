@@ -25,7 +25,9 @@ function reports(result: ReturnType<typeof runOpenCodeStartupMigration>): readon
     movePlan: entry.preview?.backupMoves ?? [],
     status: entry.status,
     ...(entry.targetBackupPath === undefined ? {} : { targetBackupPath: entry.targetBackupPath }),
-    ...(entry.preview === undefined ? {} : { targetPath: entry.preview.targetPath, transform: entry.preview.transform }),
+    ...(entry.preview === undefined
+      ? {}
+      : { targetPath: entry.preview.targetPath, transform: entry.preview.transform }),
   }))
 }
 

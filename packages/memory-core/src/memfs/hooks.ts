@@ -12,7 +12,9 @@ export interface InstalledHook {
   path: string
 }
 
-const hookScripts = (checker: MemoryHookChecker | undefined): readonly { name: InstalledHook["name"]; script: string }[] => [
+const hookScripts = (
+  checker: MemoryHookChecker | undefined,
+): readonly { name: InstalledHook["name"]; script: string }[] => [
   { name: "pre-commit", script: withMemoryHookChecker(PRE_COMMIT_HOOK_SCRIPT, "pre-commit", checker) },
   { name: "commit-msg", script: withMemoryHookChecker(COMMIT_MSG_HOOK_SCRIPT, "commit-msg", checker) },
   { name: "post-commit", script: POST_COMMIT_HOOK_SCRIPT },
@@ -27,7 +29,10 @@ const hookScripts = (checker: MemoryHookChecker | undefined): readonly { name: I
  * main repository, which is where git actually looks for them. The engine passes
  * its `checker` so the hooks validate staged notes with the TypeScript reader.
  */
-export function installHooks(repoPath: string, options: { readonly checker?: MemoryHookChecker } = {}): InstalledHook[] {
+export function installHooks(
+  repoPath: string,
+  options: { readonly checker?: MemoryHookChecker } = {},
+): InstalledHook[] {
   const hooksDir = resolveHooksDir(repoPath)
   mkdirSync(hooksDir, { recursive: true })
 

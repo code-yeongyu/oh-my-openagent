@@ -101,13 +101,10 @@ describe("playwright browser skill facade", () => {
     for (const browserProvider of ["playwright-cli", "dev-browser"] as const) {
       // when
       const skills = createBuiltinSkills({ browserProvider, playwrightMcpArgs: ["--headless"] })
-      const browserSkill = skills.find((skill) =>
-        ["playwright", "dev-browser"].includes(skill.name),
-      )
+      const browserSkill = skills.find((skill) => ["playwright", "dev-browser"].includes(skill.name))
 
       // then
       expect(browserSkill?.mcpConfig).toBeUndefined()
     }
   })
-
 })
