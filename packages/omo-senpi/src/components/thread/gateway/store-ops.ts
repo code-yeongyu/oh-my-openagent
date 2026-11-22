@@ -36,7 +36,14 @@ import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { GATEWAY_MIGRATIONS, GATEWAY_TABLE_REBUILDS, GatewaySchemaVersionError } from "./schema"
+import { isDevBuildRuntime, isSharedAgentDir } from "../../agent-home/dev-build-runtime"
+import {
+  GATEWAY_MIGRATIONS,
+  GATEWAY_READER_FLOOR_KEY,
+  GATEWAY_TABLE_REBUILDS,
+  GatewaySchemaVersionError,
+  gatewayReaderFloor,
+} from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -357,12 +364,56 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
+function storedReaderFloor(ctx: StoreContext): number | undefined {
+  const tables = ctx.sql.one(["n"], "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'gateway_meta'")
+  if (Number(tables?.n ?? 0) === 0) return undefined
+  const found = ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [GATEWAY_READER_FLOOR_KEY])
+  const floor = Number(found?.value)
+  return found !== undefined && Number.isInteger(floor) ? floor : undefined
+}
+
+/**
+ * The store's schema version. A store newer than this binary stays usable when the binary that migrated it recorded a
+ * reader floor this binary meets (#14382); otherwise, or with no floor recorded, it is refused typed.
+ */
 function schemaVersion(ctx: StoreContext): number {
   const version = Number(
     ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0,
   )
-  if (version > GATEWAY_MIGRATIONS.length) throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
+  if (version > GATEWAY_MIGRATIONS.length) {
+    const floor = storedReaderFloor(ctx)
+    if (floor === undefined || floor > GATEWAY_MIGRATIONS.length) {
+      throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
+    }
+  }
   return version
+}
+
+/** Records this binary's reader floor on a store at exactly its schema; a store already carrying it takes no write lock. */
+async function recordReaderFloor(ctx: StoreContext): Promise<void> {
+  const floor = gatewayReaderFloor(GATEWAY_MIGRATIONS.length)
+  const current = () => schemaVersion(ctx) === GATEWAY_MIGRATIONS.length && storedReaderFloor(ctx) !== floor
+  if (!current()) return
+  await transaction(ctx, "migrate", () => {
+    if (!current()) return
+    write(
+      ctx,
+      "INSERT INTO gateway_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      [GATEWAY_READER_FLOOR_KEY, String(floor)],
+    )
+  })
+}
+
+/**
+ * An omob source build never moves the shared agent dir's store forward (#14382): every released session on the device
+ * reads that store, and a schema only an unreleased build knows would lock them out.
+ */
+function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
+  if (!isDevBuildRuntime() || !isSharedAgentDir(ctx.config.agent_dir)) return undefined
+  return new GatewayMigrationError(
+    version + 1,
+    `a source build does not migrate the shared gateway store from v${version} to v${GATEWAY_MIGRATIONS.length}; run it with OMO_CODING_AGENT_DIR set to an isolated agent dir`,
+  )
 }
 
 /**
@@ -382,10 +433,14 @@ export class GatewayMigrationError extends Error {
 }
 
 export async function migrate(ctx: StoreContext): Promise<void> {
-  if (schemaVersion(ctx) >= GATEWAY_MIGRATIONS.length) return
+  const opened = schemaVersion(ctx)
+  if (opened < GATEWAY_MIGRATIONS.length) {
+    const refusal = sourceBuildMigrationRefusal(ctx, opened)
+    if (refusal !== undefined) throw refusal
+  }
   for (;;) {
     const version = schemaVersion(ctx)
-    if (version >= GATEWAY_MIGRATIONS.length) return
+    if (version >= GATEWAY_MIGRATIONS.length) return await recordReaderFloor(ctx)
     // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) must run with foreign_keys OFF, which SQLite only
     // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
     // extension tables referencing the rebuilt table). The pragma is restored to its prior value afterwards, and

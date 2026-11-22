@@ -458,6 +458,23 @@ export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
   [14, "deliveries"],
 ])
 
+/**
+ * Per migration (same index as GATEWAY_MIGRATIONS): the oldest gateway schema whose code may keep reading and writing a
+ * store this step has reached (#14382). A step that only adds what older code never reads (a nullable column, an index)
+ * or widens a CHECK to a value older code passes through as data keeps the floor; a step that changes what a column older
+ * code uses means sets it to its own version. Steps up to v14 predate the floor and claim nothing.
+ * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
+ * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
+ */
+export const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
+
+export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
+
+/** The oldest schema a binary must know to use a store at `version`: the highest floor of the steps that reached it. */
+export function gatewayReaderFloor(version: number): number {
+  return GATEWAY_READER_FLOORS.slice(0, version).reduce((floor, step) => Math.max(floor, step), 0)
+}
+
 export const GATEWAY_TABLES = [
   "deliveries",
   "receipts",
