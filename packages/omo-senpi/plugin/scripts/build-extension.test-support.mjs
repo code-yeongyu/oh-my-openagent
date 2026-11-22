@@ -51,16 +51,18 @@ export function outputPathsIn(root) {
  * of each check rebuilding its own reproduction. It stays a separate build so the comparison still
  * proves the build reproduces its outputs.
  */
-export function createBuildFixture() {
+export function createBuildFixture(build = buildExtension) {
   const perTestRoots = []
+  const fileRoots = []
   let sharedBuildPromise = null
   let reproductionPromise = null
   async function sharedOutputs() {
     sharedBuildPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
+      fileRoots.push(root)
       const paths = outputPathsIn(root)
-      const build = await buildExtension(paths)
-      return { root, ...paths, ...build }
+      const result = await build(paths)
+      return { root, ...paths, ...result }
     })()
     return sharedBuildPromise
   }
@@ -74,7 +76,8 @@ export function createBuildFixture() {
   async function reproductionRoot() {
     reproductionPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-reproduction-"))
-      await buildExtension(outputPathsIn(root))
+      fileRoots.push(root)
+      await build(outputPathsIn(root))
       return root
     })()
     return reproductionPromise
@@ -88,11 +91,10 @@ export function createBuildFixture() {
       await Promise.all(perTestRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
     },
     cleanupFile: async () => {
-      const roots = await Promise.all([
-        sharedBuildPromise === null ? undefined : sharedBuildPromise.then((shared) => shared.root),
-        reproductionPromise,
-      ])
-      await Promise.all(roots.filter((root) => root != null).map((root) => rm(root, { recursive: true, force: true })))
+      const builds = await Promise.allSettled([sharedBuildPromise, reproductionPromise])
+      await Promise.all(fileRoots.map((root) => rm(root, { recursive: true, force: true })))
+      const failure = builds.find((result) => result.status === "rejected")
+      if (failure) throw failure.reason
     },
   }
 }
