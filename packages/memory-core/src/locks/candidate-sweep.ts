@@ -1,4 +1,5 @@
 import path from "node:path"
+import { isOnDevice } from "../fs/device-scope"
 
 import { readdir, stat, unlink } from "../fs/resilient"
 import { getPidLiveness } from "./process-identity"
@@ -81,7 +82,9 @@ export async function sweepStaleLockCandidates(
     const candidatePath = path.join(lockDirectory, name)
     try {
       const status = await stat(candidatePath)
-      const stale = knownLeakedCandidates.has(candidatePath) || isCreatorDead(name) || now() - status.mtimeMs > CANDIDATE_STALE_AGE_MS
+      // Leaked paths and PID probes describe this machine, not the device that owns this directory.
+      const localLeak = !isOnDevice() && (knownLeakedCandidates.has(candidatePath) || isCreatorDead(name))
+      const stale = localLeak || now() - status.mtimeMs > CANDIDATE_STALE_AGE_MS
       if (!stale) continue
       let removed = false
       for (let attempt = 0; attempt < CANDIDATE_UNLINK_ATTEMPTS; attempt += 1) {

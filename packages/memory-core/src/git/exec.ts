@@ -292,7 +292,10 @@ async function runGitOnDevice(files: MemoryDeviceFiles, argv: readonly string[],
     ...(options.stdin === undefined ? {} : { stdin: Buffer.from(options.stdin) }),
     timeoutMs: options.timeoutMs,
     activityLock: true,
-  }, options.signal === undefined ? undefined : { signal: options.signal })
+  }, options.signal === undefined ? undefined : { signal: options.signal }).catch((error: unknown) => {
+    if (error instanceof Error && "code" in error && error.code === "aborted") throw new GitAbortedError(argv)
+    throw error
+  })
   const stdoutBytes = Buffer.from(result.stdout)
   return {
     code: result.code ?? 1,

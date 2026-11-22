@@ -1,7 +1,10 @@
 import { expect, it } from "bun:test"
 import { join } from "node:path"
+import { hostname } from "node:os"
 import { runOnDevice, type MemoryDeviceFiles } from "../fs/device-scope"
-import { GitMemoryRepo } from "../git"
+import { createNodeGitExec, GitAbortedError, GitMemoryRepo } from "../git"
+import { sweepStaleLockCandidates } from "../locks/candidate-sweep"
+import { isLockOwnerProvenDead } from "../locks/stale-owner"
 import { recordPendingRollback, settlePendingRollback } from "../git/pending-rollback"
 import { StrandedGitLockError } from "../git/repo-lock-sweep"
 import { undoBehindKeptLock } from "./rollback-behind-lock"
@@ -62,4 +65,28 @@ it("preserves a held device index and records the pending staged rollback", asyn
   expect(entries.has(note)).toBe(false)
   expect(JSON.parse(new TextDecoder().decode(entries.get(join(repo.dir, ".git", "omo-pending-rollback.json")))))
     .toEqual({ head: "before", paths: ["note.md"] })
+})
+
+it("maps a typed hand cancellation but preserves an unexplained device termination", async () => {
+  const { files, repo } = fixture()
+  const run = () => createNodeGitExec().run(["status"], { cwd: repo.dir, timeoutMs: 1000 })
+  files.run = async () => { throw Object.assign(new Error("cancelled"), { code: "aborted" }) }
+  await expect(runOnDevice(files, run)).rejects.toBeInstanceOf(GitAbortedError)
+  files.run = async () => ({ code: null, signal: "SIGTERM", stdout: new Uint8Array(), stderr: "" })
+  expect((await runOnDevice(files, run)).termination?.signal).toBe("SIGTERM")
+})
+
+it("keeps a fresh device candidate whose pid is absent on the loop", async () => {
+  const { files, entries, repo } = fixture()
+  const name = "writer.candidate-2147483647-11111111-aaaa-bbbb-cccc-000000000001"
+  entries.set(join(repo.dir, name), Uint8Array.of(1))
+  files.list = async () => [name]
+  expect(await runOnDevice(files, () => sweepStaleLockCandidates(repo.dir, () => 0))).toBe(0)
+  expect(entries.has(join(repo.dir, name))).toBe(true)
+})
+
+it("does not use a matching hostname to prove a device owner dead", async () => {
+  const { files } = fixture()
+  const owner = { hostname: hostname(), pid: 2147483647, nonce: "n", purpose: "writer", created_at: "", process_start: "unavailable" }
+  expect(await runOnDevice(files, () => isLockOwnerProvenDead(owner))).toBe(false)
 })

@@ -1,4 +1,5 @@
 import { hostname } from "node:os"
+import { isOnDevice } from "../fs/device-scope"
 import path from "node:path"
 
 import { lstat, readdir, readFile } from "../fs/resilient"
@@ -62,6 +63,8 @@ async function reclaimIfDeadOwner(lockPath: string, options: DeadOwnerSweepOptio
  * many were reclaimed.
  */
 export async function sweepDeadOwnerLocks(lockDirectory: string, options: DeadOwnerSweepOptions = {}): Promise<number> {
+  // This sweep needs a local process table as proof; the hand does not expose one.
+  if (isOnDevice()) return 0
   let names: readonly string[]
   try {
     names = await readdir(lockDirectory)

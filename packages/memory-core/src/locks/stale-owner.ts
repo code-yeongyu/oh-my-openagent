@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { isOnDevice } from "../fs/device-scope"
 import { link, rename, unlink } from "../fs/resilient"
 import { hostname } from "node:os"
 
@@ -19,7 +20,7 @@ function errorCode(error: unknown): string | undefined {
  * was recycled). Another host, an unknown liveness or an incomparable identity all keep the owner.
  */
 export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean> {
-  if (owner.hostname !== hostname()) return false
+  if (isOnDevice() || owner.hostname !== hostname()) return false
   const liveness = getPidLiveness(owner.pid)
   if (liveness === "dead") return true
   if (liveness === "unknown") return false
