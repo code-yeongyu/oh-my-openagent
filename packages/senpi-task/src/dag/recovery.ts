@@ -309,9 +309,12 @@ async function reconcileNodes(
   const startedHere = new Set<string>()
   // A child still waiting for a concurrency slot in this host has no resident handle either, but
   // this host's queue will launch it and settle it through the same waiters.
-  const queuedHere = new Set(context.taskManager.list({ scope: "all" })
-    .filter((entry) => entry.record.status === "pending" && entry.queue_position !== undefined)
-    .map((entry) => entry.record.task_id))
+  const queuedHere = new Set(
+    context.taskManager
+      .list({ scope: "all" })
+      .filter((entry) => entry.record.status === "pending" && entry.queue_position !== undefined)
+      .map((entry) => entry.record.task_id),
+  )
   for (const observed of journal.snapshot().nodes) {
     if (observed.state === "completed") {
       const result = readDagNodeResult({ store: context.store, runId: journal.snapshot().runId, nodeId: observed.id })
@@ -391,19 +394,26 @@ async function reconcileNodes(
     // as long as the slowest child ran, withholding `dag.run.resumed`, the reuse events of every
     // node ordered after it, and every operator lever that refuses on an active run.
     if (task.status === "pending" || task.status === "running" || task.status === "paused") {
-      const orphaned = startedHere.has(task.task_id) || queuedHere.has(task.task_id) ? undefined : orphanedTaskReason(context, task)
+      const orphaned =
+        startedHere.has(task.task_id) || queuedHere.has(task.task_id) ? undefined : orphanedTaskReason(context, task)
       // A child that never launched and that no queue here still holds lost no work: retire its
       // record so it can never launch beside a replacement, and re-admit the node (#12107).
-      if (orphaned !== undefined && task.status === "pending" && task.started_at === undefined &&
-        (observed.execAttempt ?? 0) < MAX_RECOVERY_READMISSIONS) {
+      if (
+        orphaned !== undefined &&
+        task.status === "pending" &&
+        task.started_at === undefined &&
+        (observed.execAttempt ?? 0) < MAX_RECOVERY_READMISSIONS
+      ) {
         context.taskManager.withdrawAdmissions?.([task.task_id])
         await context.taskManager.cancelTask(task.task_id, "never launched; the DAG node was re-admitted on recovery")
-        journal.append(dagNodeRetriedEvent({
-          nodeId: observed.id,
-          priorTaskId: task.task_id,
-          execAttempt: (observed.execAttempt ?? 0) + 1,
-          promptChanged: false,
-        }))
+        journal.append(
+          dagNodeRetriedEvent({
+            nodeId: observed.id,
+            priorTaskId: task.task_id,
+            execAttempt: (observed.execAttempt ?? 0) + 1,
+            promptChanged: false,
+          }),
+        )
         continue
       }
       if (orphaned !== undefined) {

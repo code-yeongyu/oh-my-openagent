@@ -16,40 +16,66 @@ afterEach(cleanupProjects)
 const PARENT = "parent-1"
 const WAVE_ONE = Array.from({ length: 12 }, (_, index) => `w1-${index}`)
 const DEFINITION = {
-  key: "queued-recovery", name: "queued recovery",
+  key: "queued-recovery",
+  name: "queued recovery",
   nodes: [
-    ...WAVE_ONE.map(id => ({ id, prompt: id, subagent_type: "explore", model: "omo-mock/mock-1" })),
+    ...WAVE_ONE.map((id) => ({ id, prompt: id, subagent_type: "explore", model: "omo-mock/mock-1" })),
     { id: "merge", prompt: "merge", subagent_type: "explore", model: "omo-mock/mock-1", dependsOn: WAVE_ONE },
   ],
 }
 
-const drained = async () => { for (let turn = 0; turn < 20; turn += 1) await new Promise<void>(resolve => setImmediate(resolve)) }
+const drained = async () => {
+  for (let turn = 0; turn < 20; turn += 1) await new Promise<void>((resolve) => setImmediate(resolve))
+}
 
 function compose(cwd: string) {
   const runner = new FakeRunner()
   const pi = new FakeExtensionAPI()
-  const coordinator = new IdleInjectionCoordinator((message, options) => deliverItems((_native, delivery) => delivery.items.map(item =>
-    ({ itemId: item.itemId, entryId: `entry:${item.itemId}`, disposition: "message_persisted" as const })), { ...options, message }))
+  const coordinator = new IdleInjectionCoordinator((message, options) =>
+    deliverItems(
+      (_native, delivery) =>
+        delivery.items.map((item) => ({
+          itemId: item.itemId,
+          entryId: `entry:${item.itemId}`,
+          disposition: "message_persisted" as const,
+        })),
+      { ...options, message },
+    ),
+  )
   const state: { pause: EnginePauseState } = { pause: { pauseSeq: 6, holds: [] } }
   const config = loadOmoConfig({ cwd }).config
   const engine = composeTaskEngine({
-    pi, cwd, omoConfig: { ...config, task: OmoTaskSettingsSchema.parse({ ...config.task, default_concurrency: 3 }) }, sharedParentTools: () => [], coordinator,
+    pi,
+    cwd,
+    omoConfig: { ...config, task: OmoTaskSettingsSchema.parse({ ...config.task, default_concurrency: 3 }) },
+    sharedParentTools: () => [],
+    coordinator,
     runnerFactories: { inProcess: () => runner, process: () => runner },
     childPausePort: {
-      pauseForRun: async child => {
+      pauseForRun: async (child) => {
         runner.handles.get(child.task_id)?.settle({ status: "cancelled" })
         return { childSeq: 3 }
       },
-      resumeTurn: async child => ({ turnId: "resumed-turn", outcome: child.waitForOutcome() }),
-      holdInput: async () => { throw new Error("no input was held") },
+      resumeTurn: async (child) => ({ turnId: "resumed-turn", outcome: child.waitForOutcome() }),
+      holdInput: async () => {
+        throw new Error("no input was held")
+      },
     },
   })
   engine.runtime.captureFrom({
-    modelRegistry: createTeamServiceTestModelRegistry(), isIdle: () => true,
+    modelRegistry: createTeamServiceTestModelRegistry(),
+    isIdle: () => true,
     sessionManager: { getSessionId: () => PARENT },
-    getPauseState: () => state.pause, fenceRun: () => undefined, releaseRunFence: () => undefined,
+    getPauseState: () => state.pause,
+    fenceRun: () => undefined,
+    releaseRunFence: () => undefined,
   })
-  const runtime = createDagRuntime({ pi, engine, coordinator, logger: { info: () => undefined, warn: () => undefined, error: () => undefined } })
+  const runtime = createDagRuntime({
+    pi,
+    engine,
+    coordinator,
+    logger: { info: () => undefined, warn: () => undefined, error: () => undefined },
+  })
   const dispose = async () => {
     for (const { record } of engine.manager.list({ scope: "all" })) await engine.manager.cancelTask(record.task_id)
     runtime.dispose()
@@ -60,10 +86,16 @@ function compose(cwd: string) {
 
 async function startWithQueue(world: ReturnType<typeof compose>): Promise<DagRunId> {
   await world.runtime.attach()
-  const started = await world.runtime.manager.start({ parentSessionId: PARENT, rootSessionId: PARENT, definition: DEFINITION })
+  const started = await world.runtime.manager.start({
+    parentSessionId: PARENT,
+    rootSessionId: PARENT,
+    definition: DEFINITION,
+  })
   await drained()
   expect(world.runner.startedSpecs).toHaveLength(3)
-  expect(world.engine.manager.list({ scope: "all" }).filter(({ record }) => record.status === "pending")).toHaveLength(9)
+  expect(world.engine.manager.list({ scope: "all" }).filter(({ record }) => record.status === "pending")).toHaveLength(
+    9,
+  )
   return started.snapshot.runId as DagRunId
 }
 
@@ -71,7 +103,8 @@ async function completeRunningChildren(world: ReturnType<typeof compose>): Promi
   for (let round = 0; round < 10; round += 1) {
     const running = world.engine.manager.list({ scope: "all" }).filter(({ record }) => record.status === "running")
     if (running.length === 0) return
-    for (const { record } of running) world.runner.handles.get(record.task_id)?.settle({ status: "completed", finalResponse: `${record.task_id} done` })
+    for (const { record } of running)
+      world.runner.handles.get(record.task_id)?.settle({ status: "completed", finalResponse: `${record.task_id} done` })
     await drained()
   }
 }
@@ -89,13 +122,19 @@ test("#given wave-one nodes queued behind the concurrency cap #when the user Sto
     await completeRunningChildren(world)
 
     const record = world.runtime.manager.record(runId, PARENT)
-    expect(record.nodes.filter(node => node.error?.code === "resume_task_orphaned")).toEqual([])
+    expect(record.nodes.filter((node) => node.error?.code === "resume_task_orphaned")).toEqual([])
     expect(record.nodes).toHaveLength(WAVE_ONE.length + 1)
-    expect(record.nodes.filter(node => node.state !== "completed").map(node => `${node.id}:${node.state}`)).toEqual([])
+    expect(record.nodes.filter((node) => node.state !== "completed").map((node) => `${node.id}:${node.state}`)).toEqual(
+      [],
+    )
     expect(record.status).toBe("completed")
-    expect(world.engine.manager.list({ scope: "all" }).filter(({ record: task }) => task.status === "pending")).toEqual([])
-  } finally { await world.dispose() }
-}, 15_000)
+    expect(world.engine.manager.list({ scope: "all" }).filter(({ record: task }) => task.status === "pending")).toEqual(
+      [],
+    )
+  } finally {
+    await world.dispose()
+  }
+})
 
 test("#given wave-one nodes queued behind the concurrency cap #when the session quits and is reopened #then the queued nodes are re-admitted instead of failing as orphaned", async () => {
   const cwd = tempProject()
@@ -117,9 +156,12 @@ test("#given wave-one nodes queued behind the concurrency cap #when the session 
     await drained()
 
     const record = after.runtime.manager.record(runId, PARENT)
-    expect(record.nodes.filter(node => node.error?.code === "resume_task_orphaned")).toEqual([])
-    const strandedPending = after.engine.manager.list({ scope: "all" })
-      .filter(entry => entry.record.status === "pending" && entry.queue_position === undefined)
+    expect(record.nodes.filter((node) => node.error?.code === "resume_task_orphaned")).toEqual([])
+    const strandedPending = after.engine.manager
+      .list({ scope: "all" })
+      .filter((entry) => entry.record.status === "pending" && entry.queue_position === undefined)
     expect(strandedPending).toEqual([])
-  } finally { await after.dispose() }
-}, 15_000)
+  } finally {
+    await after.dispose()
+  }
+})
