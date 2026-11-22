@@ -155,7 +155,7 @@ export async function aggregateDiagnosticsForDirectory(
     })
     await Promise.all(workers)
   } finally {
-    manager.releaseClient(root, server.id)
+    manager.releaseClient(root, server)
   }
 
   const displayDiagnostics = allDiagnostics.slice(0, DEFAULT_MAX_DIAGNOSTICS)

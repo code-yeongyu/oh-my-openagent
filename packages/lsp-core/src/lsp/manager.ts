@@ -1,5 +1,6 @@
 import { reportBestEffortCleanupError } from "./cleanup-errors.js"
 import { LspClient } from "./client.js"
+import { type ClientIdentity, lspClientKey } from "./client-key.js"
 import {
   CLIENT_RESPAWN_COOLDOWN_MS,
   CLIENT_RESPAWN_RETRY_LIMIT,
@@ -13,6 +14,8 @@ import { installProcessSignalCleanup } from "./process-signal-cleanup.js"
 import type { ResolvedServer } from "./types.js"
 
 interface ManagedClient {
+  readonly root: string
+  readonly serverId: string
   client: LspClient
   refCount: number
   pendingWaiters: number
@@ -122,10 +125,6 @@ export class LspManager {
     if (typeof this.reaperHandle.unref === "function") {
       this.reaperHandle.unref()
     }
-  }
-
-  private getKey(root: string, serverId: string): string {
-    return `${root}::${serverId}`
   }
 
   /**
@@ -241,7 +240,7 @@ export class LspManager {
     }
     signal?.throwIfAborted()
 
-    const key = this.getKey(root, server.id)
+    const key = lspClientKey(root, server)
     for (;;) {
       const pendingStop = this.pendingStops.get(key)
       if (pendingStop === undefined) break
@@ -311,6 +310,8 @@ export class LspManager {
     })()
 
     const newManaged: ManagedClient = {
+      root,
+      serverId: server.id,
       client,
       refCount: 0,
       pendingWaiters: 1,
@@ -357,8 +358,8 @@ export class LspManager {
     return client
   }
 
-  releaseClient(root: string, serverId: string): void {
-    const key = this.getKey(root, serverId)
+  releaseClient(root: string, server: ClientIdentity): void {
+    const key = lspClientKey(root, server)
     const managed = this.clients.get(key)
     if (managed && managed.refCount > 0) {
       managed.refCount--
@@ -366,8 +367,8 @@ export class LspManager {
     }
   }
 
-  invalidateClient(root: string, serverId: string, client?: LspClient): void {
-    const key = this.getKey(root, serverId)
+  invalidateClient(root: string, server: ClientIdentity, client?: LspClient): void {
+    const key = lspClientKey(root, server)
     const managed = this.clients.get(key)
     if (!managed) return
     if (client && managed.client !== client) return
@@ -377,7 +378,7 @@ export class LspManager {
 
   warmupClient(root: string, server: ResolvedServer): void {
     if (this.disposed) return
-    const key = this.getKey(root, server.id)
+    const key = lspClientKey(root, server)
     if (this.clients.has(key) || this.pendingStops.has(key)) return
 
     this.evictForAdmission()
@@ -395,6 +396,8 @@ export class LspManager {
     })()
 
     const managed: ManagedClient = {
+      root,
+      serverId: server.id,
       client,
       refCount: 0,
       pendingWaiters: 0,
@@ -421,18 +424,17 @@ export class LspManager {
     )
   }
 
-  isServerInitializing(root: string, serverId: string): boolean {
-    const managed = this.clients.get(this.getKey(root, serverId))
+  isServerInitializing(root: string, server: ClientIdentity): boolean {
+    const managed = this.clients.get(lspClientKey(root, server))
     return managed?.isInitializing ?? false
   }
 
   getSnapshot(): ClientSnapshot[] {
     const snapshots: ClientSnapshot[] = []
-    for (const [key, managed] of this.clients) {
-      const [root, serverId] = key.split("::") as [string, string]
+    for (const managed of this.clients.values()) {
       snapshots.push({
-        root,
-        serverId,
+        root: managed.root,
+        serverId: managed.serverId,
         refCount: managed.refCount,
         pendingWaiters: managed.pendingWaiters,
         lastUsedAt: managed.lastUsedAt,
@@ -444,8 +446,8 @@ export class LspManager {
     return snapshots
   }
 
-  hasClient(root: string, serverId: string): boolean {
-    return this.clients.has(this.getKey(root, serverId))
+  hasClient(root: string, server: ClientIdentity): boolean {
+    return this.clients.has(lspClientKey(root, server))
   }
 
   clientCount(): number {
