@@ -76,6 +76,53 @@ describe.each(flavors)("steering engine over the %s runner fake", (flavor) => {
     expect(fake.steerCalls).toEqual([])
   })
 
+  test("#given a finished resident child whose host liveness is not running #when sent a steer #then the unresponsive reply depends on the liveness state", async () => {
+    // given a resident child past its run whose handle reports terminal-pending host liveness.
+    const harness = makeHarness()
+    const record = harness.seedRecord()
+    toCompleted(harness, record)
+    const closing = makeFakeHandle(record.task_id, flavor, {
+      liveness: () => ({ state: "terminal-pending", since: 0 }),
+    })
+    harness.setLive(record.task_id, closing.handle)
+
+    // when a send lands while the host session is already closing.
+    const closingOutcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "late",
+      deliverAs: "steer",
+    })
+
+    // then the reply never promises a retry-until-running for a state that cannot return.
+    expect(closingOutcome).toMatchObject({ kind: "unresponsive", retryable: true })
+    if (closingOutcome.kind !== "unresponsive") throw new Error("expected unresponsive")
+    expect(closingOutcome.reason).not.toContain("Retry when its host status")
+
+    // and a merely unresponsive session keeps the retry wording, so the two states read differently.
+    const unresponsive = makeFakeHandle(record.task_id, flavor, {
+      liveness: () => ({ state: "unresponsive", since: 0 }),
+    })
+    harness.setLive(record.task_id, unresponsive.handle)
+    const unresponsiveOutcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "late",
+      deliverAs: "steer",
+    })
+    if (unresponsiveOutcome.kind !== "unresponsive") throw new Error("expected unresponsive")
+    expect(unresponsiveOutcome.reason).toContain("returns to running")
+    expect(unresponsiveOutcome.reason).not.toBe(closingOutcome.reason)
+
+    // and a running liveness never takes the unresponsive branch.
+    const running = makeFakeHandle(record.task_id, flavor, { liveness: () => ({ state: "running" }) })
+    harness.setLive(record.task_id, running.handle)
+    const runningOutcome = await harness.engine.sendToTask({
+      idOrName: record.task_id,
+      message: "late",
+      deliverAs: "steer",
+    })
+    expect(runningOutcome.kind).not.toBe("unresponsive")
+  })
+
   test("#given terminal teardown already claimed eviction #when a revive arrives #then it is typed-refused without touching the disposing session", async () => {
     const harness = makeHarness()
     const record = harness.seedRecord()

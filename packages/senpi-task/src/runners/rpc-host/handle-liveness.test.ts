@@ -8,6 +8,7 @@ import { fakeClock } from "../rpc/__fixtures__/clock"
 import { createHostSessionHandle } from "./handle"
 import { fakeSessionPort, FAKE_SESSION } from "./handle.test-support"
 import type { HostSessionLiveness } from "./handle-port"
+import { hostLivenessText, type HostLivenessStatus } from "../../state/host-liveness"
 import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 let clock: ReturnType<typeof fakeClock>
@@ -130,13 +131,59 @@ test("an overdue session is aborted and closed before reporting terminal", async
 
 test("an unreachable host never produces a false crashed completion", async () => {
   clock = fakeClock()
-  const h = stalledSession()
-  // When even close cannot be confirmed, keep ownership and retry.
+  // A host that ANSWERS the confirm with a refusal: every close attempt settles as a failure,
+  // so the retry ladder keeps running (a hanging confirm is the next test's subject).
+  const refusing = stalledSession(() => Promise.reject(new Error("close refused")))
+  await clock.advance(170_000)
+  await refusing.closing
+  refusing.closed.resolve(undefined)
+  // When close keeps being refused, retries continue and ownership is kept.
   await clock.advance(400_000)
+  expect(refusing.handle.hasExited()).toBe(false)
+  expect(refusing.closes()).toBeGreaterThan(1)
+  expect(refusing.port.detaches).toBe(0)
+  await refusing.handle.dispose()
+  expect(clock.pending()).toBe(0)
+})
+
+test("a stalled host holds exactly one outstanding close confirm", async () => {
+  clock = fakeClock()
+  const h = stalledSession()
+  // When the close confirm never resolves and many retry ticks fire.
+  await clock.advance(400_000)
+  // Then only the first attempt opened a confirm; the later ticks joined it instead of piling
+  // up new close_session/list_sessions probes against the stalled host (#11347).
+  expect(h.closes()).toBe(1)
   expect(h.handle.hasExited()).toBe(false)
-  expect(h.closes()).toBeGreaterThan(1)
   expect(h.port.detaches).toBe(0)
   await h.handle.dispose()
+  expect(clock.pending()).toBe(0)
+})
+
+test("a host that keeps failing the close confirm escalates to the parent exactly once", async () => {
+  clock = fakeClock()
+  const refusing = stalledSession(() => Promise.reject(new Error("close refused")))
+  const statuses: HostLivenessStatus[] = []
+  refusing.handle.onLiveness?.((status) => {
+    statuses.push(status)
+  })
+  // When every confirm attempt fails while the retry ladder keeps running.
+  await clock.advance(170_000)
+  await refusing.closing
+  refusing.closed.resolve(undefined)
+  await clock.advance(400_000)
+  // Then the parent-visible status escalates once and never repeats.
+  const escalated = statuses.filter(
+    (status): status is Extract<HostLivenessStatus, { state: "terminal-pending" | "unresponsive" }> =>
+      status.state !== "running" && status.escalated === true,
+  )
+  expect(escalated).toHaveLength(1)
+  expect(hostLivenessText(escalated[0]!)).not.toBe(
+    hostLivenessText({ state: "terminal-pending", since: escalated[0]!.since }),
+  )
+  expect(refusing.handle.hasExited()).toBe(false)
+  expect(refusing.closes()).toBeGreaterThan(3)
+  await refusing.handle.dispose()
   expect(clock.pending()).toBe(0)
 })
 

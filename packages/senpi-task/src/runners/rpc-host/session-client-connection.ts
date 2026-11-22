@@ -205,11 +205,17 @@ export class HostSessionClient {
     const routingId = this.routingId
     if (routingId === undefined) throw new HostSessionDetachedError("close_session")
     this.confirmingClose = true
-    await confirmHostSessionAbsent(client, routingId, () => this.client === client)
-    this.extensionEvents.clear()
-    this.client = undefined
-    this.routingId = undefined
-    await client.stop()
+    try {
+      await confirmHostSessionAbsent(client, routingId, () => this.client === client)
+      this.extensionEvents.clear()
+      this.client = undefined
+      this.routingId = undefined
+      await client.stop()
+    } finally {
+      // A failed confirm must not ignore later closed/parked frames for this client's remaining
+      // life: only frames that arrive while a confirm is actually in flight are ours (#11347).
+      this.confirmingClose = false
+    }
   }
 
   /** Drop the connection and leave the session running on the daemon (retained, attachments 0). */

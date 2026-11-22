@@ -8,6 +8,7 @@ import { subscribeEffectiveModel } from "./observed-model"
 import { observeModelRefusals } from "./model-refusals"
 import { subscribeTranscriptLog } from "./transcript-log"
 import type { HostLivenessStatus } from "../runners/rpc-host/handle-heartbeat"
+import { hostLivenessText } from "../state/host-liveness"
 
 const MOTION_EVENTS: ReadonlySet<string> = new Set(["agent_start", "turn_start", "tool_execution_start"])
 const LIVENESS_NOTICE_DEBOUNCE_MS = 30_000
@@ -68,20 +69,22 @@ export function subscribeChildFacts(input: {
   })
   const extension = handle.subscribeExtensionEvents?.(input.onExtensionEvent)
   let noticeTimer: ReturnType<typeof setTimeout> | undefined
-  let noticedState: HostLivenessStatus["state"] = "running"
+  // Deduped by rendered text, not state: the one-time terminal-pending escalation (#11347) keeps
+  // the same state but must reach the parent exactly once.
+  let noticedText = hostLivenessText({ state: "running" })
   const liveness = handle.onLiveness?.((status) => {
     const record = input.store.load(taskId)
     if (record === null || record.residency_state !== "resident") return
     input.store.appendEvent(taskId, { type: "host_liveness", payload: status })
     input.onLiveness(status)
     clearTimeout(noticeTimer)
-    if (status.state === noticedState) return
+    if (hostLivenessText(status) === noticedText) return
     const notify = (): void => {
       const current = input.store.load(taskId)
       if (current === null || current.residency_state !== "resident") return
       try {
         input.onLivenessNotice(current, status)
-        noticedState = status.state
+        noticedText = hostLivenessText(status)
       } catch (error) {
         log("senpi-task host liveness notice failed", {
           taskId,
