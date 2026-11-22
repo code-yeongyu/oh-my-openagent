@@ -564,9 +564,6 @@
   "packages/omo-native/test/computer-use-doctor.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/omo-native/test/daemon-observe-idle.test.ts": {
-    "omo-testing/no-flake-masking": 1
-  },
   "packages/omo-native/test/device-service-pin-served.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
