@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { execFileSync } from "node:child_process"
 import {
   existsSync,
   lstatSync,
@@ -6,6 +7,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs"
@@ -79,15 +81,28 @@ function resolveRelativeImport(sourcePath: string, specifier: string): string {
   return resolveModule(resolve(dirname(sourcePath), specifier), specifier, sourcePath)
 }
 
-// omo#11926: an exports value may nest condition objects (e.g. `import: { types, default }`);
-// walk them in Node's condition order (import before default), recursing into objects and
-// backtracking when a branch yields no active condition. Anything else fails closed (undefined).
-function resolveExportTarget(entry: unknown): string | undefined {
-  if (typeof entry === "string") return entry
-  if (typeof entry !== "object" || entry === null || Array.isArray(entry)) return undefined
-  for (const condition of ["import", "default"]) {
-    const target = resolveExportTarget(Reflect.get(entry, condition))
-    if (target !== undefined) return target
+// omo#11926: follows Node's PACKAGE_TARGET_RESOLVE for an ESM import. Condition keys are tried in
+// manifest order and only active ones match; `undefined` means "no condition matched, keep looking"
+// while `null` is a terminal "not exported" that stops the walk; an array yields its first usable item.
+const ACTIVE_CONDITIONS: ReadonlySet<string> = new Set(["node", "import", "default"])
+
+function resolveExportTarget(target: unknown): string | null | undefined {
+  if (typeof target === "string") return target
+  if (target === null) return null
+  if (Array.isArray(target)) {
+    let last: null | undefined
+    for (const item of target) {
+      const resolved = resolveExportTarget(item)
+      if (typeof resolved === "string") return resolved
+      last = resolved
+    }
+    return target.length === 0 ? null : last
+  }
+  if (typeof target !== "object") return null
+  for (const [condition, value] of Object.entries(target)) {
+    if (!ACTIVE_CONDITIONS.has(condition)) continue
+    const resolved = resolveExportTarget(value)
+    if (resolved !== undefined) return resolved
   }
   return undefined
 }
@@ -125,7 +140,7 @@ function resolveWorkspaceImport(
       }
     }
     const target = resolveExportTarget(entry)
-    if (target === undefined) throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
+    if (typeof target !== "string") throw new Error(`Cannot resolve exported ${specifier} from ${sourcePath}`)
     return resolveModule(
       resolve(workspace.directory, capture === undefined ? target : target.replaceAll("*", capture)),
       specifier,
@@ -270,6 +285,67 @@ describe("config-migration public subpath", () => {
       )
 
       expect(offenders).toEqual([`${NEGATIVE_FIXTURE_ENTRY_POINT} imports @opencode-ai/sdk`])
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("export targets resolve exactly as Node's ESM resolver resolves them", () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "config-migration-exports-")))
+    try {
+      const scope = join(root, "node_modules", "@audit")
+      const targets: Record<string, unknown> = {
+        "default-first": { default: "./src/d.ts", import: "./src/i.ts" },
+        "inactive-first": { types: "./src/t.ts", import: "./src/i.ts" },
+        "node-condition": { node: "./src/n.ts", default: "./src/d.ts" },
+        "nested-unmatched": { import: { types: "./src/t.ts" }, default: "./src/d.ts" },
+        "terminal-null": { import: null, default: "./src/d.ts" },
+        "nested-null": { import: { default: null }, default: "./src/d.ts" },
+        "require-only": { require: "./src/r.ts" },
+        "array-first": ["./src/a.ts", "./src/b.ts"],
+        "array-fallback": [{ types: "./src/t.ts" }, "./src/b.ts"],
+        "array-in-condition": { import: [{ require: "./src/r.ts" }, "./src/a.ts"], default: "./src/d.ts" },
+        "array-empty": [],
+      }
+      for (const [name, target] of Object.entries(targets)) {
+        const packagePath = join(scope, name)
+        mkdirSync(join(packagePath, "src"), { recursive: true })
+        writeFileSync(
+          join(packagePath, "package.json"),
+          JSON.stringify({ name: `@audit/${name}`, type: "module", exports: { "./alias": target } }),
+        )
+        for (const file of ["a", "b", "d", "i", "n", "r", "t"]) {
+          writeFileSync(join(packagePath, "src", `${file}.ts`), "export {}\n")
+        }
+      }
+      const names = Object.keys(targets)
+      const script = [
+        'import { fileURLToPath } from "node:url"',
+        "const resolved = {}",
+        `for (const name of ${JSON.stringify(names)}) {`,
+        "  try { resolved[name] = fileURLToPath(import.meta.resolve(`@audit/${name}/alias`)) }",
+        "  catch (error) { resolved[name] = error.code }",
+        "}",
+        "console.log(JSON.stringify(resolved))",
+      ].join("\n")
+      const node = JSON.parse(
+        execFileSync("node", ["--input-type=module", "-e", script], { cwd: root, encoding: "utf-8" }),
+      ) as Record<string, string>
+
+      const packages = workspacePackages(scope)
+      const audited: Record<string, string> = {}
+      for (const name of names) {
+        try {
+          audited[name] =
+            resolveWorkspaceImport(join(root, "entry.ts"), `@audit/${name}/alias`, packages) ?? "unresolved"
+        } catch {
+          audited[name] = "ERR_PACKAGE_PATH_NOT_EXPORTED"
+        }
+      }
+
+      expect(node["default-first"]).toBe(join(scope, "default-first", "src", "d.ts"))
+      expect(node["terminal-null"]).toBe("ERR_PACKAGE_PATH_NOT_EXPORTED")
+      expect(audited).toEqual(node)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
