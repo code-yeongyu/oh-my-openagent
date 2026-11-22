@@ -69,6 +69,41 @@ describe("the systemd user unit", () => {
     expect(systemdSessionHostUnit(launch)).not.toContain("PATH=")
   })
 
+  test.each([
+    ["node", "/runtime/node"],
+    [undefined, "/runtime/bun"],
+  ] as const)("selects a JS runtime for a mixed install (preferred %s)", (preferredRuntime, expected) => {
+    const launch = SessionHostLaunch.from({
+      omoBin: "/npm/bin/omo.js",
+      execPath: "/bin/omo",
+      agentDir: AGENT_DIR,
+      preferredRuntime,
+      findRuntime: (name: string) => `/runtime/${name}`,
+    })
+    expect(launch.argv).toEqual([expected, "/npm/bin/omo.js", "daemon", "run", "--pinned"])
+  })
+
+  test("refuses a JS target when a compiled caller cannot locate a runtime", () => {
+    expect(() =>
+      SessionHostLaunch.from({
+        omoBin: "/npm/bin/omo.js",
+        execPath: "/bin/omo",
+        agentDir: AGENT_DIR,
+        findRuntime: () => null,
+      }),
+    ).toThrow(ColdWakeUnitError)
+  })
+
+  test("falls back to node when bun is unavailable", () => {
+    const launch = SessionHostLaunch.from({
+      omoBin: "/npm/bin/omo.js",
+      execPath: "/bin/omo",
+      agentDir: AGENT_DIR,
+      findRuntime: (name) => (name === "node" ? "/usr/bin/node" : null),
+    })
+    expect(launch.argv[0]).toBe("/usr/bin/node")
+  })
+
   test("escapes quotes, backslashes, % specifiers and $ expansion so a path stays one literal argument", () => {
     const launch = SessionHostLaunch.from({
       omoBin: '/opt/a "b"\\c/%h/$HOME/omo',
