@@ -44,7 +44,26 @@ function probeSocketPath(): string {
 const PROTOCOL_ANSWER_MS = 30_000
 const PROGRESS_SAMPLE_MS = 250
 const PROGRESS_EPSILON_S = 0.02
-const PROBE_TIMEOUT_MS = RUNAWAY_CAP_MS + 5_000
+// A host that ignores SIGTERM is killed after this grace, so a watchdog failure is reported, not hidden by teardown.
+const TEARDOWN_GRACE_MS = 5_000
+// Both phases keep their own bound: the whole startup allowance, then the full post-readiness budget, then teardown.
+const PROBE_TIMEOUT_MS = RUNAWAY_CAP_MS + PROTOCOL_ANSWER_MS + TEARDOWN_GRACE_MS + 5_000
+
+async function stopHost(host: ReturnType<typeof spawn>, exited: Promise<number | null>): Promise<void> {
+  host.kill("SIGTERM")
+  let grace: ReturnType<typeof setTimeout> | undefined
+  const stopped = await Promise.race([
+    exited.then(() => true),
+    new Promise<boolean>((resolve) => {
+      grace = setTimeout(() => resolve(false), TEARDOWN_GRACE_MS)
+    }),
+  ])
+  clearTimeout(grace)
+  if (!stopped) {
+    host.kill("SIGKILL")
+    await exited
+  }
+}
 
 // Readiness is the host's own signal: it prints `senpi rpc listening on unix://<path>` once the socket is bound.
 // A directory watch is not one: macOS does not report a bound socket as a change event, so the wait never ended.
@@ -154,8 +173,7 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
     host.stderr.resume()
     return await requestProtocolInfo(socketPath)
   } finally {
-    host.kill("SIGTERM")
-    await exited
+    await stopHost(host, exited)
   }
 }
 
