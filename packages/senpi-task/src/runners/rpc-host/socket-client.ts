@@ -39,7 +39,8 @@ export async function resolveRpcSocketTransport(
  * tool's synchronous work in the same engine), no host can be heard, so that time is never charged to the host. A
  * terminal drops a connection whose secret has not arrived within its handshake window (senpi
  * `SOCKET_HANDSHAKE_TIMEOUT_MS`), which a blocked caller cannot send; a read (`isReadCommand`) that lost its connection
- * that way, before any response byte, is dialed once more. Nothing else is retried.
+ * that way (the host dropped it before any response byte, and the drop is seen as the stall ends), with budget left, is
+ * dialed once more. Nothing else is retried.
  */
 export async function withRpcSocket<T>(
   endpoint: string,
@@ -65,7 +66,7 @@ export async function withRpcSocket<T>(
         const lost = error instanceof Error ? lostConnections.get(error) : undefined
         // A reset handled before an already-due timeout callback must not open a second socket once the budget is gone.
         const budgetLeft = performance.now() < deadline + meter.total()
-        if (redial && attempt === 1 && lost !== undefined && lost.stalledMs > 0 && budgetLeft) {
+        if (redial && attempt === 1 && lost?.duringStall === true && budgetLeft) {
           diagnostic?.redialed()
           continue
         }
@@ -75,7 +76,7 @@ export async function withRpcSocket<T>(
       }
     }
   } finally {
-    meter.stop()
+    meter.pause()
   }
 }
 
@@ -86,30 +87,62 @@ const STALL_TOLERANCE_MS = 50
 type CallerStallMeter = {
   /** Records the gap since the last look; the milliseconds this process could not run its event loop so far. */
   total(): number
-  stop(): void
+  /**
+   * Whether a stall ended within one probe period plus the tolerance of now (#14624 review M5): only a drop seen that soon
+   * can be the host giving up on a caller that could not run. The cumulative total says nothing about this drop.
+   */
+  justStalled(): boolean
+  /** Stops looking while nothing waits on the clock (a subscription between requests); the gap is never counted. */
+  pause(): void
+  resume(): void
 }
 
 /**
- * Milliseconds this process's event loop was blocked while a conversation was open: every look later than its period plus
- * the tolerance adds the excess. A conversation's deadline is moved by exactly that much.
+ * Milliseconds this process's event loop was blocked while a conversation was waiting on the clock: every look later than
+ * its period plus the tolerance adds the excess. A conversation's deadline is moved by exactly that much.
  */
 function callerStallMeter(): CallerStallMeter {
   let stalled = 0
   let last = performance.now()
+  let stallEndedAt: number | undefined
+  let probe: ReturnType<typeof setInterval> | undefined
   const look = () => {
     const now = performance.now()
-    stalled += Math.max(0, now - last - STALL_PROBE_MS - STALL_TOLERANCE_MS)
+    const excess = Math.max(0, now - last - STALL_PROBE_MS - STALL_TOLERANCE_MS)
+    if (excess > 0) {
+      stalled += excess
+      stallEndedAt = now
+    }
     last = now
     return stalled
   }
-  const probe = setInterval(look, STALL_PROBE_MS)
-  probe.unref?.()
-  return { total: look, stop: () => clearInterval(probe) }
+  const resume = () => {
+    if (probe !== undefined) return
+    last = performance.now()
+    probe = setInterval(look, STALL_PROBE_MS)
+    probe.unref?.()
+  }
+  resume()
+  return {
+    total: () => (probe === undefined ? stalled : look()),
+    justStalled: () => {
+      if (probe === undefined) return false
+      look()
+      return stallEndedAt !== undefined && performance.now() - stallEndedAt <= STALL_PROBE_MS + STALL_TOLERANCE_MS
+    },
+    pause: () => {
+      if (probe === undefined) return
+      look()
+      clearInterval(probe)
+      probe = undefined
+    },
+    resume,
+  }
 }
 
 const transportFailures = new WeakSet<Error>()
 /** Transport failures that lost the connection before any response byte, with the caller stall seen until then. */
-const lostConnections = new WeakMap<Error, { readonly stalledMs: number }>()
+const lostConnections = new WeakMap<Error, { readonly duringStall: boolean }>()
 /**
  * Socket errors that mean the host side dropped the connection (#14624 review M2). Anything else (EACCES, ETIMEDOUT, a
  * refused connect) is not evidence that the host cut the handshake, so it is never redialed.
@@ -145,7 +178,7 @@ async function converse<T>(
   // A deadline is never redialed: the host had its whole budget of this process's running time.
   const fail = (error: Error, droppedByHost = true) => {
     transportFailures.add(error)
-    if (droppedByHost && !answered) lostConnections.set(error, { stalledMs: meter.total() })
+    if (droppedByHost && !answered) lostConnections.set(error, { duringStall: meter.justStalled() })
     if (failure === undefined) options.listen?.closed(error)
     failure = error
     clear()
@@ -157,6 +190,7 @@ async function converse<T>(
   // budget can only shorten what is left of it, both on a monotonic clock that stops while this process's event loop is blocked.
   const arm = (timeoutMs: number) => {
     clear()
+    meter.resume()
     const armedAt = performance.now()
     const stalledAtArm = meter.total()
     const due = () => {
@@ -204,6 +238,8 @@ async function converse<T>(
       const waiter = pending
       pending = undefined
       clear()
+      // A subscription between requests waits only for frames, so nothing needs the clock (#14624 review L2).
+      if (options.listen !== undefined) meter.pause()
       waiter?.resolve(frame as RpcObject)
     }
   })
