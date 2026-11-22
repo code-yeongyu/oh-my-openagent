@@ -58,6 +58,13 @@ const TRANSPORT = [
   "captureEvent",
   "capture",
 ]
+/** The functions that hand an event to a transport; a read of one as a value is a site too (#10484). */
+export const EMITTERS: ReadonlySet<string> = new Set([
+  "captureEvent",
+  "capture",
+  "recordDailyActive",
+  "recordSenpiDailyActive",
+])
 const SINK_MODULES = /^(?:node:)?(?:fs|fs\/promises|http|https|http2|net|tls|dgram|child_process)$/u
 const NETWORK_OBJECTS = /^(?:http|https|http2|net|tls|dgram|Bun)$/u
 const CONSTRUCTED_SINKS = new Set(["WebSocket", "XMLHttpRequest", "EventSource"])
@@ -183,6 +190,7 @@ function callText(node: ts.CallExpression | ts.NewExpression): string {
 export function scanWriterSites(file: string, text: string): readonly WriterSite[] {
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
   const imports = sinkImports(source)
+  const aliases = emitterAliases(source)
   const sites: WriterSite[] = []
   const record = (node: ts.CallExpression | ts.NewExpression, call: string): void => {
     sites.push({ file, fn: enclosingFunctions(node), guard: guardsOf(node), call })
@@ -190,7 +198,8 @@ export function scanWriterSites(file: string, text: string): readonly WriterSite
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
       const callee = calleeName(node.expression)
-      if (callee !== undefined && isSink(callee.name, callee.object, imports)) record(node, callText(node))
+      const aliased = callee?.object === "" && aliases.has(callee.name)
+      if (callee !== undefined && (aliased || isSink(callee.name, callee.object, imports))) record(node, callText(node))
     } else if (
       ts.isNewExpression(node) &&
       ts.isIdentifier(node.expression) &&
@@ -199,6 +208,8 @@ export function scanWriterSites(file: string, text: string): readonly WriterSite
       record(node, `new ${callText(node)}`)
     } else if (ts.isIdentifier(node) && isSinkAlias(node.text, imports) && !isCalleeOrBinding(node)) {
       sites.push({ file, fn: enclosingFunctions(node), guard: guardsOf(node), call: `ref ${node.text}` })
+    } else if (isEmitterReference(node)) {
+      sites.push({ file, fn: enclosingFunctions(node), guard: guardsOf(node), call: `ref ${squash(node.getText())}` })
     }
     ts.forEachChild(node, visit)
   }
@@ -209,6 +220,70 @@ export function scanWriterSites(file: string, text: string): readonly WriterSite
 function isSinkAlias(name: string, imports: SinkImports): boolean {
   const resolved = imports.aliases.get(name)
   return resolved !== undefined && (DISK.includes(resolved) || NETWORK.includes(resolved) || PROCESS.includes(resolved))
+}
+
+/**
+ * An emitter read as a value rather than called (`const send = client.captureEvent`,
+ * `Reflect.apply(client.captureEvent, ...)`) sends wherever that value is called, out of reach of the
+ * call-site scan, so the read itself is the site.
+ */
+function isEmitterReference(node: ts.Node): node is ts.PropertyAccessExpression {
+  return ts.isPropertyAccessExpression(node) && EMITTERS.has(node.name.text) && escapes(node)
+}
+
+const unwrap = (node: ts.Expression): ts.Expression =>
+  ts.isParenthesizedExpression(node) ||
+  ts.isAsExpression(node) ||
+  ts.isNonNullExpression(node) ||
+  ts.isSatisfiesExpression(node)
+    ? unwrap(node.expression)
+    : node
+
+/** Local names bound to an emitter (`const send = client.captureEvent`): a call through one is a site. */
+function emitterAliases(source: ts.SourceFile): ReadonlySet<string> {
+  const aliases = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
+      const value = unwrap(node.initializer)
+      if (ts.isPropertyAccessExpression(value) && EMITTERS.has(value.name.text)) aliases.add(node.name.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  return aliases
+}
+
+/** Whether the value of `node` flows on: stored, passed, returned or bound, not just called, compared or overwritten. */
+function escapes(node: ts.Expression): boolean {
+  const parent = node.parent
+  if (
+    ts.isParenthesizedExpression(parent) ||
+    ts.isAsExpression(parent) ||
+    ts.isNonNullExpression(parent) ||
+    ts.isSatisfiesExpression(parent) ||
+    (ts.isConditionalExpression(parent) && parent.condition !== node)
+  )
+    return escapes(parent)
+  if (ts.isBinaryExpression(parent)) {
+    const operator = parent.operatorToken.kind
+    if (operator === ts.SyntaxKind.EqualsToken) return parent.right === node
+    const flows =
+      operator === ts.SyntaxKind.BarBarToken ||
+      operator === ts.SyntaxKind.QuestionQuestionToken ||
+      operator === ts.SyntaxKind.AmpersandAmpersandToken
+    return flows && escapes(parent)
+  }
+  if (ts.isPropertyAccessExpression(parent)) return ["bind", "call", "apply"].includes(parent.name.text)
+  if (ts.isCallExpression(parent) || ts.isNewExpression(parent)) return parent.expression !== node
+  // A local alias is tracked through its calls instead (`emitterAliases`).
+  if (ts.isVariableDeclaration(parent)) return !ts.isIdentifier(parent.name)
+  return (
+    ts.isPropertyAssignment(parent) ||
+    ts.isReturnStatement(parent) ||
+    ts.isArrowFunction(parent) ||
+    ts.isArrayLiteralExpression(parent) ||
+    ts.isSpreadElement(parent)
+  )
 }
 
 function isCalleeOrBinding(node: ts.Identifier): boolean {

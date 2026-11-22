@@ -162,6 +162,14 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     reason: LEGACY_DAILY_ACTIVE,
   },
   {
+    file: "omo-native-session.ts",
+    fn: "captureCategoryConfig",
+    guard: "unless(registry === undefined || input.omoConfig === undefined)",
+    route: VIA_SESSION_CLIENT,
+    call: "ref input.client.captureEvent",
+    reason: SESSION_START_PATH,
+  },
+  {
     file: "omo-native-category-config.ts",
     fn: "createCategoryConfigCapture>observe",
     guard: "unless(form === canonical)",
@@ -192,6 +200,32 @@ export const REVIEWED_WRITERS: readonly ReviewedWriter[] = [
     guard: "",
     call: "createEventTelemetryClient({ diagnostics: options.diagnostics, distinctId: template.dis)",
     reason: FAN_IN,
+  },
+  {
+    file: "omo-native-component.ts",
+    fn: "installCaptureFacade",
+    guard: "",
+    route: { kind: "callers", fn: "capture" },
+    call: "ref privacyClient.captureEvent",
+    reason: "installs the facade as state.capture, the sink only the gated fan-in and the gated summary send call",
+  },
+  {
+    file: "omo-native-component.ts",
+    fn: "createOmoNativeTelemetryComponent>register",
+    guard: "unless(isTelemetryHostWarmup(pi))",
+    route: VIA_FAN_IN,
+    call: "ref sessionClient.captureEvent",
+    count: 5,
+    reason:
+      "hands the session client, which forwards only through the gated fan-in, to a summary or observer registration",
+  },
+  {
+    file: "omo-native-component.ts",
+    fn: "createOmoNativeTelemetryComponent>register",
+    guard: "unless(isTelemetryHostWarmup(pi))",
+    route: VIA_FAN_IN,
+    call: "ref client.captureEvent",
+    reason: THROUGH_FAN_IN,
   },
   {
     file: "omo-native-component.ts",

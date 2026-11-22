@@ -1,4 +1,6 @@
-import { scanWriterSites, siteKey, type WriterSite } from "./consent-gate-sites.test-support"
+import ts from "@typescript/typescript6"
+
+import { EMITTERS, scanWriterSites, siteKey, type WriterSite } from "./consent-gate-sites.test-support"
 
 // How an event-emitting call site reaches the one consent gate, `isOmoNativeTelemetryEnabled` (#10226 H1).
 // The reviewed table declares a route per call; the audit then checks the route against the source as it
@@ -18,9 +20,8 @@ export type GateRoute =
 export type RoutedSite = Pick<WriterSite, "file" | "fn" | "call"> & { readonly route?: GateRoute }
 type SourceFile = { readonly name: string; readonly source: string }
 
-const EMITTERS = new Set(["captureEvent", "capture", "recordDailyActive", "recordSenpiDailyActive"])
-/** A guard reads the gate when it calls the gate itself or the component's consent read built on it. */
-const GATE_READ = /\bisOmoNativeTelemetryEnabled\(|\bisConsented\b/u
+/** The gate itself and the component's consent read built on it. */
+const GATE_READS = new Set(["isOmoNativeTelemetryEnabled", "isConsented"])
 const FAN_IN = {
   file: "omo-native-component.ts",
   fn: "createOmoNativeTelemetryComponent>captureEvent",
@@ -32,9 +33,73 @@ const SESSION_CLIENT = {
   call: "createEventTelemetryClient(",
 }
 
-const calleeOf = (call: string): string => call.slice(0, call.indexOf("(")).split(".").at(-1) ?? ""
+const calleeOf = (call: string): string =>
+  (call.startsWith("ref ") ? call.slice(4) : call.slice(0, call.indexOf("("))).split(".").at(-1) ?? ""
 const routeKey = (site: Pick<WriterSite, "file" | "fn" | "call">): string => `${site.file}: ${site.fn} | ${site.call}`
-const gated = (site: WriterSite | undefined): boolean => site !== undefined && GATE_READ.test(site.guard)
+
+function isGateRead(expression: ts.Expression): boolean {
+  const target = ts.isCallExpression(expression) ? expression.expression : expression
+  if (ts.isIdentifier(target)) return GATE_READS.has(target.text)
+  return ts.isCallExpression(expression) && ts.isPropertyAccessExpression(target) && GATE_READS.has(target.name.text)
+}
+
+/** Whether `expression` evaluating to `outcome` proves the consent read returned true (#10484). */
+function provesConsent(expression: ts.Expression, outcome: boolean): boolean {
+  if (ts.isParenthesizedExpression(expression) || ts.isAwaitExpression(expression))
+    return provesConsent(expression.expression, outcome)
+  if (ts.isPrefixUnaryExpression(expression) && expression.operator === ts.SyntaxKind.ExclamationToken)
+    return provesConsent(expression.operand, !outcome)
+  if (!ts.isBinaryExpression(expression)) return outcome && isGateRead(expression)
+  const operator = expression.operatorToken.kind
+  if (operator === ts.SyntaxKind.AmpersandAmpersandToken)
+    return outcome && (provesConsent(expression.left, true) || provesConsent(expression.right, true))
+  if (operator === ts.SyntaxKind.BarBarToken)
+    return !outcome && (provesConsent(expression.left, false) || provesConsent(expression.right, false))
+  if (expression.right.kind !== ts.SyntaxKind.TrueKeyword) return false
+  if (operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.EqualsEqualsToken)
+    return outcome && provesConsent(expression.left, true)
+  if (operator === ts.SyntaxKind.ExclamationEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsToken)
+    return !outcome && provesConsent(expression.left, true)
+  return false
+}
+
+/** The guard's clauses, `if(c)`, `else(c)` and `unless(c)`, split at their top-level parentheses. */
+function guardClauses(guard: string): readonly { readonly kind: string; readonly condition: string }[] {
+  const clauses: { kind: string; condition: string }[] = []
+  let depth = 0
+  let start = 0
+  let open = 0
+  let quote: string | undefined
+  for (let index = 0; index < guard.length; index++) {
+    const char = guard[index]
+    if (quote !== undefined) {
+      if (char === "\\") index++
+      else if (char === quote) quote = undefined
+    } else if (char === '"' || char === "'" || char === "`") quote = char
+    else if (char === "(" && depth++ === 0) open = index
+    else if (char === ")" && --depth === 0) {
+      clauses.push({ kind: guard.slice(start, open).trim(), condition: guard.slice(open + 1, index) })
+      start = index + 1
+    }
+  }
+  return clauses
+}
+
+/**
+ * A site is gated when one of its guards lets it run only after the consent read returned true: an
+ * `if` whose condition proves consent, or an early exit / `else` whose condition proves it when false.
+ * A guard that merely mentions the read, such as an inverted `if (isConsented()) return`, does not count.
+ */
+const gated = (site: WriterSite | undefined): boolean =>
+  site !== undefined &&
+  guardClauses(site.guard).some(({ kind, condition }) => {
+    const statement = ts.createSourceFile("guard.ts", `(${condition})`, ts.ScriptTarget.Latest, true).statements[0]
+    return (
+      statement !== undefined &&
+      ts.isExpressionStatement(statement) &&
+      provesConsent(statement.expression, kind === "if")
+    )
+  })
 
 export const isEmitterSite = (site: Pick<WriterSite, "call">): boolean => EMITTERS.has(calleeOf(site.call))
 
