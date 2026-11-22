@@ -20,9 +20,15 @@ miss has another cause and you climb the ladder instead.
 ## Dialogs never block
 
 `alert`, `confirm`, `prompt`, and `beforeunload` are answered at the protocol layer, before the
-page sees them: by a `dialog` listener that answers, otherwise by the `dialogPolicy` passed to
-`connectPipe` (or `browser.setDialogPolicy`). Default to accepting (`{ accept: true }`; a policy
-function receives a plain `{ type, message, defaultPrompt, url }` and returns `{ accept, promptText }`).
+page sees them: by a `dialog` listener that answers, otherwise by the `dialogPolicy` passed when
+the connection is made (`connectPipe`, `connect(url, { dialogPolicy })` or `connectNamed(name, {
+dialogPolicy })`). Default to accepting (`{ accept: true }`; a policy function receives a plain
+`{ type, message, defaultPrompt, url }` and returns `{ accept, promptText }`).
+
+Pass the policy at connect time rather than calling `browser.setDialogPolicy` later. Attaches made
+with `connect(url)` or `connectNamed` in one process share one connection per browser, and on a
+connection with two or more holders `setDialogPolicy` throws `SharedConnectionError` (code
+`shared_connection`). Passing `dialogPolicy` when attaching gives you a connection of your own.
 
 `page.on("dialog", (dialog) => ...)` hands each listener a Playwright-style `Dialog` object, not a
 plain object: read it through methods (`dialog.type()`, `dialog.message()`, `dialog.defaultValue()`,
