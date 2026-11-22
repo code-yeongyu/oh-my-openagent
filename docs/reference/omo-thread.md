@@ -653,3 +653,9 @@ if (created.kind === "ok") {
   await sdk.close({ thread: "nightly-build" })
 }
 ```
+
+### Diagnose a local read RPC failure
+
+Set `OMO_THREAD_READ_TRACE=1` in the **calling process** to print a `[thread-read-rpc]` line to stderr when a local socket conversation for `list_sessions`, `get_protocol_info`, `get_messages`, or `get_entries` fails. Leave it unset for normal use. Each line contains only the requested command, the last observed socket phase, elapsed milliseconds, a fixed error code, `caller_stall_ms` (how long the calling process's own event loop was blocked over the whole call, every attempt included) and `attempts` (2 when a connection lost during such a stall was dialed again). It does not contain socket paths, IDs, credentials or transcript data.
+
+A failed listing probe does not necessarily mean the entire tool call failed: other endpoints can still answer. `response-frame` means a line delimiter arrived, not that a matching reply arrived. This diagnostic does not retry a call or change its deadline.
