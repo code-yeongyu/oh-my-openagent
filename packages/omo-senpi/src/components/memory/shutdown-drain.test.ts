@@ -605,6 +605,40 @@ describe("session shutdown drain budget", () => {
     ])
   })
 
+  test("#given settles raced around the drain #when a post-drain settle exhausts the budget #then its warning lists every completed step", async () => {
+    // given
+    const order: string[] = []
+    const { logger, warningCalls } = recordingLogger()
+    let clock = 0
+    const input = { reason: "quit", sessionId: SESSION, deadlineAt: 1_000, now: () => clock } as const
+    const drain = createShutdownDrain({ logger, steps: recordingSteps(order) })
+
+    // when: the pre-drain settles complete, the drain completes its own steps, and the first
+    // post-drain settle finds the budget gone.
+    expect(await drain.raceDetached(input, "maintenance-settle", async () => {})).toBe(true)
+    expect(await drain.raceDetached(input, "status-settle", async () => {})).toBe(true)
+    await drain.run(input, { journalFlushed: true })
+    clock = 2_000
+    expect(await drain.raceDetached(input, "reflection-launch-settle", () => new Promise<void>(() => {}))).toBe(false)
+
+    // then: the budget warning names every step that completed before it (#11696), not only the
+    // settles raced after the drain.
+    const details = warningCalls.at(-1)?.details as { completedSteps?: string[] } | undefined
+    expect(details?.completedSteps).toContain("maintenance-settle")
+    expect(details?.completedSteps).toContain("status-settle")
+    expect(details?.completedSteps).toContain("journal-flush")
+    expect(details?.completedSteps).toContain("facts-enqueue")
+    expect(details?.completedSteps).toContain("skills-usage-flush")
+    expect(order).toEqual(["b", "c-prime"])
+
+    // and once the handler releases the record after its last settle, a later settle's warning
+    // starts from an empty record again: nothing of this session leaks into the next one (#11696).
+    drain.releaseDetached(SESSION)
+    expect(await drain.raceDetached(input, "memory-work-settle", () => new Promise<void>(() => {}))).toBe(false)
+    const afterRelease = warningCalls.at(-1)?.details as { completedSteps?: string[] } | undefined
+    expect(afterRelease?.completedSteps).toEqual([])
+  })
+
   test("#given a step that rejects #when the drain runs #then the drain still completes the remaining steps", async () => {
     // given
     const order: string[] = []
