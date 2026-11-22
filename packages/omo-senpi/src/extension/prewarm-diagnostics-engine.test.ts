@@ -15,6 +15,18 @@ import { composeOmoSenpiExtension } from "./compose"
 import { testBudgetSignal, useTestTimeout } from "../../../../test-support/test-deadline"
 
 const SETTLED_LOG = ["agent/logs", "agent/logs/.fallback-log-v2"]
+// What the engine itself may write under the HOME while the session is created and its extensions bind: the
+// seeded agent layout, the bundled extensions it stages, and its fallback log. Anything else written before
+// the baseline (a builtin's store taken at session_start) fails the bind-delta allowlist (#10933 review LOW).
+const ENGINE_ARTIFACTS = [
+  "agent/auth.json",
+  "agent/extensions",
+  "agent/extensions/diff.js",
+  "agent/extensions/files.js",
+  "agent/extensions/prompt-url-widget.js",
+  "agent/extensions/tps.js",
+  ...SETTLED_LOG,
+]
 
 /** Every path under the HOME, backslash-normalized so windows-latest listings match. */
 function homeListing(root: string): string[] {
@@ -29,6 +41,7 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
   const root = mkdtempSync(join(tmpdir(), "omo-prewarm-diagnostic-"))
   const agentDir = join(root, "agent")
   mkdirSync(agentDir)
+  const beforeBind = homeListing(root)
   const overrides = {
     HOME: root,
     OMO_CODING_AGENT_DIR: agentDir,
@@ -124,6 +137,7 @@ test("#given a real session with a late unsafe component #when draft prewarm ski
     }))
     await session.bindExtensions({ mode: "print" })
     baseline = homeListing(root)
+    expect(baseline.filter((entry) => !beforeBind.includes(entry) && !ENGINE_ARTIFACTS.includes(entry))).toEqual([])
     expect(warnings).toHaveLength(1)
     warnings.length = 0
     unsubscribe = session.subscribe((event) => {
