@@ -466,7 +466,7 @@ export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
  * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
  * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
  */
-export const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
+const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
 
 export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 
