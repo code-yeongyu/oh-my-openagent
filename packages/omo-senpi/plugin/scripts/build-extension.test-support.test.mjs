@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process"
+import { Worker } from "node:worker_threads"
 import { access, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -75,6 +76,29 @@ test("#given a build that makes no CPU or output progress #when it is bounded #t
       /^shared extension build stalled: no CPU or output progress for \d+s \(a hang\)$/,
     )
   } finally {
+    await rm(root, { recursive: true, force: true })
+  }
+})
+
+// On Linux the process-tree CPU includes this test process itself; its own work (here a busy worker thread) must not
+// read as build progress, or a hung bundler would never stall.
+test("#given an idle build while this test process burns CPU #when it is bounded #then it still fails as a stall", async () => {
+  // given
+  const root = await mkdtemp(join(tmpdir(), "omo-build-own-cpu-"))
+  const burner = new Worker("for (;;) {}", { eval: true })
+  try {
+    // when
+    const bounded = boundBuildProgress("shared extension build", root, new Promise(() => {}), {
+      stallMs: 1_000,
+      cpuCapS: 600,
+    })
+
+    // then
+    await expect(bounded).rejects.toThrow(
+      /^shared extension build stalled: no CPU or output progress for \d+s \(a hang\)$/,
+    )
+  } finally {
+    await burner.terminate()
     await rm(root, { recursive: true, force: true })
   }
 })
