@@ -1133,11 +1133,11 @@ export function createRemoteThreadFixture() {
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
-    const run = async (name: ThreadToolName, args: unknown): Promise<ThreadToolResult> => {
+    const run = async (name: ThreadToolName, args: unknown, signal?: AbortSignal): Promise<ThreadToolResult> => {
       const tool = tools.find((candidate) => candidate.name === name)
       if (tool === undefined) throw new Error(`${name} is not registered`)
       return (
-        await tool.execute(`call-${Math.random()}`, args, undefined, undefined, {
+        await tool.execute(`call-${Math.random()}`, args, signal, undefined, {
           sessionManager: { getSessionId: () => caller },
         } as never)
       ).details.result as ThreadToolResult
