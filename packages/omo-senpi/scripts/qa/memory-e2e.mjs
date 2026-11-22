@@ -5,7 +5,7 @@
 //   S2 step-count reflection spawns a quick-category child (shimmed SENPI_BIN) and merges a reflection commit
 //   S3 /search finds a prior message across sessions
 //   S4 /palace generates a self-contained 0600 HTML with machine-checkable payload
-//   S5 memory.enabled=false leaves the host byte-identical (no tools, no sentinel, no dirs)
+//   S5 memory.enabled=false omits memory from the provider request and creates no memory dirs
 import { spawnSync } from "node:child_process"
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, watch, writeFileSync } from "node:fs"
 import { basename, delimiter, dirname, join, resolve } from "node:path"
@@ -48,8 +48,12 @@ if (senpiBin === null) fail("senpi binary not found (set SENPI_BIN)")
 const sandboxes = []
 
 function baseEnv(sandbox, extra = {}) {
+  const env = isolatedChildEnv(process.env, sandbox.agentDir)
+  for (const name of Object.keys(env)) {
+    if (name.startsWith("MOCK_DUMP_") || name === "MOCK_SCRIPT_PATH") delete env[name]
+  }
   return {
-    ...isolatedChildEnv(process.env, sandbox.agentDir),
+    ...env,
     HOME: sandbox.homeDir,
     USERPROFILE: sandbox.homeDir,
     XDG_CONFIG_HOME: sandbox.xdgConfigHome,
@@ -328,6 +332,8 @@ function buildCommandContext(sandbox, overrides = {}) {
 
 async function scenario3And4() {
   const sandbox = scenarioSandbox()
+  const query = "zqxwvb"
+  const transcriptMarker = "qa-transcript-only-k7pv39"
   writeOmoConfig(sandbox)
   writeMockScript(sandbox, {
     parentSteps: [
@@ -338,11 +344,11 @@ async function scenario3And4() {
           command: "create",
           file_path: "system/facts.md",
           description: "qa fact",
-          file_text: "searchable unique phrase zqxwvb",
-          reason: "seed searchable memory",
+          file_text: "seed for palace",
+          reason: "seed palace memory",
         },
       },
-      { type: "text", text: "searchable unique phrase zqxwvb" },
+      { type: "text", text: `${query} ${transcriptMarker}` },
     ],
     childSteps: [],
   })
@@ -375,12 +381,18 @@ async function scenario3And4() {
     const searchCommand = pi.commands.find((command) => command.name === "search")
     if (searchCommand === undefined)
       return record("S3 search command registered", false, `commands: ${pi.commands.map((c) => c.name).join(",")}`)
-    const output = await searchCommand.options.handler("zqxwvb", buildCommandContext(sandbox))
-    record(
-      "S3 search finds prior message",
-      typeof output === "string" && output.includes("zqxwvb"),
-      String(output).slice(0, 200),
-    )
+    const output = await searchCommand.options.handler(query, buildCommandContext(sandbox))
+    const hit =
+      typeof output === "string" &&
+      output
+        .split("\n")
+        .some(
+          (line, i, lines) =>
+            line === `   assistant **${query}** ${transcriptMarker}` &&
+            /^\d+\. session .+ · assistant$/.test(lines[i - 1] ?? "") &&
+            /^ {3}entry \S+$/.test(lines[i + 1] ?? ""),
+        )
+    record("S3 search finds prior message", hit, String(output).slice(0, 200))
 
     const palaceCommand = pi.commands.find((command) => command.name === "palace")
     if (palaceCommand === undefined) return record("S4 palace command registered", false, "not registered")
@@ -430,15 +442,38 @@ async function scenario5() {
   }
   writeFileSync(join(sandbox.cwd, ".omo", "omo.json"), `${JSON.stringify(config, null, 2)}\n`)
   writeMockScript(sandbox, { parentSteps: [{ type: "text", text: "plain answer" }], childSteps: [] })
-  const dumpLog = join(sandbox.root, "sysdump-disabled.log")
-  const run = runSenpi(sandbox, { prompt: "hello", env: { MOCK_DUMP_SYSTEM: dumpLog } })
+  const systemLog = join(sandbox.root, "sysdump-disabled.log")
+  const run = runSenpi(sandbox, {
+    prompt: "hello",
+    // Keep a positive control without filtering out memory if it was registered.
+    args: ["--tools", "read,memory"],
+    env: { MOCK_DUMP_SYSTEM: systemLog },
+  })
   if (run.status !== 0) return record("S5 disabled run", false, run.stderr.slice(-400))
-  const dump = existsSync(dumpLog) ? readFileSync(dumpLog, "utf8") : ""
-  record(
-    "S5 no sentinel when disabled",
-    dump.includes('"role":"system"') && !dump.includes("<!-- senpi-memory:"),
-    dumpLog,
+  const requests = existsSync(systemLog)
+    ? readFileSync(systemLog, "utf8")
+        .split("\n")
+        .filter((line) => line.startsWith("["))
+    : []
+  const messages = requests.length === 1 ? JSON.parse(requests[0]) : []
+  // Senpi carries provider tool declarations as deltas on the request's system messages.
+  const tools = new Set()
+  for (const message of messages) {
+    for (const { name } of message.toolsRemoved ?? []) tools.delete(name)
+    for (const { name } of message.toolsAdded ?? []) tools.add(name)
+  }
+  const hasSystemContent = messages.some(
+    ({ role, content }) =>
+      role === "system" &&
+      (typeof content === "string" ? content.trim().length > 0 : content.some((part) => part.text?.trim())),
   )
+  record(
+    "S5 nonempty provider request captured",
+    hasSystemContent && tools.has("read"),
+    `requests=${requests.length} tools=${[...tools].join(",")} :: ${systemLog}`,
+  )
+  record("S5 no memory tool when disabled", tools.size > 0 && !tools.has("memory"))
+  record("S5 no sentinel when disabled", hasSystemContent && !requests[0].includes("<!-- senpi-memory:"), systemLog)
   const memoryHome = join(sandbox.root, "memory")
   record("S5 no memory dirs when disabled", !existsSync(memoryHome), memoryHome)
 }
