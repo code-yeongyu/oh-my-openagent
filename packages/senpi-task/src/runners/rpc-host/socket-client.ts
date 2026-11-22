@@ -54,22 +54,26 @@ export async function withRpcSocket<T>(
 ): Promise<T> {
   const diagnostic = readRpcDiagnostic(options.readCommand)
   const redial = options.listen === undefined && isReadCommand(options.readCommand)
-  for (let attempt = 1; ; attempt += 1) {
-    const meter = callerStallMeter()
-    try {
-      return await converse(endpoint, options, operation, meter, diagnostic)
-    } catch (error) {
-      const lost = error instanceof Error ? lostConnections.get(error) : undefined
-      if (redial && attempt === 1 && lost !== undefined && lost.stalledMs > 0) {
-        diagnostic?.redialed()
-        continue
+  // One budget for the whole call (#14624 review M1): a redial gets what is left of options.timeoutMs, never a fresh one.
+  const meter = callerStallMeter()
+  const deadline = performance.now() + options.timeoutMs
+  try {
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        return await converse(endpoint, options, operation, meter, diagnostic, deadline)
+      } catch (error) {
+        const lost = error instanceof Error ? lostConnections.get(error) : undefined
+        if (redial && attempt === 1 && lost !== undefined && lost.stalledMs > 0) {
+          diagnostic?.redialed()
+          continue
+        }
+        // Only failures a socket recorded (connect, close, timeout) are transport failures; the operation's own throws are not.
+        if (error instanceof Error && transportFailures.has(error)) diagnostic?.failed(error, meter.total())
+        throw error
       }
-      // Only failures a socket recorded (connect, close, timeout) are transport failures; the operation's own throws are not.
-      if (error instanceof Error && transportFailures.has(error)) diagnostic?.failed(error, meter.total())
-      throw error
-    } finally {
-      meter.stop()
     }
+  } finally {
+    meter.stop()
   }
 }
 
@@ -104,7 +108,11 @@ function callerStallMeter(): CallerStallMeter {
 const transportFailures = new WeakSet<Error>()
 /** Transport failures that lost the connection before any response byte, with the caller stall seen until then. */
 const lostConnections = new WeakMap<Error, { readonly stalledMs: number }>()
-const CONNECT_REFUSALS: ReadonlySet<string> = new Set(["ECONNREFUSED", "ENOENT"])
+/**
+ * Socket errors that mean the host side dropped the connection (#14624 review M2). Anything else (EACCES, ETIMEDOUT, a
+ * refused connect) is not evidence that the host cut the handshake, so it is never redialed.
+ */
+const HOST_DROPS: ReadonlySet<string> = new Set(["ECONNRESET", "EPIPE"])
 
 async function converse<T>(
   endpoint: string,
@@ -112,6 +120,7 @@ async function converse<T>(
   operation: (request: RpcRequest) => Promise<T>,
   meter: CallerStallMeter,
   diagnostic: ReturnType<typeof readRpcDiagnostic>,
+  deadline: number,
 ): Promise<T> {
   let socket: Socket
   try {
@@ -134,9 +143,7 @@ async function converse<T>(
   // A deadline is never redialed: the host had its whole budget of this process's running time.
   const fail = (error: Error, droppedByHost = true) => {
     transportFailures.add(error)
-    const code = "code" in error ? error.code : undefined
-    if (droppedByHost && !answered && !(typeof code === "string" && CONNECT_REFUSALS.has(code)))
-      lostConnections.set(error, { stalledMs: meter.total() })
+    if (droppedByHost && !answered) lostConnections.set(error, { stalledMs: meter.total() })
     if (failure === undefined) options.listen?.closed(error)
     failure = error
     clear()
@@ -144,9 +151,8 @@ async function converse<T>(
     pending?.reject(error)
     pending = undefined
   }
-  // options.timeoutMs bounds the whole conversation (connect, handshake and request) and a step's own budget can only
-  // shorten what is left of it, both on a monotonic clock that stops while this process's event loop is blocked.
-  const deadline = performance.now() + options.timeoutMs
+  // The call's deadline (withRpcSocket) bounds the whole conversation (connect, handshake and request) and a step's own
+  // budget can only shorten what is left of it, both on a monotonic clock that stops while this process's event loop is blocked.
   const arm = (timeoutMs: number) => {
     clear()
     const armedAt = performance.now()
@@ -167,7 +173,10 @@ async function converse<T>(
     }
     wait()
   }
-  socket.once("error", (error: Error) => fail(error))
+  socket.once("error", (error: Error) => {
+    const code = "code" in error ? error.code : undefined
+    fail(error, typeof code === "string" && HOST_DROPS.has(code))
+  })
   socket.once("close", () => fail(new Error("thread RPC connection closed before the response arrived")))
   socket.on("data", (chunk: Buffer) => {
     answered = true
