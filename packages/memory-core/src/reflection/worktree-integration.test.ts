@@ -47,6 +47,27 @@ afterEach(async () => {
 })
 
 describe("reflection worktree integration", () => {
+  it("#given a parent change that conflicts with the reflection #when integrated #then the outcome names the conflicting file, not git's empty stderr", async () => {
+    // #12330 review: git lists unmerged files on stdout; the detail must carry them, read before the abort.
+    const { repo, worktree } = await fixture("conflict")
+    await commit(worktree, "memory.md", "reflection\n")
+    await writeFile(join(repo.dir, "memory.md"), "parent\n")
+    await repo.commitWrite(["memory.md"], "parent edit", { agentId: "agent-one", authorName: "Person" })
+    const validation = await validateCompletion(worktree, worktree.baseSha, worktree.exec)
+    if (validation.status !== "valid") throw new Error("expected valid reflection")
+
+    const result = await integrateValidatedReflection(worktree, {
+      mode: "auto",
+      runId: "conflict",
+      summary: "conflicting facts",
+      validated: validation,
+      withWriterLock: unlocked,
+    })
+
+    expect(result).toEqual({ outcome: "merge_conflict", detail: "memory.md" })
+    expect((await git(repo.dir, ["status", "--porcelain"])).stdout.trim()).toBe("")
+  })
+
   it("#given a validated tip #when auto integration merges #then the merge runs with auto-maintenance disabled", async () => {
     // omo #10199 review MEDIUM 3: the integration merge must carry the same NO_AUTO_MAINTENANCE
     // flags as the repo's commit path; the injected exec captures the exact argv boundary call.
