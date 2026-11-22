@@ -15,6 +15,7 @@ import { createTaskRecordStore } from "../../store"
 import type { WorkpoolCreate, WorkpoolEvent } from "../types"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export const poolInput: WorkpoolCreate = {
   name: "batch",
@@ -79,7 +80,7 @@ export function fixture(
   } = {},
 ) {
   const root = mkdtempSync(join(tmpdir(), "workpool-admission-"))
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const config = OmoTaskSettingsSchema.parse({
     default_concurrency: 1,
     global_concurrency: 1,

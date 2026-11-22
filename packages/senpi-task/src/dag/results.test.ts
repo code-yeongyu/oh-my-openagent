@@ -10,6 +10,7 @@ import { createTaskRecordStore } from "../store/record-store"
 import { persistDagNodeResult, readDagNodeResult } from "./results"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const runId = "run-results" as DagRunId
@@ -36,7 +37,7 @@ function tempProject(): string {
 }
 
 function terminalRecord(projectDir: string, finalResponse: string): TaskRecord {
-  const records = createTaskRecordStore({ project_dir: projectDir })
+  const records = createTaskRecordStore(ownedTaskState(projectDir))
   const record: TaskRecord = {
     ...createTaskRecord({
       parent_session_id: "parent-session",
@@ -62,7 +63,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a terminal node record #when persisted #then the response file carries the sha256 and byte count of the copy", () => {
     // given
     const projectDir = tempProject()
-    const store: DagFileStore = createDagFileStore({ project_dir: projectDir })
+    const store: DagFileStore = createDagFileStore(ownedTaskState(projectDir))
     const finalResponse = "plan complete: shipped 3 files\nwith a trailing note"
     const record = terminalRecord(projectDir, finalResponse)
 
@@ -81,7 +82,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given run stats on the terminal record #when persisted #then a stats sidecar holds them with its own digest", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const record = terminalRecord(projectDir, "build ok")
 
     // when
@@ -101,8 +102,8 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a persisted node #when the TaskRecord is deleted #then resume reuse still reads the output and stats", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
-    const records = createTaskRecordStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
+    const records = createTaskRecordStore(ownedTaskState(projectDir))
     const finalResponse = "survives the task ttl sweep"
     const record = terminalRecord(projectDir, finalResponse)
     persistDagNodeResult({ store, runId, nodeId, record })
@@ -120,7 +121,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given an unwritable result path #when persisting #then a journal_corrupt diagnostic is returned instead of throwing", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const record = terminalRecord(projectDir, "unreachable output")
     const outputPath = store.paths.result(runId, nodeId)
     // A directory planted at the artifact path rejects open-for-write on Windows and POSIX alike.
@@ -145,7 +146,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a node with no persisted artifact #when reuse reads it #then it reports nothing rather than falling back to the record", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const record = terminalRecord(projectDir, "record-only response")
     persistDagNodeResult({ store, runId, nodeId: "build" as DagNodeId, record })
 
@@ -160,7 +161,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a terminal record without run stats #when persisted #then no sidecar is written and reuse reports undefined stats", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const record: TaskRecord = { ...terminalRecord(projectDir, "no stats output"), run_stats: undefined }
 
     // when
@@ -178,7 +179,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a persisted node #when persisted again with a different body #then the second body replaces the first and the stats sidecar is replaced", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const firstRecord = terminalRecord(projectDir, "first attempt body")
     const secondRecord = terminalRecord(projectDir, "second attempt body")
 
@@ -199,7 +200,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a fault mid-write during re-persist #then the prior artifact body remains intact and no orphan temp file is left", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const firstRecord = terminalRecord(projectDir, "first attempt body that must survive")
     const secondRecord = terminalRecord(projectDir, "second attempt body that will crash")
     persistDagNodeResult({ store, runId, nodeId, record: firstRecord })
@@ -238,7 +239,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a node id that escapes the results directory #when persisted #then it is refused, nothing is written outside the state dir, and the diagnostic names a path", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const record = terminalRecord(projectDir, "ESCAPED-CONTENT")
     // The result path is <stateDir>/dag/results/<runId>/<nodeId>.txt; three parent hops land the
     // write at <stateDir>/escaped.txt, i.e. outside dag/results.
@@ -261,7 +262,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a node id that escapes the results directory #when read #then it returns null instead of reading outside the state dir", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     // A file planted at the escaped location: pre-fix, the read would return its body.
     const escapedPath = join(store.stateDir, "escaped.txt")
     fs.mkdirSync(store.stateDir, { recursive: true })
@@ -278,7 +279,7 @@ describe("persistDagNodeResult durable node artifacts", () => {
   test("#given a node id containing an NTFS alternate-data-stream separator #when the store builds its path #then it refuses instead of naming a stream", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
 
     // when / then
     expect(() => store.paths.result(runId, "build:secret" as DagNodeId)).toThrow()

@@ -6,6 +6,7 @@ import { createTaskRecord, type HostSessionIdentity, type TaskRecord, type TaskS
 import { createTaskRecordStore } from "../store"
 import { createSteeringEngine } from "./engine"
 import type { SteeringPort } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -30,7 +31,7 @@ function parkedHarness(input: {
   readonly killed?: boolean
   readonly daemonAlive: boolean
 }): ParkedHarness {
-  const store = createTaskRecordStore({ project_dir: tempProject() })
+  const store = createTaskRecordStore(ownedTaskState(tempProject()))
   const seeded = createTaskRecord({
     parent_session_id: "parent-1",
     root_session_id: "parent-1",
