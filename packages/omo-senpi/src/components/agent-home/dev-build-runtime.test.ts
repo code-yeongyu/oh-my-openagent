@@ -33,28 +33,32 @@ test("#given the process env #when USERPROFILE differs from HOME #then the USERP
   }
 })
 
-// A fresh Node process, because os.homedir() reads HOME once at startup and Node's userInfo() reads the passwd entry;
-// Bun's userInfo().homedir follows HOME as well, so this configuration is only distinguishable under Node.
-test.skipIf(process.platform === "win32")(
-  "#given a process started with HOME at a temp dir and no USERPROFILE #when the agent dir is the passwd home's store #then it is shared",
-  () => {
+// The engine runs on Node or Bun, and each runtime is started fresh with HOME at a temp dir and USERPROFILE unset:
+// os.homedir() reads HOME at startup, and Bun's userInfo().homedir follows HOME too (#14622 review M4). The account's
+// real home comes from Node's userInfo(), which reads the passwd entry.
+const runtimes = [
+  ["node", "node"],
+  ["bun", process.versions.bun === undefined ? "bun" : process.execPath],
+] as const
+
+test.skipIf(process.platform === "win32").each(runtimes)(
+  "#given %s started with HOME at a temp dir and no USERPROFILE #when the agent dir is the account home's store #then it is shared",
+  (_runtime, executable) => {
     const alternate = mkdtempSync(join(tmpdir(), "agent-home-alt-"))
     try {
       const env: NodeJS.ProcessEnv = { ...process.env, HOME: alternate }
       delete env.USERPROFILE
-      const probe = spawnSync(
-        "node",
-        [
-          "--input-type=module",
-          "-e",
-          `import { userInfo } from "node:os"; import { join } from "node:path"; import { isSharedAgentDir } from ${JSON.stringify(join(import.meta.dirname, "dev-build-runtime.ts"))}; console.log(JSON.stringify({ passwd: userInfo().homedir, shared: isSharedAgentDir(join(userInfo().homedir, ".omo", "agent")) }))`,
-        ],
-        { env, encoding: "utf8", windowsHide: true },
-      )
-      expect(probe.stderr).toBe("")
-      const result = JSON.parse(probe.stdout) as { passwd: string; shared: boolean }
-      expect(result.passwd).not.toBe(alternate)
-      expect(result.shared).toBe(true)
+      const run = (command: string, args: string[]) => {
+        const probe = spawnSync(command, args, { env, encoding: "utf8", windowsHide: true })
+        expect(probe.stderr).toBe("")
+        return probe.stdout.trim()
+      }
+      const accountHome = run("node", ["-e", `console.log(require("node:os").userInfo().homedir)`])
+      expect(accountHome).not.toBe(alternate)
+      const module = JSON.stringify(join(import.meta.dirname, "dev-build-runtime.ts"))
+      const store = JSON.stringify(join(accountHome, ".omo", "agent"))
+      const args = ["-e", `import { isSharedAgentDir } from ${module}; console.log(isSharedAgentDir(${store}))`]
+      expect(run(executable, executable === "node" ? ["--input-type=module", ...args] : args)).toBe("true")
     } finally {
       rmSync(alternate, { recursive: true, force: true })
     }

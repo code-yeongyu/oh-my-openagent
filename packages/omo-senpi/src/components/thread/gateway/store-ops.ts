@@ -187,6 +187,7 @@ function selectRow(ctx: StoreContext, deliveryId: string): DeliveryRow | undefin
 }
 
 export function write(ctx: StoreContext, sql: string, params: readonly SqlValue[] = []): number {
+  endReadSnapshot(ctx)
   const changed = ctx.sql.run(sql, params)
   ctx.stats.writes += changed
   return changed
@@ -207,6 +208,7 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
     ctx.sql.exec("SAVEPOINT gateway_enqueue")
     return true
   }
+  endReadSnapshot(ctx)
   const started = Date.now()
   for (;;) {
     try {
@@ -230,6 +232,30 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
       await ctx.delay(ctx.config.busy_timeout_ms)
     }
   }
+}
+
+/** Connections holding the read snapshot an op's schema check opened (#14622 review M7). */
+const readSnapshots = new WeakSet<Sql>()
+
+/**
+ * Runs one store op inside the read snapshot its schema check opens (#14622 review M7): a migration another process
+ * commits after the check stays invisible to the op's reads, so they never meet a schema the check did not accept. A
+ * write leaves the snapshot first (`beginImmediate`, `write`) and checks the schema again under its write lock.
+ */
+export async function inCheckedSnapshot<T>(ctx: StoreContext, body: () => T | Promise<T>): Promise<T> {
+  ctx.sql.exec("BEGIN")
+  readSnapshots.add(ctx.sql)
+  try {
+    schemaVersion(ctx)
+    return await body()
+  } finally {
+    endReadSnapshot(ctx)
+  }
+}
+
+function endReadSnapshot(ctx: StoreContext): void {
+  // The snapshot only ever read, so ending it cannot fail on a write conflict.
+  if (readSnapshots.delete(ctx.sql)) ctx.sql.exec("COMMIT")
 }
 
 /**
@@ -393,7 +419,7 @@ function storedReaderFloor(ctx: StoreContext): number | undefined {
  * The store's schema version. A store newer than this binary stays usable when the binary that migrated it recorded a
  * reader floor this binary meets (#14382); otherwise, or with no floor recorded, it is refused typed.
  */
-export function schemaVersion(ctx: StoreContext): number {
+function schemaVersion(ctx: StoreContext): number {
   const version = Number(
     ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0,
   )

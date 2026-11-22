@@ -919,9 +919,12 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     return null
   }
   const ctx = requireContext()
-  // Another process may have migrated the store since this worker opened it (#14622 review M5): every op re-reads the
-  // schema first, and every write re-reads it again under its write lock (`store-ops.ts` `beginImmediate`).
-  ops.schemaVersion(ctx)
+  // Another process may have migrated the store since this worker opened it (#14622 review M5, M7): every op re-reads
+  // the schema and reads its data in one snapshot, and every write re-reads it under its write lock.
+  return await ops.inCheckedSnapshot(ctx, () => dispatchOp(ctx, op, args))
+}
+
+async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Promise<unknown> {
   if (op.startsWith("woken_")) return await dispatchWoken(ctx, op, args)
   switch (op) {
     case "extension_register": {

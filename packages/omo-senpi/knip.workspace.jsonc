@@ -873,8 +873,8 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
     "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
     // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
-    // #14622 review M5: schemaVersion is called per op by store-worker.ts, a worker thread knip does not reach
-    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["schemaVersion", "reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // #14622 review M5/M7: inCheckedSnapshot wraps every op in store-worker.ts, a worker thread knip does not reach
+    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["inCheckedSnapshot", "reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion

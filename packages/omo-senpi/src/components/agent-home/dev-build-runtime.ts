@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { readFileSync, realpathSync, statSync } from "node:fs"
 import { homedir, userInfo } from "node:os"
 import { join, resolve } from "node:path"
@@ -36,8 +37,8 @@ function canonical(path: string): string {
 /**
  * Every home a released omo on this account may resolve its agent dir under: HOME, USERPROFILE and the OS account home
  * can differ (a Windows session launched without HOME uses %USERPROFILE%), so each one counts (#14622 review M2).
- * `os.homedir()` follows HOME on POSIX, so the passwd entry's home is read too: an omob run under an alternate HOME
- * still sees the real account's store (#14622 review M4).
+ * `os.homedir()` follows HOME on POSIX, so the account record's home is read too: an omob run under an alternate HOME
+ * still sees the real account's store (#14622 review M4). It is read only when a source build is about to migrate.
  */
 function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
   return [env.HOME, env.USERPROFILE, homedir(), passwdHome()].filter(
@@ -46,12 +47,44 @@ function accountHomes(env: NodeJS.ProcessEnv): readonly string[] {
 }
 
 function passwdHome(): string | undefined {
-  try {
-    return userInfo().homedir
-  } catch {
-    // No passwd entry for this uid (a container user): HOME and USERPROFILE still count.
-    return undefined
+  if (process.platform === "win32") return undefined
+  // Node's userInfo() reads the passwd entry; Bun's follows HOME (and USER), so under Bun the record is asked for by uid.
+  if (process.versions.bun === undefined) {
+    try {
+      return userInfo().homedir
+    } catch {
+      // No passwd entry for this uid (a container user): HOME and USERPROFILE still count.
+      return undefined
+    }
   }
+  return process.platform === "darwin" ? directoryServicesHome() : getentHome()
+}
+
+function run(command: string, args: readonly string[]): string | undefined {
+  const result = spawnSync(command, args, { encoding: "utf8", windowsHide: true, timeout: 5_000 })
+  return result.status === 0 ? result.stdout.trim() : undefined
+}
+
+function getentHome(): string | undefined {
+  const uid = process.getuid?.()
+  if (uid === undefined) return undefined
+  // name:password:uid:gid:gecos:home:shell
+  return (
+    run("getent", ["passwd", String(uid)])
+      ?.split("\n")[0]
+      ?.split(":")[5] || undefined
+  )
+}
+
+function directoryServicesHome(): string | undefined {
+  const name = run("id", ["-un"])
+  if (name === undefined || name.length === 0) return undefined
+  // "NFSHomeDirectory: /Users/name"
+  return (
+    run("dscl", [".", "-read", `/Users/${name}`, "NFSHomeDirectory"])
+      ?.split(": ")[1]
+      ?.trim() || undefined
+  )
 }
 
 /**

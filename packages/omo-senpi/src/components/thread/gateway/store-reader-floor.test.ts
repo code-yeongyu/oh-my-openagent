@@ -8,7 +8,7 @@ import type { GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS, gatewayReaderFloor } from "./schema"
 import { Sql, type SqliteConnection } from "./sql"
-import { migrate, type StoreContext } from "./store-ops"
+import { inCheckedSnapshot, listDeliveries, migrate, type StoreContext } from "./store-ops"
 
 const GATEWAY_READER_FLOOR_KEY = "reader_floor"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -113,6 +113,59 @@ test("#given a fresh store #when migrate commits each step #then every commit ma
   expect(committed).toEqual(
     GATEWAY_MIGRATIONS.map((_, step) => ({ version: step + 1, floor: String(gatewayReaderFloor(step + 1)) })),
   )
+})
+
+test("#given an op past its schema check #when another process commits an incompatible migration before the op reads #then the op reads the schema it checked and the next op is refused typed", async () => {
+  const agentDir = realpathSync(mkdtempSync(join(tmpdir(), "omo-gateway-snapshot-")))
+  const path = join(agentDir, "gateway.sqlite")
+  const db = new Database(path)
+  db.exec("PRAGMA journal_mode = WAL")
+  let migrated = false
+  // The concurrent migrator: on the op's first read of `deliveries`, another connection commits a schema this binary
+  // cannot use (no floor) that renames a column the read selects.
+  class MigratedUnderTheReadSql extends Sql {
+    override all(...args: Parameters<Sql["all"]>): ReturnType<Sql["all"]> {
+      if (!migrated && args[1].includes("FROM deliveries")) {
+        migrated = true
+        const other = new Database(path)
+        try {
+          other.exec(
+            `ALTER TABLE deliveries RENAME COLUMN body TO body_next; DELETE FROM gateway_meta WHERE key = '${GATEWAY_READER_FLOOR_KEY}'; PRAGMA user_version = ${GATEWAY_MIGRATIONS.length + 1}`,
+          )
+        } finally {
+          other.close()
+        }
+      }
+      return super.all(...args)
+    }
+  }
+  const connection: SqliteConnection = {
+    exec: (sql) => db.exec(sql),
+    function: (name, options, fn) => db.function(name, options, fn as never),
+    setAuthorizer: () => {
+      throw new Error("no authorizer here")
+    },
+    close: () => db.close(),
+  }
+  const ctx = {
+    sql: new MigratedUnderTheReadSql(connection),
+    config: { agent_dir: agentDir, test_hooks: {}, busy_timeout_ms: 1_000, lock_wait_max_ms: 5_000 },
+    stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
+    emit: () => undefined,
+    hook: async () => undefined,
+    delay: async () => undefined,
+  } as unknown as StoreContext
+  cleanups.push(() => {
+    db.close()
+    rmSync(agentDir, { recursive: true, force: true })
+  })
+  await migrate(ctx)
+
+  expect(await settled(inCheckedSnapshot(ctx, () => listDeliveries(ctx, {})))).toEqual({ value: [] })
+  expect(migrated).toBe(true)
+  expect((await settled(inCheckedSnapshot(ctx, () => listDeliveries(ctx, {})))).error).toMatchObject({
+    code: "gateway_schema_too_new",
+  })
 })
 
 test("#given running sessions #when a newer binary migrates the store and records a floor this binary meets #then sends keep working and a session opened afterwards sends too", async () => {

@@ -465,6 +465,8 @@ export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
  * code uses means sets it to its own version. Steps up to v14 predate the floor and claim nothing.
  * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
  * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
+ * Only a binary that reads the floor relies on it (#14622 review M6): binaries released before it, schema 14 included,
+ * refuse every store newer than their own schema whatever floor it carries.
  */
 const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
 

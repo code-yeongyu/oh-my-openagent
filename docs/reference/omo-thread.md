@@ -311,9 +311,12 @@ call and restores that worker's registrations.
 A binary that migrates the core store records a reader floor in `gateway_meta`
 (`reader_floor`): the oldest schema whose code may keep reading and writing that store. A
 step that only adds what older code never reads, or widens a CHECK to a value older code passes
-through, keeps the floor; v15 and v16 keep it at 14. An older binary opens a newer store
-whose floor it meets and keeps working at its own schema, so installing a newer omo does not
-cut running sessions off. A core schema newer than this binary supports, with no floor or a
+through, keeps the floor; v15 and v16 keep it at 14. An older binary that reads the floor
+(this release and later) opens a newer store whose floor it meets and keeps working at its own
+schema, so installing a newer omo does not cut those sessions off. A binary from before the
+floor, schema 14 included, refuses every newer store: its sessions keep working only while
+their store worker stays open, and any worker they open after the migration answers
+`gateway_schema_too_new`. A core schema newer than this binary supports, with no floor or a
 floor above this binary, is refused with `gateway_schema_too_new` without applying migrations
 or lowering `user_version`. Extension registration/calls return the refusal; internal core
 store methods reject with an error carrying that code. Use a compatible binary to access that
