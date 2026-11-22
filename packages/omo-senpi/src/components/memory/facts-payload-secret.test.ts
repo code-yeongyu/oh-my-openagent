@@ -61,5 +61,5 @@ describe("facts payload secret-like spans (#10116)", () => {
     expect(containsSecretLikeMaterial(filePayloads[0] ?? "")).toBe(false)
     expect(containsSecretLikeMaterial(prompts[0] ?? "")).toBe(false)
     expect(result.status).toBe("committed")
-  }, 60_000)
+  })
 })
