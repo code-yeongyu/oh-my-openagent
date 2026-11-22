@@ -28,7 +28,9 @@ dialogPolicy })`). Default to accepting (`{ accept: true }`; a policy function r
 Pass the policy at connect time rather than calling `browser.setDialogPolicy` later. Attaches made
 with `connect(url)` or `connectNamed` in one process share one connection per browser, and on a
 connection with two or more holders `setDialogPolicy` throws `SharedConnectionError` (code
-`shared_connection`). Passing `dialogPolicy` when attaching gives you a connection of your own.
+`shared_connection`). Passing `dialogPolicy` when attaching keeps your connection apart from callers
+whose options differ; callers that pass an equal policy (the same `{ accept: true }`, or the same
+function) still share one connection, which is harmless because they asked for the same answers.
 
 `page.on("dialog", (dialog) => ...)` hands each listener a Playwright-style `Dialog` object, not a
 plain object: read it through methods (`dialog.type()`, `dialog.message()`, `dialog.defaultValue()`,
