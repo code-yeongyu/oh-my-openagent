@@ -37,7 +37,8 @@ import { locateControl } from "./locate"
 import { closeThread } from "./operations"
 import type { PromptStart } from "./prompt-start"
 import { controlRefusalOf } from "./port"
-import { createdThreadId, type HostedThread, type SessionOpenOutcome } from "./session-host"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
+import { createdThreadId, type HostedThread, type SessionHost, type SessionOpenOutcome } from "./session-host"
 
 /** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
 const RENAME_REASON_MAX_CHARS = 300
@@ -112,7 +113,9 @@ export async function createThread(
   // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
   let opened: HostedThread | undefined
   // #14648: this call opened the session on this device (`madeNew`: its session file too), so it answers for what is left.
-  let openedHere: { readonly madeNew: boolean; readonly priorIncarnation: string | null } | undefined
+  let openedHere: OpenedHere | undefined
+  // An alias the thread held before this call is its own: a refused reopen keeps it and releases only what it claimed.
+  let aliasHeldBefore = true
   const made = await (async (): Promise<ThreadToolResult> => {
     const skills =
       value.skills === undefined || value.skills.length === 0 ? undefined : checkInitialSkills(value.skills)
@@ -220,7 +223,14 @@ export async function createThread(
       }
     if (outcome.kind === "error") return outcome
     opened = outcome.thread
-    if (earlier?.kind !== "live" && plan.host.device === undefined) openedHere = { madeNew, priorIncarnation }
+    if (earlier?.kind !== "live" && plan.host.device === undefined)
+      openedHere = {
+        madeNew,
+        priorIncarnation,
+        ...(madeNew && outcome.thread.worktree !== undefined && plan.host.discard !== undefined
+          ? { worktree: outcome.thread.worktree, discard: plan.host.discard }
+          : {}),
+      }
     const created: ThreadToolResult = {
       ...openedResult(outcome.thread, deduplicated),
       ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
@@ -235,6 +245,8 @@ export async function createThread(
       return recorded.kind === "ok"
         ? ({ ...recorded, alias_scope: "local", alias_unavailable: plan.localAlias } as ThreadToolResult)
         : recorded
+    if (value.alias !== undefined && value.prompt !== undefined && plan.host.device === undefined)
+      aliasHeldBefore = await aliasHeldBy(options.remote, value.alias, outcome.thread.thread_id)
     if (!plan.creates) return await withAlias(options.remote, value.alias, recorded, plan.host.device)
     const claimed = await claimCreatedAlias(options.remote, value.alias, recorded, plan.host.device)
     if (!("local" in claimed)) return claimed
@@ -270,7 +282,7 @@ export async function createThread(
   // An alias this call claimed for the thread it made names it across the account: a refused create releases it with the
   // thread. A reopened thread may have held the alias before this call, so its alias is kept.
   const claimedAlias =
-    here?.madeNew === true &&
+    !aliasHeldBefore &&
     value.alias !== undefined &&
     "alias" in made &&
     typeof made.alias === "string" &&
@@ -285,8 +297,7 @@ export async function createThread(
             const owner = await options.store.sessionOwner(thread.thread_id)
             return owner?.endpoint == null || owner.incarnation === here.priorIncarnation
           },
-          refuse: (deliveryId: string) =>
-            refuseUnregistered(options, context, thread, deliveryId, here.madeNew, claimedAlias),
+          refuse: (deliveryId: string) => refuseUnregistered(options, context, thread, deliveryId, here, claimedAlias),
         }
   const prompt = await promptThatRan(await firstPrompt(current, opened, value, context), opened, context, unregistered)
   return "not_started" in prompt
@@ -372,6 +383,33 @@ async function promptThatRan(
   }
 }
 
+/** #14648: what this create opened on this device, and so answers for when it rolls back. */
+type OpenedHere = {
+  /** The session file is this open's own (a new thread, not a reopened file). */
+  readonly madeNew: boolean
+  /** The incarnation the session's registration had before this open, so an earlier life's is not taken for this one. */
+  readonly priorIncarnation: string | null
+  /** The worktree and branch this open made, and how its host removes them. */
+  readonly worktree?: ThreadWorktree
+  readonly discard?: SessionHost["discard"]
+}
+
+/**
+ * Whether `alias` names `threadId` in the account's registry before this call claims it. Only `alias_not_found` (or
+ * another holder) is a no; an unreadable registry counts as held, so a refusal never releases an alias it may have held.
+ */
+async function aliasHeldBy(
+  remote: ThreadToolSurfaceOptions["remote"],
+  alias: string,
+  threadId: string,
+): Promise<boolean> {
+  if (remote?.aliases === undefined) return false
+  const held = await remote.aliases.resolve(alias).catch(() => undefined)
+  if (held === undefined) return true
+  if (held.kind === "ok") return held.value.session_id === threadId
+  return held.error.code !== "alias_not_found"
+}
+
 /** #14648: whether the session a create opened here is still unregistered, and the refusal that ends it if so. */
 type UnregisteredCheck = {
   readonly check: () => Promise<boolean>
@@ -391,9 +429,10 @@ async function refuseUnregistered(
   context: CreateContext,
   thread: HostedThread,
   deliveryId: string,
-  madeNew: boolean,
+  here: OpenedHere,
   claimedAlias: string | undefined,
 ): Promise<ThreadToolFailure | undefined> {
+  const { madeNew } = here
   // Only this create's own prompt is taken back: other messages a reopened thread holds stay queued for it.
   const store = options.store
   if (!(await store.refuseQueued({ now: store.now(), delivery_id: deliveryId, reason: "target_closed" })))
@@ -424,6 +463,21 @@ async function refuseUnregistered(
         failures.push(`removing its session file failed: ${error instanceof Error ? error.message : String(error)}`)
       }
   }
+  // The worktree and branch this open made go with the session (#14648 review): a refused create leaves neither behind.
+  let worktreeRemoved = false
+  if (ended && here.worktree !== undefined && here.discard !== undefined) {
+    const kept = await here.discard(here.worktree).catch((error: unknown) => ({
+      kind: "error" as const,
+      error: { message: error instanceof Error ? error.message : String(error) },
+    }))
+    worktreeRemoved = kept === undefined
+    if (kept !== undefined) {
+      left = true
+      failures.push(
+        `removing its worktree ${here.worktree.path} (branch ${here.worktree.branch}) failed: ${kept.error.message}`,
+      )
+    }
+  }
   let aliasReleased = false
   if (claimedAlias !== undefined) {
     const released = await options.remote?.aliases
@@ -451,6 +505,9 @@ async function refuseUnregistered(
       thread: thread.thread_id,
       delivery_id: deliveryId,
       dropped_deliveries: [deliveryId],
+      ...(here.worktree === undefined
+        ? {}
+        : { worktree: { path: here.worktree.path, branch: here.worktree.branch, removed: worktreeRemoved } }),
       ...(claimedAlias === undefined ? {} : { alias: claimedAlias, alias_released: aliasReleased }),
       ...(thread.engine_version === undefined ? {} : { engine_version: thread.engine_version }),
       ...(failures.length === 0 ? {} : { failures }),

@@ -37,5 +37,7 @@ export function createLocalSessionHost(
     visible: async () => visible,
     open: async (request) =>
       await (await import("#omo-thread-client-runtime")).openLocally(host, request, worktreeRoot),
+    discard: async (worktree) =>
+      await (await import("#omo-thread-client-runtime")).discardOpenedWorktree(worktree, worktreeRoot),
   }
 }

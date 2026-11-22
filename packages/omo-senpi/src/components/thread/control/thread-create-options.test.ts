@@ -333,6 +333,21 @@ describe("thread_create whose first prompt does not start", () => {
     },
   )
 
+  test("#given a thread that holds no alias #when it is reopened with a new alias and a prompt and its host never registers it #then the alias this call claimed is released (#14648 review)", async () => {
+    const a = account()
+    const { run, agentDir } = surface(a.remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      diskSessions: ["dur-saved"],
+    })
+    writeSession(agentDir, "dur-saved")
+    expect(await run("thread_create", { thread: "dur-saved", alias: "lane-new", prompt: "build it" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { alias: "lane-new", alias_released: true } },
+    })
+    expect(a.aliases.has("lane-new")).toBe(false)
+  })
+
   test("#given a thread that already holds an alias #when it is reopened by that alias with a prompt and its host never registers it #then the refusal keeps the alias (#14648 review B4)", async () => {
     const a = account()
     const { run, agentDir } = surface(a.remote, {
