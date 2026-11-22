@@ -6,9 +6,10 @@ import type { ResidencyRegistry } from "../../lifecycle/port"
 import { fixtureHandle } from "./admission"
 import type { PendingSteeringEntry } from "../../state"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export function restartedFixture(project: string) {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const config = OmoTaskSettingsSchema.parse({ default_concurrency: 1, global_concurrency: 1 })
   const children = new Map<string, ReturnType<typeof fixtureHandle>>()
   const queues: (readonly PendingSteeringEntry[])[] = []
