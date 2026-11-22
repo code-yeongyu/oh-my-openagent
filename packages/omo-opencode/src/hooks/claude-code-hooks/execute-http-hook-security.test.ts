@@ -1,6 +1,6 @@
 /// <reference types="bun-types" />
 
-import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from "bun:test"
 import { restoreEnvironment } from "../../../../../test-support/environment-integrity"
 import { fileURLToPath } from "node:url"
 import type { HookHttp } from "./types"
@@ -16,16 +16,12 @@ async function importFreshExecuteHttpHook() {
   return import(modulePath)
 }
 
+// A spy on the shared namespace, which mock.restore() undoes after each test. A module mock of the whole shared barrel
+// rebound every function it re-exports for the rest of the process and broke later test files (#13331).
 function installSharedLogMock(logCalls: Array<{ message: string; data?: unknown }>): void {
-  const sharedMockFactory = () => ({
-    ...sharedModule,
-    log: (message: string, data?: unknown) => {
-      logCalls.push({ message, data })
-    },
+  spyOn(sharedModule, "log").mockImplementation((message: string, data?: unknown) => {
+    logCalls.push({ message, data })
   })
-
-  mock.module("../../shared", sharedMockFactory)
-  mock.module("../../shared/index.ts", sharedMockFactory)
 }
 
 describe("executeHttpHook TLS security", () => {

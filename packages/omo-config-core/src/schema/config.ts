@@ -4,6 +4,7 @@ import { OmoAgentsConfigSchema } from "./agent"
 import { OmoCategoriesConfigSchema } from "./category"
 import { OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema } from "./computer"
 import { OmoGitMasterSettingsLayerSchema, OmoGitMasterSettingsSchema } from "./git-master"
+import { OmoKeywordDetectorSettingsSchema } from "./keyword-detector"
 import { OmoHarnessIdSchema, type OmoHarnessId } from "./harness"
 import { OmoMemorySettingsLayerSchema, OmoMemorySettingsSchema } from "./memory"
 import { OmoModelCatalogLayerSchema, OmoModelCatalogSchema } from "./model-catalog"
@@ -16,6 +17,8 @@ import { OmoTelemetrySettingsLayerSchema, OmoTelemetrySettingsSchema } from "./t
 import { OmoDeviceServiceSettingsLayerSchema, OmoDeviceServiceSettingsSchema } from "./device-service"
 import { OmoFormatOnMutationLayerSchema, OmoFormatOnMutationSchema } from "./format-on-mutation"
 import { OmoProvenanceSettingsSchema } from "./provenance"
+import { OmoSessionWakeSettingsSchema } from "./session-wake"
+import { OmoOperatorAlertsSettingsSchema } from "./operator-alerts"
 
 export type { OmoHarnessId }
 export { OmoHarnessIdSchema }
@@ -38,6 +41,8 @@ export const OmoExcludedModelsSchema = z.array(z.string())
 export const OmoTypedHarnessConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -54,6 +59,7 @@ export const OmoTypedHarnessConfigSchema = z
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
+    keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
   })
   .strict()
@@ -61,6 +67,8 @@ export const OmoTypedHarnessConfigSchema = z
 export const OmoConfigProfileSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     categories: OmoCategoriesConfigSchema.optional(),
     agents: OmoAgentsConfigSchema.optional(),
@@ -77,6 +85,7 @@ export const OmoConfigProfileSchema = z
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
+    keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -88,6 +97,8 @@ export const OmoConfigProfileSchema = z
 export const OmoConfigSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),
@@ -105,6 +116,7 @@ export const OmoConfigSchema = z
     side_panel: OmoSidePanelSettingsSchema.optional(),
     computer: OmoComputerSettingsSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
+    keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),
@@ -119,6 +131,8 @@ export const OmoConfigSchema = z
 export const OmoConfigLayerSchema = z
   .object({
     provenance: OmoProvenanceSettingsSchema.optional(),
+    session_wake: OmoSessionWakeSettingsSchema.optional(),
+    operator_alerts: OmoOperatorAlertsSettingsSchema.optional(),
     formatOnMutation: OmoFormatOnMutationLayerSchema.optional(),
     $schema: z.string().optional(),
     categories: OmoCategoriesConfigSchema.optional(),
@@ -136,6 +150,7 @@ export const OmoConfigLayerSchema = z
     side_panel: OmoSidePanelSettingsLayerSchema.optional(),
     computer: OmoComputerSettingsLayerSchema.optional(),
     disabled_skills: OmoDisabledSkillsSchema.optional(),
+    keyword_detector: OmoKeywordDetectorSettingsSchema.optional(),
     exclude_models: OmoExcludedModelsSchema.optional(),
     "[opencode]": OmoOpenCodeHarnessConfigSchema.optional(),
     "[native]": OmoTypedHarnessConfigSchema.optional(),

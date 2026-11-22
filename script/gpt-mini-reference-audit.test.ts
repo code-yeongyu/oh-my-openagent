@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 const REPOSITORY_ROOT = repositoryRootFromMetaUrl(import.meta.url)
 const OLD_MODEL_ID = ["gpt-5.4", "mini"].join("-")
 const OLD_DISPLAY_NAME = ["GPT 5.4", "Mini"].join(" ")
+const FILES_PER_BATCH = 64
 // Models LazyCodex once bundled, matched only to move pre-receipt installs off them (#5245); the bundle inlines it.
 const HISTORICAL_MODEL_RECORDS = new Set([
   "packages/omo-codex/src/install/managed-agent-model-defaults.ts",
@@ -33,15 +34,18 @@ describe("GPT Mini reference audit", () => {
 
     // when
     const matches: string[] = []
-    for (const file of files) {
-      if (HISTORICAL_MODEL_RECORDS.has(file)) continue
-      const path = `${REPOSITORY_ROOT}${file}`
-      if (!existsSync(path)) continue
-      if (!(await stat(path)).isFile()) continue
-      const content = await readFile(path, "utf8")
-      if (content.toLowerCase().includes(OLD_MODEL_ID) || content.includes(OLD_DISPLAY_NAME)) {
-        matches.push(file)
-      }
+    for (let offset = 0; offset < files.length; offset += FILES_PER_BATCH) {
+      const batch = files.slice(offset, offset + FILES_PER_BATCH)
+      const checked = await Promise.all(
+        batch.map(async (file) => {
+          if (HISTORICAL_MODEL_RECORDS.has(file)) return null
+          const path = `${REPOSITORY_ROOT}${file}`
+          if (!existsSync(path) || !(await stat(path)).isFile()) return null
+          const content = await readFile(path, "utf8")
+          return content.toLowerCase().includes(OLD_MODEL_ID) || content.includes(OLD_DISPLAY_NAME) ? file : null
+        }),
+      )
+      for (const file of checked) if (file !== null) matches.push(file)
     }
 
     // then

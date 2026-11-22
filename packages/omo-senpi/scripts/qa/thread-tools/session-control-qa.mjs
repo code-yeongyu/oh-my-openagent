@@ -176,6 +176,7 @@ try {
             api: "openai-completions",
             models: ["mock-model", "mock-model-fast", "mock-model-deep"].map((id) => ({
               id,
+              ...(id === "mock-model-deep" ? { reasoning: true, thinkingLevelMap: { max: "max" } } : {}),
               baseUrl: fake.url,
               api: "openai-completions",
               contextWindow: 128000,
@@ -209,15 +210,15 @@ try {
   record(1, "list", listed.kind === "ok" ? "pass" : "fail", errorCode(listed))
 
   // 2. create A
-  const createdA = await call(tools, "thread_create", { cwd: scratch.cwd })
+  const createdA = await call(tools, "thread_create", { cwd: scratch.cwd, name: "session-control-a" })
   record(2, "create-a", createdA.kind === "ok" ? "pass" : "fail", errorCode(createdA))
   if (createdA.kind !== "ok") throw new Error("thread_create A failed; the rest of the scenario needs it")
-  const threadA = createdA.thread.thread_id
+  const threadA = createdA.thread
 
   // 3. rename A, then prove the new label is what a fresh list reports
   const renamed = await call(tools, "thread_rename", { thread: threadA, name: ALPHA, all_scope: true })
   const afterRename = await call(tools, "thread_list", { all_scope: true })
-  const seenA = afterRename.kind === "ok" ? afterRename.threads.find((t) => t.thread_id === threadA) : undefined
+  const seenA = afterRename.kind === "ok" ? afterRename.threads.find((t) => t.thread === threadA) : undefined
   record(
     3,
     "rename-visible-in-fresh-list",
@@ -226,9 +227,9 @@ try {
   )
 
   // 4. a second thread cannot take A's label
-  const createdB = await call(tools, "thread_create", { cwd: scratch.cwd })
+  const createdB = await call(tools, "thread_create", { cwd: scratch.cwd, name: "session-control-b" })
   if (createdB.kind !== "ok") throw new Error("thread_create B failed; the conflict check needs it")
-  const threadB = createdB.thread.thread_id
+  const threadB = createdB.thread
   await call(tools, "thread_rename", { thread: threadB, name: BETA, all_scope: true })
   const conflict = await call(tools, "thread_rename", { thread: threadB, name: ALPHA, all_scope: true })
   record(
@@ -283,9 +284,63 @@ try {
   // Turn scope is the VALIDATED path: the wire applies it to the active model immediately and
   // rejects a level that model cannot run. Session scope only records the remembered preference,
   // so it accepts levels the active model does not support - both steps below use turn scope.
-  const supported = await surface
-    .getAvailableThinkingLevels(createdA.thread.sessionId ?? threadA)
-    .catch(() => undefined)
+  const routingA =
+    (await surface.listSessions()).find((session) => (session.durableSessionId ?? session.sessionId) === threadA)
+      ?.sessionId ?? threadA
+  const supported = await surface.getAvailableThinkingLevels(routingA).catch(() => undefined)
+  const missingProvider = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "absent/fake:max",
+    all_scope: true,
+  })
+  const details = missingProvider.kind === "error" ? missingProvider.error.details : undefined
+  record(
+    "14445-a",
+    "absent-provider",
+    missingProvider.kind === "error" &&
+      missingProvider.error.code === "model_not_found" &&
+      details?.reason === "provider_not_configured" &&
+      details?.provider === "absent" &&
+      JSON.stringify(details?.available_providers) === '["mock"]'
+      ? "pass"
+      : "fail",
+    JSON.stringify(details),
+  )
+  const max = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "mock/mock-model-deep:max",
+    all_scope: true,
+  })
+  const state = await surface.getState(routingA)
+  record(
+    "14445-c",
+    "max-round-trip",
+    max.kind === "ok" &&
+      max.model.id === "mock-model-deep" &&
+      state.model?.id === "mock-model-deep" &&
+      state.thinkingLevel === "max"
+      ? "pass"
+      : "fail",
+    `result=${max.kind} engineModel=${state.model?.id} engineThinking=${state.thinkingLevel}`,
+  )
+  const rejectedMax = await call(tools, "thread_set_model", {
+    thread: threadA,
+    model: "mock/mock-model-fast:max",
+    all_scope: true,
+  })
+  const afterRefusal = await surface.getState(routingA)
+  record(
+    "14445-b",
+    "unsupported-max",
+    rejectedMax.kind === "error" &&
+      rejectedMax.error.code === "thinking_level_unsupported" &&
+      afterRefusal.model?.id === "mock-model-deep" &&
+      afterRefusal.thinkingLevel === "max"
+      ? "pass"
+      : "fail",
+    `${errorCode(rejectedMax)} engineModel=${afterRefusal.model?.id} engineThinking=${afterRefusal.thinkingLevel}`,
+  )
+  await call(tools, "thread_set_model", { thread: threadA, model: "mock/mock-model-fast", all_scope: true })
 
   // 8. a level the active model DOES support is accepted and echoed with its scope
   if (supported === undefined || supported.length === 0) {
@@ -340,8 +395,8 @@ try {
   record(
     10,
     "rename-self",
-    selfRenamed.kind === "ok" && selfRenamed.thread_id === threadA ? "pass" : "fail",
-    selfRenamed.kind === "ok" ? `thread_id=${selfRenamed.thread_id}` : errorCode(selfRenamed),
+    selfRenamed.kind === "ok" && selfRenamed.thread === threadA ? "pass" : "fail",
+    selfRenamed.kind === "ok" ? `thread=${selfRenamed.thread}` : errorCode(selfRenamed),
   )
   callerId = "unknown-caller"
 

@@ -175,7 +175,10 @@ describe("the omo CLI device service hand-off", () => {
     const state = await handoff.machineDevice?.()
     expect(state?.kind).toBe("unknown")
     expect(state && state.kind === "unknown" ? state.reason : "").toContain("dead_endpoint")
-    expect(lines.some((line) => line.includes("dead_endpoint"))).toBe(true)
+    // #13096 review LOW: the sign-in refusal names the leftover file to remove, and nothing on stderr claims the opposite
+    // ("treated as not running") just before it.
+    expect(state && state.kind === "unknown" ? state.endpoint : "").toBe(deviceServiceEndpointPath(stateDir))
+    expect(lines.filter((line) => line.includes("treated as not running"))).toEqual([])
   })
 
   test("a failure is reported on the log and never fails the sign-in or sign-out", async () => {

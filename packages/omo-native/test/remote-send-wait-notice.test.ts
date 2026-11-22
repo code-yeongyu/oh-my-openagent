@@ -5,7 +5,7 @@ import type { ThreadDelivery, ThreadToolResult } from "../../omo-senpi/src/compo
 const sendResult = (delivery: ThreadDelivery): ThreadToolResult =>
   ({
     kind: "ok",
-    thread_id: "s1",
+    thread: "s1",
     link: "[s1](omo-thread://v1/s1)",
     delivery,
     deduplicated: false,

@@ -60,7 +60,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
     // then
     expect(resolved.spec.provider).toBe("anthropic-subscription")
     expect(resolved.spec.modelId).toBe("claude-fable-5-1")
-    expect(resolved.spec.variant).toBe("max")
+    expect(resolved.spec.variant).toBe("xhigh")
     expect(resolved.modelSelection.fallbackEntry?.providers[0]).toBe("anthropic-subscription")
   })
 
@@ -107,7 +107,7 @@ describe("builtin Claude rungs under the senpi harness", () => {
     expect([architect.spec.provider, architect.spec.modelId, architect.spec.variant]).toEqual([
       "anthropic",
       "claude-fable-5-1",
-      "max",
+      "xhigh",
     ])
     expect(architect.spec.requested_model?.display).toBe("anthropic/claude-fable-5-2")
     expect(architect.modelSelection).toMatchObject({
@@ -117,12 +117,12 @@ describe("builtin Claude rungs under the senpi harness", () => {
     expect([meteredArchitect.spec.provider, meteredArchitect.spec.modelId, meteredArchitect.spec.variant]).toEqual([
       "opencode",
       "claude-fable-5-1",
-      "max",
+      "xhigh",
     ])
     expect(meteredArchitect.modelSelection).toMatchObject({
       selectedModel: "opencode/claude-fable-5-1",
       matchedFallback: true,
-      fallbackEntry: { model: "claude-fable-5-1", variant: "max" },
+      fallbackEntry: { model: "claude-fable-5-1", variant: "xhigh" },
     })
     expect([meteredHigh.spec.provider, meteredHigh.spec.modelId, meteredHigh.spec.variant]).toEqual([
       "opencode",

@@ -10,16 +10,13 @@ import { fileURLToPath } from "node:url"
 
 import { resolveComputerSettings } from "@oh-my-opencode/senpi-desktop-tool"
 import type { ChildFactory } from "@oh-my-opencode/senpi-desktop-service"
+import { FAKE_ENGINE_PATH } from "@oh-my-opencode/senpi-desktop-service/testing"
 
 import type { ComponentContext, ComponentLogger } from "../../extension/types"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { COMPUTER_UNAVAILABLE_MESSAGE, createComputerUseComponent } from "./index"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
-const FAKE_ENGINE = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "../../../../senpi-desktop-service/test/fake-engine.mjs",
-)
 const RECEIVED = "recv "
 class HostApi extends FakeExtensionAPI {
   active: string[] = ["read", "bash"]
@@ -81,7 +78,7 @@ function fakeEngine(): EngineLog {
   const methods: string[] = []
   const waiters: Array<{ method: string; n: number; resolve: () => void }> = []
   const factory: ChildFactory = () => {
-    const child = spawn(process.execPath, [FAKE_ENGINE, "--stdio"], {
+    const child = spawn(process.execPath, [FAKE_ENGINE_PATH, "--stdio"], {
       env: { ...process.env, FAKE_ENGINE_DESKTOP: "1" },
       stdio: "pipe",
     })

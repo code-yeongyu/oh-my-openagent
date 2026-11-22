@@ -13,6 +13,9 @@ import {
 } from "../engine-trust-policy"
 import { runTrustStage, type TrustStageOptions } from "../trust-stage"
 import { issueCertificates } from "./trust-certificate-fixtures"
+import { usePrivateTmpdir } from "./trust-private-tmpdir"
+
+usePrivateTmpdir()
 
 let root: string
 let executable: string
@@ -153,9 +156,9 @@ test.each([
   [["host", "status"], "short-host-cli"],
   [["thread", "list"], "short-host-cli"],
   [["daemon", "run"], "short-host-cli"],
-  [["login"], "static"],
-  [["whoami", "--help"], "static"],
-  [["logout"], "static"],
+  [["login"], "one-shot-network"],
+  [["logout"], "one-shot-network"],
+  [["whoami", "--help"], "one-shot-network"],
   [["update"], "one-shot-network"],
   [["doctor"], "one-shot-network"],
   [["-p"], "one-shot-network"],

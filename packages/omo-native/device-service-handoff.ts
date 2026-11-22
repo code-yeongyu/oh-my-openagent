@@ -8,6 +8,8 @@ import {
   handDeviceKeys,
 } from "../device-service-core/src/index.ts"
 import { connectOrNotRunning } from "../device-service-core/src/hand-device-keys.ts"
+import { refuseIfLocalOnly } from "../device-service-core/src/local-only.ts"
+import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import type { Credentials } from "../omo-opencode/src/cli/service-auth/protocol"
 import type { DeviceServiceHandoff } from "../omo-opencode/src/cli/service-auth/session"
 import packageJson from "./package.json" with { type: "json" }
@@ -17,7 +19,8 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 /** The account a sign-in belongs to, asked of the service with the token the sign-in holds in memory. */
 async function accountOf(api: string, credentials: Credentials, doFetch: typeof fetch): Promise<string> {
   if (credentials.accountId !== undefined) return credentials.accountId
-  const response = await doFetch(`${api}/v1/me`, { headers: { authorization: `Bearer ${credentials.accessToken}` } })
+  refuseIfLocalOnly("omo-native/device-service-handoff.ts accountOf")
+  const response = await doFetch(`${api}/v1/me`, { headers: syncRequestHeaders(credentials.accessToken) })
   if (!response.ok) throw new Error(`the account read failed (${response.status})`)
   const body: unknown = await response.json()
   const id = isRecord(body) && isRecord(body["account"]) ? body["account"]["id"] : undefined
@@ -71,15 +74,16 @@ export function cliDeviceServiceHandoff(options: {
     machineDevice: async () => {
       // No endpoint file: the service is not installed here. A leftover file that nothing answers is not absence.
       if (!existsSync(deviceServiceEndpointPath(stateDir))) return { kind: "absent" }
+      // Kept, not logged: the sign-in refuses with this reason, so a "treated as not running" line would contradict it.
       let failure: string | undefined
       const service = await connectOrNotRunning(connect, (line) => {
         failure = line
-        options.log(line)
       })
       if (service === "not_running") {
         return {
           kind: "unknown",
           reason: failure ?? "the device service endpoint is present but nothing answered",
+          endpoint: deviceServiceEndpointPath(stateDir),
         }
       }
       try {

@@ -2,17 +2,20 @@ import { afterEach, expect, spyOn, test } from "bun:test"
 
 import * as resilient from "../../fs/resilient"
 import { CrashInjected } from "./engine"
-import { type Device, GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
+import { type Device, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
 
 // #12286: a push must hold what one batch needs, not the whole backlog. Each batch used to re-read
 // and re-write one journal file holding every pending item's ops plus the sealed batch, several
 // times per batch, so the pushing device's peak memory grew with the size of the set.
 
+// The work is awaited on the cycle itself (about 9 s unloaded), never on a time budget; this only stops a real hang (#13680).
+const HANG_GUARD_MS = 10 * 60_000
+
 const devices: Device[] = []
 afterEach(async () => {
   for (const d of devices.splice(0)) await d.dispose()
-}, GIT_TEST_TIMEOUT)
+}, HANG_GUARD_MS)
 
 const BATCH_BYTES = 16 * 1024
 const ITEMS = 40
@@ -112,5 +115,5 @@ test(
     await b.engine.runCycle()
     for (const [n, key] of keys.entries()) expect(await b.read(key)).toBe(body(n))
   },
-  GIT_TEST_TIMEOUT,
+  HANG_GUARD_MS,
 )

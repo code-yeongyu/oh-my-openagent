@@ -117,7 +117,7 @@ async function surface(
 /** A session's tool registry as senpi keeps it (one tool per name), with `session_start` fired by the test. */
 function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, unknown>>>) {
   const tools = new Map(Object.entries(preRegistered))
-  const handlers: (() => void)[] = []
+  const handlers: ((event: unknown, ctx?: unknown) => unknown)[] = []
   let waiting: { readonly name: string; readonly done: () => void } | undefined
   return {
     tools,
@@ -127,7 +127,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       if (awaited !== undefined && awaited.name === tool.name) awaited.done()
     },
     getAllTools: () => [...tools.keys()].map((name) => ({ name })),
-    on(event: string, handler: () => void) {
+    on(event: string, handler: (event: unknown, ctx?: unknown) => unknown) {
       if (event === "session_start") handlers.push(handler)
     },
     /** Fires session_start and resolves once `until` is registered (the registration pass is one synchronous loop). */
@@ -135,7 +135,7 @@ function sessionStartHost(preRegistered: Readonly<Record<string, Record<string, 
       const done = new Promise<void>((resolve) => {
         waiting = { name: until, done: resolve }
       })
-      for (const handler of handlers) handler()
+      for (const handler of handlers) handler({ type: "session_start" })
       return done
     },
   }
@@ -353,6 +353,7 @@ test("#given args that try to name the caller #when the tool runs #then it is re
     ectxFor("dur-caller") as never,
   )
   expect(resultOf(output)).toMatchObject({ code: "invalid_arguments" })
+  expect(output.isError).toBe(true)
 })
 
 test("#given a declaration whose module was deleted #when a session builds its tools #then building succeeds without importing it, and only the call fails extension_import_failed", async () => {
@@ -429,8 +430,10 @@ test("#given the caller creates a child with thread_create #when it opens a thre
 test("#given a store at the previous schema version with data #when it opens #then it migrates to the new tables and keeps every existing row", async () => {
   const agentDir = tempDir("extension-tools-migrate-")
   const path = gatewayDatabasePath(agentDir)
-  // Back to the store before v10 (toolkit_replay_receipts) and v11 (deliveries.wait_kind): both re-run on open.
-  const previous = GATEWAY_MIGRATIONS.length - 2
+  // Back to the store before v10 (toolkit_replay_receipts), v11 (deliveries.wait_kind), v12 (the intake columns), v13
+  // (woken_sessions), v14 (the wake state tables; v13 and v14 are idempotent so their tables can stay) and v15 (the
+  // deliveries rebuild): all re-run. Pinned, not counted from the end, because later migrations append.
+  const previous = 9
   {
     const seed = storeAt(agentDir)
     await seed.identity()
@@ -442,6 +445,11 @@ test("#given a store at the previous schema version with data #when it opens #th
     db.exec("DROP TABLE IF EXISTS toolkit_replay_receipts;")
     db.exec("DELETE FROM extension_objects WHERE name = 'toolkit_replay_receipts'")
     db.exec("ALTER TABLE deliveries DROP COLUMN wait_kind")
+    db.exec("DROP INDEX deliveries_ledger")
+    db.exec("DELETE FROM extension_objects WHERE name = 'deliveries_ledger'")
+    db.exec("ALTER TABLE deliveries DROP COLUMN ledger_id")
+    db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_text")
+    db.exec("ALTER TABLE deliveries DROP COLUMN verbatim_display_text")
     db.exec(`PRAGMA user_version = ${previous}`)
     db.query("INSERT INTO gateway_meta (key, value) VALUES ('fixture-keep', 'kept')").run()
   } finally {

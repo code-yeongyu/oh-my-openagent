@@ -1,6 +1,6 @@
 import { DesktopService } from "@oh-my-opencode/senpi-desktop-service"
 // The desktop-service package's scripted engine: a real NDJSON JSON-RPC child, observed on the wire.
-import { fakeEngineFactory, type SpawnLog } from "../../senpi-desktop-service/test/harness"
+import { fakeEngineFactory, type SpawnLog } from "@oh-my-opencode/senpi-desktop-service/testing"
 import { ComputerHandle, type ComputerService } from "../src/activation"
 import type { ComputerHostContext, ComputerModel } from "../src/session"
 import { type ComputerSettingsInput, resolveComputerSettings } from "../src/settings"

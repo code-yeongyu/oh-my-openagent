@@ -15,6 +15,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -53,7 +54,7 @@ class HeldPrimaryStart implements ManagedRunner {
 }
 
 function managerOver(runner: ManagedRunner, project: string) {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const manager = createTaskManager({
     store,
     runners: { "in-process": runner, process: runner },
@@ -107,7 +108,7 @@ describe("a stop that lands while a primary start is in flight", () => {
 describe("a respawned child reattached after its task ended", () => {
   test("#given a running task is cancelled while its respawn is in flight #when the respawned child is reattached #then it is refused and discarded", async () => {
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const running: TaskRecord = {
       task_id: "st_0badf00d",

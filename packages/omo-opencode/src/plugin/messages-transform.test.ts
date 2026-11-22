@@ -392,6 +392,45 @@ describe("createMessagesTransformHandler", () => {
     })
   })
 
+  it("#given an Anthropic Fable history ends with an ordinary assistant tail #when messages transform runs #then it appends the same synthetic user recovery turn as Mythos", async () => {
+    // Fable and Mythos ship as one release pair; both reject assistant prefill.
+    const models = [
+      { providerID: "anthropic", modelID: "claude-mythos-5" },
+      { providerID: "anthropic", modelID: "claude-fable-5" },
+      { providerID: "anthropic", modelID: "claude-fable-5-1" },
+      { providerID: "anthropic", modelID: "claude-fable-5-2" },
+      { providerID: "aws-bedrock-anthropic", modelID: "us.anthropic.claude-fable-5-2" },
+      { providerID: "openrouter", modelID: "anthropic/claude-fable-5.2" },
+    ]
+
+    for (const model of models) {
+      //#given
+      const label = `${model.providerID}/${model.modelID}`
+      const messages: TestMessage[] = [
+        {
+          info: { id: "msg_user_fable", role: "user", sessionID: "ses_fable_prefill", model },
+          parts: [{ type: "text", text: "finish the debugging report" }],
+        },
+        {
+          info: { id: "msg_assistant_fable", role: "assistant", sessionID: "ses_fable_prefill" },
+          parts: [{ type: "text", text: "done" }],
+        },
+      ]
+
+      //#when
+      await runHandler(makeHooks({}), messages)
+
+      //#then
+      expect(messages, label).toHaveLength(3)
+      expect(messages.at(-1)?.info, label).toMatchObject({ role: "user", sessionID: "ses_fable_prefill", model })
+      expect(messages.at(-1)?.parts[0], label).toMatchObject({
+        type: "text",
+        text: "[internal] Continue from the previous assistant state.",
+        synthetic: true,
+      })
+    }
+  })
+
   it("#given rejecting model metadata is only on the assistant tail #when messages transform runs #then it appends a synthetic user recovery turn", async () => {
     //#given
     const messages: TestMessage[] = [

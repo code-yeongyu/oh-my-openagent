@@ -44,6 +44,52 @@
       },
       "additionalProperties": false
     },
+    "session_wake": {
+      "type": "object",
+      "properties": {
+        "same_device": {
+          "type": "boolean"
+        },
+        "wake_limit": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    },
+    "operator_alerts": {
+      "type": "object",
+      "properties": {
+        "error_streak": {
+          "type": "object",
+          "properties": {
+            "threshold": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "realert_minutes": {
+              "type": "number",
+              "minimum": 0
+            },
+            "threads": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "webhook_url_env": {
+              "type": "string",
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "formatOnMutation": {
       "type": "object",
       "properties": {
@@ -2702,6 +2748,36 @@
         "type": "string"
       }
     },
+    "keyword_detector": {
+      "type": "object",
+      "properties": {
+        "enabled_expansions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        },
+        "disabled_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "ultrawork",
+              "team",
+              "hyperplan",
+              "hyperplan-ultrawork"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "exclude_models": {
       "type": "array",
       "items": {
@@ -2749,6 +2825,52 @@
                 ],
                 "additionalProperties": false
               }
+            }
+          },
+          "additionalProperties": false
+        },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -5174,6 +5296,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -5226,6 +5378,52 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -7647,6 +7845,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -7699,6 +7927,52 @@
           },
           "additionalProperties": false
         },
+        "session_wake": {
+          "type": "object",
+          "properties": {
+            "same_device": {
+              "type": "boolean"
+            },
+            "wake_limit": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": false
+        },
+        "operator_alerts": {
+          "type": "object",
+          "properties": {
+            "error_streak": {
+              "type": "object",
+              "properties": {
+                "threshold": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "realert_minutes": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "webhook_url_env": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        },
         "formatOnMutation": {
           "type": "object",
           "properties": {
@@ -10120,6 +10394,36 @@
           "items": {
             "type": "string"
           }
+        },
+        "keyword_detector": {
+          "type": "object",
+          "properties": {
+            "enabled_expansions": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            },
+            "disabled_keywords": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "ultrawork",
+                  "team",
+                  "hyperplan",
+                  "hyperplan-ultrawork"
+                ]
+              }
+            }
+          },
+          "additionalProperties": false
         },
         "exclude_models": {
           "type": "array",
@@ -10174,6 +10478,52 @@
                   ],
                   "additionalProperties": false
                 }
+              }
+            },
+            "additionalProperties": false
+          },
+          "session_wake": {
+            "type": "object",
+            "properties": {
+              "same_device": {
+                "type": "boolean"
+              },
+              "wake_limit": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "additionalProperties": false
+          },
+          "operator_alerts": {
+            "type": "object",
+            "properties": {
+              "error_streak": {
+                "type": "object",
+                "properties": {
+                  "threshold": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 9007199254740991
+                  },
+                  "realert_minutes": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "threads": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "webhook_url_env": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
@@ -12600,6 +12950,36 @@
               "type": "string"
             }
           },
+          "keyword_detector": {
+            "type": "object",
+            "properties": {
+              "enabled_expansions": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              },
+              "disabled_keywords": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "ultrawork",
+                    "team",
+                    "hyperplan",
+                    "hyperplan-ultrawork"
+                  ]
+                }
+              }
+            },
+            "additionalProperties": false
+          },
           "exclude_models": {
             "type": "array",
             "items": {
@@ -12647,6 +13027,52 @@
                       ],
                       "additionalProperties": false
                     }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
                   }
                 },
                 "additionalProperties": false
@@ -15072,6 +15498,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -15124,6 +15580,52 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -17545,6 +18047,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",
@@ -17597,6 +18129,52 @@
                 },
                 "additionalProperties": false
               },
+              "session_wake": {
+                "type": "object",
+                "properties": {
+                  "same_device": {
+                    "type": "boolean"
+                  },
+                  "wake_limit": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "additionalProperties": false
+              },
+              "operator_alerts": {
+                "type": "object",
+                "properties": {
+                  "error_streak": {
+                    "type": "object",
+                    "properties": {
+                      "threshold": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 9007199254740991
+                      },
+                      "realert_minutes": {
+                        "type": "number",
+                        "minimum": 0
+                      },
+                      "threads": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "webhook_url_env": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              },
               "formatOnMutation": {
                 "type": "object",
                 "properties": {
@@ -20018,6 +20596,36 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "keyword_detector": {
+                "type": "object",
+                "properties": {
+                  "enabled_expansions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  },
+                  "disabled_keywords": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "ultrawork",
+                        "team",
+                        "hyperplan",
+                        "hyperplan-ultrawork"
+                      ]
+                    }
+                  }
+                },
+                "additionalProperties": false
               },
               "exclude_models": {
                 "type": "array",

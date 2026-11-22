@@ -22,6 +22,7 @@ import {
   tempStore,
 } from "./__fixtures__/lifecycle-fakes"
 import { NO_HOST_ENDPOINT } from "./host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -619,7 +620,7 @@ describe("reconcileOnSessionStart reattach", () => {
       cwd: "/tmp/project",
       rpcRespawnRunner: respawnRunner,
       trustedRespawnLaunch: createTeamMemberRespawnLaunchResolver({
-        stateDir: { project_dir: store.stateDir },
+        stateDir: ownedTaskState(store.stateDir),
         taskSettings: settings(),
         memberExtension: {
           entryPath: "/trusted/member-extension.js",

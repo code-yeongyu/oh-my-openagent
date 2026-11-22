@@ -15,8 +15,8 @@
 //   --oracle                           imported fixtures unchanged, new cases v3-, ORACLE-DELTAS lines valid
 //   --stubs                            no unimplemented!, todo!(, .skip(, .only( or bare #[ignore] in new sources
 
-import { existsSync, lstatSync, readFileSync } from "node:fs"
-import { dirname, join, posix, resolve } from "node:path"
+import { existsSync, lstatSync, readFileSync, readlinkSync } from "node:fs"
+import { dirname, isAbsolute, join, parse, posix, resolve, sep } from "node:path"
 
 import nameMap from "./computer-v3-name-map.json"
 
@@ -158,6 +158,65 @@ function readInput(absolute: string, label: string): string | undefined {
 
 const readText = (cwd: string, path: string): string | undefined => readInput(join(cwd, path), path)
 
+/** A removal path's own entry: there, absent, or not checkable (the lstat error code). */
+type EntryState =
+  { readonly kind: "present" } | { readonly kind: "absent" } | { readonly kind: "unreadable"; readonly code: string }
+
+/**
+ * Whether a path's own entry exists (lstat: an empty directory or a dangling symlink counts). A parent component that is
+ * a file means the path cannot exist (ENOTDIR); any other failure (no permission, a symlink loop) is reported as
+ * unreadable, so one bad path never ends the run and every one of them is named.
+ */
+const pathKey = (value: string): string => (process.platform === "win32" ? value.toLowerCase() : value)
+
+// Windows lstat of a path under a symlink cycle returns ENOENT or ENOTDIR instead of ELOOP, and
+// throwIfNoEntry then reports the path as absent. A cycle is not absence: the entry cannot be checked.
+function symlinkLoop(absolute: string): boolean {
+  const normalized = resolve(absolute)
+  const { root } = parse(normalized)
+  const rest = normalized
+    .slice(root.length)
+    .split(sep)
+    .filter((part) => part !== "")
+  let current = root
+  const seen = new Set<string>()
+  for (const part of rest) {
+    current = current.endsWith(sep) ? `${current}${part}` : join(current, part)
+    let stat: ReturnType<typeof lstatSync> | undefined
+    try {
+      stat = lstatSync(current, { throwIfNoEntry: false })
+    } catch {
+      return false
+    }
+    if (stat === undefined) return false
+    if (!stat.isSymbolicLink()) continue
+    let target: string
+    try {
+      target = readlinkSync(current)
+    } catch {
+      return false
+    }
+    const here = pathKey(current)
+    const there = pathKey(resolve(dirname(current), target))
+    if (there === here || seen.has(there)) return true
+    seen.add(here)
+  }
+  return false
+}
+
+function entryState(absolute: string): EntryState {
+  try {
+    if (lstatSync(absolute, { throwIfNoEntry: false }) !== undefined) return { kind: "present" }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code
+    if (code === "ENOTDIR" && !symlinkLoop(absolute)) return { kind: "absent" }
+    if (symlinkLoop(absolute)) return { kind: "unreadable", code: "ELOOP" }
+    return { kind: "unreadable", code: code ?? String(error) }
+  }
+  if (symlinkLoop(absolute)) return { kind: "unreadable", code: "ELOOP" }
+  return { kind: "absent" }
+}
+
 // ---------------------------------------------------------------------------------------------------------
 // --residue, --no-legacy-edge, --copy, --old-frozen, --stubs
 
@@ -165,10 +224,15 @@ function residue(git: Git, cwd: string): string[] {
   const findings = grepOldName(git, ["."]).map((line) => `residue: ${line}`)
   // Absent means absent on disk: an empty directory, one holding only ignored files, or a dangling symlink is still
   // there. lstat sees the entry itself; existsSync follows a symlink and calls a dangling one absent.
-  const remaining = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].filter(
-    (path) => lstatSync(join(cwd, path), { throwIfNoEntry: false }) !== undefined,
-  )
+  const states = [...nameMap.removal.classA, ...nameMap.removal.classB.map((entry) => entry.path)].map((path) => ({
+    path,
+    state: entryState(join(cwd, path)),
+  }))
+  const remaining = states.filter(({ state }) => state.kind === "present").map(({ path }) => path)
   findings.push(...remaining.map((path) => `residue: ${path} still exists`))
+  // An entry that cannot be checked fails the run closed, and every such path is named, beside the other findings.
+  for (const { path, state } of states)
+    if (state.kind === "unreadable") findings.push(`residue: ${path} cannot be checked (${state.code})`)
   // Path names: every tracked file and every untracked one on disk, ignored included; a remaining removal path is reported once above.
   const oldName = new RegExp(nameMap.oldNamePattern, "i")
   const isRemaining = (path: string): boolean => remaining.some((root) => path === root || path.startsWith(`${root}/`))
@@ -367,6 +431,36 @@ function blockerEdits(planFile: string, row: string): Set<string> {
   return listed
 }
 
+/**
+ * SCOPE-ADDENDA.tsv beside the plan (the plan is never edited): `row<TAB>path<TAB>ruling` admits EXACTLY that path
+ * for EXACTLY that row. A path with a glob or brace character, a trailing `/`, a `..` segment or an absolute path,
+ * or a line without three cells, is a finding.
+ */
+function addenda(planFile: string, row: string): { readonly admitted: Set<string>; readonly problems: string[] } {
+  const name = nameMap.scope.addenda
+  const content = readInput(join(dirname(planFile), name), `scope addenda ${name}`)
+  const admitted = new Set<string>()
+  const problems: string[] = []
+  if (content === undefined) return { admitted, problems }
+  content.split("\n").forEach((line, index) => {
+    if (line.trim().length === 0 || line.startsWith("#")) return
+    const cells = line.split("\t")
+    const [lineRow = "", path = "", ruling = ""] = cells
+    const exact =
+      path.length > 0 &&
+      !/[\s*?[{]/.test(path) &&
+      !path.endsWith("/") &&
+      !isAbsolute(path) &&
+      !path.split(/[\\/]/).includes("..")
+    if (cells.length !== 3 || !/^\d+$/.test(lineRow) || !exact || ruling.trim().length === 0)
+      problems.push(
+        `scope: ${name} line ${index + 1} is malformed (expected <row><TAB><exact file path><TAB><ruling>; no glob, no directory)`,
+      )
+    else if (lineRow === row) admitted.add(path)
+  })
+  return { admitted, problems }
+}
+
 function scope(git: Git, row: string, ref: string, planFile: string): string[] {
   const text = readInput(planFile, `plan file ${planFile}`)
   if (text === undefined) throw new GuardInputError(`plan file ${planFile} does not exist`)
@@ -374,18 +468,20 @@ function scope(git: Git, row: string, ref: string, planFile: string): string[] {
   const own = planRow(lines, row)
   const blockers = transitiveBlockers(lines, row)
   const listed = blockerEdits(planFile, row)
+  const { admitted, problems } = addenda(planFile, row)
   const { sharedAppend, sharedAppendNewFilesOnly, generated, driverEntryFiles } = nameMap.scope
   const isOwn = matcher([...own.scope, ...sharedAppend, ...unitFiles(own.scope), ...generated])
   const isNewFileRule = matcher(sharedAppendNewFilesOnly)
   const isBlockerOwned = matcher([...blockers.values()].flatMap(({ scope: patterns }) => patterns))
   const isDriverEntry = matcher(driverEntryFiles)
-  return changedPaths(git, ref)
+  const outside = changedPaths(git, ref)
     .filter(({ status, path }) => {
-      if (isOwn(path) || (status === "A" && isNewFileRule(path))) return false
+      if (isOwn(path) || admitted.has(path) || (status === "A" && isNewFileRule(path))) return false
       // A listed blocker path never admits a QA driver entry file or an existing scenario or v3- case (they are only ever added).
       return !(listed.has(path) && isBlockerOwned(path) && !isDriverEntry(path) && !isNewFileRule(path))
     })
     .map(({ path }) => `scope: ${path} is outside row ${row}'s write scope`)
+  return [...problems, ...outside]
 }
 
 // ---------------------------------------------------------------------------------------------------------

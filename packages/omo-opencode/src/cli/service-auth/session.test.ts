@@ -8,7 +8,7 @@ import {
 } from "./keystore"
 import type { Credentials } from "./protocol"
 import { createSession, SessionEnded } from "./session"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "./test-support"
+import { fakeApi, grant, memorySecrets, noOwnDevice, privateKeys, refusal, temporaryHome } from "./test-support"
 
 const NOW = Date.parse("2030-01-01T00:00:00Z")
 const captured: Credentials = { ...grant, ...privateKeys, accountId: "account-a", credentialGeneration: "generation-a" }
@@ -26,7 +26,7 @@ async function tokenHarness(snapshot: Credentials, authoritative = snapshot) {
     bodies.push(await request.json())
     return Response.json({ ...grant, accessToken: "refreshed-access" })
   })
-  const api = fakeApi(refresh)
+  const api = fakeApi((request) => noOwnDevice(request) ?? refresh(request))
   const store = {
     read: mock(async () => snapshot),
     readAuthoritative: mock(async () => current),
@@ -115,7 +115,7 @@ describe("credential lifecycle", () => {
     const error = await session.accessToken(sameIdentity).catch((error) => error)
     expect(error).toBeInstanceOf(InvalidCredentialState)
     expect(error.message).toBe(
-      "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again in the desktop app.",
+      "The OmO sign-in saved on this computer can't be read. Run omo account forget to remove it, then sign in again from the OmO desktop app on this computer, or with omo login in a terminal.",
     )
     expect(lock).not.toHaveBeenCalled()
   })
@@ -162,6 +162,8 @@ describe("credential lifecycle", () => {
     const permit = Promise.withResolvers<void>()
     let refreshes = 0
     const api = fakeApi(async (request) => {
+      const listed = noOwnDevice(request)
+      if (listed !== undefined) return listed
       expect(new URL(request.url).pathname).toBe("/v1/session/refresh")
       expect(await request.json()).toEqual({ refreshToken: grant.refreshToken })
       refreshes++
