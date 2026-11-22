@@ -15,6 +15,35 @@ select_green_push() {
   '
 }
 
+# The stamp inherits these validation steps, not their summary/status jobs.
+# Keep the contract in this file: publish may source it alone from the dispatch SHA.
+release_validation_contract() {
+  cat <<'JSON'
+{
+  "typecheck": ["Type check", "Lint", "Lint ratchet", "Dead-code check (knip)"],
+  "test-linux (omo-opencode)": ["Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine"],
+  "test-linux (memory-core)": ["Run memory-core tests in a PID namespace"],
+  "test-linux (remainder-1)": ["Run the first remainder half"],
+  "test-linux (remainder-2)": ["Run the second remainder half"],
+  "test (ubuntu-latest, 1/2)": ["Verify root shard coverage"],
+  "test (ubuntu-latest, 2/2)": ["Verify root shard coverage"],
+  "test (windows-latest, 1/2)": ["Run vendored lsp-daemon tests", "Run tests with Windows telemetry"],
+  "test (windows-latest, 2/2)": ["Run tests"],
+  "macos-combined": ["Run vendored lsp-daemon tests", "Run root test shard 1", "Run root test shard 2 heavy", "Run root test shard 2 light", "Run Codex platform smoke", "Run Senpi compatibility tests"],
+  "codex-compatibility (ubuntu-latest, full)": ["Run full Codex compatibility suite", "Run omo-codex component checks and tests"],
+  "codex-compatibility (windows-latest, platform)": ["Build Codex platform smoke prerequisites", "Run Codex platform smoke tests (.mjs via node --test)", "Run Codex platform smoke tests (.ts via bun test)"],
+  "senpi-compatibility (windows-latest)": ["Run Senpi compatibility tests with Windows telemetry"],
+  "senpi-tests-linux (one)": ["Run Senpi compatibility tests"],
+  "senpi-tests-linux (two)": ["Run Senpi compatibility tests"],
+  "senpi-compatibility (ubuntu-latest)": ["Verify Senpi shard coverage"],
+  "senpi-bundle-check": ["Verify committed Senpi plugin bundle is current"],
+  "senpi-eq": ["Run omo fused-path equivalence (EQ.omo E21-E24)"],
+  "build": ["Build", "Verify build output", "Verify generated schema artifacts are committed", "Verify dist bundle tests"],
+  "omo-ai-payload-check": ["Verify omo-ai payload", "Verify packed omo-ai consumer", "Dry-run publish"]
+}
+JSON
+}
+
 require_push_validation() {
   local repo="$1" run="$2" id attempt jobs missing
   IFS=$'\t' read -r id attempt <<< "$run"
@@ -29,19 +58,10 @@ require_push_validation() {
 
   # Like platform-jobs.jq, look through job success to the actual work.
   # Use named validation steps: setup and status-only jobs do not test anything.
-  missing="$(jq -rs '
+  missing="$(jq -rs --argjson contract "$(release_validation_contract)" '
     if length != 1 or (.[0] | type) != "array" then error("expected paginated CI jobs") else .[0] end
     | [.[].jobs[]] as $jobs
-    | {
-        "typecheck": ["Type check", "Lint", "Lint ratchet", "Dead-code check (knip)"],
-        "test-linux (omo-opencode)": ["Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine"],
-        "test-linux (memory-core)": ["Run memory-core tests in a PID namespace"],
-        "test-linux (remainder-1)": ["Run the first remainder half"],
-        "test-linux (remainder-2)": ["Run the second remainder half"],
-        "test (windows-latest, 1/2)": ["Run vendored lsp-daemon tests", "Run tests with Windows telemetry"],
-        "test (windows-latest, 2/2)": ["Run tests"],
-        "macos-combined": ["Run vendored lsp-daemon tests", "Run root test shard 1", "Run root test shard 2 heavy", "Run root test shard 2 light"]
-      }
+    | $contract
     | to_entries[] as $required
     | select(any($jobs[];
         .name == $required.key and .status == "completed" and .conclusion == "success"

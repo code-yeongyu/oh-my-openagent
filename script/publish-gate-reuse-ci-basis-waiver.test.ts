@@ -184,14 +184,19 @@ function dispatch(input: Dispatch): Outcome {
 const RECEIPT = "ci-basis-20261116-01"
 
 describe("#given a pinned release", () => {
-  test.each(["skipped-job", "skipped-step", "empty-response", "passed"] as const)(
-    "the parent requires validation evidence (%s) even if the pin push is green",
-    (validation) => {
-      const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
-      expect(result.status === 0, result.output).toBe(validation === "passed")
-      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
-    },
-  )
+  test.each([
+    "skipped-job",
+    "skipped-step",
+    "empty-response",
+    "missing-codex",
+    "skipped-senpi",
+    "skipped-macos-codex",
+    "passed",
+  ] as const)("the parent requires validation evidence (%s) even if the pin push is green", (validation) => {
+    const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
+    expect(result.status === 0, result.output).toBe(validation === "passed")
+    expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+  })
 
   test.each(["skipped-job", "skipped-step", "passed"] as const)(
     "the child requires independent validation evidence (%s) for an exact non-stamp push",
