@@ -1,5 +1,5 @@
 import { describe, expect, onTestFinished, test } from "bun:test"
-import { chmodSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, writeFileSync } from "node:fs"
 import { execFileSync } from "node:child_process"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -59,7 +59,6 @@ describe("memoryGitEnvironment (#12354)", () => {
     expect(env).toEqual({
       PATH: "/usr/bin",
       HOME: "/home/m",
-      GIT_INDEX_FILE: "/scratch/index",
       GIT_CONFIG_GLOBAL: "/home/m/.gitconfig",
       GIT_CONFIG_NOSYSTEM: "1",
       GIT_TERMINAL_PROMPT: "0",
@@ -325,5 +324,83 @@ describe("memoryGitEnvironment (#12354)", () => {
     expect(result.code).toBe(0)
     // git prints forward slashes on Windows; resolve() normalizes both sides to the platform separator.
     expect(resolve(result.stdout.trim())).toBe(resolve(join(memory, ".git")))
+  })
+})
+
+// #12368: an engine started from a git hook (or a test run from one) inherits that hook's GIT_INDEX_FILE.
+describe("memory git index isolation (#12368)", () => {
+  test("#given an inherited GIT_INDEX_FILE naming another index #when memory git stages a file #then the memory repository's own index takes it and the other index is untouched", async () => {
+    // #given
+    const root = scratchRoot()
+    const memory = repoWithRefusingHook(root, "memory")
+    const foreignIndex = join(root, "foreign-index")
+    writeFileSync(foreignIndex, "not an index\n")
+    writeFileSync(join(memory, "note.md"), "note\n")
+    const env = { ...process.env, GIT_INDEX_FILE: foreignIndex }
+    const exec = createNodeGitExec()
+
+    // #when
+    const added = await exec.run(["add", "note.md"], { cwd: memory, timeoutMs: TIMEOUT_MS, env })
+    const staged = await exec.run(["diff", "--cached", "--name-only"], { cwd: memory, timeoutMs: TIMEOUT_MS })
+
+    // #then
+    expect(added.code).toBe(0)
+    expect(staged.stdout.trim()).toBe("note.md")
+    expect(readFileSync(foreignIndex, "utf8")).toBe("not an index\n")
+  })
+
+  test("#given an index named through indexFile #when memory git stages a file #then that index takes it and the repository's own index does not", async () => {
+    // #given
+    const root = scratchRoot()
+    const memory = repoWithRefusingHook(root, "memory")
+    const temporaryIndex = join(root, "temporary-index")
+    writeFileSync(join(memory, "note.md"), "note\n")
+    const exec = createNodeGitExec()
+
+    // #when
+    const added = await exec.run(["add", "note.md"], { cwd: memory, timeoutMs: TIMEOUT_MS, indexFile: temporaryIndex })
+    const inTemporary = await exec.run(["ls-files", "--cached"], {
+      cwd: memory,
+      timeoutMs: TIMEOUT_MS,
+      indexFile: temporaryIndex,
+    })
+    const inRepository = await exec.run(["ls-files", "--cached"], { cwd: memory, timeoutMs: TIMEOUT_MS })
+
+    // #then
+    expect(added.code).toBe(0)
+    expect(inTemporary.stdout.trim()).toBe("note.md")
+    expect(inRepository.stdout.trim()).toBe("")
+  })
+
+  test("#given an inherited GIT_INDEX_FILE and an indexFile for this command #when memory git stages a file #then indexFile wins and the inherited index is untouched", async () => {
+    // #given: the shape path-state and sync use, process env plus one command's own index
+    const root = scratchRoot()
+    const memory = repoWithRefusingHook(root, "memory")
+    const foreignIndex = join(root, "foreign-index")
+    const temporaryIndex = join(root, "temporary-index")
+    writeFileSync(foreignIndex, "not an index\n")
+    writeFileSync(join(memory, "note.md"), "note\n")
+    const env = { ...process.env, GIT_INDEX_FILE: foreignIndex }
+    const exec = createNodeGitExec()
+
+    // #when
+    const added = await exec.run(["add", "note.md"], {
+      cwd: memory,
+      timeoutMs: TIMEOUT_MS,
+      env,
+      indexFile: temporaryIndex,
+    })
+    const inTemporary = await exec.run(["ls-files", "--cached"], {
+      cwd: memory,
+      timeoutMs: TIMEOUT_MS,
+      indexFile: temporaryIndex,
+    })
+    const inRepository = await exec.run(["ls-files", "--cached"], { cwd: memory, timeoutMs: TIMEOUT_MS })
+
+    // #then
+    expect(added.code).toBe(0)
+    expect(inTemporary.stdout.trim()).toBe("note.md")
+    expect(inRepository.stdout.trim()).toBe("")
+    expect(readFileSync(foreignIndex, "utf8")).toBe("not an index\n")
   })
 })

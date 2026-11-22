@@ -4,12 +4,15 @@ import { win32 } from "node:path"
 import { GitAbortedError, GitNotFoundError, GitTimeoutError } from "./errors"
 import { memoryGitEnvironment } from "./exec-environment"
 import { holdGitActivityShared } from "./git-activity-lock"
+import { resolveHooksDir } from "./git-dir"
 import { recordGitTimeout } from "./timeout-diagnostics"
 
 export interface GitExecOptions {
   cwd: string
   timeoutMs: number
   env?: NodeJS.ProcessEnv
+  /** The index this one command uses (GIT_INDEX_FILE). Set here, never through env: an index in env is dropped (#12368). */
+  indexFile?: string
   stdin?: string | Buffer
   /** Stops the git process (SIGTERM, so git removes its own lock and temp files) and rejects. */
   signal?: AbortSignal
@@ -250,9 +253,15 @@ export function createNodeGitExec(runtime: NodeGitExecRuntime = {}): GitExec {
 
   return {
     async run(callerArgv, options) {
-      const argv = [...NO_FSMONITOR, ...callerArgv]
+      // A global core.hooksPath silently redirects hook lookup away from the hooks
+      // memory installs, so every commit through this boundary would skip its own
+      // pre-commit, commit-msg and post-commit hooks (#12367). Pin the memory hooks
+      // directory next to NO_FSMONITOR; the value is inert for commands that run no hooks.
+      const argv = [...NO_FSMONITOR, "-c", `core.hooksPath=${resolveHooksDir(options.cwd)}`, ...callerArgv]
       // Never the caller's raw environment: an inherited GIT_CONFIG_* or GIT_DIR would redirect this git (#12354).
-      const environment = memoryGitEnvironment(options.env ?? process.env, platform)
+      const filtered = memoryGitEnvironment(options.env ?? process.env, platform)
+      const environment =
+        options.indexFile === undefined ? filtered : { ...filtered, GIT_INDEX_FILE: options.indexFile }
       try {
         return await runCommand("git", argv, options, environment)
       } catch (error) {

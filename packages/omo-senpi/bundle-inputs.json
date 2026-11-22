@@ -230,6 +230,7 @@
     "packages/memory-core/src/git/exec-environment.ts",
     "packages/memory-core/src/git/exec.ts",
     "packages/memory-core/src/git/git-activity-lock.ts",
+    "packages/memory-core/src/git/git-dir.ts",
     "packages/memory-core/src/git/index.ts",
     "packages/memory-core/src/git/local-filesystem.ts",
     "packages/memory-core/src/git/lock-scans.ts",
