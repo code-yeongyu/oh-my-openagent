@@ -39,9 +39,14 @@ describe("#12314: the OS refuses to start ps", () => {
   test("#given ps cannot be started #when a live claimant is judged #then it counts as live, as any unreadable start time does", async () => {
     const spawn = refuseSpawn()
     try {
-      expect(await isClaimantDead({ pid: process.pid, process_start_time: "epoch:1", instance_id: randomUUID() })).toBe(
-        false,
-      )
+      expect(
+        await isClaimantDead({
+          pid: process.pid,
+          process_start_time: "epoch:1",
+          instance_id: randomUUID(),
+          runtime_instance: null,
+        }),
+      ).toBe(false)
     } finally {
       spawn.mockRestore()
     }
