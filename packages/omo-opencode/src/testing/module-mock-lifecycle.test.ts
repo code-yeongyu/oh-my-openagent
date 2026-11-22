@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, expect, mock, test } from "bun:test"
+import { join } from "node:path"
 import { getCallerUrlFromStack, installModuleMockLifecycle, normalizeStackPath } from "./module-mock-lifecycle"
 
 describe("installModuleMockLifecycle", () => {
@@ -29,6 +30,28 @@ describe("installModuleMockLifecycle", () => {
 
     // then
     expect(callerUrl).toBe("file:///D:/a/oh-my-openagent/oh-my-openagent/src/hooks/example.test.ts")
+  })
+
+  test("#given an extensionless relative specifier #when the default resolver restores it #then the restore names the loaded module file", () => {
+    // given
+    const moduleCalls: string[] = []
+    const mockApi = {
+      module: (specifier: string) => {
+        moduleCalls.push(specifier)
+      },
+      restore: mock(() => {}),
+    }
+    installModuleMockLifecycle(mockApi, {
+      getCallerUrl: () => import.meta.url,
+      loadUnmockedModule: () => ({ ok: true, value: { named: "original" } }),
+    })
+
+    // when
+    mockApi.module("./module-mock-lifecycle", () => ({ named: "mocked" }))
+    mockApi.restore()
+
+    // then
+    expect(moduleCalls).toEqual(["./module-mock-lifecycle", join(import.meta.dir, "module-mock-lifecycle.ts")])
   })
 
   test("restores the original module exports on mock.restore", () => {
@@ -205,8 +228,8 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-a:mock-a",
       "module:./dependency-b:mock-b",
       "delegate:restore",
-      "module:./dependency-a:mock-a",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/first.test.ts:./dependency-a:mock-a",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -236,7 +259,7 @@ describe("installModuleMockLifecycle", () => {
     lifecycle.restoreModuleMocks()
 
     // then
-    expect(events).toEqual(["module:./dependency:mocked", "delegate:restore", "module:./dependency:mocked"])
+    expect(events).toEqual(["module:./dependency:mocked", "delegate:restore", "module:resolved:./dependency:mocked"])
   })
 
   test("#given two test files register module mocks #when one file restores scoped mocks #then the other mock stays active", () => {
@@ -304,7 +327,7 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
@@ -339,8 +362,8 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency:first-mock",
       "module:./dependency:second-mock",
       "delegate:restore",
-      "module:./dependency:first-mock",
-      "module:./dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
+      "module:resolved:./shared-dependency:first-mock",
     ])
   })
 
@@ -404,7 +427,11 @@ describe("installModuleMockLifecycle", () => {
     mockApi.restore()
 
     // then
-    expect(events).toEqual(["module:./dependency-a:mock-a", "delegate:restore", "module:./dependency-a:mock-a"])
+    expect(events).toEqual([
+      "module:./dependency-a:mock-a",
+      "delegate:restore",
+      "module:file:///repo/tests/owner.test.ts:./dependency-a:mock-a",
+    ])
   })
 
   test("#given owner is preserved #when owner calls mock.restore #then the owner mock is cleared", () => {
@@ -473,7 +500,7 @@ describe("installModuleMockLifecycle", () => {
       "module:./dependency-b:mock-b",
       "delegate:restore",
       "module:file:///repo/tests/first.test.ts:./dependency-a:original",
-      "module:./dependency-b:mock-b",
+      "module:file:///repo/tests/second.test.ts:./dependency-b:mock-b",
     ])
   })
 
