@@ -2,19 +2,13 @@
 
 import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
+import * as agentLoader from "../../../features/claude-code-agent-loader"
 import type { ExecutorContext } from "../executor-types"
 import type { DelegateTaskArgs } from "../types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
 
-type ClaudeCodeAgentRecord = Record<
-  string,
-  {
-    description?: string
-    mode?: string
-    model?: string | { providerID: string; modelID: string }
-  }
->
+type ClaudeCodeAgentRecord = ReturnType<typeof agentLoader.loadUserAgents>
 
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
@@ -83,10 +77,8 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
     spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
       () => readProviderModelsCacheMock() !== null,
     )
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 

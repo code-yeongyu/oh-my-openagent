@@ -1081,12 +1081,6 @@
   "packages/omo-opencode/src/tools/delegate-task/unstable-agent-timeout.test.ts": {
     "typescript/no-explicit-any": 1
   },
-  "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-claude-code-agents-toggle.test.ts": {
-    "omo-testing/no-module-mock": 1
-  },
-  "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver.test.ts": {
-    "omo-testing/no-module-mock": 4
-  },
   "packages/omo-opencode/src/tools/hashline-edit/formatter-trigger.test.ts": {
     "typescript/no-non-null-assertion": 4
   },
