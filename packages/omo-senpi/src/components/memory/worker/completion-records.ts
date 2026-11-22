@@ -77,6 +77,8 @@ function isCompletionRecord(value: unknown): value is ReflectionCompletionRecord
         record.origin === "pressure"
       : record.origin === undefined) &&
     typeof record.outcome === "string" &&
+    (record.conflictPaths === undefined ||
+      (Array.isArray(record.conflictPaths) && record.conflictPaths.every((path) => typeof path === "string"))) &&
     typeof record.startedAt === "string" &&
     typeof record.finishedAt === "string" &&
     !!delivery &&

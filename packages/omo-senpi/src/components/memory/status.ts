@@ -1,14 +1,16 @@
 import { readFile } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
+import { truncateToWidth } from "@earendil-works/pi-tui"
 
 import { GitMemoryRepo, readReflectionParkFile } from "@oh-my-opencode/memory-core"
 
 import type { MemoryIdentityContext } from "./context"
 import { shownSyncFailure, type SyncStatusReader } from "./sync-status-surface"
 import {
-  excerptRendererText,
+  ELLIPSIS,
   normalizeRendererText,
   rendererVisibleWidth,
+  stripTerminalControls,
 } from "@oh-my-opencode/senpi-task/renderer-text"
 import { childFailureCause } from "./worker/failure-detail"
 import { readReflectionHealth } from "./worker/health"
@@ -159,14 +161,16 @@ export function formatMemoryStatusLine(identity: string, age: string, segments: 
   return base + sync
 }
 
-/** The last reflection that did not integrate: its outcome, the internal reason code, and the child's own cause. */
+/** The last reflection that did not integrate and the cause the user can act on. */
 export interface MemoryIntegrationFailure {
   readonly outcome: string
   readonly reason?: string
   readonly cause?: string
+  readonly conflictPaths?: readonly string[]
 }
 
 const INTEGRATION_FAILURE_PREFIX = "reflection not integrated: "
+const CONFLICT_PATHS_SHOWN = 3
 
 /**
  * The failure line in at most `width` terminal cells (#12330). The child's cause (a file, a refusal) is what the
@@ -176,7 +180,12 @@ const INTEGRATION_FAILURE_PREFIX = "reflection not integrated: "
 function formatIntegrationFailure(failure: MemoryIntegrationFailure, width: number): string {
   const outcome = normalizeRendererText(failure.outcome)
   const reason = failure.reason === undefined ? undefined : normalizeRendererText(failure.reason)
-  const cause = failure.cause === undefined ? undefined : normalizeRendererText(failure.cause)
+  const cause =
+    failure.conflictPaths === undefined
+      ? failure.cause === undefined
+        ? undefined
+        : normalizeRendererText(failure.cause)
+      : formatConflictPaths(failure.conflictPaths)
   const candidates = [
     reason && cause ? `${outcome} (${reason}: ${cause})` : undefined,
     cause ? `${outcome} (${cause})` : undefined,
@@ -189,7 +198,16 @@ function formatIntegrationFailure(failure: MemoryIntegrationFailure, width: numb
     const line = INTEGRATION_FAILURE_PREFIX + candidate
     if (rendererVisibleWidth(line) <= width) return line
   }
-  return excerptRendererText(INTEGRATION_FAILURE_PREFIX + (cause || outcome), width)
+  return stripTerminalControls(truncateToWidth(INTEGRATION_FAILURE_PREFIX + (cause || outcome), width, ELLIPSIS))
+}
+
+function formatConflictPaths(paths: readonly string[]): string {
+  const shown = paths
+    .slice(0, CONFLICT_PATHS_SHOWN)
+    .map((path) => stripTerminalControls(path, { preserveWhitespace: true }).replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, "�"))
+    .join(", ")
+  const remaining = paths.length - CONFLICT_PATHS_SHOWN
+  return remaining > 0 ? `${shown} (+${remaining} more)` : shown
 }
 
 async function readSyncState(
@@ -253,13 +271,17 @@ async function readReflectionStatus(
     })
     const last = health.integrationFailure
     if (last) {
-      const cause = childFailureCause(last.detail)
+      const cause =
+        last.conflictPaths === undefined && last.detail !== undefined
+          ? childFailureCause(stripTerminalControls(last.detail, { preserveWhitespace: true }))
+          : undefined
       return {
         streak: health.streak,
         integrationFailure: {
           outcome: last.outcome.replaceAll("_", " "),
           ...(last.reason ? { reason: last.reason } : {}),
           ...(cause ? { cause } : {}),
+          ...(last.conflictPaths === undefined ? {} : { conflictPaths: last.conflictPaths }),
         },
       }
     }

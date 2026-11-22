@@ -44,8 +44,8 @@ export async function settleReservationRun(
   if (category === undefined || conversationIds === undefined) {
     throw new Error(`Reflection completion identity unavailable for ${current.runId}`)
   }
-  let launch
-  let park
+  let launch: ReservationRunResult["launch"]
+  let park: ReservationRunResult["park"]
   if (active?.runId === current.runId) {
     const failure = classifyReflectionFailure(decision)
     const transition = await context.reservation.complete(
@@ -79,6 +79,7 @@ export async function settleReservationRun(
       outcome: decision.outcome,
       ...(decision.reason === undefined ? {} : { reason: decision.reason }),
       ...(decision.detail === undefined ? {} : { detail: decision.detail }),
+      ...(decision.conflictPaths === undefined ? {} : { conflictPaths: decision.conflictPaths }),
       startedAt: current.startedAt,
       finishedAt: finalizedAt,
       durationMs: Math.max(0, Date.parse(finalizedAt) - Date.parse(current.startedAt)),

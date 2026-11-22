@@ -45,6 +45,7 @@ export interface DurableFinalizationDecision {
   readonly reason?: string
   readonly detail?: string
   readonly integrationSha?: string
+  readonly conflictPaths?: readonly string[]
   /** The supervisor died before publishing; its child's committed tip was validated and recovered. */
   readonly recoveredFromWorktree?: true
 }

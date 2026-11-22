@@ -162,6 +162,7 @@ export async function resolveFinalizationDecision(
       ? {}
       : { detail: [integrated.detail, droppedNote].filter(Boolean).join("; ") }),
     ...(integrated.integrationSha === undefined ? {} : { integrationSha: integrated.integrationSha }),
+    ...(integrated.conflictPaths === undefined ? {} : { conflictPaths: integrated.conflictPaths }),
     ...budget,
   }
   if (decision.outcome === "merged") await checkpointIntegrated(ledgerPath, decision)
@@ -182,6 +183,7 @@ function decisionFromLedger(ledger: ReservationRunLedger): DurableFinalizationDe
     outcome: ledger.finalizeOutcome,
     ...(ledger.finalizeReason === undefined ? {} : { reason: ledger.finalizeReason }),
     ...(ledger.finalizeDetail === undefined ? {} : { detail: ledger.finalizeDetail }),
+    ...(ledger.finalizeConflictPaths === undefined ? {} : { conflictPaths: ledger.finalizeConflictPaths }),
     ...(ledger.integrationSha === undefined ? {} : { integrationSha: ledger.integrationSha }),
   }
 }
@@ -191,6 +193,7 @@ async function checkpointDecision(path: string, decision: DurableFinalizationDec
     finalizeOutcome: decision.outcome,
     ...(decision.reason === undefined ? {} : { finalizeReason: decision.reason }),
     ...(decision.detail === undefined ? {} : { finalizeDetail: decision.detail }),
+    ...(decision.conflictPaths === undefined ? {} : { finalizeConflictPaths: decision.conflictPaths }),
   })
 }
 

@@ -31,6 +31,7 @@ export interface ReflectionIntegrationResult {
   readonly outcome: "merged" | "parent_dirty" | "merge_conflict" | "failed"
   readonly integrationSha?: string
   readonly detail?: string
+  readonly conflictPaths?: readonly string[]
 }
 
 export type WriterLock = <T>(operation: () => Promise<T>) => Promise<T>
@@ -134,7 +135,10 @@ export async function integrateValidatedReflection(
     }
     if (landedMergeHead === input.validated.tipSha || unmerged.stdout.length > 0) {
       // git prints the conflicting files on stdout, not stderr (#12330 review): read before the abort clears them.
-      return { outcome: "merge_conflict", detail: conflictedPaths(unmerged.stdout) ?? merge.stderr.trim() }
+      const paths = unmerged.stdout.split("\0").filter(Boolean)
+      return paths.length === 0
+        ? { outcome: "merge_conflict", detail: merge.stderr.trim() }
+        : { outcome: "merge_conflict", conflictPaths: paths, detail: summarizeConflictPaths(paths) }
     }
     return { outcome: "failed", detail: merge.stderr.trim() || "Reflection merge failed" }
   })
@@ -142,10 +146,8 @@ export async function integrateValidatedReflection(
 
 const CONFLICT_PATHS_SHOWN = 3
 
-/** The unmerged files, at most three named, so the detail stays one short line the footer can show. */
-function conflictedPaths(stdout: string): string | undefined {
-  const paths = stdout.split("\0").filter(Boolean)
-  if (paths.length === 0) return undefined
+/** Keep the existing text detail for consumers that don't use the typed paths. */
+function summarizeConflictPaths(paths: readonly string[]): string {
   const shown = paths
     .slice(0, CONFLICT_PATHS_SHOWN)
     .map((path) => path.replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, "�"))

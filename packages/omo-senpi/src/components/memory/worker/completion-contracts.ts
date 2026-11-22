@@ -41,6 +41,7 @@ export interface ReflectionCompletionRecord {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly conflictPaths?: readonly string[]
   readonly startedAt: string
   /** Palace Reflection-tab contract: ISO completion timestamp used for newest-first ordering. */
   readonly finishedAt: string

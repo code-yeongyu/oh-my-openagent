@@ -997,7 +997,10 @@ describe("formatMemoryStatusLine integration failure width", () => {
   })
 
   test("#given a failure and a blocked sync #when formatted #then the sync segment is kept and the whole line fits", () => {
-    const text = line({ outcome: "parent dirty", reason: "merge_apply_fail", cause: "충돌 파일: notes.md" }, { syncBlocked: true })
+    const text = line(
+      { outcome: "parent dirty", reason: "merge_apply_fail", cause: "충돌 파일: notes.md" },
+      { syncBlocked: true },
+    )
     expect(text.endsWith(SYNC_BLOCKED_SEGMENT)).toBe(true)
     expect(rendererVisibleWidth(text)).toBeLessThanOrEqual(MEMORY_STATUS_MAX_WIDTH)
   })

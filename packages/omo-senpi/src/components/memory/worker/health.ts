@@ -22,7 +22,7 @@ export interface ReflectionHealth {
   readonly streak: number
   readonly fingerprint: string
   /** Local status context; not part of the RPC lastOutcome contract. */
-  readonly integrationFailure?: Pick<HealthRecord, "outcome" | "reason" | "detail">
+  readonly integrationFailure?: Pick<HealthRecord, "outcome" | "reason" | "detail" | "conflictPaths">
   readonly lastFailure?: {
     readonly runId?: string
     readonly reason: string
@@ -56,6 +56,7 @@ type HealthRecord = {
   readonly outcome: ReflectionOutcome
   readonly reason?: string
   readonly detail?: string
+  readonly conflictPaths?: readonly string[]
   readonly finishedAt: string
   readonly pending: boolean
   readonly launcher?: ReflectionLauncher
@@ -126,6 +127,7 @@ export async function readReflectionHealth(
             outcome: newest.outcome,
             ...(newest.reason && { reason: newest.reason }),
             ...(newest.detail && { detail: newest.detail }),
+            ...(newest.conflictPaths === undefined ? {} : { conflictPaths: newest.conflictPaths }),
           },
         }
       : {}),
@@ -175,11 +177,18 @@ async function readHealthRecord(path: string): Promise<HealthRecord | undefined>
     const parsed: unknown = JSON.parse(await readFile(path, "utf8"))
     if (!isRecord(parsed) || typeof parsed.finishedAt !== "string" || !isOutcome(parsed.outcome)) return undefined
     const delivery = isRecord(parsed.delivery) ? parsed.delivery : undefined
+    const paths: unknown = parsed.conflictPaths
     return {
       ...(typeof parsed.runId === "string" ? { runId: parsed.runId } : {}),
       outcome: parsed.outcome,
       ...(typeof parsed.reason === "string" ? { reason: parsed.reason } : {}),
       ...(typeof parsed.detail === "string" ? { detail: parsed.detail } : {}),
+      ...(parsed.outcome === "merge_conflict" &&
+      Array.isArray(paths) &&
+      paths.length > 0 &&
+      paths.every((path) => typeof path === "string" && path.length > 0)
+        ? { conflictPaths: paths }
+        : {}),
       finishedAt: parsed.finishedAt,
       pending: delivery?.status === "pending",
       ...(isReflectionLauncher(parsed.launcher) ? { launcher: parsed.launcher } : {}),

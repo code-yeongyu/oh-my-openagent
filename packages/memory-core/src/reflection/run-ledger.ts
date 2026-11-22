@@ -51,6 +51,7 @@ export interface ReservationRunLedger {
   readonly finalizeOutcome?: ReflectionOutcome
   readonly finalizeReason?: string
   readonly finalizeDetail?: string
+  readonly finalizeConflictPaths?: readonly string[]
   readonly finalizedAt?: string
   /** Cleanup left a worktree or branch behind; the reflection orphan sweep reclaims it later. */
   readonly cleanupIncomplete?: boolean
@@ -161,12 +162,11 @@ export function parseReservationRunLedger(value: unknown): ReservationRunLedger 
   ] as const) {
     if (value[field] !== undefined && typeof value[field] !== "string") throw new Error(`Invalid ${field}`)
   }
-  if (
-    value.validatedChangedPaths !== undefined &&
-    (!Array.isArray(value.validatedChangedPaths) ||
-      !value.validatedChangedPaths.every((path) => typeof path === "string"))
-  ) {
-    throw new Error("Invalid validated changed paths")
+  for (const field of ["validatedChangedPaths", "finalizeConflictPaths"] as const) {
+    const paths = value[field]
+    if (paths !== undefined && (!Array.isArray(paths) || !paths.every((path) => typeof path === "string"))) {
+      throw new Error(`Invalid ${field}`)
+    }
   }
   if (value.finalizeOutcome !== undefined && !isReflectionOutcome(value.finalizeOutcome)) {
     throw new Error("Invalid finalization outcome")
