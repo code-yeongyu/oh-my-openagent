@@ -187,7 +187,7 @@ const fixtures = [
   {
     id: "libressl-between-blocks",
     text: pem(hex("3000"), "OTHER") + textDump + "\n" + rootPem,
-    expected: { kind: "kept", certificates: [{ der: rootDer, index: 1 }] },
+    expected: { kind: "kept", certificates: [{ der: rootDer, index: 1 }] } as const,
   },
   // Outside a block, BIO_gets can only start a read with "-----" if the line holds "-----"; length alone is inert.
   { id: "long-comment", text: rootPem + `=== ${"x".repeat(600)}\n`, expected: kept },
