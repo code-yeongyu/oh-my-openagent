@@ -5,7 +5,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { runMemoryHook } from "@oh-my-opencode/memory-core/memory-hook"
-import type { RunOutcome } from "./run-artifacts"
+import type { RunChildExit, RunLaunchManifest, RunOutcome } from "./run-artifacts"
 import type { SupervisorChildExit } from "./supervisor-process-identity"
 
 async function runSupervisor(runDir: string): Promise<void> {
@@ -127,20 +127,52 @@ async function runSupervisor(runDir: string): Promise<void> {
   // the child before the supervisor's callback fires, and the cancels above would otherwise
   // erase a deadline that was in fact exceeded.
   const clockNow = readSupervisorClockNow()
+  const deadlineReached = timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt)
+  // Grace SIGKILL can stop the bootstrap after the atomic exit record is published but before
+  // its pipe status is sent. Keep the model's recorded status instead of the bootstrap's signal.
+  const recordedExit =
+    platform === "posix" && deadlineReached && childExit === undefined
+      ? await readRecordedChildExit(runDir, manifest)
+      : undefined
   const finishedAt = new Date().toISOString()
   const outcome: RunOutcome = {
     version: 1,
     runId: manifest.runId,
     attempt: manifest.attempt,
     finishedAt,
-    childExit: childExit ?? wrapperExit,
-    timedOut: timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt),
+    childExit: childExit ?? recordedExit ?? wrapperExit,
+    timedOut: deadlineReached,
   }
   await lease.release()
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
   process.exit(0)
 }
+
+async function readRecordedChildExit(
+  runDir: string,
+  manifest: Pick<RunLaunchManifest, "runId" | "attempt">,
+): Promise<SupervisorChildExit | undefined> {
+  const { CHILD_EXIT_FILENAME, readRunJson } = await import("./run-artifacts")
+  try {
+    const exit = await readRunJson<Partial<RunChildExit> | null>(join(runDir, CHILD_EXIT_FILENAME))
+    if (
+      exit?.version === 1 &&
+      exit.runId === manifest.runId &&
+      exit.attempt === manifest.attempt &&
+      (typeof exit.code === "number" || exit.code === null) &&
+      (typeof exit.signal === "string" || exit.signal === null)
+    ) {
+      return { code: exit.code, signal: exit.signal }
+    }
+  } catch (error) {
+    if (!(error instanceof SyntaxError) && !(error instanceof Error && "code" in error && error.code === "ENOENT")) {
+      throw error
+    }
+  }
+  return undefined
+}
+
 const args = process.argv.slice(2)
 try {
   if (args[0] === "--memory-hook") {

@@ -167,7 +167,11 @@ describe("memory run supervisor IC-8 containment", () => {
 
           // then: await peer closure, not PID disappearance (the orphan may still be a zombie).
           await waitBounded(childExited, 5_000, "SIGTERM-ignoring grandchild socket close")
-          if (enforcer === "supervisor") expect(await exit).toEqual({ code: 0, signal: null })
+          if (enforcer === "supervisor") {
+            expect(await exit).toEqual({ code: 0, signal: null })
+            const outcome = JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))
+            expect(outcome).toMatchObject({ timedOut: true, childExit: { code: 0, signal: null } })
+          }
         } finally {
           if (!socket.destroyed) {
             killFixturePid(pid)
