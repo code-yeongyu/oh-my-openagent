@@ -41,7 +41,7 @@ export function buildGoalRows(goal: PanelGoal | undefined, width: number): reado
   // The objective is the content, not a labelled field, and it is a handle: objectives run to
   // kilobytes, so the row shows the head and a click opens the whole thing.
   rows.push({ text: truncateVisible(goal.objective, width), color: "text", action: { kind: "goal" } })
-  if (goal.tokensUsed > 0) rows.push(field("tokens", compactTokens(goal.tokensUsed), "muted"))
+  if (goal.tokensUsed > 0) rows.push(field("tokens", `${compactTokens(goal.tokensUsed)} excl. cache`, "muted"))
   const budget = goal.tokenBudget
   if (budget !== undefined && budget > 0) {
     const percent = (goal.tokensUsed / budget) * 100
