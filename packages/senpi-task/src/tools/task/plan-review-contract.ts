@@ -36,7 +36,11 @@ export function extractPlanPaths(text: string): readonly string[] {
 export type PlanReviewTarget =
   { readonly kind: "path"; readonly path: string } | { readonly kind: "deny"; readonly message: string }
 
-export function resolvePlanReviewTarget(callerPrompt: string, state: SkillInvocationState, cwd: string): PlanReviewTarget {
+export function resolvePlanReviewTarget(
+  callerPrompt: string,
+  state: SkillInvocationState,
+  cwd: string,
+): PlanReviewTarget {
   const references = state.planArtifactReferences()
   const explicit = extractPlanPaths(callerPrompt)
   if (explicit.length > 1) {
@@ -69,7 +73,12 @@ function resolveExplicitPlan(
   })
   if (recorded !== undefined) return { kind: "path", path: recorded.path }
   const projectPlans = realPath(resolve(cwd, ".omo", "plans"))
-  if (wantedReal !== undefined && projectPlans !== undefined && dirname(wantedReal) === projectPlans && isFile(wantedReal)) {
+  if (
+    wantedReal !== undefined &&
+    projectPlans !== undefined &&
+    dirname(wantedReal) === projectPlans &&
+    isFile(wantedReal)
+  ) {
     return { kind: "path", path: wantedReal }
   }
   const shown = isAbsolute(candidate) ? candidate : `${candidate} (resolved against ${cwd})`

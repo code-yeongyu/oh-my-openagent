@@ -138,7 +138,13 @@ describe("buildTaskExecute plan-review contract explicit path (#10837, #11728)",
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
     // when
-    const result = await execute("c", { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" }, undefined, undefined, { ...CTX, cwd: project })
+    const result = await execute(
+      "c",
+      { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      { ...CTX, cwd: project },
+    )
 
     // then
     expect(specs).toHaveLength(0)
@@ -155,7 +161,13 @@ describe("buildTaskExecute plan-review contract explicit path (#10837, #11728)",
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(makeDeps(manager, { resolveSkillInvocations: resolverFor(OPEN_SESSION) }))
 
-    const result = await execute("c", { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" }, undefined, undefined, { ...CTX, cwd: project })
+    const result = await execute(
+      "c",
+      { prompt: `review ${foreign}`, subagent_type: "plan-reviewer" },
+      undefined,
+      undefined,
+      { ...CTX, cwd: project },
+    )
 
     expect(specs).toHaveLength(0)
     expect(result.details.status).toBe("denied")
@@ -170,12 +182,25 @@ describe("buildTaskExecute plan-review contract explicit path (#10837, #11728)",
     const { specs, manager } = specCapture()
     const execute = buildTaskExecute(
       makeDeps(manager, {
-        resolveSkillInvocations: resolverFor({ requested: ["ulw-plan"], artifact: true, references: refs([[PLAN_A, 5, 2], [recorded, 1, 1]]) }),
+        resolveSkillInvocations: resolverFor({
+          requested: ["ulw-plan"],
+          artifact: true,
+          references: refs([
+            [PLAN_A, 5, 2],
+            [recorded, 1, 1],
+          ]),
+        }),
       }),
     )
 
     // when
-    await execute("c", { prompt: `review ${recorded}`, subagent_type: "plan-reviewer", run_in_background: true }, undefined, undefined, { ...CTX, cwd: project })
+    await execute(
+      "c",
+      { prompt: `review ${recorded}`, subagent_type: "plan-reviewer", run_in_background: true },
+      undefined,
+      undefined,
+      { ...CTX, cwd: project },
+    )
 
     // then
     expect(specs[0]?.prompt).toBe(canonical(recorded))
