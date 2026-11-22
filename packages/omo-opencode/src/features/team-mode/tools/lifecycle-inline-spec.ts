@@ -95,6 +95,6 @@ export function parseInlineTeamSpec(
   }
 
   const parsedSpec = parsedSpecResult.data
-  validateSpec(parsedSpec)
+  validateSpec(parsedSpec, { allowUnknownSubagentTypes: true })
   return parsedSpec
 }
