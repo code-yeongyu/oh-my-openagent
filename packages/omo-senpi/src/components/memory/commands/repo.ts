@@ -30,11 +30,16 @@ export function openRepo(deps: MemoryCommandDeps, identity: MemoryCommandIdentit
 }
 
 /** Raw git for read-only queries GitMemoryRepo does not expose (diff, worktree list). */
-export function runGit(deps: MemoryCommandDeps, dir: string, argv: readonly string[]): Promise<GitExecResult> {
+export function runGit(
+  deps: MemoryCommandDeps,
+  dir: string,
+  argv: readonly string[],
+  timeoutMs = RAW_GIT_TIMEOUT_MS,
+): Promise<GitExecResult> {
   const exec: GitExec = deps.exec ?? createNodeGitExec()
   return exec.run(argv, {
     cwd: dir,
-    timeoutMs: RAW_GIT_TIMEOUT_MS,
+    timeoutMs,
     env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
   })
 }

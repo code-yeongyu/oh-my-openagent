@@ -298,7 +298,7 @@ describe("createMemoryPromptHandler", () => {
     expect(pressureLines[0]).toContain("24002/30000")
   }, 30_000)
 
-  test("#given the estimate's own read fails #when the pressure line is compiled #then the failure surfaces instead of passing for no pressure", async () => {
+  test("#given the estimate's own read fails #when the pressure line is compiled #then memory is omitted rather than reported as under budget", async () => {
     // given - the block compiles from the first listing; only the estimate's own read fails, so this
     // isolates the estimator from the compile path. Answering 0 here would report "no pressure" for a
     // repository whose size is simply unknown, which silences the advisory exactly when it cannot be
@@ -330,9 +330,8 @@ describe("createMemoryPromptHandler", () => {
     )
 
     // when / then
-    await expect(
-      dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0))),
-    ).rejects.toThrow("tree unreadable")
+    const result = await dispatchEvent(pi, beforeAgentStart("BASE PROMPT"), eventContext("session-1", liveBranch(0)))
+    expect(result).toEqual({ systemPrompt: "BASE PROMPT" })
   }, 30_000)
 
   test("#given nudge state at the threshold #when before_agent_start compiles #then the late message carries the behavioral nudge token", async () => {

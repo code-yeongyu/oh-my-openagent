@@ -13,7 +13,7 @@ export const LAZY_MEMORY_COMMANDS = {
   memory: {
     description:
       "View committed memory: HEAD, system bodies, external names, and uncommitted changes; unlock re-checks and removes a stranded git lock.",
-    argumentHint: "[unlock <lock path> [--force]]",
+    argumentHint: "[doctor [--json] | unlock <lock path> [--force]]",
   },
   remember: {
     description: "Persist text to long-term memory via a memory-tool turn.",

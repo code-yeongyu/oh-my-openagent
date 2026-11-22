@@ -1,6 +1,6 @@
 // /doctor — deterministic memory health checks plus the skill frontmatter repair.
 //
-// Checks: repository presence, frontmatter validity sweep, persona presence,
+// Checks: repository presence and integrity, frontmatter validity sweep, persona presence,
 // stale locks, orphaned reflection worktrees, and the compile-warn token
 // advisory. Output is read-only and never enters model context.
 
@@ -14,6 +14,7 @@ import {
   checkFrontmatter,
   checkLocks,
   checkRepository,
+  checkRepositoryIntegrity,
   checkReflectionHealth,
   checkRuntimeSize,
   checkSoulSeed,
@@ -111,6 +112,8 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
   let runtimeSize: RuntimeSizeReport | null = null
 
   if (repository.level === "ok") {
+    const integrity = await checkRepositoryIntegrity(deps, repoDir)
+    checks.push(integrity)
     const settings = deps.loadSettings().settings
     const warnTokens = settings.compile_warn_tokens
     const systemTokens = await estimateSystemTokens(repoDir)
@@ -142,8 +145,14 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
       await checkTokens(repoDir, warnTokens, systemTokens),
       runtime.check,
     )
-    const projection = await checkProjection(repoDir, identity.identity, projectionLimits(settings, identity.identity))
-    if (projection !== undefined) checks.push(projection)
+    if (integrity.level === "ok") {
+      const projection = await checkProjection(
+        repoDir,
+        identity.identity,
+        projectionLimits(settings, identity.identity),
+      )
+      if (projection !== undefined) checks.push(projection)
+    }
     if (audit.issues.length === 0) {
       checks.push({ name: "audit", level: "ok", detail: "no structural issues" })
     } else {
@@ -161,16 +170,18 @@ export async function runDoctor(deps: MemoryCommandDeps, ctx: MemoryCommandConte
     const facts = await checkFacts(deps, identity.identityPaths)
     if (facts !== undefined) checks.push(facts)
 
-    const repaired = await repairMissingSkillNameFrontmatter(repoDir)
-    skills = { scanned: repaired.scanned, repaired: repaired.repaired.length }
-    const report = formatSkillNameFrontmatterRepairReport(repaired)
-    extra.push(
-      `[info] skills: scanned ${repaired.scanned} skill file${repaired.scanned === 1 ? "" : "s"}`,
-      ...report
-        .split("\n")
-        .filter((line) => line.length > 0)
-        .map((line) => `[info] skills: ${line}`),
-    )
+    if (integrity.level !== "fail") {
+      const repaired = await repairMissingSkillNameFrontmatter(repoDir)
+      skills = { scanned: repaired.scanned, repaired: repaired.repaired.length }
+      const report = formatSkillNameFrontmatterRepairReport(repaired)
+      extra.push(
+        `[info] skills: scanned ${repaired.scanned} skill file${repaired.scanned === 1 ? "" : "s"}`,
+        ...report
+          .split("\n")
+          .filter((line) => line.length > 0)
+          .map((line) => `[info] skills: ${line}`),
+      )
+    }
   }
 
   const level = worstLevel(checks)
