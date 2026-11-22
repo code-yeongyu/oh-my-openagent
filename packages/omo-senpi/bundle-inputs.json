@@ -1770,6 +1770,7 @@
     "packages/omo-senpi/src/components/thread/remote/relay-transport.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-ops.ts",
     "packages/omo-senpi/src/components/thread/remote/remote-watch.ts",
+    "packages/omo-senpi/src/components/thread/remote/senpi-projector.ts",
     "packages/omo-senpi/src/components/thread/remote/session-state.ts",
     "packages/omo-senpi/src/components/thread/remote/this-device.ts",
     "packages/omo-senpi/src/components/thread/remote/transcript-tail.ts",

@@ -1,7 +1,6 @@
 import { createLazyRemoteSurface } from "../../remote/port/lazy-remote"
 import type { RemoteSender } from "../../remote/types"
-import type { SessionEntry } from "@code-yeongyu/senpi"
-import type { AliasRegistry, RemoteThreadSurface } from "./ports"
+import type { AliasRegistry, RemoteThreadSurface, SessionProjector } from "./ports"
 
 type SignIn = {
   readonly env: Readonly<Record<string, string | undefined>>
@@ -28,6 +27,8 @@ export function createDefaultRemoteSurface(options: {
   readonly sender: RemoteSender
   readonly log?: (line: string) => void
   readonly permissionPreset?: () => string | undefined
+  /** The engine's own projector (`senpi-projector.ts`), passed in so this module, which the thread SDK also imports, loads no senpi. */
+  readonly loadProjector?: () => Promise<SessionProjector>
 }): RemoteThreadSurface {
   return createLazyRemoteSurface({
     version: options.version,
@@ -40,12 +41,7 @@ export function createDefaultRemoteSurface(options: {
         ...(options.log === undefined ? {} : { log: options.log }),
       }),
     ...(options.permissionPreset === undefined ? {} : { permissionPreset: options.permissionPreset }),
-    // The engine this extension runs in projects the entries a paged thread_read fetched from another device the way that
-    // device's engine answers get_messages; entries are senpi's own session records, as get_entries hands them over.
-    loadProjector: async () => {
-      const { buildSessionProjection } = await import("@code-yeongyu/senpi")
-      return (entries, leafId) => buildSessionProjection(entries as unknown as SessionEntry[], leafId).entries
-    },
+    ...(options.loadProjector === undefined ? {} : { loadProjector: options.loadProjector }),
   })
 }
 
