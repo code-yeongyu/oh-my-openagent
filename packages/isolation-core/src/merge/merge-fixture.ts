@@ -14,18 +14,32 @@ export async function setup(nested = false) {
   const baseline = await captureBaseline(f.repoRoot)
   const isolationDir = join(f.root, "child")
   await cp(f.repoRoot, isolationDir, { recursive: true })
-  const options = { ...f, baseline, isolationDir, id: "test", artifactsDir: join(f.root, "artifacts"), apply: true, mode: "patch" as const }
+  const options = {
+    ...f,
+    baseline,
+    isolationDir,
+    id: "test",
+    artifactsDir: join(f.root, "artifacts"),
+    apply: true,
+    mode: "patch" as const,
+  }
   return options
 }
 
 async function signalOrFailure(signal: Promise<void>, merge: Promise<unknown>, name: string) {
-  const ended = merge.then(() => { throw new Error(`${name} merge finished before its lock signal`) })
+  const ended = merge.then(() => {
+    throw new Error(`${name} merge finished before its lock signal`)
+  })
   await Promise.race([signal, ended])
 }
 
 type Gates = { readonly release: PromiseWithResolvers<void>; readonly own: <T>(work: Promise<T>) => Promise<T> }
 
-async function concurrentMerges(mode: "patch" | "branch", firstOverrides: Partial<IsolationMergeOptions>, { release, own }: Gates) {
+async function concurrentMerges(
+  mode: "patch" | "branch",
+  firstOverrides: Partial<IsolationMergeOptions>,
+  { release, own }: Gates,
+) {
   const f = await setup()
   await writeFile(join(f.isolationDir, "one"), "one\n")
   const other = join(f.root, "other")
@@ -34,15 +48,33 @@ async function concurrentMerges(mode: "patch" | "branch", firstOverrides: Partia
   const entered = Promise.withResolvers<void>()
   const queued = Promise.withResolvers<void>()
   const events: string[] = []
-  const first = own(mergeIsolatedChanges({ ...f, mode, ...firstOverrides, lockHook: async event => {
-    events.push(`first:${event}`)
-    if (event === "acquired") { entered.resolve(); await release.promise }
-  } }))
+  const first = own(
+    mergeIsolatedChanges({
+      ...f,
+      mode,
+      ...firstOverrides,
+      lockHook: async (event) => {
+        events.push(`first:${event}`)
+        if (event === "acquired") {
+          entered.resolve()
+          await release.promise
+        }
+      },
+    }),
+  )
   await signalOrFailure(entered.promise, first, "first")
-  const second = own(mergeIsolatedChanges({ ...f, mode, id: "second", isolationDir: other, lockHook: event => {
-    events.push(`second:${event}`)
-    if (event === "waiting") queued.resolve()
-  } }))
+  const second = own(
+    mergeIsolatedChanges({
+      ...f,
+      mode,
+      id: "second",
+      isolationDir: other,
+      lockHook: (event) => {
+        events.push(`second:${event}`)
+        if (event === "waiting") queued.resolve()
+      },
+    }),
+  )
   await signalOrFailure(queued.promise, second, "second")
   return { f, first, second, events }
 }
@@ -58,7 +90,14 @@ export function startConcurrentMerges(mode: "patch" | "branch", firstOverrides: 
   const own = <T>(promise: Promise<T>) => {
     pending++
     work.push(promise)
-    promise.then(() => { pending-- }, () => { pending-- })
+    promise.then(
+      () => {
+        pending--
+      },
+      () => {
+        pending--
+      },
+    )
     return promise
   }
   // Registered before setup() registers the fixture's removal: bun runs onTestFinished callbacks in registration order.

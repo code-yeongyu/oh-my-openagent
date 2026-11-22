@@ -14,10 +14,7 @@ export type FactsRecoveryResult =
   | { readonly outcome: "committed"; readonly sha: string; readonly affectedPaths: readonly string[] }
   | { readonly outcome: "parent_dirty"; readonly detail?: string }
 
-export async function findFactsBatchReceipt(
-  repo: GitMemoryRepo,
-  batchId: string,
-): Promise<MemoryCommit | undefined> {
+export async function findFactsBatchReceipt(repo: GitMemoryRepo, batchId: string): Promise<MemoryCommit | undefined> {
   return (await repo.log()).find((commit) => commit.trailers["Omo-Facts-Batch"] === batchId)
 }
 
@@ -40,21 +37,31 @@ export async function applyFactsRecovery(
       // Publish only after removing old partial writes. A restart then sees either the old
       // envelope's pre-state or the new envelope's pre/post-state, never an unowned third image.
       await agreementInput?.publishRecovery?.(effective)
-      transaction = new FactsMutationTransaction(repo, effective, new Map(effective.paths.map((entry) => [entry.path, entry.pre])))
+      transaction = new FactsMutationTransaction(
+        repo,
+        effective,
+        new Map(effective.paths.map((entry) => [entry.path, entry.pre])),
+      )
     }
     await transaction.applyPostState()
     const result = await repo.commitPrepared(
       effective.paths.map((entry) => entry.path),
-      commitMessage(effective.batchId, recordCount, await strippedHeaderPaths(repo, effective), await evictedAgreementIds(repo, effective)),
+      commitMessage(
+        effective.batchId,
+        recordCount,
+        await strippedHeaderPaths(repo, effective),
+        await evictedAgreementIds(repo, effective),
+      ),
       author,
     )
     return { outcome: "committed", sha: result.sha, affectedPaths: recovery.paths.map((entry) => entry.path) }
   } catch (error) {
     await transaction.rollback()
-    if (error instanceof FactsOwnershipLostError) return {
-      outcome: "parent_dirty",
-      ...(error.recoveryPath === undefined ? {} : { detail: `Foreign entry retained at ${error.recoveryPath}` }),
-    }
+    if (error instanceof FactsOwnershipLostError)
+      return {
+        outcome: "parent_dirty",
+        ...(error.recoveryPath === undefined ? {} : { detail: `Foreign entry retained at ${error.recoveryPath}` }),
+      }
     throw error
   }
 }
@@ -67,7 +74,12 @@ async function evictedAgreementIds(repo: GitMemoryRepo, recovery: FactsApplyReco
   return before.filter((item) => !after.has(item.id)).map((item) => item.id)
 }
 
-function commitMessage(batchId: string, count: number, stripped: readonly string[], evicted: readonly string[]): string {
+function commitMessage(
+  batchId: string,
+  count: number,
+  stripped: readonly string[],
+  evicted: readonly string[],
+): string {
   return [
     `chore(facts): extract ${count} ${count === 1 ? "fact" : "facts"}`,
     "",
@@ -81,7 +93,9 @@ function commitMessage(batchId: string, count: number, stripped: readonly string
 
 // The paths whose legacy user header this batch dropped, compared between the pre-state blob and the written file.
 async function strippedHeaderPaths(repo: GitMemoryRepo, recovery: FactsApplyRecovery): Promise<string[]> {
-  const before = await repo.readBlobs(recovery.paths.flatMap((entry) => (entry.pre.index === null ? [] : [entry.pre.index.oid])))
+  const before = await repo.readBlobs(
+    recovery.paths.flatMap((entry) => (entry.pre.index === null ? [] : [entry.pre.index.oid])),
+  )
   const stripped: string[] = []
   for (const entry of recovery.paths) {
     const prior = entry.pre.index === null ? undefined : before.get(entry.pre.index.oid)

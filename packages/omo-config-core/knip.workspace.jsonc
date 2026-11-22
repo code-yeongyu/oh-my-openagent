@@ -1,0 +1,49 @@
+// knip config owned by this directory, composed by the root knip.ts (script/knip-config.ts).
+{
+  "workspaces": {
+    "packages/omo-config-core": {
+      "includeEntryExports": true,
+      // knip's default entry patterns (an explicit "entry" replaces them), files run by path from package.json scripts or CI
+      // workflows, and the test, config and helper files plugins report with exports unchecked: listing them export-checks
+      // them too (script/knip-entry-exports.test.ts probes every knip entry and fails on one that is missing).
+      "entry": [
+        "{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "src/{index,cli,main}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.{test,spec}.{js,cjs,mjs,jsx,ts,cts,mts,tsx}",
+        "**/*.test-d.ts",
+      ],
+      "ignoreFiles": [
+        // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
+        "src/internal/index.ts",
+      ],
+      "ignoreIssues": {
+        // pre-existing at origin dev 4686e425b5: duplicate export(s) OmoComputerSettingsLayerSchema, OmoComputerSettingsSchema
+        "src/schema/computer.ts": ["duplicates"],
+      },
+    }
+  },
+  "preExistingExports": {
+    // pre-existing at origin dev 4686e425b5: unused export(s) posixJoin
+    "packages/omo-config-core/src/internal/posix-path.ts": ["posixJoin"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) MAX_PRUNE_PASSES
+    "packages/omo-config-core/src/loader/prune-invalid-leaves.ts": ["MAX_PRUNE_PASSES"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) parseDocument
+    "packages/omo-config-core/src/migration/commit.ts": ["parseDocument"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoAgentModelEntrySchema, OmoAgentPermissionSchema
+    "packages/omo-config-core/src/schema/agent.ts": ["OmoAgentModelEntrySchema", "OmoAgentPermissionSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoHarnessIdSchema, OmoOpenCodeHarnessConfigSchema, OmoDisabledSkillsSchema, OmoExcludedModelsSchema
+    "packages/omo-config-core/src/schema/config.ts": ["OmoHarnessIdSchema", "OmoOpenCodeHarnessConfigSchema", "OmoDisabledSkillsSchema", "OmoExcludedModelsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoMemoryReflectionTriggerSchema, OmoMemoryReflectionSchema, OmoMemorySyncSchema, OmoMemorySearchSchema, OmoMemoryRecallEventCapsSchema, OmoMemoryProjectScopeSchema, OmoMemoryProjectScopeLayerSchema, OmoMemoryNudgeSchema, OmoMemoryFactsSchema, OmoMemoryDreamSchema and 18 more
+    "packages/omo-config-core/src/schema/memory.ts": ["OmoMemoryReflectionTriggerSchema", "OmoMemoryReflectionSchema", "OmoMemorySyncSchema", "OmoMemorySearchSchema", "OmoMemoryRecallEventCapsSchema", "OmoMemoryProjectScopeSchema", "OmoMemoryProjectScopeLayerSchema", "OmoMemoryNudgeSchema", "OmoMemoryFactsSchema", "OmoMemoryDreamSchema", "OmoMemoryPeopleSchema", "OmoMemorySoulSchema", "OmoMemoryWriteNoticeSchema", "OmoMemoryReflectionTriggerLayerSchema", "OmoMemoryReflectionLayerSchema", "OmoMemorySyncLayerSchema", "OmoMemorySearchLayerSchema", "OmoMemoryRecallEventCapsLayerSchema", "OmoMemoryNudgeLayerSchema", "OmoMemoryFactsLayerSchema", "OmoMemoryDreamLayerSchema", "OmoMemoryPeopleLayerSchema", "OmoMemorySoulLayerSchema", "OmoMemoryWriteNoticeLayerSchema", "OmoMemoryProjectionSchema", "OmoMemoryProjectionLayerSchema", "OmoMemoryAgentOverridesSchema", "OmoMemoryAutoIdentitySchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoModelCatalogEntrySchema, OmoModelCatalogEntryLayerSchema
+    "packages/omo-config-core/src/schema/model-catalog.ts": ["OmoModelCatalogEntrySchema", "OmoModelCatalogEntryLayerSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) isReasoningLevel
+    "packages/omo-config-core/src/schema/reasoning-vocabulary.ts": ["isReasoningLevel"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoSidePanelSectionsLayerSchema, OmoSidePanelSectionsSchema
+    "packages/omo-config-core/src/schema/side-panel.ts": ["OmoSidePanelSectionsLayerSchema", "OmoSidePanelSectionsSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoTaskWaitSchema, OmoTaskTeamSettingsSchema, OmoTaskWarningsSchema, OmoTaskIsolationSchema, OmoTaskIsolationLayerSchema, OmoTaskDagSettingsSchema, OmoTaskDagSettingsLayerSchema, OmoTaskWaitLayerSchema, OmoTaskTeamSettingsLayerSchema, OmoTaskWarningsLayerSchema
+    "packages/omo-config-core/src/schema/task.ts": ["OmoTaskWaitSchema", "OmoTaskTeamSettingsSchema", "OmoTaskWarningsSchema", "OmoTaskIsolationSchema", "OmoTaskIsolationLayerSchema", "OmoTaskDagSettingsSchema", "OmoTaskDagSettingsLayerSchema", "OmoTaskWaitLayerSchema", "OmoTaskTeamSettingsLayerSchema", "OmoTaskWarningsLayerSchema"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) OmoTeamCategoryMemberSchema, OmoTeamSubagentMemberSchema, OmoTeamMemberSchema, OmoTeamSpecSchema, OmoTeamSpecLayerSchema
+    "packages/omo-config-core/src/schema/team.ts": ["OmoTeamCategoryMemberSchema", "OmoTeamSubagentMemberSchema", "OmoTeamMemberSchema", "OmoTeamSpecSchema", "OmoTeamSpecLayerSchema"]
+  }
+}

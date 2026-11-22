@@ -41,7 +41,7 @@ describe("Codex config Git Bash MCP policy", () => {
     const content = await readFile(configPath, "utf8")
     expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.lsp]')
     expect(content).toContain('[plugins."omo@sisyphuslabs".mcp_servers.git_bash]')
-    expect(content).toContain("[hooks.state.\"omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0\"]")
+    expect(content).toContain('[hooks.state."omo@sisyphuslabs:hooks/hooks.json:post_tool_use:0:0"]')
     expect(content).toMatch(/\[plugins\."omo@sisyphuslabs"\.mcp_servers\.git_bash\][\s\S]*?enabled = true/)
   })
 

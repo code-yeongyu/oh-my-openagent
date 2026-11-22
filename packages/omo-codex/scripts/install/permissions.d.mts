@@ -1,1 +1,1 @@
-export function ensureAutonomousPermissions(config: string): string;
+export function ensureAutonomousPermissions(config: string): string

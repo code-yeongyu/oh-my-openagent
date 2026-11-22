@@ -94,7 +94,7 @@ describe("getCachedVersion (GH-3257)", () => {
         findPackageJson: () => mockState.walkUpResult,
         currentDir: sandboxDir,
         execDir: null,
-      })
+      }),
     ).toBe("3.17.5")
   })
 

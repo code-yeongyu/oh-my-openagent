@@ -8,9 +8,18 @@ import type { ManagedChildHandle } from "./child-handle"
 import type { DagNodeId, DagRunId } from "../dag/types"
 import { createTaskRecordStore } from "../store"
 import type { TaskRecordStore } from "../store"
-import { FakeRunner, baseSpec, categoryPlanner, cleanupProjects, makeManager, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  FakeRunner,
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  makeManager,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner, ManagedStartSpec, SpawnAdmission } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const owner: DagTaskOwner = {
   kind: "dag",
@@ -23,7 +32,9 @@ afterEach(cleanupProjects)
 
 function deferred<T>() {
   let resolve = (_value: T): void => undefined
-  const promise = new Promise<T>((done) => { resolve = done })
+  const promise = new Promise<T>((done) => {
+    resolve = done
+  })
   return { promise, resolve }
 }
 
@@ -31,7 +42,7 @@ describe("TaskManager.startOwned", () => {
   test("#given a new DAG owner #when started #then the initial claim persists the owner before launch", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     let claimedOwner: unknown
     const store: TaskRecordStore = {
       ...inner,
@@ -72,7 +83,7 @@ describe("TaskManager.startOwned", () => {
         return launch.promise
       },
     }
-    const firstStore = createTaskRecordStore({ project_dir: project })
+    const firstStore = createTaskRecordStore(ownedTaskState(project))
     const firstManager = createTaskManager({
       store: firstStore,
       runners: { "in-process": runner, process: runner },
@@ -81,7 +92,7 @@ describe("TaskManager.startOwned", () => {
       cwd: project,
     })
     const secondManager = createTaskManager({
-      store: createTaskRecordStore({ project_dir: project }),
+      store: createTaskRecordStore(ownedTaskState(project)),
       runners: { "in-process": runner, process: runner },
       planner: categoryPlanner(),
       config: settings({ default_concurrency: 5, max_depth: 1 }),
@@ -212,10 +223,11 @@ describe("TaskManager.startOwned", () => {
     const depthResult = await depth.manager.startOwned(baseSpec({ depth: 2 }), owner)
     const residencyResult = await residency.manager.startOwned(baseSpec(), owner)
     const running = await queued.manager.startOwned(baseSpec({ name: "running" }), owner)
-    const pending = await queued.manager.startOwned(
-      baseSpec({ name: "pending" }),
-      { ...owner, nodeId: "node-2" as DagNodeId, fingerprint: "fingerprint-2" },
-    )
+    const pending = await queued.manager.startOwned(baseSpec({ name: "pending" }), {
+      ...owner,
+      nodeId: "node-2" as DagNodeId,
+      fingerprint: "fingerprint-2",
+    })
 
     // then
     expect(depthResult.kind).toBe("depth_denied")

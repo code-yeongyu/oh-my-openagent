@@ -38,7 +38,8 @@ async function downloadAsset(tag: string, name: string, path: string): Promise<v
 }
 
 async function inBatches<T>(items: readonly T[], width: number, run: (item: T) => Promise<void>): Promise<void> {
-  for (let start = 0; start < items.length; start += width) await Promise.all(items.slice(start, start + width).map(run))
+  for (let start = 0; start < items.length; start += width)
+    await Promise.all(items.slice(start, start + width).map(run))
 }
 
 const { values } = parseArgs({
@@ -100,11 +101,14 @@ async function main(): Promise<void> {
     }))
     await withRetry("download SHA256SUMS", () => downloadAsset(tag, "SHA256SUMS", join(work, "SHA256SUMS")))
     const plan = planMirrorAssets(assets, parseSha256Sums(await Bun.file(join(work, "SHA256SUMS")).text()))
-    await inBatches(plan, UPLOAD_CONCURRENCY, (asset) => withRetry(`download ${asset.name}`, () => downloadAsset(tag, asset.name, join(work, asset.name))))
+    await inBatches(plan, UPLOAD_CONCURRENCY, (asset) =>
+      withRetry(`download ${asset.name}`, () => downloadAsset(tag, asset.name, join(work, asset.name))),
+    )
     log(`plan: ${plan.length} assets, ${(plan.reduce((sum, asset) => sum + asset.size, 0) / 1e9).toFixed(2)} GB`)
     for (const asset of plan) {
       const local = await sha256File(join(work, asset.name))
-      if (local !== asset.sha256) throw new MirrorPlanError(`${asset.name}: downloaded sha256 ${local} != published ${asset.sha256}`)
+      if (local !== asset.sha256)
+        throw new MirrorPlanError(`${asset.name}: downloaded sha256 ${local} != published ${asset.sha256}`)
     }
     log(`verified all ${plan.length} downloads against SHA256SUMS and the GitHub digests`)
 
@@ -112,7 +116,10 @@ async function main(): Promise<void> {
       const key = `releases/v${version}/${asset.name}`
       if (await store.exists(key)) {
         const stored = await sha256Object(store, key)
-        if (stored.sha256 !== asset.sha256) throw new MirrorPlanError(`${key} already holds different bytes (${stored.sha256}); refusing to overwrite an immutable object`)
+        if (stored.sha256 !== asset.sha256)
+          throw new MirrorPlanError(
+            `${key} already holds different bytes (${stored.sha256}); refusing to overwrite an immutable object`,
+          )
         log(`kept ${asset.name} (already mirrored, sha256 matches)`)
         return
       }
@@ -134,15 +141,29 @@ async function main(): Promise<void> {
     }
     log(`read back and re-hashed all ${plan.length} objects from R2`)
 
-    const marker = JSON.stringify({ version, assets: Object.fromEntries(plan.map((a) => [a.name, a.sha256])), mirroredAt: new Date().toISOString(), run: process.env.GITHUB_RUN_ID ?? null })
+    const marker = JSON.stringify({
+      version,
+      assets: Object.fromEntries(plan.map((a) => [a.name, a.sha256])),
+      mirroredAt: new Date().toISOString(),
+      run: process.env.GITHUB_RUN_ID ?? null,
+    })
     await store.write(`releases/v${version}/.complete`, marker, "application/json")
     log("wrote completion marker")
 
     if (channel !== "none") {
       const pointerKey = `channels/${channel}`
-      const pointer = await mirrorChannel(store, live, pointerKey, version, dryRun, values["force-channel"] === true, log)
+      const pointer = await mirrorChannel(
+        store,
+        live,
+        pointerKey,
+        version,
+        dryRun,
+        values["force-channel"] === true,
+        log,
+      )
       // What get.omo.dev must serve for this channel after the run, read back from the bucket (moved or kept).
-      if (!dryRun && process.env.GITHUB_OUTPUT && pointer) await appendFile(process.env.GITHUB_OUTPUT, `pointer=${pointer}\n`)
+      if (!dryRun && process.env.GITHUB_OUTPUT && pointer)
+        await appendFile(process.env.GITHUB_OUTPUT, `pointer=${pointer}\n`)
     }
 
     if (!dryRun) {

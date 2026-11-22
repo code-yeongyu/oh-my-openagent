@@ -5,7 +5,12 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
-import { GitMemoryRepo, RecallCorpusCache, selectRecallCandidates, type RecallTermStoreModule } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  RecallCorpusCache,
+  selectRecallCandidates,
+  type RecallTermStoreModule,
+} from "@oh-my-opencode/memory-core"
 import { withRecallTermSavesExcluded } from "@oh-my-opencode/memory-core/recall-store"
 import { rmEfaultTolerant } from "./teardown.test-support"
 

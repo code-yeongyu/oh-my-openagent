@@ -8,7 +8,14 @@ import { createSummaryPublisher } from "./session-summary-publisher"
 import { createLazySummaryRecovery, memoizeLoad, type LoadSummaryRecovery } from "./session-summary-lazy-recovery"
 import { isSessionSampled } from "./session-summary-sampling"
 import { isRecordSendable, type ConsentScope, type SummaryStorage, type WindowRecord } from "./session-summary-storage"
-import { addTurn, newSummaryEpoch, openWindow, type EndedBy, type SummaryTurn, type SummaryWindow } from "./session-summary-window"
+import {
+  addTurn,
+  newSummaryEpoch,
+  openWindow,
+  type EndedBy,
+  type SummaryTurn,
+  type SummaryWindow,
+} from "./session-summary-window"
 
 export type { SummaryTurn } from "./session-summary-window"
 export type { SummaryPublication } from "./session-summary-publisher"
@@ -207,7 +214,8 @@ export function createSessionSummaryRecorder(options: SessionSummaryOptions): Se
     return runSweep()
   }
 
-  const isOwn = (owner: WindowRecord["owner"]) => owner.pid === storage.owner.pid && owner.bootId === storage.owner.bootId
+  const isOwn = (owner: WindowRecord["owner"]) =>
+    owner.pid === storage.owner.pid && owner.bootId === storage.owner.bootId
 
   // Before a session adopts a window another process wrote, the sidecar (owner liveness, claims) must be loaded.
   const loadLivenessFor = (sessionHash: string): Promise<unknown> | undefined => {
@@ -242,7 +250,12 @@ export function createSessionSummaryRecorder(options: SessionSummaryOptions): Se
   const adopt = (sessionHash: string): LiveWindow => {
     const key = storage.windowKey(sessionHash)
     const fresh = (entryKey = key, epoch = newSummaryEpoch(), seq = 0): LiveWindow => ({
-      key: entryKey, epoch, seq, sampleRate: options.sampleRate(), windowId: null, window: null,
+      key: entryKey,
+      epoch,
+      seq,
+      sampleRate: options.sampleRate(),
+      windowId: null,
+      window: null,
     })
     const ownCopy = storage.windowKey(sessionHash, true)
     const stored = storage.readWindow(key)
@@ -253,25 +266,49 @@ export function createSessionSummaryRecorder(options: SessionSummaryOptions): Se
       return fresh()
     }
     if (isOwn(stored.owner)) {
-      return { key, epoch: stored.epoch ?? newSummaryEpoch(), seq: stored.seq, sampleRate: stored.sampleRate, windowId: stored.windowId, window: stored.window }
+      return {
+        key,
+        epoch: stored.epoch ?? newSummaryEpoch(),
+        seq: stored.seq,
+        sampleRate: stored.sampleRate,
+        windowId: stored.windowId,
+        window: stored.window,
+      }
     }
     // Without the sidecar (its load failed, already reported) the owner counts as alive: nothing is claimed.
-    return recovery.runtime()?.adopt({ key, ownCopy, stored, isScopeConsented, fresh, persist: (entry) => persist(sessionHash, entry) }) ?? fresh(ownCopy)
+    return (
+      recovery
+        .runtime()
+        ?.adopt({ key, ownCopy, stored, isScopeConsented, fresh, persist: (entry) => persist(sessionHash, entry) }) ??
+      fresh(ownCopy)
+    )
   }
 
   const close = (sessionHash: string, entry: LiveWindow, endedBy: EndedBy, keepFile: boolean): void => {
     const window = entry.window ?? openWindow(now(), 0)
     const windowId = entry.windowId ?? randomUUID()
     const seq = entry.seq
-    void publisher.publishWindow({
-      consent: "enabled", scope: consentScope(), sessionHash, sessionRole: options.sessionRole, sampleRate: entry.sampleRate, epoch: entry.epoch, seq, windowId, window, endedBy,
-    }, () => {
-      entry.seq = seq + 1
-      entry.window = null
-      entry.windowId = null
-      if (keepFile) persist(sessionHash, entry)
-      else removeWindow(sessionHash, entry.key)
-    })
+    void publisher.publishWindow(
+      {
+        consent: "enabled",
+        scope: consentScope(),
+        sessionHash,
+        sessionRole: options.sessionRole,
+        sampleRate: entry.sampleRate,
+        epoch: entry.epoch,
+        seq,
+        windowId,
+        window,
+        endedBy,
+      },
+      () => {
+        entry.seq = seq + 1
+        entry.window = null
+        entry.windowId = null
+        if (keepFile) persist(sessionHash, entry)
+        else removeWindow(sessionHash, entry.key)
+      },
+    )
   }
 
   return {
@@ -298,7 +335,10 @@ export function createSessionSummaryRecorder(options: SessionSummaryOptions): Se
         entry.sampleRate = options.sampleRate()
       }
       addTurn(entry.window, turn, at)
-      if (entry.window.totals.length >= CHECKPOINT_MAX_TURNS || at - entry.window.startedAt >= CHECKPOINT_MAX_WINDOW_MS) {
+      if (
+        entry.window.totals.length >= CHECKPOINT_MAX_TURNS ||
+        at - entry.window.startedAt >= CHECKPOINT_MAX_WINDOW_MS
+      ) {
         close(sessionHash, entry, "checkpoint", true)
       } else {
         persist(sessionHash, entry)

@@ -8,12 +8,13 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import { createRpcManagedRunner } from "./runner"
 import { categoryPlanner, cleanupProjects, FakeRunner, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const children: ChildProcess[] = []
 
 function createManager() {
   const project = tempProject()
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const processRunner = new RpcProcessRunner({
     modelAdmission: async () => {},
     spawnChild: (descriptor) => {
@@ -66,7 +67,8 @@ describe("RPC terminal outcomes", () => {
     // then
     expect(record.status).toBe("error")
     expect(record.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
-    if (result.kind === "start_failed") expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
+    if (result.kind === "start_failed")
+      expect(result.error_message).toBe("Child prompt failed to start: the prompt was refused (host_refused).")
     expect(rejections).toEqual([])
   })
 

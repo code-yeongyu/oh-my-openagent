@@ -9,63 +9,54 @@
  *   bun run scripts/test-headless-edit-ops.ts [-m <model>] [--provider <provider>]
  */
 
-import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process"
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 // ── CLI arg passthrough ───────────────────────────────────────
-const extraArgs: string[] = [];
-const rawArgs = process.argv.slice(2);
+const extraArgs: string[] = []
+const rawArgs = process.argv.slice(2)
 for (let i = 0; i < rawArgs.length; i++) {
-  const arg = rawArgs[i];
-  if (
-    (arg === "-m" || arg === "--model" || arg === "--provider") &&
-    i + 1 < rawArgs.length
-  ) {
-    extraArgs.push(arg, rawArgs[i + 1]);
-    i++;
+  const arg = rawArgs[i]
+  if ((arg === "-m" || arg === "--model" || arg === "--provider") && i + 1 < rawArgs.length) {
+    extraArgs.push(arg, rawArgs[i + 1])
+    i++
   } else if (arg === "--think" || arg === "--no-translate") {
-    extraArgs.push(arg);
+    extraArgs.push(arg)
   } else if (arg === "--reasoning-mode" && i + 1 < rawArgs.length) {
-    extraArgs.push(arg, rawArgs[i + 1]);
-    i++;
+    extraArgs.push(arg, rawArgs[i + 1])
+    i++
   }
 }
 
 // ── Colors ────────────────────────────────────────────────────
-const BOLD = "\x1b[1m";
-const GREEN = "\x1b[32m";
-const RED = "\x1b[31m";
-const DIM = "\x1b[2m";
-const CYAN = "\x1b[36m";
-const RESET = "\x1b[0m";
+const BOLD = "\x1b[1m"
+const GREEN = "\x1b[32m"
+const RED = "\x1b[31m"
+const DIM = "\x1b[2m"
+const CYAN = "\x1b[36m"
+const RESET = "\x1b[0m"
 
-const pass = (msg: string) => console.log(`  ${GREEN}✓${RESET} ${msg}`);
-const fail = (msg: string) => console.log(`  ${RED}✗${RESET} ${msg}`);
-const info = (msg: string) => console.log(`  ${DIM}${msg}${RESET}`);
+const pass = (msg: string) => console.log(`  ${GREEN}✓${RESET} ${msg}`)
+const fail = (msg: string) => console.log(`  ${RED}✗${RESET} ${msg}`)
+const info = (msg: string) => console.log(`  ${DIM}${msg}${RESET}`)
 
 // ── Test case definition ─────────────────────────────────────
 interface TestCase {
-  fileContent: string;
-  fileName: string;
-  name: string;
-  prompt: string;
-  validate: (content: string) => { passed: boolean; reason: string };
+  fileContent: string
+  fileName: string
+  name: string
+  prompt: string
+  validate: (content: string) => { passed: boolean; reason: string }
 }
 
 const TEST_CASES: TestCase[] = [
   {
     name: "1. Replace single line",
     fileName: "config.txt",
-    fileContent: [
-      "host: localhost",
-      "port: 3000",
-      "debug: false",
-      "timeout: 30",
-      "retries: 3",
-    ].join("\n"),
+    fileContent: ["host: localhost", "port: 3000", "debug: false", "timeout: 30", "retries: 3"].join("\n"),
     prompt: [
       "Follow these steps exactly:",
       "Step 1: Call read_file on config.txt.",
@@ -75,18 +66,18 @@ const TEST_CASES: TestCase[] = [
       "IMPORTANT: pos must be ONLY the anchor (like '2#KB'). lines must be a SEPARATE array field with the new content.",
     ].join(" "),
     validate: (content) => {
-      const has8080 = content.includes("port: 8080");
-      const has3000 = content.includes("port: 3000");
+      const has8080 = content.includes("port: 8080")
+      const has3000 = content.includes("port: 3000")
       if (has8080 && !has3000) {
-        return { passed: true, reason: "port changed to 8080" };
+        return { passed: true, reason: "port changed to 8080" }
       }
       if (has3000) {
-        return { passed: false, reason: "port still 3000 — edit not applied" };
+        return { passed: false, reason: "port still 3000 — edit not applied" }
       }
       return {
         passed: false,
         reason: `unexpected content: ${content.slice(0, 100)}`,
-      };
+      }
     },
   },
   {
@@ -96,31 +87,31 @@ const TEST_CASES: TestCase[] = [
     prompt:
       "Read fruits.txt with read_file. Then use edit_file with op='append' to insert a new line 'grape' after the 'banana' line. Use pos='LINE#HASH' of the banana line and lines=['grape'].",
     validate: (content) => {
-      const lines = content.trim().split("\n");
-      const bananaIdx = lines.findIndex((l) => l.trim() === "banana");
-      const grapeIdx = lines.findIndex((l) => l.trim() === "grape");
+      const lines = content.trim().split("\n")
+      const bananaIdx = lines.findIndex((l) => l.trim() === "banana")
+      const grapeIdx = lines.findIndex((l) => l.trim() === "grape")
       if (grapeIdx === -1) {
-        return { passed: false, reason: '"grape" not found in file' };
+        return { passed: false, reason: '"grape" not found in file' }
       }
       if (bananaIdx === -1) {
-        return { passed: false, reason: '"banana" was removed' };
+        return { passed: false, reason: '"banana" was removed' }
       }
       if (grapeIdx !== bananaIdx + 1) {
         return {
           passed: false,
           reason: `"grape" at line ${grapeIdx + 1} but expected after "banana" at line ${bananaIdx + 1}`,
-        };
+        }
       }
       if (lines.length !== 4) {
         return {
           passed: false,
           reason: `expected 4 lines, got ${lines.length}`,
-        };
+        }
       }
       return {
         passed: true,
         reason: '"grape" correctly appended after "banana"',
-      };
+      }
     },
   },
   {
@@ -130,29 +121,25 @@ const TEST_CASES: TestCase[] = [
     prompt:
       "Read code.txt with read_file. Then use edit_file with op='prepend' to add '// Greeting function' before the function line. Use pos='LINE#HASH' of the function line and lines=['// Greeting function'].",
     validate: (content) => {
-      const lines = content.trim().split("\n");
-      const commentIdx = lines.findIndex(
-        (l) => l.trim().startsWith("//") && l.toLowerCase().includes("greet")
-      );
-      const funcIdx = lines.findIndex((l) =>
-        l.trim().startsWith("function greet")
-      );
+      const lines = content.trim().split("\n")
+      const commentIdx = lines.findIndex((l) => l.trim().startsWith("//") && l.toLowerCase().includes("greet"))
+      const funcIdx = lines.findIndex((l) => l.trim().startsWith("function greet"))
       if (commentIdx === -1) {
-        return { passed: false, reason: "comment line not found" };
+        return { passed: false, reason: "comment line not found" }
       }
       if (funcIdx === -1) {
-        return { passed: false, reason: '"function greet" line was removed' };
+        return { passed: false, reason: '"function greet" line was removed' }
       }
       if (commentIdx !== funcIdx - 1) {
         return {
           passed: false,
           reason: `comment at line ${commentIdx + 1} but function at ${funcIdx + 1} — not directly before`,
-        };
+        }
       }
       return {
         passed: true,
         reason: "comment correctly prepended before function",
-      };
+      }
     },
   },
   {
@@ -178,20 +165,18 @@ const TEST_CASES: TestCase[] = [
       "Do not make any other changes.",
     ].join(" "),
     validate: (content) => {
-      const lines = content.trim().split("\n");
-      const hasResolved = lines.some(
-        (l) => l.trim() === "RESOLVED: issues cleared"
-      );
-      const hasWarn = content.includes("WARN: slow query");
-      const hasError = content.includes("ERROR: timeout");
+      const lines = content.trim().split("\n")
+      const hasResolved = lines.some((l) => l.trim() === "RESOLVED: issues cleared")
+      const hasWarn = content.includes("WARN: slow query")
+      const hasError = content.includes("ERROR: timeout")
       if (!hasResolved) {
         return {
           passed: false,
           reason: '"RESOLVED: issues cleared" not found',
-        };
+        }
       }
       if (hasWarn || hasError) {
-        return { passed: false, reason: "old WARN/ERROR lines still present" };
+        return { passed: false, reason: "old WARN/ERROR lines still present" }
       }
       // Core assertion: 2 old lines removed, 1 new line added = net -1 line
       // Allow slight overshoot from model adding extra content
@@ -199,23 +184,18 @@ const TEST_CASES: TestCase[] = [
         return {
           passed: false,
           reason: `expected ~5 lines, got ${lines.length}`,
-        };
+        }
       }
       return {
         passed: true,
         reason: "range replace succeeded — 2 lines → 1 line",
-      };
+      }
     },
   },
   {
     name: "5. Delete line",
     fileName: "settings.txt",
-    fileContent: [
-      "mode: production",
-      "debug: true",
-      "cache: enabled",
-      "log_level: info",
-    ].join("\n"),
+    fileContent: ["mode: production", "debug: true", "cache: enabled", "log_level: info"].join("\n"),
     prompt: [
       "Follow these steps exactly:",
       "Step 1: Call read_file on settings.txt to see line anchors.",
@@ -225,26 +205,21 @@ const TEST_CASES: TestCase[] = [
       "IMPORTANT: lines must be an empty array [] to delete the line. pos must be ONLY the anchor like '2#SR'.",
     ].join(" "),
     validate: (content) => {
-      const lines = content.trim().split("\n");
-      const hasDebug = content.includes("debug: true");
+      const lines = content.trim().split("\n")
+      const hasDebug = content.includes("debug: true")
       if (hasDebug) {
-        return { passed: false, reason: '"debug: true" still present' };
+        return { passed: false, reason: '"debug: true" still present' }
       }
       if (lines.length !== 3) {
         return {
           passed: false,
           reason: `expected 3 lines, got ${lines.length}`,
-        };
+        }
       }
-      if (
-        !(
-          content.includes("mode: production") &&
-          content.includes("cache: enabled")
-        )
-      ) {
-        return { passed: false, reason: "other lines were removed" };
+      if (!(content.includes("mode: production") && content.includes("cache: enabled"))) {
+        return { passed: false, reason: "other lines were removed" }
       }
-      return { passed: true, reason: '"debug: true" successfully deleted' };
+      return { passed: true, reason: '"debug: true" successfully deleted' }
     },
   },
 
@@ -261,13 +236,13 @@ const TEST_CASES: TestCase[] = [
       "Both edits must be in the SAME edits array in a single edit_file call.",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (!c.includes("crimson")) return { passed: false, reason: "'crimson' not found" };
-      if (!c.includes("navy")) return { passed: false, reason: "'navy' not found" };
-      if (c.includes("red")) return { passed: false, reason: "'red' still present" };
-      if (c.includes("blue")) return { passed: false, reason: "'blue' still present" };
-      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` };
-      return { passed: true, reason: "both lines replaced in single call" };
+      const lines = c.trim().split("\n")
+      if (!c.includes("crimson")) return { passed: false, reason: "'crimson' not found" }
+      if (!c.includes("navy")) return { passed: false, reason: "'navy' not found" }
+      if (c.includes("red")) return { passed: false, reason: "'red' still present" }
+      if (c.includes("blue")) return { passed: false, reason: "'blue' still present" }
+      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` }
+      return { passed: true, reason: "both lines replaced in single call" }
     },
   },
   {
@@ -281,12 +256,12 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='replace', pos=<line2 anchor>, lines=['step 1: init', 'step 2: process', 'step 3: cleanup'].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (c.includes("TODO")) return { passed: false, reason: "TODO line still present" };
-      if (!c.includes("step 1: init")) return { passed: false, reason: "'step 1: init' not found" };
-      if (!c.includes("step 3: cleanup")) return { passed: false, reason: "'step 3: cleanup' not found" };
-      if (lines.length !== 5) return { passed: false, reason: `expected 5 lines, got ${lines.length}` };
-      return { passed: true, reason: "1 line expanded to 3 lines" };
+      const lines = c.trim().split("\n")
+      if (c.includes("TODO")) return { passed: false, reason: "TODO line still present" }
+      if (!c.includes("step 1: init")) return { passed: false, reason: "'step 1: init' not found" }
+      if (!c.includes("step 3: cleanup")) return { passed: false, reason: "'step 3: cleanup' not found" }
+      if (lines.length !== 5) return { passed: false, reason: `expected 5 lines, got ${lines.length}` }
+      return { passed: true, reason: "1 line expanded to 3 lines" }
     },
   },
   {
@@ -299,33 +274,27 @@ const TEST_CASES: TestCase[] = [
       "Use op='append', pos=<last line anchor>, lines=['line three'].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (!c.includes("line three")) return { passed: false, reason: "'line three' not found" };
-      if (lines[lines.length - 1].trim() !== "line three")
-        return { passed: false, reason: "'line three' not at end" };
-      if (lines.length !== 3) return { passed: false, reason: `expected 3 lines, got ${lines.length}` };
-      return { passed: true, reason: "appended at EOF" };
+      const lines = c.trim().split("\n")
+      if (!c.includes("line three")) return { passed: false, reason: "'line three' not found" }
+      if (lines[lines.length - 1].trim() !== "line three") return { passed: false, reason: "'line three' not at end" }
+      if (lines.length !== 3) return { passed: false, reason: `expected 3 lines, got ${lines.length}` }
+      return { passed: true, reason: "appended at EOF" }
     },
   },
   {
     name: "9. Special characters in content",
     fileName: "special.json",
-    fileContent: [
-      '{',
-      '  "name": "old-value",',
-      '  "count": 42',
-      '}',
-    ].join("\n"),
+    fileContent: ["{", '  "name": "old-value",', '  "count": 42', "}"].join("\n"),
     prompt: [
       "Read special.json with read_file.",
       'Replace the line containing \"name\": \"old-value\" with \"name\": \"new-value\".',
       "Use edit_file with op='replace', pos=<that line's anchor>, lines=['  \"name\": \"new-value\",'].",
     ].join(" "),
     validate: (c) => {
-      if (c.includes("old-value")) return { passed: false, reason: "'old-value' still present" };
-      if (!c.includes('"new-value"')) return { passed: false, reason: "'new-value' not found" };
-      if (!c.includes('"count": 42')) return { passed: false, reason: "other content was modified" };
-      return { passed: true, reason: "JSON value replaced with special chars intact" };
+      if (c.includes("old-value")) return { passed: false, reason: "'old-value' still present" }
+      if (!c.includes('"new-value"')) return { passed: false, reason: "'new-value' not found" }
+      if (!c.includes('"count": 42')) return { passed: false, reason: "other content was modified" }
+      return { passed: true, reason: "JSON value replaced with special chars intact" }
     },
   },
   {
@@ -338,11 +307,11 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='replace', pos=<line1 anchor>, lines=['NEW HEADER'].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (c.includes("OLD HEADER")) return { passed: false, reason: "'OLD HEADER' still present" };
-      if (lines[0].trim() !== "NEW HEADER") return { passed: false, reason: "first line is not 'NEW HEADER'" };
-      if (!c.includes("body content")) return { passed: false, reason: "body was modified" };
-      return { passed: true, reason: "first line replaced" };
+      const lines = c.trim().split("\n")
+      if (c.includes("OLD HEADER")) return { passed: false, reason: "'OLD HEADER' still present" }
+      if (lines[0].trim() !== "NEW HEADER") return { passed: false, reason: "first line is not 'NEW HEADER'" }
+      if (!c.includes("body content")) return { passed: false, reason: "body was modified" }
+      return { passed: true, reason: "first line replaced" }
     },
   },
   {
@@ -355,11 +324,11 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='replace', pos=<last line anchor>, lines=['NEW_FOOTER'].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (c.includes("OLD_FOOTER")) return { passed: false, reason: "'OLD_FOOTER' still present" };
+      const lines = c.trim().split("\n")
+      if (c.includes("OLD_FOOTER")) return { passed: false, reason: "'OLD_FOOTER' still present" }
       if (lines[lines.length - 1].trim() !== "NEW_FOOTER")
-        return { passed: false, reason: "last line is not 'NEW_FOOTER'" };
-      return { passed: true, reason: "last line replaced" };
+        return { passed: false, reason: "last line is not 'NEW_FOOTER'" }
+      return { passed: true, reason: "last line replaced" }
     },
   },
   {
@@ -374,13 +343,13 @@ const TEST_CASES: TestCase[] = [
       "  { op: 'replace', pos: <line3 anchor>, lines: ['CCC'] }",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (c.includes("bbb")) return { passed: false, reason: "'bbb' still present" };
-      if (c.includes("ccc")) return { passed: false, reason: "'ccc' still present" };
-      if (!c.includes("BBB")) return { passed: false, reason: "'BBB' not found" };
-      if (!c.includes("CCC")) return { passed: false, reason: "'CCC' not found" };
-      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` };
-      return { passed: true, reason: "two adjacent lines replaced" };
+      const lines = c.trim().split("\n")
+      if (c.includes("bbb")) return { passed: false, reason: "'bbb' still present" }
+      if (c.includes("ccc")) return { passed: false, reason: "'ccc' still present" }
+      if (!c.includes("BBB")) return { passed: false, reason: "'BBB' not found" }
+      if (!c.includes("CCC")) return { passed: false, reason: "'CCC' not found" }
+      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` }
+      return { passed: true, reason: "two adjacent lines replaced" }
     },
   },
   {
@@ -394,13 +363,13 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='prepend', pos=<line1 anchor>, lines=['# Author: test', '# Date: 2025-01-01'].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (!c.includes("# Author: test")) return { passed: false, reason: "author comment not found" };
-      if (!c.includes("# Date: 2025-01-01")) return { passed: false, reason: "date comment not found" };
-      const defIdx = lines.findIndex((l) => l.startsWith("def main"));
-      const authorIdx = lines.findIndex((l) => l.includes("Author"));
-      if (authorIdx >= defIdx) return { passed: false, reason: "comments not before def" };
-      return { passed: true, reason: "2-line block prepended before function" };
+      const lines = c.trim().split("\n")
+      if (!c.includes("# Author: test")) return { passed: false, reason: "author comment not found" }
+      if (!c.includes("# Date: 2025-01-01")) return { passed: false, reason: "date comment not found" }
+      const defIdx = lines.findIndex((l) => l.startsWith("def main"))
+      const authorIdx = lines.findIndex((l) => l.includes("Author"))
+      if (authorIdx >= defIdx) return { passed: false, reason: "comments not before def" }
+      return { passed: true, reason: "2-line block prepended before function" }
     },
   },
   {
@@ -414,12 +383,12 @@ const TEST_CASES: TestCase[] = [
       "An empty lines array deletes the range.",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (c.includes("remove")) return { passed: false, reason: "'remove' lines still present" };
-      if (!c.includes("keep1")) return { passed: false, reason: "'keep1' was deleted" };
-      if (!c.includes("keep2")) return { passed: false, reason: "'keep2' was deleted" };
-      if (lines.length !== 2) return { passed: false, reason: `expected 2 lines, got ${lines.length}` };
-      return { passed: true, reason: "3 consecutive lines deleted via range" };
+      const lines = c.trim().split("\n")
+      if (c.includes("remove")) return { passed: false, reason: "'remove' lines still present" }
+      if (!c.includes("keep1")) return { passed: false, reason: "'keep1' was deleted" }
+      if (!c.includes("keep2")) return { passed: false, reason: "'keep2' was deleted" }
+      if (lines.length !== 2) return { passed: false, reason: `expected 2 lines, got ${lines.length}` }
+      return { passed: true, reason: "3 consecutive lines deleted via range" }
     },
   },
   {
@@ -433,14 +402,14 @@ const TEST_CASES: TestCase[] = [
       "The anchor hash uniquely identifies line 3 even though the content is identical.",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (!c.includes("CHANGED")) return { passed: false, reason: "'CHANGED' not found" };
-      const changedCount = lines.filter((l) => l.trim() === "CHANGED").length;
-      const itemCount = lines.filter((l) => l.trim() === "item").length;
-      if (changedCount !== 1) return { passed: false, reason: `expected 1 CHANGED, got ${changedCount}` };
-      if (itemCount !== 3) return { passed: false, reason: `expected 3 item lines, got ${itemCount}` };
-      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` };
-      return { passed: true, reason: "only line 3 changed among duplicates" };
+      const lines = c.trim().split("\n")
+      if (!c.includes("CHANGED")) return { passed: false, reason: "'CHANGED' not found" }
+      const changedCount = lines.filter((l) => l.trim() === "CHANGED").length
+      const itemCount = lines.filter((l) => l.trim() === "item").length
+      if (changedCount !== 1) return { passed: false, reason: `expected 1 CHANGED, got ${changedCount}` }
+      if (itemCount !== 3) return { passed: false, reason: `expected 3 item lines, got ${itemCount}` }
+      if (lines.length !== 4) return { passed: false, reason: `expected 4 lines, got ${lines.length}` }
+      return { passed: true, reason: "only line 3 changed among duplicates" }
     },
   },
 
@@ -456,22 +425,18 @@ const TEST_CASES: TestCase[] = [
       "The ONLY change is the indentation: 2 spaces → 4 spaces. Content stays the same.",
     ].join(" "),
     validate: (c) => {
-      const lines = c.split("\n");
-      const line2 = lines[1];
-      if (!line2) return { passed: false, reason: "line 2 missing" };
-      if (line2 === "    const x = 1;") return { passed: true, reason: "indentation fixed to 4 spaces" };
-      if (line2 === "  const x = 1;") return { passed: false, reason: "still 2-space indent" };
-      return { passed: false, reason: `unexpected line 2: '${line2}'` };
+      const lines = c.split("\n")
+      const line2 = lines[1]
+      if (!line2) return { passed: false, reason: "line 2 missing" }
+      if (line2 === "    const x = 1;") return { passed: true, reason: "indentation fixed to 4 spaces" }
+      if (line2 === "  const x = 1;") return { passed: false, reason: "still 2-space indent" }
+      return { passed: false, reason: `unexpected line 2: '${line2}'` }
     },
   },
   {
     name: "17. Replace preserving leading whitespace",
     fileName: "preserve.py",
-    fileContent: [
-      "class Foo:",
-      "    def old_method(self):",
-      "        pass",
-    ].join("\n"),
+    fileContent: ["class Foo:", "    def old_method(self):", "        pass"].join("\n"),
     prompt: [
       "Read preserve.py with read_file.",
       "Replace line 2 '    def old_method(self):' with '    def new_method(self):'.",
@@ -479,12 +444,12 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='replace', pos=<line2 anchor>, lines=['    def new_method(self):'].",
     ].join(" "),
     validate: (c) => {
-      if (c.includes("old_method")) return { passed: false, reason: "'old_method' still present" };
-      const lines = c.split("\n");
-      const methodLine = lines.find((l) => l.includes("new_method"));
-      if (!methodLine) return { passed: false, reason: "'new_method' not found" };
-      if (!methodLine.startsWith("    ")) return { passed: false, reason: "indentation lost" };
-      return { passed: true, reason: "method renamed with indentation preserved" };
+      if (c.includes("old_method")) return { passed: false, reason: "'old_method' still present" }
+      const lines = c.split("\n")
+      const methodLine = lines.find((l) => l.includes("new_method"))
+      if (!methodLine) return { passed: false, reason: "'new_method' not found" }
+      if (!methodLine.startsWith("    ")) return { passed: false, reason: "indentation lost" }
+      return { passed: true, reason: "method renamed with indentation preserved" }
     },
   },
   {
@@ -498,15 +463,15 @@ const TEST_CASES: TestCase[] = [
       "lines=[''] inserts one empty line.",
     ].join(" "),
     validate: (c) => {
-      const lines = c.split("\n");
-      const valAIdx = lines.findIndex((l) => l.includes("value-a=1"));
-      const secBIdx = lines.findIndex((l) => l.includes("[section-b]"));
-      if (valAIdx === -1) return { passed: false, reason: "'value-a=1' missing" };
-      if (secBIdx === -1) return { passed: false, reason: "'[section-b]' missing" };
-      if (secBIdx - valAIdx < 2) return { passed: false, reason: "no blank line between sections" };
-      const between = lines[valAIdx + 1];
-      if (between.trim() !== "") return { passed: false, reason: `line between is '${between}', not blank` };
-      return { passed: true, reason: "blank line inserted between sections" };
+      const lines = c.split("\n")
+      const valAIdx = lines.findIndex((l) => l.includes("value-a=1"))
+      const secBIdx = lines.findIndex((l) => l.includes("[section-b]"))
+      if (valAIdx === -1) return { passed: false, reason: "'value-a=1' missing" }
+      if (secBIdx === -1) return { passed: false, reason: "'[section-b]' missing" }
+      if (secBIdx - valAIdx < 2) return { passed: false, reason: "no blank line between sections" }
+      const between = lines[valAIdx + 1]
+      if (between.trim() !== "") return { passed: false, reason: `line between is '${between}', not blank` }
+      return { passed: true, reason: "blank line inserted between sections" }
     },
   },
   {
@@ -518,11 +483,11 @@ const TEST_CASES: TestCase[] = [
       "Delete the empty blank line (line 2). Use edit_file with op='replace', pos=<line2 anchor>, lines=[].",
     ].join(" "),
     validate: (c) => {
-      const lines = c.trim().split("\n");
-      if (lines.length !== 3) return { passed: false, reason: `expected 3 lines, got ${lines.length}` };
-      if (lines[0].trim() !== "first") return { passed: false, reason: "'first' not on line 1" };
-      if (lines[1].trim() !== "second") return { passed: false, reason: "'second' not on line 2" };
-      return { passed: true, reason: "blank line deleted" };
+      const lines = c.trim().split("\n")
+      if (lines.length !== 3) return { passed: false, reason: `expected 3 lines, got ${lines.length}` }
+      if (lines[0].trim() !== "first") return { passed: false, reason: "'first' not on line 1" }
+      if (lines[1].trim() !== "second") return { passed: false, reason: "'second' not on line 2" }
+      return { passed: true, reason: "blank line deleted" }
     },
   },
   {
@@ -535,25 +500,17 @@ const TEST_CASES: TestCase[] = [
       "Expected final line 2 to be 4 spaces followed by indented-with-spaces.",
     ].join(" "),
     validate: (c) => {
-      if (c.includes("\t")) return { passed: false, reason: "tab still present" };
+      if (c.includes("\t")) return { passed: false, reason: "tab still present" }
       if (!c.includes("    indented-with-spaces"))
-        return { passed: false, reason: "'    indented-with-spaces' not found" };
-      if (!c.includes("start")) return { passed: false, reason: "'start' was modified" };
-      return { passed: true, reason: "tab converted to 4 spaces" };
+        return { passed: false, reason: "'    indented-with-spaces' not found" }
+      if (!c.includes("start")) return { passed: false, reason: "'start' was modified" }
+      return { passed: true, reason: "tab converted to 4 spaces" }
     },
   },
   {
     name: "21. Deeply nested indent replacement",
     fileName: "nested.ts",
-    fileContent: [
-      "if (a) {",
-      "  if (b) {",
-      "    if (c) {",
-      "      old_call();",
-      "    }",
-      "  }",
-      "}",
-    ].join("\n"),
+    fileContent: ["if (a) {", "  if (b) {", "    if (c) {", "      old_call();", "    }", "  }", "}"].join("\n"),
     prompt: [
       "Read nested.ts with read_file.",
       "Replace line 4 '      old_call();' with '      new_call();'.",
@@ -561,41 +518,41 @@ const TEST_CASES: TestCase[] = [
       "Use edit_file with op='replace', pos=<line4 anchor>, lines=['      new_call();'].",
     ].join(" "),
     validate: (c) => {
-      if (c.includes("old_call")) return { passed: false, reason: "'old_call' still present" };
-      const lines = c.split("\n");
-      const callLine = lines.find((l) => l.includes("new_call"));
-      if (!callLine) return { passed: false, reason: "'new_call' not found" };
-      const leadingSpaces = callLine.match(/^ */)?.[0].length ?? 0;
-      if (leadingSpaces !== 6) return { passed: false, reason: `expected 6-space indent, got ${leadingSpaces}` };
-      return { passed: true, reason: "deeply nested line replaced with indent preserved" };
+      if (c.includes("old_call")) return { passed: false, reason: "'old_call' still present" }
+      const lines = c.split("\n")
+      const callLine = lines.find((l) => l.includes("new_call"))
+      if (!callLine) return { passed: false, reason: "'new_call' not found" }
+      const leadingSpaces = callLine.match(/^ */)?.[0].length ?? 0
+      if (leadingSpaces !== 6) return { passed: false, reason: `expected 6-space indent, got ${leadingSpaces}` }
+      return { passed: true, reason: "deeply nested line replaced with indent preserved" }
     },
   },
-];
+]
 
 // ── JSONL event types ─────────────────────────────────────────
 interface ToolCallEvent {
-  [key: string]: unknown;
-  tool_call_id: string;
-  tool_input: Record<string, unknown>;
-  tool_name: string;
-  type: "tool_call";
+  [key: string]: unknown
+  tool_call_id: string
+  tool_input: Record<string, unknown>
+  tool_name: string
+  type: "tool_call"
 }
 
 interface ToolResultEvent {
-  [key: string]: unknown;
-  error?: string;
-  output: string;
-  tool_call_id: string;
-  type: "tool_result";
+  [key: string]: unknown
+  error?: string
+  output: string
+  tool_call_id: string
+  type: "tool_result"
 }
 
 interface AnyEvent {
-  type: string;
-  [key: string]: unknown;
+  type: string
+  [key: string]: unknown
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === "object" && value !== null
 }
 
 function isToolCallEvent(event: AnyEvent): event is ToolCallEvent {
@@ -604,7 +561,7 @@ function isToolCallEvent(event: AnyEvent): event is ToolCallEvent {
     typeof event.tool_call_id === "string" &&
     typeof event.tool_name === "string" &&
     isRecord(event.tool_input)
-  );
+  )
 }
 
 function isToolResultEvent(event: AnyEvent): event is ToolResultEvent {
@@ -613,216 +570,201 @@ function isToolResultEvent(event: AnyEvent): event is ToolResultEvent {
     typeof event.tool_call_id === "string" &&
     typeof event.output === "string" &&
     (event.error === undefined || typeof event.error === "string")
-  );
+  )
 }
 
 // ── Run single test case ─────────────────────────────────────
 async function runTestCase(
   tc: TestCase,
-  testDir: string
+  testDir: string,
 ): Promise<{
-  passed: boolean;
-  editCalls: number;
-  editSuccesses: number;
-  duration: number;
+  passed: boolean
+  editCalls: number
+  editSuccesses: number
+  duration: number
 }> {
-  const testFile = join(testDir, tc.fileName);
-  writeFileSync(testFile, tc.fileContent, "utf-8");
+  const testFile = join(testDir, tc.fileName)
+  writeFileSync(testFile, tc.fileContent, "utf-8")
 
-  const currentDirectory = dirname(fileURLToPath(import.meta.url));
-  const headlessScript = resolve(currentDirectory, "headless.ts");
-  const headlessArgs = [
-    "run",
-    headlessScript,
-    "-p",
-    tc.prompt,
-    "--no-translate",
-    ...extraArgs,
-  ];
+  const currentDirectory = dirname(fileURLToPath(import.meta.url))
+  const headlessScript = resolve(currentDirectory, "headless.ts")
+  const headlessArgs = ["run", headlessScript, "-p", tc.prompt, "--no-translate", ...extraArgs]
 
-  const startTime = Date.now();
+  const startTime = Date.now()
 
   const output = await new Promise<string>((res, reject) => {
     const proc = spawn("bun", headlessArgs, {
       cwd: testDir,
       env: { ...process.env, BUN_INSTALL: process.env.BUN_INSTALL },
       stdio: ["ignore", "pipe", "pipe"],
-    });
+    })
 
-    let stdout = "";
-    let stderr = "";
+    let stdout = ""
+    let stderr = ""
 
     proc.stdout.on("data", (chunk: Buffer) => {
-      stdout += chunk.toString();
-    });
+      stdout += chunk.toString()
+    })
     proc.stderr.on("data", (chunk: Buffer) => {
-      stderr += chunk.toString();
-    });
+      stderr += chunk.toString()
+    })
 
     const timeout = setTimeout(
       () => {
-        proc.kill("SIGTERM");
-        reject(new Error("Timed out after 4 minutes"));
+        proc.kill("SIGTERM")
+        reject(new Error("Timed out after 4 minutes"))
       },
-      4 * 60 * 1000
-    );
+      4 * 60 * 1000,
+    )
 
     proc.on("close", (code) => {
-      clearTimeout(timeout);
+      clearTimeout(timeout)
       if (code !== 0) {
-        reject(new Error(`Exit code ${code}\n${stderr.slice(-500)}`));
+        reject(new Error(`Exit code ${code}\n${stderr.slice(-500)}`))
       } else {
-        res(stdout);
+        res(stdout)
       }
-    });
+    })
     proc.on("error", (err) => {
-      clearTimeout(timeout);
-      reject(err);
-    });
-  });
+      clearTimeout(timeout)
+      reject(err)
+    })
+  })
 
-  const duration = Date.now() - startTime;
+  const duration = Date.now() - startTime
 
   // Parse events
-  const events: AnyEvent[] = [];
+  const events: AnyEvent[] = []
   for (const line of output.split("\n").filter((l) => l.trim())) {
     try {
-      events.push(JSON.parse(line) as AnyEvent);
+      events.push(JSON.parse(line) as AnyEvent)
     } catch {
       // skip non-JSON
     }
   }
 
-  const toolCalls = events.filter(isToolCallEvent);
-  const toolResults = events.filter(isToolResultEvent);
+  const toolCalls = events.filter(isToolCallEvent)
+  const toolResults = events.filter(isToolResultEvent)
 
-  const editCalls = toolCalls.filter((e) => e.tool_name === "edit_file");
-  const editCallIds = new Set(editCalls.map((e) => e.tool_call_id));
-  const editResults = toolResults.filter((e) =>
-    editCallIds.has(e.tool_call_id)
-  );
-  const editSuccesses = editResults.filter((e) => !e.error);
+  const editCalls = toolCalls.filter((e) => e.tool_name === "edit_file")
+  const editCallIds = new Set(editCalls.map((e) => e.tool_call_id))
+  const editResults = toolResults.filter((e) => editCallIds.has(e.tool_call_id))
+  const editSuccesses = editResults.filter((e) => !e.error)
 
   // Show blocked calls
-  const editErrors = editResults.filter((e) => e.error);
+  const editErrors = editResults.filter((e) => e.error)
   for (const err of editErrors) {
-    const matchingCall = editCalls.find(
-      (c) => c.tool_call_id === err.tool_call_id
-    );
-    info(`  blocked: ${err.error?.slice(0, 120)}`);
+    const matchingCall = editCalls.find((c) => c.tool_call_id === err.tool_call_id)
+    info(`  blocked: ${err.error?.slice(0, 120)}`)
     if (matchingCall) {
-      info(`  input: ${JSON.stringify(matchingCall.tool_input).slice(0, 200)}`);
+      info(`  input: ${JSON.stringify(matchingCall.tool_input).slice(0, 200)}`)
     }
   }
 
   // Validate file content
-  let finalContent: string;
+  let finalContent: string
   try {
-    finalContent = readFileSync(testFile, "utf-8");
+    finalContent = readFileSync(testFile, "utf-8")
   } catch {
     return {
       passed: false,
       editCalls: editCalls.length,
       editSuccesses: editSuccesses.length,
       duration,
-    };
+    }
   }
 
-  const validation = tc.validate(finalContent);
+  const validation = tc.validate(finalContent)
 
   return {
     passed: validation.passed,
     editCalls: editCalls.length,
     editSuccesses: editSuccesses.length,
     duration,
-  };
+  }
 }
 
 // ── Main ──────────────────────────────────────────────────────
 const main = async () => {
-  console.log(`\n${BOLD}Headless Edit Operations Test — ${TEST_CASES.length} Types${RESET}\n`);
+  console.log(`\n${BOLD}Headless Edit Operations Test — ${TEST_CASES.length} Types${RESET}\n`)
 
-  const testDir = join(tmpdir(), `edit-ops-${Date.now()}`);
-  mkdirSync(testDir, { recursive: true });
-  info(`Test dir: ${testDir}`);
-  console.log();
+  const testDir = join(tmpdir(), `edit-ops-${Date.now()}`)
+  mkdirSync(testDir, { recursive: true })
+  info(`Test dir: ${testDir}`)
+  console.log()
 
-  let totalPassed = 0;
-  const results: { name: string; passed: boolean; detail: string }[] = [];
+  let totalPassed = 0
+  const results: { name: string; passed: boolean; detail: string }[] = []
 
   for (const tc of TEST_CASES) {
-    console.log(`${CYAN}${BOLD}${tc.name}${RESET}`);
-    info(`File: ${tc.fileName}`);
-    info(`Prompt: "${tc.prompt.slice(0, 80)}..."`);
+    console.log(`${CYAN}${BOLD}${tc.name}${RESET}`)
+    info(`File: ${tc.fileName}`)
+    info(`Prompt: "${tc.prompt.slice(0, 80)}..."`)
 
     try {
-      const result = await runTestCase(tc, testDir);
-      const status = result.passed
-        ? `${GREEN}PASS${RESET}`
-        : `${RED}FAIL${RESET}`;
-      const detail = `edit_file: ${result.editSuccesses}/${result.editCalls} succeeded, ${(result.duration / 1000).toFixed(1)}s`;
+      const result = await runTestCase(tc, testDir)
+      const status = result.passed ? `${GREEN}PASS${RESET}` : `${RED}FAIL${RESET}`
+      const detail = `edit_file: ${result.editSuccesses}/${result.editCalls} succeeded, ${(result.duration / 1000).toFixed(1)}s`
 
-      console.log(`  ${status} — ${detail}`);
+      console.log(`  ${status} — ${detail}`)
 
       if (result.passed) {
-        totalPassed++;
+        totalPassed++
         // Validate the file to show reason
-        const content = readFileSync(join(testDir, tc.fileName), "utf-8");
-        const v = tc.validate(content);
-        pass(v.reason);
+        const content = readFileSync(join(testDir, tc.fileName), "utf-8")
+        const v = tc.validate(content)
+        pass(v.reason)
       } else {
-        const content = readFileSync(join(testDir, tc.fileName), "utf-8");
-        const v = tc.validate(content);
-        fail(v.reason);
+        const content = readFileSync(join(testDir, tc.fileName), "utf-8")
+        const v = tc.validate(content)
+        fail(v.reason)
         info(
           `Final content:\n${content
             .split("\n")
             .map((l, i) => `    ${i + 1}: ${l}`)
-            .join("\n")}`
-        );
+            .join("\n")}`,
+        )
       }
 
-      results.push({ name: tc.name, passed: result.passed, detail });
+      results.push({ name: tc.name, passed: result.passed, detail })
     } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      console.log(`  ${RED}ERROR${RESET} — ${msg.slice(0, 200)}`);
-      fail(msg.slice(0, 200));
-      results.push({ name: tc.name, passed: false, detail: msg.slice(0, 100) });
+      const msg = error instanceof Error ? error.message : String(error)
+      console.log(`  ${RED}ERROR${RESET} — ${msg.slice(0, 200)}`)
+      fail(msg.slice(0, 200))
+      results.push({ name: tc.name, passed: false, detail: msg.slice(0, 100) })
     }
 
     // Reset file for next test (in case of side effects)
     try {
-      rmSync(join(testDir, tc.fileName), { force: true });
+      rmSync(join(testDir, tc.fileName), { force: true })
     } catch {}
 
-    console.log();
+    console.log()
   }
 
   // Summary
-  console.log(`${BOLD}━━━ Summary ━━━${RESET}`);
+  console.log(`${BOLD}━━━ Summary ━━━${RESET}`)
   for (const r of results) {
-    const icon = r.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`;
-    console.log(`  ${icon} ${r.name} — ${r.detail}`);
+    const icon = r.passed ? `${GREEN}✓${RESET}` : `${RED}✗${RESET}`
+    console.log(`  ${icon} ${r.name} — ${r.detail}`)
   }
-  console.log();
+  console.log()
   console.log(
-    `${BOLD}Result: ${totalPassed}/${TEST_CASES.length} passed (${Math.round((totalPassed / TEST_CASES.length) * 100)}%)${RESET}`
-  );
+    `${BOLD}Result: ${totalPassed}/${TEST_CASES.length} passed (${Math.round((totalPassed / TEST_CASES.length) * 100)}%)${RESET}`,
+  )
 
   // Cleanup
   try {
-    rmSync(testDir, { recursive: true, force: true });
+    rmSync(testDir, { recursive: true, force: true })
   } catch {}
 
   if (totalPassed === TEST_CASES.length) {
-    console.log(
-      `\n${BOLD}${GREEN}🎉 ALL TESTS PASSED — 100% success rate!${RESET}\n`
-    );
-    process.exit(0);
+    console.log(`\n${BOLD}${GREEN}🎉 ALL TESTS PASSED — 100% success rate!${RESET}\n`)
+    process.exit(0)
   } else {
-    console.log(`\n${BOLD}${RED}Some tests failed.${RESET}\n`);
-    process.exit(1);
+    console.log(`\n${BOLD}${RED}Some tests failed.${RESET}\n`)
+    process.exit(1)
   }
-};
+}
 
-main();
+main()

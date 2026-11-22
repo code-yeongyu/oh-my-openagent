@@ -19,7 +19,12 @@ export function readSkillFileChecked(path: string, provenance: SkillProvenance):
     }
     descriptor = fs.openSync(canonical, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0))
     const opened = fs.fstatSync(descriptor)
-    if (!opened.isFile() || opened.dev !== expected.dev || opened.ino !== expected.ino || fs.lstatSync(canonical).isSymbolicLink()) {
+    if (
+      !opened.isFile() ||
+      opened.dev !== expected.dev ||
+      opened.ino !== expected.ino ||
+      fs.lstatSync(canonical).isSymbolicLink()
+    ) {
       checkSkillPath(path, provenance)
       throw Object.assign(new Error(`ESTALE: skill file changed during read, '${path}'`), { code: "ESTALE", path })
     }
@@ -28,7 +33,9 @@ export function readSkillFileChecked(path: string, provenance: SkillProvenance):
     if (error instanceof SkillLinkBlockedError) throw error
     // An O_NOFOLLOW failure may be a real escape after replacement; ordinary I/O
     // errors keep their original errno instead of becoming a security warning.
-    try { checkSkillPath(path, provenance) } catch (current) {
+    try {
+      checkSkillPath(path, provenance)
+    } catch (current) {
       if (current instanceof SkillLinkBlockedError) throw current
     }
     throw error

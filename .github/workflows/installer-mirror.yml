@@ -40,7 +40,7 @@ on:
         default: none
         options: [none, head, recreate]
       version:
-        description: "recreate only: the X.Y.Z[-pre] version to write into the channel; it must already be fully mirrored and fit the channel (prerelease on beta, stable on latest)"
+        description: "recreate only: the X.Y.Z[-pre] version to write into the channel; it must already be fully mirrored and fit the channel (latest takes only a stable version; beta takes either, since it is never older than latest)"
         type: string
         default: ""
 

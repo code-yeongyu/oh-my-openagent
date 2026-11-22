@@ -74,7 +74,10 @@ export type SummaryStorage = {
   readonly owner: ProcessOwner
   readonly now: () => number
   /** The liveness probes recovery tells a dead owner apart with; absent ones default to the real probes. */
-  readonly probes: { readonly isPidAlive?: (pid: number) => boolean; readonly processStartTime?: (pid: number) => string | null }
+  readonly probes: {
+    readonly isPidAlive?: (pid: number) => boolean
+    readonly processStartTime?: (pid: number) => string | null
+  }
   /** Writes (or refreshes, at most once a minute) this process's owner entry. */
   readonly register: () => void
   readonly windowKey: (sessionHash: string, ownCopy?: boolean) => string
@@ -133,13 +136,19 @@ export function createSummaryStorage(input: {
       writeJsonAtomic(windowPath(key), { v: 2, ...record }, owner)
     },
     removeWindow: (key) => removeFile(windowPath(key)),
-    windowKeys: () => listNames(dir).filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -".json".length)),
+    windowKeys: () =>
+      listNames(dir)
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => name.slice(0, -".json".length)),
     writePending(record) {
       ensureRegistered()
       writeJsonAtomic(pendingPath(record.uuid), { v: 2, ...record }, owner)
     },
     removePending: (uuid) => removeFile(pendingPath(uuid)),
-    pendingUuids: () => listNames(pendingDir).filter((name) => name.endsWith(".json")).map((name) => name.slice(0, -".json".length)),
+    pendingUuids: () =>
+      listNames(pendingDir)
+        .filter((name) => name.endsWith(".json"))
+        .map((name) => name.slice(0, -".json".length)),
   }
 }
 
@@ -215,5 +224,7 @@ function parseScope(value: unknown): ConsentScope | undefined {
 }
 
 function fileName(sessionHash: string): string {
-  return SAFE_NAME.test(sessionHash) ? sessionHash.replaceAll(":", "_") : Buffer.from(sessionHash).toString("hex").slice(0, 128)
+  return SAFE_NAME.test(sessionHash)
+    ? sessionHash.replaceAll(":", "_")
+    : Buffer.from(sessionHash).toString("hex").slice(0, 128)
 }

@@ -14,7 +14,11 @@ import {
 
 function hostContext(options: {
   readonly hasUI?: boolean
-  readonly confirm?: (title: string, body: string, opts?: { signal?: AbortSignal; timeout?: number }) => Promise<boolean>
+  readonly confirm?: (
+    title: string,
+    body: string,
+    opts?: { signal?: AbortSignal; timeout?: number },
+  ) => Promise<boolean>
   readonly notify?: (message: string, level: "info" | "warning" | "error") => void
 }): ComputerHostContext {
   return {
@@ -288,5 +292,4 @@ describe("confirmComputerControl (#9651 B5b)", () => {
     expect(scheduledMs).toBe(10_000)
     expect(confirmTimeouts).toEqual([10_000])
   })
-
 })

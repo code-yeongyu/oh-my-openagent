@@ -54,7 +54,8 @@ export function createTurnWakeSources(): TurnWakeSources {
       monitorWatches.clear()
       return
     }
-    const items = typeof data === "object" && data !== null ? (data as { readonly monitors?: unknown }).monitors : undefined
+    const items =
+      typeof data === "object" && data !== null ? (data as { readonly monitors?: unknown }).monitors : undefined
     if (!Array.isArray(items)) return
     const seen = new Set<string>()
     for (const item of items) {

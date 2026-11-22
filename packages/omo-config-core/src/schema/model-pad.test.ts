@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  OmoConfigLayerSchema,
-  OmoConfigProfileSchema,
-  OmoConfigSchema,
-  OmoTypedHarnessConfigSchema,
-} from "../index"
+import { OmoConfigLayerSchema, OmoConfigProfileSchema, OmoConfigSchema, OmoTypedHarnessConfigSchema } from "../index"
 
 const SHAPES = {
   config: OmoConfigSchema,
@@ -28,7 +23,12 @@ describe("model_pad schema", () => {
     const parsed = OmoConfigSchema.parse(block)
 
     // then
-    expect(results).toEqual([["config", true], ["harness", true], ["layer", true], ["profile", true]])
+    expect(results).toEqual([
+      ["config", true],
+      ["harness", true],
+      ["layer", true],
+      ["profile", true],
+    ])
     expect(parsed.model_pad).toEqual({ labels: { daily: "Claude", geeky: "GPT", normal: "Normal", heavy: "Heavy" } })
   })
 

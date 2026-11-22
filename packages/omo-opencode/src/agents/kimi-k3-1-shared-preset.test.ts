@@ -8,7 +8,9 @@ import { getNativePromptSource } from "./native-model-prompt"
 // Default prompt-routing contract (#11196): every Kimi K3.1 spelling selects Native's kimi-k3-1 preset, not K3's.
 const K3_1 = /k3[.-]1|k3p1/i
 const catalogK31 = getBuiltinProviders().flatMap((providerID) =>
-  getBuiltinModels(providerID).filter((model) => K3_1.test(model.id)).map((model) => `${providerID}/${model.id}`),
+  getBuiltinModels(providerID)
+    .filter((model) => K3_1.test(model.id))
+    .map((model) => `${providerID}/${model.id}`),
 )
 const models: string[] = [...new Set([...catalogK31, "kimi-coding/k3p1", "moonshotai/kimi-k3.1-pro"])]
 const agents = [

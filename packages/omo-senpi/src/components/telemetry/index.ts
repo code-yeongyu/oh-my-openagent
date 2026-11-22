@@ -57,12 +57,7 @@ export function getSenpiTelemetryStateDir(env: TelemetryEnv = process.env): stri
 
 export async function recordSenpiDailyActive(options: SenpiTelemetryOptions = {}): Promise<void> {
   const input = createRecordDailyActiveInput(options)
-  await withTimeout(
-    recordDailyActive(
-      input,
-    ),
-    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-  )
+  await withTimeout(recordDailyActive(input), options.timeoutMs ?? DEFAULT_TIMEOUT_MS)
 }
 
 export function createSenpiTelemetryComponent(options: SenpiTelemetryOptions = {}): OmoSenpiComponent {
@@ -85,12 +80,14 @@ function createRecordDailyActiveInput(options: SenpiTelemetryOptions): RecordDai
   const product = createSenpiTelemetryProductConfig()
   const baseInput = {
     diagnostics: options.diagnostics,
-    transportFactory: options.transportFactory ?? createSenpiTelemetryTransportFactory({
-      env,
-      consent: () => isTelemetryClientEnabled({ env, product }),
-      diagnostics: options.diagnostics,
-      source: SENPI_TELEMETRY_SOURCE,
-    }),
+    transportFactory:
+      options.transportFactory ??
+      createSenpiTelemetryTransportFactory({
+        env,
+        consent: () => isTelemetryClientEnabled({ env, product }),
+        diagnostics: options.diagnostics,
+        source: SENPI_TELEMETRY_SOURCE,
+      }),
     env,
     product,
     reason: SESSION_START_REASON,

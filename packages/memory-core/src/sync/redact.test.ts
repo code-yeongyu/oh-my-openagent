@@ -145,16 +145,28 @@ describe("redactUrl", () => {
   })
 
   describe("#given malformed PEM-shaped input", () => {
-    it("#then redaction completes within a bounded time and real PEM blocks remain masked", () => {
-      const hostile = `-----BEGIN ${"A".repeat(100_000)}-----${"B".repeat(100_000)}`
-      const started = performance.now()
-      const redacted = redactUrl(hostile)
-      expect(performance.now() - started).toBeLessThan(500)
-      expect(redacted).toBe(hostile)
+    // A wall-clock bound times the host, not the scan (#12693). Four times the input takes about four times as long
+    // for a linear scan and about sixteen times for a quadratic one; the fastest of several runs keeps load spikes out.
+    it("#then redaction time grows linearly with the input and real PEM blocks remain masked", () => {
+      const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
+      const fastest = (input: string) => {
+        let best = Number.POSITIVE_INFINITY
+        for (let run = 0; run < 5; run++) {
+          const started = performance.now()
+          expect(redactUrl(input)).toBe(input)
+          best = Math.min(best, performance.now() - started)
+        }
+        return best
+      }
+      const small = hostile(12_500)
+      const large = hostile(50_000)
+      redactUrl(large)
+
+      expect(fastest(large) / fastest(small)).toBeLessThan(8)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
       expect(redactUrl(pem)).toBe("***")
-    })
+    }, 30_000)
   })
 
   describe("#given an empty url", () => {

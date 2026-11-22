@@ -35,14 +35,18 @@ export const readRecoveryClock: RecoveryClock = async () => {
           const timebase = new Uint32Array(2)
           const boot = new Uint8Array(128)
           const size = new BigUint64Array([BigInt(boot.byteLength)])
-          if (library.symbols.mach_timebase_info(timebase) !== 0 ||
-              library.symbols.sysctlbyname(Buffer.from("kern.bootsessionuuid\0"), boot, size, null, 0) !== 0) return null
+          if (
+            library.symbols.mach_timebase_info(timebase) !== 0 ||
+            library.symbols.sysctlbyname(Buffer.from("kern.bootsessionuuid\0"), boot, size, null, 0) !== 0
+          )
+            return null
           const numerator = timebase[0]
           const denominator = timebase[1]
           if (numerator === undefined || denominator === undefined || numerator === 0 || denominator === 0) return null
           const bootId = Buffer.from(boot).toString("utf8").split("\0")[0] ?? ""
           if (!/^[a-f0-9-]{36}$/i.test(bootId)) return null
-          const continuousTimeMs = Number(library.symbols.mach_continuous_time()) * numerator / denominator / 1_000_000
+          const continuousTimeMs =
+            (Number(library.symbols.mach_continuous_time()) * numerator) / denominator / 1_000_000
           return { wallTimeMs: Date.now(), continuousTimeMs, bootId }
         } finally {
           library.close()
@@ -59,8 +63,12 @@ export const readRecoveryClock: RecoveryClock = async () => {
             // SystemBootEnvironmentInformation starts with the 16-byte BootIdentifier GUID.
             const boot = new Uint8Array(32)
             const returned = new Uint32Array(1)
-            if (ntdll.symbols.NtQuerySystemInformation(90, boot, boot.byteLength, returned) !== 0 ||
-                (returned[0] ?? 0) < 16 || boot.subarray(0, 16).every(byte => byte === 0)) return null
+            if (
+              ntdll.symbols.NtQuerySystemInformation(90, boot, boot.byteLength, returned) !== 0 ||
+              (returned[0] ?? 0) < 16 ||
+              boot.subarray(0, 16).every((byte) => byte === 0)
+            )
+              return null
             return {
               wallTimeMs: Date.now(),
               continuousTimeMs: Number(kernel.symbols.GetTickCount64()),

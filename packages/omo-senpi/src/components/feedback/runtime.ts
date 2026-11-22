@@ -3,12 +3,23 @@
 // command and RPC shells; collection, draft building, the draft store, the upload and the TUI command flow live here.
 
 import { randomUUID } from "node:crypto"
-import { createCredentialStore, type CredentialStore, quietNotice, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
+import {
+  createCredentialStore,
+  type CredentialStore,
+  quietNotice,
+  SignInError,
+} from "@oh-my-opencode/omo-opencode/service-auth"
 import type { ComponentLogger } from "../../extension/types"
 
 import { collectHostSections, type HostSessionView } from "./collect-host"
 import { buildDraft, type CollectedSection, type FeedbackDraft, type FeedbackKind, type UploadRedactor } from "./draft"
-import { feedbackUploadsDisabled, submitReport, type ReportClient, type ReportTransport, type SubmitResult } from "./submit"
+import {
+  feedbackUploadsDisabled,
+  submitReport,
+  type ReportClient,
+  type ReportTransport,
+  type SubmitResult,
+} from "./submit"
 
 const DRAFT_TTL_MS = 30 * 60 * 1000
 const MAX_DRAFTS = 8
@@ -20,7 +31,11 @@ const SIGNED_OUT_SEND = "Your OmO sign-in could not be used, so this report is s
  * spends the single-use refresh token, and a report is worth more than its attribution. `fellBack` is a stored
  * sign-in that could not be used.
  */
-async function cliAccessToken(api: string, env: Readonly<Record<string, string | undefined>>, store?: CredentialStore): Promise<{ readonly token: string | null; readonly fellBack: boolean }> {
+async function cliAccessToken(
+  api: string,
+  env: Readonly<Record<string, string | undefined>>,
+  store?: CredentialStore,
+): Promise<{ readonly token: string | null; readonly fellBack: boolean }> {
   if (feedbackUploadsDisabled(env)) return { token: null, fellBack: false }
   try {
     const current = await (store ?? createCredentialStore(api, { notice: quietNotice })).read()
@@ -133,7 +148,11 @@ export const clientIdentityLines = (input: unknown, redact: UploadRedactor): rea
   })
 }
 
-const mergeSections = (host: readonly CollectedSection[], client: readonly CollectedSection[], identityLines: readonly string[]): CollectedSection[] => {
+const mergeSections = (
+  host: readonly CollectedSection[],
+  client: readonly CollectedSection[],
+  identityLines: readonly string[],
+): CollectedSection[] => {
   const merged = new Map(host.map((section) => [section.id, section]))
   for (const section of client) {
     const existing = merged.get(section.id)
@@ -141,7 +160,11 @@ const mergeSections = (host: readonly CollectedSection[], client: readonly Colle
   }
   if (identityLines.length > 0) {
     const existing = merged.get("identity")
-    merged.set("identity", { id: "identity", verbatim: true, text: [...identityLines, ...(existing === undefined ? [] : [existing.text])].join("\n") })
+    merged.set("identity", {
+      id: "identity",
+      verbatim: true,
+      text: [...identityLines, ...(existing === undefined ? [] : [existing.text])].join("\n"),
+    })
   }
   return [...merged.values()]
 }
@@ -177,7 +200,15 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
     }
     drafts.set(draft.draftId, {
       draft,
-      client: { app: env.OMO_NATIVE_SURFACE === "desktop" ? "desktop" : "cli", omo: omoVersion, senpi: senpiVersion, os: process.platform, arch: process.arch, locale: Intl.DateTimeFormat().resolvedOptions().locale, channel },
+      client: {
+        app: env.OMO_NATIVE_SURFACE === "desktop" ? "desktop" : "cli",
+        omo: omoVersion,
+        senpi: senpiVersion,
+        os: process.platform,
+        arch: process.arch,
+        locale: Intl.DateTimeFormat().resolvedOptions().locale,
+        channel,
+      },
       ...(host.installHash === undefined ? {} : { installHash: host.installHash }),
       ...(host.sessionHash === undefined ? {} : { sessionHash: host.sessionHash }),
       expiresAt: now().getTime() + DRAFT_TTL_MS,
@@ -208,8 +239,10 @@ export function createFeedbackCore(config: FeedbackCoreConfig): FeedbackCore {
       ...(stored.sessionHash === undefined ? {} : { sessionHash: stored.sessionHash }),
       ...(typeof idempotencyKey === "string" ? { idempotencyKey } : {}),
     })
-    if (result.kind === "refused" && (result.reason === "service-rejected" || result.reason === "service-unavailable")) config.logger?.warn("feedback.report_rejected", { code: result.code, requestId: result.requestId })
-    if (result.kind !== "refused" || result.reason === "secret-detected" || result.reason === "too-large") drafts.delete(stored.draft.draftId)
+    if (result.kind === "refused" && (result.reason === "service-rejected" || result.reason === "service-unavailable"))
+      config.logger?.warn("feedback.report_rejected", { code: result.code, requestId: result.requestId })
+    if (result.kind !== "refused" || result.reason === "secret-detected" || result.reason === "too-large")
+      drafts.delete(stored.draft.draftId)
     return result
   }
 
@@ -233,7 +266,15 @@ export interface FeedbackCommand {
 }
 
 /** The TUI flow behind /feedback and /bug: describe, see the notice, optionally see exactly what is sent, then Send. */
-export async function runFeedbackCommand({ kind, args, ui, env, credentialStore, prepare, submit }: FeedbackCommand): Promise<void> {
+export async function runFeedbackCommand({
+  kind,
+  args,
+  ui,
+  env,
+  credentialStore,
+  prepare,
+  submit,
+}: FeedbackCommand): Promise<void> {
   let prepared: FeedbackDraft
   try {
     prepared = await prepare()
@@ -241,19 +282,30 @@ export async function runFeedbackCommand({ kind, args, ui, env, credentialStore,
     ui.notify(error instanceof Error ? error.message : String(error), "error")
     return
   }
-  const description = args.trim() !== "" ? args.trim() : await ui.input("What went wrong?", "What happened, and what did you expect?")
+  const description =
+    args.trim() !== "" ? args.trim() : await ui.input("What went wrong?", "What happened, and what did you expect?")
   if (description === undefined || description.trim() === "") return
   const notice = noticeFor(prepared)
   for (;;) {
     const choice = await ui.select(notice, ["Send report", "See exactly what is sent", "Cancel"])
     if (choice === "See exactly what is sent") {
-      ui.notify(prepared.sections.filter((s) => s.id !== "description").map((s) => `## ${s.title}\n${s.text}`).join("\n\n"), "info")
+      ui.notify(
+        prepared.sections
+          .filter((s) => s.id !== "description")
+          .map((s) => `## ${s.title}\n${s.text}`)
+          .join("\n\n"),
+        "info",
+      )
       continue
     }
     if (choice !== "Send report") return
     break
   }
-  const { token, fellBack } = await cliAccessToken(env.OMO_SERVICE_API_URL ?? "https://api.omo.dev", env, credentialStore)
+  const { token, fellBack } = await cliAccessToken(
+    env.OMO_SERVICE_API_URL ?? "https://api.omo.dev",
+    env,
+    credentialStore,
+  )
   if (fellBack) ui.notify(SIGNED_OUT_SEND, "warning")
   const result = await submit({ draftId: prepared.draftId, kind, description, accessToken: token })
   ui.notify(resultMessage(result), result.kind === "refused" ? "error" : "info")
@@ -273,7 +325,8 @@ export function noticeFor(draft: FeedbackDraft): string {
     const phrase = SECTION_PHRASES[section.id]
     return phrase === undefined ? [] : [phrase]
   })
-  const included = phrases.length <= 1 ? phrases.join("") : `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1) ?? ""}`
+  const included =
+    phrases.length <= 1 ? phrases.join("") : `${phrases.slice(0, -1).join(", ")} and ${phrases.at(-1) ?? ""}`
   return draft.destination === "intake"
     ? `Sending also includes ${included}. Passwords, keys and tokens are removed first, and your memory is never sent. Only the OmO team can read it; it is kept ${draft.retentionDays} days.`
     : `Uploads are turned off here (OMO_DISABLE_FEEDBACK), so the report, with ${included}, is saved as a file you can send yourself.`
@@ -296,7 +349,8 @@ export function resultMessage(result: SubmitResult): string {
       }
       return {
         "sign-in-required": "Sign in to send a report: run omo login",
-        "secret-detected": "The report still looked like it contained a password or key, so nothing was sent. Remove it from the description and try again.",
+        "secret-detected":
+          "The report still looked like it contained a password or key, so nothing was sent. Remove it from the description and try again.",
         "too-large": "The report is too large to send. Try again from a shorter conversation.",
         "rate-limited": "Too many reports in a short time. Try again in a few minutes.",
         unavailable: "The report could not be sent right now. Check your connection and try again.",

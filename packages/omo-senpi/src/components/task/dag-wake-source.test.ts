@@ -82,19 +82,23 @@ describe("createDagWakeSource", () => {
     harness.wakeSource.onRunStart(first.runId)
 
     // then
-    expect(harness.emitted).toEqual([{
-      name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: {
-        source: DAG_WAKE_SOURCE,
-        kind: "children",
-        activeCount: 1,
-        channels: [{
-          id: first.runId,
-          description: first.name,
-          startedAtMs: Date.parse("2026-08-08T01:02:05.000Z"),
-        }],
+    expect(harness.emitted).toEqual([
+      {
+        name: DAG_WAKE_SOURCE_STATE_EVENT,
+        data: {
+          source: DAG_WAKE_SOURCE,
+          kind: "children",
+          activeCount: 1,
+          channels: [
+            {
+              id: first.runId,
+              description: first.name,
+              startedAtMs: Date.parse("2026-08-08T01:02:05.000Z"),
+            },
+          ],
+        },
       },
-    }])
+    ])
   })
 
   it("#given a live run #when a second run starts #then the emission aggregates both channels as activeCount 2", () => {
@@ -115,26 +119,28 @@ describe("createDagWakeSource", () => {
     harness.wakeSource.onRunStart(second.runId)
 
     // then a run that has not stamped startedAt falls back to its creation time
-    expect(harness.emitted).toEqual([{
-      name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: {
-        source: DAG_WAKE_SOURCE,
-        kind: "children",
-        activeCount: 2,
-        channels: [
-          {
-            id: first.runId,
-            description: first.name,
-            startedAtMs: Date.parse("2026-08-08T01:02:05.000Z"),
-          },
-          {
-            id: second.runId,
-            description: second.name,
-            startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
-          },
-        ],
+    expect(harness.emitted).toEqual([
+      {
+        name: DAG_WAKE_SOURCE_STATE_EVENT,
+        data: {
+          source: DAG_WAKE_SOURCE,
+          kind: "children",
+          activeCount: 2,
+          channels: [
+            {
+              id: first.runId,
+              description: first.name,
+              startedAtMs: Date.parse("2026-08-08T01:02:05.000Z"),
+            },
+            {
+              id: second.runId,
+              description: second.name,
+              startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
+            },
+          ],
+        },
       },
-    }])
+    ])
   })
 
   it("#given two live runs #when both reach a terminal status #then the last emission clears the state with activeCount 0", () => {
@@ -160,11 +166,13 @@ describe("createDagWakeSource", () => {
           source: DAG_WAKE_SOURCE,
           kind: "children",
           activeCount: 1,
-          channels: [{
-            id: second.runId,
-            description: second.name,
-            startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
-          }],
+          channels: [
+            {
+              id: second.runId,
+              description: second.name,
+              startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
+            },
+          ],
         },
       },
       {
@@ -185,10 +193,12 @@ describe("createDagWakeSource", () => {
     harness.wakeSource.emitShutdown()
 
     // then
-    expect(harness.emitted).toEqual([{
-      name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
-    }])
+    expect(harness.emitted).toEqual([
+      {
+        name: DAG_WAKE_SOURCE_STATE_EVENT,
+        data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
+      },
+    ])
   })
 
   it("#given a run that starts, goes terminal and outlives shutdown #when every lifecycle hook fires #then the module never injects a message and never triggers a turn", () => {
@@ -232,10 +242,12 @@ describe("createDagWakeSource", () => {
     wakeSource.onRunStart("dag_00000001")
 
     // then
-    expect(emitted).toEqual([{
-      name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
-    }])
+    expect(emitted).toEqual([
+      {
+        name: DAG_WAKE_SOURCE_STATE_EVENT,
+        data: { source: DAG_WAKE_SOURCE, kind: "children", activeCount: 0, channels: [] },
+      },
+    ])
   })
 
   it("#given a run pruned between list and snapshot #when the state is republished #then the surviving run still reports as live", () => {
@@ -249,18 +261,22 @@ describe("createDagWakeSource", () => {
     harness.wakeSource.onRunStart(survivor.runId)
 
     // then
-    expect(harness.emitted).toEqual([{
-      name: DAG_WAKE_SOURCE_STATE_EVENT,
-      data: {
-        source: DAG_WAKE_SOURCE,
-        kind: "children",
-        activeCount: 1,
-        channels: [{
-          id: survivor.runId,
-          description: survivor.name,
-          startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
-        }],
+    expect(harness.emitted).toEqual([
+      {
+        name: DAG_WAKE_SOURCE_STATE_EVENT,
+        data: {
+          source: DAG_WAKE_SOURCE,
+          kind: "children",
+          activeCount: 1,
+          channels: [
+            {
+              id: survivor.runId,
+              description: survivor.name,
+              startedAtMs: Date.parse("2026-08-08T01:03:00.000Z"),
+            },
+          ],
+        },
       },
-    }])
+    ])
   })
 })

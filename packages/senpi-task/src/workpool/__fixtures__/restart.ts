@@ -6,14 +6,17 @@ import type { ResidencyRegistry } from "../../lifecycle/port"
 import { fixtureHandle } from "./admission"
 import type { PendingSteeringEntry } from "../../state"
 import { NO_HOST_ENDPOINT } from "../../lifecycle/host-session"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export function restartedFixture(project: string) {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const config = OmoTaskSettingsSchema.parse({ default_concurrency: 1, global_concurrency: 1 })
   const children = new Map<string, ReturnType<typeof fixtureHandle>>()
   const queues: (readonly PendingSteeringEntry[])[] = []
   const runner = {
-    start: async (): Promise<never> => { throw new Error("Recovery must not replay the initial prompt") },
+    start: async (): Promise<never> => {
+      throw new Error("Recovery must not replay the initial prompt")
+    },
     resume: async (spec: { taskId: string }) => {
       queues.push(store.load(spec.taskId)?.pending_steering ?? [])
       const child = fixtureHandle(spec.taskId)
@@ -21,22 +24,44 @@ export function restartedFixture(project: string) {
       return child.handle
     },
   }
-  const manager = createTaskManager({ store, config, cwd: project, runners: { "in-process": runner, process: runner },
+  const manager = createTaskManager({
+    store,
+    config,
+    cwd: project,
+    runners: { "in-process": runner, process: runner },
     planner: () => ({ kind: "resolved", plan: { model: "test/model" } }),
     destruction: { destroyResidentTask: (id, cause) => lifecycle.destroyResidentTask(id, cause) },
   })
   const registry: ResidencyRegistry = {
-    get: taskId => {
+    get: (taskId) => {
       const child = manager.getResidentHandle(taskId)
-      return child === undefined ? undefined : { task_id: taskId, kind: "in-process", pid: undefined,
-        abort: () => child.abort(), dispose: () => child.dispose(), terminate: async () => undefined }
+      return child === undefined
+        ? undefined
+        : {
+            task_id: taskId,
+            kind: "in-process",
+            pid: undefined,
+            abort: () => child.abort(),
+            dispose: () => child.dispose(),
+            terminate: async () => undefined,
+          }
     },
-    entries: () => manager.residentTaskIds().flatMap(id => { const child = registry.get(id); return child === undefined ? [] : [child] }),
-    forget: (taskId, options) => manager.forget(taskId, options), hasPendingSends: taskId => manager.hasPendingSends?.(taskId) ?? false,
-    tryClaimEviction: taskId => manager.tryClaimEviction?.(taskId) ?? false, releaseEviction: taskId => manager.releaseEviction?.(taskId),
+    entries: () =>
+      manager.residentTaskIds().flatMap((id) => {
+        const child = registry.get(id)
+        return child === undefined ? [] : [child]
+      }),
+    forget: (taskId, options) => manager.forget(taskId, options),
+    hasPendingSends: (taskId) => manager.hasPendingSends?.(taskId) ?? false,
+    tryClaimEviction: (taskId) => manager.tryClaimEviction?.(taskId) ?? false,
+    releaseEviction: (taskId) => manager.releaseEviction?.(taskId),
   }
   const lifecycle = createTaskLifecycle({ hostEndpoint: NO_HOST_ENDPOINT, store, registry, config })
-  return { manager, store, queues, children,
+  return {
+    manager,
+    store,
+    queues,
+    children,
     cleanup: async () => {
       manager.workpools.dispose()
       lifecycle.dispose?.()

@@ -1,5 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
-import { clearSessionAgent, handedBackSyncSessions, setSessionAgent, subagentSessions, syncSubagentSessions } from "../../features/claude-code-session-state"
+import {
+  clearSessionAgent,
+  handedBackSyncSessions,
+  setSessionAgent,
+  subagentSessions,
+  syncSubagentSessions,
+} from "../../features/claude-code-session-state"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import { getAgentToolRestrictions, isAmbiguousPostDispatchPromptFailure, log } from "../../shared"
 import { normalizeAgentForPrompt, stripAgentListSortPrefix } from "../../shared/agent-display-names"
@@ -20,7 +26,9 @@ type SessionWithPrompt = {
   prompt: (opts: { path: { id: string }; body: Record<string, unknown> }) => Promise<unknown>
 }
 
-function hasPrompt(session: PluginInput["client"]["session"]): session is PluginInput["client"]["session"] & SessionWithPrompt {
+function hasPrompt(
+  session: PluginInput["client"]["session"],
+): session is PluginInput["client"]["session"] & SessionWithPrompt {
   return "prompt" in session && typeof session.prompt === "function"
 }
 
@@ -113,7 +121,7 @@ export async function executeSync(
       toolContext.metadata?.({
         title: args.description,
         metadata: { sessionId: sessionID },
-      })
+      }),
     )
 
     log(`[call_omo_agent] Sending prompt to session ${sessionID}`)
@@ -154,8 +162,8 @@ export async function executeSync(
           },
         },
       })
-      const promptMayHaveBeenAccepted = promptResult.status === "failed"
-        && isAmbiguousPostDispatchPromptFailure(promptResult)
+      const promptMayHaveBeenAccepted =
+        promptResult.status === "failed" && isAmbiguousPostDispatchPromptFailure(promptResult)
       if (promptResult.status === "failed") {
         if (promptMayHaveBeenAccepted) {
           log("[call_omo_agent] Prompt returned an ambiguous error after dispatch; waiting for completion", {

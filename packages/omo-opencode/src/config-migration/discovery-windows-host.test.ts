@@ -1,10 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { posix, win32 } from "node:path"
 
-import {
-  discoverLegacyConfigGroups,
-  type ConfigMigrationDiscoveryFileSystem,
-} from "./index"
+import { discoverLegacyConfigGroups, type ConfigMigrationDiscoveryFileSystem } from "./index"
 
 function windowsMemoryFileSystem(paths: readonly string[]): ConfigMigrationDiscoveryFileSystem {
   const files = new Set(paths.map((path) => win32.normalize(path).toLowerCase()))

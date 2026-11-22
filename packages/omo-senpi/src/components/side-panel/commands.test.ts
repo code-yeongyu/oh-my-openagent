@@ -24,14 +24,16 @@ interface Harness {
   run(): Promise<void>
 }
 
-function harness(options: {
-  status?: () => PanelGitStatus | undefined
-  exec?: PanelExec
-  choose?: (options: string[]) => string | undefined
-  withCustom?: boolean
-  noExec?: boolean
-  mounted?: boolean
-} = {}): Harness {
+function harness(
+  options: {
+    status?: () => PanelGitStatus | undefined
+    exec?: PanelExec
+    choose?: (options: string[]) => string | undefined
+    withCustom?: boolean
+    noExec?: boolean
+    mounted?: boolean
+  } = {},
+): Harness {
   const notices: Array<{ message: string; type: string | undefined }> = []
   const selected: string[] = []
   const popupRows: string[][] = []
@@ -178,7 +180,9 @@ describe("side panel diff command", () => {
 describe("side panel diff command hardening", () => {
   test("#given a file name carrying terminal controls #when the picker lists it #then the label carries none of them", async () => {
     // given: the host's select list folds newlines only
-    const test = harness({ status: () => ({ root: "/repo", files: [{ xy: "??", path: "evil\x1b]8;;x\x07\u202ename.txt" }] }) })
+    const test = harness({
+      status: () => ({ root: "/repo", files: [{ xy: "??", path: "evil\x1b]8;;x\x07\u202ename.txt" }] }),
+    })
 
     // when
     await test.run()

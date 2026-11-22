@@ -13,15 +13,26 @@ const roots: string[] = []
 function createEngine(): string {
   const root = mkdtempSync(join(tmpdir(), "omo-engine-prepare-"))
   roots.push(root)
-  writeFileSync(join(root, "package.json"), JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.9.23", type: "module" }))
+  writeFileSync(
+    join(root, "package.json"),
+    JSON.stringify({ name: "@code-yeongyu/senpi", version: "2026.9.23", type: "module" }),
+  )
   const rpcPath = join(root, RPC_MODE)
   mkdirSync(dirname(rpcPath), { recursive: true })
-  writeFileSync(rpcPath, readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"))
+  writeFileSync(
+    rpcPath,
+    readFileSync(new URL("./modes/rpc/rpc-mode.js", import.meta.resolve("@code-yeongyu/senpi")), "utf8"),
+  )
   return root
 }
 
 function prepareOnce(root: string, reported: string[] = []) {
-  ensureEnginePrepared({ senpiRoot: root, omoVersion: OMO_VERSION, reinstallCommand: REINSTALL, report: (line: string) => reported.push(line) })
+  ensureEnginePrepared({
+    senpiRoot: root,
+    omoVersion: OMO_VERSION,
+    reinstallCommand: REINSTALL,
+    report: (line: string) => reported.push(line),
+  })
 }
 
 const readRpc = (root: string) => readFileSync(join(root, RPC_MODE), "utf8")

@@ -11,7 +11,13 @@ import { toTeamCoreConfig } from "../runtime-config"
 import { resolveTeamMemberInboxDir, teamStorageBaseDir } from "../storage"
 import { buildTeamMessage } from "./message"
 import { reconcileTeamMailboxOnSessionStart } from "./session-start-reconcile"
-import { FakeTeamManager, cleanupTeamRuntimeTmp, stateDirConfig, taskSettings, tempProjectDir } from "../__fixtures__/runtime-fakes"
+import {
+  FakeTeamManager,
+  cleanupTeamRuntimeTmp,
+  stateDirConfig,
+  taskSettings,
+  tempProjectDir,
+} from "../__fixtures__/runtime-fakes"
 
 const STALE_TTL_MS = 30_000
 

@@ -6,7 +6,16 @@ import { createTaskRecordStore } from "../store"
 import type { ManagedChildHandle } from "./child-handle"
 import { createTaskManager } from "./manager"
 import type { ManagedRunner, ManagedStartSpec, ResolvedChildPlan } from "./types"
-import { baseSpec, categoryPlanner, cleanupProjects, FakeRunner, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import {
+  baseSpec,
+  categoryPlanner,
+  cleanupProjects,
+  FakeRunner,
+  makeHandle,
+  settings,
+  tempProject,
+} from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -31,7 +40,8 @@ class HeldPrimaryStart implements ManagedRunner {
     this.models.push(spec.model ?? "")
     this.entered.resolve()
     await this.release.promise
-    if (this.outcome === "model_unavailable") throw new RunnerError({ kind: "model_unavailable", message: `${spec.model} is unavailable` })
+    if (this.outcome === "model_unavailable")
+      throw new RunnerError({ kind: "model_unavailable", message: `${spec.model} is unavailable` })
     const { handle } = makeHandle(spec.taskId)
     return {
       ...handle,
@@ -44,7 +54,7 @@ class HeldPrimaryStart implements ManagedRunner {
 }
 
 function managerOver(runner: ManagedRunner, project: string) {
-  const store = createTaskRecordStore({ project_dir: project })
+  const store = createTaskRecordStore(ownedTaskState(project))
   const manager = createTaskManager({
     store,
     runners: { "in-process": runner, process: runner },
@@ -98,7 +108,7 @@ describe("a stop that lands while a primary start is in flight", () => {
 describe("a respawned child reattached after its task ended", () => {
   test("#given a running task is cancelled while its respawn is in flight #when the respawned child is reattached #then it is refused and discarded", async () => {
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.list()
     const running: TaskRecord = {
       task_id: "st_0badf00d",
@@ -129,7 +139,12 @@ describe("a respawned child reattached after its task ended", () => {
     const disposed = Promise.withResolvers<void>()
     const { handle } = makeHandle(running.task_id)
 
-    const result = await manager.reattach(running, { ...handle, dispose: async () => { disposed.resolve() } })
+    const result = await manager.reattach(running, {
+      ...handle,
+      dispose: async () => {
+        disposed.resolve()
+      },
+    })
     await disposed.promise
 
     expect(result.ok).toBe(false)

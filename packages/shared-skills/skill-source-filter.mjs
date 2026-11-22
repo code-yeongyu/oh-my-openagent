@@ -8,14 +8,29 @@
  * skills). Testing the absolute path was the defect this module replaces.
  */
 
-export const ignoredSkillSourceDirNames = Object.freeze([".mypy_cache", ".omo", ".pytest_cache", ".ruff_cache", "__pycache__"]);
-export const ignoredSkillSourceFileNames = Object.freeze([".gitignore", ".npmignore", "pyrightconfig.json"]);
-const sourceTestFilePattern = /\.test\.ts$/;
-const testDirNamePattern = /^(?:tests?|__tests__|.+_test)$/;
-const shippedTopLevelTestDirNames = new Set(["test", "tests"]);
+export const ignoredSkillSourceDirNames = Object.freeze([
+  ".mypy_cache",
+  ".omo",
+  ".pytest_cache",
+  ".ruff_cache",
+  "__pycache__",
+])
+// knip.workspace.jsonc: the repository's knip config fragment for a skill directory (script/knip-config.ts), dev-only.
+export const ignoredSkillSourceFileNames = Object.freeze([
+  ".gitignore",
+  ".npmignore",
+  "pyrightconfig.json",
+  "knip.workspace.jsonc",
+])
+const sourceTestFilePattern = /\.test\.ts$/
+const testDirNamePattern = /^(?:tests?|__tests__|.+_test)$/
+const shippedTopLevelTestDirNames = new Set(["test", "tests"])
 
 function toSegments(path) {
-	return path.replaceAll("\\", "/").split("/").filter((segment) => segment.length > 0);
+  return path
+    .replaceAll("\\", "/")
+    .split("/")
+    .filter((segment) => segment.length > 0)
 }
 
 /**
@@ -24,25 +39,26 @@ function toSegments(path) {
  * @returns {(sourcePath: string) => boolean} an fs.cp-compatible filter
  */
 export function createSkillSourceCopyFilter(sourceRoot, options = {}) {
-	const rootSegments = toSegments(sourceRoot);
-	const ignoredFileNames = new Set([...ignoredSkillSourceFileNames, ...(options.ignoredFileNames ?? [])]);
-	const ignoredDirNames = new Set(ignoredSkillSourceDirNames);
+  const rootSegments = toSegments(sourceRoot)
+  const ignoredFileNames = new Set([...ignoredSkillSourceFileNames, ...(options.ignoredFileNames ?? [])])
+  const ignoredDirNames = new Set(ignoredSkillSourceDirNames)
 
-	return function shouldCopySkillSource(sourcePath) {
-		const pathSegments = toSegments(sourcePath);
-		if (pathSegments.length < rootSegments.length) return false;
-		for (let index = 0; index < rootSegments.length; index += 1) {
-			if (pathSegments[index] !== rootSegments[index]) return false;
-		}
-		const segments = pathSegments.slice(rootSegments.length);
-		if (segments.length === 0) return true;
-		const name = segments.at(-1) ?? "";
-		if (segments.some((segment) => ignoredDirNames.has(segment))) return false;
-		if (ignoredFileNames.has(name)) return false;
-		if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false;
-		// Test directories are source-only at any depth; only a skill's top-level test/ or tests/ still ships.
-		return !segments.some(
-			(segment, index) => testDirNamePattern.test(segment) && !(index === 0 && shippedTopLevelTestDirNames.has(segment)),
-		);
-	};
+  return function shouldCopySkillSource(sourcePath) {
+    const pathSegments = toSegments(sourcePath)
+    if (pathSegments.length < rootSegments.length) return false
+    for (let index = 0; index < rootSegments.length; index += 1) {
+      if (pathSegments[index] !== rootSegments[index]) return false
+    }
+    const segments = pathSegments.slice(rootSegments.length)
+    if (segments.length === 0) return true
+    const name = segments.at(-1) ?? ""
+    if (segments.some((segment) => ignoredDirNames.has(segment))) return false
+    if (ignoredFileNames.has(name)) return false
+    if (sourceTestFilePattern.test(name) || name.endsWith(".pyc")) return false
+    // Test directories are source-only at any depth; only a skill's top-level test/ or tests/ still ships.
+    return !segments.some(
+      (segment, index) =>
+        testDirNamePattern.test(segment) && !(index === 0 && shippedTopLevelTestDirNames.has(segment)),
+    )
+  }
 }

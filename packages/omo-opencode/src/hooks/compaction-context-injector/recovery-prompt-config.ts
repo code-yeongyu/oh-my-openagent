@@ -17,10 +17,7 @@ function matchesExpectedModel(
     return true
   }
 
-  return (
-    actualModel?.providerID === expectedModel.providerID &&
-    actualModel.modelID === expectedModel.modelID
-  )
+  return actualModel?.providerID === expectedModel.providerID && actualModel.modelID === expectedModel.modelID
 }
 
 function matchesExpectedTools(
@@ -40,9 +37,7 @@ function matchesExpectedTools(
     return false
   }
 
-  return expectedEntries.every(
-    ([toolName, isAllowed]) => actualTools[toolName] === isAllowed,
-  )
+  return expectedEntries.every(([toolName, isAllowed]) => actualTools[toolName] === isAllowed)
 }
 
 export function createExpectedRecoveryPromptConfig(
@@ -67,7 +62,8 @@ export function isPromptConfigRecovered(
   const agentMatches =
     typeof actualAgent === "string" &&
     !isCompactionAgent(actualAgent) &&
-    stripInvisibleAgentCharacters(actualAgent).toLowerCase() === stripInvisibleAgentCharacters(expectedPromptConfig.agent).toLowerCase()
+    stripInvisibleAgentCharacters(actualAgent).toLowerCase() ===
+      stripInvisibleAgentCharacters(expectedPromptConfig.agent).toLowerCase()
 
   return (
     agentMatches &&

@@ -25,7 +25,11 @@ function rememberBufferedEpoch(tracker: NotificationEpochTracker, taskId: string
   tracker.bufferedByTask.set(taskId, epochs)
 }
 
-function resolveDetailEpoch(tracker: NotificationEpochTracker, store: TaskRecordStore, detail: CompletionDetails): number {
+function resolveDetailEpoch(
+  tracker: NotificationEpochTracker,
+  store: TaskRecordStore,
+  detail: CompletionDetails,
+): number {
   const tagged = tracker.detailEpochs.get(detail)
   if (tagged !== undefined) return tagged
   const active = tracker.activeByTask.get(detail.task_id)
@@ -145,14 +149,21 @@ async function checkNoSlotLeak(state: ChaosState): Promise<Violation[]> {
   const violations: Violation[] = []
   const records = state.harness.store.list().records
   const pending = records.filter((record) => record.status === "pending")
-  if (pending.length > 0) violations.push({ invariant: 3, detail: `${pending.length} task(s) still pending after drain` })
-  const stuck = records.filter((record) =>
-    !isTerminalStatus(record.status) && record.residency_state !== "disposed" && record.residency_state !== "evicted")
+  if (pending.length > 0)
+    violations.push({ invariant: 3, detail: `${pending.length} task(s) still pending after drain` })
+  const stuck = records.filter(
+    (record) =>
+      !isTerminalStatus(record.status) && record.residency_state !== "disposed" && record.residency_state !== "evicted",
+  )
   if (stuck.length > 0) {
-    const detail = stuck.map((record) => {
-      const owners = state.harness.engines.filter((engine) => engine.manager.getResidentHandle(record.task_id) !== undefined).map((engine) => engine.id)
-      return `${record.task_id}:${record.status}/${record.residency_state}:host=${record.host_pid ?? "none"}:handles=${owners.join("+") || "none"}`
-    }).join(",")
+    const detail = stuck
+      .map((record) => {
+        const owners = state.harness.engines
+          .filter((engine) => engine.manager.getResidentHandle(record.task_id) !== undefined)
+          .map((engine) => engine.id)
+        return `${record.task_id}:${record.status}/${record.residency_state}:host=${record.host_pid ?? "none"}:handles=${owners.join("+") || "none"}`
+      })
+      .join(",")
     violations.push({ invariant: 3, detail: `${stuck.length} non-terminal task(s) after drain: ${detail}` })
   }
 
@@ -172,13 +183,20 @@ async function checkNoSlotLeak(state: ChaosState): Promise<Violation[]> {
     if (result.status !== "running") queued += 1
   }
   if (queued > 0) {
-    violations.push({ invariant: 3, detail: `slot leak: ${queued}/${state.harness.limit} probe task(s) queued despite all prior tasks terminal` })
+    violations.push({
+      invariant: 3,
+      detail: `slot leak: ${queued}/${state.harness.limit} probe task(s) queued despite all prior tasks terminal`,
+    })
   }
   for (const id of probeIds) {
-    for (const handle of state.harness.probeEngine.inProcessRunner.allHandles.filter((entry) => entry.handle.task_id === id)) {
+    for (const handle of state.harness.probeEngine.inProcessRunner.allHandles.filter(
+      (entry) => entry.handle.task_id === id,
+    )) {
       handle.settle({ status: "completed", finalResponse: "probe" })
     }
-    for (const handle of state.harness.probeEngine.processRunner.allHandles.filter((entry) => entry.handle.task_id === id)) {
+    for (const handle of state.harness.probeEngine.processRunner.allHandles.filter(
+      (entry) => entry.handle.task_id === id,
+    )) {
       handle.settle({ status: "completed", finalResponse: "probe" })
     }
   }
@@ -209,29 +227,36 @@ function checkLifecycleInvariants(state: ChaosState): Violation[] {
     violations.push({ invariant: 6, detail })
   }
   for (const detail of state.harness.observations.lifecycleBreaches) {
-    const invariant = detail.includes("recoverable") ? 7
-      : detail.includes("run_epoch") || detail.includes("suspension") ? 8
-      : 10
+    const invariant = detail.includes("recoverable")
+      ? 7
+      : detail.includes("run_epoch") || detail.includes("suspension")
+        ? 8
+        : 10
     violations.push({ invariant, detail })
   }
   for (const detail of state.harness.lifecycleObservations.pidBreaches) {
     violations.push({ invariant: 9, detail })
   }
   const referencedPids = new Set(
-    state.harness.store.list().records.flatMap((record) => record.pid === undefined ? [] : [record.pid]),
+    state.harness.store.list().records.flatMap((record) => (record.pid === undefined ? [] : [record.pid])),
   )
   for (const pid of state.harness.processes.alive) {
     if (pid >= 20_000 && !referencedPids.has(pid)) {
       violations.push({ invariant: 9, detail: `orphan fake pid ${pid} remained alive after reconcile` })
     }
   }
-  const killedResidents = state.harness.store.list().records.filter((record) => record.killed === true && record.residency_state === "resident")
+  const killedResidents = state.harness.store
+    .list()
+    .records.filter((record) => record.killed === true && record.residency_state === "resident")
   for (const record of killedResidents) {
     violations.push({ invariant: 10, detail: `killed task ${record.task_id} still pins a residency slot` })
   }
   const maxResidents = state.harness.observations.maxResidentsByParent.get(state.harness.sessionId) ?? 0
   if (maxResidents > state.harness.residencyMax) {
-    violations.push({ invariant: 11, detail: `resident count ${maxResidents} exceeded cap ${state.harness.residencyMax}` })
+    violations.push({
+      invariant: 11,
+      detail: `resident count ${maxResidents} exceeded cap ${state.harness.residencyMax}`,
+    })
   }
   for (const detail of state.harness.lifecycleObservations.reclamationBreaches) {
     violations.push({ invariant: 12, detail })

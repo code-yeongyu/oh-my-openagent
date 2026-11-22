@@ -5,7 +5,14 @@ import type { PluginInput } from "@opencode-ai/plugin"
 
 import { OhMyOpenCodeConfigSchema } from "./config/schema/oh-my-opencode-config"
 import { createManagers } from "./create-managers"
-import type { MonitorManager, MonitorManagerEvent, MonitorOutputQuery, MonitorOutputResult, MonitorRecord, MonitorStartOpts } from "./features/monitor"
+import type {
+  MonitorManager,
+  MonitorManagerEvent,
+  MonitorOutputQuery,
+  MonitorOutputResult,
+  MonitorRecord,
+  MonitorStartOpts,
+} from "./features/monitor"
 import type { createMonitorManager } from "./features/monitor"
 import { createModelCacheState } from "./plugin-state"
 

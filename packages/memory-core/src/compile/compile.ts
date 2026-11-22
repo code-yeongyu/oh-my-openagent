@@ -12,8 +12,8 @@ import { renderSystemTree, type CompiledSystemFile } from "./render"
 const PERSONA_PATH = "system/persona.md"
 const IDENTITY_PATH = "system/identity.md"
 const REMINDER =
-  "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. "
-  + MEMORY_AUTHORITY_RULE
+  "Reminder: <projection> holds local paths of memory projections. <memory> is your persistent memory across conversations. Consult it BEFORE asking the user anything it may already answer. Save durable facts, preferences, decisions, and corrections with the memory tools THE MOMENT they emerge. Route facts about a person to their record under people/ (the primary human's card is system/human.md). Relevant stored memory arrives on its own as <recalled-memory> blocks; there is no recall tool to call. " +
+  MEMORY_AUTHORITY_RULE
 
 export interface CompileMemoryBlockOptions {
   agentId: string
@@ -21,10 +21,7 @@ export interface CompileMemoryBlockOptions {
   projection?: ExternalProjectionLimits
 }
 
-export async function compileMemoryBlock(
-  repo: GitMemoryRepo,
-  options: CompileMemoryBlockOptions,
-): Promise<string> {
+export async function compileMemoryBlock(repo: GitMemoryRepo, options: CompileMemoryBlockOptions): Promise<string> {
   return compileMemoryBlockAtRevision(repo, await repo.head(), options)
 }
 
@@ -61,31 +58,36 @@ export async function compileMemoryBlockWithReads(
   revision: string | null,
   options: CompileMemoryBlockOptions,
   asOfMs: number = Date.now(),
-): Promise<{ readonly block: string; readonly degraded: readonly string[]; readonly expiries: readonly MemoryExpiry[] }> {
+): Promise<{
+  readonly block: string
+  readonly degraded: readonly string[]
+  readonly expiries: readonly MemoryExpiry[]
+}> {
   const reads: CompileReads = { degraded: [] }
   const paths = revision ? await repo.lsTree(revision) : []
-  const persona = revision && paths.includes(PERSONA_PATH)
-    ? await readSystemFile(repo, revision, PERSONA_PATH, reads)
-    : undefined
-  const identity = revision && paths.includes(IDENTITY_PATH)
-    ? await readSystemFile(repo, revision, IDENTITY_PATH, reads)
-    : undefined
-  const agreements = revision && paths.includes(AGREEMENTS_PATH)
-    ? await readSystemFile(repo, revision, AGREEMENTS_PATH, reads)
-    : undefined
-  const systemFiles = revision
-    ? await readSystemFiles(repo, revision, paths.filter(isOtherSystemMarkdown), reads)
-    : []
+  const persona =
+    revision && paths.includes(PERSONA_PATH) ? await readSystemFile(repo, revision, PERSONA_PATH, reads) : undefined
+  const identity =
+    revision && paths.includes(IDENTITY_PATH) ? await readSystemFile(repo, revision, IDENTITY_PATH, reads) : undefined
+  const agreements =
+    revision && paths.includes(AGREEMENTS_PATH)
+      ? await readSystemFile(repo, revision, AGREEMENTS_PATH, reads)
+      : undefined
+  const systemFiles = revision ? await readSystemFiles(repo, revision, paths.filter(isOtherSystemMarkdown), reads) : []
   const expiries = [persona, identity, agreements, ...systemFiles].flatMap((file) =>
-    file?.expiresAtMs === undefined ? [] : [{ path: file.relativePath, expiresAtMs: file.expiresAtMs }])
-  const live = (file: SystemFileRead | undefined) => file === undefined || isMemoryExpired(file.expiresAtMs, asOfMs) ? undefined : file
+    file?.expiresAtMs === undefined ? [] : [{ path: file.relativePath, expiresAtMs: file.expiresAtMs }],
+  )
+  const live = (file: SystemFileRead | undefined) =>
+    file === undefined || isMemoryExpired(file.expiresAtMs, asOfMs) ? undefined : file
   const externalPaths = paths.filter(isExternalPath)
   const external = await projectionInput(repo, revision, externalPaths, options.projection)
-  if (external.recencyUnavailable === true) reads.degraded.push(`commit times unavailable: ${external.recencyError ?? "unknown error"}`)
+  if (external.recencyUnavailable === true)
+    reads.degraded.push(`commit times unavailable: ${external.recencyError ?? "unknown error"}`)
   // The listing renderer is a lazy sidecar in bundles that map `#memory-external-projection` (omo-senpi's omo.js).
-  const listing = externalPaths.length === 0
-    ? ""
-    : (await import("#memory-external-projection")).renderExternalProjection(externalPaths, external)
+  const listing =
+    externalPaths.length === 0
+      ? ""
+      : (await import("#memory-external-projection")).renderExternalProjection(externalPaths, external)
   const projection = renderProjection(
     live(persona),
     live(identity),
@@ -94,7 +96,11 @@ export async function compileMemoryBlockWithReads(
     listing,
   )
   const metadata = renderMetadata(options)
-  return { block: [projection, metadata].filter((part) => part.length > 0).join("\n\n"), degraded: reads.degraded, expiries }
+  return {
+    block: [projection, metadata].filter((part) => part.length > 0).join("\n\n"),
+    degraded: reads.degraded,
+    expiries,
+  }
 }
 
 /** What `<external_projection>` would show at `revision` under `limits`, without compiling the block. */
@@ -121,7 +127,12 @@ async function projectionInput(
   } catch (error) {
     // Commit times only order names; without them the same limits apply in name order, and the
     // fallback is reported (`/doctor` projection) instead of silently changing the order.
-    return { times: new Map(), limits, recencyUnavailable: true, recencyError: error instanceof Error ? error.message : String(error) }
+    return {
+      times: new Map(),
+      limits,
+      recencyUnavailable: true,
+      recencyError: error instanceof Error ? error.message : String(error),
+    }
   }
 }
 
@@ -132,7 +143,8 @@ async function readSystemFiles(
   reads: CompileReads,
 ): Promise<SystemFileRead[]> {
   const files = await Promise.all(paths.map((path) => readSystemFile(repo, revision, path, reads)))
-  return files.filter((file): file is SystemFileRead => file !== undefined)
+  return files
+    .filter((file): file is SystemFileRead => file !== undefined)
     .sort((a, b) => a.relativePath.localeCompare(b.relativePath))
 }
 
@@ -176,16 +188,10 @@ function renderProjection(
   if (persona || identity) {
     lines.push("", "<self>")
     if (persona) {
-      lines.push(
-        "<projection>$MEMORY_DIR/system/persona.md</projection>",
-        persona.body.trimEnd(),
-      )
+      lines.push("<projection>$MEMORY_DIR/system/persona.md</projection>", persona.body.trimEnd())
     }
     if (identity) {
-      lines.push(
-        "<projection>$MEMORY_DIR/system/identity.md</projection>",
-        identity.body.trimEnd(),
-      )
+      lines.push("<projection>$MEMORY_DIR/system/identity.md</projection>", identity.body.trimEnd())
     }
     lines.push("</self>")
   }
@@ -204,8 +210,13 @@ interface SystemFileRead extends CompiledSystemFile {
 }
 
 function isOtherSystemMarkdown(path: string): boolean {
-  return path.startsWith("system/") && path !== PERSONA_PATH && path !== IDENTITY_PATH && path !== AGREEMENTS_PATH
-    && path.endsWith(".md")
+  return (
+    path.startsWith("system/") &&
+    path !== PERSONA_PATH &&
+    path !== IDENTITY_PATH &&
+    path !== AGREEMENTS_PATH &&
+    path.endsWith(".md")
+  )
 }
 
 function isExternalPath(path: string): boolean {
@@ -213,9 +224,5 @@ function isExternalPath(path: string): boolean {
 }
 
 function renderMetadata(options: CompileMemoryBlockOptions): string {
-  return [
-    "<memory_metadata>",
-    `- AGENT_ID: ${options.agentId}`,
-    "</memory_metadata>",
-  ].join("\n")
+  return ["<memory_metadata>", `- AGENT_ID: ${options.agentId}`, "</memory_metadata>"].join("\n")
 }

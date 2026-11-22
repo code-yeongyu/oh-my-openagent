@@ -1,13 +1,5 @@
 import { randomUUID } from "node:crypto"
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  statSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { existsSync, mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 export const COOLDOWN_DAYS = 7
@@ -150,7 +142,11 @@ export function writeGlobalDecline(stateDir: string): void {
     writeFileSync(tmp, JSON.stringify({ declinedAt: Date.now() }), { mode: 0o600 })
     renameSync(tmp, dest)
   } finally {
-    try { unlinkSync(tmp) } catch { /* already renamed or never created */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* already renamed or never created */
+    }
   }
 }
 
@@ -171,7 +167,11 @@ export function writeProjectDecline(stateDir: string, repoHash: string): void {
     writeFileSync(tmp, JSON.stringify({ declinedAt: Date.now() }), { mode: 0o600 })
     renameSync(tmp, dest)
   } finally {
-    try { unlinkSync(tmp) } catch { /* already renamed or never created */ }
+    try {
+      unlinkSync(tmp)
+    } catch {
+      /* already renamed or never created */
+    }
   }
 }
 
@@ -186,11 +186,10 @@ export function isProjectDeclined(stateDir: string, repoHash: string): boolean {
 export function writeCooldown(stateDir: string, repoHash: string, at: number): void {
   const dir = join(stateDir, COOLDOWN_DIR)
   mkdirSync(dir, { recursive: true })
-  writeFileSync(
-    join(dir, repoHash),
-    JSON.stringify({ until: at + COOLDOWN_DAYS * MS_PER_DAY }),
-    { flag: "w", mode: 0o600 },
-  )
+  writeFileSync(join(dir, repoHash), JSON.stringify({ until: at + COOLDOWN_DAYS * MS_PER_DAY }), {
+    flag: "w",
+    mode: 0o600,
+  })
 }
 
 export function isCoolingDown(stateDir: string, repoHash: string, now: number): boolean {

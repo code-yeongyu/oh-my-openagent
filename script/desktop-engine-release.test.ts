@@ -32,13 +32,16 @@ describe("desktop engine GitHub release assets", () => {
       writeFileSync(source, contents)
       const signed: string[] = []
       for (const host of DESKTOP_ENGINE_RELEASE_HOSTS) {
-        stageDesktopEngineReleaseAsset(host, source, staged, (path) => { signed.push(path) })
+        stageDesktopEngineReleaseAsset(host, source, staged, (path) => {
+          signed.push(path)
+        })
       }
 
       const checksums = writeDesktopEngineChecksums(staged)
       const digest = createHash("sha256").update(contents).digest("hex")
       expect(readFileSync(checksums, "utf8")).toBe(
-        DESKTOP_ENGINE_RELEASE_HOSTS.map((host) => `${digest}  ${desktopEngineReleaseAssetName(host)}`).join("\n") + "\n",
+        DESKTOP_ENGINE_RELEASE_HOSTS.map((host) => `${digest}  ${desktopEngineReleaseAssetName(host)}`).join("\n") +
+          "\n",
       )
       expect(signed).toHaveLength(2)
     } finally {

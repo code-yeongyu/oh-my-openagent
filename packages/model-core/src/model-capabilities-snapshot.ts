@@ -1,7 +1,4 @@
-import type {
-  ModelCapabilitiesSnapshot,
-  ModelCapabilitiesSnapshotEntry,
-} from "./model-capabilities"
+import type { ModelCapabilitiesSnapshot, ModelCapabilitiesSnapshotEntry } from "./model-capabilities"
 
 export const MODELS_DEV_SOURCE_URL = "https://models.dev/api.json"
 
@@ -46,24 +43,26 @@ function normalizeSnapshotEntry(rawModelID: string, rawModel: unknown): ModelCap
   const rawModalities = isRecord(rawModel.modalities) ? rawModel.modalities : undefined
   const modalitiesInput = readStringArray(rawModalities?.input)
   const modalitiesOutput = readStringArray(rawModalities?.output)
-  const modalities = modalitiesInput || modalitiesOutput
-    ? {
-        ...(modalitiesInput ? { input: modalitiesInput } : {}),
-        ...(modalitiesOutput ? { output: modalitiesOutput } : {}),
-      }
-    : undefined
+  const modalities =
+    modalitiesInput || modalitiesOutput
+      ? {
+          ...(modalitiesInput ? { input: modalitiesInput } : {}),
+          ...(modalitiesOutput ? { output: modalitiesOutput } : {}),
+        }
+      : undefined
 
   const rawLimit = isRecord(rawModel.limit) ? rawModel.limit : undefined
   const limitContext = readNumber(rawLimit?.context)
   const limitInput = readNumber(rawLimit?.input)
   const limitOutput = readNumber(rawLimit?.output)
-  const limit = limitContext !== undefined || limitInput !== undefined || limitOutput !== undefined
-    ? {
-        ...(limitContext !== undefined ? { context: limitContext } : {}),
-        ...(limitInput !== undefined ? { input: limitInput } : {}),
-        ...(limitOutput !== undefined ? { output: limitOutput } : {}),
-      }
-    : undefined
+  const limit =
+    limitContext !== undefined || limitInput !== undefined || limitOutput !== undefined
+      ? {
+          ...(limitContext !== undefined ? { context: limitContext } : {}),
+          ...(limitInput !== undefined ? { input: limitInput } : {}),
+          ...(limitOutput !== undefined ? { output: limitOutput } : {}),
+        }
+      : undefined
 
   return {
     id,
@@ -84,18 +83,20 @@ function mergeSnapshotEntries(
     return incoming
   }
 
-  const mergedModalities = existing.modalities || incoming.modalities
-    ? {
-        ...existing.modalities,
-        ...incoming.modalities,
-      }
-    : undefined
-  const mergedLimit = existing.limit || incoming.limit
-    ? {
-        ...existing.limit,
-        ...incoming.limit,
-      }
-    : undefined
+  const mergedModalities =
+    existing.modalities || incoming.modalities
+      ? {
+          ...existing.modalities,
+          ...incoming.modalities,
+        }
+      : undefined
+  const mergedLimit =
+    existing.limit || incoming.limit
+      ? {
+          ...existing.limit,
+          ...incoming.limit,
+        }
+      : undefined
 
   return {
     ...existing,
@@ -139,10 +140,12 @@ export function buildModelCapabilitiesSnapshotFromModelsDev(raw: unknown): Model
   }
 }
 
-export async function fetchModelCapabilitiesSnapshot(args: {
-  sourceUrl?: string
-  fetchImpl?: FetchImpl
-} = {}): Promise<ModelCapabilitiesSnapshot> {
+export async function fetchModelCapabilitiesSnapshot(
+  args: {
+    sourceUrl?: string
+    fetchImpl?: FetchImpl
+  } = {},
+): Promise<ModelCapabilitiesSnapshot> {
   const sourceUrl = args.sourceUrl ?? MODELS_DEV_SOURCE_URL
   const fetchImpl = args.fetchImpl ?? fetch
   const response = await fetchImpl(sourceUrl)

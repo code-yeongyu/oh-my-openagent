@@ -11,7 +11,9 @@ describe("describeSessionError", () => {
   })
 
   test("#given a plain object with message and code #when described #then both appear", () => {
-    expect(describeSessionError({ message: "database is locked", code: "SQLITE_BUSY" })).toBe("database is locked (SQLITE_BUSY)")
+    expect(describeSessionError({ message: "database is locked", code: "SQLITE_BUSY" })).toBe(
+      "database is locked (SQLITE_BUSY)",
+    )
   })
 
   test("#given an object with no known fields #when described #then its JSON is shown, never [object Object]", () => {
@@ -31,7 +33,10 @@ describe("sdk session reads", () => {
     const client = { session: { messages: async () => ({ error: notFoundBody }) } } as unknown as PluginInput["client"]
 
     //#when
-    const failure = await getSdkSessionMessages(client, "ses_gone").then(() => undefined, (error: unknown) => error)
+    const failure = await getSdkSessionMessages(client, "ses_gone").then(
+      () => undefined,
+      (error: unknown) => error,
+    )
 
     //#then
     expect(failure).toBeInstanceOf(Error)

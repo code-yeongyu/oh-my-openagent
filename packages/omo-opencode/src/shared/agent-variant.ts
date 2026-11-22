@@ -41,39 +41,27 @@ export function lowerReasoningForModel(
   }
 }
 
-function findAgentOverride(
-  config: OhMyOpenCodeConfig,
-  agentName: string,
-): ReasoningConfig | undefined {
+function findAgentOverride(config: OhMyOpenCodeConfig, agentName: string): ReasoningConfig | undefined {
   const stripped = stripInvisibleAgentCharacters(agentName)
   const agentOverrides = config.agents
   return agentOverrides
-    ? agentOverrides[stripped]
-      ?? Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1]
+    ? (agentOverrides[stripped] ??
+        Object.entries(agentOverrides).find(([key]) => key.toLowerCase() === stripped.toLowerCase())?.[1])
     : undefined
 }
 
-function getCategoryConfig(
-  config: OhMyOpenCodeConfig,
-  categoryName: string | undefined,
-): ReasoningConfig | undefined {
+function getCategoryConfig(config: OhMyOpenCodeConfig, categoryName: string | undefined): ReasoningConfig | undefined {
   return categoryName ? config.categories?.[categoryName] : undefined
 }
 
-export function resolveAgentVariant(
-  config: OhMyOpenCodeConfig,
-  agentName?: string,
-): string | undefined {
+export function resolveAgentVariant(config: OhMyOpenCodeConfig, agentName?: string): string | undefined {
   if (!agentName) return undefined
 
   const agentOverride = findAgentOverride(config, agentName)
   if (!agentOverride) return undefined
 
   const categoryConfig = getCategoryConfig(config, agentOverride.category)
-  return agentOverride.reasoning
-    ?? categoryConfig?.reasoning
-    ?? agentOverride.variant
-    ?? categoryConfig?.variant
+  return agentOverride.reasoning ?? categoryConfig?.reasoning ?? agentOverride.variant ?? categoryConfig?.variant
 }
 
 export function resolveVariantForModel(
@@ -86,20 +74,20 @@ export function resolveVariantForModel(
   const categoryName = agentOverride?.category
   const categoryConfig = getCategoryConfig(config, categoryName)
   const agentChain = AGENT_MODEL_REQUIREMENTS[stripped]?.fallbackChain
-  const categoryChain = categoryName
-    ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain
-    : undefined
+  const categoryChain = categoryName ? CATEGORY_MODEL_REQUIREMENTS[categoryName]?.fallbackChain : undefined
   const agentChainEntry = findEntryInChain(agentChain, currentModel)
   const categoryChainEntry = findEntryInChain(categoryChain, currentModel)
 
-  return agentOverride?.reasoning
-    ?? categoryConfig?.reasoning
-    ?? agentChainEntry?.reasoning
-    ?? categoryChainEntry?.reasoning
-    ?? agentOverride?.variant
-    ?? categoryConfig?.variant
-    ?? agentChainEntry?.variant
-    ?? categoryChainEntry?.variant
+  return (
+    agentOverride?.reasoning ??
+    categoryConfig?.reasoning ??
+    agentChainEntry?.reasoning ??
+    categoryChainEntry?.reasoning ??
+    agentOverride?.variant ??
+    categoryConfig?.variant ??
+    agentChainEntry?.variant ??
+    categoryChainEntry?.variant
+  )
 }
 
 function findEntryInChain(
@@ -108,10 +96,9 @@ function findEntryInChain(
 ): FallbackEntry | undefined {
   if (!fallbackChain) return undefined
 
-  const exactMatch = fallbackChain.find((entry) => (
-    entry.providers.includes(currentModel.providerID)
-    && entry.model === currentModel.modelID
-  ))
+  const exactMatch = fallbackChain.find(
+    (entry) => entry.providers.includes(currentModel.providerID) && entry.model === currentModel.modelID,
+  )
   if (exactMatch) return exactMatch
 
   // Some providers expose identical model IDs (e.g. OpenAI models via different providers).

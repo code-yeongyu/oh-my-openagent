@@ -1,4 +1,10 @@
-import type { EffectiveModelChange, EffectiveModelChangeKind, EffectiveModelSource, TaskRecord, TaskStatus } from "../state"
+import type {
+  EffectiveModelChange,
+  EffectiveModelChangeKind,
+  EffectiveModelSource,
+  TaskRecord,
+  TaskStatus,
+} from "../state"
 import { EFFECTIVE_MODEL_CHANGE_KINDS } from "../state"
 
 function liveChangeKind(source: EffectiveModelSource): EffectiveModelChangeKind | undefined {
@@ -19,7 +25,9 @@ function liveChangeKind(source: EffectiveModelSource): EffectiveModelChangeKind 
 // build map the pair back to `paused`.
 export type StoredPausedMarker = { readonly paused?: true }
 
-export function storedStatus(status: TaskStatus): { readonly status: Exclude<TaskStatus, "paused"> } & StoredPausedMarker {
+export function storedStatus(
+  status: TaskStatus,
+): { readonly status: Exclude<TaskStatus, "paused"> } & StoredPausedMarker {
   return status === "paused" ? { status: "running", paused: true } : { status }
 }
 

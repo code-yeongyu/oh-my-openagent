@@ -47,9 +47,7 @@ export type ResumptionChannelEmitterDeps = {
   readonly logger?: Pick<ComponentLogger, "warn">
 }
 
-export function createResumptionChannelEmitter(
-  deps: ResumptionChannelEmitterDeps,
-): ResumptionChannelEmitter {
+export function createResumptionChannelEmitter(deps: ResumptionChannelEmitterDeps): ResumptionChannelEmitter {
   const resolveOwnedTeamMember = deps.isOwnedTeamMember ?? isOwnedTeamMemberTask
   let active = false
   let lastIds = ""
@@ -77,9 +75,12 @@ export function createResumptionChannelEmitter(
           poolTaskIds = deps.manager.workpools?.ownedTaskIds() ?? new Set()
         } catch (error) {
           poolStoreReadable = false
-          deps.logger?.warn("resumption channels: workpool store unreadable, unclassified tasks stay counted this round", {
-            error: error instanceof Error ? error.message : String(error),
-          })
+          deps.logger?.warn(
+            "resumption channels: workpool store unreadable, unclassified tasks stay counted this round",
+            {
+              error: error instanceof Error ? error.message : String(error),
+            },
+          )
           return false
         }
       }
@@ -121,12 +122,13 @@ export function createResumptionChannelEmitter(
   }
 
   return {
-    emitIfChanged: () => enqueue(async () => {
-      if (!active) return
-      const channels = await snapshot()
-      if (idsOf(channels) === lastIds) return
-      publish(channels)
-    }),
+    emitIfChanged: () =>
+      enqueue(async () => {
+        if (!active) return
+        const channels = await snapshot()
+        if (idsOf(channels) === lastIds) return
+        publish(channels)
+      }),
     emitSessionStart: () => {
       active = true
       return enqueue(async () => publish(await snapshot()))

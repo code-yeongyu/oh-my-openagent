@@ -154,7 +154,10 @@ function getSharedProperties(input: CreateTelemetryClientInput): TelemetryCaptur
 // The login shell's path often contains the user's name (/home/<user>/.nix-profile/bin/zsh), so only the program
 // name is sent: the last path segment, without a Windows .exe suffix.
 function getShellName(shellPath: string | undefined): string | undefined {
-  const name = shellPath?.split(/[\\/]/).pop()?.replace(/\.exe$/i, "")
+  const name = shellPath
+    ?.split(/[\\/]/)
+    .pop()
+    ?.replace(/\.exe$/i, "")
   return name ? name : undefined
 }
 

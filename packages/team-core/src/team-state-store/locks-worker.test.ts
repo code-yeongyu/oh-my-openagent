@@ -28,8 +28,13 @@ function reply(worker: Worker, event: string): Promise<z.infer<typeof Reply>> {
     const onError = (error: Error) => done(error)
     const onExit = (code: number) => done(new Error(`worker exited ${code} before ${event}`))
     const onMessage = (message: unknown) => {
-      if (event === "registered" && typeof message === "object" && message !== null &&
-        "kind" in message && message.kind === "omo-team-lock-register-v1") {
+      if (
+        event === "registered" &&
+        typeof message === "object" &&
+        message !== null &&
+        "kind" in message &&
+        message.kind === "omo-team-lock-register-v1"
+      ) {
         done(undefined, { event: "registered" })
         return
       }
@@ -59,9 +64,12 @@ async function fixture() {
     lockPath,
     state: new Int32Array(counters),
     async worker(supervised = false) {
-      const worker = new Worker(new URL(supervised ? "./lock-worker-host.fixture.ts" : "./lock-worker.fixture.ts", import.meta.url), {
-        workerData: { lockPath, counters },
-      })
+      const worker = new Worker(
+        new URL(supervised ? "./lock-worker-host.fixture.ts" : "./lock-worker.fixture.ts", import.meta.url),
+        {
+          workerData: { lockPath, counters },
+        },
+      )
       workers.push(worker)
       const ready = reply(worker, "ready")
       if (supervised) await ready

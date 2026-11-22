@@ -3,14 +3,13 @@ import type { DelegatedModelConfig } from "../../../shared/model-resolution-type
 import type { ExecutorContext } from "../../../tools/delegate-task/executor-types"
 import type { DelegateTaskArgs } from "../../../tools/delegate-task/types"
 import type { Member } from "../types"
-import {
-  buildSystemContent,
-  resolveCategoryExecution,
-  resolveSubagentExecution,
-} from "./resolve-member-dependencies"
+import { buildSystemContent, resolveCategoryExecution, resolveSubagentExecution } from "./resolve-member-dependencies"
 
 export class TeamMemberResolutionError extends Error {
-  constructor(public readonly memberName: string, public readonly cause: Error) {
+  constructor(
+    public readonly memberName: string,
+    public readonly cause: Error,
+  ) {
     super(`Failed to resolve member '${memberName}': ${cause.message}`)
     this.name = "TeamMemberResolutionError"
   }
@@ -24,7 +23,9 @@ export interface ResolvedMember {
   systemContent: string
 }
 
-function createBaseDelegateTaskArgs(prompt: string): Pick<DelegateTaskArgs, "description" | "load_skills" | "prompt" | "run_in_background"> {
+function createBaseDelegateTaskArgs(
+  prompt: string,
+): Pick<DelegateTaskArgs, "description" | "load_skills" | "prompt" | "run_in_background"> {
   return {
     description: "Resolve team member",
     load_skills: [],
@@ -43,12 +44,14 @@ function resolveSystemContent(input: {
   maxPromptTokens?: number
   model: DelegatedModelConfig | undefined
 }): string {
-  return buildSystemContent({
-    agentName: input.agentToUse,
-    categoryPromptAppend: input.categoryPromptAppend,
-    maxPromptTokens: input.maxPromptTokens,
-    model: input.model,
-  }) ?? ""
+  return (
+    buildSystemContent({
+      agentName: input.agentToUse,
+      categoryPromptAppend: input.categoryPromptAppend,
+      maxPromptTokens: input.maxPromptTokens,
+      model: input.model,
+    }) ?? ""
+  )
 }
 
 // Strip global `agents.sisyphus-junior.model` override at the team-mode boundary —

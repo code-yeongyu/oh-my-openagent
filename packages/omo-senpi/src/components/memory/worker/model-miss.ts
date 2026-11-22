@@ -47,7 +47,8 @@ export function classifyRetryableModelMiss(result: ModelMissResult): RetryableMo
  * prefix (`note:`, `info:`, `warning:`, ...). It is never the provider's answer, so it can never make a
  * child look like a provider outage (#9553).
  */
-const ADVISORY = /\bunder (?:Bun|Node(?:\.js)?|Deno)\b|^(?:\[[^\]]*\]\s*)?(?:note|notice|info|hint|debug|warn|warning)\s*:/i
+const ADVISORY =
+  /\bunder (?:Bun|Node(?:\.js)?|Deno)\b|^(?:\[[^\]]*\]\s*)?(?:note|notice|info|hint|debug|warn|warning)\s*:/i
 
 /**
  * The child's failure line: the first line that is not an advisory. senpi prints the fatal provider

@@ -5,12 +5,19 @@ import { createLazyPostHogTransportFactory } from "./lazy-posthog"
 import { createSenpiTelemetryProductConfig } from "./index"
 
 const options = {
-  host: "https://posthog.test", disableGeoip: false, enableExceptionAutocapture: false,
-  enableLocalEvaluation: false, strictLocalEvaluation: true, disableRemoteConfig: true,
-  flushAt: 20, flushInterval: 0,
+  host: "https://posthog.test",
+  disableGeoip: false,
+  enableExceptionAutocapture: false,
+  enableLocalEvaluation: false,
+  strictLocalEvaluation: true,
+  disableRemoteConfig: true,
+  flushAt: 20,
+  flushInterval: 0,
 }
 const message = (ordinal: number): TelemetryCaptureMessage => ({
-  distinctId: "synthetic", event: "buffered", properties: { ordinal },
+  distinctId: "synthetic",
+  event: "buffered",
+  properties: { ordinal },
 })
 
 it("keeps the caller's diagnostic source when the sidecar import fails", async () => {
@@ -18,8 +25,12 @@ it("keeps the caller's diagnostic source when the sidecar import fails", async (
   const diagnostics: TelemetryDiagnosticInput[] = []
   const transport = createLazyPostHogTransportFactory({
     source: "native-caller",
-    diagnostics: value => { diagnostics.push(value) },
-    load: async () => { throw new Error("unavailable") },
+    diagnostics: (value) => {
+      diagnostics.push(value)
+    },
+    load: async () => {
+      throw new Error("unavailable")
+    },
   })("key", options)
   transport.capture(message(0))
   await transport.flush?.()
@@ -29,19 +40,29 @@ it("keeps the caller's diagnostic source when the sidecar import fails", async (
 
 it("bounds the buffer at 256 captures, drops oldest, and reports the aggregate once on flush", async () => {
   // Given an import held open while the fixed buffer overflows.
-  let release: () => void = () => { throw new Error("uninitialized") }
-  const ready = new Promise<void>(resolve => { release = resolve })
+  let release: () => void = () => {
+    throw new Error("uninitialized")
+  }
+  const ready = new Promise<void>((resolve) => {
+    release = resolve
+  })
   const captured: TelemetryCaptureMessage[] = []
   const diagnostics: TelemetryDiagnosticInput[] = []
   const transport = createLazyPostHogTransportFactory({
     source: "buffer-test",
-    diagnostics: value => { diagnostics.push(value) },
+    diagnostics: (value) => {
+      diagnostics.push(value)
+    },
     load: async () => {
       await ready
-      return { createDefaultPostHogTransport: () => ({
-        capture: (value: TelemetryCaptureMessage) => { captured.push(value) },
-        shutdown: async () => undefined,
-      }) }
+      return {
+        createDefaultPostHogTransport: () => ({
+          capture: (value: TelemetryCaptureMessage) => {
+            captured.push(value)
+          },
+          shutdown: async () => undefined,
+        }),
+      }
     },
   })("key", options)
   for (let ordinal = 0; ordinal < 260; ordinal++) transport.capture(message(ordinal))
@@ -65,14 +86,21 @@ it("memoizes one import across transports and backs off failures without retryin
   const diagnostics: TelemetryDiagnosticInput[] = []
   const captured: TelemetryCaptureMessage[] = []
   const factory = createLazyPostHogTransportFactory({
-    source: "caller-source", now: () => now,
-    diagnostics: value => { diagnostics.push(value) },
+    source: "caller-source",
+    now: () => now,
+    diagnostics: (value) => {
+      diagnostics.push(value)
+    },
     load: async () => {
       if (++imports === 1) throw new Error("sidecar unavailable")
-      return { createDefaultPostHogTransport: () => ({
-        capture: (value: TelemetryCaptureMessage) => { captured.push(value) },
-        shutdown: async () => undefined,
-      }) }
+      return {
+        createDefaultPostHogTransport: () => ({
+          capture: (value: TelemetryCaptureMessage) => {
+            captured.push(value)
+          },
+          shutdown: async () => undefined,
+        }),
+      }
     },
   })
   const first = factory("key", options)
@@ -101,7 +129,10 @@ for (const method of ["flush", "shutdown"] as const) {
     // Given no buffered event, when the lifecycle operation runs, then the loader stays untouched.
     let imports = 0
     const transport = createLazyPostHogTransportFactory({
-      load: async () => { imports++; throw new Error("must not import") },
+      load: async () => {
+        imports++
+        throw new Error("must not import")
+      },
     })("key", options)
     await transport[method]?.()
     expect(imports).toBe(0)
@@ -112,20 +143,32 @@ it("never calls the loader for disabled native or legacy telemetry", async () =>
   // Given disabled telemetry and a load spy used by both real core clients.
   let imports = 0
   const transportFactory = createLazyPostHogTransportFactory({
-    load: async () => { imports++; throw new Error("must not import") },
+    load: async () => {
+      imports++
+      throw new Error("must not import")
+    },
   })
   const product = createSenpiTelemetryProductConfig()
   const env = { DO_NOT_TRACK: "1" }
   // When disabled clients are used, then capture, flush and shutdown cannot reach the loader.
   const client = createEventTelemetryClient({
-    distinctId: "synthetic", env, product, source: "disabled",
-    propertyAllowlist: { test: [] }, schemaVersion: 1, transportFactory,
+    distinctId: "synthetic",
+    env,
+    product,
+    source: "disabled",
+    propertyAllowlist: { test: [] },
+    schemaVersion: 1,
+    transportFactory,
   })
   client.captureEvent("test", {})
   await client.flush()
   await client.shutdown()
   await recordDailyActive({
-    env, product, reason: "test", source: "disabled", stateDir: "/never-used",
+    env,
+    product,
+    reason: "test",
+    source: "disabled",
+    stateDir: "/never-used",
     transportFactory,
   })
   expect(client.enabled).toBe(false)

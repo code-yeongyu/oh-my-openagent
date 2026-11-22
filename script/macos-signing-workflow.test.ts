@@ -3,7 +3,16 @@
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { createHash } from "node:crypto"
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { load } from "js-yaml"
@@ -22,11 +31,17 @@ const bashRuns = spawnSync("bash", ["-c", "exit 0"]).status === 0
 const posixBashTest = test.skipIf(process.platform === "win32" || !bashRuns)
 const anyBashTest = test.skipIf(!bashRuns)
 
-const stepsSchema = z.array(z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }))
-const jobs = z.object({ jobs: z.object({
-  "desktop-engine": z.object({ steps: stepsSchema }),
-  build: z.object({ steps: stepsSchema }),
-}) }).parse(load(readFileSync(workflowPath, "utf8"))).jobs
+const stepsSchema = z.array(
+  z.object({ name: z.string().optional(), if: z.string().optional(), run: z.string().optional() }),
+)
+const jobs = z
+  .object({
+    jobs: z.object({
+      "desktop-engine": z.object({ steps: stepsSchema }),
+      build: z.object({ steps: stepsSchema }),
+    }),
+  })
+  .parse(load(readFileSync(workflowPath, "utf8"))).jobs
 
 function stepIndex(steps: z.infer<typeof stepsSchema>, name: string): number {
   const index = steps.findIndex((step) => step.name === name)
@@ -43,7 +58,10 @@ function sandbox(): { root: string; calls: string; env: NodeJS.ProcessEnv } {
   const bin = join(root, "bin")
   mkdirSync(bin)
   const calls = join(root, "codesign-calls")
-  writeFileSync(join(bin, "codesign"), `#!/bin/bash\necho "$*" >> "${calls}"\nif [ "$1" = --force ]; then printf 'signature' >> "\${@: -1}"; fi\n`)
+  writeFileSync(
+    join(bin, "codesign"),
+    `#!/bin/bash\necho "$*" >> "${calls}"\nif [ "$1" = --force ]; then printf 'signature' >> "\${@: -1}"; fi\n`,
+  )
   chmodSync(join(bin, "codesign"), 0o755)
   const env: NodeJS.ProcessEnv = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` }
   for (const name of [...signingMaterial, "MACOS_SIGNING_REQUIRED"]) delete env[name]
@@ -89,9 +107,17 @@ describe("macOS signing in the platform publish workflow", () => {
       writeFileSync(join(binaries, "omo-darwin-arm64"), "unsigned build output")
       writeFileSync(join(binaries, "SHA256SUMS"), "stale  omo-darwin-arm64\n")
       const workflow = readFileSync(workflowPath, "utf8")
-      const step = runBlock(workflow, "      - name: Sign and notarize Darwin release binary\n", "      - name: Smoke test release binary\n")
+      const step = runBlock(
+        workflow,
+        "      - name: Sign and notarize Darwin release binary\n",
+        "      - name: Smoke test release binary\n",
+      )
 
-      const result = spawnSync("bash", ["-e", "-c", step], { cwd: root, env: { ...env, BINARY: "omo-darwin-arm64" }, encoding: "utf8" })
+      const result = spawnSync("bash", ["-e", "-c", step], {
+        cwd: root,
+        env: { ...env, BINARY: "omo-darwin-arm64" },
+        encoding: "utf8",
+      })
 
       expect(result.status, result.stderr).toBe(0)
       const signed = readFileSync(join(binaries, "omo-darwin-arm64"))
@@ -109,11 +135,15 @@ describe("macOS signing in the platform publish workflow", () => {
       const binary = join(root, "omo-darwin-arm64")
       writeFileSync(binary, "unsigned build output")
 
-      const result = spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], {
-        cwd: root,
-        env: { ...env, MACOS_SIGNING_REQUIRED: "true", CSC_LINK: "present" },
-        encoding: "utf8",
-      })
+      const result = spawnSync(
+        "bash",
+        [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary],
+        {
+          cwd: root,
+          env: { ...env, MACOS_SIGNING_REQUIRED: "true", CSC_LINK: "present" },
+          encoding: "utf8",
+        },
+      )
 
       expect(result.status).toBe(1)
       expect(result.stderr).toContain("CSC_KEY_PASSWORD")

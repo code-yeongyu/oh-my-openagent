@@ -17,12 +17,12 @@ export interface ProjectionItem {
 }
 
 /** How a listed name maps back to its file; the block opens with it when nothing is folded or grouped. */
-export const NAME_NOTE = "Names drop \".md\" (a quoted name is exact)."
+export const NAME_NOTE = 'Names drop ".md" (a quoted name is exact).'
 
 /** How a listed entry maps back to its file; the block opens with it when a line folds or groups names. */
 export const NAME_LEGEND =
-  "Names drop \".md\" (a quoted name is exact); {a, b}-20261027 is a-20261027 and b-20261027; "
-  + "\"x … y (N files)\" and <id> stand for similar names: read the directory to list them."
+  'Names drop ".md" (a quoted name is exact); {a, b}-20261027 is a-20261027 and b-20261027; ' +
+  '"x … y (N files)" and <id> stand for similar names: read the directory to list them.'
 
 const MARKDOWN = ".md"
 const DATE = /^(?:19|20)\d{6}$/
@@ -31,7 +31,8 @@ const MONTH = /^(?:0[1-9]|1[0-2])$/
 // A token after a date that names no topic: a clock time with an optional real zone (0930, 093015z, 0330KST),
 // a one- or two-digit sequence number, or a part (p3). Any other number (a ticket, a PR, an HTTP code) or a
 // clock time with a word after it (1200fix) is the hint and keeps the name listed.
-const HINT_FREE = /^(?:(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d)?(?:z|utc|gmt|kst|jst|pst|pdt|est|edt|cet|cest|bst|ist)?|\d{1,2}|p\d+)$/i
+const HINT_FREE =
+  /^(?:(?:[01]\d|2[0-3])[0-5]\d(?:[0-5]\d)?(?:z|utc|gmt|kst|jst|pst|pdt|est|edt|cet|cest|bst|ist)?|\d{1,2}|p\d+)$/i
 const DATE_SUFFIX = /^(.+)-((?:19|20)\d{6})$/
 const UUID = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i
 const HEX_DIGEST = /^(?:[0-9a-f]{16,}|[0-9A-F]{16,})$/
@@ -41,16 +42,18 @@ const MIXED_CASE_TOKEN = /^(?=.*[a-z])(?=.*[A-Z])[A-Za-z0-9]{12,}$/
 const WORDS = /[A-Z]+(?=[A-Z][a-z])|[A-Z]?[a-z]+|[A-Z]+|\d+/g
 const VOWEL = /[aeiouy]/i
 // The most frequent English letter pairs; the words of a random token are mostly made of other pairs.
-const COMMON_PAIRS: ReadonlySet<string> = new Set((
-  "th he in er an re on at en nd ti es or te of ed is it al ar st to nt ng se ha as ou io le ve co "
-  + "me de hi ri ro ic ne ea ra ce li ch ll be ma si om ur ca el ta la ns di fo ho pe ec pr no ct us "
-  + "ac ot il tr ly nc et ut ss so rs un lo wa ge ie wh ee wi em ad ol rt po we na ul ni ts mo ow pa "
-  + "im mi ai sh ir su id os iv ia am fi ci vi pl ig tu ev ld ry mp fe bl ab gh ty op wo sa ay ex ke "
-  + "fr oo av ag if ap gr od bo sp rd do uc bu ei ov by rm ep tt oc fa ef cu rn sc gi da yo cr cl du "
-  + "ga qu ue ff ba ey ls va um pp ua up lu go ht ru ug ds lt pi rc rr eg au ck ew mu br bi pt ak pu "
-  + "ui rg ib tl ny ki rk ys ob mm fu ph og ms ye ud mb ip ub oi rl gu dr hr cc tw ft wn nu af hu nn "
-  + "eo vo rv nf xp gn sm fl iz ok nl my gl aw sy oa"
-).split(" "))
+const COMMON_PAIRS: ReadonlySet<string> = new Set(
+  (
+    "th he in er an re on at en nd ti es or te of ed is it al ar st to nt ng se ha as ou io le ve co " +
+    "me de hi ri ro ic ne ea ra ce li ch ll be ma si om ur ca el ta la ns di fo ho pe ec pr no ct us " +
+    "ac ot il tr ly nc et ut ss so rs un lo wa ge ie wh ee wi em ad ol rt po we na ul ni ts mo ow pa " +
+    "im mi ai sh ir su id os iv ia am fi ci vi pl ig tu ev ld ry mp fe bl ab gh ty op wo sa ay ex ke " +
+    "fr oo av ag if ap gr od bo sp rd do uc bu ei ov by rm ep tt oc fa ef cu rn sc gi da yo cr cl du " +
+    "ga qu ue ff ba ey ls va um pp ua up lu go ht ru ug ds lt pi rc rr eg au ck ew mu br bi pt ak pu " +
+    "ui rg ib tl ny ki rk ys ob mm fu ph og ms ye ud mb ip ub oi rl gu dr hr cc tw ft wn nu af hu nn " +
+    "eo vo rv nf xp gn sm fl iz ok nl my gl aw sy oa"
+  ).split(" "),
+)
 // Each bar is met by most random base62 tokens; the most id-like of 13,995 real identifiers misses one by 0.05 or more.
 const MIN_NOISE = 0.25
 const MIN_RARE_PAIRS = 0.3
@@ -104,7 +107,12 @@ function readsAsRandom(name: string): boolean {
       if (!COMMON_PAIRS.has(lower.slice(index - 1, index + 1))) rare++
     }
   }
-  return marks / name.length >= MIN_NOISE && pairs > 0 && rare / pairs >= MIN_RARE_PAIRS && words.length / name.length >= MIN_WORD_DENSITY
+  return (
+    marks / name.length >= MIN_NOISE &&
+    pairs > 0 &&
+    rare / pairs >= MIN_RARE_PAIRS &&
+    words.length / name.length >= MIN_WORD_DENSITY
+  )
 }
 
 /** `a.md` lists as `a`; any other file keeps its exact name in quotes. Secret-like text is masked first. */
@@ -145,9 +153,10 @@ function mergeByName(files: readonly NamedFile[]): NamedFile[] {
   for (const file of files) {
     const name = redactSecretLikeMaterial(file.name)
     const seen = byName.get(name)
-    byName.set(name, seen
-      ? { name, time: Math.max(seen.time, file.time), files: seen.files + file.files }
-      : { ...file, name })
+    byName.set(
+      name,
+      seen ? { name, time: Math.max(seen.time, file.time), files: seen.files + file.files } : { ...file, name },
+    )
   }
   return [...byName.values()]
 }
@@ -202,7 +211,10 @@ function dateGroups(files: readonly NamedFile[]): ProjectionItem[] {
       items.push(...members.map(item))
       continue
     }
-    const listed = members.map(item).sort(newestFirst).map((entry) => entry.text.slice(0, -date.length - 1))
+    const listed = members
+      .map(item)
+      .sort(newestFirst)
+      .map((entry) => entry.text.slice(0, -date.length - 1))
     items.push({ text: `{${listed.join(", ")}}-${date}`, files: count(members), time: newest(members) })
   }
   return items

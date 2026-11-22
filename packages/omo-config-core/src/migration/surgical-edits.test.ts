@@ -23,7 +23,10 @@ function readTarget(fileSystem: MemoryMigrationFileSystem): string {
   return written
 }
 
-function replaceTarget(content: string, transform: (current: Record<string, unknown>) => Record<string, unknown>): string {
+function replaceTarget(
+  content: string,
+  transform: (current: Record<string, unknown>) => Record<string, unknown>,
+): string {
   const fileSystem = new MemoryMigrationFileSystem()
   fileSystem.files.set(migrationFixture.targetPath, content)
   const result = runMigration({
@@ -85,7 +88,10 @@ describe("replace-target migrations edit only what changes (#9777)", () => {
 
     // then
     expectOriginalLinesKept(
-      COMMENTED_FIXTURE.replace('        "oracle": { "model": "anthropic/claude-opus-5-5" },   // inline trailing comment\n', ""),
+      COMMENTED_FIXTURE.replace(
+        '        "oracle": { "model": "anthropic/claude-opus-5-5" },   // inline trailing comment\n',
+        "",
+      ),
       migrated,
     )
     expect(migrated).toContain('"reasoning": "high"')

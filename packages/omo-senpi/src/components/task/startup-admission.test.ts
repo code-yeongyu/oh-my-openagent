@@ -1,8 +1,16 @@
 import { afterEach, expect, test } from "bun:test"
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 import { createTaskLifecycle } from "@oh-my-opencode/senpi-task"
-import { hostLifecycleDeps, hostSession, hostSessionRecordInput } from "../../../../senpi-task/src/lifecycle/__fixtures__/host-session-fakes"
-import { cleanupProjects, seedRecord, tempStore } from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
+import {
+  hostLifecycleDeps,
+  hostSession,
+  hostSessionRecordInput,
+} from "../../../../senpi-task/src/lifecycle/__fixtures__/host-session-fakes"
+import {
+  cleanupProjects,
+  seedRecord,
+  tempStore,
+} from "../../../../senpi-task/src/lifecycle/__fixtures__/lifecycle-fakes"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { composeTaskEngine } from "./engine"
 import { wireEventBridge } from "./event-bridge"
@@ -15,7 +23,8 @@ test("session admission and RPC attachment finish while a host never answers", a
   const store = tempStore()
   seedRecord(store, {
     ...hostSessionRecordInput("st_10056001", hostSession("st_10056001")),
-    status: "running", host_pid: 1111,
+    status: "running",
+    host_pid: 1111,
   })
   const entered = Promise.withResolvers<void>()
   const probe = Promise.withResolvers<boolean>()
@@ -24,11 +33,18 @@ test("session admission and RPC attachment finish while a host never answers", a
     ...fixture.deps,
     hostSessionProbe: {
       ...fixture.hostSessionProbe,
-      daemonAlive: () => { entered.resolve(); return probe.promise },
+      daemonAlive: () => {
+        entered.resolve()
+        return probe.promise
+      },
     },
   })
   const pi = new FakeExtensionAPI()
-  pi.rpc = { emit: (name, data) => { pi.rpcEvents.push({ name, data }) } }
+  pi.rpc = {
+    emit: (name, data) => {
+      pi.rpcEvents.push({ name, data })
+    },
+  }
   const cwd = store.stateDir
   const base = composeTaskEngine({ pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [] })
   base.lifecycle.dispose?.()
@@ -37,27 +53,38 @@ test("session admission and RPC attachment finish while a host never answers", a
     ...base,
     lifecycle: {
       ...lifecycle,
-      reconcileOnSessionStart: (id?: string, signal?: AbortSignal) => lifecycle.reconcileOnSessionStart(id, signal).finally(finished.resolve),
+      reconcileOnSessionStart: (id?: string, signal?: AbortSignal) =>
+        lifecycle.reconcileOnSessionStart(id, signal).finally(finished.resolve),
     },
   }
-  wireEventBridge(pi, {
-    logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => false }, getCapturedTools: () => [],
-  }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
-  createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
-    reconcileTeamMailbox: async () => {},
-    leadPollers: { tick: async () => {}, shutdown() {} },
-    resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
-  })
+  wireEventBridge(
+    pi,
+    {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => false },
+      getCapturedTools: () => [],
+    },
+    engine,
+    { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
+    createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }),
+    {
+      reconcileTeamMailbox: async () => {},
+      leadPollers: { tick: async () => {}, shutdown() {} },
+      resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
+    },
+  )
   // RPC attachment is observable through the real task bridge; admission itself must settle
   // before the probe is released, with the test deadline only serving as a deadlock watchdog.
   const start = pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-1" } })
   try {
     await entered.promise
-    expect(await Promise.race([
-      start.then(() => "admitted"),
-      new Promise<string>(resolve => setImmediate(() => resolve("blocked"))),
-    ])).toBe("admitted")
-    expect(pi.rpcEvents.some(event => event.name === "omo.task.updated")).toBe(true)
+    expect(
+      await Promise.race([
+        start.then(() => "admitted"),
+        new Promise<string>((resolve) => setImmediate(() => resolve("blocked"))),
+      ]),
+    ).toBe("admitted")
+    expect(pi.rpcEvents.some((event) => event.name === "omo.task.updated")).toBe(true)
   } finally {
     lifecycle.dispose?.()
     probe.resolve(false)
@@ -76,7 +103,9 @@ test("DAG attach waits for the session-start reconcile without holding admission
   wireDagLifecycle(
     pi,
     {
-      attach: async (event) => { attached.push(event) },
+      attach: async (event) => {
+        attached.push(event)
+      },
       detach() {},
       pauseForShutdown: async () => {},
       dispose() {},
@@ -101,7 +130,10 @@ test("the first turn after session_start starts only once the DAG attach has fin
   wireDagLifecycle(
     pi,
     {
-      attach: async () => { await attach.promise; order.push("attached") },
+      attach: async () => {
+        await attach.promise
+        order.push("attached")
+      },
       detach() {},
       pauseForShutdown: async () => {},
       dispose() {},
@@ -111,8 +143,9 @@ test("the first turn after session_start starts only once the DAG attach has fin
   )
   await pi.dispatch("session_start", { type: "session_start" }, {})
 
-  const turn = pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {})
-    .then(() => { order.push("turn") })
+  const turn = pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "continue" }, {}).then(() => {
+    order.push("turn")
+  })
   // Drain every queued continuation before releasing the attach: a turn that does not wait has
   // already finished by now.
   await new Promise<void>((resolve) => setImmediate(resolve))
@@ -133,9 +166,13 @@ test("a preview pass never waits for a pending DAG attach", async () => {
   )
   await pi.dispatch("session_start", { type: "session_start" }, {})
 
-  const preview = pi.dispatch("before_agent_start", { type: "before_agent_start", prompt: "x", preview: true }, {})
+  const preview = pi
+    .dispatch("before_agent_start", { type: "before_agent_start", prompt: "x", preview: true }, {})
     .then(() => "settled")
-  const outcome = await Promise.race([preview, new Promise<string>((resolve) => setImmediate(() => resolve("blocked")))])
+  const outcome = await Promise.race([
+    preview,
+    new Promise<string>((resolve) => setImmediate(() => resolve("blocked"))),
+  ])
   attach.resolve()
 
   expect(outcome).toBe("settled")
@@ -151,7 +188,9 @@ test("a client reattaching to a retained session gets the DAG snapshot restated"
       detach() {},
       pauseForShutdown: async () => {},
       dispose() {},
-      resend: () => { resent.push("resend") },
+      resend: () => {
+        resent.push("resend")
+      },
     },
     () => ({ afterSessionStartReconcile: () => Promise.resolve(true) }),
   )
@@ -165,7 +204,8 @@ test("workpool attach waits for the session-start reconcile", async () => {
   const store = tempStore()
   seedRecord(store, {
     ...hostSessionRecordInput("st_10056002", hostSession("st_10056002")),
-    status: "running", host_pid: 1111,
+    status: "running",
+    host_pid: 1111,
   })
   const entered = Promise.withResolvers<void>()
   const probe = Promise.withResolvers<boolean>()
@@ -174,11 +214,18 @@ test("workpool attach waits for the session-start reconcile", async () => {
     ...fixture.deps,
     hostSessionProbe: {
       ...fixture.hostSessionProbe,
-      daemonAlive: () => { entered.resolve(); return probe.promise },
+      daemonAlive: () => {
+        entered.resolve()
+        return probe.promise
+      },
     },
   })
   const pi = new FakeExtensionAPI()
-  pi.rpc = { emit: (name, data) => { pi.rpcEvents.push({ name, data }) } }
+  pi.rpc = {
+    emit: (name, data) => {
+      pi.rpcEvents.push({ name, data })
+    },
+  }
   const cwd = store.stateDir
   const base = composeTaskEngine({ pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [] })
   base.lifecycle.dispose?.()
@@ -189,23 +236,34 @@ test("workpool attach waits for the session-start reconcile", async () => {
   const workpools = base.manager.workpools
   if (workpools === undefined) throw new Error("the task engine has no workpools")
   Object.defineProperty(workpools, "attach", {
-    value: (input: { readonly sessionId: string }) => { workpoolAttaches.push(input.sessionId) },
+    value: (input: { readonly sessionId: string }) => {
+      workpoolAttaches.push(input.sessionId)
+    },
   })
   const engine = {
     ...base,
     lifecycle: {
       ...lifecycle,
-      reconcileOnSessionStart: (id?: string, signal?: AbortSignal) => lifecycle.reconcileOnSessionStart(id, signal).finally(finished.resolve),
+      reconcileOnSessionStart: (id?: string, signal?: AbortSignal) =>
+        lifecycle.reconcileOnSessionStart(id, signal).finally(finished.resolve),
     },
   }
-  const bridge = wireEventBridge(pi, {
-    logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => false }, getCapturedTools: () => [],
-  }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
-  createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
-    reconcileTeamMailbox: async () => {},
-    leadPollers: { tick: async () => {}, shutdown() {} },
-    resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
-  })
+  const bridge = wireEventBridge(
+    pi,
+    {
+      logger: { info() {}, warn() {}, error() {} },
+      config: { getFlag: () => false },
+      getCapturedTools: () => [],
+    },
+    engine,
+    { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
+    createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }),
+    {
+      reconcileTeamMailbox: async () => {},
+      leadPollers: { tick: async () => {}, shutdown() {} },
+      resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
+    },
+  )
   const start = pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-2" } })
   try {
     await entered.promise
@@ -223,23 +281,37 @@ test("workpool attach waits for the session-start reconcile", async () => {
 test("a session start whose pause restore throws still settles the reconcile gate (#11335 delta review)", async () => {
   const store = tempStore()
   const pi = new FakeExtensionAPI()
-  pi.rpc = { emit: (name, data) => { pi.rpcEvents.push({ name, data }) } }
+  pi.rpc = {
+    emit: (name, data) => {
+      pi.rpcEvents.push({ name, data })
+    },
+  }
   const cwd = store.stateDir
   const engine = composeTaskEngine({ pi, cwd, omoConfig: loadOmoConfig({ cwd }).config, sharedParentTools: () => [] })
   try {
-    const bridge = wireEventBridge(pi, {
-      logger: { info() {}, warn() {}, error() {} }, config: { getFlag: () => false }, getCapturedTools: () => [],
-    }, engine, { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
-    createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }), {
-      reconcileTeamMailbox: async () => {},
-      leadPollers: { tick: async () => {}, shutdown() {} },
-      resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
-      runPause: {
-        restore: async () => { throw new Error("invalid pause registry") },
-        reconciled: async () => {},
-        changed: async () => {},
-      } as unknown as NonNullable<Parameters<typeof wireEventBridge>[5]["runPause"]>,
-    })
+    const bridge = wireEventBridge(
+      pi,
+      {
+        logger: { info() {}, warn() {}, error() {} },
+        config: { getFlag: () => false },
+        getCapturedTools: () => [],
+      },
+      engine,
+      { scheduleSync() {}, syncNow() {}, observeRecord() {}, dispose() {} },
+      createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier }),
+      {
+        reconcileTeamMailbox: async () => {},
+        leadPollers: { tick: async () => {}, shutdown() {} },
+        resumptionChannels: { emitSessionStart: async () => {}, emitShutdown: async () => {} },
+        runPause: {
+          restore: async () => {
+            throw new Error("invalid pause registry")
+          },
+          reconciled: async () => {},
+          changed: async () => {},
+        } as unknown as NonNullable<Parameters<typeof wireEventBridge>[5]["runPause"]>,
+      },
+    )
     const start = pi.dispatch("session_start", {}, { sessionManager: { getSessionId: () => "parent-3" } })
     await start.catch(() => undefined)
     const settled = await Promise.race([

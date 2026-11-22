@@ -1,0 +1,163 @@
+{
+  "request": "session.locate",
+  "cases": [
+    {
+      "name": "a host that takes the locate probe answers the created session's device, key and id",
+      "outcome": "ok",
+      "world": {
+        "located": {
+          "dev-peer-1": {
+            "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10": "S0VZS0VZS0VZS0VZS0VZSw"
+          }
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1",
+            "engine_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": true,
+            "data": {
+              "device": "dev-peer-1",
+              "key": "S0VZS0VZS0VZS0VZS0VZSw",
+              "session": "dev-peer-1.S0VZS0VZS0VZS0VZS0VZSw"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an engine id that host does not list ends session_not_found",
+      "outcome": "refusal",
+      "world": {
+        "located": {
+          "dev-peer-1": {}
+        }
+      },
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1",
+            "engine_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "session_not_found"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "a host that does not take the locate probe answers unsupported",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1",
+            "engine_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unsupported"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "an empty engine_id is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1",
+            "engine_id": ""
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "session.locate without an engine_id is refused",
+      "outcome": "refusal",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "invalid_request"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "refused before the client proof",
+      "outcome": "refusal",
+      "handshake": "welcome_only",
+      "steps": [
+        {
+          "send": {
+            "id": "1",
+            "type": "session.locate",
+            "device": "dev-peer-1",
+            "engine_id": "0193f5c2-7e1a-7c3e-9b1a-2f6c8d4e5a10"
+          }
+        },
+        {
+          "expect": {
+            "id": "1",
+            "type": "response",
+            "ok": false,
+            "error": {
+              "code": "unauthenticated"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

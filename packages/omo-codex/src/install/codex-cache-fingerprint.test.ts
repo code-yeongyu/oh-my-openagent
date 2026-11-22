@@ -18,7 +18,7 @@ async function specialEntries(root: string, directory = root): Promise<string[]>
   for (const name of await readdir(directory)) {
     const path = join(directory, name)
     const entry = await lstat(path)
-    if (entry.isDirectory()) paths.push(...await specialEntries(root, path))
+    if (entry.isDirectory()) paths.push(...(await specialEntries(root, path)))
     else if (!entry.isFile()) paths.push(relative(root, path))
   }
   return paths.sort()
@@ -43,10 +43,13 @@ async function assemblePlugin() {
   }
   await mkdir(join(component, "dist"), { recursive: true })
   await writeFile(join(sourcePath, "package.json"), JSON.stringify({ name: "omo", version: "1.0.0" }))
-  await writeFile(join(component, "package.json"), JSON.stringify({
-    name: "@code-yeongyu/codex-comment-checker",
-    bin: { "omo-comment-checker": "dist/cli.js" },
-  }))
+  await writeFile(
+    join(component, "package.json"),
+    JSON.stringify({
+      name: "@code-yeongyu/codex-comment-checker",
+      bin: { "omo-comment-checker": "dist/cli.js" },
+    }),
+  )
   await writeFile(join(component, "dist", "cli.js"), "#!/usr/bin/env node\n")
   const runCommand: RunCommand = async (_command, _args, options) => {
     const modules = join(options.cwd, "node_modules")
@@ -56,7 +59,10 @@ async function assemblePlugin() {
     await writeFile(join(checker, "package.json"), JSON.stringify({ name: "@code-yeongyu/comment-checker" }))
     await writeFile(join(checker, "bin", "comment-checker.js"), "#!/usr/bin/env node\n")
     await mkdir(join(modules, "@code-yeongyu", platformName, "bin"), { recursive: true })
-    await writeFile(join(modules, "@code-yeongyu", platformName, "package.json"), JSON.stringify({ name: `@code-yeongyu/${platformName}` }))
+    await writeFile(
+      join(modules, "@code-yeongyu", platformName, "package.json"),
+      JSON.stringify({ name: `@code-yeongyu/${platformName}` }),
+    )
     const binary = process.platform === "win32" ? "comment-checker.exe" : "comment-checker"
     await writeFile(join(modules, "@code-yeongyu", platformName, "bin", binary), "native checker fixture")
     await chmod(join(modules, "@code-yeongyu", platformName, "bin", binary), 0o755)
@@ -68,9 +74,17 @@ async function assemblePlugin() {
       await symlink("../@code-yeongyu/comment-checker/bin/comment-checker.js", join(modules, ".bin", "comment-checker"))
     }
     const workspace = join(options.cwd, "components", "comment-checker")
-    await symlink(workspace, join(modules, "@code-yeongyu", "codex-comment-checker"), process.platform === "win32" ? "junction" : "dir")
+    await symlink(
+      workspace,
+      join(modules, "@code-yeongyu", "codex-comment-checker"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
     await mkdir(join(modules, "@oh-my-opencode"), { recursive: true })
-    await symlink(shared, join(modules, "@oh-my-opencode", "shared-skills"), process.platform === "win32" ? "junction" : "dir")
+    await symlink(
+      shared,
+      join(modules, "@oh-my-opencode", "shared-skills"),
+      process.platform === "win32" ? "junction" : "dir",
+    )
   }
   const installed = await installCachedPlugin({
     buildSource: false,
@@ -82,7 +96,9 @@ async function assemblePlugin() {
     runCommand,
   })
   await rm(shared, { recursive: true })
-  expect(await readFile(join(installed.path, "node_modules", "@oh-my-opencode", "shared-skills", "index.mjs"), "utf8")).toBe("export const skills = []\n")
+  expect(
+    await readFile(join(installed.path, "node_modules", "@oh-my-opencode", "shared-skills", "index.mjs"), "utf8"),
+  ).toBe("export const skills = []\n")
   expect(existsSync(previous)).toBe(false)
   return installed.path
 }
@@ -94,11 +110,15 @@ test("assembled plugin contains only regular files and directories after npm cre
 
 test("assembled plugin removes npm bin symlinks while preserving regular third-party command shims", async () => {
   const plugin = await assemblePlugin()
-  expect(await readFile(join(plugin, "node_modules", ".bin", "other-tool.cmd"), "utf8")).toBe("@echo off\r\necho preserved\r\n")
+  expect(await readFile(join(plugin, "node_modules", ".bin", "other-tool.cmd"), "utf8")).toBe(
+    "@echo off\r\necho preserved\r\n",
+  )
   const dependencyBins = join(plugin, "node_modules", "@oh-my-opencode", "shared-skills", "node_modules", ".bin")
   expect(await readFile(join(dependencyBins, "other-tool.cmd"), "utf8")).toBe("@echo off\r\necho preserved\r\n")
   if (process.platform !== "win32") {
-    await expect(lstat(join(plugin, "node_modules", ".bin", "comment-checker"))).rejects.toMatchObject({ code: "ENOENT" })
+    await expect(lstat(join(plugin, "node_modules", ".bin", "comment-checker"))).rejects.toMatchObject({
+      code: "ENOENT",
+    })
     await expect(lstat(join(dependencyBins, "linked-tool"))).rejects.toMatchObject({ code: "ENOENT" })
   }
   expect(await specialEntries(plugin)).toEqual([])
@@ -114,18 +134,20 @@ test.if(process.platform !== "win32")("special file aborts assembly before repla
   await mkdir(previous, { recursive: true })
   await writeFile(join(previous, "payload.txt"), "previous working plugin")
   await writeFile(join(sourcePath, "package.json"), JSON.stringify({ name: "omo", version: "1.0.0" }))
-  await expect(installCachedPlugin({
-    buildSource: false,
-    codexHome,
-    marketplaceName: "sisyphuslabs",
-    name: "omo",
-    sourcePath,
-    version: "1.0.0",
-    runCommand: async (_command, _args, options) => {
-      const child = Bun.spawn(["mkfifo", join(options.cwd, "bad.pipe")])
-      expect(await child.exited).toBe(0)
-    },
-  })).rejects.toThrow("bad.pipe")
+  await expect(
+    installCachedPlugin({
+      buildSource: false,
+      codexHome,
+      marketplaceName: "sisyphuslabs",
+      name: "omo",
+      sourcePath,
+      version: "1.0.0",
+      runCommand: async (_command, _args, options) => {
+        const child = Bun.spawn(["mkfifo", join(options.cwd, "bad.pipe")])
+        expect(await child.exited).toBe(0)
+      },
+    }),
+  ).rejects.toThrow("bad.pipe")
   expect(await readFile(join(previous, "payload.txt"), "utf8")).toBe("previous working plugin")
   expect(await readdir(join(previous, ".."))).toEqual(["1.0.0"])
 })
@@ -141,7 +163,16 @@ test("assembled comment hook still resolves its CLI and optional native checker 
     existsSync,
     importMetaUrl: pathToFileURL(cli).href,
   })
-  expect(binary).toBe(join(plugin, "node_modules", "@code-yeongyu", `comment-checker-${process.platform}-${process.arch}`, "bin", binaryName))
+  expect(binary).toBe(
+    join(
+      plugin,
+      "node_modules",
+      "@code-yeongyu",
+      `comment-checker-${process.platform}-${process.arch}`,
+      "bin",
+      binaryName,
+    ),
+  )
   if (binary === null) throw new Error("native checker was not resolved")
   expect(await readFile(binary, "utf8")).toBe("native checker fixture")
   expect((await lstat(join(plugin, "node_modules", "@code-yeongyu", "codex-comment-checker"))).isDirectory()).toBe(true)

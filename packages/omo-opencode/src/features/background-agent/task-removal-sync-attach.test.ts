@@ -45,7 +45,11 @@ function createManager(): { manager: BackgroundManager; deleteCalls: string[] } 
     $: {} as PluginInput["$"],
   }
 
-  const manager = new BackgroundManager({ pluginContext: ctx, config: undefined, enableParentSessionNotifications: false })
+  const manager = new BackgroundManager({
+    pluginContext: ctx,
+    config: undefined,
+    enableParentSessionNotifications: false,
+  })
   return { manager, deleteCalls }
 }
 
@@ -70,7 +74,11 @@ function installFakeTimers(): FakeTimers {
   const callbacks = new Map<ReturnType<typeof setTimeout>, () => void | Promise<void>>()
   const delays = new Map<ReturnType<typeof setTimeout>, number>()
 
-  globalThis.setTimeout = ((handler: Parameters<typeof setTimeout>[0], delay?: number, ...args: unknown[]): ReturnType<typeof setTimeout> => {
+  globalThis.setTimeout = ((
+    handler: Parameters<typeof setTimeout>[0],
+    delay?: number,
+    ...args: unknown[]
+  ): ReturnType<typeof setTimeout> => {
     if (typeof handler !== "function") {
       throw new Error("Expected function timeout handler")
     }

@@ -10,8 +10,12 @@ test("port-based session verifies and uses supplied transports without CLI authe
     await enableSync(f.input)
     const transport = createHttpTransport(f.options)
     const outcome = await openAccountSession({
-      account: ACCOUNT, keyring: f.keyring, pinDir: f.input.pinDir, spaceId: new Uint8Array(16),
-      chain: f.input.chain, transport,
+      account: ACCOUNT,
+      keyring: f.keyring,
+      pinDir: f.input.pinDir,
+      spaceId: new Uint8Array(16),
+      chain: f.input.chain,
+      transport,
     })
     expect(outcome.ok).toBe(true)
     if (!outcome.ok) throw new Error(outcome.reason)

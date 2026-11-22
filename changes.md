@@ -1,3 +1,7 @@
+## 2026-10-29 - Finish sweep fixtures before removing their parents
+
+The shared removal helpers, synchronous and async, check the path with lstat after rm, so a disappearing child cannot make Bun report cleanup success while the parent remains. Silent leftovers use the existing bounded ENOTEMPTY retry path. The held-root recovery cases await their sweep remover before fixture cleanup, and both fixture groups assert their parent directory is absent afterward.
+
 ## 2026-11-01 - Give a timed-out or cancelled browser template a graceful quit (fixes #12067)
 
 The ultimate-browsing executor runs each Playwright template in its own session. On timeout, and when the run is cancelled (KeyboardInterrupt or SystemExit during the wait), it sends SIGTERM to the template's process group and waits up to 5 s, so the template's `ctx.close()` and Chrome's clean quit can run, before sending SIGKILL to the group; a cancellation is re-raised after the teardown. Previously only the node process was SIGKILLed, which orphaned Chrome and leaked its macOS code-sign clone and temp profile. POSIX only: on Windows `terminate()` is an immediate kill. The omowright dependency moves to code-yeongyu/omowright@73c4898ca4 (omowright#83), which applies the same SIGTERM-then-SIGKILL grace to the browser it spawns over a pipe.

@@ -1,33 +1,33 @@
 import { replaceToolArgs } from "../../shared/replace-tool-args"
 
-const MAX_LABEL_LENGTH = 30;
+const MAX_LABEL_LENGTH = 30
 
 interface QuestionOption {
-  label: string;
-  description?: string;
+  label: string
+  description?: string
 }
 
 interface Question {
-  question: string;
-  header?: string;
-  options: QuestionOption[];
-  multiSelect?: boolean;
+  question: string
+  header?: string
+  options: QuestionOption[]
+  multiSelect?: boolean
 }
 
 interface AskUserQuestionArgs {
-  questions: Question[];
+  questions: Question[]
 }
 
 function truncateLabel(label: string, maxLength: number = MAX_LABEL_LENGTH): string {
   if (label.length <= maxLength) {
-    return label;
+    return label
   }
-  return label.substring(0, maxLength - 3) + "...";
+  return label.substring(0, maxLength - 3) + "..."
 }
 
 function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs {
   if (!args.questions || !Array.isArray(args.questions)) {
-    return args;
+    return args
   }
 
   return {
@@ -40,27 +40,27 @@ function truncateQuestionLabels(args: AskUserQuestionArgs): AskUserQuestionArgs 
           label: truncateLabel(option.label),
         })) ?? [],
     })),
-  };
+  }
 }
 
 function hasQuestions(args: Record<string, unknown>): args is Record<string, unknown> & AskUserQuestionArgs {
-  return Array.isArray(args.questions);
+  return Array.isArray(args.questions)
 }
 
 export function createQuestionLabelTruncatorHook() {
   return {
     "tool.execute.before": async (
       input: { tool: string },
-      output: { args: Record<string, unknown> }
+      output: { args: Record<string, unknown> },
     ): Promise<void> => {
-      const toolName = input.tool?.toLowerCase();
+      const toolName = input.tool?.toLowerCase()
 
       if (toolName === "askuserquestion" || toolName === "ask_user_question") {
         if (hasQuestions(output.args)) {
-          const truncatedArgs = truncateQuestionLabels(output.args);
-          replaceToolArgs(output, { questions: truncatedArgs.questions });
+          const truncatedArgs = truncateQuestionLabels(output.args)
+          replaceToolArgs(output, { questions: truncatedArgs.questions })
         }
       }
     },
-  };
+  }
 }

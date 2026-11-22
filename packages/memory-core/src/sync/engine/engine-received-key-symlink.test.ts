@@ -27,40 +27,52 @@ async function settlesAndKeepsApplying(server: FakeSyncServer, b: Device): Promi
   expect(await b.read("after.md")).toBe("after\n")
 }
 
-test("a received key under a directory symlink that stays inside the memory root is dropped and the cycle completes", async () => {
-  const server = new FakeSyncServer()
-  const b = await receiver(server)
-  await b.write("real/x.md", "mine\n")
-  await b.engine.runCycle()
-  await symlink("real", join(b.repo.root, "alias"), "dir")
-  await publish(server, item("alias/x.md", "through the link"), item("ok.md", "ok"))
-  expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
-  expect(await b.read("real/x.md")).toBe("mine\n")
-  expect(await b.read("ok.md")).toBe("ok\n")
-  await settlesAndKeepsApplying(server, b)
-}, GIT_TEST_TIMEOUT)
+test(
+  "a received key under a directory symlink that stays inside the memory root is dropped and the cycle completes",
+  async () => {
+    const server = new FakeSyncServer()
+    const b = await receiver(server)
+    await b.write("real/x.md", "mine\n")
+    await b.engine.runCycle()
+    await symlink("real", join(b.repo.root, "alias"), "dir")
+    await publish(server, item("alias/x.md", "through the link"), item("ok.md", "ok"))
+    expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
+    expect(await b.read("real/x.md")).toBe("mine\n")
+    expect(await b.read("ok.md")).toBe("ok\n")
+    await settlesAndKeepsApplying(server, b)
+  },
+  GIT_TEST_TIMEOUT,
+)
 
-test("a received key under a dangling directory symlink is dropped without creating anything", async () => {
-  const server = new FakeSyncServer()
-  const b = await receiver(server)
-  await symlink("missing-dir", join(b.repo.root, "gone"), "dir")
-  await publish(server, item("gone/x.md", "into nowhere"), item("ok.md", "ok"))
-  expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
-  expect(existsSync(join(b.repo.root, "missing-dir"))).toBe(false)
-  expect((await lstat(join(b.repo.root, "gone"))).isSymbolicLink()).toBe(true)
-  expect(await b.read("ok.md")).toBe("ok\n")
-  await settlesAndKeepsApplying(server, b)
-}, GIT_TEST_TIMEOUT)
+test(
+  "a received key under a dangling directory symlink is dropped without creating anything",
+  async () => {
+    const server = new FakeSyncServer()
+    const b = await receiver(server)
+    await symlink("missing-dir", join(b.repo.root, "gone"), "dir")
+    await publish(server, item("gone/x.md", "into nowhere"), item("ok.md", "ok"))
+    expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
+    expect(existsSync(join(b.repo.root, "missing-dir"))).toBe(false)
+    expect((await lstat(join(b.repo.root, "gone"))).isSymbolicLink()).toBe(true)
+    expect(await b.read("ok.md")).toBe("ok\n")
+    await settlesAndKeepsApplying(server, b)
+  },
+  GIT_TEST_TIMEOUT,
+)
 
-test("a received key that names a symlink on this device leaves the link and its target untouched", async () => {
-  const server = new FakeSyncServer()
-  const b = await receiver(server)
-  await b.write("f.md", "mine\n")
-  await b.engine.runCycle()
-  await symlink("f.md", join(b.repo.root, "f-link.md"))
-  await publish(server, item("f-link.md", "from a peer"), item("ok.md", "ok"))
-  expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
-  expect((await lstat(join(b.repo.root, "f-link.md"))).isSymbolicLink()).toBe(true)
-  expect(await b.read("f.md")).toBe("mine\n")
-  await settlesAndKeepsApplying(server, b)
-}, GIT_TEST_TIMEOUT)
+test(
+  "a received key that names a symlink on this device leaves the link and its target untouched",
+  async () => {
+    const server = new FakeSyncServer()
+    const b = await receiver(server)
+    await b.write("f.md", "mine\n")
+    await b.engine.runCycle()
+    await symlink("f.md", join(b.repo.root, "f-link.md"))
+    await publish(server, item("f-link.md", "from a peer"), item("ok.md", "ok"))
+    expect(await b.engine.runCycle()).toMatchObject({ applied: 1, rejectedItems: 1 })
+    expect((await lstat(join(b.repo.root, "f-link.md"))).isSymbolicLink()).toBe(true)
+    expect(await b.read("f.md")).toBe("mine\n")
+    await settlesAndKeepsApplying(server, b)
+  },
+  GIT_TEST_TIMEOUT,
+)

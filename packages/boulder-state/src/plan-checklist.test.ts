@@ -266,12 +266,9 @@ describe("parsePlanChecklist", () => {
 
   test("#given structured headings with ATX closing markers #when parsed #then canonical tasks remain structured", () => {
     // given
-    const markdown = [
-      "## TODOs ##",
-      "- [ ] 1. Implement",
-      "## Final Verification Wave ###",
-      "- [ ] F1. Verify",
-    ].join("\n")
+    const markdown = ["## TODOs ##", "- [ ] 1. Implement", "## Final Verification Wave ###", "- [ ] F1. Verify"].join(
+      "\n",
+    )
 
     // when
     const checklist = parsePlanChecklist(markdown)
@@ -328,10 +325,7 @@ describe("getPlanChecklist", () => {
     const directory = mkdtempSync(join(tmpdir(), "boulder-plan-checklist-"))
     cleanupRoots.push(directory)
     const planPath = join(directory, "plan.md")
-    writeFileSync(
-      planPath,
-      "## Todos\n- [x] 1. First\n- [X] 2. Second\n## Final verification wave\n- [x] F1. Final\n",
-    )
+    writeFileSync(planPath, "## Todos\n- [x] 1. First\n- [X] 2. Second\n## Final verification wave\n- [x] F1. Final\n")
 
     // when
     const checklist = getPlanChecklist(planPath)

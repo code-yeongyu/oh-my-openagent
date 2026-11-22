@@ -37,12 +37,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-message-error",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-message-error", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-message-error")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
@@ -108,12 +103,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-fresh-tool-activity",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-fresh-tool-activity", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-tool-activity")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {
@@ -123,7 +113,10 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
 
     try {
       // when
-      const decision = await notifier["shouldDeferParentWakeForSessionHistory"]("parent-fresh-tool-activity", pendingWake)
+      const decision = await notifier["shouldDeferParentWakeForSessionHistory"](
+        "parent-fresh-tool-activity",
+        pendingWake,
+      )
 
       // then
       expect(decision).toEqual({ defer: true, skipPromptGateToolStateCheck: false })
@@ -180,12 +173,7 @@ describe("ParentWakeNotifier — assistant history deferral", () => {
         userMessageInProgressWindowMs: 2_000,
       },
     )
-    notifier.queuePendingParentWake(
-      "parent-fresh-tool-state-activity",
-      "task complete",
-      { agent: "sisyphus" },
-      true,
-    )
+    notifier.queuePendingParentWake("parent-fresh-tool-state-activity", "task complete", { agent: "sisyphus" }, true)
     const pendingWake = notifier.getPendingParentWakes().get("parent-fresh-tool-state-activity")
     expect(pendingWake).toBeDefined()
     if (!pendingWake) {

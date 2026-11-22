@@ -25,7 +25,10 @@ function rungLabel(rung: ModelProfileRung): string {
   return provider === undefined ? rung.model : `${provider}/${rung.model}`
 }
 
-function rungsOf(profile: string, config: OmoConfig): readonly { readonly label: string; readonly source: ModelProfileRungView["source"] }[] {
+function rungsOf(
+  profile: string,
+  config: OmoConfig,
+): readonly { readonly label: string; readonly source: ModelProfileRungView["source"] }[] {
   if (profile.includes("/")) return [{ label: profile, source: "pin" }]
   const definition = mergeModelProfiles(config.model_profiles)[profile]
   if (definition === undefined) return []
@@ -33,7 +36,12 @@ function rungsOf(profile: string, config: OmoConfig): readonly { readonly label:
   return definition.models.map((rung) => ({ label: rungLabel(rung), source }))
 }
 
-function view(profile: string, selection: ModelProfileView["selection"], resolution: ModelProfileResolution, config: OmoConfig): ModelProfileView {
+function view(
+  profile: string,
+  selection: ModelProfileView["selection"],
+  resolution: ModelProfileResolution,
+  config: OmoConfig,
+): ModelProfileView {
   const applied = resolution.kind === "resolved" ? `${resolution.provider}/${resolution.modelId}` : undefined
   const appliedIndex = resolution.kind === "resolved" ? resolution.skipped.length : -1
   const rungs = rungsOf(profile, config).map(({ label, source }, index): ModelProfileRungView => {
@@ -47,7 +55,11 @@ function view(profile: string, selection: ModelProfileView["selection"], resolut
     selection,
     ...(applied === undefined ? {} : { applied }),
     rungs,
-    ...(resolution.kind === "unknown" ? { reason: resolution.message } : resolution.kind === "empty" ? { reason: "the profile lists no models" } : {}),
+    ...(resolution.kind === "unknown"
+      ? { reason: resolution.message }
+      : resolution.kind === "empty"
+        ? { reason: "the profile lists no models" }
+        : {}),
   }
 }
 
@@ -57,11 +69,17 @@ function view(profile: string, selection: ModelProfileView["selection"], resolut
  * resolves. `exclude_models` is applied the way the session-start component applies it.
  */
 export function describeModelProfile(config: OmoConfig, availableModels: readonly string[]): ModelProfileView {
-  const available = availableModels.filter((selector) => excludedModelPattern(selector, config.exclude_models) === undefined)
+  const available = availableModels.filter(
+    (selector) => excludedModelPattern(selector, config.exclude_models) === undefined,
+  )
   const configured = config.model_profile?.trim()
   const named = configured !== undefined && configured.length > 0 ? configured : undefined
-  const explicit = named !== undefined && RETIRED_MODEL_PROFILE_IDS.has(named) && config.model_profiles?.[named] === undefined ? undefined : named
-  const resolve = (active: string) => resolveModelProfile({ profiles: config.model_profiles, active, availableModels: available })
+  const explicit =
+    named !== undefined && RETIRED_MODEL_PROFILE_IDS.has(named) && config.model_profiles?.[named] === undefined
+      ? undefined
+      : named
+  const resolve = (active: string) =>
+    resolveModelProfile({ profiles: config.model_profiles, active, availableModels: available })
   if (explicit !== undefined) return view(explicit, "set", resolve(explicit), config)
   const [first] = DEFAULT_MODEL_PROFILE_ORDER
   const lane = DEFAULT_MODEL_PROFILE_ORDER.find((id) => resolve(id).kind === "resolved") ?? first

@@ -27,25 +27,36 @@ function sandbox(): { root: string; env: NodeJS.ProcessEnv } {
 }
 
 /** Fake macOS toolchain: a signing keychain, codesign, a notarytool whose `info` answers from a script, and spctl. */
-function notarySandbox(infoAnswers: readonly string[], spctlAnswers: readonly string[] = [NOTARIZED]): { root: string; env: NodeJS.ProcessEnv; binary: string } {
+function notarySandbox(
+  infoAnswers: readonly string[],
+  spctlAnswers: readonly string[] = [NOTARIZED],
+): { root: string; env: NodeJS.ProcessEnv; binary: string } {
   const { root, env } = sandbox()
   const bin = join(root, "bin")
   const answers = join(root, "info-answers")
   writeFileSync(answers, `${infoAnswers.join("\n")}\n`)
   const assessments = join(root, "spctl-answers")
   writeFileSync(assessments, `${spctlAnswers.join("\n")}\n`)
-  writeFileSync(join(bin, "security"), `#!/bin/bash
+  writeFileSync(
+    join(bin, "security"),
+    `#!/bin/bash
 case "$1" in
   list-keychains) echo '    "/login.keychain-db"' ;;
   find-identity) echo '  1) ABCDEF "Developer ID Application: Test (TEAM123456)"' ;;
 esac
 exit 0
-`)
-  writeFileSync(join(bin, "codesign"), `#!/bin/bash
+`,
+  )
+  writeFileSync(
+    join(bin, "codesign"),
+    `#!/bin/bash
 if [ "$1" = -dv ]; then echo "flags=0x10000(runtime) TeamIdentifier=TEAM123456" >&2; fi
 exit 0
-`)
-  writeFileSync(join(bin, "xcrun"), `#!/bin/bash
+`,
+  )
+  writeFileSync(
+    join(bin, "xcrun"),
+    `#!/bin/bash
 shift
 case "$1" in
   submit) echo '{"id":"sub-1"}' ;;
@@ -55,26 +66,55 @@ case "$1" in
     echo "{\\"id\\":\\"sub-1\\",\\"status\\":\\"$line\\"}" ;;
   log) echo '{"issues":[]}' ;;
 esac
-`)
-  writeFileSync(join(bin, "spctl"), `#!/bin/bash
+`,
+  )
+  writeFileSync(
+    join(bin, "spctl"),
+    `#!/bin/bash
 echo call >> "${root}/spctl-calls"
 line=$(head -n 1 "${assessments}")
 [ "$(wc -l < "${assessments}")" -gt 1 ] && sed -i.bak 1d "${assessments}"
 echo "$line"
-`)
-  writeFileSync(join(bin, "ditto"), `#!/bin/bash
+`,
+  )
+  writeFileSync(
+    join(bin, "ditto"),
+    `#!/bin/bash
 find "\${@: -2:1}" -type f -exec cat {} \\; -exec echo \\; > "${root}/archived-files"
 touch "\${@: -1}"
-`)
+`,
+  )
   for (const tool of ["security", "codesign", "xcrun", "spctl", "ditto"]) chmodSync(join(bin, tool), 0o755)
   const binary = join(root, "omo-darwin-arm64")
   writeFileSync(binary, "binary")
-  const material = { CSC_LINK: Buffer.from("p12").toString("base64"), CSC_KEY_PASSWORD: "pw", APPLE_API_KEY: "key", APPLE_API_KEY_ID: "KEY", APPLE_API_ISSUER: "issuer" }
-  return { root, binary, env: { ...env, ...material, RUNNER_TEMP: root, NOTARY_POLL_SECONDS: "0", NOTARY_TIMEOUT_SECONDS: "30", GATEKEEPER_POLL_SECONDS: "0", GATEKEEPER_TIMEOUT_SECONDS: "30" } }
+  const material = {
+    CSC_LINK: Buffer.from("p12").toString("base64"),
+    CSC_KEY_PASSWORD: "pw",
+    APPLE_API_KEY: "key",
+    APPLE_API_KEY_ID: "KEY",
+    APPLE_API_ISSUER: "issuer",
+  }
+  return {
+    root,
+    binary,
+    env: {
+      ...env,
+      ...material,
+      RUNNER_TEMP: root,
+      NOTARY_POLL_SECONDS: "0",
+      NOTARY_TIMEOUT_SECONDS: "30",
+      GATEKEEPER_POLL_SECONDS: "0",
+      GATEKEEPER_TIMEOUT_SECONDS: "30",
+    },
+  }
 }
 
 function runSigning(root: string, env: NodeJS.ProcessEnv, binary: string) {
-  return spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary], { cwd: root, env, encoding: "utf8" })
+  return spawnSync(
+    "bash",
+    [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.omo", binary],
+    { cwd: root, env, encoding: "utf8" },
+  )
 }
 
 function spctlCalls(root: string): number {
@@ -92,7 +132,17 @@ describe("notarization polling", () => {
       writeFileSync(arm, "arm64 build")
       writeFileSync(amd, "amd64 build")
       rmSync(binary)
-      const result = spawnSync("bash", [join(root, ".github", "scripts", "macos-sign-and-notarize.sh"), "--identifier", "ai.sisyphuslabs.comment-checker", arm, amd], { cwd: root, env, encoding: "utf8" })
+      const result = spawnSync(
+        "bash",
+        [
+          join(root, ".github", "scripts", "macos-sign-and-notarize.sh"),
+          "--identifier",
+          "ai.sisyphuslabs.comment-checker",
+          arm,
+          amd,
+        ],
+        { cwd: root, env, encoding: "utf8" },
+      )
       expect(result.status, result.stderr).toBe(0)
       const archived = readFileSync(join(root, "archived-files"), "utf8").trim().split("\n")
       expect(archived).toHaveLength(2)
@@ -147,9 +197,12 @@ describe("Gatekeeper check after notarization", () => {
     const { root, env, binary } = notarySandbox(["Accepted"], [NOT_YET])
     const clock = join(root, "clock")
     writeFileSync(clock, "1000\n")
-    writeFileSync(join(root, "bin", "date"), `#!/bin/bash
+    writeFileSync(
+      join(root, "bin", "date"),
+      `#!/bin/bash
 if [ "$1" = "+%s" ]; then now=$(cat "${clock}"); echo $((now + 1)) > "${clock}"; echo "$now"; else exec /bin/date "$@"; fi
-`)
+`,
+    )
     chmodSync(join(root, "bin", "date"), 0o755)
     try {
       // when - a three-second window: the deadline read, then one read after each unaccepted poll

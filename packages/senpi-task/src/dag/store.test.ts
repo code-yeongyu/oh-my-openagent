@@ -54,12 +54,14 @@ function event(seq: number, input: Partial<DagRunEvent> = {}): DagRunEvent {
   } as DagRunEvent
 }
 
-function checkpoint(input: {
-  readonly id?: DagRunId
-  readonly status?: "running" | "completed"
-  readonly completedAt?: string
-  readonly taskId?: string
-} = {}) {
+function checkpoint(
+  input: {
+    readonly id?: DagRunId
+    readonly status?: "running" | "completed"
+    readonly completedAt?: string
+    readonly taskId?: string
+  } = {},
+) {
   return {
     schemaVersion: 1,
     runId: input.id ?? runId,
@@ -72,7 +74,9 @@ function checkpoint(input: {
 }
 
 // Mirrors LOCK_WAIT_TIMEOUT_MS in store.ts; the handoff test asserts the wait exceeded it in total.
-const LOCK_WAIT_TIMEOUT_MS_FOR_TEST = 1_000
+const LOCK_WAIT_TIMEOUT_MS_FOR_TEST = 30_000
+// One step of an injected clock that already crosses the lock-wait ceiling.
+const PAST_LOCK_WAIT_MS = LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 1
 
 describe("createDagFileStore event WAL", () => {
   test("#given five durable events #when reading two at a time #then sinceSeq is exclusive and hasMore flips", () => {
@@ -171,9 +175,7 @@ describe("createDagFileStore event WAL", () => {
 
     // then
     expect(page.events.map(({ seq }) => seq)).toEqual([1, 2])
-    expect(recovered.diagnostics()).toEqual([
-      expect.objectContaining({ kind: "event_log_recovered", runId }),
-    ])
+    expect(recovered.diagnostics()).toEqual([expect.objectContaining({ kind: "event_log_recovered", runId })])
     expect(fs.readFileSync(recovered.paths.event(runId), "utf8")).toEndWith("\n")
   })
 
@@ -391,10 +393,7 @@ describe("createDagFileStore checkpoints and layout", () => {
 describe("createDagFileStore locks and retention", () => {
   test("#given a lock held by a dead pid #when the run lock is acquired #then the stale lock is reclaimed", () => {
     // given
-    const store = createDagFileStore(
-      { project_dir: tempProject() },
-      { isProcessAlive: () => false },
-    )
+    const store = createDagFileStore({ project_dir: tempProject() }, { isProcessAlive: () => false })
     fs.writeFileSync(store.paths.runLock(runId), JSON.stringify({ hostPid: 2_147_483_647 }))
     let entered = false
 
@@ -427,10 +426,11 @@ describe("createDagFileStore locks and retention", () => {
     let entered = false
 
     // when
-    const acquire = () => store.withRunLock(runId, () => {
-      entered = true
-      expect(fs.existsSync(store.paths.runLock(runId))).toBe(true)
-    })
+    const acquire = () =>
+      store.withRunLock(runId, () => {
+        entered = true
+        expect(fs.existsSync(store.paths.runLock(runId))).toBe(true)
+      })
 
     // then
     expect(acquire).not.toThrow()
@@ -450,7 +450,7 @@ describe("createDagFileStore locks and retention", () => {
         isProcessAlive: (pid: number) => pid === holderPid,
         platform: "win32" as const,
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
       },
@@ -471,13 +471,11 @@ describe("createDagFileStore locks and retention", () => {
 
   test("#given a concurrent observer watches stale reclamation #when ownership changes #then the canonical lock path is never vacant", () => {
     // given
-    const store = createDagFileStore(
-      { project_dir: tempProject() },
-      { isProcessAlive: () => false },
-    )
+    const store = createDagFileStore({ project_dir: tempProject() }, { isProcessAlive: () => false })
     fs.writeFileSync(store.paths.runLock(runId), JSON.stringify({ hostPid: 2_147_483_647, token: "stale" }))
     const signal = new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT * 2))
-    const observer = new Worker(`
+    const observer = new Worker(
+      `
       const { existsSync } = require("node:fs")
       const { workerData } = require("node:worker_threads")
       const signal = new Int32Array(workerData.signal)
@@ -489,10 +487,12 @@ describe("createDagFileStore locks and retention", () => {
         Atomics.notify(signal, 0)
         while (Atomics.load(signal, 0) === 2) Atomics.wait(signal, 0, 2)
       }
-    `, {
-      eval: true,
-      workerData: { path: store.paths.runLock(runId), signal: signal.buffer },
-    })
+    `,
+      {
+        eval: true,
+        workerData: { path: store.paths.runLock(runId), signal: signal.buffer },
+      },
+    )
     const observedPresence: boolean[] = []
     const observe = () => {
       Atomics.store(signal, 0, 1)
@@ -537,7 +537,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          reclaimerClock += 1_001
+          reclaimerClock += PAST_LOCK_WAIT_MS
           return reclaimerClock
         },
         isProcessAlive,
@@ -547,7 +547,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          contenderClock += 1_001
+          contenderClock += PAST_LOCK_WAIT_MS
           return contenderClock
         },
         isProcessAlive,
@@ -566,8 +566,13 @@ describe("createDagFileStore locks and retention", () => {
     let restoreOverwroteContender = false
     let overlappingLiveHoldersPossible = false
     spyOn(fs, "renameSync").mockImplementation((from, to) => {
-      if (!probingPublication && !publicationProbed && typeof from === "string" &&
-        from.endsWith(".successor") && to === canonical) {
+      if (
+        !probingPublication &&
+        !publicationProbed &&
+        typeof from === "string" &&
+        from.endsWith(".successor") &&
+        to === canonical
+      ) {
         probingPublication = true
         publicationProbed = true
         try {
@@ -600,7 +605,7 @@ describe("createDagFileStore locks and retention", () => {
       })
     }
     const finalHolder = fs.existsSync(canonical)
-      ? JSON.parse(fs.readFileSync(canonical, "utf8")) as { readonly owner?: string }
+      ? (JSON.parse(fs.readFileSync(canonical, "utf8")) as { readonly owner?: string })
       : undefined
 
     // then
@@ -638,9 +643,13 @@ describe("createDagFileStore locks and retention", () => {
       realLink(existingPath, newPath)
       if (newPath !== reclaimSentinel) return
       const value = JSON.parse(fs.readFileSync(reclaimSentinel, "utf8")) as unknown
-      publishedSentinelHadOwnerRecord = typeof value === "object" && value !== null &&
-        "hostPid" in value && typeof value.hostPid === "number" &&
-        "token" in value && typeof value.token === "string"
+      publishedSentinelHadOwnerRecord =
+        typeof value === "object" &&
+        value !== null &&
+        "hostPid" in value &&
+        typeof value.hostPid === "number" &&
+        "token" in value &&
+        typeof value.token === "string"
     })
     spyOn(fs, "openSync").mockImplementation((path, flags, mode) => {
       const fd = realOpen(path, flags, mode)
@@ -651,9 +660,13 @@ describe("createDagFileStore locks and retention", () => {
         const content = fs.readFileSync(reclaimSentinel, "utf8")
         try {
           const value = JSON.parse(content) as unknown
-          ownerlessSentinelObserved = typeof value !== "object" || value === null ||
-            !("hostPid" in value) || typeof value.hostPid !== "number" ||
-            !("token" in value) || typeof value.token !== "string"
+          ownerlessSentinelObserved =
+            typeof value !== "object" ||
+            value === null ||
+            !("hostPid" in value) ||
+            typeof value.hostPid !== "number" ||
+            !("token" in value) ||
+            typeof value.token !== "string"
         } catch (error) {
           if (!(error instanceof SyntaxError)) throw error
           ownerlessSentinelObserved = true
@@ -709,7 +722,7 @@ describe("createDagFileStore locks and retention", () => {
         secondReclaimerEntered = true
       })
       // the first reclaimer's remaining I/O is slow on the loaded host
-      clock += 1_500
+      clock += LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 500
       return fd
     })
 
@@ -730,8 +743,9 @@ describe("createDagFileStore locks and retention", () => {
 
   test("#given two live holders hand the lock over back to back #when each holds for less than the budget but together they exceed it #then the waiter acquires because the budget restarts per holder", () => {
     // given - the deadline must bound time stalled behind ONE holder. Holder A (alive) keeps us out
-    // for 800ms, then hands off to holder B (alive) for another 800ms. Neither stalls us past the
-    // 1000ms budget on its own; a wall-clock deadline would throw at B's second poll.
+    // for 80% of the budget, then hands off to holder B (alive) for another 80%. Neither stalls us
+    // past the budget on its own; a wall-clock deadline would throw at B's second poll.
+    const pollCost = LOCK_WAIT_TIMEOUT_MS_FOR_TEST * 0.4
     const project = tempProject()
     let clock = 5_000_000
     const now = () => clock
@@ -747,9 +761,9 @@ describe("createDagFileStore locks and retention", () => {
       const content = realRead(path, options as never)
       if (path !== canonical) return content
       polls += 1
-      // each poll of the canonical lock costs 400ms on this slow host
-      clock += 400
-      // after two polls (800ms) A releases and B takes over; after two more, B releases
+      // each poll of the canonical lock costs 40% of the budget on this slow host
+      clock += pollCost
+      // after two polls A releases and B takes over; after two more, B releases
       if (polls === 2) fs.writeFileSync(canonical, JSON.stringify(holderB))
       if (polls === 4) fs.rmSync(canonical, { force: true })
       return content
@@ -764,15 +778,46 @@ describe("createDagFileStore locks and retention", () => {
     // then
     expect(entered).toBe(true)
     expect(polls).toBeGreaterThanOrEqual(4)
-    expect(clock - 5_000_000).toBeGreaterThanOrEqual(LOCK_WAIT_TIMEOUT_MS_FOR_TEST + 400)
+    expect(clock - 5_000_000).toBeGreaterThanOrEqual(LOCK_WAIT_TIMEOUT_MS_FOR_TEST + pollCost)
+  })
+
+  test("#given one live holder whose fsynced writes stall for seconds on a starved host #when it releases #then the waiter acquires instead of timing out", () => {
+    // given - the losing side of a same-key dag start (#9306, #14095): the winner is alive and progressing, but a
+    // loaded runner stalls its checkpoint, key and WAL writes for seconds. Each poll of the lock observes 2 s pass.
+    const project = tempProject()
+    let clock = 7_000_000
+    const holder = { hostPid: 4101, token: "slow-live-holder" }
+    const store = createDagFileStore(
+      { project_dir: project },
+      { isProcessAlive: (pid) => pid === process.pid || pid === holder.hostPid, now: () => clock },
+    )
+    const canonical = store.paths.runLock(runId)
+    fs.writeFileSync(canonical, JSON.stringify(holder))
+    const realRead = fs.readFileSync
+    let polls = 0
+    spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
+      const content = realRead(path, options as never)
+      if (path !== canonical) return content
+      polls += 1
+      clock += 2_000
+      if (polls === 3) fs.rmSync(canonical, { force: true })
+      return content
+    }) as typeof fs.readFileSync)
+
+    // when
+    let entered = false
+    store.withRunLock(runId, () => {
+      entered = true
+    })
+
+    // then
+    expect(entered).toBe(true)
+    expect(clock - 7_000_000).toBeGreaterThanOrEqual(6_000)
   })
 
   test("#given a crashed reclaimer left its sentinel #when another process reclaims the stale holder #then the sentinel cannot wedge acquisition", () => {
     // given
-    const store = createDagFileStore(
-      { project_dir: tempProject() },
-      { isProcessAlive: () => false },
-    )
+    const store = createDagFileStore({ project_dir: tempProject() }, { isProcessAlive: () => false })
     const canonical = store.paths.runLock(runId)
     const reclaimSentinel = `${canonical}.reclaim`
     fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
@@ -794,10 +839,7 @@ describe("createDagFileStore locks and retention", () => {
     // briefly holds the sentinel open, so the quarantining rename is refused with EPERM (a sharing
     // violation POSIX rename does not have) while both recorded holder pids are dead. The refusal
     // must be retried, not crash the reclaim and not wedge acquisition until the stall budget.
-    const store = createDagFileStore(
-      { project_dir: tempProject() },
-      { isProcessAlive: () => false },
-    )
+    const store = createDagFileStore({ project_dir: tempProject() }, { isProcessAlive: () => false })
     const canonical = store.paths.runLock(runId)
     const reclaimSentinel = `${canonical}.reclaim`
     fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
@@ -833,17 +875,15 @@ describe("createDagFileStore locks and retention", () => {
     // mutex once, so the clear is observed across two acquisition passes; the budget must follow
     // that state transition instead of expiring mid-reclaim.
     let clock = 1_000_000
-    const store = createDagFileStore(
-      { project_dir: tempProject() },
-      { isProcessAlive: () => false, now: () => clock },
-    )
+    const store = createDagFileStore({ project_dir: tempProject() }, { isProcessAlive: () => false, now: () => clock })
     const canonical = store.paths.runLock(runId)
     const reclaimSentinel = `${canonical}.reclaim`
     fs.writeFileSync(canonical, JSON.stringify({ hostPid: 101, token: "stale-holder" }))
     fs.writeFileSync(reclaimSentinel, JSON.stringify({ hostPid: 202, token: "crashed-reclaimer" }))
     const realRead = fs.readFileSync
     spyOn(fs, "readFileSync").mockImplementation(((path: fs.PathOrFileDescriptor, options?: unknown) => {
-      if (typeof path === "string" && (path === canonical || path === reclaimSentinel)) clock += 600
+      if (typeof path === "string" && (path === canonical || path === reclaimSentinel))
+        clock += LOCK_WAIT_TIMEOUT_MS_FOR_TEST * 0.6
       return realRead(path, options as never)
     }) as typeof fs.readFileSync)
     const realLink = fs.linkSync
@@ -873,16 +913,13 @@ describe("createDagFileStore locks and retention", () => {
   test("#given a contender probes every reclamation transition #when a stale lock is replaced #then only the reclaimer concludes it holds the lock", () => {
     // given
     const project = tempProject()
-    const reclaimer = createDagFileStore(
-      { project_dir: project },
-      { isProcessAlive: () => false },
-    )
+    const reclaimer = createDagFileStore({ project_dir: project }, { isProcessAlive: () => false })
     let contenderClock = 0
     const contender = createDagFileStore(
       { project_dir: project },
       {
         now: () => {
-          contenderClock += 1_001
+          contenderClock += PAST_LOCK_WAIT_MS
           return contenderClock
         },
         isProcessAlive: () => true,
@@ -896,8 +933,11 @@ describe("createDagFileStore locks and retention", () => {
     let reclaimerEntered = false
     spyOn(fs, "renameSync").mockImplementation((from, to) => {
       realRename(from, to)
-      if (!probed && !reclaimerEntered &&
-        (from === reclaimer.paths.runLock(runId) || to === reclaimer.paths.runLock(runId))) {
+      if (
+        !probed &&
+        !reclaimerEntered &&
+        (from === reclaimer.paths.runLock(runId) || to === reclaimer.paths.runLock(runId))
+      ) {
         probed = true
         try {
           contender.withRunLock(runId, () => {
@@ -932,7 +972,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => pid === freshPid,
@@ -953,7 +993,10 @@ describe("createDagFileStore locks and retention", () => {
     let entered = false
 
     // when
-    const acquire = () => store.withRunLock(runId, () => { entered = true })
+    const acquire = () =>
+      store.withRunLock(runId, () => {
+        entered = true
+      })
 
     // then
     expect(acquire).toThrow(`Timed out acquiring DAG lock: ${store.paths.runLock(runId)}`)
@@ -974,7 +1017,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => pid === freshPid || pid === contenderPid,
@@ -997,7 +1040,10 @@ describe("createDagFileStore locks and retention", () => {
     let entered = false
 
     // when
-    const acquire = () => store.withRunLock(runId, () => { entered = true })
+    const acquire = () =>
+      store.withRunLock(runId, () => {
+        entered = true
+      })
 
     // then
     expect(acquire).toThrow(`Timed out acquiring DAG lock: ${store.paths.runLock(runId)}`)
@@ -1032,7 +1078,7 @@ describe("createDagFileStore locks and retention", () => {
       { project_dir: project },
       {
         now: () => {
-          clock += 1_001
+          clock += PAST_LOCK_WAIT_MS
           return clock
         },
         isProcessAlive: (pid) => {
@@ -1049,7 +1095,10 @@ describe("createDagFileStore locks and retention", () => {
     let entered = false
 
     // when
-    const acquire = () => store.withRunLock(runId, () => { entered = true })
+    const acquire = () =>
+      store.withRunLock(runId, () => {
+        entered = true
+      })
 
     // then
     expect(acquire).toThrow(`Timed out acquiring DAG lock: ${store.paths.runLock(runId)}`)

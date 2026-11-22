@@ -7,9 +7,7 @@
  */
 import { type ChildProcess, spawn } from "node:child_process"
 
-export type SandboxUsability =
-  | { readonly usable: true }
-  | { readonly usable: false; readonly reason: string }
+export type SandboxUsability = { readonly usable: true } | { readonly usable: false; readonly reason: string }
 
 export interface BwrapSmokeResult {
   readonly exitCode: number | null
@@ -29,13 +27,17 @@ const SMOKE_ARGS = ["--ro-bind", "/", "/", "--proc", "/proc", "--dev", "/dev", "
 
 export function classifyBwrapSmoke(result: BwrapSmokeResult): SandboxUsability {
   if (result.timedOut) return unusable(`smoke test timed out after ${SMOKE_TIMEOUT_MS}ms`, result.stderr)
-  if (result.errorMessage !== undefined) return unusable(`smoke test could not run: ${result.errorMessage}`, result.stderr)
+  if (result.errorMessage !== undefined)
+    return unusable(`smoke test could not run: ${result.errorMessage}`, result.stderr)
   if (result.exitCode === 0) return { usable: true }
   return unusable(`smoke test exited ${result.exitCode ?? "without an exit code"}`, result.stderr)
 }
 
-// One verdict per absolute executable path per process. Memoizes both the result and the promise
-// to ensure a second call during a concurrent first spawn does not trigger a second spawn.
+// One DEFINITIVE verdict per absolute executable path per process: the smoke exited (usable or
+// not) or could not be spawned. A timeout is transient (a loaded host, a slow first start), so it
+// is returned to its caller but never memoized; the next probe, which reflection runs once per
+// spawn, runs the smoke again. The pending promise is shared, so concurrent callers still trigger
+// one spawn.
 const verdicts = new Map<string, SandboxUsability>()
 const pendingProbes = new Map<string, Promise<SandboxUsability>>()
 
@@ -50,7 +52,7 @@ export async function probeBwrapUsability(executable: string): Promise<SandboxUs
     try {
       const result = await runBwrapSmoke(executable)
       const verdict = classifyBwrapSmoke(result)
-      verdicts.set(executable, verdict)
+      if (!result.timedOut) verdicts.set(executable, verdict)
       return verdict
     } finally {
       pendingProbes.delete(executable)
@@ -76,7 +78,12 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
     try {
       child = spawn(executable, [...SMOKE_ARGS], { stdio: ["ignore", "ignore", "pipe"], windowsHide: true })
     } catch (error) {
-      finish({ exitCode: null, timedOut: false, errorMessage: error instanceof Error ? error.message : String(error), stderr: "" })
+      finish({
+        exitCode: null,
+        timedOut: false,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        stderr: "",
+      })
       return
     }
     const stderrChunks: Buffer[] = []
@@ -86,7 +93,9 @@ async function runBwrapSmoke(executable: string): Promise<BwrapSmokeResult> {
       finish({ exitCode: null, timedOut: true, stderr: "" })
     }, SMOKE_TIMEOUT_MS)
     child.once("error", (error) => finish({ exitCode: null, timedOut: false, errorMessage: error.message, stderr: "" }))
-    child.once("close", (code) => finish({ exitCode: code, timedOut: false, stderr: Buffer.concat(stderrChunks).toString("utf8") }))
+    child.once("close", (code) =>
+      finish({ exitCode: code, timedOut: false, stderr: Buffer.concat(stderrChunks).toString("utf8") }),
+    )
   })
 }
 
@@ -94,4 +103,3 @@ function unusable(cause: string, stderr: string): SandboxUsability {
   const tail = stderr.trim().slice(-REASON_STDERR_CHARS)
   return { usable: false, reason: tail === "" ? cause : `${cause}: ${tail}` }
 }
-

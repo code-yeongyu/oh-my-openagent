@@ -49,7 +49,7 @@ describe("createWriteExistingFileGuardHook", () => {
         sessionID: args.sessionID ?? "ses_default",
         callID: `call_${callCounter}`,
       } as never,
-      output as never
+      output as never,
     )
 
     return output
@@ -74,7 +74,7 @@ describe("createWriteExistingFileGuardHook", () => {
       invoke({
         tool: "write",
         outputArgs: { filePath: join(tempDir, "new-file.txt"), content: "new content" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -85,7 +85,7 @@ describe("createWriteExistingFileGuardHook", () => {
       invoke({
         tool: "write",
         outputArgs: { filePath: existingFile, content: "new content" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -104,7 +104,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "first overwrite" },
-      })
+      }),
     ).resolves.toBeDefined()
 
     await expect(
@@ -112,7 +112,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "second overwrite" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -140,9 +140,7 @@ describe("createWriteExistingFileGuardHook", () => {
     ])
 
     const successCount = results.filter((result) => result.status === "fulfilled").length
-    const failures = results.filter(
-      (result): result is PromiseRejectedResult => result.status === "rejected"
-    )
+    const failures = results.filter((result): result is PromiseRejectedResult => result.status === "rejected")
 
     expect(successCount).toBe(1)
     expect(failures).toHaveLength(1)
@@ -163,7 +161,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID: "ses_writer",
         outputArgs: { filePath: existingFile, content: "new content" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -209,7 +207,7 @@ describe("createWriteExistingFileGuardHook", () => {
             content: "new content",
             overwrite,
           },
-        })
+        }),
       ).rejects.toThrow(BLOCK_MESSAGE)
     }
   })
@@ -233,7 +231,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID: "ses_b",
         outputArgs: { filePath: existingFile, content: "updated by B" },
-      })
+      }),
     ).resolves.toBeDefined()
 
     await expect(
@@ -241,7 +239,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID: "ses_a",
         outputArgs: { filePath: existingFile, content: "updated by A" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -252,7 +250,7 @@ describe("createWriteExistingFileGuardHook", () => {
       invoke({
         tool: "write",
         outputArgs: { filePath: existingFile, content: "new plan" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -266,11 +264,7 @@ describe("createWriteExistingFileGuardHook", () => {
 
   test("#given file arg variants #when read then write executes #then supports all variants", async () => {
     const existingFile = createFile("variants.txt")
-    const variants: Array<"filePath" | "path" | "file_path"> = [
-      "filePath",
-      "path",
-      "file_path",
-    ]
+    const variants: Array<"filePath" | "path" | "file_path"> = ["filePath", "path", "file_path"]
 
     for (const variant of variants) {
       const sessionID = `ses_${variant}`
@@ -285,7 +279,7 @@ describe("createWriteExistingFileGuardHook", () => {
           tool: "write",
           sessionID,
           outputArgs: { [variant]: existingFile, content: `overwrite via ${variant}` },
-        })
+        }),
       ).resolves.toBeDefined()
     }
   })
@@ -295,14 +289,14 @@ describe("createWriteExistingFileGuardHook", () => {
       invoke({
         tool: "write",
         outputArgs: { content: "no path" },
-      })
+      }),
     ).resolves.toBeDefined()
 
     await expect(
       invoke({
         tool: "read",
         outputArgs: {},
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -321,7 +315,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "should block" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -342,7 +336,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: absolutePath, content: "updated" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -357,7 +351,7 @@ describe("createWriteExistingFileGuardHook", () => {
         invoke({
           tool: "write",
           outputArgs: { filePath: outsideFile, content: "allowed overwrite" },
-        })
+        }),
       ).resolves.toBeDefined()
     } finally {
       rmSync(outsideDir, { recursive: true, force: true })
@@ -381,7 +375,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "after cleanup" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
@@ -434,17 +428,14 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: targetFile, content: "updated via symlink read" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
   test("#given session reads beyond path cap #when writing oldest and newest #then only newest is authorized", async () => {
     const sessionID = "ses_path_cap"
     const maxTrackedPathsPerSession = 4
-    hook = createWriteExistingFileGuardHook(
-      { directory: tempDir } as never,
-      { maxTrackedPathsPerSession },
-    )
+    hook = createWriteExistingFileGuardHook({ directory: tempDir } as never, { maxTrackedPathsPerSession })
     const oldestFile = createFile("path-cap/0.txt")
     let newestFile = oldestFile
 
@@ -468,7 +459,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: oldestFile, content: "stale write" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
 
     await expect(
@@ -476,7 +467,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: newestFile, content: "fresh write" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -517,7 +508,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID: hotSession,
         outputArgs: { filePath: existingFile, content: "hot session write" },
-      })
+      }),
     ).resolves.toBeDefined()
   })
 
@@ -538,7 +529,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "first write" },
-      })
+      }),
     ).resolves.toBeDefined()
 
     // read the file again to re-establish permission after first write consumed it
@@ -557,7 +548,7 @@ describe("createWriteExistingFileGuardHook", () => {
         tool: "write",
         sessionID,
         outputArgs: { filePath: existingFile, content: "second write after delete" },
-      })
+      }),
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 })
@@ -589,7 +580,7 @@ describe("frozen args handling (issue #3816)", () => {
         sessionID: args.sessionID ?? "ses_default",
         callID: `call_${callCounter}`,
       } as never,
-      output as never
+      output as never,
     )
 
     return output

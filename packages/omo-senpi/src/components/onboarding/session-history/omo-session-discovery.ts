@@ -23,7 +23,12 @@ export interface OmoDiscovery {
 }
 
 /** Entry kinds a session records on its own while it starts; anything else happened in the session. */
-const STARTUP_ENTRY_TYPES: ReadonlySet<string> = new Set(["model_change", "thinking_level_change", "custom", "custom_message"])
+const STARTUP_ENTRY_TYPES: ReadonlySet<string> = new Set([
+  "model_change",
+  "thinking_level_change",
+  "custom",
+  "custom_message",
+])
 
 const parseObject = (line: string): Record<string, unknown> | null => {
   try {
@@ -34,7 +39,10 @@ const parseObject = (line: string): Record<string, unknown> | null => {
   }
 }
 
-async function peekSessionHeader(fs: SessionHistoryFs, filePath: string): Promise<{ id: string | null; cwd: string | null }> {
+async function peekSessionHeader(
+  fs: SessionHistoryFs,
+  filePath: string,
+): Promise<{ id: string | null; cwd: string | null }> {
   let raw: Uint8Array | null = null
   try {
     const file = await fs.open(filePath)
@@ -51,7 +59,11 @@ async function peekSessionHeader(fs: SessionHistoryFs, filePath: string): Promis
   const header = parseObject(new TextDecoder().decode(newline === -1 ? raw : raw.subarray(0, newline)))
   const id = header?.["id"]
   const cwd = header?.["cwd"]
-  if (header === null || (id !== undefined && typeof id !== "string") || (cwd !== undefined && typeof cwd !== "string")) {
+  if (
+    header === null ||
+    (id !== undefined && typeof id !== "string") ||
+    (cwd !== undefined && typeof cwd !== "string")
+  ) {
     return { id: null, cwd: null }
   }
   return { id: typeof id === "string" ? id : null, cwd: typeof cwd === "string" ? cwd : null }
@@ -91,7 +103,10 @@ async function listSessionFiles(fs: SessionHistoryFs, roots: ReadonlyArray<strin
     } catch {
       continue
     }
-    const directories = [root, ...names.filter((name) => name.startsWith("--") && name.endsWith("--")).map((name) => join(root, name))]
+    const directories = [
+      root,
+      ...names.filter((name) => name.startsWith("--") && name.endsWith("--")).map((name) => join(root, name)),
+    ]
     for (const directory of directories) {
       if (!spend()) return { files, truncated: true }
       let entries: ReadonlyArray<string>
@@ -116,7 +131,10 @@ async function listSessionFiles(fs: SessionHistoryFs, roots: ReadonlyArray<strin
  * Projects the omo CLI has run sessions in. A folder is offered only for a session in which something
  * happened; one confirmed session per folder is enough, so a confirmed folder is never read again.
  */
-export async function discoverOmoCliProjects(fs: SessionHistoryFs, roots: ReadonlyArray<string>): Promise<OmoDiscovery> {
+export async function discoverOmoCliProjects(
+  fs: SessionHistoryFs,
+  roots: ReadonlyArray<string>,
+): Promise<OmoDiscovery> {
   const listed = await listSessionFiles(fs, roots)
   const files = listed.files.toSorted(
     (left, right) => (right.mtimeMs ?? 0) - (left.mtimeMs ?? 0) || left.filePath.localeCompare(right.filePath),
@@ -127,7 +145,11 @@ export async function discoverOmoCliProjects(fs: SessionHistoryFs, roots: Readon
   for (const file of selected) {
     const header = await peekSessionHeader(fs, file.filePath)
     if (header.id === null || header.id.trim().length === 0 || header.cwd === null || !isAbsolute(header.cwd)) continue
-    if (!confirmedCwds.has(header.cwd) && file.size <= OMO_STARTUP_ONLY_MAX_BYTES && (await holdsOnlyStartupRecords(fs, file.filePath))) {
+    if (
+      !confirmedCwds.has(header.cwd) &&
+      file.size <= OMO_STARTUP_ONLY_MAX_BYTES &&
+      (await holdsOnlyStartupRecords(fs, file.filePath))
+    ) {
       continue
     }
     confirmedCwds.add(header.cwd)

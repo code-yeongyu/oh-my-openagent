@@ -1,12 +1,23 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import * as fs from "node:fs"
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { createTaskRecord } from "../state"
 import { createTaskRecordStore } from "./record-store"
 import { resolveStateDir } from "./state-dir"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 
@@ -39,7 +50,7 @@ describe("createTaskRecordStore caching", () => {
   test("#given an agent-resolved record #when a fresh store reads it #then source agent round-trips without diagnostics", () => {
     // given
     const project = tempProject()
-    const writer = createTaskRecordStore({ project_dir: project })
+    const writer = createTaskRecordStore(ownedTaskState(project))
     const resolvedModel = {
       source: "agent" as const,
       provider: "openai",
@@ -47,7 +58,7 @@ describe("createTaskRecordStore caching", () => {
       display: "openai/gpt-5.6-luna-fast",
     }
     writer.save({ ...baseRecord("st_00000007"), resolved_model: resolvedModel })
-    const reader = createTaskRecordStore({ project_dir: project })
+    const reader = createTaskRecordStore(ownedTaskState(project))
 
     // when
     const result = reader.list()
@@ -60,13 +71,13 @@ describe("createTaskRecordStore caching", () => {
   test("#given a persisted liveness delivery epoch #when a fresh store reads the task #then the epoch round-trips", () => {
     // given
     const project = tempProject()
-    const writer = createTaskRecordStore({ project_dir: project })
+    const writer = createTaskRecordStore(ownedTaskState(project))
     const record = baseRecord("st_00000008")
     writer.save({
       ...record,
       notification: { ...record.notification, liveness_notified_epoch: 0 },
     })
-    const reader = createTaskRecordStore({ project_dir: project })
+    const reader = createTaskRecordStore(ownedTaskState(project))
 
     // when
     const loaded = reader.load(record.task_id)
@@ -78,13 +89,19 @@ describe("createTaskRecordStore caching", () => {
   test("#given unchanged records #when list() is called repeatedly #then results stay consistent", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const ids = Array.from({ length: 5 }, (_, index) => `st_${String(index + 1).padStart(8, "0")}`)
     for (const taskId of ids) store.save(baseRecord(taskId))
 
     // when
-    const first = store.list().records.map((record) => record.task_id).sort()
-    const second = store.list().records.map((record) => record.task_id).sort()
+    const first = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
+    const second = store
+      .list()
+      .records.map((record) => record.task_id)
+      .sort()
 
     // then
     expect(second).toEqual(first)
@@ -93,14 +110,14 @@ describe("createTaskRecordStore caching", () => {
   test("#given an externally mutated record #when list() runs #then the change is reflected", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const idA = "st_00000001"
     const idB = "st_00000002"
     store.save(baseRecord(idA))
     store.save(baseRecord(idB))
     store.list() // warm cache
 
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
     const pathA = join(stateDir, "tasks", `${idA}.json`)
     const rawA = JSON.parse(readFileSync(pathA, "utf8")) as { name: string }
     writeFileSync(pathA, JSON.stringify({ ...rawA, name: "mutated-A" }), "utf8")
@@ -116,11 +133,11 @@ describe("createTaskRecordStore caching", () => {
   test("#given another store rewriting a record to the same size within one mtime tick #when load() runs #then it returns the new record", () => {
     // given
     const project = tempProject()
-    const reader = createTaskRecordStore({ project_dir: project })
-    const writer = createTaskRecordStore({ project_dir: project })
+    const reader = createTaskRecordStore(ownedTaskState(project))
+    const writer = createTaskRecordStore(ownedTaskState(project))
     const taskId = "st_00000003"
     reader.save({ ...baseRecord(taskId), name: "name-1" })
-    const path = join(resolveStateDir({ project_dir: project }), "tasks", `${taskId}.json`)
+    const path = join(resolveStateDir(ownedTaskState(project)), "tasks", `${taskId}.json`)
     const tick = 1_700_000_000 // whole seconds, so the restored mtime is bit-identical to the cached one
     utimesSync(path, tick, tick)
     expect(reader.load(taskId)?.name).toBe("name-1") // warm the reader's cache
@@ -139,11 +156,11 @@ describe("createTaskRecordStore caching", () => {
   test("#given a record removed by another process #when list() runs #then it disappears from results", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000003"))
     store.list() // warm cache
 
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
     rmSync(join(stateDir, "tasks", "st_00000003.json"), { force: true })
 
     // when
@@ -155,8 +172,8 @@ describe("createTaskRecordStore caching", () => {
 
   test("#given a concurrent lifecycle write #when a serialized conditional patch runs #then it re-reads fresh state and preserves every lifecycle field", () => {
     const project = tempProject()
-    const writer = createTaskRecordStore({ project_dir: project })
-    const patcher = createTaskRecordStore({ project_dir: project })
+    const writer = createTaskRecordStore(ownedTaskState(project))
+    const patcher = createTaskRecordStore(ownedTaskState(project))
     const record = baseRecord("st_00000009")
     writer.save(record)
     const advanced = {
@@ -181,7 +198,7 @@ describe("createTaskRecordStore caching", () => {
   test("#given a record replaced through the store #when list() runs #then the cache reflects the new value", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = baseRecord("st_00000004")
     store.save(record)
     store.list() // warm cache
@@ -199,7 +216,7 @@ describe("createTaskRecordStore event append", () => {
   test("#given a removed task #when appendEvent is called again #then the log file is recreated", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord("st_00000005"))
     store.appendEvent("st_00000005", { type: "before", payload: {} })
     store.remove("st_00000005")
@@ -208,7 +225,7 @@ describe("createTaskRecordStore event append", () => {
     store.appendEvent("st_00000005", { type: "after", payload: {} })
 
     // then
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
     const logPath = join(stateDir, "logs", "st_00000005.jsonl")
     const lines = readFileSync(logPath, "utf8").trim().split("\n")
     expect(lines).toHaveLength(1)
@@ -218,14 +235,14 @@ describe("createTaskRecordStore event append", () => {
   test("#given a record save #when the file is read back #then it is compact JSON without pretty-print indentation", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const record = baseRecord("st_00000006")
 
     // when
     store.save(record)
 
     // then
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
     const raw = readFileSync(join(stateDir, "tasks", "st_00000006.json"), "utf8")
     expect(raw).not.toContain("\n  ")
     expect(JSON.parse(raw).task_id).toBe("st_00000006")
@@ -240,14 +257,14 @@ describe("createTaskRecordStore rename contention", () => {
   }
 
   function tempFiles(project: string): string[] {
-    const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+    const tasksDir = join(resolveStateDir(ownedTaskState(project)), "tasks")
     return readdirSync(tasksDir).filter((entry) => entry.endsWith(".tmp"))
   }
 
   test("#given a win32 store replacing a record #when renameSync is refused with EPERM twice #then the terminal status persists and no temp file remains", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project }, { platform: "win32" })
+    const store = createTaskRecordStore(ownedTaskState(project), { platform: "win32" })
     const record = baseRecord("st_00000011")
     store.save(record)
     const rename = spyOn(fs, "renameSync")
@@ -259,14 +276,14 @@ describe("createTaskRecordStore rename contention", () => {
 
     // then
     expect(rename).toHaveBeenCalledTimes(3)
-    expect(createTaskRecordStore({ project_dir: project }).load(record.task_id)?.status).toBe("completed")
+    expect(createTaskRecordStore(ownedTaskState(project)).load(record.task_id)?.status).toBe("completed")
     expect(tempFiles(project)).toEqual([])
   })
 
   test("#given a POSIX store replacing a record #when renameSync is refused with EPERM once #then the error rethrows unchanged after one attempt and no temp file remains", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project }, { platform: "darwin" })
+    const store = createTaskRecordStore(ownedTaskState(project), { platform: "darwin" })
     const record = baseRecord("st_00000012")
     store.save(record)
     const rename = spyOn(fs, "renameSync").mockImplementationOnce(renameRefusal("EPERM"))
@@ -286,16 +303,16 @@ describe("createTaskRecordStore remove artifacts", () => {
   const TASK_ID = "st_00000010"
 
   function seedFullArtifactSet(project: string): string {
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord(TASK_ID))
     store.appendEvent(TASK_ID, { type: "created", payload: {} })
 
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
 
     // children/<taskId>/sessions/<taskId>/x.jsonl
     const childDir = join(stateDir, "children", TASK_ID, "sessions", TASK_ID)
     mkdirSync(childDir, { recursive: true })
-    writeFileSync(join(childDir, "x.jsonl"), "{\"role\":\"user\",\"content\":\"hi\"}\n", "utf8")
+    writeFileSync(join(childDir, "x.jsonl"), '{"role":"user","content":"hi"}\n', "utf8")
 
     // completion-results/<taskId>.txt
     const spillDir = join(stateDir, "completion-results")
@@ -309,7 +326,7 @@ describe("createTaskRecordStore remove artifacts", () => {
     // given
     const project = tempProject()
     const stateDir = seedFullArtifactSet(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
 
     const recordPath = join(stateDir, "tasks", `${TASK_ID}.json`)
     const logPath = join(stateDir, "logs", `${TASK_ID}.jsonl`)
@@ -338,7 +355,7 @@ describe("createTaskRecordStore remove artifacts", () => {
     // simulate a partial cleanup: children dir already removed
     rmSync(join(stateDir, "children", TASK_ID), { recursive: true, force: true })
 
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const recordPath = join(stateDir, "tasks", `${TASK_ID}.json`)
     const logPath = join(stateDir, "logs", `${TASK_ID}.jsonl`)
     const spillPath = join(stateDir, "completion-results", `${TASK_ID}.txt`)
@@ -360,7 +377,7 @@ describe("createTaskRecordStore remove artifacts", () => {
     // given
     const project = tempProject()
     const stateDir = seedFullArtifactSet(project)
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.remove(TASK_ID)
 
     const recordPath = join(stateDir, "tasks", `${TASK_ID}.json`)
@@ -387,11 +404,14 @@ describe("createTaskRecordStore remove artifacts", () => {
 describe("createTaskRecordStore tombstone expunge", () => {
   const TASK_ID = "st_00000030"
 
-  function seedTombstoneCandidate(project: string): { store: ReturnType<typeof createTaskRecordStore>; stateDir: string } {
-    const store = createTaskRecordStore({ project_dir: project })
+  function seedTombstoneCandidate(project: string): {
+    store: ReturnType<typeof createTaskRecordStore>
+    stateDir: string
+  } {
+    const store = createTaskRecordStore(ownedTaskState(project))
     store.save(baseRecord(TASK_ID))
     store.appendEvent(TASK_ID, { type: "created", payload: {} })
-    const stateDir = resolveStateDir({ project_dir: project })
+    const stateDir = resolveStateDir(ownedTaskState(project))
     mkdirSync(join(stateDir, "children", TASK_ID), { recursive: true })
     const spillDir = join(stateDir, "completion-results")
     mkdirSync(spillDir, { recursive: true })
@@ -441,7 +461,7 @@ describe("createTaskRecordStore tombstone expunge", () => {
   test("#given a missing record #when tombstoneIfExpired runs #then it reports missing without writing anything", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
 
     // when
     const result = store.tombstoneIfExpired(TASK_ID, () => false)

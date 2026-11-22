@@ -4,7 +4,15 @@ import { dirname, join } from "node:path"
 
 import { readFrames } from "./otlp-spool-file"
 import { SpoolWriter } from "./otlp-wal"
-import { attributeMap, capture, createSpoolRoot, decodeLogs, logRecordsOf, makeTransport, recordingFetch } from "./otlp-test-support"
+import {
+  attributeMap,
+  capture,
+  createSpoolRoot,
+  decodeLogs,
+  logRecordsOf,
+  makeTransport,
+  recordingFetch,
+} from "./otlp-test-support"
 
 const roots: (() => void)[] = []
 afterEach(() => {
@@ -57,7 +65,9 @@ describe("short and failed spool writes", () => {
     })
 
     // when
-    const appended = [new Uint8Array([1, 2, 3, 4, 5]), new Uint8Array([6, 7, 8]), new Uint8Array([9])].map((p) => spool.append(p))
+    const appended = [new Uint8Array([1, 2, 3, 4, 5]), new Uint8Array([6, 7, 8]), new Uint8Array([9])].map((p) =>
+      spool.append(p),
+    )
 
     // then
     expect(appended).toEqual([true, true, true])
@@ -72,17 +82,21 @@ describe("short and failed spool writes", () => {
     mkdirSync(dir, { recursive: true })
     const errors: unknown[] = []
     let failNext = false
-    const spool = writer(dir, (fd, bytes) => {
-      if (failNext) {
-        failNext = false
-        throw enospc()
-      }
-      if (bytes.byteLength > 6) {
-        failNext = true
-        return writeSync(fd, bytes.subarray(0, 3))
-      }
-      return writeSync(fd, bytes)
-    }, errors)
+    const spool = writer(
+      dir,
+      (fd, bytes) => {
+        if (failNext) {
+          failNext = false
+          throw enospc()
+        }
+        if (bytes.byteLength > 6) {
+          failNext = true
+          return writeSync(fd, bytes.subarray(0, 3))
+        }
+        return writeSync(fd, bytes)
+      },
+      errors,
+    )
 
     // when
     const first = spool.append(new Uint8Array([1]))
@@ -112,7 +126,12 @@ describe("short and failed spool writes", () => {
         throw enospc()
       },
       [],
-      { truncate: () => { throw enospc() }, lost },
+      {
+        truncate: () => {
+          throw enospc()
+        },
+        lost,
+      },
     )
     spool.append(new Uint8Array([1]))
     spool.append(new Uint8Array([2]))
@@ -126,7 +145,10 @@ describe("short and failed spool writes", () => {
     expect(existsSync(join(dir, spool.name))).toBe(false)
     expect(lost.reduce((sum, entry) => sum + entry.records, 0)).toBe(3)
     expect(spool.append(new Uint8Array([4]))).toBe(true)
-    expect(readFrames(new Uint8Array(readFileSync(join(dir, spool.name)))).map((f) => Array.from(f))).toEqual([[1, 1], [4]])
+    expect(readFrames(new Uint8Array(readFileSync(join(dir, spool.name)))).map((f) => Array.from(f))).toEqual([
+      [1, 1],
+      [4],
+    ])
   })
 
   test("#given an event lost to a spool write failure #then droppedEvents counts it and the next flush reports it as write_failed", async () => {
@@ -146,8 +168,14 @@ describe("short and failed spool writes", () => {
 
     // then
     expect(droppedAfterFailure).toBe(1)
-    const records = calls.flatMap((c) => logRecordsOf(decodeLogs(c.body))).map((r) => [r.eventName, attributeMap(r.attributes)] as const)
-    expect(records.filter(([name]) => name === "omo.client_dropped").map(([, a]) => [a["omo.dropped.reason"], a["omo.dropped.count"]])).toEqual([["write_failed", 1]])
+    const records = calls
+      .flatMap((c) => logRecordsOf(decodeLogs(c.body)))
+      .map((r) => [r.eventName, attributeMap(r.attributes)] as const)
+    expect(
+      records
+        .filter(([name]) => name === "omo.client_dropped")
+        .map(([, a]) => [a["omo.dropped.reason"], a["omo.dropped.count"]]),
+    ).toEqual([["write_failed", 1]])
     expect(records.filter(([name]) => name === "omo.feature_used").map(([, a]) => a["omo.feature"])).toEqual(["kept"])
   })
 })

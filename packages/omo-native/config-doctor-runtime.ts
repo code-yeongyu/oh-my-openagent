@@ -1,4 +1,9 @@
-import { loadOmoConfig, omoConfigDiagnosticLines, resolveHomeDir, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import {
+  loadOmoConfig,
+  omoConfigDiagnosticLines,
+  resolveHomeDir,
+  type OmoConfigEnv,
+} from "@oh-my-opencode/omo-config-core"
 import { categoryShadowedAgentNames, categoryShadowMessage } from "@oh-my-opencode/senpi-task/category-shadow"
 
 /**

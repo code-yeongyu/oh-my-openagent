@@ -6,7 +6,12 @@ function normalize(version) {
   const [core = "", ...pre] = String(version).trim().replace(/^v/, "").split("+")[0].split("-")
   const numeric = (part) => (/^\d+$/.test(part) ? String(Number.parseInt(part, 10)) : part)
   const release = core.split(".").map(numeric).join(".")
-  const prerelease = pre.join("-").split(".").filter((part) => part !== "").map(numeric).join(".")
+  const prerelease = pre
+    .join("-")
+    .split(".")
+    .filter((part) => part !== "")
+    .map(numeric)
+    .join(".")
   return prerelease === "" ? release : `${release}-${prerelease}`
 }
 
