@@ -40,7 +40,7 @@ function probeSocketPath(): string {
 function waitForListening(
   stderr: NodeJS.ReadableStream,
   socketPath: string,
-  exited: Promise<number | null>,
+  exited: Promise<number | null | Error>,
 ): Promise<void> {
   const ready = `senpi rpc listening on unix://${socketPath}`
   return new Promise((resolve, reject) => {
@@ -66,8 +66,12 @@ function waitForListening(
       if (seen.includes(ready)) finish()
     }
     stderr.on("data", onData)
-    void exited.then((code) =>
-      finish(new Error(`host exited (${code}) before listening; stderr: ${seen.slice(-2000)}`)),
+    void exited.then((outcome) =>
+      finish(
+        outcome instanceof Error
+          ? outcome
+          : new Error(`host exited (${outcome}) before listening; stderr: ${seen.slice(-2000)}`),
+      ),
     )
   })
 }
@@ -100,7 +104,7 @@ function requestProtocolInfo(socketPath: string): Promise<ProtocolInfo> {
   })
 }
 
-async function probePackagedHost(compactFlag: "1" | undefined): Promise<ProtocolInfo> {
+async function probePackagedHost(compactFlag: "1" | undefined, command = process.execPath): Promise<ProtocolInfo> {
   const root = testTempDir("omo-o01-probe-")
   const agentDir = join(root, "agent")
   mkdirSync(agentDir, { mode: 0o755 })
@@ -116,15 +120,15 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
     OMO_DISABLE_POSTHOG: "true",
   }
   if (compactFlag !== undefined) env.SENPI_ENGINE_SOCKET_COMPACT_UPDATES = compactFlag
-  const host = spawn(
-    process.execPath,
-    [join(packageDir, packaged.bin.senpi), "--mode", "rpc", "--listen", socketPath],
-    { cwd: root, env, stdio: ["ignore", "ignore", "pipe"] },
-  )
+  const host = spawn(command, [join(packageDir, packaged.bin.senpi), "--mode", "rpc", "--listen", socketPath], {
+    cwd: root,
+    env,
+    stdio: ["ignore", "ignore", "pipe"],
+  })
   // A spawn that fails emits 'error' and never 'exit'; settle on either so the wait names it and teardown never hangs.
-  const exited = new Promise<number | null>((resolve) => {
+  const exited = new Promise<number | null | Error>((resolve) => {
     host.once("exit", (code) => resolve(code))
-    host.once("error", () => resolve(null))
+    host.once("error", resolve)
   })
   try {
     await waitForListening(host.stderr, socketPath, exited)
@@ -137,6 +141,11 @@ async function probePackagedHost(compactFlag: "1" | undefined): Promise<Protocol
 }
 
 describe.skipIf(process.platform === "win32")("packaged senpi engine compact delta (O01 package probe)", () => {
+  it("reports the spawn error when the host binary is missing", async () => {
+    const command = join(testTempDir("omo-o01-missing-"), "missing-host")
+    await expect(probePackagedHost(undefined, command)).rejects.toMatchObject({ code: "ENOENT", path: command })
+  })
+
   it("#given the pinned senpi package #when its bin is resolved #then it is the exact pinned version", () => {
     expect(packaged.version).toBe(pinnedVersion)
   })
