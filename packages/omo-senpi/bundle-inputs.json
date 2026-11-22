@@ -1279,6 +1279,7 @@
     "packages/omo-senpi/src/components/memory/sync-start-launch.ts",
     "packages/omo-senpi/src/components/memory/sync-status-copy.ts",
     "packages/omo-senpi/src/components/memory/sync-status-surface.ts",
+    "packages/omo-senpi/src/components/memory/tool-call-bound.ts",
     "packages/omo-senpi/src/components/memory/tool-metadata.ts",
     "packages/omo-senpi/src/components/memory/tools.ts",
     "packages/omo-senpi/src/components/memory/transient-age.ts",
