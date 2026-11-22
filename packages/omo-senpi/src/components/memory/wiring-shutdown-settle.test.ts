@@ -4,7 +4,7 @@ import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths, RecallCorpusCache } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, InFlightReads, RecallCorpusCache } from "@oh-my-opencode/memory-core"
 import { createMemoryIdentityContext } from "./context"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import type { MemoryMaintenance } from "./memory-maintenance"
@@ -48,7 +48,9 @@ async function bindAndShutDown(overrides: {
     },
     error: () => {},
   }
+  const work = new InFlightReads()
   const wiring = createMemoryWiring({
+    work,
     sessions: new Map([[sessionId, { context: identity }]]),
     loadConfig: () => loadedMemoryConfig(memorySettings()),
     cwd: () => root,
@@ -69,6 +71,8 @@ async function bindAndShutDown(overrides: {
   await pi.dispatch("input", { source: "rpc", inputId: "settle-input", text: "Continue." }, eventCtx)
   await pi.dispatch("input_disposition", { inputId: "settle-input", disposition: "started" }, eventCtx)
   await pi.dispatch("agent_settled", {}, eventCtx)
+  // That reconcile runs detached from the turn; let it finish so the shutdown below races only the step under test.
+  await work.settled()
   // A zero budget (the default) reports every raced step as over budget instead of awaiting it.
   let returned = false
   const shutdown = wiring

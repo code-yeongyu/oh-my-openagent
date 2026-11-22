@@ -1,5 +1,5 @@
 import { existsSync } from "@oh-my-opencode/memory-core/fs"
-import { readdir } from "@oh-my-opencode/memory-core/fs"
+import { readdir, stat } from "@oh-my-opencode/memory-core/fs"
 import { hostname as readHostname } from "node:os"
 import { join } from "node:path"
 
@@ -13,7 +13,7 @@ import {
   type ReservedRun,
 } from "@oh-my-opencode/memory-core"
 
-import { readRunJson, runOutcomeMatchesLedger, type RunOutcome } from "./run-artifacts"
+import { readRunJson, runOutcomeMatchesLedger, writeRunJsonAtomic, type RunOutcome } from "./run-artifacts"
 import {
   abandonReservationRun,
   failReservationRun,
@@ -21,7 +21,7 @@ import {
   type ReservationRunResult,
   type ReservationStatePort,
 } from "./run-finalization"
-import { backfillRunReceipt } from "./run-receipt-backfill"
+import { backfillRunReceipt, runReceiptStamp } from "./run-receipt-backfill"
 import { classifyRunProcess, signalRecordedProcessGroup, waitUntil as waitForTime } from "./run-liveness"
 import { quarantineRun, reconcilePrelaunch } from "./run-reconciliation-prelaunch"
 import { RunTerminalClaimUnrecoverableError } from "./run-terminal-claim"
@@ -57,7 +57,19 @@ export interface ReflectionRunReconciliationOptions {
   readonly waitPolicy?: "deadline" | "none"
   readonly receipts?: MemoryReceiptsPort
   readonly warn?: ReceiptWarn
+  /** Called when a pass completes, with how many run directories it could not mark reconciled. */
+  readonly onPassComplete?: (state: { readonly unsettledRuns: number }) => void
 }
+
+/**
+ * Marks a terminal run directory whose receipt is backfilled and which holds no temporary, so later
+ * passes skip it. A terminal run never changes again; re-reading every one of them on every pass made
+ * a pass grow with every run the identity ever kept (#12355). The marker is honoured only while it is
+ * newer than the run's ledger and terminal sentinels. A rewrite that lands on the marker's own
+ * timestamp is caught by the receipt identity stored in the marker.
+ */
+const RUN_RECONCILED_MARKER = "reconciled.json"
+const RUN_STATE_FILES = ["ledger.json", "final.json", "abandoned.json", "quarantined.json"] as const
 
 export type ReconcileContext = Required<Pick<ReflectionRunReconciliationOptions, "now" | "hostname">> &
   ReflectionRunReconciliationOptions
@@ -82,6 +94,7 @@ export async function reconcileReflectionRuns(
       context.getPidLiveness,
     )
     const runsDir = join(options.identity.paths.reflection, "runs")
+    let unsettledRuns = 0
     let reservation: ReservationState | undefined
     const reserved = async (): Promise<ReservationState> => {
       reservation ??= await context.reservation.readState(
@@ -93,14 +106,32 @@ export async function reconcileReflectionRuns(
       context.signal?.throwIfAborted()
       // A retired-generation dir shares the active reservation's id; settling it through the
       // normal path would complete the live reservation, so it waits for a later pass.
-      if (name === prelaunch.retiredRunId) continue
-      const runDir = join(runsDir, name)
-      await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
-      context.signal?.throwIfAborted()
-      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
-        await backfillRunReceipt(options.identity.paths.runtime, runDir, options.receipts, options.warn)
+      if (name === prelaunch.retiredRunId) {
+        unsettledRuns += 1
         continue
       }
+      const runDir = join(runsDir, name)
+      if (await isReconciledRun(runDir)) continue
+      const keptTemporaries = await sweepStrandedRunTemporaries(runDir, context.now(), context.getPidLiveness)
+      context.signal?.throwIfAborted()
+      if (["final.json", "abandoned.json", "quarantined.json"].some((file) => existsSync(join(runDir, file)))) {
+        const backfilled = await backfillRunReceipt(
+          options.identity.paths.runtime,
+          runDir,
+          options.receipts,
+          options.warn,
+        )
+        if (backfilled && keptTemporaries === 0) {
+          const receipt = await runReceiptStamp(runDir)
+          await writeRunJsonAtomic(join(runDir, RUN_RECONCILED_MARKER), {
+            version: 1,
+            runId: name,
+            ...(receipt === undefined ? {} : { receipt }),
+          })
+        } else unsettledRuns += 1
+        continue
+      }
+      unsettledRuns += 1
       const ledger = existsSync(join(runDir, "ledger.json")) ? await readLedgerOrUndefined(runDir) : undefined
       context.signal?.throwIfAborted()
       if (ledger === undefined) {
@@ -117,6 +148,7 @@ export async function reconcileReflectionRuns(
     }
     context.signal?.throwIfAborted()
     await sweepReflectionRunOrphans(context)
+    options.onPassComplete?.({ unsettledRuns })
     return results
   } catch (error) {
     if (context.deferOnSchedulerContention && error instanceof LockContentionError) return []
@@ -280,6 +312,36 @@ function deadRunDetail(ledger: ReservationRunLedger, child: "dead" | "absent"): 
 
 function deadProcesses(ledger: ReservationRunLedger): string {
   return `supervisor pid ${ledger.pid ?? "unknown"}, child pid ${ledger.childPid ?? "unknown"}`
+}
+
+async function isReconciledRun(runDir: string): Promise<boolean> {
+  const markerPath = join(runDir, RUN_RECONCILED_MARKER)
+  const marked = await modifiedAt(markerPath)
+  if (marked === undefined) return false
+  let tied = false
+  for (const file of RUN_STATE_FILES) {
+    const changed = await modifiedAt(join(runDir, file))
+    if (changed === undefined) continue
+    if (changed > marked) return false
+    if (changed === marked) tied = true
+  }
+  if (!tied) return true
+  let recorded: { readonly receipt?: unknown }
+  try {
+    recorded = await readRunJson(markerPath)
+  } catch {
+    return false
+  }
+  return recorded.receipt === (await runReceiptStamp(runDir))
+}
+
+async function modifiedAt(path: string): Promise<number | undefined> {
+  try {
+    return (await stat(path)).mtimeMs
+  } catch (error) {
+    if (error instanceof Error && "code" in error && error.code === "ENOENT") return undefined
+    throw error
+  }
 }
 
 async function directoryNames(path: string): Promise<readonly string[]> {

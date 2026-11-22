@@ -36,15 +36,17 @@ export async function emitMemoryReceipt(
   input: MemoryReceiptInput,
   port: MemoryReceiptsPort = DEFAULT_RECEIPTS_PORT,
   warn?: ReceiptWarn,
-): Promise<void> {
+): Promise<boolean> {
   try {
     await port.append(runtimeDir, input)
+    return true
   } catch (error) {
     warn?.("memory receipt write failed; the run's own artifact still records its outcome", {
       kind: input.kind,
       event: input.event,
       error: error instanceof Error ? error.message : String(error),
     })
+    return false
   }
 }
 

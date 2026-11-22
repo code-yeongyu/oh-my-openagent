@@ -51,6 +51,7 @@ describe("memory session shutdown budget", () => {
           resolveContext: () => undefined,
           factsWiringFor: () => ({}),
           resetSession: () => {},
+          retireReconcile: () => undefined,
         },
         { reason: "quit", sessionId: "session-quit", deadlineAt: shutdownDeadlineAt(Date.now) },
       )

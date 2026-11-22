@@ -44,9 +44,17 @@ export async function backfillRunReceipt(
   runDir: string,
   port?: MemoryReceiptsPort,
   warn?: ReceiptWarn,
-): Promise<void> {
+): Promise<boolean> {
+  // False only when a receipt exists and its write failed; artifacts that yield no receipt never will.
   const receipt = await terminalReceipt(runDir)
-  if (receipt !== undefined) await emitMemoryReceipt(runtimeDir, receipt, port, warn)
+  return receipt === undefined || (await emitMemoryReceipt(runtimeDir, receipt, port, warn))
+}
+
+/** Identity a later pass compares when a rewrite lands in the same timestamp as the reconciled marker. */
+export async function runReceiptStamp(runDir: string): Promise<string | undefined> {
+  const receipt = await terminalReceipt(runDir)
+  if (receipt === undefined || receipt.kind === "facts") return undefined
+  return `${receipt.event}\n${receipt.generation}`
 }
 
 async function terminalReceipt(runDir: string): Promise<MemoryReceiptInput | undefined> {
