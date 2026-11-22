@@ -1522,7 +1522,13 @@ jobs:
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build native payload inputs
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        env:
+          OMO_BUILD_PROFILE: omo-native
+        run: bun run build
 
       - name: Build omo-native
         if: needs.ci-mode.outputs.run_heavy == 'true'
