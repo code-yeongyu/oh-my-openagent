@@ -1,14 +1,14 @@
 import { afterEach, describe, expect, it, spyOn } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises"
+import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { removeTree } from "../../../../test-support/remove-tree"
-import { consumeAgreementsNoticeDelta } from "../agreements/notice-watermark"
+import { AGREEMENTS_NOTICE_WATERMARK_FILENAME, consumeAgreementsNoticeDelta } from "../agreements/notice-watermark"
 import * as fs from "../fs/resilient"
 import { GitMemoryRepo } from "../git"
 import * as durability from "../journal/fsync"
-import { consumeSoulNoticeDelta } from "../soul/watermark"
+import { SOUL_NOTICE_WATERMARK_FILENAME, consumeSoulNoticeDelta } from "../soul/watermark"
 
 const roots: string[] = []
 const AUTHOR = { agentId: "watermark-failure", authorName: "Watermark Failure Test" }
@@ -88,7 +88,7 @@ for (const kind of ["agreements", "soul"] as const) {
       },
     )
 
-    it("#given rename and cleanup both fail #when publication aborts #then the original rename error surfaces", async () => {
+    it("#given rename and cleanup both fail #when publication aborts #then the original rename error surfaces and the cleanup failure is reported", async () => {
       // given
       const f = await fixture(kind)
       const failure = Object.assign(new Error("injected rename failure"), { code: "EIO" })
@@ -115,8 +115,11 @@ for (const kind of ["agreements", "soul"] as const) {
         renameSpy.mockRestore()
         rmSpy.mockRestore()
       }
-      // then
+      // then: the rename error still propagates, and the discarded cleanup failure reaches onWarn (#11353).
       expect(caught).toBe(failure)
+      expect(f.warnings).toHaveLength(1)
+      expect(String(f.warnings[0]?.[0])).toContain("temporary-file cleanup failed")
+      expect(f.warnings[0]?.[1]).toBe("EACCES")
     })
 
     it("#given directory-sync EIO after rename #when consumed #then the warning reaches onWarn, not console.warn", async () => {
@@ -127,16 +130,36 @@ for (const kind of ["agreements", "soul"] as const) {
         if (dir !== f.noticesDir) return sync(dir)
         throw Object.assign(new Error("injected directory sync failure"), { code: "EIO" })
       })
+      const renameFailure = Object.assign(new Error("injected rename failure"), { code: "EIO" })
+      const originalWarn = console.warn
       const warn = spyOn(console, "warn").mockImplementation(() => undefined)
+      const watermark = kind === "agreements" ? AGREEMENTS_NOTICE_WATERMARK_FILENAME : SOUL_NOTICE_WATERMARK_FILENAME
+      let renameSpy: { readonly mockRestore: () => void } | undefined
+      let consoleCalls: number
+      let caught: unknown
       try {
-        // when
+        // when: the first consume publishes with a directory-sync warning; forcing a second,
+        // throwing publication proves the console spy is restored by the finally alone (#11353).
         await f.consume()
+        consoleCalls = warn.mock.calls.length
+        await rm(join(f.noticesDir, watermark), { force: true })
+        const rename = fs.rename
+        renameSpy = spyOn(fs, "rename").mockImplementation(async (from, to) => {
+          if (dirname(String(to)) !== f.noticesDir) return rename(from, to)
+          throw renameFailure
+        })
+        caught = await f.consume().then(
+          () => undefined,
+          (error: unknown) => error,
+        )
       } finally {
+        renameSpy?.mockRestore()
         intercepted.mockRestore()
+        warn.mockRestore()
       }
-      const consoleCalls = warn.mock.calls.length
-      warn.mockRestore()
       // then
+      expect(caught).toBe(renameFailure)
+      expect(console.warn).toBe(originalWarn)
       expect(consoleCalls).toBe(0)
       expect(f.warnings).toHaveLength(1)
       expect(String(f.warnings[0]?.[0])).toContain("directory sync failed")

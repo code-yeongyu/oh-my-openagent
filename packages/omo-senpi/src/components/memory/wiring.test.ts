@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, spyOn, test } from "bun:test"
 import { realpathSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -21,6 +21,7 @@ import { createMemoryWiring } from "./wiring"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import type { SenpiModelPort } from "@oh-my-opencode/senpi-task"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
+import * as durability from "../../../../memory-core/src/journal/fsync"
 const roots: string[] = []
 
 // afterBind starts background git pipelines it never exposes a drain handle for
@@ -988,4 +989,61 @@ describe("memory footer live wiring", () => {
     harness.advanceFrames(10)
     expect(harness.statusCalls).toHaveLength(afterShutdown)
   })
+})
+
+describe("memory wiring notice warnings", () => {
+  test("#given a soul watermark publication whose directory sync fails #when a turn starts #then the warning reaches the component logger", async () => {
+    // given: a bound repo whose first watermark publication hits a post-rename directory-sync failure;
+    // wiring-static's onWarn sink is the only path from memory-core's warning to options.logger (#11353).
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-wiring-warn-")))
+    roots.push(root)
+    const identity = "wiring-warn-agent"
+    const paths = buildIdentityPaths(root, identity)
+    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: identity })
+    await repo.init({
+      seedFiles: [{ relativePath: "system/persona.md", content: "---\ndescription: Persona\n---\npersona\n" }],
+    })
+    const context = createMemoryIdentityContext({
+      identity,
+      identityPaths: paths,
+      binding: { identity, repoPathHash: "hash", boundAt: 1 },
+    })
+    const warnings: { readonly message: string; readonly details: unknown }[] = []
+    const pi = new MemoryFakeExtensionAPI()
+    createMemoryWiring({
+      sessions: new Map([["session-warn", { context }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings()),
+      cwd: () => root,
+      env: {},
+      logger: {
+        info: () => {},
+        warn: (message, details) => {
+          warnings.push({ message, details })
+        },
+        error: () => {},
+      },
+    }).registerStatic(pi, componentContext())
+    const sync = durability.syncJournalDirectory
+    const intercepted = spyOn(durability, "syncJournalDirectory").mockImplementation(async (dir) => {
+      if (dir !== paths.notices) return sync(dir)
+      throw Object.assign(new Error("injected directory sync failure"), { code: "EIO" })
+    })
+    try {
+      // when
+      await pi.dispatch(
+        "before_agent_start",
+        { type: "before_agent_start", prompt: "continue", systemPrompt: "BASE" },
+        sessionContext("session-warn"),
+      )
+    } finally {
+      intercepted.mockRestore()
+    }
+
+    // then: both watermark publications publish under the failing directory sync, and each warning
+    // reaches the component logger through the wiring's onWarn sink.
+    expect(warnings).toHaveLength(2)
+    expect(warnings.some((call) => call.message.includes("soul watermark directory sync failed"))).toBe(true)
+    expect(warnings.some((call) => call.message.includes("agreements watermark directory sync failed"))).toBe(true)
+    expect(warnings.every((call) => call.details === "EIO")).toBe(true)
+  }, 30_000)
 })

@@ -153,8 +153,12 @@ async function writeWatermark(
     })
     await rename(temporary, target)
   } catch (error) {
-    // Cleanup is best-effort: a failing rm must not replace the original write/rename error.
-    await rm(temporary, { force: true }).catch(() => undefined)
+    // Cleanup is best-effort: a failing rm must not replace the original write/rename error, but its
+    // own failure is reported (#11353) before the original error propagates.
+    await rm(temporary, { force: true }).catch((cleanupError: unknown) => {
+      const detail = cleanupError instanceof Error && "code" in cleanupError ? cleanupError.code : cleanupError
+      onWarn?.("[memory] Soul watermark temporary-file cleanup failed:", detail)
+    })
     throw error
   }
   try {
