@@ -151,4 +151,77 @@ describe("whole-run pause custody", () => {
     await h.controller.cancel("root", participant.runRef)
     expect(h.registry.require("root").participants).toEqual({})
   })
+
+  test("#given a lost queued admission after a restart #when retryLost runs without a credential #then it settles and drops instead of failing every session start (#10864)", async () => {
+    const queued: PauseParticipant = {
+      key: "held",
+      kind: "held_admission",
+      runEpoch: 0,
+      runRef: { kind: "task", id: "held" },
+      state: "pending",
+      at: new Date(0).toISOString(),
+    }
+    const h = harness({
+      snapshot: () => [participant, queued],
+      resume: async (entry, _request, credential) => {
+        if (entry.kind === "held_admission" && credential === undefined)
+          throw new Error("a queued admission resumes only inside a resume transaction")
+        return { kind: "resumed", turnId: "turn-2" }
+      },
+    })
+    await h.controller.pause("root", 1)
+    await h.controller.resume("root", 1, "resume-1")
+    expect(h.controller.released("root", 1, "resume-1")).toBe(true)
+    h.registry.update("root", 1, "held", { state: "lost", lostReason: "propagation failed" })
+
+    // A restart rebuilt the controller: the released transaction's credential is gone.
+    const restarted = new RunPauseController(h.registry, h.effects)
+    expect(await restarted.retryLost("root", 1)).toEqual([])
+    expect(h.registry.require("root").participants.held).toBeUndefined()
+  })
+
+  test("#given a lost participant its engine no longer holds #when the resume observes it #then the participant leaves the run instead of being re-observed forever (#10864)", async () => {
+    const h = harness({
+      snapshot: () => [participant],
+      pause: async () => ({ kind: "lost", reason: "propagation failed" }),
+      observeHold: async () => ({ held: false, childSeq: 0 }),
+    })
+    await h.controller.pause("root", 1)
+    expect(h.registry.require("root").participants.a).toMatchObject({ state: "lost" })
+    await h.controller.resume("root", 1, "resume-1")
+    expect(h.controller.released("root", 1, "resume-1")).toBe(true)
+    expect(await h.controller.retryLost("root", 1)).toEqual([])
+    expect(h.registry.require("root").participants.a).toBeUndefined()
+  })
+
+  test("#given a participant recorded without a cutoff #when Resume reaches it #then the failure is recorded instead of throwing past the transaction (#10864)", async () => {
+    const h = harness({ snapshot: () => [participant] })
+    await h.controller.pause("root", 1)
+    h.registry.update("root", 1, "a", { state: "resuming", observedChildSeq: undefined, ackSeq: undefined })
+    const result = await h.controller.resume("root", 1, "resume-1")
+    expect(result).toMatchObject({ kind: "installed", failures: [{ key: "a" }] })
+    expect(h.registry.require("root").participants.a).toMatchObject({ state: "lost" })
+  })
+
+  test("#given guidance or install that throws #when Resume runs #then the failure is recorded and the barrier still releases (#10864)", async () => {
+    const h = harness({
+      dispatchGuidance: async () => {
+        throw new Error("guidance exploded")
+      },
+      install: async () => {
+        throw new Error("install exploded")
+      },
+    })
+    await h.controller.pause("root", 1)
+    const result = await h.controller.resume("root", 1, "resume-1")
+    expect(result).toMatchObject({
+      kind: "installed",
+      failures: [
+        { key: "parent", reason: expect.stringContaining("guidance exploded") },
+        { key: "parent", reason: expect.stringContaining("install exploded") },
+      ],
+    })
+    expect(h.controller.released("root", 1, "resume-1")).toBe(true)
+    expect(h.barrier.state("root")).toEqual({ kind: "open" })
+  })
 })
