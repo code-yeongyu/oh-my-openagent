@@ -78,6 +78,7 @@ async function providerFixture(chosen: string | undefined, explicit?: string) {
   const eventCtx = {
     sessionManager: {
       getSessionId: () => sessionId,
+      getEntryCount: () => branch.length,
       getEntries: () => branch,
       getBranch: () => branch,
       getSessionFile: () => join(root, "session.jsonl"),

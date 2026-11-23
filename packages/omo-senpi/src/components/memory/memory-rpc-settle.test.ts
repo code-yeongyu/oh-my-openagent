@@ -161,6 +161,7 @@ test.each(["reflection", "journal"] as const)(
     const eventCtx = {
       sessionManager: {
         getSessionId: () => sessionId,
+        getEntryCount: () => entries.length,
         getEntries: () => entries,
         getBranch: () => entries,
       },
