@@ -14,13 +14,11 @@ async function runSupervisor(runDir: string): Promise<void> {
   const {
     getSupervisorProcessStart,
     getSupervisorRuntimePlatform,
-    isSupervisorProcessGroupGone,
     parseSupervisorChildExit,
     readSupervisorClockNow,
     recordSupervisorGracefulDeadline,
     scheduleSupervisorDeadline,
-    signalSupervisorProcessGroup,
-    terminateSupervisorChildHard,
+    taskkillTree,
   } = await import("./supervisor-process-identity")
   const { publishRunOutcome } = await import("./run-outcome-publication")
   const { admitSupervisor } = await import("./supervisor-admission")
@@ -29,9 +27,13 @@ async function runSupervisor(runDir: string): Promise<void> {
   const { manifest, lease } = await admitSupervisor(runDir)
   const platform = getSupervisorRuntimePlatform()
   let childPid: number | undefined
+  let requestGroupSignal: ((signal: NodeJS.Signals) => void) | undefined
   const containChild = () => {
     try {
-      terminateSupervisorChildHard(platform, childPid, true)
+      if (childPid !== undefined) {
+        if (platform === "win32") taskkillTree(childPid, true)
+        else requestGroupSignal?.("SIGKILL")
+      }
     } catch (error) {
       process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`)
       return
@@ -49,10 +51,33 @@ async function runSupervisor(runDir: string): Promise<void> {
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
-    stdio: ["pipe", stdoutFd, stderrFd, "pipe"],
+    stdio: ["pipe", stdoutFd, stderrFd, "pipe", platform === "posix" ? "pipe" : "ignore"],
     windowsHide: true,
   })
   childPid = bootstrap.pid
+  const commands = bootstrap.stdio[4]
+  if (commands && "write" in commands) {
+    commands.on("error", (error: NodeJS.ErrnoException) => {
+      if (error.code !== "EPIPE" && error.code !== "ECONNRESET") throw error
+    })
+    requestGroupSignal = (signal) => {
+      if (commands.writable) commands.write(`${signal}\n`)
+    }
+  }
+  let cancelTerm = () => {}
+  let cancelKill = () => {}
+  let bootstrapExited = false
+  bootstrap.once("exit", () => {
+    bootstrapExited = true
+    if (platform !== "posix") return
+    cancelTerm()
+    cancelKill()
+    requestGroupSignal = undefined
+  })
+  const closed = new Promise<SupervisorChildExit>((resolve, reject) => {
+    bootstrap.once("error", reject)
+    bootstrap.once("close", (code, signal) => resolve({ code, signal }))
+  })
   let modelPid: number | undefined
   let bootstrapStatus = ""
   const control = bootstrap.stdio[3]
@@ -84,37 +109,21 @@ async function runSupervisor(runDir: string): Promise<void> {
 
   let timedOut = false
   const { promise: hardKillFinished, resolve: finishHardKill } = Promise.withResolvers<undefined>()
-  const cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
-    timedOut = true
-    if (platform === "win32") recordSupervisorGracefulDeadline(bootstrapPid)
-    else signalSupervisorProcessGroup(bootstrapPid, "SIGTERM")
-  })
-  const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
-    terminateSupervisorChildHard(platform, platform === "win32" ? (modelPid ?? bootstrapPid) : bootstrapPid)
-    finishHardKill(undefined)
-  })
-  const wrapperExit = await new Promise<SupervisorChildExit>((resolve, reject) => {
-    let settled = false
-    bootstrap.once("error", (error) => {
-      if (settled) return
-      settled = true
-      reject(error)
+  if (!bootstrapExited) {
+    cancelTerm = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () => {
+      timedOut = true
+      if (platform === "win32") recordSupervisorGracefulDeadline(bootstrapPid)
+      else requestGroupSignal?.("SIGTERM")
     })
-    bootstrap.once("close", (code, signal) => {
-      if (settled) return
-      settled = true
-      resolve({ code, signal })
+    cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
+      if (platform === "win32") taskkillTree(modelPid ?? bootstrapPid)
+      else requestGroupSignal?.("SIGKILL")
+      finishHardKill(undefined)
     })
-  })
+  }
+  const wrapperExit = await closed
   const childExit = parseSupervisorChildExit(bootstrapStatus)
-  // A child-exit record describes only the model. Even the bootstrap can disappear while its
-  // POSIX group survives. A timely model exit is still allowed to complete without escalation.
-  const needsHardKill =
-    platform === "posix"
-      ? (childExit === undefined || timedOut || readSupervisorClockNow() >= manifest.hardDeadlineAt) &&
-        !isSupervisorProcessGroupGone(bootstrapPid)
-      : timedOut && childExit === undefined
-  if (needsHardKill) await hardKillFinished
+  if (platform === "win32" && timedOut && childExit === undefined) await hardKillFinished
   cancelTerm()
   cancelKill()
   childPid = undefined
@@ -128,12 +137,10 @@ async function runSupervisor(runDir: string): Promise<void> {
   // erase a deadline that was in fact exceeded.
   const clockNow = readSupervisorClockNow()
   const deadlineReached = timedOut || (Number.isFinite(clockNow) && clockNow >= manifest.hardDeadlineAt)
-  // Grace SIGKILL can stop the bootstrap after the atomic exit record is published but before
-  // its pipe status is sent. Keep the model's recorded status instead of the bootstrap's signal.
+  // If the pipe was lost after the atomic write, keep the model's status, not the
+  // bootstrap's exit code or the signal that ended the group.
   const recordedExit =
-    platform === "posix" && deadlineReached && childExit === undefined
-      ? await readRecordedChildExit(runDir, manifest)
-      : undefined
+    platform === "posix" && childExit === undefined ? await readRecordedChildExit(runDir, manifest) : undefined
   const finishedAt = new Date().toISOString()
   const outcome: RunOutcome = {
     version: 1,
@@ -180,7 +187,10 @@ try {
   } else if (args[0] === "--child-bootstrap") {
     if (args[1] === undefined) throw new TypeError("run directory is required")
     const { runChildBootstrap } = await import("./supervisor-child-bootstrap")
-    await runChildBootstrap(args[1])
+    await runChildBootstrap(args[1], fileURLToPath(import.meta.url))
+  } else if (args[0] === "--group-guard") {
+    const { runGroupGuard } = await import("./supervisor-group-guard")
+    runGroupGuard(Number(args[1]))
   } else {
     if (args[0] === undefined) throw new TypeError("run directory is required")
     await runSupervisor(args[0])

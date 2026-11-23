@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from "node:child_process"
 import { readdirSync, watch, writeFileSync } from "@oh-my-opencode/memory-core/fs"
-import { getPidLiveness, getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
+import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
 
 export type SupervisorRuntimePlatform = "posix" | "win32"
 export type CancelSupervisorDeadline = () => void
@@ -133,21 +133,19 @@ function spawnTerminationCommand(command: readonly string[], args: readonly stri
   child.once("error", (error) => process.stderr.write(`${error.message}\n`))
 }
 
-export function signalSupervisorProcessGroup(pid: number, signal: NodeJS.Signals): void {
+/** Only the detached bootstrap and its non-detached guard call this. The leader PID is
+ * diagnostic (and used by the Windows-hosted test fixture), never a native kill target. */
+export function signalOwnSupervisorGroup(pid: number, signal: NodeJS.Signals): void {
   recordTestTermination(`posix-${signal}`, pid)
-  const injected = testCommand("OMO_MEMORY_SUPERVISOR_POSIX_SIGNAL_COMMAND")
+  const injected = process.platform === "win32" ? testCommand("OMO_MEMORY_SUPERVISOR_POSIX_SIGNAL_COMMAND") : undefined
   if (injected !== undefined) {
     spawnTerminationCommand(injected, ["--signal-group", String(pid), signal], false)
     return
   }
-  try {
-    process.kill(-pid, signal)
-  } catch (error) {
-    if (!(error instanceof Error) || !("code" in error) || error.code !== "ESRCH") throw error
-  }
+  process.kill(0, signal)
 }
 
-function taskkillTree(pid: number, synchronous: boolean): void {
+export function taskkillTree(pid: number, synchronous = false): void {
   const command = testCommand("OMO_MEMORY_SUPERVISOR_TASKKILL_COMMAND") ?? ["taskkill"]
   spawnTerminationCommand(command, ["/pid", String(pid), "/T", "/F"], synchronous)
 }
@@ -181,21 +179,6 @@ export async function terminateSupervisorWin32Tree(pid: number | undefined): Pro
 
 export function recordSupervisorGracefulDeadline(pid: number | undefined): void {
   if (pid !== undefined) recordTestTermination("win32-graceful", pid)
-}
-
-export function isSupervisorProcessGroupGone(pid: number): boolean {
-  // Only the injected POSIX branch can call this on Windows, where there is no process group.
-  return getPidLiveness(process.platform === "win32" ? pid : -pid) === "dead"
-}
-
-export function terminateSupervisorChildHard(
-  platform: SupervisorRuntimePlatform,
-  pid: number | undefined,
-  synchronous = false,
-): void {
-  if (pid === undefined) return
-  if (platform === "win32") taskkillTree(pid, synchronous)
-  else signalSupervisorProcessGroup(pid, "SIGKILL")
 }
 
 /**

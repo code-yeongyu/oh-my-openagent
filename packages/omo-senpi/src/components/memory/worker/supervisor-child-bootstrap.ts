@@ -13,8 +13,8 @@ import {
   readSupervisorClockNow,
   recordSupervisorGracefulDeadline,
   scheduleSupervisorDeadline,
-  signalSupervisorProcessGroup,
-  terminateSupervisorChildHard,
+  signalOwnSupervisorGroup,
+  taskkillTree,
   terminateSupervisorWin32Tree,
   type SupervisorChildExit,
 } from "./supervisor-process-identity"
@@ -34,10 +34,12 @@ function writeBootstrapStatus(status: SupervisorChildExit): void {
   }
 }
 
-export async function runChildBootstrap(runDir: string): Promise<void> {
+export async function runChildBootstrap(runDir: string, entry: string): Promise<void> {
   if (!(await readRelease())) return
   const manifest = await readRunJson<RunLaunchManifest>(join(runDir, "launch.json"))
   const platform = getSupervisorRuntimePlatform()
+  const finishGuard =
+    platform === "posix" ? await (await import("./supervisor-group-guard")).startGroupGuard(entry) : undefined
   const child = spawn(manifest.command, [...manifest.args], {
     cwd: manifest.cwd,
     env: manifest.env,
@@ -68,11 +70,12 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
       // the entire tree at the deadline, while this bootstrap stays alive to record child-exit.
       recordSupervisorGracefulDeadline(child.pid)
       killModelTree()
-    } else signalSupervisorProcessGroup(process.pid, "SIGTERM")
+    } else signalOwnSupervisorGroup(process.pid, "SIGTERM")
   })
   const cancelKill = scheduleSupervisorDeadline(manifest.hardDeadlineAt + manifest.terminationGraceMs, () => {
     deadlineFired = true
-    terminateSupervisorChildHard(platform, process.pid)
+    if (platform === "win32") taskkillTree(process.pid)
+    else signalOwnSupervisorGroup(process.pid, "SIGKILL")
   })
   const status = await new Promise<SupervisorChildExit>((resolve) => {
     let settled = false
@@ -98,7 +101,7 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
   const timedOut = deadlineFired || reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)
   // The POSIX model can exit on SIGTERM while descendants in our group are still running.
   // Keep the timer (and this group leader) alive so containment works without the supervisor.
-  if (platform === "win32" || !timedOut) cancelKill()
+  if (platform === "win32") cancelKill()
   // Durable before it is reported: a supervisor that dies after this point loses the pipe message,
   // and recovery may only trust a tip whose child is recorded as having finished cleanly in time.
   await writeRunJsonAtomic(join(runDir, CHILD_EXIT_FILENAME), {
@@ -111,6 +114,10 @@ export async function runChildBootstrap(runDir: string): Promise<void> {
     timedOut,
   } satisfies RunChildExit)
   writeBootstrapStatus(status)
+  if (finishGuard && !timedOut && !reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)) {
+    cancelKill()
+    finishGuard()
+  }
 }
 
 /** A clock the bootstrap cannot read counts as past the deadline, so recovery stays closed. */

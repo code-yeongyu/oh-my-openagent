@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile, rm, stat } from "node:fs/promises"
+import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { createMemoryRunSupervisorIc8Harness, IC8_PLATFORMS, IC8_WAIT_MS } from "./memory-run-supervisor-ic8-harness"
 import { terminateProcessGroup } from "./memory-run-supervisor-ic8-process-groups"
+import { withRunTerminalGate } from "./run-terminal-gate"
+import { waitForFilesystemState } from "./supervisor-test-signals"
 
 setDefaultTimeout(IC8_WAIT_MS)
 const harness = createMemoryRunSupervisorIc8Harness()
@@ -26,6 +28,94 @@ const {
 afterEach(async () => harness.cleanup())
 
 describe("memory run supervisor IC-8 containment", () => {
+  test("#given an owned child before deadline #when the supervisor receives TERM #then its exit handler contains the group", async () => {
+    if (process.platform === "win32") return
+    const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("stubborn")
+    const supervisor = launchSupervisor(runDir, clockPath, "posix")
+    const exit = waitForExit(supervisor)
+    await exitSocketAccepted
+    supervisor.kill("SIGTERM")
+    expect(await exit).toEqual({ code: 143, signal: null })
+    await waitBounded(childExited, 3_000, "owned socket close on supervisor exit")
+  })
+
+  test("#given a timely nonzero model exit without pipe status #then the durable code wins over the bootstrap's zero", async () => {
+    if (process.platform === "win32") return
+    const { runDir, clockPath } = await makeRun("inspect")
+    const supervisor = launchSupervisor(
+      runDir,
+      clockPath,
+      "posix",
+      join(import.meta.dir, "__fixtures__/supervisor-signal-spy.ts"),
+    )
+    expect(await waitForExit(supervisor)).toEqual({ code: 0, signal: null })
+    expect(JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))).toMatchObject({
+      timedOut: false,
+      childExit: { code: 23, signal: null },
+    })
+  })
+
+  for (const duringGrace of [false, true]) {
+    test(`#given bootstrap loss ${duringGrace ? "during grace" : "before deadline"} without pipe status #then containment does not wait for or signal at a later deadline`, async () => {
+      if (process.platform === "win32") return
+      const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun(
+        duringGrace ? "with-stubborn-grandchild" : "stubborn",
+      )
+      const supervisor = launchSupervisor(
+        runDir,
+        clockPath,
+        "posix",
+        join(import.meta.dir, "__fixtures__/supervisor-signal-spy.ts"),
+      )
+      const exit = waitForExit(supervisor)
+      await exitSocketAccepted
+      await waitForPath(join(runDir, "child-started.json"))
+      const { childPid } = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))
+      const peer = JSON.parse(
+        await readFile(join(runDir, duringGrace ? "grandchild.json" : "child-started.json"), "utf8"),
+      )
+      if (duringGrace) {
+        await advanceClock(clockPath, 2_000)
+        const record = join(runDir, "child-exit.json")
+        await waitForPath(record)
+        expect(JSON.parse(await readFile(record, "utf8"))).toMatchObject({ code: 0, signal: null, timedOut: true })
+      }
+      const spyLog = join(runDir, "external-signals.jsonl")
+      await writeFile(spyLog, "")
+      try {
+        const containedBeforeDeadline = await withRunTerminalGate(runDir, "run-ic8", async () => {
+          killFixturePid(childPid)
+          const contained = await waitBounded(
+            childExited,
+            3_000,
+            "owned child to close after bootstrap loss with clock frozen",
+          ).then(
+            () => true,
+            () => false,
+          )
+          // Keep the supervisor alive in publication while crossing BOTH pending instants.
+          if (contained) await waitForPath(join(runDir, "publishing.json"))
+          await advanceClock(clockPath, 3_000)
+          return contained
+        })
+        expect(await exit).toEqual({ code: 0, signal: null })
+        expect(await readFile(spyLog, "utf8")).toBe("")
+        expect(containedBeforeDeadline).toBe(true)
+        const outcome = JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))
+        expect(outcome).toMatchObject({
+          timedOut: duringGrace,
+          childExit: duringGrace ? { code: 0, signal: null } : { code: null, signal: "SIGKILL" },
+        })
+      } finally {
+        // On RED the spy swallows the stale group signals, so clean up only our socket peer.
+        if (!(await exitSocketAccepted).destroyed) {
+          killFixturePid(peer.pid)
+          await childExited
+        }
+      }
+    })
+  }
+
   test("#given a connected model child #when the supervisor is killed and test cleanup runs #then cleanup terminates the child group and releases the socket", async () => {
     // given
     const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("graceful")
@@ -214,9 +304,20 @@ describe("memory run supervisor IC-8 containment", () => {
       // when
       await advanceClock(clockPath, 2_000)
       if (supervisor.pid === undefined) throw new Error("supervisor pid is required")
-      await waitForPath(
-        join(runDir, `${platform === "win32" ? "win32-graceful" : "posix-SIGTERM"}-${supervisor.pid}.json`),
-      )
+      if (platform === "win32") await waitForPath(join(runDir, `win32-graceful-${supervisor.pid}.json`))
+      else {
+        const { childPid } = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))
+        // A TERM delivered on the supervisor's behalf, independently of the bootstrap's own timer.
+        await waitForFilesystemState(
+          runDir,
+          async () =>
+            (await readdir(runDir)).some(
+              (name) => name.startsWith("posix-SIGTERM-") && name !== `posix-SIGTERM-${childPid}.json`,
+            ) || undefined,
+          IC8_WAIT_MS,
+          "supervisor's group TERM",
+        )
+      }
       if (nativeWindowsGraceWins) {
         await childExited
         await waitForPath(join(runDir, "outcome.json"))

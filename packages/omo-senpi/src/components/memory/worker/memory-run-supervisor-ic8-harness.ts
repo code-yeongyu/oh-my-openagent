@@ -30,7 +30,9 @@ export function createMemoryRunSupervisorIc8Harness() {
     await waitForFilesystemState(dirname(path), () => (existsSync(path) ? true : undefined), timeoutMs, path)
   }
 
-  const makeRun = async (mode: "graceful" | "stubborn" | "with-grandchild" | "with-stubborn-grandchild") => {
+  const makeRun = async (
+    mode: "inspect" | "graceful" | "stubborn" | "with-grandchild" | "with-stubborn-grandchild",
+  ) => {
     const runDir = realpathSync.native(await mkdtemp(join(tmpdir(), "memory-run-supervisor-ic8-")))
     roots.push(runDir)
     await mkdir(runDir, { recursive: true, mode: 0o700 })
@@ -69,8 +71,9 @@ export function createMemoryRunSupervisorIc8Harness() {
     runDir: string,
     clockPath: string,
     platform: (typeof IC8_PLATFORMS)[number],
+    entry = supervisorPath,
   ): ChildProcess => {
-    const child = spawn(process.execPath, [supervisorPath, runDir], {
+    const child = spawn(process.execPath, [entry, runDir], {
       detached: true,
       stdio: "ignore",
       windowsHide: true,
