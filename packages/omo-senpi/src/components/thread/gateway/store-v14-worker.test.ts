@@ -55,8 +55,13 @@ test("#given a v14 session whose worker opened before this binary migrated the s
   expect(read.error).toBeUndefined()
   expect(read.value?.map((row) => row.mode_effective)).toContain("start")
 
+  // #14842: the start delivery stays open (taken by the lead, not yet written) until the drain its emit wakes has run in
+  // the background. A baseline read before that counted it as held and then lost it once written. Wait for it, so the
+  // baseline holds nothing and the count below is exactly the two rows this case holds.
+  await h.quiesce()
   lead.runtime.beginUserTurn()
   const heldBefore = (await notifier.store.backlogs(["lead"]))["lead"]?.held ?? 0
+  expect(heldBefore).toBe(0)
   const written = await h.engineFor(old).deliver({
     sender: { kind: "session", durable_id: "notifier" },
     target: "lead",
