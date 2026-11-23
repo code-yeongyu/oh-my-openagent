@@ -32,6 +32,7 @@
         "src/components/memory/index-engine.fixture.ts",
         "src/components/memory/index-observer.fixture.ts",
         "src/components/memory/index-selection.fixture.ts",
+        "src/components/thread/caller-stall-host.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
