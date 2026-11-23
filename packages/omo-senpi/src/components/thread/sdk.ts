@@ -57,7 +57,7 @@ import { resolveThreadSocket } from "./live-surface-paths"
 import { createGatewayResolver, createGatewayServices } from "./tools/gateway-services"
 import { addressBook, hostView, sendAddressBook } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
-import { listThreads, readThread } from "./tools/read-ops"
+import { listThreads, readThread, withBacklog } from "./tools/read-ops"
 import { sendView } from "./tools/send-view"
 import { listAcross } from "./remote/cross-device"
 import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
@@ -87,7 +87,8 @@ export type ThreadSdkOptions = {
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
-   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
+   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
+   * shipped entry (`extension/thread-sdk.ts`) passes the account surface when its caller passes none (#14616).
    */
   readonly remote?: RemoteThreadSurface
 }
@@ -166,6 +167,8 @@ export type ThreadSdk = StoreExtensionApi & {
         readonly expected_turn_id?: number
         readonly binding_id?: string
         readonly author?: ExternalAuthor
+        /** Bindingless only: replaces this sender's earlier undelivered send to the thread under the same key (#14428). */
+        readonly collapse_key?: string
       },
   ) => Promise<ThreadSdkSendResult>
   readonly bind: (
@@ -488,7 +491,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       guarded(async () =>
         listAcross(
           options.remote,
-          listThreads(surface, await view(), request.all_scope, request.state),
+          await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
           request.all_scope === true,
           request.state,
         ),
@@ -509,6 +512,12 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ),
     send: (request) =>
       guarded(async () => {
+        if (request.binding_id !== undefined && request.collapse_key !== undefined)
+          return fail(
+            "invalid_arguments",
+            "A send through a binding is keyed by its event id; collapse_key applies to a send without a binding.",
+            "Drop collapse_key, or send without the binding.",
+          )
         if (request.binding_id !== undefined)
           return named(await inbound({ ...request, binding_id: request.binding_id }))
         if (request.thread === undefined)
@@ -563,6 +572,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
           ...(request.expected_turn_id === undefined ? {} : { expected_turn_id: String(request.expected_turn_id) }),
           idempotency_key: request.idempotency_key ?? `auto:${randomUUID()}`,
+          ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
           args: request,
         })
         if (sent.kind === "ok" && "device" in sent)

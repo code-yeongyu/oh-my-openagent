@@ -303,7 +303,7 @@ function renderFailure(dependencies: RemoteCommandDependencies, failure: RemoteF
   }
   dependencies.error(`omo remote: ${failure.message}`)
   dependencies.error(withVerbs(failure.next_action))
-  for (const line of candidateLines(failure.details)) dependencies.error(line)
+  for (const line of candidateLines(failure)) dependencies.error(line)
   return exitCodeOf(failure)
 }
 

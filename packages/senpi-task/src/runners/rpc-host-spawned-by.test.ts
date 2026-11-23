@@ -7,6 +7,7 @@ import { baseSpec, cleanupProjects, launchSettled, makeManager, settings } from 
 import { normalizeSenpiTeamSpec, spawnTeamMembers } from "../team"
 import { bounded } from "../workpool/__fixtures__/admission"
 import { hostRunnerHarness } from "./rpc-host.test-support"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const harness = hostRunnerHarness()
 afterEach(async () => {
@@ -47,7 +48,7 @@ test.each(["tree-root", "nested-parent"])("hosted task wire retains ancestry fro
 test("workflow node wire uses the manager task ID, not the workflow node ID", async () => {
   // given a real workflow scheduler and manager
   const f = await fixture()
-  const store = createDagFileStore({ project_dir: f.project })
+  const store = createDagFileStore(ownedTaskState(f.project))
   const dag = createDagManager({ store })
   const { snapshot } = await dag.start({
     parentSessionId: "nested-parent",

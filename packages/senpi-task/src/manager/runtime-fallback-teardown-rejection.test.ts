@@ -4,6 +4,7 @@ import { createTaskRecordStore, type TaskRecordStore } from "../store"
 import type { ManagedRunner } from "./types"
 import { baseSpec, cleanupProjects, makeHandle, tempProject } from "./__fixtures__/manager-fakes"
 import { managerOver, managerWithLifecycle, NEXT, PRIMARY, stubbornChild } from "./__fixtures__/fallback-launch-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -15,7 +16,7 @@ describe("runtime fallback: the failed rung's teardown rejects", () => {
   ] as const)
     test(`#given the failed rung's teardown rejects with ${label} #when the handoff was committed #then the task ends in error, is released, and no next rung starts`, async () => {
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const starts: string[] = []
       let first: ReturnType<typeof makeHandle> | undefined
       const runner: ManagedRunner = {
@@ -50,7 +51,7 @@ describe("runtime fallback: the failed rung's teardown rejects", () => {
 
   test("#given a cancel lands while the stranded handoff is being failed #when the failure is written #then the cancel is kept", async () => {
     const project = tempProject()
-    const backing = createTaskRecordStore({ project_dir: project })
+    const backing = createTaskRecordStore(ownedTaskState(project))
     let injectCancel = false
     const cancelNow = (taskId: string): void => {
       if (!injectCancel) return
@@ -102,7 +103,7 @@ describe("runtime fallback: the failed rung's teardown rejects", () => {
 describe("runtime fallback: a child whose cleanup rejects is handed to orphan termination", () => {
   test("#given a stale next-rung child whose discard rejects #when the task was cancelled mid-start #then its pid is recorded and the orphan path signals it", async () => {
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const alive = new Set([2_222])
     const entered = Promise.withResolvers<void>()
     const release = Promise.withResolvers<void>()
@@ -138,7 +139,7 @@ describe("runtime fallback: a child whose cleanup rejects is handed to orphan te
 
   test("#given the failed rung's teardown rejects and its child stays alive #when the task is failed #then the failed rung's pid is restored and the orphan path signals it", async () => {
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const alive = new Set([3_333])
     const starts: string[] = []
     let first: ReturnType<typeof makeHandle> | undefined

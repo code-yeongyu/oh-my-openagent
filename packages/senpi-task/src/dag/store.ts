@@ -95,6 +95,7 @@ export type DagStorePaths = {
   readonly runLock: (runId: DagRunId) => string
   readonly keyLock: (parentSessionId: string, runKey: string) => string
   readonly taskOwnerLock: (taskOwner: string) => string
+  readonly sessionRunsLock: (parentSessionId: string) => string
 }
 
 export type DagFileStore = {
@@ -164,7 +165,7 @@ export function readDagDirectory(directory: string): readonly fs.Dirent[] {
 
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
-  const paths = createPaths(stateDir)
+  const paths = createDagStorePaths(stateDir)
   const diagnosticLog: DagStoreDiagnostic[] = []
   const recoveredPaths = new Set<string>()
   const now = options.now ?? Date.now
@@ -291,7 +292,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       withLock(paths.taskOwnerLock(taskOwner), runId, operation, isProcessAlive, now, fsyncWrites),
     withSessionRunCapacity: (parentSessionId, runId, operation) =>
       withLock(
-        sessionCapacityLock(paths, parentSessionId),
+        paths.sessionRunsLock(parentSessionId),
         undefined,
         () => {
           assertSessionRunCapacity(paths, parentSessionId, runId, maxRunsPerSession, now)
@@ -327,7 +328,9 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
   return store
 }
 
-function createPaths(stateDir: string): DagStorePaths {
+// Exported for the in-memory store (#11621): a test double with its own copy of the layout drifted from
+// this one (no result-path containment, raw task-owner lock names), so both build paths here.
+export function createDagStorePaths(stateDir: string): DagStorePaths {
   const root = join(stateDir, "dag")
   const keys = join(root, "keys")
   const runs = join(root, "runs")
@@ -365,6 +368,7 @@ function createPaths(stateDir: string): DagStorePaths {
     runLock: (runId) => join(locks, `${runId}.lock`),
     keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
     taskOwnerLock: (taskOwner) => join(locks, `task-owner-${sha256(taskOwner)}.lock`),
+    sessionRunsLock: (parentSessionId) => join(locks, `session-runs-${sha256(parentSessionId)}.lock`),
   }
 }
 
@@ -385,7 +389,7 @@ function writeCheckpointWithinSessionLimit(
     return
   }
   withLock(
-    sessionCapacityLock(paths, parentSessionId),
+    paths.sessionRunsLock(parentSessionId),
     undefined,
     () => {
       if (fs.existsSync(path)) {
@@ -404,10 +408,6 @@ function writeCheckpointWithinSessionLimit(
     now,
     fsyncWrites,
   )
-}
-
-function sessionCapacityLock(paths: DagStorePaths, parentSessionId: string): string {
-  return join(paths.locks, `session-runs-${sha256(parentSessionId)}.lock`)
 }
 
 // Only runs that can still hold a scheduler count: a finished run waits for retention, not a slot.

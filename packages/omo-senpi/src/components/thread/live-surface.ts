@@ -143,7 +143,7 @@ export async function requestFrame(
 ): Promise<RpcFrame> {
   return await withRpcSocket(
     socketPath,
-    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS },
+    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS, readCommand: command.type },
     async (request) => {
       if (options.rpcHost !== true) return await request(command)
       const protocolRequest = command.type === "get_protocol_info" ? command : undefined
@@ -815,7 +815,7 @@ export function createLiveThreadSurface(
   ): ThreadSessionPort & Required<Pick<ThreadSessionPort, "watchSession">> => ({
     getMessages: async (sessionId) =>
       (await send<{ messages: ThreadTranscriptEntry[] }>("get_messages", { sessionId })).messages,
-    getState: (sessionId) => send("get_state", { sessionId }),
+    getState: (sessionId, durableId) => send("get_state", { sessionId }, durableId),
     watchSession: (sessionId, handlers) => watchOn(socket ?? legacy, sessionId, handlers),
     prompt: (sessionId, message, options, durableId) => send("prompt", { sessionId, message, ...options }, durableId),
     interrupt: (sessionId, request, durableId) => send("interrupt", { sessionId, ...request }, durableId),

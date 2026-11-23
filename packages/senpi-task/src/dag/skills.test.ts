@@ -9,6 +9,7 @@ import { createDagManager } from "./manager"
 import { createDagSkillMaterializer, readDagSkillManifest } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const parentSessionId = "parent-session"
@@ -67,7 +68,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
     writeSkill(cwd, "programming", "programming skill body")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
 
     // when
     const result = materializer(
@@ -93,7 +94,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     const cwd = tempDir("senpi-dag-skills-cwd-")
     const body = "git-master skill body\nwith two lines"
     writeSkill(cwd, "git-master", body)
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
 
     // when
     materializer(
@@ -124,7 +125,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
     writeSkill(cwd, "programming", "programming skill body")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
 
     // when
     const result = materializer(
@@ -159,7 +160,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
     writeSkill(cwd, "programming", "v1 skill body")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     const materialize = materializer(store, cwd)
     materialize({
       runId,
@@ -183,7 +184,7 @@ describe("createDagSkillMaterializer at run creation", () => {
     // given
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
 
     // when
     const result = materializer(
@@ -207,7 +208,7 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
     writeSkill(cwd, "programming", "v1 skill body")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     const manager = createDagManager({
       store,
       materializeSkills: createDagSkillMaterializer({ store, cwd, homeDir: tempDir("senpi-dag-skills-home-") }),
@@ -235,7 +236,7 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
     // given
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     const manager = createDagManager({
       store,
       materializeSkills: createDagSkillMaterializer({ store, cwd, homeDir: tempDir("senpi-dag-skills-home-") }),
@@ -267,7 +268,7 @@ describe("createDagSkillMaterializer wired into DagManager.start", () => {
     const project = tempDir("senpi-dag-skills-project-")
     const cwd = tempDir("senpi-dag-skills-cwd-")
     writeSkill(cwd, "programming", "v1 skill body")
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     const nodes = definition([
       { id: "build", prompt: "ship the feature", category: "quick", load_skills: ["programming"] },
     ])

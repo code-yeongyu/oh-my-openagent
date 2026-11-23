@@ -7,6 +7,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedRunner, ManagedStartSpec } from "./types"
 import { cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(() => {
   cleanupProjects()
@@ -26,7 +27,7 @@ async function memberGrant() {
 
 function harness() {
   const root = tempProject()
-  const store = createTaskRecordStore({ project_dir: root })
+  const store = createTaskRecordStore(ownedTaskState(root))
   const starts: ManagedStartSpec[] = []
   const runner: ManagedRunner = {
     start: async (spec): Promise<ManagedChildHandle> => {

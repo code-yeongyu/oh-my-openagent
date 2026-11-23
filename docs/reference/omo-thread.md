@@ -30,7 +30,7 @@ Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or 
 
 ```bash
 omo thread list [--all-scope] [--state running|idle|inactive|archived[,...]] [--json]
-omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--json]
+omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>] [--json]
 omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]
                 [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]] [--json]
 omo thread read <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>] [--json]
@@ -161,11 +161,17 @@ Every send is checked against fixed budgets, which no setting raises:
 | Guard | Limit | Answer |
 | --- | --- | --- |
 | Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
-| Backlog of one target | 128 undelivered messages or 1 MiB | `queue_full` |
+| Backlog of one target | 128 undelivered follow-up/auto messages or 1 MiB; steers have their own 16 / 256 KiB; an expired message no longer counts, also while the target is not running | `queue_full` (details: held count, how many the session holds vs the gateway, oldest age, reason, `target_running`, and `frees_at`: when the oldest queued message expires and frees a slot) |
 | One sender to one target (the loop guard) | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
-| An undelivered message | expires after 24 hours (or when its binding expires) | the row ends `refused` |
+| An undelivered message | expires after 24 hours (or when its binding expires), whether or not the target is running | the row ends `refused` |
+
+A sender that repeats one message (an alert re-sent every few minutes) passes `--collapse-key <k>`
+(`collapse_key` on `thread_send`): the send replaces the sender's earlier undelivered message under
+the same key, which ends `refused` `superseded`, or, when the session already took that one into its
+queue, is answered deduplicated with its delivery id and `collapsed: true` (this text is not delivered;
+the earlier message stands). One key never holds more than one undelivered message. It reaches sessions on this device only; a send to another device with it answers `unsupported`.
 
 A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
 
@@ -612,7 +618,9 @@ try {
 ```
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
-CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint registry on disk; pass
+CLI's JSON; nothing throws for a refusal. Like `omo thread`, it lists, reads and addresses the threads on the
+account's other devices through this device's device service, loaded on the first call that needs another device
+and closed by `dispose()`. Endpoints come from the endpoint registry on disk; pass
 `engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
 enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
 diagnostic pass that took 8-9 s on a host with about 50 endpoints.
@@ -645,3 +653,9 @@ if (created.kind === "ok") {
   await sdk.close({ thread: "nightly-build" })
 }
 ```
+
+### Diagnose a local read RPC failure
+
+Set `OMO_THREAD_READ_TRACE=1` in the **calling process** to print a `[thread-read-rpc]` line to stderr when a local socket conversation for `list_sessions`, `get_protocol_info`, `get_messages`, or `get_entries` fails. Leave it unset for normal use. Each line contains only the requested command, the last observed socket phase, elapsed milliseconds, a fixed error code, `caller_stall_ms` (how long the calling process's own event loop was blocked over the whole call, every attempt included) and `attempts` (2 when a connection lost during such a stall was dialed again). It does not contain socket paths, IDs, credentials or transcript data.
+
+A failed listing probe does not necessarily mean the entire tool call failed: other endpoints can still answer. `response-frame` means a line delimiter arrived, not that a matching reply arrived. This diagnostic does not retry a call or change its deadline.
