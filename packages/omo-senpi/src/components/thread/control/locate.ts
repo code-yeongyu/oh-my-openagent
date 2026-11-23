@@ -4,6 +4,7 @@ import { workspaceEntries } from "../addressing"
 import { resolveAddress } from "../address/lazy"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
+import type { RemoteSessionRow } from "../remote/ports"
 import { sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
@@ -12,7 +13,14 @@ import type { SessionControl } from "./port"
 export type LocatedControl =
   | { readonly kind: "control"; readonly control: SessionControl }
   /** The address names a thread no engine holds live: its session file here, or an ended session on another device. */
-  | { readonly kind: "not_live"; readonly thread_id: string; readonly title: string; readonly device?: string }
+  | {
+      readonly kind: "not_live"
+      readonly thread_id: string
+      readonly title: string
+      readonly device?: string
+      /** The ended row of a session another device holds; a read reopens it there (omo#14799). */
+      readonly row?: RemoteSessionRow
+    }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
 /**
@@ -42,7 +50,7 @@ export async function locateControl(
   if (resolved.where.kind === "device" && options.remote !== undefined) {
     const row = resolved.where.row
     if (row.state === "ended")
-      return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device }
+      return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
   const session = targetSession(current, resolved.thread)

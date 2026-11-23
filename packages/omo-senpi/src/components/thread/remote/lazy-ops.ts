@@ -5,6 +5,7 @@ import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
+import type * as ReopenParked from "./reopen-parked"
 import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
 import type { RemoteSessionRow, RemoteThreadSurface } from "./ports"
@@ -15,6 +16,7 @@ type Runtime = Pick<
 > &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
+  Pick<typeof ReopenParked, "reopenParkedRow"> &
   Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
 // The cross-device half ships in the thread client sidecar (`#omo-thread-client-runtime`), which every thread
@@ -30,6 +32,8 @@ export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =
 export const withAlias = async (...args: Parameters<Runtime["withAlias"]>) => await (await runtime()).withAlias(...args)
 export const claimCreatedAlias = async (...args: Parameters<Runtime["claimCreatedAlias"]>) =>
   await (await runtime()).claimCreatedAlias(...args)
+export const reopenParkedRow = async (...args: Parameters<Runtime["reopenParkedRow"]>) =>
+  await (await runtime()).reopenParkedRow(...args)
 export const resolveMonitorTarget = async (...args: Parameters<Runtime["resolveMonitorTarget"]>) =>
   await (await runtime()).resolveMonitorTarget(...args)
 

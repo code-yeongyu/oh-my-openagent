@@ -3,6 +3,7 @@ import { workspaceDirectories, workspaceEntries } from "../addressing"
 import type { ThreadReadInput, ThreadState, ThreadToolResult, ThreadWaitOutcome } from "../contracts"
 import { listDiskSessions } from "../disk-list"
 import { locateControl } from "../control/locate"
+import { createRelayControl, reopenParkedRow } from "../remote/lazy-ops"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
 import { readTranscript, type ThreadTranscriptEntry } from "../reader"
@@ -141,6 +142,12 @@ export async function readThread(
 ): Promise<ThreadToolResult> {
   const located = await locateControl(options, current, value.thread, value.all_scope, callerId)
   if (located.kind === "error") return located.result
+  if (located.kind === "not_live" && located.row !== undefined && options.remote !== undefined) {
+    // omo#14799: a session another device parked is reopened there and read live, never answered not_resumable.
+    const reopened = await reopenParkedRow(options.remote, located.row)
+    if ("result" in reopened) return reopened.result
+    return readLive(createRelayControl(options.remote, reopened.row), value, signal)
+  }
   if (located.kind === "not_live") return readDegraded(options, current, located.thread_id, value)
   return readLive(located.control, value, signal)
 }
