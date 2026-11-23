@@ -135,6 +135,13 @@ Passive consumers can read the optional top-level `nickname` string from the
 linked native task record or an `omo.task.updated` task snapshot. Older or
 unconfigured tasks omit it.
 
+Stock Senpi displays nicknames in task spawn, send, cancel, and output
+results. Tool clients can read the optional `nickname` alongside `name` and
+`task_id` on a resolved result or batch item, or in `task_output`'s
+`details.snapshot`. The handle and task ID are still the only task addresses.
+Team mail from a known nicknamed worker can show a `Message from` notification;
+the hidden mailbox delivery and its acknowledgment are unchanged.
+
 ### Checkout isolation
 
 The task tool accepts `isolated`, `apply`, and `merge` on a single request or

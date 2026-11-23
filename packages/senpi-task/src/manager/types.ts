@@ -163,6 +163,7 @@ export type StartResult =
       readonly run_epoch?: number
       readonly status: "running" | "pending"
       readonly name: string
+      readonly nickname?: string
       readonly resolved_model?: ResolvedModelRecord
       // The model the child ACTUALLY started on, read from the child itself (never the plan) -
       // absent for a queued start that has not launched yet (#9722).

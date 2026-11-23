@@ -214,6 +214,7 @@ function noProgress(record: TaskRecord): TaskOutputToolResult {
     task_id: record.task_id,
     status: record.status,
     reason,
+    ...(record.nickname === undefined ? {} : { nickname: record.nickname }),
   })
 }
 

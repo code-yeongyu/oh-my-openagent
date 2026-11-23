@@ -138,6 +138,7 @@ export type TaskToolItemDetail = {
   readonly run_epoch?: number
   readonly task_summary?: string
   readonly name?: string
+  readonly nickname?: string
   readonly category?: string
   readonly subagent_type?: string
   readonly model?: string
@@ -159,6 +160,7 @@ export type TaskToolDetails = {
   readonly mode: TaskToolMode
   readonly task_summary?: string
   readonly name?: string
+  readonly nickname?: string
   readonly category?: string
   readonly subagent_type?: string
   readonly execution_mode?: string

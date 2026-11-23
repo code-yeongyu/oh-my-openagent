@@ -3,6 +3,7 @@ import type { ResolvedModelRecord, TaskRecord, TaskStatus } from "../../../state
 export type RecordOverrides = {
   readonly task_id?: string
   readonly name?: string
+  readonly nickname?: string
   readonly description?: string
   readonly status?: TaskStatus
   readonly parent_session_id?: string
@@ -49,6 +50,7 @@ export function makeRecord(overrides: RecordOverrides = {}): TaskRecord {
         : { notification_failed_epoch: overrides.notification_failed_epoch }),
     },
     ...(overrides.name !== undefined ? { name: overrides.name } : {}),
+    ...(overrides.nickname !== undefined ? { nickname: overrides.nickname } : {}),
     ...(overrides.resolved_model === undefined ? {} : { resolved_model: overrides.resolved_model }),
     ...(overrides.agent_type !== undefined ? { agent_type: overrides.agent_type } : {}),
     ...(overrides.category !== undefined ? { category: overrides.category } : {}),

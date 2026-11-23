@@ -12,7 +12,7 @@ import {
 } from "../task/renderers"
 import type { TaskCancelInput } from "./cancel"
 import type { MemberScopedTaskSendInput, TaskSendInput, StructuredMessageInput } from "./send-schema"
-import type { CancelResultDetails, SendResultDetails } from "./types"
+import type { CancelResultDetails, ControlWorkerLabel, SendResultDetails } from "./types"
 import { withDroppedSteeringNotice } from "../../state/queued-steering"
 
 export type ControlRenderTheme = Pick<Theme, "fg" | "italic">
@@ -147,7 +147,7 @@ function optionalToken(label: string, value: string | undefined): string | undef
 function taskSendResultRow(details: SendResultDetails): ResultRow {
   switch (details.kind) {
     case "unresponsive":
-      return { color: "muted", text: `task_send unresponsive ${details.task_id}: ${details.reason}` }
+      return { color: "muted", text: `task_send unresponsive ${controlTarget(details)}: ${details.reason}` }
     case "uncertain":
       return { color: "warning", text: `task_send ${details.reason} Effect id: ${details.effect_id}` }
     case "failed":
@@ -155,38 +155,40 @@ function taskSendResultRow(details: SendResultDetails): ResultRow {
     case "admission_refused":
     case "cwd_unavailable":
     case "config_generation_mismatch":
-      return { color: "warning", text: `task_send ${details.kind} ${details.task_id}: ${details.reason}` }
+      return { color: "warning", text: `task_send ${details.kind} ${controlTarget(details)}: ${details.reason}` }
     case "steered":
       return {
         color: statusThemeColor(details.status),
-        text: `task_send delivered ${details.task_id} as ${details.delivered} (${details.status})`,
+        text: details.nickname === undefined
+          ? `task_send delivered ${details.task_id} as ${details.delivered} (${details.status})`
+          : `Messaged ${controlTarget(details)} as ${details.delivered} (${details.status})`,
       }
     case "revived":
-      return { color: "success", text: `task_send revived ${details.task_id} epoch ${details.run_epoch}` }
+      return { color: "success", text: `task_send revived ${controlTarget(details)} epoch ${details.run_epoch}` }
     case "delivery_uncertain":
       return {
         color: "warning",
-        text: `task_send delivery uncertain ${details.task_id} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}`,
+        text: `task_send delivery uncertain ${controlTarget(details)} epoch ${details.run_epoch}: ${details.reason} ${details.suggestion}`,
       }
     case "queued":
-      return { color: "muted", text: `task_send queued ${details.task_id} position ${details.queue_position}` }
+      return { color: "muted", text: `task_send queued ${controlTarget(details)} position ${details.queue_position}` }
     case "held":
-      return { color: "muted", text: `task_send held ${details.task_id} until the run resumes` }
+      return { color: "muted", text: `task_send held ${controlTarget(details)} until the run resumes` }
     case "redispatched":
-      return { color: "success", text: `task_send redispatched ${details.task_id} epoch ${details.run_epoch}` }
+      return { color: "success", text: `task_send redispatched ${controlTarget(details)} epoch ${details.run_epoch}` }
     case "invalid_state":
-      return { color: "warning", text: `task_send invalid state ${details.task_id}: ${details.reason}` }
+      return { color: "warning", text: `task_send invalid state ${controlTarget(details)}: ${details.reason}` }
     case "respawn_failed":
-      return { color: "error", text: `task_send redispatch failed ${details.task_id}: ${details.reason}` }
+      return { color: "error", text: `task_send redispatch failed ${controlTarget(details)}: ${details.reason}` }
     case "capacity_deferred":
-      return { color: "warning", text: `task_send deferred ${details.task_id}: ${details.reason}` }
+      return { color: "warning", text: `task_send deferred ${controlTarget(details)}: ${details.reason}` }
     case "not_continuable":
       return {
         color: "warning",
-        text: `task_send not continuable ${details.task_id}: ${details.reason} ${details.suggestion}`,
+        text: `task_send not continuable ${controlTarget(details)}: ${details.reason} ${details.suggestion}`,
       }
     case "one_shot_agent":
-      return { color: "error", text: `task_send denied ${details.task_id} one-shot:${details.agent}` }
+      return { color: "error", text: `task_send denied ${controlTarget(details)} one-shot:${details.agent}` }
     case "scope_denied":
       return { color: "error", text: `task_send denied ${details.task_id} owner:${details.owning_session_id}` }
     case "not_found":
@@ -248,19 +250,19 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
     case "cancelled":
       return {
         color: statusThemeColor(details.status),
-        text: `task_cancel cancelled ${details.task_id} (${details.previous_status} -> ${details.status})`,
+        text: `task_cancel cancelled ${controlTarget(details)} (${details.previous_status} -> ${details.status})`,
       }
     case "cancel_pending":
-      return { color: "warning", text: `task_cancel pending ${details.task_id}: ${details.reason}` }
+      return { color: "warning", text: `task_cancel pending ${controlTarget(details)}: ${details.reason}` }
     case "noop":
       return {
         color: statusThemeColor(details.status),
-        text: `task_cancel no change ${details.task_id} (${details.status}): ${details.reason}`,
+        text: `task_cancel no change ${controlTarget(details)} (${details.status}): ${details.reason}`,
       }
     case "released":
       return {
         color: statusThemeColor(details.status),
-        text: `task_cancel released ${details.task_id} (${details.status}, child stopped)`,
+        text: `task_cancel released ${controlTarget(details)} (${details.status}, child stopped)`,
       }
     case "not_found":
       return { color: "error", text: `task_cancel not found: ${details.reason}` }
@@ -269,6 +271,10 @@ function taskCancelResultRow(details: CancelResultDetails): ResultRow {
     default:
       return assertNever(details)
   }
+}
+
+function controlTarget(details: ControlWorkerLabel & { readonly task_id: string }): string {
+  return details.nickname === undefined ? details.task_id : `${details.nickname} (${details.name ?? details.task_id})`
 }
 
 function assertNever(value: never): never {

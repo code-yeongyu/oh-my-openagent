@@ -138,6 +138,7 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
       fallbackCountToken(details),
       mode,
       formatTaskStatus(details.status),
+      details.nickname === undefined ? undefined : `nickname:${optionalRendererText(details.nickname)}`,
       taskId === undefined ? undefined : `id:${taskId}`,
       details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
       reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
@@ -154,6 +155,7 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
     name === undefined ? undefined : `name:${name}`,
     taskTargetToken(item),
     formatTaskStatus(item.status),
+    item.nickname === undefined ? undefined : `nickname:${optionalRendererText(item.nickname)}`,
     taskId === undefined ? undefined : `id:${taskId}`,
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
     error === undefined ? undefined : `error:${excerptRendererText(error, TASK_REASON_EXCERPT_WIDTH)}`,
@@ -208,6 +210,7 @@ function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
     taskId === undefined ? undefined : `id:${taskId}`,
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
+    details.nickname === undefined ? undefined : `nickname:${optionalRendererText(details.nickname)}`,
   ].filter((token): token is string => token !== undefined)
 }
 

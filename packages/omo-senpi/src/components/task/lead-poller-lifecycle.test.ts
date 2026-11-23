@@ -7,6 +7,7 @@ import { createLeadDeliveryJournal, toTeamCoreConfig, type LeadInjection } from 
 import type { IdleInjection } from "../../extension/idle-injection-coordinator"
 import { createLeadPollerLifecycle, type LeadPollerFactoryInput, type LeadPollerPort } from "./lead-poller-lifecycle"
 import type { TaskRuntimeContext } from "./runtime-context"
+import { taskRecord } from "./event-bridge.test-fixtures"
 
 type FakePoller = LeadPollerPort & { readonly teamRunId: string; polls: number; shutdowns: number }
 
@@ -24,6 +25,7 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
   let soon = 0
   const userMessages: string[] = []
   const sentMessages: Array<{ message: unknown; options: unknown }> = []
+  const notices: string[] = []
   const journal = createLeadDeliveryJournal()
 
   const lifecycle = createLeadPollerLifecycle({
@@ -37,6 +39,10 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     runtimeDir: (teamRunId) => `/tmp/runtime/${teamRunId}`,
     deliveryJournal: journal,
     appendTaskEvent: () => undefined,
+    readTask: (id) => id === "st_alpha"
+      ? taskRecord({ task_id: id, status: "running", team_run_id: "run-owned", team_member_name: "alpha", nickname: "Selene" })
+      : undefined,
+    notify: (label) => notices.push(label),
     pi: {
       sendMessage: (message: unknown, deliveryOptions: unknown) => {
         sentMessages.push({ message, options: deliveryOptions })
@@ -95,6 +101,7 @@ function harness(options: { readonly withCoordinator?: boolean } = {}) {
     journal,
     userMessages,
     sentMessages,
+    notices,
     get scheduled() {
       return scheduled
     },
@@ -124,6 +131,21 @@ function ownedTeam(teamRunId: string, leadSessionId = "session-a") {
 }
 
 describe("lead poller lifecycle", () => {
+  test("a flushed team message shows its verified worker nickname without changing the delivered content", async () => {
+    const h = harness()
+    await h.lifecycle.tick()
+    const sink = h.created[0]?.input.coordinator
+    if (sink === undefined) throw new Error("expected owned team sink")
+    sink.enqueue({ ...injection("verified"), sender: { name: "alpha", taskId: "st_alpha" } })
+    sink.enqueue({ ...injection("mismatch"), sender: { name: "other", taskId: "st_alpha" } })
+    expect(h.notices).toEqual([])
+    expect(h.injected.map((item) => [item.content, item.display])).toEqual([
+      ["verified", false], ["mismatch", false],
+    ])
+    for (const item of h.injected) item.onFlushed?.()
+    expect(h.notices).toEqual(["Message from Selene (alpha)"])
+  })
+
   test("#given no shared coordinator #when team mail injects #then fallback is hidden custom steer", async () => {
     const h = harness({ withCoordinator: false })
     await h.lifecycle.tick()

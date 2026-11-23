@@ -49,6 +49,7 @@ export type TaskSnapshot = {
   readonly task_id: string
   readonly lease?: "held" | "parked"
   readonly name?: string
+  readonly nickname?: string
   readonly description?: string
   readonly task_summary?: string
   readonly status: TaskStatus
@@ -88,6 +89,7 @@ export type TaskOutputDetails =
       readonly task_id: string
       readonly status: TaskStatus
       readonly reason: string
+      readonly nickname?: string
     }
   | {
       readonly kind: "transcript"

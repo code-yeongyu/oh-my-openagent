@@ -412,6 +412,8 @@ function createTeamToolContext(pi: SenpiExtensionAPI, ctx: ComponentContext, eng
     runtimeDir: (teamRunId) => resolveTeamRuntimeDirs(stateDir, teamRunId).runtimeDir,
     deliveryJournal,
     appendTaskEvent: engine.appendTaskEvent,
+    readTask: (id) => engine.manager.get(id),
+    notify: (label) => engine.runtime.ui()?.notify(label, "info"),
     pi,
     logger: ctx.logger,
     ...(ctx.idleCoordinator !== undefined ? { coordinator: ctx.idleCoordinator } : {}),

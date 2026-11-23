@@ -15,7 +15,7 @@ function started(
   name: string,
   status: "running" | "pending" = "running",
   queuePosition?: number,
-): StartResult {
+): Extract<StartResult, { kind: "started" }> {
   return {
     kind: "started",
     task_id: taskId,
@@ -33,10 +33,10 @@ describe("buildTaskExecute batch fanout", () => {
         const taskId = IDS[startIndex]
         if (taskId === undefined) throw new Error("unexpected extra start")
         startIndex += 1
-        return started(taskId, spec.name ?? `item-${startIndex}`)
+        return { ...started(taskId, spec.name ?? `item-${startIndex}`), nickname: "Selene" }
       },
       waitFor: async (taskId): Promise<TaskRecord> =>
-        makeRecord({ task_id: taskId, status: "completed", final_response: `done:${taskId}` }),
+        makeRecord({ task_id: taskId, status: "completed", nickname: "Selene", final_response: `done:${taskId}` }),
     })
     const execute = buildTaskExecute(makeDeps(manager))
     // when
@@ -50,6 +50,7 @@ describe("buildTaskExecute batch fanout", () => {
     // then
     expect(output.details.status).toBe("completed")
     expect(output.details.items).toMatchObject(IDS.map((task_id) => ({ task_id, status: "completed" })))
+    expect(output.details.items?.map((item) => item.nickname)).toEqual(["Selene", "Selene", "Selene"])
   })
 
   test(" w2batch #given one runner error #when the sync batch settles #then both successes remain and aggregate status is error", async () => {

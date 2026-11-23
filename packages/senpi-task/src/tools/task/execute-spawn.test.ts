@@ -14,6 +14,7 @@ describe("buildTaskExecute spawn", () => {
         task_id: "st_00000001",
         status: "running",
         name: "bg-task",
+        nickname: "Selene",
       }),
       waitFor: () => {
         waitForCalls += 1
@@ -34,6 +35,7 @@ describe("buildTaskExecute spawn", () => {
     expect(result.details.task_id).toBe("st_00000001")
     expect(result.details.status).toBe("running")
     expect(result.details.run_in_background).toBe(true)
+    expect(result.details.nickname).toBe("Selene")
     expect(result.content[0]?.type).toBe("text")
   })
 
@@ -209,6 +211,7 @@ describe("buildTaskExecute spawn", () => {
         task_id: "st_00000014",
         status: "running",
         name: "resolved-fg",
+        nickname: "Selene",
         resolved_model: resolvedModel,
       }),
       waitFor: async (): Promise<TaskRecord> =>
@@ -217,6 +220,7 @@ describe("buildTaskExecute spawn", () => {
           status: "completed",
           category: "ultrabrain",
           model: "openai/gpt-5.6-sol",
+          nickname: "Selene",
           resolved_model: resolvedModel,
           final_response: "done",
         }),
@@ -235,6 +239,7 @@ describe("buildTaskExecute spawn", () => {
     // then
     expect(result.details.resolved_model).toEqual(resolvedModel)
     expect(result.details.model).toBe("openai/gpt-5.6-sol")
+    expect(result.details.nickname).toBe("Selene")
     expect(result.details.run_in_background).toBe(false)
   })
 })

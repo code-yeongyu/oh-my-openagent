@@ -123,7 +123,7 @@ async function sendNow(
     if (manager.redispatchTask === undefined) return invalidArguments("this manager does not support redispatch")
     const scopedCaller = params.all_scope === true ? undefined : callerSessionId
     const outcome = await manager.redispatchTask(params.to, scopedCaller)
-    return mapRedispatchOutcome(manager, outcome, callerSessionId)
+    return withResolvedWorker(manager, mapRedispatchOutcome(manager, outcome, callerSessionId))
   }
 
   if (typeof params.message === "string") {
@@ -135,7 +135,7 @@ async function sendNow(
       ...(params.all_scope === true ? { allScope: true } : {}),
     })
 
-    if (outcome.kind !== "not_found") return mapSendOutcome(outcome)
+    if (outcome.kind !== "not_found") return withResolvedWorker(manager, mapSendOutcome(outcome))
     if (teamRouting === undefined) return notFound(manager, outcome.reason, callerSessionId)
 
     const resolution = await resolveSendTeamRunId(params, teamRouting)
@@ -157,6 +157,17 @@ async function sendNow(
   if (params.message !== undefined) return routeStructuredMessage(params.to, params.message, params, teamRouting)
 
   return invalidArguments("message is required")
+}
+
+function withResolvedWorker(manager: SendManager, result: SendToolResult): SendToolResult {
+  const details = result.details
+  if (!("task_id" in details) || details.kind === "scope_denied") return result
+  const worker = manager.get?.(details.task_id)
+  if (worker?.nickname === undefined) return result
+  return {
+    ...result,
+    details: { ...details, nickname: worker.nickname, ...(worker.name === undefined ? {} : { name: worker.name }) },
+  }
 }
 
 function validateParams(params: TaskSendInput): SendToolResult | undefined {

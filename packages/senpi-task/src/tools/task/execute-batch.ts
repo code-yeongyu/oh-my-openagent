@@ -111,11 +111,13 @@ function backgroundResult(starts: readonly BatchStart[]): AgentToolResult<TaskTo
 }
 
 function recordOutput(record: TaskRecord, start: StartedResult, skills?: TaskSkillSummary): BatchItemOutput {
+  const nickname = record.nickname ?? start.nickname
   return {
     detail: {
       task_id: record.task_id,
       run_epoch: record.notification.run_epoch,
       name: record.name ?? start.name,
+      ...(nickname === undefined ? {} : { nickname }),
       status: record.status,
       ...(record.error_message !== undefined && { error_message: record.error_message }),
       ...(skills === undefined ? {} : { skills }),
@@ -150,6 +152,7 @@ function rejectedOutput(start: LiveStart, aborted: boolean, reason: unknown): Ba
     detail: {
       task_id: start.result.task_id,
       name: start.result.name,
+      ...(start.result.nickname === undefined ? {} : { nickname: start.result.nickname }),
       status: aborted ? "cancelled" : "error",
       error_message: message,
       ...(start.skills === undefined ? {} : { skills: start.skills }),

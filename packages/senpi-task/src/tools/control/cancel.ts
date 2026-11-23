@@ -41,9 +41,14 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
   }
 
   const outcome = await manager.cancelTask(idOrName, params.reason)
+  const worker = "task_id" in outcome && outcome.kind !== "stale" ? manager.get(outcome.task_id) : undefined
+  const label =
+    worker?.nickname === undefined
+      ? {}
+      : { nickname: worker.nickname, ...(worker.name === undefined ? {} : { name: worker.name }) }
   switch (outcome.kind) {
     case "cancelled": {
-      const status = manager.get(outcome.task_id)?.status ?? ("cancelled" satisfies TaskStatus)
+      const status = worker?.status ?? ("cancelled" satisfies TaskStatus)
       return toolResult(
         withDroppedSteeringNotice(
           `Cancelled ${outcome.task_id} (was ${outcome.previous_status}, now ${status}).`,
@@ -51,6 +56,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         ),
         {
           kind: "cancelled",
+          ...label,
           task_id: outcome.task_id,
           previous_status: outcome.previous_status,
           status,
@@ -66,6 +72,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         ),
         {
           kind: "cancel_pending",
+          ...label,
           task_id: outcome.task_id,
           previous_status: outcome.previous_status,
           reason: outcome.reason,
@@ -75,6 +82,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
     case "noop":
       return toolResult(`${outcome.reason} No change.`, {
         kind: "noop",
+        ...label,
         task_id: outcome.task_id,
         status: outcome.status,
         reason: outcome.reason,
@@ -87,6 +95,7 @@ export async function runTaskCancel(manager: CancelManager, params: TaskCancelIn
         ),
         {
           kind: "released",
+          ...label,
           task_id: outcome.task_id,
           status: outcome.status,
           ...(outcome.undelivered_messages === undefined ? {} : { undelivered_messages: outcome.undelivered_messages }),

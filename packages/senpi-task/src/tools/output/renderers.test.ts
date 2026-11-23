@@ -162,7 +162,7 @@ describe("task_output renderers", () => {
         source: "event-log",
         transcript: "secret transcript body that must stay out of compact rows",
         truncated: true,
-        snapshot: snapshot(),
+        snapshot: snapshot({ nickname: "Selene" }),
       },
       { kind: "not_found", reason: "No task 'missing' in this session.", known_tasks: ["alpha"] },
       { kind: "invalid_arguments", reason: "Provide task_id or name." },
@@ -177,6 +177,7 @@ describe("task_output renderers", () => {
     expect(lines).toHaveLength(details.length)
     expect(lines.join("\n")).toContain("task_output st_done running")
     expect(lines.join("\n")).toContain("task_output transcript st_done")
+    expect(lines.join("\n")).toContain("nickname:Selene")
     expect(lines.join("\n")).toContain("source:event-log")
     expect(lines.join("\n")).toContain("truncated")
     expect(lines.join("\n")).toContain("task_output not found")
@@ -201,6 +202,24 @@ describe("task_output renderers", () => {
 
     // then
     expect(line).toStartWith("[success]task_output Audit the waiting line (st_done) completed")
+  })
+
+  test("#given a nicknamed task snapshot #when the status row renders #then nickname is shown beside its canonical task identity", () => {
+    // given / when
+    const line = firstLine(
+      renderTaskOutputResult(
+        toolResult("ignored", {
+          kind: "status",
+          snapshot: snapshot({ name: "canonical-name", nickname: "Selene" }),
+        }),
+        RESULT_OPTIONS,
+        TEST_THEME,
+      ),
+      200,
+    )
+
+    // then
+    expect(line).toContain("task_output canonical-name (st_done) completed nickname:Selene")
   })
 
   test("#given a described task #when the status row renders #then the human label leads and the id trails", () => {
@@ -414,12 +433,14 @@ describe("task_output run stats rendering", () => {
       kind: "no_progress",
       task_id: "st_done",
       status: "completed",
+      nickname: "Selene",
       reason: "Task st_done is completed. It will not send a completion notification.",
     }
 
     const line = firstLine(renderTaskOutputResult(toolResult("ignored", detail), RESULT_OPTIONS, TEST_THEME), 200)
 
     expect(line).toContain("It will not send a completion notification.")
+    expect(line).toContain("nickname:Selene")
     expect(line).not.toContain("await notification")
   })
 })

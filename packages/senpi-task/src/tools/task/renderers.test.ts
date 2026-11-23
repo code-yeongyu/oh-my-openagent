@@ -222,6 +222,34 @@ describe("taskResultLines", () => {
     expect(lines.join(" ")).toContain("completed")
   })
 
+  test("#given a nickname in single and batch spawn details #when rendered #then it is displayed without replacing names or ids", () => {
+    // given
+    const single = {
+      task_id: "st_single",
+      name: "canonical-single",
+      nickname: "Selene",
+      status: "running",
+      mode: "spawn" as const,
+    }
+    const batch = {
+      task_id: "st_batch",
+      status: "running",
+      mode: "spawn" as const,
+      items: [{ task_id: "st_batch_item", name: "canonical-item", nickname: "Helios", status: "pending" }],
+    }
+
+    // when
+    const singleLine = taskResultLines(single)[0] ?? ""
+    const batchLines = taskResultLines(batch)
+
+    // then
+    expect(singleLine).toContain("nickname:Selene")
+    expect(singleLine).toContain("id:st_single")
+    expect(batchLines[1]).toContain("name:canonical-item")
+    expect(batchLines[1]).toContain("nickname:Helios")
+    expect(batchLines[1]).toContain("id:st_batch_item")
+  })
+
   test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {
     // given
     const details = {

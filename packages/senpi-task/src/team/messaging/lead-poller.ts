@@ -122,10 +122,12 @@ async function processMessage(deps: LeadPollerDeps, message: Message, state: Lea
   const delivery: PendingDelivery = { message, reservation, phase: "awaiting_flush" }
   state.pending.set(message.messageId, delivery)
   try {
+    const taskId = deps.eventTaskId(message)
     deps.coordinator.enqueue({
       key: `team-message:${message.messageId}`,
       source: "team-message",
       content: buildPeerMessageEnvelope(message),
+      ...(message.kind === "message" && taskId !== undefined ? { sender: { name: message.from, taskId } } : {}),
       onFlushed: () => {
         const current = state.pending.get(message.messageId)
         if (current === delivery && current.phase === "awaiting_flush") current.phase = "awaiting_persistence"

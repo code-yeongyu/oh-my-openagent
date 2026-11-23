@@ -2,7 +2,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { AGENT_INTERACTION_POLICIES } from "../../agents"
 import type { SendInput, SendOutcome } from "../../steering"
-import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager } from "../../manager/__fixtures__/manager-fakes"
+import { FakeRunner, baseSpec, cleanupProjects, flush, makeManager, settings } from "../../manager/__fixtures__/manager-fakes"
+import { runTaskCancel } from "./cancel"
 import { createMemberScopedTaskSendTool, createTaskSendTool, runTaskSend } from "./send"
 import type { TeamToolsService } from "../team/types"
 import type { SendManager } from "./types"
@@ -69,6 +70,25 @@ describe("runTaskSend", () => {
     if (result.details.kind !== "steered") throw new Error("expected steered")
     expect(result.details.delivered).toBe("steer")
     expect(result.details.task_id).toBe(started.task_id)
+  })
+
+  test("resolved send and cancel results carry the display nickname without making it an address", async () => {
+    const { manager } = makeManager({
+      config: settings({ nicknames: { sets: { moon: ["Selene"] }, default: "moon" } }),
+    })
+    const started = await manager.start(baseSpec({ parent_session_id: "p1", name: "worker" }))
+    if (started.kind !== "started") throw new Error("expected started")
+    const foreign = await runTaskSend(manager, { to: started.task_id, message: "not authorized" }, "other")
+    expect(foreign.details.kind).toBe("scope_denied")
+    expect(foreign.details).not.toHaveProperty("nickname")
+    const alias = await runTaskSend(manager, { to: "Selene", message: "not an address" }, "p1")
+    expect(alias.details.kind).toBe("not_found")
+    const sent = await runTaskSend(manager, { to: "worker", message: "keep going" }, "p1")
+    expect(sent.details).toMatchObject({ kind: "steered", task_id: started.task_id, name: "worker", nickname: "Selene" })
+    const cancelled = await runTaskCancel(manager, { task_id: started.task_id })
+    expect(cancelled.details).toMatchObject({
+      kind: "cancelled", task_id: started.task_id, name: "worker", nickname: "Selene",
+    })
   })
 
   test("#given a caller session id #when sending #then callerSessionId is injected into the steering call", async () => {

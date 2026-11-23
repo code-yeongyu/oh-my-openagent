@@ -1,10 +1,13 @@
 import { fileURLToPath } from "node:url"
 
 import type { ExtensionAPI } from "@code-yeongyu/senpi"
+import { getRuntimeStateDir } from "@oh-my-opencode/team-core/team-registry"
 import { TeamModeConfigSchema, type TeamModeConfig } from "@oh-my-opencode/team-core/config"
 import { log } from "@oh-my-opencode/utils/logger"
 
 import { createTaskRecordStore } from "../../store"
+import { normalizeRendererText } from "../../tools/task/renderers"
+import { readMemberTaskMap } from "../member-map"
 import { MEMBER_EXTENSION_BUNDLE_NAME, WORKPOOL_STATE_DIR_ENV, WORKPOOL_TASK_ID_ENV } from "./identity"
 import { createMemberWakeSource, resolveMemberExtensionConfig, type MemberWakeSource } from "./member-session"
 import { createMemberSelfPoller, type MemberSelfPoller } from "./self-poller"
@@ -52,6 +55,7 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
   const parsed = resolveMemberExtensionConfig(pi, process.env)
   if (parsed === undefined) return
   const store = createTaskRecordStore({ project_dir: parsed.stateDir, task: { state_dir: parsed.stateDir } })
+  let notify: ((label: string) => void) | undefined
   const afterInject = createQaAfterInjectHold(process.env)
   const appendEvent = (event: Parameters<typeof store.appendEvent>[1]): void => {
     store.appendEvent(parsed.taskId, event)
@@ -61,7 +65,7 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
     memberName: parsed.memberName,
     config: parsed.config,
     sessionDir: parsed.sessionDir,
-    inject: (content) =>
+    inject: (content, message) => {
       pi.sendMessage(
         {
           customType: "senpi-task:team-message",
@@ -69,7 +73,22 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
           display: false,
         },
         { triggerTurn: true, deliverAs: "steer" },
-      ),
+      )
+      const currentNotify = notify
+      if (currentNotify === undefined || message.kind !== "message" || !parsed.members.includes(message.from)) return
+      void readMemberTaskMap(getRuntimeStateDir(parsed.config.base_dir ?? "", parsed.teamRunId))
+        .then((map) => {
+          if (notify !== currentNotify || !Object.hasOwn(map, message.from)) return
+          const id = map[message.from]
+          if (id === undefined) return
+          const worker = store.load(id)
+          if (worker?.team_run_id !== parsed.teamRunId || worker.team_member_name !== message.from) return
+          if (worker.nickname !== undefined) {
+            currentNotify(normalizeRendererText(`Message from ${worker.nickname} (${message.from})`))
+          }
+        })
+        .catch((error: unknown) => log("senpi-task member message label unavailable", { error: String(error) }))
+    },
     appendEvent,
     ...(afterInject !== undefined ? { afterInject } : {}),
   })
@@ -90,8 +109,14 @@ export default async function registerMemberExtension(pi: ExtensionAPI): Promise
       appendEvent: (taskId, event) => store.appendEvent(taskId, event),
     }),
   )
-  pi.on("session_start", () => startRuntime(runtime))
-  pi.on("session_shutdown", () => stopRuntime(pi, runtime))
+  pi.on("session_start", (_event, ctx) => {
+    notify = ctx?.hasUI ? (label) => ctx.ui.notify(label, "info") : undefined
+    return startRuntime(runtime)
+  })
+  pi.on("session_shutdown", () => {
+    notify = undefined
+    stopRuntime(pi, runtime)
+  })
 }
 
 async function startRuntime(runtime: ActiveRuntime): Promise<void> {

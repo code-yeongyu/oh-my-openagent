@@ -73,19 +73,34 @@ function taskOutputResultRow(details: TaskOutputDetails): ResultRow {
       const statusLabel = details.snapshot.suspended?.explanation ?? normalizeRendererText(details.snapshot.status)
       return {
         color: statusThemeColor(details.snapshot.status),
-        text: `${joinRendererTokens([`task_output ${identity}`, idSuffix, statusLabel])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
+        text: `${joinRendererTokens([
+          `task_output ${identity}`,
+          idSuffix,
+          statusLabel,
+          details.snapshot.nickname === undefined
+            ? undefined
+            : `nickname:${normalizeRendererText(details.snapshot.nickname)}`,
+        ])} · ${target}${runStatsSuffix(details.snapshot.run_stats)}`,
       }
     }
     case "no_progress":
       return {
         color: statusThemeColor(details.status),
-        text: `task_output ${normalizeRendererText(details.task_id)} ${normalizeRendererText(details.status)} · ${normalizeRendererText(details.reason)}`,
+        text: joinRendererTokens([
+          `task_output ${normalizeRendererText(details.task_id)}`,
+          normalizeRendererText(details.status),
+          details.nickname === undefined ? undefined : `nickname:${normalizeRendererText(details.nickname)}`,
+          `· ${normalizeRendererText(details.reason)}`,
+        ]),
       }
     case "transcript":
       return {
         color: statusThemeColor(details.snapshot.status),
         text: joinRendererTokens([
           `task_output transcript ${snapshotIdentity(details.snapshot)}`,
+          details.snapshot.nickname === undefined
+            ? undefined
+            : `nickname:${normalizeRendererText(details.snapshot.nickname)}`,
           `mode:${details.mode}`,
           `source:${details.source}`,
           details.truncated ? "truncated" : undefined,

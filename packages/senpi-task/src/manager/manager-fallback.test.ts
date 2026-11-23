@@ -73,6 +73,7 @@ describe("TaskManager configured runtime fallback", () => {
     const initialStart = runner.nextStart()
     const result = await manager.start(baseSpec({ execution_mode: "in-process", name: "worker" }))
     if (result.kind !== "started") throw new Error("expected started task")
+    expect(result.nickname).toBe("Selene")
     await initialStart
     const firstHandle = runner.handles.get(result.task_id)
     if (firstHandle === undefined) throw new Error("expected initial handle")

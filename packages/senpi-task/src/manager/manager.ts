@@ -732,6 +732,7 @@ class TaskManagerImpl implements TaskManager {
     spec.admission?.transfer()
     const startParts = {
       run_epoch: finalRecord.notification.run_epoch,
+      ...(finalRecord.nickname === undefined ? {} : { nickname: finalRecord.nickname }),
       ...(isolation === undefined
         ? {}
         : { isolation: { backend: isolation.spec.backend, merged_dir: isolation.spec.merged_dir } }),

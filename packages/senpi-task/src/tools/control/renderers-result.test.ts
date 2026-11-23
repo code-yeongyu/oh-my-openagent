@@ -49,6 +49,11 @@ const SEND_RESULT_RENDER_CASES = [
     { kind: "steered", task_id: "st_1", status: "running", delivered: "steer" },
     "[accent]task_send delivered st_1 as steer (running)[/accent]",
   ],
+  [
+    "steered with a worker nickname",
+    { kind: "steered", task_id: "st_1", name: "worker", nickname: "Selene", status: "running", delivered: "steer" },
+    "[accent]Messaged Selene (worker) as steer (running)[/accent]",
+  ],
   ["revived", { kind: "revived", task_id: "st_1", run_epoch: 2 }, "[success]task_send revived st_1 epoch 2[/success]"],
   [
     "delivery_uncertain",
