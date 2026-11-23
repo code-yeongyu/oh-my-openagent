@@ -32,23 +32,39 @@ function linuxStatFields(pid: number): readonly string[] | null {
   }
 }
 
-let procPidInfo: ((pid: number, flavor: number, buffer: Uint8Array) => number) | null | undefined
+type LibSystem = {
+  readonly procPidInfo: (pid: number, flavor: number, buffer: Uint8Array) => number
+  /** Nanoseconds per Mach absolute-time tick: 1 on Intel, 125/3 on Apple Silicon. */
+  readonly nanosecondsPerTick: number
+}
+let libSystem: LibSystem | null | undefined
+
+function loadLibSystem(): LibSystem | null {
+  if (libSystem !== undefined) return libSystem
+  try {
+    const library = loadFfi()?.dlopen("/usr/lib/libSystem.B.dylib", {
+      proc_pidinfo: { args: ["i32", "i32", "u64", "ptr", "i32"], returns: "i32" },
+      mach_timebase_info: { args: ["ptr"], returns: "i32" },
+    })
+    const timebase = new Uint32Array(2)
+    if (library === undefined || library.symbols.mach_timebase_info(timebase) !== 0 || !timebase[1]) {
+      libSystem = null
+      return libSystem
+    }
+    libSystem = {
+      procPidInfo: (target, kind, buffer) =>
+        Number(library.symbols.proc_pidinfo(target, kind, 0n, buffer, buffer.length)),
+      nanosecondsPerTick: (timebase[0] ?? 0) / timebase[1],
+    }
+  } catch {
+    libSystem = null
+  }
+  return libSystem
+}
 
 function darwinPidInfo(pid: number, flavor: number, size: number): DataView | null {
-  if (procPidInfo === undefined) {
-    try {
-      const library = loadFfi()?.dlopen("/usr/lib/libSystem.B.dylib", {
-        proc_pidinfo: { args: ["i32", "i32", "u64", "ptr", "i32"], returns: "i32" },
-      })
-      procPidInfo =
-        library === undefined
-          ? null
-          : (target, kind, buffer) => Number(library.symbols.proc_pidinfo(target, kind, 0n, buffer, buffer.length))
-    } catch {
-      procPidInfo = null
-    }
-  }
-  if (procPidInfo === null) return null
+  const procPidInfo = loadLibSystem()?.procPidInfo
+  if (procPidInfo === undefined) return null
   const buffer = new Uint8Array(size)
   // A short read means the flavor was rejected or the pid is gone.
   return procPidInfo(pid, flavor, buffer) === size ? new DataView(buffer.buffer) : null
@@ -120,7 +136,10 @@ export function readProcessStartIdentity(pid: number): string | null {
 const PROC_PIDTASKINFO = 4
 /** sizeof(struct proc_taskinfo) on 64-bit darwin. */
 const PROC_TASKINFO_SIZE = 96
-/** Byte offsets of `pti_total_user` and `pti_total_system` (nanoseconds) inside struct proc_taskinfo. */
+/**
+ * Byte offsets of `pti_total_user` and `pti_total_system` inside struct proc_taskinfo. They count Mach absolute-time
+ * ticks, which are nanoseconds only on Intel; Apple Silicon ticks are 125/3 ns, so they are scaled by the timebase.
+ */
 const TOTAL_USER_OFFSET = 16
 const TOTAL_SYSTEM_OFFSET = 24
 /** Linux clock ticks per second for utime/stime; 100 on every kernel these tests and users run. */
@@ -138,8 +157,10 @@ export function readProcessCpuSeconds(pid: number): number | null {
     }
     case "darwin": {
       const info = darwinPidInfo(pid, PROC_PIDTASKINFO, PROC_TASKINFO_SIZE)
-      if (info === null) return null
-      return Number(info.getBigUint64(TOTAL_USER_OFFSET, true) + info.getBigUint64(TOTAL_SYSTEM_OFFSET, true)) / 1e9
+      const nanosecondsPerTick = loadLibSystem()?.nanosecondsPerTick
+      if (info === null || nanosecondsPerTick === undefined) return null
+      const ticks = info.getBigUint64(TOTAL_USER_OFFSET, true) + info.getBigUint64(TOTAL_SYSTEM_OFFSET, true)
+      return (Number(ticks) * nanosecondsPerTick) / 1e9
     }
     case "win32": {
       const times = win32ProcessTimes(pid)

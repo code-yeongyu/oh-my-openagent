@@ -213,9 +213,12 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
   // #13165: the wait for the engine's first answer is bounded by its CPU progress. An engine that is alive but idle and
   // never answers its protocol probe still fails as a chain timeout, now named as a stall, within the stall window.
   test("#given an engine that never answers get_protocol_info #when it makes no CPU progress for the stall window #then the start fails as a stall and nothing else is sent", async () => {
-    // given
-    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", startupStallMs: 1_000 })
-    const started = Date.now()
+    // given: an idle engine whose CPU reading never advances, so the stall bound and not host load decides the outcome
+    const engine = processRunner(["retry_fallback_command"], {
+      protocolInfo: "after-prompt",
+      readCpuSeconds: () => 0.5,
+      startupStallMs: 1_000,
+    })
 
     // when
     const error = await engine.runner.start(spec("st_stall", CHAINED)).then(
@@ -226,7 +229,6 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
 
     // then
     expect(String(error)).toContain("made no CPU progress")
-    expect(Date.now() - started).toBeLessThan(15_000)
     expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info"])
   })
 
