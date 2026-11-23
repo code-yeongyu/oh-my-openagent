@@ -110,16 +110,19 @@ export function createRelaySessionHost(
           })
     const created = !(ended?.kind === "ok" && replyData(ended.response)["outcome"] === "unloaded")
     // #14397 review M1: a worktree this call made on b for the session is removed with it; one b does not remove is
-    // named in the answer, never covered by "nothing was left behind".
-    const left = worktree === undefined ? undefined : await removeRemoteWorktree(remote, device, worktree)
+    // named in the answer, never covered by "nothing was left behind". #14623 review M5: only once b's engine confirms
+    // the session is unloaded. The removal checks git state, not whether an engine still holds the folder, so after a
+    // refused, timed-out or unknown unload the folder stays (the session may still run in it) and is named.
+    const left = worktree === undefined || created ? undefined : await removeRemoteWorktree(remote, device, worktree)
     const shown = escapeForDisplay(reason)
     const session = created
       ? routingId === undefined
         ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and its open named no routing id to end it by: it is left with no live owner.`
         : `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
       : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads.`
+    const kept = worktree !== undefined && (created || left !== undefined)
     const remains =
-      left !== undefined && worktree !== undefined
+      kept && worktree !== undefined
         ? ` The worktree ${worktree.path} made for it is still on that device.`
         : created
           ? ""
@@ -134,7 +137,7 @@ export function createRelaySessionHost(
         created,
         ...(created ? { thread } : {}),
         ...(created && routingId === undefined ? { unload: "no_routing_id" } : {}),
-        ...(left === undefined || worktree === undefined ? {} : { worktree, cleanup: left.error }),
+        ...(kept ? { worktree, ...(left === undefined ? {} : { cleanup: left.error }) } : {}),
       },
     )
   }
