@@ -28,6 +28,7 @@ export class SpawnBudgetError extends Error {
 export type TreeBound =
   | { readonly kind: "stalled"; readonly stalledForS: number; readonly cpuS: number }
   | { readonly kind: "runaway"; readonly cpuS: number }
+  | { readonly kind: "unmeasurable"; readonly forS: number }
 
 export function describeTreeBound(bound: TreeBound, cpuCapS = RUNAWAY_CPU_CAP_S): string {
   switch (bound.kind) {
@@ -35,21 +36,36 @@ export function describeTreeBound(bound: TreeBound, cpuCapS = RUNAWAY_CPU_CAP_S)
       return `made no CPU progress for ${bound.stalledForS}s (tree cpu ${bound.cpuS.toFixed(2)}s): stalled, not slow`
     case "runaway":
       return `burned ${bound.cpuS.toFixed(2)}s of tree CPU without finishing, over the ${cpuCapS}s runaway CPU cap`
+    case "unmeasurable":
+      return `could not read its process tree's CPU for ${bound.forS}s, so neither bound could be checked`
   }
 }
 
 // Samples the CPU time of the tree rooted at pid and calls onBound once, when the tree stops advancing for stallMs
-// or passes cpuCapS. Neither bound reads the wall clock as a budget, so host load cannot trip them. Returns stop().
+// or passes cpuCapS. Neither bound reads the wall clock as a budget, so host load cannot trip them. A sampler that
+// cannot read the tree for stallMs disables both bounds, so that is reported as its own bound. Returns stop().
 export function watchTreeProgress(
   pid: number,
   onBound: (bound: TreeBound) => void,
-  { stallMs = STALL_KILL_MS, cpuCapS = RUNAWAY_CPU_CAP_S }: { stallMs?: number; cpuCapS?: number } = {},
+  {
+    stallMs = STALL_KILL_MS,
+    cpuCapS = RUNAWAY_CPU_CAP_S,
+    sample = childTreeCpuSeconds,
+  }: { stallMs?: number; cpuCapS?: number; sample?: (pid: number) => number } = {},
 ): () => void {
   let lastCpu = -1
   let lastAdvance = Date.now()
+  let lastValidSample = Date.now()
   const sampler = setInterval(() => {
-    const cpu = childTreeCpuSeconds(pid)
-    if (cpu < 0) return
+    const cpu = sample(pid)
+    if (cpu < 0) {
+      if (Date.now() - lastValidSample >= stallMs) {
+        clearInterval(sampler)
+        onBound({ kind: "unmeasurable", forS: Math.round((Date.now() - lastValidSample) / 1000) })
+      }
+      return
+    }
+    lastValidSample = Date.now()
     if (cpu > cpuCapS) {
       clearInterval(sampler)
       onBound({ kind: "runaway", cpuS: cpu })
@@ -198,6 +214,13 @@ export function createDaemonTestRunner() {
     options: { stallMs?: number; cpuCapS?: number } = {},
   ) {
     return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
+      // A tripped bound must be able to kill the child's group, so confirm that before starting anything.
+      try {
+        ownPgid()
+      } catch (error) {
+        reject(error)
+        return
+      }
       // The sampler runs in this process's event loop while the child runs asynchronously beside it, so it keeps
       // sampling however the child blocks; spawnSync here would starve it.
       const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"], detached: true })
@@ -239,7 +262,15 @@ export function createDaemonTestRunner() {
                       ),
                     )
                   })
-                  killGroup(child)
+                  try {
+                    killGroup(child)
+                  } catch (error) {
+                    // The group could not be signalled: end at least the child itself, then fail through run().
+                    child.removeAllListeners("close")
+                    child.kill("SIGKILL")
+                    runningChildren.delete(child)
+                    reject(error)
+                  }
                 })
               },
               options,

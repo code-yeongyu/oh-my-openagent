@@ -7,9 +7,12 @@ import { join, resolve } from "node:path"
 import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
 import {
   createDaemonTestRunner,
+  describeTreeBound,
   signalTarget,
-  TREE_BOUNDED_TEST_TIMEOUT_MS,
   SpawnBudgetError,
+  TREE_BOUNDED_TEST_TIMEOUT_MS,
+  type TreeBound,
+  watchTreeProgress,
 } from "./daemon-test-runner"
 
 const { run, killChildren } = createDaemonTestRunner()
@@ -120,6 +123,16 @@ if (process.platform !== "win32") {
     })
   })
 }
+
+// A sampler that cannot read the tree (no ps, an unreadable /proc) disables both bounds; it must fail on its own instead
+// of leaving the child to the outer test timeout.
+test("#given a tree whose CPU cannot be read #when the stall window passes #then the watch reports it as unmeasurable", async () => {
+  const bound = await new Promise<TreeBound>((resolveBound) => {
+    watchTreeProgress(process.pid, resolveBound, { stallMs: 500, sample: () => -1 })
+  })
+  expect(bound.kind).toBe("unmeasurable")
+  expect(describeTreeBound(bound)).toContain("could not read its process tree's CPU")
+})
 
 // A child that has exited but that nobody reaped (a container whose init does not reap promptly) is a zombie: signal 0
 // still reaches it, yet the harness must treat it as gone instead of failing the teardown.
