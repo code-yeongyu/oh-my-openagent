@@ -76,9 +76,10 @@ an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device par
 `here`, a device name or a unique device-id prefix; the thread part resolves among that device's
 threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
 and an address may resolve to a thread on another of the account's devices: `read` and `locate`
-reach it there. `send` resolves it too, but the other device's engine admits no command-line
-sender, so a bindingless send answers `unsupported` with `details.reason: "sender_not_allowed"`
-naming the device. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
+reach it there. `send` resolves it too and delivers it the way `omo remote send` does: the other
+device's engine admits no command-line delivery from another machine, so the text goes as this
+user's own input (a prompt under principal `person:<uid>`, no delivery envelope) and the result
+names the `device` that answered, with no local `message_seq` or `endpoint_kind`. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
 bound send's target) resolve on this device first and bind and report only sessions this device
 holds: a session only another device holds answers `unsupported` with `details.reason:
 "session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
