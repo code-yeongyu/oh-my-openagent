@@ -63,7 +63,7 @@ function bundleDifference(before, after, versions) {
   })
 }
 
-export function strictStampRefusals(pin, stamp) {
+function strictStampRefusals(pin, stamp) {
   const versions = [
     [versionAt(pin, "package.json"), versionAt(stamp, "package.json")],
     [versionAt(pin, "packages/omo-native/package.json"), versionAt(stamp, "packages/omo-native/package.json")],
