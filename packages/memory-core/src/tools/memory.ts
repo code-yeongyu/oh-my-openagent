@@ -112,11 +112,11 @@ async function applyCommand(
     case "insert":
       return insert(root, params, versions)
     case "delete":
-      return remove(root, params)
+      return remove(root, params, versions)
     case "rename":
-      return move(root, params)
+      return move(root, params, versions)
     case "update_description":
-      return updateDescription(root, params)
+      return updateDescription(root, params, versions)
     case "apply_patch": {
       const input = required(params.input, "input", "apply_patch")
       return applyMemoryPatch(root, input, params.provenance?.claim, versions)
@@ -150,9 +150,7 @@ async function strReplace(
   const oldString = required(params.old_string, "old_string", "str_replace")
   const newString = required(params.new_string, "new_string", "str_replace")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
-  const conflict = await staleRead(path, versions)
-  if (conflict) throw conflict
-  const file = await loadEditable(path, source)
+  const file = await loadEditable(path, source, versions)
   const index = file.body.indexOf(oldString)
   if (index < 0) throw toolError("str_replace: old_string was not found in the target memory block")
   const body = file.body.slice(0, index) + newString + file.body.slice(index + oldString.length)
@@ -197,28 +195,36 @@ async function insert(
   return affected(root, path, file)
 }
 
-async function remove(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function remove(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "delete")
   const repositoryPath = validateRepositoryPath(root, source, "file_path")
   if (existsSync(repositoryPath) && (await stat(repositoryPath)).isDirectory()) {
-    await assertDirectoryEditable(repositoryPath, root)
+    await assertDirectoryEditable(repositoryPath, root, versions)
     const tracked = await collectFiles(repositoryPath, root)
     await rm(repositoryPath, { recursive: true, force: false })
     return { affectedPaths: tracked }
   }
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
-  await loadEditable(path, source)
+  await loadEditable(path, source, versions)
   await unlink(path)
   return affected(root, path)
 }
 
-async function move(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function move(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand> {
   const oldSource = required(params.old_path, "old_path", "rename")
   const newSource = required(params.new_path, "new_path", "rename")
   const oldPath = validateMemoryPath(root, oldSource, { fieldName: "old_path" })
   const newPath = validateMemoryPath(root, newSource, { fieldName: "new_path" })
   if (existsSync(newPath)) throw toolError(`rename: destination already exists at ${newSource}`)
-  const loaded = await loadEditable(oldPath, oldSource)
+  const loaded = await loadEditable(oldPath, oldSource, versions)
   await mkdir(dirname(newPath), { recursive: true })
   await rename(oldPath, newPath)
   if (isLegacyUserHeader(readHeader(loaded.frontmatter)))
@@ -233,10 +239,16 @@ async function move(root: string, params: MemoryToolParams): Promise<AppliedComm
   }
 }
 
-async function updateDescription(root: string, params: MemoryToolParams): Promise<AppliedCommand> {
+async function updateDescription(
+  root: string,
+  params: MemoryToolParams,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "update_description")
   const description = acceptableDescription(params.description, "update_description")
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
+  const conflict = await staleRead(path, versions)
+  if (conflict) throw conflict
   const content = await readUtf8(path, source)
   let parsed: ParsedMemoryFile | undefined
   try {
@@ -296,7 +308,13 @@ function acceptableDescription(value: string | undefined, command: MemoryCommand
   return description
 }
 
-async function loadEditable(path: string, source: string): Promise<ParsedMemoryFile> {
+async function loadEditable(
+  path: string,
+  source: string,
+  versions?: MemoryObservedVersions,
+): Promise<ParsedMemoryFile> {
+  const conflict = await staleRead(path, versions)
+  if (conflict) throw conflict
   const content = await readUtf8(path, source)
   let parsed: ParsedMemoryFile
   try {
@@ -332,11 +350,15 @@ async function readUtf8(path: string, source: string): Promise<string> {
   }
 }
 
-async function assertDirectoryEditable(directory: string, root: string): Promise<void> {
+async function assertDirectoryEditable(
+  directory: string,
+  root: string,
+  versions?: MemoryObservedVersions,
+): Promise<void> {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) await assertDirectoryEditable(path, root)
-    else if (entry.isFile() && entry.name.endsWith(".md")) await loadEditable(path, relativePath(root, path))
+    if (entry.isDirectory()) await assertDirectoryEditable(path, root, versions)
+    else if (entry.isFile() && entry.name.endsWith(".md")) await loadEditable(path, relativePath(root, path), versions)
   }
 }
 
