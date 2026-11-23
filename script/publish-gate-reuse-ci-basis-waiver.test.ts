@@ -6,7 +6,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { CI_YML_PATH, ciJobs, VALIDATIONS, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
-import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import { createGitOrigin, type GitOrigin, releaseStepTemp } from "./fixtures/publish-gate-reuse-origin"
 
 /**
  * Release contract: publish.yml gate-reuse waits for a successful hosted ci.yml run on the prepared
@@ -162,6 +162,7 @@ function dispatch(input: Dispatch): Outcome {
     timeout: TEST_TIMEOUT_MS - 1_000,
     env: {
       ...fixture.gitEnv,
+      ...releaseStepTemp(root),
       GH_CALLS: ghCalls,
       GITHUB_STEP_SUMMARY: summary,
       GITHUB_OUTPUT: join(root, "output"),

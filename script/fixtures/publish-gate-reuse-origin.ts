@@ -57,6 +57,13 @@ const COMMITS = [
 
 export type CommitName = (typeof COMMITS)[number][0]
 
+// Git Bash's mktemp and native children must agree on a directory owned by
+// this case, even when the hermetic subprocess env has no Windows TEMP.
+export function releaseStepTemp(root: string): Record<"TMPDIR" | "TEMP" | "TMP", string> {
+  const temp = root.replaceAll("\\", "/")
+  return { TMPDIR: temp, TEMP: temp, TMP: temp }
+}
+
 export interface GitOrigin {
   readonly origin: string
   /** Hermetic git environment: no system or user config. */

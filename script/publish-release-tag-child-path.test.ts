@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { CI_YML_PATH, ciJobs, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
-import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import { type CommitName, createGitOrigin, type GitOrigin, releaseStepTemp } from "./fixtures/publish-gate-reuse-origin"
 import {
   needsOf,
   PRE_TAG_WRITERS,
@@ -147,6 +147,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
     timeout: TEST_TIMEOUT_MS - 1_000,
     env: {
       ...fixture.gitEnv,
+      ...releaseStepTemp(root),
       GH_CALLS: ghCalls,
       GITHUB_REPOSITORY: "test/repo",
       GITHUB_SHA: fixture.sha.A,
