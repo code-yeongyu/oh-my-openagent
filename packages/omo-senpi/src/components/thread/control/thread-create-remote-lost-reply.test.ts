@@ -101,7 +101,8 @@ describe("thread_create on another device survives a lost open reply", () => {
     expect(recovered).toMatchObject({ kind: "ok" })
     const sentBefore = a.sent.length
 
-    expect(await run("thread_create", args)).toEqual(recovered)
+    // A same-key create replay answers deduplicated (d9f50119d7); everything else is the recorded answer.
+    expect(await run("thread_create", args)).toEqual({ ...recovered, deduplicated: true })
     expect(a.sent.length).toBe(sentBefore)
   })
 
