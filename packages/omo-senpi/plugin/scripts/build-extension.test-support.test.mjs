@@ -117,7 +117,7 @@ test("#given a build blocked in a synchronous child that sleeps #when it is boun
 
   // then
   expect(String(error)).toMatch(
-    /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process group \d+$/,
+    /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process (?:group|tree) \d+$/,
   )
   expect(Date.now() - started).toBeLessThan(600_000)
   expect(groupMembers(Number(String(error).match(/process group (\d+)$/)?.[1]))).toBe(0)
@@ -136,7 +136,7 @@ test("#given a build blocked in a synchronous child that spins #when its tree pa
 
   // then
   expect(String(error)).toMatch(
-    /shared extension build ran away: used \d+ CPU seconds \(cap 1\); killed process group \d+$/,
+    /shared extension build ran away: used \d+ CPU seconds \(cap 1\); killed process (?:group|tree) \d+$/,
   )
   expect(groupMembers(Number(String(error).match(/process group (\d+)$/)?.[1]))).toBe(0)
 })
@@ -159,4 +159,29 @@ test("#given a hung build while this test process burns CPU #when it is bounded 
   } finally {
     await burner.terminate()
   }
+})
+
+// #14780 review L2: a sampler that cannot read the tree disables both bounds, so it must end the build as its own
+// outcome (the "unmeasurable" bound of watchTreeProgress), not pass for a stall or wait for the job limit.
+test("#given a tree sampler that always fails #when a hung build is bounded #then it fails as unmeasurable and its process tree is gone", async () => {
+  // given
+  const { url } = await buildModule(
+    `import { spawnSync } from "node:child_process"\nexport function buildExtension() { spawnSync("sleep", ["600"]) }\n`,
+  )
+
+  // when
+  const error = await rejection(
+    boundBuild(
+      "shared extension build",
+      await outputRoot(),
+      {},
+      { buildModule: url, stallMs: 1_500, sample: () => -1 },
+    ),
+  )
+
+  // then
+  expect(String(error)).toMatch(
+    /shared extension build could not read its process tree's CPU for \d+s, so neither bound could be checked; killed process (?:group|tree) \d+$/,
+  )
+  expect(groupMembers(Number(String(error).match(/process (?:group|tree) (\d+)$/)?.[1]))).toBe(0)
 })

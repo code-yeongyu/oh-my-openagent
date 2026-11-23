@@ -3,7 +3,7 @@ import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { childTreeCpuSeconds } from "../../../omo-native/test/daemon-test-runner.ts"
+import { killProcessTree, watchTreeProgress } from "../../../omo-native/test/daemon-test-runner.ts"
 
 export function outputPathsIn(root) {
   return {
@@ -63,12 +63,14 @@ export function outputPathsIn(root) {
 const BUILD_STALL_MS = 30_000
 const BUILD_CPU_CAP_S = 380
 /**
- * Outer bound for the hook that runs the cold builds: the longest CI job that runs these files (senpi-compatibility,
- * 100 min) minus a margin. It is not the correctness check; the stall and CPU guards above are.
+ * Outer bound for the hook that runs the cold builds: half of the limit of the CI job that runs these files on this
+ * platform (ci.yml: senpi-tests-linux 18 min, the macOS Senpi step 20 min, the Windows Senpi step 75 min). The other
+ * half covers checkout, install and the earlier tests, so a broken guard fails here, naming the hook, instead of the
+ * job being cancelled. It is not the correctness check; the stall and CPU guards above are.
  */
-export const BUILD_HOOK_OUTER_BOUND_MS = 95 * 60_000
-const PROGRESS_SAMPLE_MS = 250
-const PROGRESS_EPSILON_S = 0.02
+const CI_JOB_LIMIT_MIN = { linux: 18, darwin: 20, win32: 75 }
+export const BUILD_HOOK_OUTER_BOUND_MS = ((CI_JOB_LIMIT_MIN[process.platform] ?? CI_JOB_LIMIT_MIN.linux) / 2) * 60_000
+const OUTPUT_SAMPLE_MS = 250
 const STDERR_TAIL_CHARS = 2_000
 const DEFAULT_BUILD_MODULE = new URL("./build-extension.mjs", import.meta.url).href
 
@@ -94,23 +96,29 @@ async function outputFingerprint(root) {
   return fingerprint
 }
 
-function killGroup(pgid) {
-  try {
-    process.kill(-pgid, "SIGKILL")
-  } catch (error) {
-    if (error?.code !== "ESRCH") throw error
+function describeBuildBound(bound, cpuCapS) {
+  switch (bound.kind) {
+    case "stalled":
+      return `stalled: no CPU or output progress for ${bound.stalledForS}s (a hang)`
+    case "runaway":
+      return `ran away: used ${Math.round(bound.cpuS)} CPU seconds (cap ${cpuCapS})`
+    case "unmeasurable":
+      return `could not read its process tree's CPU for ${bound.forS}s, so neither bound could be checked`
   }
 }
 
+const TREE = process.platform === "win32" ? "process tree" : "process group"
+
 /**
- * Builds `paths` with `buildModule`'s buildExtension in a child process group and bounds it by the progress of that
- * group's process tree and of the output directory `root`. A tripped bound kills the whole group before rejecting.
+ * Builds `paths` with `buildModule`'s buildExtension in a child process tree, bounded by watchTreeProgress (the same
+ * stall, runaway and unmeasurable bounds the daemon tests use), where a change in the output directory `root` also
+ * counts as progress. A tripped bound ends the whole tree before rejecting.
  */
 export function boundBuild(
   name,
   root,
   paths,
-  { buildModule = DEFAULT_BUILD_MODULE, stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S } = {},
+  { buildModule = DEFAULT_BUILD_MODULE, stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S, sample } = {},
 ) {
   const resultPath = `${root}.build-result.json`
   const child = spawn(
@@ -126,45 +134,57 @@ export function boundBuild(
     stderr = (stderr + chunk).slice(-STDERR_TAIL_CHARS)
   })
   return new Promise((resolve, reject) => {
-    let lastCpu = 0
     let lastOutput = -1
-    let lastAdvance = Date.now()
-    let sampling = false
-    let settled = false
-    const sampler = setInterval(async () => {
-      if (sampling || child.pid === undefined) return
-      sampling = true
-      const cpu = childTreeCpuSeconds(child.pid)
+    let outputMoved = false
+    let reading = false
+    const outputWatch = setInterval(async () => {
+      if (reading) return
+      reading = true
       const output = await outputFingerprint(root)
-      sampling = false
-      const now = Date.now()
-      if (cpu >= lastCpu + PROGRESS_EPSILON_S || output !== lastOutput) lastAdvance = now
-      if (cpu >= 0) lastCpu = cpu
-      lastOutput = output
-      if (lastCpu > cpuCapS) {
-        trip(`ran away: used ${Math.round(lastCpu)} CPU seconds (cap ${cpuCapS})`)
-      } else if (now - lastAdvance >= stallMs) {
-        trip(`stalled: no CPU or output progress for ${Math.round((now - lastAdvance) / 1000)}s (a hang)`)
+      reading = false
+      if (output !== lastOutput) {
+        lastOutput = output
+        outputMoved = true
       }
-    }, PROGRESS_SAMPLE_MS)
+    }, OUTPUT_SAMPLE_MS)
+    let settled = false
+    const stopWatch =
+      child.pid === undefined
+        ? () => {}
+        : watchTreeProgress(child.pid, (bound) => trip(describeBuildBound(bound, cpuCapS)), {
+            stallMs,
+            cpuCapS,
+            ...(sample === undefined ? {} : { sample }),
+            progressed: () => {
+              const moved = outputMoved
+              outputMoved = false
+              return moved
+            },
+          })
     function settle(finish) {
       if (settled) return
       settled = true
-      clearInterval(sampler)
+      clearInterval(outputWatch)
+      stopWatch()
       finish()
     }
     function trip(why) {
       settle(() => {
-        // Reject only once the group leader is reaped, so the caller never sees a group still holding the build.
-        child.once("exit", () => reject(new Error(`${name} ${why}; killed process group ${child.pid}`)))
-        killGroup(child.pid)
+        // Reject only once the leader is reaped, so the caller never sees a tree still holding the build.
+        child.once("exit", () => reject(new Error(`${name} ${why}; killed ${TREE} ${child.pid}`)))
+        killProcessTree(child)
       })
     }
     child.on("error", (error) => settle(() => reject(error)))
     child.on("exit", (code, signal) => {
       settle(async () => {
         // A sidecar the build left behind (the minifier server) must not outlive it.
-        killGroup(child.pid)
+        try {
+          killProcessTree(child)
+        } catch (error) {
+          reject(error)
+          return
+        }
         if (code !== 0) {
           reject(new Error(`${name} failed: code=${String(code)} signal=${String(signal)}\n${stderr}`))
           return

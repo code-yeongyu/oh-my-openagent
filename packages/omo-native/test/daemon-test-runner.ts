@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs"
 import { type ChildProcess, spawn, spawnSync } from "node:child_process"
+
+import { childTreeCpuSeconds } from "./process-tree-cpu"
 
 // #11845: a starved-but-working child must not die at a wall-clock deadline. A cold daemon start on a
 // CPU-starved shard container legitimately needs multiples of its quiet-box wall time, and the CLI spends
@@ -43,7 +44,8 @@ export function describeTreeBound(bound: TreeBound, cpuCapS = RUNAWAY_CPU_CAP_S)
 
 // Samples the CPU time of the tree rooted at pid and calls onBound once, when the tree stops advancing for stallMs
 // or passes cpuCapS. Neither bound reads the wall clock as a budget, so host load cannot trip them. A sampler that
-// cannot read the tree for stallMs disables both bounds, so that is reported as its own bound. Returns stop().
+// cannot read the tree for stallMs disables both bounds, so that is reported as its own bound. `progressed` lets a
+// caller count another sign of work (a build's output changing) as progress too. Returns stop().
 export function watchTreeProgress(
   pid: number,
   onBound: (bound: TreeBound) => void,
@@ -51,7 +53,8 @@ export function watchTreeProgress(
     stallMs = STALL_KILL_MS,
     cpuCapS = RUNAWAY_CPU_CAP_S,
     sample = childTreeCpuSeconds,
-  }: { stallMs?: number; cpuCapS?: number; sample?: (pid: number) => number } = {},
+    progressed = () => false,
+  }: { stallMs?: number; cpuCapS?: number; sample?: (pid: number) => number; progressed?: () => boolean } = {},
 ): () => void {
   let lastCpu = -1
   let lastAdvance = Date.now()
@@ -69,79 +72,19 @@ export function watchTreeProgress(
     if (cpu > cpuCapS) {
       clearInterval(sampler)
       onBound({ kind: "runaway", cpuS: cpu })
-    } else if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
+    } else if (cpu >= lastCpu + PROGRESS_EPSILON_S || progressed()) {
       lastCpu = cpu
       lastAdvance = Date.now()
+    } else if (cpu < lastCpu) {
+      // A descendant exited and its CPU left the sum (the ps and Windows readings count live processes only): this is a
+      // new baseline, not progress, and the tree must still advance from it.
+      lastCpu = cpu
     } else if (Date.now() - lastAdvance >= stallMs) {
       clearInterval(sampler)
       onBound({ kind: "stalled", stalledForS: Math.round((Date.now() - lastAdvance) / 1000), cpuS: cpu })
     }
   }, PROGRESS_SAMPLE_MS)
   return () => clearInterval(sampler)
-}
-
-// Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
-// stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
-// macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
-export function childTreeCpuSeconds(rootPid: number): number {
-  if (process.platform === "linux") {
-    try {
-      const ppidOf = new Map<number, number>()
-      const cpuOf = new Map<number, number>()
-      for (const entry of readdirSync("/proc")) {
-        if (!/^\d+$/.test(entry)) continue
-        let stat: string
-        try {
-          stat = readFileSync(`/proc/${entry}/stat`, "utf8")
-        } catch {
-          continue
-        }
-        const fields = stat.slice(stat.lastIndexOf(")") + 2).split(" ")
-        ppidOf.set(Number(entry), Number(fields[1]))
-        cpuOf.set(
-          Number(entry),
-          (Number(fields[11]) + Number(fields[12]) + Number(fields[13]) + Number(fields[14])) / 100,
-        )
-      }
-      let total = 0
-      const walk = (pid: number): void => {
-        const cpu = cpuOf.get(pid)
-        if (cpu === undefined) return
-        total += cpu
-        for (const [childPid, parentPid] of ppidOf) if (parentPid === pid) walk(childPid)
-      }
-      walk(rootPid)
-      return total
-    } catch {
-      return -1
-    }
-  }
-  const listing = spawnSync("ps", ["-axo", "pid=,ppid=,cputime="], { encoding: "utf8" })
-  if (listing.status !== 0) return -1
-  const ppidOf = new Map<number, number>()
-  const cpuOf = new Map<number, number>()
-  for (const line of listing.stdout.split("\n")) {
-    const match = line.trim().match(/^(\d+)\s+(\d+)\s+(.+)$/)
-    if (!match) continue
-    const parts = match[3].split(":")
-    let seconds = 0
-    for (const part of parts) {
-      const [days, rest] = part.split("-")
-      if (rest !== undefined) seconds += Number.parseInt(days, 10) * 86_400
-      seconds = seconds * 60 + Number.parseFloat(rest ?? days)
-    }
-    ppidOf.set(Number(match[1]), Number(match[2]))
-    cpuOf.set(Number(match[1]), seconds)
-  }
-  let total = 0
-  const walk = (pid: number): void => {
-    const cpu = cpuOf.get(pid)
-    if (cpu === undefined) return
-    total += cpu
-    for (const [childPid, parentPid] of ppidOf) if (parentPid === pid) walk(childPid)
-  }
-  walk(rootPid)
-  return total
 }
 
 // Every signal these tests send goes through this check first. A pid of 0 (or a negative one) addresses a whole
@@ -171,8 +114,28 @@ export function signalTarget(pid: unknown, what: string): number {
 
 // Each child leads its own process group, so a tripped bound kills every process it started, not only itself. A
 // daemon the child detaches on purpose (host ensure's shard) leaves the group and stays with the harness cleanup.
-function killGroup(child: ChildProcess): void {
+// Windows has no process groups to signal: taskkill /T ends the child and every live descendant instead.
+export function killProcessTree(
+  child: ChildProcess,
+  platform: NodeJS.Platform = process.platform,
+  run: typeof spawnSync = spawnSync,
+): void {
   if (child.pid === undefined) return
+  if (platform === "win32") {
+    const pid = child.pid
+    // 0 and 4 are the idle and system processes; the runner itself is never a target.
+    if (!Number.isSafeInteger(pid) || pid <= 4 || pid === process.pid) {
+      throw new Error(`refusing to end the bounded child's process tree: ${String(pid)} is not a separate process`)
+    }
+    const ended = run("taskkill", ["/T", "/F", "/PID", String(pid)], { encoding: "utf8" })
+    // 128: the process had already exited.
+    if (ended.error !== undefined || (ended.status !== 0 && ended.status !== 128)) {
+      throw new Error(
+        `taskkill /T /F /PID ${pid} failed (status ${ended.status}): ${String(ended.error ?? ended.stderr)}`,
+      )
+    }
+    return
+  }
   try {
     process.kill(-signalTarget(child.pid, "the bounded child's process group"), "SIGKILL")
   } catch (error) {
@@ -269,7 +232,7 @@ export function createDaemonTestRunner() {
                     )
                   })
                   try {
-                    killGroup(child)
+                    killProcessTree(child)
                   } catch (error) {
                     // The group could not be signalled: end at least the child itself, then fail through run().
                     child.removeAllListeners("close")
@@ -297,7 +260,7 @@ export function createDaemonTestRunner() {
   }
 
   function killChildren(): void {
-    for (const child of runningChildren) killGroup(child)
+    for (const child of runningChildren) killProcessTree(child)
     runningChildren.clear()
   }
 
