@@ -49,7 +49,7 @@ const GH_STUB = [
   '  case "$*" in',
   '    *"/actions/runs/42/jobs"*) leg_jobs "$RUN_LEGS" | jq -r "$filter" ;;',
   '    *"/actions/runs/7/jobs"*) leg_jobs "$BASE_LEGS" | jq -r "$filter" ;;',
-  '    *"actions/workflows/ci.yml/runs?branch=dev"*) printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z"}]}\' | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs?branch=dev"*) printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z","conclusion":"success"}]}\' | jq -r "$filter" ;;',
   '    *"/collaborators/"*"/permission"*)',
   '      local login="${2#*/collaborators/}"; login="${login%/permission}"',
   '      [ -n "$PERMISSION_API_DOWN" ] && return 1',

@@ -86,6 +86,8 @@ jobs:
           BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -101,15 +103,23 @@ jobs:
             : > "$PATHS_FILE"
           fi
 
-          # A release-state pull request may stay on Linux only when its base's dev push run already ran macOS/Windows green
-          # AND its diff is a release stamp by content; either check failing (or gh failing) leaves the full matrix on.
+          # A release-state pull request skips the macOS/Windows matrix only when its stamp commit is ONE commit on the pinned
+          # source, that pin is on the base branch, the pin's completed dev push run passed with every macOS/Windows leg run
+          # and green, the head is not a fork, and the stamp changes nothing but versions (release-stamp-strict.mjs). Any
+          # failure, API error or unfinished run keeps the full matrix (#14847).
           BASE_PLATFORM_GREEN=false
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" =~ ^release/v.+-source-state$ ]] &&
-             [ "$DIFF_AVAILABLE" = true ] &&
-             [ "$(GH_REPO="$GITHUB_REPOSITORY" bash .github/scripts/base-platform-green.sh || true)" = true ] &&
-             node script/release-state-paths.mjs --check-stamp "$BASE_SHA" "$GITHUB_SHA"; then
-            BASE_PLATFORM_GREEN=true
+             [ "$DIFF_AVAILABLE" = true ] && [ "$PR_HEAD_REPO" = "$GITHUB_REPOSITORY" ] &&
+             [ -n "$PR_HEAD_SHA" ] && git cat-file -e "${PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+            STAMP_PARENTS="$(git show -s --format=%P "$PR_HEAD_SHA")"
+            if [ "$(wc -w <<< "$STAMP_PARENTS")" -eq 1 ] &&
+               git merge-base --is-ancestor "$STAMP_PARENTS" "$BASE_SHA" &&
+               node script/release-stamp-strict.mjs "$STAMP_PARENTS" "$PR_HEAD_SHA" &&
+               [ "$(GH_REPO="$GITHUB_REPOSITORY" BASE_SHA="$STAMP_PARENTS" bash .github/scripts/base-platform-green.sh || true)" = true ]; then
+              BASE_PLATFORM_GREEN=true
+            fi
           fi
+          echo "release-stamp platform proof: $BASE_PLATFORM_GREEN"
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
           BODY_FILE="$RUNNER_TEMP/pr-body.md"
