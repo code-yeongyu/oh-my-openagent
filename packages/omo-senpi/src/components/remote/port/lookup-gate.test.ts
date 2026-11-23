@@ -252,9 +252,82 @@ describe("#14748 the lookup gate: a solo lookup is never in flight with another 
     expect(await alone).toEqual({ kind: "found", key: "key-c" })
   })
 
-  test("E46: #given a capped solo locate that never settles #when another locate is admitted #then it is dispatched after one lookup cap, never dropped", async () => {
+  test("E46: #given a capped solo locate that never settles #when another locate is admitted #then it is refused after one lookup cap and never dispatched (review round 6)", async () => {
     const run = locates({ capped: ["c"], fenceWaitMs: 30 })
     await run.gate.lookupAlone("c", "id", 5_000)
-    expect(await run.gate.admit(async () => "key-x")).toBe("key-x")
+    let dispatched = false
+    await expect(
+      run.gate.admit(async () => {
+        dispatched = true
+      }),
+    ).rejects.toThrow("lookup_fence_timeout")
+    expect(dispatched).toBe(false)
   })
+})
+
+// Review round 6: every pair of gate operations, the second started after each number of microtask turns, so every await
+// point of the first is crossed. At every locate start the fake checks the two isolation rules: a solo locate starts with
+// nothing in flight, and nothing starts while a solo locate runs. Solo devices are named s*, everything else is plain.
+type Op = "solo" | "lookup" | "admit"
+
+async function interleave(first: Op, second: Op, offset: number): Promise<readonly string[]> {
+  const violations: string[] = []
+  const running = new Map<string, () => void>()
+  let soloRunning = 0
+  const begin = (device: string) => {
+    const solo = device.startsWith("s")
+    if (solo && running.size > 0) violations.push(`${device} started with ${[...running.keys()].join(",")} in flight`)
+    if (!solo && soloRunning > 0) violations.push(`${device} started while a solo locate ran`)
+    if (solo) soloRunning += 1
+    let finish: () => void = () => {}
+    const settled = new Promise<void>((resolve) => {
+      finish = () => {
+        running.delete(device)
+        if (solo) soloRunning -= 1
+        resolve()
+      }
+    })
+    running.set(device, finish)
+    return settled
+  }
+  const gate = createLookupGate((device) => {
+    const settled = begin(device)
+    return { answer: settled.then(() => ({ kind: "found" as const, key: `key-${device}` })), settled }
+  }, 5_000)
+  const run = (op: Op, name: string): Promise<unknown> =>
+    op === "solo"
+      ? gate.lookupAlone(`s${name}`, "id", 5_000)
+      : op === "lookup"
+        ? gate.lookup(`p${name}`, "id")
+        : gate.admit(() => begin(`a${name}`))
+  const a = run(first, "1")
+  await turns(offset)
+  const b = run(second, "2")
+  let done = false
+  const both = Promise.all([a, b]).then(() => (done = true))
+  for (let round = 0; round < 200 && !done; round += 1) {
+    await turns(5)
+    for (const finish of [...running.values()]) finish()
+  }
+  await both
+  return violations
+}
+
+describe("#14748 review round 6: gate admission is atomic under every interleaving", () => {
+  const pairs: ReadonlyArray<readonly [Op, Op]> = [
+    ["lookup", "solo"],
+    ["solo", "lookup"],
+    ["admit", "solo"],
+    ["solo", "admit"],
+    ["admit", "admit"],
+    ["solo", "solo"],
+    ["lookup", "admit"],
+  ]
+  test.each(pairs)(
+    "#given %s then %s at every microtask offset #then no solo locate ever overlaps another locate",
+    async (first, second) => {
+      for (let offset = 0; offset <= 15; offset += 1)
+        expect({ offset, violations: await interleave(first, second, offset) }).toEqual({ offset, violations: [] })
+    },
+  )
 })

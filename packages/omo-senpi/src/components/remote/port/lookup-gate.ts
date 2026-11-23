@@ -7,8 +7,9 @@ export type LookupGate = {
   readonly lookup: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
   readonly lookupAlone: (device: string, durableId: string, waitMs: number) => Promise<RemoteLookupOutcome | undefined>
   /**
-   * Any other locate the port sends (attach, watch recovery, post-create): dispatched once the fence is open, or once a
-   * fence that stays closed has been waited on for one lookup cap, and counted as in flight until it settles.
+   * Any other locate the port sends (attach, watch recovery, post-create): dispatched only while no solo locate runs and
+   * counted as in flight until it settles; a fence still closed after one lookup cap rejects (`lookup_fence_timeout`)
+   * and dispatches nothing, so solo isolation is never traded for progress (review round 6).
    */
   readonly admit: <T>(dispatch: () => Promise<T>) => Promise<T>
 }
@@ -41,22 +42,30 @@ export function createLookupGate(
   const drained = async (): Promise<void> => {
     while (inFlight.size > 0) await Promise.allSettled([...inFlight])
   }
-  const fenceOpen = async (): Promise<boolean> => {
+  // Admission (review round 6): the last fence check and the in-flight registration run in one synchronous step, so no
+  // lookup or admitted locate can see an open fence and then dispatch after a solo lookup has closed it. undefined: the
+  // fence stayed closed for the whole wait and nothing was dispatched.
+  const admitted = async <T>(dispatch: () => T): Promise<T | undefined> => {
     // A monotonic clock: a wall-clock jump never stretches or skips the wait.
     const deadline = performance.now() + fenceWaitMs
-    while (fence !== undefined) if (!(await within(fence, deadline - performance.now()))) return false
-    return true
+    while (fence !== undefined) if (!(await within(fence, deadline - performance.now()))) return undefined
+    return dispatch()
   }
   return {
     admit: async (dispatch) => {
-      await fenceOpen()
-      const work = dispatch()
-      track(work)
-      return await work
+      // Boxed: an awaited promise would be flattened, and a locate that resolves to undefined would read as not dispatched.
+      const admittedWork = await admitted(() => {
+        const sent = dispatch()
+        track(sent)
+        return { sent }
+      })
+      if (admittedWork === undefined)
+        throw new Error("lookup_fence_timeout: a solo lookup's locate is still running on this port")
+      return await admittedWork.sent
     },
     lookup: async (device, durableId) => {
-      if (!(await fenceOpen())) return { kind: "silent", reason: "lookup_timeout" }
-      return await send(device, durableId).answer
+      const started = await admitted(() => send(device, durableId))
+      return started === undefined ? { kind: "silent", reason: "lookup_timeout" } : await started.answer
     },
     lookupAlone: async (device, durableId, waitMs) => {
       const deadline = performance.now() + waitMs
