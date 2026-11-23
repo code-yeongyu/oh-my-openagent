@@ -24,12 +24,13 @@ type StoredReceipt = {
   readonly status: string
   readonly owner_instance: string
   readonly result: string | null
+  readonly error_note: string | null
 }
 
 function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): StoredReceipt | undefined {
   const found = ctx.sql.one(
-    ["args_hash", "status", "owner_instance", "result"],
-    "SELECT args_hash, status, owner_instance, result FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+    ["args_hash", "status", "owner_instance", "result", "error_note"],
+    "SELECT args_hash, status, owner_instance, result, error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
     [key.principal, key.operation, key.idempotency_key],
   )
   if (found === undefined) return undefined
@@ -38,6 +39,7 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
     status: String(found.status),
     owner_instance: String(found.owner_instance),
     result: nullableString(found.result),
+    error_note: nullableString(found.error_note),
   }
 }
 
@@ -45,7 +47,12 @@ export type ToolReceiptBegin =
   | { readonly kind: "accepted" }
   | { readonly kind: "replay"; readonly result: unknown }
   | { readonly kind: "conflict" }
-  | { readonly kind: "in_progress" }
+  /**
+   * This instance holds the key's `prepared` receipt. `recovery` names a reserved retry of an uncertain call (it keeps
+   * the first cause); a fresh call's reservation has none. A caller whose admission reply was lost resumes by it
+   * (#14623 review round 2 H1), so a lost recovery reply never restarts the call as a fresh one.
+   */
+  | { readonly kind: "in_progress"; readonly recovery?: { readonly error_note: string } }
   | { readonly kind: "uncertain"; readonly error_note: string | null }
   /** The uncertain receipt is now this call's to recover (`retry_uncertain`): settle it like a new one. */
   | { readonly kind: "retry"; readonly error_note: string | null }
@@ -100,7 +107,10 @@ function admitToolReceipt(
   if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
   if (receipt.status === "completed")
     return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
-  if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id) return { kind: "in_progress" }
+  if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id)
+    return receipt.error_note === null
+      ? { kind: "in_progress" }
+      : { kind: "in_progress", recovery: { error_note: receipt.error_note } }
   if (receipt.status === "prepared") {
     write(
       ctx,

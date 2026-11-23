@@ -257,8 +257,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         // The slot passes to the key's recovery entry when the failure left one; otherwise it is free again.
         releaseAdmitting(key)
       }
+      // The store committed this key's reservation for a call whose reply was lost, so nothing ran under it: the call
+      // resumes as the reservation it found, a recovery keeping its first cause (#14623 review round 2 H1).
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
-        admission = { kind: "accepted" }
+        admission =
+          admission.recovery === undefined
+            ? { kind: "accepted" }
+            : { kind: "retry", error_note: admission.recovery.error_note }
       unanswered.delete(key)
       if (admission.kind === "replay") {
         const result = currentResult(admission.result as ThreadToolResult)

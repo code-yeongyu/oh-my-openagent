@@ -4,7 +4,7 @@ import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { rowCreatedAt, rowFolder, rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
-import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
+import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
 import { resolveTypedDevice } from "../address/device"
@@ -158,6 +158,8 @@ export function createRelaySessionHost(
     readonly located?: string
     readonly cwd?: string
     readonly worktree?: ThreadWorktree
+    /** Told each answer b's route gives the session's first step (an adoption counts only an observed `ok`). */
+    readonly onRouteAnswer?: (answer: RemoteCommandOutcome) => void
   }
   /** The steps once b holds the session: its listing key, its name or one reach check, and the thread as reported. */
   const finish = async (data: JsonObject, step: Finish): Promise<SessionOpenOutcome> => {
@@ -210,7 +212,12 @@ export function createRelaySessionHost(
     let applied = step.name
     // The first command a create sends the new session through b's route: its name, else (a create that goes on to
     // use the session) the state read its first prompt would make anyway.
-    const firstStep = (key: string) =>
+    const firstStep = async (key: string) => {
+      const answer = await routeStep(key)
+      if (answer !== undefined) step.onRouteAnswer?.(answer)
+      return answer
+    }
+    const routeStep = (key: string) =>
       step.name !== undefined
         ? remote.sessions.sessionCommand(
             device,
@@ -293,7 +300,9 @@ export function createRelaySessionHost(
    * Only fresh evidence adopts it (#14623 review M4): a `cache` row is b's last snapshot, served because b did not
    * answer this round, so it proves nothing now; and the live row must answer one observing read through b's route.
    * A read that does not reach b leaves the create uncertain; `route_unlisted` goes on to `finish`, which ends the
-   * orphan where b's engine holds it.
+   * orphan where b's engine holds it once a second route_unlisted confirms it. Only a successful observation through
+   * b's route makes the adoption a success (#14623 review round 2 M4): after a first route_unlisted, `finish` answering
+   * ok means its later steps never reached b (a timeout, a lost route), so the create stays uncertain.
    */
   const adopted = async (
     durableId: string,
@@ -317,7 +326,20 @@ export function createRelaySessionHost(
     if (probe.kind !== "ok" && !(probe.kind === "refused" && probe.reason === ROUTE_UNLISTED)) return undefined
     const cwd = rowFolder(row)
     const state = { durableSessionId: durableId, cwd, ...(row.title === "" ? {} : { sessionName: row.title }) }
-    return await finish({ state }, { ...step, reopens: false, located: row.session_id, cwd })
+    let observed = probe.kind === "ok"
+    const done = await finish(
+      { state },
+      {
+        ...step,
+        reopens: false,
+        located: row.session_id,
+        cwd,
+        onRouteAnswer: (answer) => {
+          if (answer.kind === "ok") observed = true
+        },
+      },
+    )
+    return observed || done.kind !== "ok" ? done : undefined
   }
   return {
     device,

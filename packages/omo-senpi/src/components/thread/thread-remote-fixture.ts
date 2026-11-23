@@ -1025,6 +1025,11 @@ export function createRemoteThreadFixture() {
        * `dur-fork-here`; any other source is refused `fork_source_not_local`, as the host client throws it.
        */
       forks?: boolean
+      /**
+       * #14623 review round 2: the store commits this receipt admission (1-based, every key counted) and then its worker
+       * exits before the reply reaches the tool, which sees the call fail as the store's.
+       */
+      loseAdmissionReply?: number
     } = {},
   ) {
     const engine = extra.engine ?? ENGINE
@@ -1188,27 +1193,35 @@ export function createRemoteThreadFixture() {
       await drain.drain({ reason: "command" })
       drain.stop()
     }
+    let admissions = 0
     const countedStore = new Proxy(store, {
       get: (target, property, receiver) =>
-        property === "enqueue"
-          ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
-              enqueued.push(request)
-              const outcome = await target.enqueue(request)
-              if (
-                outcome.kind === "inserted" &&
-                createdIds.has(request.target_durable_id) &&
-                extra.createdNeverDrains !== true
-              )
-                await drainCreated(request.target_durable_id)
-              if (
-                outcome.kind === "inserted" &&
-                request.target_durable_id === local.durableSessionId &&
-                extra.localDrainsIn !== undefined
-              )
-                await drainCreated(request.target_durable_id, extra.localDrainsIn)
-              return outcome
+        property === "toolReceiptBegin" && extra.loseAdmissionReply !== undefined
+          ? async (request: Parameters<GatewayStore["toolReceiptBegin"]>[0]) => {
+              const admission = await target.toolReceiptBegin(request)
+              admissions++
+              if (admissions === extra.loseAdmissionReply) throw new Error("the gateway store worker exited (1)")
+              return admission
             }
-          : Reflect.get(target, property, receiver),
+          : property === "enqueue"
+            ? async (request: Parameters<GatewayStore["enqueue"]>[0]) => {
+                enqueued.push(request)
+                const outcome = await target.enqueue(request)
+                if (
+                  outcome.kind === "inserted" &&
+                  createdIds.has(request.target_durable_id) &&
+                  extra.createdNeverDrains !== true
+                )
+                  await drainCreated(request.target_durable_id)
+                if (
+                  outcome.kind === "inserted" &&
+                  request.target_durable_id === local.durableSessionId &&
+                  extra.localDrainsIn !== undefined
+                )
+                  await drainCreated(request.target_durable_id, extra.localDrainsIn)
+                return outcome
+              }
+            : Reflect.get(target, property, receiver),
     })
     const toolOptions: Parameters<typeof createThreadTools>[0] = {
       host,

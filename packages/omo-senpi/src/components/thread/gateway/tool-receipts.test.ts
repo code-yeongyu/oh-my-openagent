@@ -93,6 +93,25 @@ describe("tool receipts in the gateway store (replay, conflict, in_progress, unc
     })
     expect(await a.toolReceiptBegin({ ...scope("r-1"), now, args_hash: "h", retry_uncertain: true })).toEqual({
       kind: "in_progress",
+      recovery: { error_note: "first cause" },
+    })
+  })
+
+  // #14623 review round 2 H1: the owner's own in_progress says which reservation it found, so a caller whose admission
+  // reply was lost can resume a recovery as a recovery (first cause kept) and a fresh call as a fresh one.
+  test("#given a fresh reservation and a recovery reservation #when their owner begins each key again #then only the recovery's in_progress carries its first cause", async () => {
+    const { a } = twoInstances()
+    const now = Date.now()
+    await a.toolReceiptBegin({ ...scope("r-7f"), now, args_hash: "h", retry_uncertain: true })
+    expect(await a.toolReceiptBegin({ ...scope("r-7f"), now, args_hash: "h", retry_uncertain: true })).toEqual({
+      kind: "in_progress",
+    })
+    await a.toolReceiptBegin({ ...scope("r-7r"), now, args_hash: "h" })
+    await a.toolReceiptSettle({ ...scope("r-7r"), now, error_note: "first cause" })
+    await a.toolReceiptBegin({ ...scope("r-7r"), now, args_hash: "h", retry_uncertain: true })
+    expect(await a.toolReceiptBegin({ ...scope("r-7r"), now, args_hash: "h", retry_uncertain: true })).toEqual({
+      kind: "in_progress",
+      recovery: { error_note: "first cause" },
     })
   })
 

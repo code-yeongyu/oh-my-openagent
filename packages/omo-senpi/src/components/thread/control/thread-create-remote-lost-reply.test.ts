@@ -55,6 +55,29 @@ const cachedAndUnreachable = (
   },
 })
 
+// #14623 review round 2 M4: b's route answers the first `unlisted` commands route_unlisted (a session b opened a moment
+// ago may not be routed yet), and every later command never reaches b (request_timeout).
+const unlistedThenUnreachable = (
+  a: ReturnType<typeof account>,
+  unlisted: number,
+  then: "unreachable" | "routed" = "unreachable",
+): RemoteThreadSurface => {
+  let commands = 0
+  return {
+    ...a.remote,
+    sessions: {
+      ...a.remote.sessions,
+      sessionCommand: async (device, session, rpc, options) => {
+        commands++
+        if (commands <= unlisted) return { kind: "refused", reason: "route_unlisted" }
+        return then === "routed"
+          ? a.remote.sessions.sessionCommand(device, session, rpc, options)
+          : { kind: "refused", reason: "request_timeout" }
+      },
+    },
+  }
+}
+
 const opens = (sent: readonly { rpc?: Record<string, unknown> }[]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "open_session")
 const toSession = (
@@ -133,6 +156,47 @@ describe("thread_create on another device survives a lost open reply", () => {
     },
   )
 
+  test.each([
+    ["the name step's retry through b's route never reaches b", { name: "lost-mixed" }, 2],
+    ["the unnamed create's reach check after it never reaches b", {}, 1],
+  ] as const)(
+    "#given a lost-open create whose adoption first sees route_unlisted #when %s #then the retry stays idempotency_uncertain",
+    async (_label, named, unlisted) => {
+      const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+      const { run } = surface(unlistedThenUnreachable(a, unlisted))
+      const args = { device: "studio", ...named, prompt: "build it", idempotency_key: `remote-lost-mixed-${unlisted}` }
+
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain" },
+      })
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain" },
+      })
+      // Not replayed as a success either: the next call under the key is uncertain again.
+      expect(await run("thread_create", args)).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain" },
+      })
+      expect(opens(a.sent)).toHaveLength(1)
+    },
+  )
+
+  test("#given a lost-open create whose adoption first sees route_unlisted #when b's route then answers the name step #then the retry adopts b's session", async () => {
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(unlistedThenUnreachable(a, 2, "routed"))
+    const args = { device: "studio", name: "lost-lagged", idempotency_key: "remote-lost-lagged" }
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({
+      kind: "ok",
+      thread: createdThreadId("dur-caller", "remote-lost-lagged"),
+      name: "lost-lagged",
+    })
+    expect(opens(a.sent)).toHaveLength(1)
+  })
+
   test("#given an uncertain create #when two same-key retries overlap #then one runs the recovery and the other is idempotency_in_progress", async () => {
     const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
     const { run } = surface(a.remote)
@@ -147,6 +211,53 @@ describe("thread_create on another device survives a lost open reply", () => {
       "ok",
     ])
     expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
+  })
+
+  // #14623 review round 2 H1: the store committed the RECOVERY reservation but its reply was lost (the worker exited).
+  // The next same-key call resumes it as the recovery it is: adoption with the first cause, never a fresh second open.
+  test("#given an uncertain remote create whose recovery reservation's admission reply is lost #when the key is called again #then it adopts b's session and b opened one session", async () => {
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(a.remote, { loseAdmissionReply: 2 })
+    const args = { device: "studio", name: "lost-admit", prompt: "build it", idempotency_key: "remote-lost-admit" }
+    const id = createdThreadId("dur-caller", "remote-lost-admit")
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "ok", thread: id, device: "b" })
+
+    expect(opens(a.sent)).toHaveLength(1)
+    expect(toSession(a.sent, `rk-${id}`, "admit_external_message") + toSession(a.sent, `rk-${id}`, "prompt")).toBe(1)
+  })
+
+  test("#given b ignores the derived id and the recovery reservation's admission reply is lost #when the key is called again #then it stays idempotency_uncertain under the first cause and opens nothing", async () => {
+    const a = account({ openLosesReply: 1, ignoresDurableSessionId: true })
+    const { run } = surface(a.remote, { loseAdmissionReply: 2 })
+    const args = { device: "studio", name: "lost-admit-cause", idempotency_key: "remote-lost-admit-cause" }
+
+    const first = await run("thread_create", args)
+    if (first.kind !== "error") throw new Error(`the first create did not fail: ${JSON.stringify(first)}`)
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(await run("thread_create", args)).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_uncertain", details: { error_note: first.error.message } },
+    })
+    expect(opens(a.sent)).toHaveLength(1)
+  })
+
+  test("#given a lost recovery-reservation reply #when two same-key calls follow at once #then one resumes the recovery, the other is idempotency_in_progress, and b opened one session", async () => {
+    const a = account({ openLosesReply: 1, listFailsAfterLostReply: true })
+    const { run } = surface(a.remote, { loseAdmissionReply: 2 })
+    const args = { device: "studio", name: "lost-admit-overlap", idempotency_key: "remote-lost-admit-overlap" }
+
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    const answers = await Promise.all([run("thread_create", args), run("thread_create", args)])
+
+    expect(answers.map((answer) => (answer.kind === "ok" ? "ok" : answer.error.code)).sort()).toEqual([
+      "idempotency_in_progress",
+      "ok",
+    ])
+    expect(opens(a.sent)).toHaveLength(1)
   })
 
   test("#given b's engine ignores the derived id and the reply is lost #when the create is retried under the same key #then idempotency_uncertain and no second open", async () => {
