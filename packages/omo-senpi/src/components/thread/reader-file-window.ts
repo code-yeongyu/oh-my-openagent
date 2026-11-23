@@ -1,7 +1,10 @@
 import { createHash } from "node:crypto"
 import { closeSync, fstatSync, openSync, readSync, statSync, type Stats } from "node:fs"
 import { THREAD_READ_MAX_BYTES } from "./contracts"
+import type { FileScanCursor } from "../../../../omo-native/bin/lib/thread-read-cursor.js"
 import type { ThreadTranscriptEntry } from "./reader"
+
+export type { FileScanCursor }
 
 /**
  * One JSONL line as an entry. A line that is not a JSON object - malformed syntax, a bare scalar, or a run of non-UTF8
@@ -73,13 +76,6 @@ export function readRange(descriptor: number, position: number, length: number):
     read += got
   }
   return chunk
-}
-
-export type FileScanCursor = {
-  readonly direction: "file_scan"
-  readonly revision: string
-  readonly offset: number
-  readonly skip: boolean
 }
 
 /** Start at a line boundary, or discard the remaining fragments of a line known to exceed the scan ceiling. */

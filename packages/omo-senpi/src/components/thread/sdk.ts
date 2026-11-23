@@ -21,6 +21,8 @@ import {
   type ThreadState,
   type ThreadToolResult,
 } from "./contracts"
+import { isReadCursor } from "../../../../omo-native/bin/lib/thread-read-cursor.js"
+import { invalidReadCursor } from "./reader"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
@@ -496,19 +498,11 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         ),
       ),
     read: (request) =>
-      guarded(async () =>
-        readThread(
-          { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-          await view(),
-          {
-            thread: request.thread,
-            max_bytes: request.max_bytes,
-            cursor: request.cursor,
-            all_scope: request.all_scope,
-          },
-          UNKNOWN_CALLER,
-        ),
-      ),
+      guarded(async () => {
+        if (request.cursor !== undefined && !isReadCursor(request.cursor)) return invalidReadCursor()
+        const { thread, max_bytes, cursor, all_scope } = request
+        return readThread(controls, await view(), { thread, max_bytes, cursor, all_scope }, UNKNOWN_CALLER)
+      }),
     send: (request) =>
       guarded(async () => {
         if (request.binding_id !== undefined && request.collapse_key !== undefined)

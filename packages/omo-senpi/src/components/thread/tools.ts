@@ -32,8 +32,8 @@ import {
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
-import { isEntryCursor } from "./paged-reader"
-import { decodeTranscriptCursor, invalidReadCursor } from "./reader"
+import { isReadCursor } from "../../../../omo-native/bin/lib/thread-read-cursor.js"
+import { invalidReadCursor } from "./reader"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
@@ -185,13 +185,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const parsed = parseThreadParams(threadToolParamSchemas[name], args)
     if (parsed.kind === "error") return output(parsed as ThreadToolResult)
     const value = parsed.value as Static<(typeof threadToolParamSchemas)[T]>
-    if (
-      name === "thread_read" &&
-      "cursor" in value &&
-      typeof value.cursor === "string" &&
-      decodeTranscriptCursor(value.cursor) === null &&
-      !isEntryCursor(value.cursor)
-    )
+    if (name === "thread_read" && "cursor" in value && typeof value.cursor === "string" && !isReadCursor(value.cursor))
       return output(invalidReadCursor())
     const callerId =
       (ectx as { sessionManager?: { getSessionId?: () => string } } | undefined)?.sessionManager?.getSessionId?.() ??

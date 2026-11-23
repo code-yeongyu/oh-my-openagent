@@ -32,27 +32,36 @@ import { createHash } from "node:crypto"
 import { closeSync, openSync, readSync, statSync, type Stats } from "node:fs"
 import { StringDecoder } from "node:string_decoder"
 
+import {
+  decodeTranscriptCursor,
+  encodeTranscriptCursor,
+  THREAD_TAIL_MAX_ITEMS,
+  type TranscriptCursor,
+} from "../../../../omo-native/bin/lib/thread-read-cursor.js"
 import { THREAD_READ_DEFAULT_BYTES, THREAD_READ_MAX_BYTES, type ThreadReadSource } from "./contracts"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "./errors"
-import {
-  fileRevision,
-  parseLine,
-  readFileWindow,
-  readRange,
-  readRecoveryPage,
-  type FileScanCursor,
-} from "./reader-file-window"
+import { fileRevision, parseLine, readFileWindow, readRange, readRecoveryPage } from "./reader-file-window"
 import { takeWithinBudget } from "./read-budget"
+
+export { decodeTranscriptCursor }
 
 /** Default number of trailing entries a tail read returns. */
 export const THREAD_TAIL_DEFAULT_ITEMS = 60
 /** Hard ceiling on a tail request; a larger `tail_items` is invalid_arguments. */
-export const THREAD_TAIL_MAX_ITEMS = 200
+export { THREAD_TAIL_MAX_ITEMS }
 
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue }
 
 /** A raw JSONL entry object, handed back unmodified. */
 export type ThreadTranscriptEntry = { readonly [key: string]: JsonValue }
+
+/** The message a public file read can render, or undefined for session bookkeeping. */
+export function sessionMessage(entry: ThreadTranscriptEntry): ThreadTranscriptEntry | undefined {
+  const message = entry.message
+  if (entry.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message))
+    return undefined
+  return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? message : undefined
+}
 
 export type ThreadReadMode = "status" | "tail" | "page"
 
@@ -110,9 +119,6 @@ export type ThreadTranscriptReadResult =
   ThreadTranscriptReadOk | { readonly kind: "error"; readonly error: ThreadToolFailure }
 
 const READ_CHUNK_BYTES = 65536
-const CURSOR_VERSION = "t1"
-const OLDER_CURSOR_VERSION = "t1o"
-const FILE_TAIL_CURSOR_VERSION = "t1t"
 const NEWLINE = 0x0a
 
 function fail(code: ThreadErrorCode, message: string, nextAction: string): ThreadTranscriptReadResult {
@@ -280,30 +286,6 @@ function tailRevisionOf(tail: LoadedTail): string {
   return `${tail.size}.${tail.hash}`
 }
 
-/**
- * `forward` continues after `offset` (page mode); `older` pages the entries of a tail window before `before`, down to
- * the window's first entry `floor` (the cursor a tail read issues, #14173); `file_tail` does the same for a window
- * read from the session file's end, whose requested `count` the next page reuses and whose positions count from
- * that window's first entry (#14418).
- */
-type Cursor =
-  | FileScanCursor
-  | { readonly direction: "forward"; readonly revision: string; readonly offset: number }
-  | { readonly direction: "older"; readonly revision: string; readonly before: number; readonly floor: number }
-  | { readonly direction: "file_tail"; readonly revision: string; readonly before: number; readonly count: number }
-
-function encodeCursor(cursor: Cursor): string {
-  if (cursor.direction === "file_scan")
-    return Buffer.from(`t1s:${cursor.revision}:${cursor.offset}:${Number(cursor.skip)}`).toString("base64url")
-  const text =
-    cursor.direction === "forward"
-      ? `${CURSOR_VERSION}:${cursor.revision}:${cursor.offset}`
-      : cursor.direction === "older"
-        ? `${OLDER_CURSOR_VERSION}:${cursor.revision}:${cursor.before}:${cursor.floor}`
-        : `${FILE_TAIL_CURSOR_VERSION}:${cursor.revision}:${cursor.before}:${cursor.count}`
-  return Buffer.from(text, "utf8").toString("base64url")
-}
-
 export function invalidReadCursor() {
   return {
     kind: "error" as const,
@@ -313,44 +295,6 @@ export function invalidReadCursor() {
       "Re-read the thread without a cursor to get a fresh next_cursor, or call thread_list (tool.thread_list() in an eval cell) to confirm the thread address.",
     ),
   }
-}
-
-export function decodeTranscriptCursor(raw: string): Cursor | null {
-  if (typeof raw !== "string" || raw.length === 0) return null
-  let decoded: string
-  try {
-    decoded = Buffer.from(raw, "base64url").toString("utf8")
-  } catch {
-    return null
-  }
-  if (Buffer.from(decoded).toString("base64url") !== raw) return null
-  const [version, revision = "", ...positions] = decoded.split(":")
-  if (!/^\d+\.[0-9a-z]+$/.test(revision)) return null
-  if (positions.some((position) => !/^\d+$/.test(position))) return null
-  const offsets = positions.map(Number)
-  if (offsets.some((offset) => !Number.isSafeInteger(offset) || offset < 0)) return null
-  const [first = 0, second = 0] = offsets
-  if (
-    version === "t1s" &&
-    /^\d+\.[0-9a-f]{64}$/.test(revision) &&
-    offsets.length === 2 &&
-    first <= Number(revision.split(".")[0]) &&
-    (second === 0 || second === 1)
-  )
-    return { direction: "file_scan", revision, offset: first, skip: second === 1 }
-  if (version === CURSOR_VERSION && offsets.length === 1) return { direction: "forward", revision, offset: first }
-  if (version === OLDER_CURSOR_VERSION && offsets.length === 2 && second <= first)
-    return { direction: "older", revision, before: first, floor: second }
-  if (
-    version === FILE_TAIL_CURSOR_VERSION &&
-    /^\d+\.[0-9a-f]{64}$/.test(revision) &&
-    offsets.length === 2 &&
-    first <= second &&
-    second > 0 &&
-    second <= THREAD_TAIL_MAX_ITEMS
-  )
-    return { direction: "file_tail", revision, before: first, count: second }
-  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -413,7 +357,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
   const maxBytes = opts.max_bytes ?? THREAD_READ_DEFAULT_BYTES
   const tailItems = opts.tail_items ?? THREAD_TAIL_DEFAULT_ITEMS
 
-  let cursor: Cursor | null = null
+  let cursor: TranscriptCursor | null = null
   if (opts.cursor !== undefined) {
     cursor = decodeTranscriptCursor(opts.cursor)
     if (cursor === null) {
@@ -474,7 +418,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       items: page.items,
       total_items: null,
       truncated: page.next !== null,
-      next_cursor: page.next === null ? null : encodeCursor(page.next),
+      next_cursor: page.next === null ? null : encodeTranscriptCursor(page.next),
       encoded_bytes: page.encodedBytes,
       max_bytes: maxBytes,
       skipped_lines: page.skippedLines,
@@ -491,15 +435,15 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     const revision = tailRevisionOf(tail)
     if (fileTail !== undefined && (fileTail.revision !== revision || fileTail.before > tail.entries.length))
       return stale()
-    if (!tail.whole && tail.entries.length === 0)
+    if (tail.size > THREAD_READ_MAX_BYTES && !tail.entries.some((entry) => sessionMessage(entry) !== undefined))
       return {
         kind: "error",
         error: threadToolFailure(
           "message_too_large",
-          "No complete entry fits in the 1 MiB tail scan window.",
+          "No complete transcript message was found in the 1 MiB tail scan window.",
           "In an eval cell, call tool.thread_read({ thread: thread, cursor: error.details.next_cursor }) with the same thread, then follow next_cursor until absent.",
           {
-            next_cursor: encodeCursor({
+            next_cursor: encodeTranscriptCursor({
               direction: "file_scan",
               revision: fileRevision(tail.snapshot),
               offset: 0,
@@ -519,7 +463,8 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       items: selected,
       total_items: tail.whole ? tail.entries.length : null,
       truncated: start > 0,
-      next_cursor: start > 0 ? encodeCursor({ direction: "file_tail", revision, before: start, count }) : null,
+      next_cursor:
+        start > 0 ? encodeTranscriptCursor({ direction: "file_tail", revision, before: start, count }) : null,
       encoded_bytes: encodedBytes,
       max_bytes: maxBytes,
       skipped_lines: tail.skippedLines,
@@ -568,7 +513,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
       ...base,
       items: selected,
       truncated,
-      next_cursor: truncated ? encodeCursor({ direction: "forward", revision, offset: nextOffset }) : null,
+      next_cursor: truncated ? encodeTranscriptCursor({ direction: "forward", revision, offset: nextOffset }) : null,
       encoded_bytes: encodedBytes,
     }
   }
@@ -584,7 +529,7 @@ export function readTranscript(source: ThreadReadSourceRef, opts: ThreadReadOpti
     ...base,
     items: selected,
     truncated,
-    next_cursor: truncated ? encodeCursor({ direction: "older", revision, before: start, floor }) : null,
+    next_cursor: truncated ? encodeTranscriptCursor({ direction: "older", revision, before: start, floor }) : null,
     encoded_bytes: encodedBytes,
   }
 }

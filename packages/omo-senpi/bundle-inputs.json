@@ -785,6 +785,7 @@
     "packages/omo-native/bin/lib/setup-stream-items.js",
     "packages/omo-native/bin/lib/setup-stream.js",
     "packages/omo-native/bin/lib/sqlite-rows.js",
+    "packages/omo-native/bin/lib/thread-read-cursor.js",
     "packages/omo-native/bunfig.toml",
     "packages/omo-native/package.json",
     "packages/omo-native/trust-userns.ts",

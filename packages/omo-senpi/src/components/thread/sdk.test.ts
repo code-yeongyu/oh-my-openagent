@@ -214,6 +214,13 @@ describe("thread SDK: options are checked at the boundary", () => {
 })
 
 describe("thread SDK: sessions", () => {
+  test("SDK read rejects a malformed cursor before requesting the host view", async () => {
+    const { sdk, views } = fixture({ noHostAnswering: true })
+    const result = await sdk.read({ thread: "dur-host", cursor: "!" })
+    expect(views).toEqual([])
+    expect(result).toMatchObject({ kind: "error", error: { code: "cursor_invalid" } })
+  })
+
   test("#given a host and a terminal session #when listed and read #then rows carry surface and the live transcript comes from the session's endpoint", async () => {
     const { sdk } = fixture()
     const listed = await sdk.list({})

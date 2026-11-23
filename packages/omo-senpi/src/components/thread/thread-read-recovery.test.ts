@@ -16,47 +16,57 @@ function diskReader(lines: readonly string[]) {
   return { ...surface, path, read: (args: object = {}) => surface.run("thread_read", { thread, ...args }) }
 }
 
-test("thread_read recovery skips an oversized record and returns the surrounding messages within bounded pages", async () => {
-  // Blank padding leaves no complete entry in the initial tail, even with a normal record after the oversized one.
-  const { read, path } = diskReader([
-    message("before"),
-    message("x".repeat(2 * limit)),
-    message("after"),
-    " ".repeat(limit),
-  ])
-  const failed = await read()
-  if (failed.kind !== "error") throw new Error("expected the empty tail window to fail")
-  expect(failed.error.code).toBe("message_too_large")
-  expect(failed.error.next_action).toBe(
-    "In an eval cell, call tool.thread_read({ thread: thread, cursor: error.details.next_cursor }) with the same thread, then follow next_cursor until absent.",
-  )
-  const first = failed.error.details?.["next_cursor"]
-  if (typeof first !== "string") throw new Error("expected recovery cursor")
-  const contents: string[] = []
-  const seen = new Set<string>()
-  let cursor: string | undefined = first
-  using reads = spyOn(fs, "readSync")
-  while (cursor !== undefined) {
-    expect(seen.has(cursor)).toBe(false)
-    seen.add(cursor)
-    expect(seen.size).toBeLessThan(10)
-    reads.mockClear()
-    const page = await read({ cursor, max_bytes: 512 })
-    if (page.kind !== "ok" || !("items" in page)) throw new Error(JSON.stringify(page))
-    const bytes = reads.mock.results.reduce(
-      (sum, r) => sum + (r.type === "return" && typeof r.value === "number" ? r.value : 0),
-      0,
+test.each([
+  {
+    tail: "blank padding",
+    suffix: [message("after"), " ".repeat(limit)],
+    expected: ['"before"', '"after"'],
+  },
+  {
+    tail: "a bookkeeping-only entry",
+    suffix: [JSON.stringify({ type: "model_change", modelId: "new-model" })],
+    expected: ['"before"'],
+  },
+])(
+  "thread_read recovery skips an oversized message followed by $tail within bounded pages",
+  async ({ suffix, expected }) => {
+    const { read, path } = diskReader([message("before"), message("x".repeat(2 * limit)), ...suffix])
+    using reads = spyOn(fs, "readSync")
+    const bytesRead = () =>
+      reads.mock.results.reduce((sum, r) => sum + (r.type === "return" && typeof r.value === "number" ? r.value : 0), 0)
+    const failed = await read()
+    expect(bytesRead()).toBeLessThanOrEqual(limit)
+    expect(failed.kind).toBe("error")
+    if (failed.kind !== "error") throw new Error("expected a recovery cursor")
+    expect(failed.error.code).toBe("message_too_large")
+    expect(failed.error.next_action).toBe(
+      "In an eval cell, call tool.thread_read({ thread: thread, cursor: error.details.next_cursor }) with the same thread, then follow next_cursor until absent.",
     )
-    expect(bytes).toBeGreaterThan(0)
-    expect(bytes).toBeLessThanOrEqual(limit)
-    expect(Buffer.byteLength(JSON.stringify(page.items))).toBeLessThanOrEqual(512)
-    contents.push(...page.items.map((item) => item.content))
-    cursor = page.next_cursor
-  }
-  expect(contents).toEqual(['"before"', '"after"'])
-  fs.appendFileSync(path, "\n" + message("new"))
-  expect(await read({ cursor: first })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
-})
+    const first = failed.error.details?.["next_cursor"]
+    if (typeof first !== "string") throw new Error("expected recovery cursor")
+    const contents: string[] = []
+    const seen = new Set<string>()
+    let cursor: string | undefined = first
+    while (cursor !== undefined) {
+      expect(seen.has(cursor)).toBe(false)
+      seen.add(cursor)
+      expect(seen.size).toBeLessThan(10)
+      reads.mockClear()
+      const page = await read({ cursor, max_bytes: 512 })
+      if (page.kind !== "ok" || !("items" in page)) throw new Error(JSON.stringify(page))
+      const bytes = bytesRead()
+      expect(bytes).toBeGreaterThan(0)
+      expect(bytes).toBeLessThanOrEqual(limit)
+      expect(Buffer.byteLength(JSON.stringify(page.items))).toBeLessThanOrEqual(512)
+      contents.push(...page.items.map((item) => item.content))
+      expect(page.truncated).toBe(page.next_cursor !== undefined)
+      cursor = page.next_cursor
+    }
+    expect(contents).toEqual([...expected])
+    fs.appendFileSync(path, "\n" + message("new"))
+    expect(await read({ cursor: first })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
+  },
+)
 
 test("a file recovery cursor never loads the whole live transcript when the thread resumes", async () => {
   const { read } = diskReader([message("small"), message("x".repeat(limit * 2))])

@@ -5,7 +5,7 @@ import { listDiskSessions } from "../disk-list"
 import { locateControl } from "../control/locate"
 import { controlIdentity, controlRefusalOf, type SessionControl } from "../control/port"
 import { isEntryCursor, staleEntryCursor } from "../paged-reader"
-import { decodeTranscriptCursor, readTranscript, type ThreadTranscriptEntry } from "../reader"
+import { decodeTranscriptCursor, readTranscript, sessionMessage, type ThreadTranscriptEntry } from "../reader"
 import { threadLink } from "../thread-link"
 import { addressBook, degradedSummary, failure, rowNamed, sendAddressBook, summary } from "./internals"
 import { readItem } from "./read-item"
@@ -245,13 +245,7 @@ function readDegraded(
     readWindow(value),
   )
   if (durable.kind === "error") return { kind: "error", error: durable.error }
-  // A session file interleaves messages with bookkeeping (the session header, model and thinking
-  // changes, names): only message entries are transcript, rendered with the live path's roles.
-  const messages = durable.items.flatMap((item) => {
-    const message = item.message
-    if (item.type !== "message" || typeof message !== "object" || message === null || Array.isArray(message)) return []
-    return message.role === "user" || message.role === "assistant" || message.role === "toolResult" ? [message] : []
-  })
+  const messages = durable.items.map(sessionMessage).filter((message) => message !== undefined)
   const items = messages.map(readItem)
   return {
     kind: "ok",
