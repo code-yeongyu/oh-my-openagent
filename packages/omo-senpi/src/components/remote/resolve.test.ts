@@ -259,6 +259,7 @@ describe("sessions.resolve", () => {
     const unreached = () => Promise.reject(new Error("resolve reads only the roster and the listing"))
     const resolve = resolveMember({
       sender: { kind: "person", uid: "user-1" },
+      onClose: () => undefined,
       timers: clock,
       deps: { version: "5.1.70" },
       dial: unreached,
@@ -295,6 +296,7 @@ describe("sessions.resolve", () => {
     const resolved = await resolveRemoteDevice(
       {
         sender: { kind: "person", uid: "user-1" },
+        onClose: () => undefined,
         timers: clock,
         deps: { version: "5.1.70" },
         dial: unreached,
