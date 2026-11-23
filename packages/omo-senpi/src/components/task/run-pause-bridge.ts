@@ -1,5 +1,5 @@
 import { log } from "@oh-my-opencode/utils"
-import type { EnginePauseState } from "../../../../senpi-task/src/pause/ports"
+import { RELEASE_RUN_FENCE, type EnginePauseState, type RunRef } from "../../../../senpi-task/src/pause/ports"
 import type { RunPauseController } from "../../../../senpi-task/src/pause/run-controller"
 import { readEngineRunHold } from "./engine-hold-reader"
 
@@ -20,7 +20,10 @@ export class EngineRunPauseBridge {
 
   constructor(
     readonly controller: RunPauseController,
-    readonly native: { getPauseState(): EnginePauseState | undefined },
+    readonly native: {
+      getPauseState(): EnginePauseState | undefined
+      readonly [RELEASE_RUN_FENCE]?: (runRef: RunRef) => boolean | void
+    },
     readonly afterReleased?: (parentSessionId: string) => void | Promise<void>,
     readonly lostRecovery?: LostParticipantRecovery,
   ) {}
@@ -30,35 +33,56 @@ export class EngineRunPauseBridge {
     const persisted = registry.load(parentSessionId)
     const state = this.native.getPauseState()
     const live = state === undefined ? undefined : readEngineRunHold(state)
-    if (persisted === undefined && live?.stopped !== true) return
-    const pauseSeq = Math.max(persisted?.pauseSeq ?? 0, live?.pauseSeq ?? 0)
+    if (live?.stopped === true && state !== undefined) {
+      const pauseSeq = Math.max(persisted?.pauseSeq ?? 0, observedStopSeq(state))
+      registry.restore(parentSessionId, {
+        pauseSeq,
+        rebuild: () => this.controller.effects.snapshot(parentSessionId, registry.barrier.inFlight(parentSessionId)),
+      })
+      return
+    }
+    if (persisted === undefined) {
+      if (live !== undefined) this.#releaseOrphanFences(live)
+      return
+    }
     registry.restore(parentSessionId, {
-      pauseSeq,
+      pauseSeq: persisted.pauseSeq,
       rebuild: () => this.controller.effects.snapshot(parentSessionId, registry.barrier.inFlight(parentSessionId)),
     })
   }
 
   async reconciled(parentSessionId: string): Promise<void> {
-    const registry = this.controller.registry
-    const record = registry.load(parentSessionId)
-    if (record === undefined) return
+    const record = this.controller.registry.load(parentSessionId)
     const state = this.native.getPauseState()
     if (state === undefined) return
     const live = readEngineRunHold(state)
+    if (record === undefined) {
+      this.#releaseOrphanFences(live)
+      return
+    }
     const pauseSeq = record.pauseSeq
-    if (record.phase === "resumed" && !live.stopped) return this.#retryLost(parentSessionId, pauseSeq)
-    // Only an authoritative engine ledger at this epoch proves that the user's Stop
-    // was released. An absent/old context must not turn a restart into Resume.
-    if (!live.stopped && live.pauseSeq === pauseSeq) return this.#resume(parentSessionId, pauseSeq)
-    await this.#pause(parentSessionId, pauseSeq)
+    if (record.phase === "resumed" && !live.stopped) {
+      this.#releaseOrphanFences(live)
+      return this.#retryLost(parentSessionId, pauseSeq)
+    }
+    // Only an authoritative engine ledger at or past this Stop's seq (#12249) with no live Stop
+    // proves the user's Stop was released. An absent/old context must not turn a restart into Resume.
+    if (!live.stopped && live.pauseSeq >= pauseSeq) return this.#resume(parentSessionId, pauseSeq)
+    await this.#pause(parentSessionId, live.stopped ? Math.max(pauseSeq, observedStopSeq(state)) : pauseSeq)
   }
 
   changed(parentSessionId: string, event: RunHoldChange): Promise<void> {
     const state = this.native.getPauseState()
-    if (state !== undefined && state.pauseSeq > event.pauseSeq) return Promise.resolve()
+    const current = state === undefined ? undefined : readEngineRunHold(state)
     const live = readEngineRunHold(event)
-    if (event.change === "paused" && live.stopped) return this.#pause(parentSessionId, event.pauseSeq)
+    if (event.change === "paused") {
+      if (!live.stopped) return Promise.resolve()
+      if (state !== undefined && current !== undefined && (!current.stopped || observedStopSeq(state) > event.pauseSeq))
+        return Promise.resolve()
+      return this.#pause(parentSessionId, event.pauseSeq)
+    }
     if (event.change !== "resumed" || live.stopped) return Promise.resolve()
+    if (state !== undefined && current?.stopped === true && state.pauseSeq > event.pauseSeq) return Promise.resolve()
     // The Stop's run fences are engine holds too, so the Resume event carries a seq past the Stop it
     // releases (#12249). It releases the run's Stop at or below that seq, never a newer one.
     const stop = this.controller.registry.load(parentSessionId)?.pauseSeq
@@ -136,6 +160,8 @@ export class EngineRunPauseBridge {
       })
     }
     if (installed.kind === "installed" && this.controller.released(parentSessionId, pauseSeq, resumeId)) {
+      const latest = this.native.getPauseState()
+      if (latest !== undefined) this.#releaseOrphanFences(readEngineRunHold(latest))
       await this.afterReleased?.(parentSessionId)
       // Backgrounded: the hold-change handler must not wait out the retry schedule.
       if (this.lostRecovery !== undefined && this.controller.hasLost(parentSessionId, pauseSeq)) {
@@ -192,6 +218,27 @@ export class EngineRunPauseBridge {
     })
     return next
   }
+
+  #releaseOrphanFences(live: ReturnType<typeof readEngineRunHold>): void {
+    const release = this.native[RELEASE_RUN_FENCE]
+    if (live.stopped || release === undefined) return
+    for (const runRef of live.runRefs) release(runRef)
+  }
+}
+
+function observedStopSeq(state: EnginePauseState): number {
+  let maxStopSeq = 0
+  for (const hold of state.holds) {
+    if (hold.kind !== "session_hold") continue
+    const dataSeq =
+      typeof hold.data === "object" && hold.data !== null && "localSeq" in hold.data
+        ? (hold.data as { readonly localSeq?: unknown }).localSeq
+        : undefined
+    const keyMatch = /^session_hold:(\d+)$/.exec(hold.key)
+    const seq = typeof dataSeq === "number" ? dataSeq : keyMatch !== null ? Number(keyMatch[1]) : undefined
+    if (seq !== undefined && Number.isSafeInteger(seq) && seq > maxStopSeq) maxStopSeq = seq
+  }
+  return maxStopSeq > 0 ? maxStopSeq : state.pauseSeq
 }
 
 export function isRunHoldChange(value: unknown): value is RunHoldChange {

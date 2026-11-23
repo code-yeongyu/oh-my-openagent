@@ -2,9 +2,15 @@ import type { TaskManager } from "../../../../senpi-task/src/manager/types"
 import type { TaskPauseMethods } from "../../../../senpi-task/src/manager/run-pause"
 import type { TaskRecord } from "../../../../senpi-task/src/state"
 import type { AdmissionBarrier, ResumeCredential } from "../../../../senpi-task/src/pause/admission-barrier"
-import type { EnginePauseState, RunRef, RunPauseOwner } from "../../../../senpi-task/src/pause/ports"
+import {
+  RELEASE_RUN_FENCE,
+  type EnginePauseState,
+  type RunRef,
+  type RunPauseOwner,
+} from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
+import { readEngineRunHold } from "./engine-hold-reader"
 import { EngineRunPauseBridge, type LostParticipantRecovery } from "./run-pause-bridge"
 import { createWorkpoolRunPauseSource } from "./workpool-run-pause-source"
 
@@ -33,7 +39,11 @@ export function createEngineRunPause(ports: {
   readonly stateDir: string
   readonly barrier: AdmissionBarrier
   readonly manager: TaskManager & TaskPauseMethods
-  readonly runtime: { getPauseState(): EnginePauseState | undefined; fenceRun(runRef: RunRef): void }
+  readonly runtime: {
+    getPauseState(): EnginePauseState | undefined
+    fenceRun(runRef: RunRef): void
+    readonly [RELEASE_RUN_FENCE]?: (runRef: RunRef) => boolean | void
+  }
   readonly resumeAdmission?: RunPauseEffects["resume"]
   readonly lostRecovery?: LostParticipantRecovery
 }) {
@@ -129,6 +139,9 @@ export function createEngineRunPause(ports: {
     },
     settleCreations: (parentSessionId) => ports.barrier.creationsSettled(parentSessionId),
     async addFences(_parentSessionId, _pauseSeq, runs) {
+      if (runs.length === 0) return
+      const state = ports.runtime.getPauseState()
+      if (state !== undefined && !readEngineRunHold(state).stopped) return
       for (const run of runs) ports.runtime.fenceRun(run)
     },
     async pause(participant, owner) {
