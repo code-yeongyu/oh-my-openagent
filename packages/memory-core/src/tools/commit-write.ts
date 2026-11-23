@@ -22,7 +22,11 @@ export interface CommitMemoryWriteOptions {
   readonly successLabel: string
   readonly noChangesMessage?: string
   readonly writer?: "memory-tool" | "human-command"
+  /** Told each stage as the write enters it, so a caller that stops waiting can say where it stopped. */
+  readonly onStage?: (stage: MemoryWriteStage) => void
 }
+
+export type MemoryWriteStage = "lock" | "check" | "apply" | "commit"
 
 // The paths a write touched, and the ones whose legacy user header it dropped (reported by the writer itself).
 export interface AppliedWrite {
@@ -44,14 +48,19 @@ export interface MemoryWriteCommit {
 export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Promise<MemoryWriteCommit> {
   const { repo, lock, reason, author, provenance, successLabel, noChangesMessage } = options
   const writer = options.writer ?? "memory-tool"
+  const enter = options.onStage ?? (() => {})
+  enter("lock")
   return lock("memory-write", async () => {
+    enter("check")
     await repo.cleanCheck()
+    enter("apply")
     const applied = await options.apply()
     const paths = applied.affectedPaths
     if (paths.length === 0) throw new MemoryToolError(noChangesMessage ?? "made no changes")
     const violation = writer === "memory-tool" ? await refuseAgreementsViolation(repo, paths) : undefined
     if (violation !== undefined) throw new MemoryToolError(violation)
     let result
+    enter("commit")
     try {
       result = await repo.commitWrite(
         paths,
