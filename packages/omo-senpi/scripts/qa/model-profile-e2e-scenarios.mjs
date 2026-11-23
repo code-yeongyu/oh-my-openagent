@@ -29,9 +29,9 @@ export const SCENARIOS = {
   },
   "geeky-heavy-subscription-first": {
     omoConfig: { model_profile: "geeky-heavy" },
-    mockModels: ["mock-1", "gpt-6.2-astra"],
+    mockModels: ["mock-1", "gpt-6.2-astra", "gpt-6-astra"],
     registerProviders: ["openai", "chatgpt-subscription"],
-    expect: { model: "gpt-6.2-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
   },
   "daily-normal-opus": {
     omoConfig: { model_profile: "daily-normal" },
@@ -75,10 +75,10 @@ export const SCENARIOS = {
   },
   "geeky-heavy-astra": {
     omoConfig: { model_profile: "geeky-heavy" },
-    mockModels: ["mock-1", "gpt-6.2-astra"],
+    mockModels: ["mock-1", "gpt-6-astra"],
     cliModel: undefined,
     registerProviders: ["chatgpt-subscription"],
-    expect: { model: "gpt-6.2-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "high" },
+    expect: { model: "gpt-6-astra", provider: "chatgpt-subscription", notice: APPLIED_TYPE, thinking: "medium" },
   },
   "daily-normal-kimi": {
     omoConfig: { model_profile: "daily-normal" },

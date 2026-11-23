@@ -162,13 +162,12 @@ describe("BUILTIN_MODEL_PROFILES", () => {
     ])
   })
 
-  it("runs geeky-heavy as gpt-6.2-astra then gpt-6-astra high with the same provider ranking as deep-high", () => {
+  it("ships only GPT-6 Astra at medium for Obsessive Heavy", () => {
     expect(BUILTIN_MODEL_PROFILES["geeky-heavy"]?.models).toEqual([
-      { providers: ["chatgpt-subscription", "openai", "opencode"], model: "gpt-6.2-astra", variant: "high" },
       {
         providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"],
         model: "gpt-6-astra",
-        variant: "high",
+        variant: "medium",
       },
     ])
   })

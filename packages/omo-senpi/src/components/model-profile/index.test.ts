@@ -437,14 +437,14 @@ describe("createModelProfileComponent", () => {
     expect(appliedContent(pi)).toContain("github-copilot/gpt-5.6-sol medium")
   })
 
-  test("#given geeky-heavy #when the session starts #then astra high is applied", async () => {
+  test("#given geeky-heavy #when the session starts #then Astra medium is applied", async () => {
     const { pi, start } = harness({ model_profile: "geeky-heavy" }, [ASTRA, SOL_FAST])
 
     await start(STARTUP)
 
     expect(pi.sessionModels).toEqual([ASTRA])
-    expect(pi.sessionThinkingLevels).toEqual(["high"])
-    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra high")
+    expect(pi.sessionThinkingLevels).toEqual(["medium"])
+    expect(appliedContent(pi)).toContain("chatgpt-subscription/gpt-6-astra medium")
   })
 
   test("#given a literal provider/model #when the session starts #then that pin is applied for the session", async () => {

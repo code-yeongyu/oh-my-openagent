@@ -66,10 +66,8 @@ export const RETIRED_MODEL_PROFILE_IDS: ReadonlySet<string> = new Set(["recommen
 const CLAUDE_PROVIDERS = ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"] as const
 const KIMI_PROVIDERS = ["kimi-coding", "kimi-for-coding", "moonshotai", "opencode-go"] as const
 const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"] as const
-// Copilot does not serve GPT-6.2, so the GPT-6.2 Astra rung lists the other GPT providers and GPT-6 Astra
-// stays right behind it on all four (also covering a registry without 6.2). GPT-6.x Sol and its Fast tier
-// are served only on the two OpenAI lanes here, and Obsessive · Normal ends on GPT-5.6 Sol, which keeps
-// the profile on every GPT provider.
+// Obsessive · Normal lists GPT-6.2 Astra before GPT-6 Astra, with Copilot on the latter rung only.
+// Its GPT-6.x Sol tiers are served only on the two OpenAI lanes here; GPT-5.6 Sol covers all four.
 const GPT_6_2_ASTRA_PROVIDERS = ["chatgpt-subscription", "openai", "opencode"] as const
 const GPT_SOL_PROVIDERS = ["chatgpt-subscription", "openai"] as const
 
@@ -126,9 +124,6 @@ export const BUILTIN_MODEL_PROFILES: Readonly<Record<string, BuiltinModelProfile
     displayName: "Obsessive · Heavy",
     description: "Obsessive focus on one hard task, checked from every side.",
     caution: "NOT RECOMMENDED FOR WRITING OR EVERYDAY WORK.",
-    models: [
-      { providers: [...GPT_6_2_ASTRA_PROVIDERS], model: LATEST_MODEL_BY_FAMILY.gptAstra, variant: "high" },
-      { providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "high" },
-    ],
+    models: [{ providers: [...GPT_PROVIDERS], model: "gpt-6-astra", variant: "medium" }],
   },
 })
