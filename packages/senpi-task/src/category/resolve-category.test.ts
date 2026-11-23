@@ -433,7 +433,7 @@ describe("builtin category defaults", () => {
 
     // then: declared order plus each category's primary provider, model, and variant
     expect(defaults.map(({ config, name }) => [name, config.model, config.variant])).toEqual([
-      ["visual-engineering", "google/gemini-4-argon", "low"],
+      ["visual-engineering", "anthropic/claude-fable-5-2", "max"],
       ["artistry", "anthropic/claude-fable-5-2", "max"],
       ["ultrabrain", "chatgpt-subscription/gpt-6.2-astra", "max"],
       ["deep-low", "chatgpt-subscription/gpt-6.2-sol", "medium"],

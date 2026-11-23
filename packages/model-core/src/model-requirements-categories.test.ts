@@ -19,15 +19,15 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
     expect(requirement.requiresAnyModel).toBe(true)
   })
 
-  test("visual-engineering starts with Argon low (#10187)", () => {
+  test("visual-engineering starts with Fable 5.2 at max", () => {
     expect(CATEGORY_MODEL_REQUIREMENTS["visual-engineering"].fallbackChain.at(0)).toEqual({
-      providers: ["google", "google-vertex", "opencode"],
-      model: "gemini-4-argon",
-      variant: "low",
+      providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
+      model: "claude-fable-5-2",
+      variant: "max",
     })
   })
 
-  test("visual-engineering follows the approved 4-rung chain", () => {
+  test("visual-engineering preserves the order of the five remaining rungs", () => {
     // given
     const requirement = CATEGORY_MODEL_REQUIREMENTS["visual-engineering"]
 
@@ -36,11 +36,6 @@ describe("CATEGORY_MODEL_REQUIREMENTS", () => {
 
     // then
     expect(chain).toEqual([
-      {
-        providers: ["google", "google-vertex", "opencode"],
-        model: "gemini-4-argon",
-        variant: "low",
-      },
       {
         providers: ["anthropic", "anthropic-api", "github-copilot", "opencode"],
         model: "claude-fable-5-2",

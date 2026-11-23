@@ -30,7 +30,6 @@ describe("CATEGORY_FALLBACK_CHAINS", () => {
   test("#given the mirrored fallback table #when compared with the independent transcription #then every provider model variant and order is pinned", () => {
     expect(CATEGORY_FALLBACK_CHAINS).toEqual({
       "visual-engineering": [
-        { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" },
         {
           providers: ["anthropic-subscription", "anthropic", "anthropic-api", "github-copilot", "opencode"],
           model: "claude-fable-5-2",
