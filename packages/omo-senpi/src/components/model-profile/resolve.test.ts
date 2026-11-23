@@ -273,7 +273,7 @@ describe("builtin chain routing", () => {
     }
   })
 
-  it("resolves geeky-normal and geeky-heavy to gpt-6.2-astra when the subscription serves it beside GPT-6 Astra", () => {
+  it("keeps GPT-6.2 Astra on Obsessive Normal and picks GPT-6 Astra on Heavy when both are available", () => {
     expect(resolveModelProfile({ active: "geeky-normal", availableModels: [ASTRA_62, ASTRA, SOL_61] })).toMatchObject({
       kind: "resolved",
       provider: "chatgpt-subscription",
@@ -283,8 +283,8 @@ describe("builtin chain routing", () => {
     expect(resolveModelProfile({ active: "geeky-heavy", availableModels: [ASTRA_62, ASTRA] })).toMatchObject({
       kind: "resolved",
       provider: "chatgpt-subscription",
-      modelId: "gpt-6.2-astra",
-      reasoning: "high",
+      modelId: "gpt-6-astra",
+      reasoning: "medium",
     })
   })
 
@@ -422,17 +422,17 @@ describe("builtin chain routing", () => {
       kind: "resolved",
       provider: "chatgpt-subscription",
       modelId: "gpt-6-astra",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
-  it("resolves geeky-heavy to astra high", () => {
+  it("resolves geeky-heavy to Astra at medium even if the Sol tiers are available", () => {
     const result = resolveModelProfile({ active: "geeky-heavy", availableModels: [ASTRA, SOL_FAST] })
 
     expect(result).toMatchObject({
       kind: "resolved",
       modelId: "gpt-6-astra",
-      reasoning: "high",
+      reasoning: "medium",
     })
   })
 
