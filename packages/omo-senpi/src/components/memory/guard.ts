@@ -7,6 +7,7 @@ import type { ToolCallEventResult, ToolResultEventResult } from "@code-yeongyu/s
 import type { ComponentContext, SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 import { unverifiedReceiptNotice } from "./receipt-read-guard"
+import { createMemoryReadVersionCapture } from "./read-versions"
 import { isGrantedProjectMemoryRead } from "./project-memory-grants"
 import { isWithin as isWithinPath, scanForeignRoots, type AreaEntry, type ForeignRootScan } from "./guard-foreign-roots"
 import { TRANSIENT_DIRNAME } from "./transient-identity"
@@ -68,8 +69,9 @@ export function registerMemoryGuard(
   const warnedBashSessions = new Set<string>()
   // Per session, the ancestor enumerations allowed at tool_call whose results are still outstanding.
   const pendingAncestorChecks = new Map<string, Map<string, PendingAncestorCheck>>()
+  const readVersions = createMemoryReadVersionCapture()
 
-  pi.on("tool_call", (payload, eventContext): ToolCallEventResult | undefined => {
+  pi.on("tool_call", (payload, eventContext): ToolCallEventResult | Promise<void> | undefined => {
     const context = options.getContext(eventContext)
     if (context === undefined) return undefined
 
@@ -110,7 +112,11 @@ export function registerMemoryGuard(
       if (scan.kind !== "clear") return { block: true, reason: ancestorDenyReason(event.toolName, rawPath, scan) }
       ancestor = { areas: verdict.areas, ownRoots: verdict.ownRoots, toolName: event.toolName, rawPath }
     }
-    if (ancestor === undefined) return undefined
+    if (ancestor === undefined) {
+      if (event.toolName !== "read" || event.toolCallId === undefined) return undefined
+      const cwd = isRecord(eventContext) && typeof eventContext.cwd === "string" ? eventContext.cwd : pi.cwd
+      return readVersions.start(context, event.toolCallId, event.input, cwd)
+    }
     // The result is re-checked on tool_result; a call that cannot be matched to its result is not allowed.
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId) ?? new Map<string, PendingAncestorCheck>()
@@ -131,10 +137,13 @@ export function registerMemoryGuard(
   // ONE tool_result registration for the whole guard: senpi runs a PostToolUse hook (one hookRunId index) per
   // handler on every tool call, and the EQ goldens pin that count. The ancestor re-check (enumeration tools) and
   // the receipt notice (read tools) never apply to the same call; a replaced result is final.
-  pi.on(
-    "tool_result",
-    (payload, eventContext) => recheckAncestorResult(payload, eventContext) ?? unverifiedReceiptNotice(payload),
-  )
+  pi.on("tool_result", (payload, eventContext) => {
+    const result = recheckAncestorResult(payload, eventContext) ?? unverifiedReceiptNotice(payload)
+    if (!isRecord(payload) || payload.toolName !== "read" || typeof payload.toolCallId !== "string") return result
+    const context = options.getContext(eventContext)
+    const recorded = context === undefined ? undefined : readVersions.finish(context, payload.toolCallId, payload)
+    return recorded === undefined ? result : recorded.then(() => result)
+  })
 
   // The host checks only the enumeration root, so an identity created while the walk ran would be read.
   // Re-list the areas once the result exists and, if anything foreign appeared, replace the whole result.
@@ -165,6 +174,10 @@ export function registerMemoryGuard(
   // anyway. Pending checks are never released on agent_end: a nested walk from a background cell can outlive a run.
   pi.on("tool_execution_end", (payload, eventContext) => {
     if (!isRecord(payload) || typeof payload.toolCallId !== "string") return
+    if (payload.toolName === "read") {
+      const context = options.getContext(eventContext)
+      if (context !== undefined) readVersions.forget(context, payload.toolCallId)
+    }
     const sessionId = readSessionId(eventContext)
     const pending = pendingAncestorChecks.get(sessionId)
     pending?.delete(payload.toolCallId)

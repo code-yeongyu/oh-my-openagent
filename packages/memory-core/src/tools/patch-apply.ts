@@ -4,6 +4,7 @@ import { dirname, relative } from "node:path"
 import { isMissingFrontmatterError, parseMemoryFile, renderMemoryFile } from "../memfs/frontmatter"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { ClaimReceipt } from "../provenance"
+import { checkPatchVersions, type MemoryObservedVersions } from "./observed-versions"
 import { hasLegacyUserHeader, restampContent } from "./claim-frontmatter"
 import {
   applyMemoryPatchHunk,
@@ -20,8 +21,15 @@ export interface AppliedPatch {
   readonly strippedPaths: string[]
 }
 
-export async function applyMemoryPatch(root: string, input: string, claim?: ClaimReceipt): Promise<AppliedPatch> {
-  return applyOperations(root, parseMemoryPatch(input), claim)
+export async function applyMemoryPatch(
+  root: string,
+  input: string,
+  claim?: ClaimReceipt,
+  versions?: MemoryObservedVersions,
+): Promise<AppliedPatch> {
+  const operations = parseMemoryPatch(input)
+  await checkPatchVersions(root, operations, versions)
+  return applyOperations(root, operations, claim)
 }
 
 async function applyOperations(

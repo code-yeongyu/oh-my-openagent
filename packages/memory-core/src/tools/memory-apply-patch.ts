@@ -12,6 +12,8 @@ import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
 import { MemoryPathError, validateMemoryPath } from "../memfs/paths"
 import type { LockDomain } from "../locks"
 import { refuseAgreementsViolation } from "./agreements-write-guard"
+import { checkPatchVersions, type MemoryObservedVersions } from "./observed-versions"
+import { MemoryStaleReadError } from "./tool-errors"
 import {
   applyMemoryPatchHunk,
   MemoryPatchHunkError,
@@ -39,6 +41,7 @@ export interface MemoryApplyPatchLock {
 }
 
 export interface RunMemoryApplyPatchOptions {
+  readonly expectedVersions?: MemoryObservedVersions
   readonly repo: GitMemoryRepo
   readonly lock: MemoryApplyPatchLock
   readonly params: MemoryApplyPatchParams
@@ -65,7 +68,9 @@ export async function runMemoryApplyPatch(options: RunMemoryApplyPatchOptions): 
 
     return await lock("memory-write", async () => {
       await repo.cleanCheck()
-      const applied = await applyOperations(repo.dir, parseMemoryPatch(params.input), params.provenance?.claim)
+      const operations = parseMemoryPatch(params.input)
+      await checkPatchVersions(repo.dir, operations, options.expectedVersions)
+      const applied = await applyOperations(repo.dir, operations, params.provenance?.claim)
       const paths = applied.affectedPaths
       const violation = await refuseAgreementsViolation(repo, paths)
       if (violation !== undefined) throw new MemoryApplyPatchError(violation)
@@ -108,6 +113,7 @@ export async function runMemoryApplyPatch(options: RunMemoryApplyPatchOptions): 
   } catch (error) {
     if (
       error instanceof MemoryApplyPatchError ||
+      error instanceof MemoryStaleReadError ||
       error instanceof MemoryPatchParseError ||
       error instanceof MemoryPatchHunkError
     )
