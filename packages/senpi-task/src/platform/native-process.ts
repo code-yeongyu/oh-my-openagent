@@ -142,8 +142,33 @@ const PROC_TASKINFO_SIZE = 96
  */
 const TOTAL_USER_OFFSET = 16
 const TOTAL_SYSTEM_OFFSET = 24
-/** Linux clock ticks per second for utime/stime; 100 on every kernel these tests and users run. */
-const LINUX_CLK_TCK = 100
+/** `_SC_CLK_TCK` on Linux (glibc and musl). */
+const SC_CLK_TCK = 2
+/** USER_HZ every mainstream Linux kernel uses; only the answer when the system value cannot be read. */
+const FALLBACK_LINUX_CLK_TCK = 100
+let linuxClockTicksPerSecond: number | undefined
+
+/** Linux clock ticks per second for /proc utime/stime, read once from sysconf(_SC_CLK_TCK). */
+function linuxClockTicks(): number {
+  if (linuxClockTicksPerSecond !== undefined) return linuxClockTicksPerSecond
+  linuxClockTicksPerSecond = FALLBACK_LINUX_CLK_TCK
+  for (const libc of ["libc.so.6", `libc.musl-${process.arch === "arm64" ? "aarch64" : "x86_64"}.so.1`]) {
+    try {
+      const ticks = Number(
+        loadFfi()
+          ?.dlopen(libc, { sysconf: { args: ["i32"], returns: "i64" } })
+          .symbols.sysconf(SC_CLK_TCK),
+      )
+      if (Number.isSafeInteger(ticks) && ticks > 0) {
+        linuxClockTicksPerSecond = ticks
+        break
+      }
+    } catch {
+      continue
+    }
+  }
+  return linuxClockTicksPerSecond
+}
 
 /** User plus system CPU seconds the process itself has used, or null when it cannot be read. */
 export function readProcessCpuSeconds(pid: number): number | null {
@@ -153,7 +178,7 @@ export function readProcessCpuSeconds(pid: number): number | null {
       const fields = linuxStatFields(pid)
       if (fields === null) return null
       const ticks = Number(fields[11]) + Number(fields[12])
-      return Number.isFinite(ticks) ? ticks / LINUX_CLK_TCK : null
+      return Number.isFinite(ticks) ? ticks / linuxClockTicks() : null
     }
     case "darwin": {
       const info = darwinPidInfo(pid, PROC_PIDTASKINFO, PROC_TASKINFO_SIZE)
