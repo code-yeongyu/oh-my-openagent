@@ -296,6 +296,43 @@ describe("refreshMemoryStatus segments", () => {
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   })
 
+  test("#given a refresh in flight when the footer is cleared #when its read lands after the clear #then the cleared footer stays clear", async () => {
+    // #14825 review L1: a clear (session start or shutdown) supersedes every refresh already requested, the newest too.
+    const context = segmentContext({})
+    const recorder = recordingUi()
+    const host = readUi({ ui: recorder.ui })
+    if (host === undefined) throw new Error("readUi returned no handle")
+    let finishRead: (porcelain: string) => void = () => {}
+    const read = new Promise<string>((resolve) => {
+      finishRead = resolve
+    })
+    let markReading: () => void = () => {}
+    const reading = new Promise<void>((resolve) => {
+      markReading = resolve
+    })
+
+    const inFlight = refreshMemoryStatus({
+      context,
+      ui: host,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      checkAdvisory: false,
+      now: () => SEGMENT_NOW,
+      gitRepo: segmentRepo({
+        status: () => {
+          markReading()
+          return read
+        },
+      }),
+    })
+    await reading
+    host.setStatus(MEMORY_STATUS_KEY, undefined)
+    finishRead("")
+    await inFlight
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: undefined }])
+  })
+
   test("#given a tree left dirty with no writer holding the lock #when refresh runs #then the dirty marker still renders", async () => {
     const context = segmentContext({})
     mkdirSync(context.identityPaths.locks, { recursive: true })

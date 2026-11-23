@@ -66,7 +66,10 @@ function publishStatus(
 ): void {
   const state = statusOf(host)
   const last = state.lines.get(key)
-  if (text !== undefined && request !== undefined && last !== undefined && request < last.request) return
+  // A clear supersedes every request issued before it, the newest in-flight one included (#14825 review L1).
+  if (text !== undefined && request !== undefined && last !== undefined) {
+    if (request < last.request || (last.text === undefined && request <= last.request)) return
+  }
   // A clear supersedes every refresh already requested; an unsequenced line (the reflecting spinner) neither
   // supersedes nor is superseded, so the footer restore that follows the spinner still lands.
   const stamp = request ?? (text === undefined ? state.requests : (last?.request ?? 0))
