@@ -463,14 +463,23 @@ describe("thread SDK: read reaches the account like the agent tools (#12833)", (
     })
   })
 
-  test("#given a thread on b #when omo thread send names it #then the command-line sender is refused there as data (the engine admits one only from its own machine) and nothing is sent, while a send to a thread here still delivers as cli", async () => {
+  test("#given a thread on b #when omo thread send names it #then it reaches b as this person's own input (the omo remote send path; the engine admits no command-line delivery from another machine), while a send to a thread here still delivers as cli (#14616)", async () => {
     const account = remoteFixture.account({ aliases: new Map([["lane-b", { session_id: "dur-on-b", device: "b" }]]) })
     const { sdk, store } = fixture({ remote: account.remote })
     expect(await sdk.send({ thread: "lane-b", text: "ping b" })).toMatchObject({
-      kind: "error",
-      error: { code: "unsupported", details: { device: "b", reason: "sender_not_allowed" } },
+      kind: "ok",
+      device: "b",
+      thread: "dur-on-b",
     })
-    expect(account.sent.filter((entry) => entry.via === "session")).toEqual([])
+    // The person's own input: a plain prompt, no delivery envelope, exactly what `omo remote send` puts on the wire.
+    expect(account.sent).toEqual([
+      expect.objectContaining({
+        via: "session",
+        device: "b",
+        session: "rk-on-b",
+        rpc: expect.objectContaining({ type: "prompt", message: "ping b", sessionId: "rk-on-b" }),
+      }),
+    ])
     expect(await sdk.send({ thread: "my-tui", text: "ping here" })).toMatchObject({
       kind: "ok",
       endpoint_kind: "tui",
@@ -551,16 +560,19 @@ describe("thread SDK: every address form through the shared resolver (#14305)", 
     expect(local.thread).not.toHaveProperty("address")
   })
 
-  test("#given a thread on device B #when send addresses it by <device name>/<id> and by <device prefix>/<id prefix> #then each resolves there and the engine's refusal of a command-line sender comes back as data", async () => {
+  test("#given a thread on device B #when send addresses it by <device name>/<id> and by <device prefix>/<id prefix> #then each resolves there and reaches B as the person's own input (#14616)", async () => {
     const two = twoDevices()
     const { sdk } = sdkOn(two)
     for (const address of [`${B.name}/${T.bLive}`, `${B.id.slice(0, 6)}/${T.bLive.slice(0, 8)}`]) {
       expect(await sdk.send({ thread: address, text: "ping" })).toMatchObject({
-        kind: "error",
-        error: { code: "unsupported", details: { device: B.id, reason: "sender_not_allowed" } },
+        kind: "ok",
+        device: B.id,
+        thread: T.bLive,
       })
     }
-    expect(two.account.sent.filter((entry) => entry.via === "session")).toEqual([])
+    expect(
+      two.account.sent.filter((entry) => entry.via === "session").map((entry) => (entry.rpc as { type?: string }).type),
+    ).toEqual(["prompt", "prompt"])
   })
 
   test("#given a thread on this device #when read names it here/<id> #then it reads this device's transcript (surface pin: the control path already resolves it)", async () => {
