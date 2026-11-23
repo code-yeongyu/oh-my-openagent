@@ -1,14 +1,7 @@
 /// <reference types="bun-types" />
 
-import { afterAll, describe, expect, it, mock } from "bun:test"
-
-mock.module("../shared/logger", () => ({ log: mock(() => {}) }))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
+import { describe, expect, it, mock } from "bun:test"
+import { createPreemptiveCompactionHook } from "./preemptive-compaction"
 
 function createMockCtx() {
   return {

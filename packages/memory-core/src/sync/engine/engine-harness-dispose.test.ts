@@ -1,8 +1,23 @@
 import { expect, spyOn, test } from "bun:test"
+import { mkdtemp, readdir, rm } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import * as resilient from "../../fs/resilient"
 import { GIT_TEST_TIMEOUT, makeDevice } from "./engine-harness.test-support"
 import { FakeSyncServer } from "./fake-server.test-support"
+
+test("device setup removes its base if copying the source fails", async () => {
+  const tempRoot = await mkdtemp(join(tmpdir(), "omo-sync-setup-fault-"))
+  try {
+    await expect(
+      makeDevice(new FakeSyncServer(), "failed-copy", undefined, { tempRoot, memoryFrom: join(tempRoot, "missing") }),
+    ).rejects.toMatchObject({ code: "ENOENT", path: join(tempRoot, "missing") })
+    expect(await readdir(tempRoot)).toEqual([])
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true })
+  }
+})
 
 test(
   "#given a cycle blocked inside a journal write #when the device is disposed #then the cycle settles before the directory is removed",
