@@ -42,13 +42,17 @@ The verdict is per page. One failing page fails the whole surface, so "most page
 
 Every gate runs on captures produced AFTER the last edit to the rendered source. If any screenshot, PDF, capture, or QA JSON is older than the source file it claims to verify, it is stale and invalid - regenerate it before trusting it. Never report a PASS from an artifact you did not just produce against the current build. Between review rounds, re-capture only the pages a fix touched; the final approving round always judges a complete fresh set. The one deliberately old artifact is the `before` set of Step 6, which is dated to the pre-edit build on purpose.
 
+### Evidence must be real
+
+Under every capture name what it ran on: packaged app, dev server or fixture page; seeded, mocked or real-account data. A hold or a failure you inject at the network boundary is the condition of the Held, Failed and Switch cases, not a mock: the case is EXECUTED when the client under test is the real build. What an injected answer cannot prove is success: a success path answered by a stub, a mock or a fixture proves the stub, so run it once against the real backend and data, or mark it UNVERIFIED. Mark each behaviour claim EXECUTED (you ran it and saw it) or TRACED (read in source); only EXECUTED is a PASS. A tool's "visible" is true for a covered, transparent or off-viewport element, so check its box or capture the region. Wait for the event or the state, never a fixed time, and never loosen a wait, tolerance, locator or expected value to pass. A pass on retry does not erase the first failure: keep its capture.
+
 ### Machine pre-check - the detect SDK before any reviewer
 
 On a web surface, run the `frontend` skill's detect SDK on every enumerated page before capturing for reviewers (`frontend/references/perfection/detect.md`: `detectPage({ kind: "url", url }, { reflow: true })`, or `bun <frontend skill dir>/scripts/detect/cli.ts --reflow --json <url>`). It reads the rendered page and reports contrast against the painted background, the type scale and heading order, overflow at 320-1440 px under an unbroken stress string, and decoration and copy tells. An error or warning is a FAIL on the matching checklist item (E2 contrast, B8 type scale, A9 or A13 layout, F8/F9 surfaces and scaffolds, C4 wrapping) before either reviewer looks; fix it and rerun. Keep the JSON beside the captures and hand it to both reviewers as evidence. Advisories go to the verdict's taste findings.
 
 ### Capture hygiene - validate before dispatching reviewers
 
-Before any reviewer sees an image, verify each capture yourself: the file signature matches its extension (a JPEG named `.png` is invalid), the frame is fully composited (no black or missing regions from the screenshot compositor), dimensions match the requested viewport, and the frame holds only the page - a capture showing the browser's tabs or address bar, or the capture tool's own UI, is a window grab, not evidence. A defective capture wastes an entire review round on the pipeline instead of the product - fix the capture tooling and re-shoot before dispatch, and record the tooling defect in the QA log instead of looping the reviewer on it.
+Before any reviewer sees an image, verify each capture yourself: the file signature matches its extension (a JPEG named `.png` is invalid), the frame is fully composited (no black or missing regions from the screenshot compositor), dimensions match the requested viewport, and the frame holds only the page - a capture showing the browser's tabs or address bar, or the capture tool's own UI, is a window grab, not evidence. It must also show the build, theme and state you meant: a blank window from the wrong build, an unpainted theme, or a locator that hit a caption instead of its control is an `[evidence]` defect, and any product finding read off it is withdrawn. A defective capture wastes an entire review round on the pipeline instead of the product - fix the capture tooling and re-shoot before dispatch, and record the tooling defect in the QA log instead of looping the reviewer on it.
 
 ### Web
 
@@ -113,9 +117,21 @@ Static screenshots miss what moves. For every interactive element and every anim
 
 **Animation is never an excuse to skip or pass a region.** A high `diffRatio` from an in-flight animation means: compare the settled frame to the settled frame for pixel fidelity, and judge the motion itself against the reference's motion or, with no reference, against checklist section G.
 
-## The checklist - every item PASS, FAIL or N/A, proven by a named capture
+### State and flow capture
 
-This is the platform baseline, distilled from Apple's Human Interface Guidelines and the `frontend` skill's visually checkable rules. Run it yourself on the capture matrix before dispatching and fix what you can; then both reviewers run it again independently (Pass A owns sections G-J, Pass B owns A-F). An item the surface has no instance of is N/A, never PASS. `(mac)` marks macOS desktop items, `(phone)` marks items judged on the 390 captures; unmarked items apply everywhere.
+Static frames miss a failed read drawn as an empty list, an error left up after the retry worked, and a late response painted over the item the user moved to. When the change touches a request, saved or restored state, or a multi-step flow, capture these cases by pressing the real control (a typed route, a scripted event, a forced click or an API call proves a different path):
+
+- **Held:** hold the request, confirm it is pending, capture; release it, capture the settled state.
+- **Failed:** the same with an error or a dropped response.
+- **Re-entry:** reload or restart, close and reopen, back and forward, the deep link.
+- **Switch:** hold a request for item A, move to item B, release A, capture B.
+- **Twice:** press again while pending; retry after a refusal.
+
+Record the requests sent beside each capture: a success notice is not a saved result. `$SKILL_DIR/references/behaviour-evidence.md` scopes the cases to the change and has the hold recipe, the keep-and-clear table and the first-use walk. A case you cannot produce here is UNVERIFIED, with the reason.
+
+## The checklist - every item PASS, FAIL, UNVERIFIED or N/A, proven by a named capture
+
+This is the platform baseline, distilled from Apple's Human Interface Guidelines and the `frontend` skill's visually checkable rules. Run it yourself on the capture matrix before dispatching and fix what you can; then both reviewers run it again independently (Pass A owns sections G-J, Pass B owns A-F). An item the surface has no instance of is N/A, never PASS. An item whose condition you could not produce or observe is UNVERIFIED with the reason, never PASS and never N/A. H12-H19 are behaviour checks, proven by the state and flow captures. `(mac)` marks macOS desktop items, `(phone)` marks items judged on the 390 captures; unmarked items apply everywhere.
 
 **A. Layout and alignment**
 - A1 Content is anchored by intent, centred or on the layout grid; nothing sits in the top-left of an otherwise empty canvas.
@@ -201,6 +217,14 @@ A13, B8, E7, F8 and F9 are adapted from the craft floor of [pbakaus/impeccable](
 - H9 Sign-in is deferred until needed and its benefit stated; the auth method is named ("Sign in with GitHub", not "Sign in"); no license text in onboarding; password fields are masked and never pre-filled.
 - H10 Search, when present: one search location, scope visible in the placeholder or a scope bar, recents or suggestions offered.
 - H11 Settings, when present: labels say what ON does; system-wide settings are not duplicated; (mac) the settings window title names the visible pane.
+- H12 The state shown is true: a read that failed or has not finished is never drawn as empty, zero, signed out or "none"; unknown has its own state with a retry.
+- H13 When an action settles every region agrees (header, row, badge, count, button, toast), and the previous spinner, error, notice and form are gone.
+- H14 Every pending state ends in success, failure or a deadline message with a way out.
+- H15 A late response lands only on the target that asked: after Switch the screen shows nothing from the item the user left.
+- H16 The result survives re-entry: the same state, data and controls after reload or restart, reopen, back and forward, and the deep link.
+- H17 A second press while pending sends nothing twice, a retry after a refusal sends again, and leaving mid-request loses nothing without a message.
+- H18 Across a refetch or state change the selection, typed input, focus and scroll stay, and the region being worked in does not move (box read before, while held, after).
+- H19 First-use walk: at each step of the changed flow a first-time user can tell what to do, find the control, predict the result from its label, and see whether it worked; a control that looks actionable does something.
 
 **I. Keyboard and accessibility**
 - I1 A visible focus ring on every interactive element; focus order equals reading order; focus never moves without user action and never lands on a destructive or approve action by default.
@@ -251,6 +275,9 @@ SOURCE CODE:
 CAPTURES:
 {Web: actual screenshot path(s) plus your described observations. TUI: paste terminal.txt and terminal-ansi.txt inline.}
 
+STATE AND FLOW EVIDENCE:
+{The state table for each changed screen; per case (held, failed, re-entry, switch, twice) the capture paths, requests sent, build and data, and EXECUTED or TRACED. Write NONE if the change touches no request, saved state or multi-step flow.}
+
 SHARED SCRIPT EVIDENCE (reference, not verdict):
 {Paste the image-diff or tui-check JSON. Use alphaChannelIntact for the transparency check.}
 
@@ -261,15 +288,15 @@ CHECK EACH:
 1. Real design system vs ad-hoc/mock-only: are styles driven by coherent design tokens and reused primitives, or one-off hardcoded values scattered per element? When a reference packet exists, the implementation must encode the reference's colors, type, spacing, radii, shadows, component anatomy, and states as reusable tokens/primitives that can extend to new pages. Treat mock-only screens, static compositions, or one-page hardcoded styling with no reusable system as BLOCKING unless the user explicitly requested a throwaway mock.
 2. Faked-with-an-image anti-pattern: is the UI a real DOM/component tree, or a pasted raster/screenshot or background-image standing in for live elements? For TUI: a real layout that reflows, or hardcoded pre-rendered text at fixed widths?
 3. Alpha and transparency: handled correctly, with no unexpected opaque or black fills and correct PNG/CSS alpha? Cross-check alphaChannelIntact.
-4. Do the user-intended FEATURES actually work: interactions, states, navigation (web); input handling, resize, scroll (TUI)? Trace the code paths.
+4. Do the user-intended FEATURES actually work on the path a user takes: interactions, states, navigation (web); input handling, resize, scroll (TUI)? Judge from the executed captures. A code trace locates a cause; it does not prove what the screen shows.
 5. Required content: every item on the required-content list is present by name with its own control, field, or text. A merged input (two required fields collapsed into one), a dropped datum, or shortened required copy is BLOCKING. Reference packet coverage: every reference page, state, viewport, and annotated requirement is implemented or explicitly marked out of scope by the user; missing copy, swapped hierarchy, or unimplemented reference states are BLOCKING.
-6. Checklist sections G-J, item by item: PASS, FAIL or N/A with the capture or clip that proves it. Where the captures do not show a state or a key, trace the code path that produces it and say so. Every FAIL is BLOCKING.
+6. Checklist sections G-J, item by item: PASS, FAIL, UNVERIFIED or N/A with the capture or clip that proves it. An item the captures do not show is UNVERIFIED: name the capture that would prove it, and add what the code path suggests, labelled TRACED. Every FAIL is BLOCKING.
 
 OUTPUT:
 VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
-CHECKLIST: one line per item in G-J - id, PASS/FAIL/N/A, proving capture
+CHECKLIST: one line per item in G-J - id, PASS/FAIL/UNVERIFIED/N/A, proving capture
 FINDINGS: for each, [product|evidence] [defect|taste] [dimension] [severity] what is wrong, where (file/line or capture region), and the concrete fix
 WHAT IS GOOD: correct aspects that must not regress
 BLOCKING: items that must be fixed; empty if PASS
@@ -322,7 +349,7 @@ USE THE EVIDENCE:
 - TUI (tui-check): inspect maxWidth vs expectedColumns, every overflowLines[] entry, borderMisaligned, and wideCharColumns[].
 
 CHECK:
-1. Checklist sections A-F, item by item, on the 390, 1440 and (for page layouts) 1920 captures in BOTH themes and on the scrolled-to-end shots: PASS, FAIL or N/A with the capture that proves it. Every FAIL is BLOCKING.
+1. Checklist sections A-F, item by item, on the 390, 1440 and (for page layouts) 1920 captures in BOTH themes and on the scrolled-to-end shots: PASS, FAIL, UNVERIFIED or N/A with the capture that proves it. Every FAIL is BLOCKING.
 2. When a reference packet exists, compare ACTUAL against REFERENCE pixel-perfectly, region by region: page bounds, header/nav, hero, cards, grids, charts, media, typography, copy, color tokens, radius, shadow, border, icon size, spacing, alignment, scroll position, and state. Anything off beyond unavoidable rasterization/rounding is a finding. The overview text is part of the target: missing or rearranged reference content is a finding even if the screenshot looks plausible.
 3. When before/after pairs exist, judge each pair side by side: the after must show the brief's primary action and priorities more legibly than the before, carry fewer elements without a job, and lose nothing from the required-content list. A pair with no change a reader can point to, or a required input, datum, or copy present in before and missing or merged in after, is a BLOCKING [defect].
 4. CJK precision:
@@ -338,7 +365,7 @@ OUTPUT:
 VERDICT: PASS | REVISE | FAIL
 CONFIDENCE: HIGH | MEDIUM | LOW
 SUMMARY: 1-3 sentences
-CHECKLIST: one line per item in A-F - id, PASS/FAIL/N/A, proving capture
+CHECKLIST: one line per item in A-F - id, PASS/FAIL/UNVERIFIED/N/A, proving capture
 EVIDENCE TRACE: each hotspot or overflow line mapped to its visual cause
 FINDINGS: for each, [product|evidence] [defect|taste] [severity] what is wrong, where (hotspot grid or capture line:col), and the concrete fix
 BLOCKING: items that must be fixed; empty if PASS
@@ -348,7 +375,7 @@ BLOCKING: items that must be fixed; empty if PASS
 
 ## Step 4 - Synthesize one verdict
 
-When both passes return, merge them into a single report: one row per checklist item with its verdict and proving capture, then the non-checklist dimensions. For each FAIL or bad item, state what is wrong, where (file/line, hotspot grid, or capture line), and the concrete fix. Call out what is genuinely good so it is not regressed later. Any `[defect]` FAIL makes the verdict NEEDS WORK.
+When both passes return, merge them into a single report: one row per checklist item with its verdict and proving capture, then the non-checklist dimensions. For each FAIL or bad item, state what is wrong, where (file/line, hotspot grid, or capture line), and the concrete fix. Call out what is genuinely good so it is not regressed later. Any `[defect]` FAIL makes the verdict NEEDS WORK. So does an UNVERIFIED item on a state or flow the change touches that you can still produce here; one that this environment cannot produce makes it NEEDS HUMAN REVIEW, naming the item and who can verify it.
 
 ### Completion gate - bounded independent review on fresh evidence
 
@@ -357,6 +384,7 @@ This is a hard stop rule, not a guideline. The UI is done when ALL of these hold
 - An independent read-only reviewer returned PASS, or only `[taste]` findings, on the current build.
 - That reviewer judged a FRESH capture of every enumerated page from Step 2 - no stale artifacts, no skipped pages.
 - Every `[defect]` finding is resolved in the rendered output, not merely noted.
+- No item on a state or flow the change touches is UNVERIFIED.
 
 The loop is bounded. The initial dual-oracle pass is round 1; each fresh re-review increments it. A low-risk surface (one component, a figure, a report page, a copy change) gets 2 rounds; a product surface gets 3. Record the round count and the wall-clock time per round in the report.
 
@@ -369,12 +397,13 @@ The final approving round judges a complete fresh capture set. Do not stop becau
 ```markdown
 # Visual QA - Verdict: GOOD | NEEDS WORK | NEEDS HUMAN REVIEW
 
-Captured: {N pages} x {390, 1440[, 1920]} x {light, dark} + scrolled-end + motion frames, fresh as of {build}. Pages: {ids}.
+Captured: {N pages} x {390, 1440[, 1920]} x {light, dark} + scrolled-end + motion frames + state and flow cases {held, failed, re-entry, switch, twice}, fresh as of {build}. Pages: {ids}.
+Ran on: {packaged app | dev server | fixture page}, {seeded | mocked | real account} data.
 Rounds: {k} of {budget} ({time per round}). Brief: {primary action; priorities 1-3} or NONE.
 
 | Item | Verdict | Capture | Finding |
 |---|---|---|---|
-| A1 ... J2 | PASS / FAIL / N/A | path#region | [product|evidence] [defect|taste] what, where, fix - empty on PASS |
+| A1 ... J2 | PASS / FAIL / UNVERIFIED / N/A | path#region | [product|evidence] [defect|taste] what, where, fix - empty on PASS |
 
 | Dimension | Pass | Verdict | Evidence |
 |---|---|---|---|
@@ -388,6 +417,9 @@ Rounds: {k} of {budget} ({time per round}). Brief: {primary action; priorities 1
 
 ## Must fix
 [Blocking defects, each with location and fix, in priority order]
+
+## Not verified
+[Each UNVERIFIED item: the condition that could not be produced, why, and who can verify it]
 
 ## Recorded taste findings
 [Noted, not re-reviewed; the user decides]
