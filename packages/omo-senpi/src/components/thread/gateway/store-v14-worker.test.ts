@@ -89,7 +89,7 @@ test("#given a v14 session whose worker opened before this binary migrated the s
   expect(backlog).toBeDefined()
   lead.runtime.endTurn()
   await h.quiesce()
-}, 30_000)
+})
 
 test("#given a store this binary migrated #when a v14 session opens its worker afterwards #then it is refused gateway_schema_too_new: the floor helps only binaries that read it (#14622 review M6)", async () => {
   const h = (harness = createGatewayHarness())
@@ -99,4 +99,4 @@ test("#given a store this binary migrated #when a v14 session opens its worker a
   const opened = await settled(v14(h).identity())
   expect(opened.error).toMatchObject({ code: "gateway_schema_too_new" })
   expect(userVersion(h)).toBe(GATEWAY_MIGRATIONS.length)
-}, 30_000)
+})
