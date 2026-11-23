@@ -198,10 +198,11 @@ export function boundBuild(
         try {
           killTree(child)
         } catch (error) {
-          // The group could not be signalled: end at least the child itself, then fail with that error.
+          // The group could not be signalled: end at least the leader, and reject with that error once it has exited.
+          // Any other group member is left running; the caller sees the error and owns that cleanup.
           child.removeListener("exit", rejectBound)
+          child.once("exit", () => reject(error))
           child.kill("SIGKILL")
-          reject(error)
         }
       })
     }

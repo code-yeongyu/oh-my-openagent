@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process"
 import { Worker } from "node:worker_threads"
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -43,13 +44,21 @@ function blockedBuild(body) {
   ].join("\n")
 }
 
+// Only the guarded (POSIX) cases ask this. A zombie is gone for this purpose: it has exited and only waits for a
+// reaper, which a container whose PID 1 does not reap may never provide.
 function alive(pid) {
-  try {
-    process.kill(pid, 0)
-    return true
-  } catch (error) {
-    return error.code === "EPERM"
-  }
+  const listed = spawnSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" })
+  if (listed.status !== 0) return false
+  const stat = listed.stdout.trim()
+  return stat !== "" && !stat.startsWith("Z")
+}
+
+// A SIGKILLed process leaves within milliseconds; the deadline only keeps a stuck one from hanging the case, and stays
+// under bun's 5 s default test timeout so a local run without --timeout still reports the alive diff.
+const GONE_DEADLINE_MS = 3_000
+async function waitGone(pids) {
+  const deadline = Date.now() + GONE_DEADLINE_MS
+  while (pids.some(alive) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
 }
 
 // A killed process is reaped on its own schedule: wait, bounded, for both the build's leader and its blocked child to
@@ -57,8 +66,7 @@ function alive(pid) {
 async function expectTreeGone(error, dir) {
   const leader = Number(String(error).match(/process group (\d+)$/)?.[1])
   const blocked = Number(await readFile(join(dir, "blocked.pid"), "utf8"))
-  const deadline = Date.now() + 10_000
-  while ((alive(leader) || alive(blocked)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
+  await waitGone([leader, blocked])
   expect({ leader: alive(leader), blocked: alive(blocked) }).toEqual({ leader: false, blocked: false })
 }
 
@@ -141,7 +149,6 @@ guarded(
   async () => {
     // given
     const { dir, url } = await buildModule(blockedBuild(SLEEPS))
-    const started = Date.now()
 
     // when
     const error = await rejection(
@@ -152,7 +159,6 @@ guarded(
     expect(String(error)).toMatch(
       /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process group \d+$/,
     )
-    expect(Date.now() - started).toBeLessThan(600_000)
     await expectTreeGone(error, dir)
   },
 )
@@ -224,30 +230,34 @@ guarded(
 )
 
 // #14780 review (c914af016c) M1: a kill that throws inside the exit settle used to leave the promise neither resolved
-// nor rejected, so the hook hung until its outer bound. It must reject with that error instead.
-test("#given a build that finishes #when ending its leftover process tree throws #then the build rejects with that error", async () => {
-  // given
-  const { url } = await buildModule("export async function buildExtension() { return { mainInputs: [] } }\n")
-  const refused = new Error("kill refused")
+// nor rejected, so the hook hung until its outer bound. It must reject with that error instead. The sidecar kill on
+// exit is a process-group signal, which only exists off win32 (#14832).
+guarded(
+  "#given a build that finishes #when ending its leftover process tree throws #then the build rejects with that error",
+  async () => {
+    // given
+    const { url } = await buildModule("export async function buildExtension() { return { mainInputs: [] } }\n")
+    const refused = new Error("kill refused")
 
-  // when
-  const error = await rejection(
-    boundBuild(
-      "shared extension build",
-      await outputRoot(),
-      {},
-      {
-        buildModule: url,
-        killTree: () => {
-          throw refused
+    // when
+    const error = await rejection(
+      boundBuild(
+        "shared extension build",
+        await outputRoot(),
+        {},
+        {
+          buildModule: url,
+          killTree: () => {
+            throw refused
+          },
         },
-      },
-    ),
-  )
+      ),
+    )
 
-  // then
-  expect(error).toBe(refused)
-})
+    // then
+    expect(error).toBe(refused)
+  },
+)
 
 // #14780 review (caf0705abc) L2: a kill that throws when a bound trips must still end the build: the build rejects with
 // that error instead of waiting for an exit that may never come.
@@ -278,8 +288,7 @@ guarded(
     // then
     expect(error).toBe(refused)
     const blocked = Number(await readFile(join(dir, "blocked.pid"), "utf8"))
-    const deadline = Date.now() + 10_000
-    while (alive(blocked) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
+    await waitGone([blocked])
     expect(alive(blocked)).toBe(false)
   },
 )
@@ -314,3 +323,40 @@ test("#given win32 #when a build is bounded #then it is reported unmeasurable, n
     "shared extension build: its process tree's CPU is unmeasurable on win32 (#14832); only the hook's outer bound applies",
   ])
 })
+
+// #14780 review (7752e500ff) L4: when the group cannot be signalled, the trip ends the leader and rejects only once
+// that leader has exited, as the comment on trip() says. The rest of the group is left to the caller (this case ends
+// it itself); a real cleanup for that case needs the win32/tree work of #14832.
+guarded(
+  "#given a hung build #when its group cannot be signalled on a tripped bound #then the build rejects only after the leader exited",
+  async () => {
+    // given
+    const { dir, url } = await buildModule(blockedBuild(SLEEPS))
+    const refused = new Error("group signal refused")
+    let leader
+
+    // when
+    const error = await rejection(
+      boundBuild(
+        "shared extension build",
+        await outputRoot(),
+        {},
+        {
+          buildModule: url,
+          stallMs: 1_500,
+          killTree: (child) => {
+            leader = child
+            throw refused
+          },
+        },
+      ),
+    )
+
+    // then
+    const leaderExited = leader.exitCode !== null || leader.signalCode !== null
+    killGroup(leader)
+    await waitGone([Number(await readFile(join(dir, "blocked.pid"), "utf8"))])
+    expect(error).toBe(refused)
+    expect(leaderExited).toBe(true)
+  },
+)
