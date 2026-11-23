@@ -5,6 +5,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { afterEach, expect, test } from "bun:test"
 
+import { killGroup } from "../../../omo-native/test/daemon-test-runner.ts"
 import { boundBuild, createBuildFixture } from "./build-extension.test-support.mjs"
 
 const scratch = []
@@ -54,12 +55,16 @@ function alive(pid) {
 // A killed process is reaped on its own schedule: wait, bounded, for both the build's leader and its blocked child to
 // be gone, instead of asserting at one instant.
 async function expectTreeGone(error, dir) {
-  const leader = Number(String(error).match(/process (?:group|tree) (\d+)$/)?.[1])
+  const leader = Number(String(error).match(/process group (\d+)$/)?.[1])
   const blocked = Number(await readFile(join(dir, "blocked.pid"), "utf8"))
   const deadline = Date.now() + 10_000
   while ((alive(leader) || alive(blocked)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
   expect({ leader: alive(leader), blocked: alive(blocked) }).toEqual({ leader: false, blocked: false })
 }
+
+// The progress guard needs a tree CPU reader, which win32 does not have yet (#14832); there boundBuild reports the
+// build as unmeasurable and only the hook bound applies, which the last cases pin on every platform.
+const guarded = test.skipIf(process.platform === "win32")
 
 async function rejection(promise) {
   try {
@@ -131,80 +136,92 @@ test("#given the reproduction build rejects once #when it is asked for again #th
 // calls it. These builds block the same way (a synchronous child that sleeps, or one that spins), so a guard that
 // samples from inside the build's own process can never pass them. The earlier cases built with async fakes, which
 // left the event loop free and so stayed green while the guard could not fire on a real hung bundler.
-test("#given a build blocked in a synchronous child that sleeps #when it is bounded #then it fails as a stall and its process tree is gone", async () => {
-  // given
-  const { dir, url } = await buildModule(blockedBuild(SLEEPS))
-  const started = Date.now()
+guarded(
+  "#given a build blocked in a synchronous child that sleeps #when it is bounded #then it fails as a stall and its process group is gone",
+  async () => {
+    // given
+    const { dir, url } = await buildModule(blockedBuild(SLEEPS))
+    const started = Date.now()
 
-  // when
-  const error = await rejection(
-    boundBuild("shared extension build", await outputRoot(), {}, { buildModule: url, stallMs: 1_500 }),
-  )
-
-  // then
-  expect(String(error)).toMatch(
-    /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process (?:group|tree) \d+$/,
-  )
-  expect(Date.now() - started).toBeLessThan(600_000)
-  await expectTreeGone(error, dir)
-})
-
-test("#given a build blocked in a synchronous child that spins #when its tree passes the CPU cap #then it fails as a runaway and its process tree is gone", async () => {
-  // given
-  const { dir, url } = await buildModule(blockedBuild(SPINS))
-
-  // when
-  const error = await rejection(
-    boundBuild("shared extension build", await outputRoot(), {}, { buildModule: url, stallMs: 60_000, cpuCapS: 1 }),
-  )
-
-  // then
-  expect(String(error)).toMatch(
-    /shared extension build ran away: used \d+ CPU seconds \(cap 1\); killed process (?:group|tree) \d+$/,
-  )
-  await expectTreeGone(error, dir)
-})
-
-// The guard samples the build's process tree, not this test process, so CPU burned here must not read as progress.
-test("#given a hung build while this test process burns CPU #when it is bounded #then it still fails as a stall", async () => {
-  // given
-  const { url } = await buildModule(blockedBuild(SLEEPS))
-  const burner = new Worker("for (;;) {}", { eval: true })
-  try {
     // when
     const error = await rejection(
       boundBuild("shared extension build", await outputRoot(), {}, { buildModule: url, stallMs: 1_500 }),
     )
 
     // then
-    expect(String(error)).toContain("shared extension build stalled")
-  } finally {
-    await burner.terminate()
-  }
-})
+    expect(String(error)).toMatch(
+      /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process group \d+$/,
+    )
+    expect(Date.now() - started).toBeLessThan(600_000)
+    await expectTreeGone(error, dir)
+  },
+)
+
+guarded(
+  "#given a build blocked in a synchronous child that spins #when its tree passes the CPU cap #then it fails as a runaway and its process group is gone",
+  async () => {
+    // given
+    const { dir, url } = await buildModule(blockedBuild(SPINS))
+
+    // when
+    const error = await rejection(
+      boundBuild("shared extension build", await outputRoot(), {}, { buildModule: url, stallMs: 60_000, cpuCapS: 1 }),
+    )
+
+    // then
+    expect(String(error)).toMatch(
+      /shared extension build ran away: used \d+ CPU seconds \(cap 1\); killed process group \d+$/,
+    )
+    await expectTreeGone(error, dir)
+  },
+)
+
+// The guard samples the build's process tree, not this test process, so CPU burned here must not read as progress.
+guarded(
+  "#given a hung build while this test process burns CPU #when it is bounded #then it still fails as a stall",
+  async () => {
+    // given
+    const { url } = await buildModule(blockedBuild(SLEEPS))
+    const burner = new Worker("for (;;) {}", { eval: true })
+    try {
+      // when
+      const error = await rejection(
+        boundBuild("shared extension build", await outputRoot(), {}, { buildModule: url, stallMs: 1_500 }),
+      )
+
+      // then
+      expect(String(error)).toContain("shared extension build stalled")
+    } finally {
+      await burner.terminate()
+    }
+  },
+)
 
 // #14780 review L2: a sampler that cannot read the tree disables both bounds, so it must end the build as its own
 // outcome (the "unmeasurable" bound of watchTreeProgress), not pass for a stall or wait for the job limit.
-test("#given a tree sampler that always fails #when a hung build is bounded #then it fails as unmeasurable and its process tree is gone", async () => {
-  // given
-  const { dir, url } = await buildModule(blockedBuild(SLEEPS))
+guarded(
+  "#given a tree sampler that always fails #when a hung build is bounded #then it fails as unmeasurable and its process group is gone",
+  async () => {
+    // given
+    const { dir, url } = await buildModule(blockedBuild(SLEEPS))
 
-  // when
-  const error = await rejection(
-    boundBuild(
-      "shared extension build",
-      await outputRoot(),
-      {},
-      { buildModule: url, stallMs: 1_500, sample: () => -1 },
-    ),
-  )
+    // when
+    const error = await rejection(
+      boundBuild(
+        "shared extension build",
+        await outputRoot(),
+        {},
+        { buildModule: url, stallMs: 1_500, sample: () => -1 },
+      ),
+    )
 
-  // then
-  expect(String(error)).toMatch(
-    /shared extension build could not read its process tree's CPU for \d+s, so neither bound could be checked; killed process (?:group|tree) \d+$/,
-  )
-  await expectTreeGone(error, dir)
-})
+    // then
+    expect(String(error)).toMatch(
+      /shared extension build could not read its process tree's CPU for \d+s, so neither bound could be checked; killed process group \d+$/,
+    )
+    await expectTreeGone(error, dir)
+  },
+)
 
 // #14780 review (c914af016c) M1: a kill that throws inside the exit settle used to leave the promise neither resolved
 // nor rejected, so the hook hung until its outer bound. It must reject with that error instead.
@@ -230,4 +247,70 @@ test("#given a build that finishes #when ending its leftover process tree throws
 
   // then
   expect(error).toBe(refused)
+})
+
+// #14780 review (caf0705abc) L2: a kill that throws when a bound trips must still end the build: the build rejects with
+// that error instead of waiting for an exit that may never come.
+guarded(
+  "#given a hung build #when killing its group on a tripped bound throws #then the build rejects with that error",
+  async () => {
+    // given
+    const { dir, url } = await buildModule(blockedBuild(SLEEPS))
+    const refused = new Error("group signal refused")
+
+    // when
+    const error = await rejection(
+      boundBuild(
+        "shared extension build",
+        await outputRoot(),
+        {},
+        {
+          buildModule: url,
+          stallMs: 1_500,
+          killTree: (child) => {
+            killGroup(child)
+            throw refused
+          },
+        },
+      ),
+    )
+
+    // then
+    expect(error).toBe(refused)
+    const blocked = Number(await readFile(join(dir, "blocked.pid"), "utf8"))
+    const deadline = Date.now() + 10_000
+    while (alive(blocked) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
+    expect(alive(blocked)).toBe(false)
+  },
+)
+
+// #14780 review (caf0705abc) M2/M3, scope decision: win32 has no tree CPU reader (#14832). boundBuild reports the build
+// as unmeasurable once, never samples and never kills by pid; only the hook's outer bound applies.
+test("#given win32 #when a build is bounded #then it is reported unmeasurable, never sampled or killed, and still resolves", async () => {
+  // given
+  const { url } = await buildModule("export async function buildExtension() { return { mainInputs: [] } }\n")
+  const reported = []
+  const never = (what) => () => {
+    throw new Error(`${what} must not run on win32`)
+  }
+
+  // when
+  const result = await boundBuild(
+    "shared extension build",
+    await outputRoot(),
+    {},
+    {
+      buildModule: url,
+      platform: "win32",
+      sample: never("the tree sampler"),
+      killTree: never("the group kill"),
+      report: (line) => reported.push(line),
+    },
+  )
+
+  // then
+  expect(result).toEqual({ mainInputs: [] })
+  expect(reported).toEqual([
+    "shared extension build: its process tree's CPU is unmeasurable on win32 (#14832); only the hook's outer bound applies",
+  ])
 })

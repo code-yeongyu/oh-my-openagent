@@ -15,44 +15,12 @@ function treeCpuSeconds(rootPid: number, { ppidOf, cpuOf }: ProcessTable): numbe
   return total
 }
 
-// Windows has no ps and no /proc: CIM lists every process with its parent and its kernel+user time in 100 ns units.
-export const WIN32_PROCESS_LISTING = [
-  "powershell.exe",
-  [
-    "-NoProfile",
-    "-NonInteractive",
-    "-Command",
-    'Get-CimInstance Win32_Process | ForEach-Object { "$($_.ProcessId) $($_.ParentProcessId) $($_.KernelModeTime + $_.UserModeTime)" }',
-  ],
-] as const
-
-function parseWin32ProcessTable(stdout: string): ProcessTable {
-  const ppidOf = new Map<number, number>()
-  const cpuOf = new Map<number, number>()
-  for (const line of stdout.split(/\r?\n/)) {
-    const match = line.trim().match(/^(\d+) (\d+) (\d+)$/)
-    if (!match) continue
-    ppidOf.set(Number(match[1]), Number(match[2]))
-    cpuOf.set(Number(match[1]), Number(match[3]) / 1e7)
-  }
-  return { ppidOf, cpuOf }
-}
-
 // Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
 // stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
-// macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on. Windows: CIM, above.
-// -1 means the tree could not be read at all; watchTreeProgress reports that as its own bound.
-export function childTreeCpuSeconds(
-  rootPid: number,
-  platform: NodeJS.Platform = process.platform,
-  run: typeof spawnSync = spawnSync,
-): number {
-  if (platform === "win32") {
-    const listing = run(WIN32_PROCESS_LISTING[0], [...WIN32_PROCESS_LISTING[1]], { encoding: "utf8" })
-    if (listing.status !== 0 || listing.error !== undefined) return -1
-    return treeCpuSeconds(rootPid, parseWin32ProcessTable(String(listing.stdout)))
-  }
-  if (platform === "linux") {
+// macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
+// -1 means the tree could not be read at all (Windows has neither); watchTreeProgress reports that as its own bound.
+export function childTreeCpuSeconds(rootPid: number): number {
+  if (process.platform === "linux") {
     try {
       const ppidOf = new Map<number, number>()
       const cpuOf = new Map<number, number>()
@@ -76,7 +44,7 @@ export function childTreeCpuSeconds(
       return -1
     }
   }
-  const listing = run("ps", ["-axo", "pid=,ppid=,cputime="], { encoding: "utf8" })
+  const listing = spawnSync("ps", ["-axo", "pid=,ppid=,cputime="], { encoding: "utf8" })
   if (listing.status !== 0) return -1
   const ppidOf = new Map<number, number>()
   const cpuOf = new Map<number, number>()

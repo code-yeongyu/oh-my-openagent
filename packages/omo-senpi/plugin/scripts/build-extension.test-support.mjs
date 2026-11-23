@@ -3,7 +3,7 @@ import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { killProcessTree, watchTreeProgress } from "../../../omo-native/test/daemon-test-runner.ts"
+import { killGroup, watchTreeProgress } from "../../../omo-native/test/daemon-test-runner.ts"
 
 export function outputPathsIn(root) {
   return {
@@ -114,12 +114,13 @@ function describeBuildBound(bound, cpuCapS) {
   }
 }
 
-const TREE = process.platform === "win32" ? "process tree" : "process group"
-
 /**
- * Builds `paths` with `buildModule`'s buildExtension in a child process tree, bounded by watchTreeProgress (the same
+ * Builds `paths` with `buildModule`'s buildExtension in a child process group, bounded by watchTreeProgress (the same
  * stall, runaway and unmeasurable bounds the daemon tests use), where a change in the output directory `root` also
- * counts as progress. A tripped bound ends the whole tree before rejecting.
+ * counts as progress. A tripped bound kills the whole group before rejecting.
+ *
+ * win32 has no tree CPU reader yet (#14832), so there the build is reported as unmeasurable once and only the hook's
+ * outer bound applies, the same as before this guard existed.
  */
 export function boundBuild(
   name,
@@ -130,15 +131,18 @@ export function boundBuild(
     stallMs = BUILD_STALL_MS,
     cpuCapS = BUILD_CPU_CAP_S,
     sample,
-    killTree = killProcessTree,
+    killTree = killGroup,
+    platform = process.platform,
+    report = (line) => process.stderr.write(`${line}\n`),
   } = {},
 ) {
+  const measured = platform !== "win32"
   const resultPath = `${root}.build-result.json`
   const child = spawn(
     "node",
     ["--input-type=module", "-e", BUILD_CHILD_SOURCE, buildModule, JSON.stringify(paths), resultPath],
     {
-      detached: true,
+      detached: measured,
       stdio: ["ignore", "inherit", "pipe"],
     },
   )
@@ -146,23 +150,28 @@ export function boundBuild(
   child.stderr.setEncoding("utf8").on("data", (chunk) => {
     stderr = (stderr + chunk).slice(-STDERR_TAIL_CHARS)
   })
+  if (!measured) {
+    report(`${name}: its process tree's CPU is unmeasurable on win32 (#14832); only the hook's outer bound applies`)
+  }
   return new Promise((resolve, reject) => {
     let lastOutput = -1
     let outputMoved = false
     let reading = false
-    const outputWatch = setInterval(async () => {
-      if (reading) return
-      reading = true
-      const output = await outputFingerprint(root)
-      reading = false
-      if (output !== lastOutput) {
-        lastOutput = output
-        outputMoved = true
-      }
-    }, OUTPUT_SAMPLE_MS)
+    const outputWatch = measured
+      ? setInterval(async () => {
+          if (reading) return
+          reading = true
+          const output = await outputFingerprint(root)
+          reading = false
+          if (output !== lastOutput) {
+            lastOutput = output
+            outputMoved = true
+          }
+        }, OUTPUT_SAMPLE_MS)
+      : undefined
     let settled = false
     const stopWatch =
-      child.pid === undefined
+      !measured || child.pid === undefined
         ? () => {}
         : watchTreeProgress(child.pid, (bound) => trip(describeBuildBound(bound, cpuCapS)), {
             stallMs,
@@ -183,17 +192,26 @@ export function boundBuild(
     }
     function trip(why) {
       settle(() => {
-        // Reject only once the leader is reaped, so the caller never sees a tree still holding the build.
-        child.once("exit", () => reject(new Error(`${name} ${why}; killed ${TREE} ${child.pid}`)))
-        killTree(child)
+        // Reject only once the leader is reaped, so the caller never sees a group still holding the build.
+        const rejectBound = () => reject(new Error(`${name} ${why}; killed process group ${child.pid}`))
+        child.once("exit", rejectBound)
+        try {
+          killTree(child)
+        } catch (error) {
+          // The group could not be signalled: end at least the child itself, then fail with that error.
+          child.removeListener("exit", rejectBound)
+          child.kill("SIGKILL")
+          reject(error)
+        }
       })
     }
     child.on("error", (error) => settle(() => reject(error)))
     child.on("exit", (code, signal) => {
       settle(async () => {
         try {
-          // A sidecar the build left behind (the minifier server) must not outlive it.
-          killTree(child)
+          // A sidecar the build left behind (the minifier server) must not outlive it: it is still in the group, so
+          // the group signal reaches it after the leader exited. win32 has no group, so nothing is killed by pid there.
+          if (measured) killTree(child)
           if (code !== 0) throw new Error(`${name} failed: code=${String(code)} signal=${String(signal)}\n${stderr}`)
           resolve(JSON.parse(await readFile(resultPath, "utf8")))
         } catch (error) {

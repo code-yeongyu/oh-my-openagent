@@ -76,7 +76,7 @@ export function watchTreeProgress(
       lastCpu = cpu
       lastAdvance = Date.now()
     } else if (cpu < lastCpu) {
-      // A descendant exited and its CPU left the sum (the ps and Windows readings count live processes only): this is a
+      // A descendant exited and its CPU left the sum (the ps reading counts live processes only): this is a
       // new baseline, not progress, and the tree must still advance from it.
       lastCpu = cpu
     } else if (Date.now() - lastAdvance >= stallMs) {
@@ -114,28 +114,8 @@ export function signalTarget(pid: unknown, what: string): number {
 
 // Each child leads its own process group, so a tripped bound kills every process it started, not only itself. A
 // daemon the child detaches on purpose (host ensure's shard) leaves the group and stays with the harness cleanup.
-// Windows has no process groups to signal: taskkill /T ends the child and every live descendant instead.
-export function killProcessTree(
-  child: ChildProcess,
-  platform: NodeJS.Platform = process.platform,
-  run: typeof spawnSync = spawnSync,
-): void {
+export function killGroup(child: ChildProcess): void {
   if (child.pid === undefined) return
-  if (platform === "win32") {
-    const pid = child.pid
-    // 0 and 4 are the idle and system processes; the runner itself is never a target.
-    if (!Number.isSafeInteger(pid) || pid <= 4 || pid === process.pid) {
-      throw new Error(`refusing to end the bounded child's process tree: ${String(pid)} is not a separate process`)
-    }
-    const ended = run("taskkill", ["/T", "/F", "/PID", String(pid)], { encoding: "utf8" })
-    // 128: the process had already exited.
-    if (ended.error !== undefined || (ended.status !== 0 && ended.status !== 128)) {
-      throw new Error(
-        `taskkill /T /F /PID ${pid} failed (status ${ended.status}): ${String(ended.error ?? ended.stderr)}`,
-      )
-    }
-    return
-  }
   try {
     process.kill(-signalTarget(child.pid, "the bounded child's process group"), "SIGKILL")
   } catch (error) {
@@ -232,7 +212,7 @@ export function createDaemonTestRunner() {
                     )
                   })
                   try {
-                    killProcessTree(child)
+                    killGroup(child)
                   } catch (error) {
                     // The group could not be signalled: end at least the child itself, then fail through run().
                     child.removeAllListeners("close")
@@ -260,7 +240,7 @@ export function createDaemonTestRunner() {
   }
 
   function killChildren(): void {
-    for (const child of runningChildren) killProcessTree(child)
+    for (const child of runningChildren) killGroup(child)
     runningChildren.clear()
   }
 
