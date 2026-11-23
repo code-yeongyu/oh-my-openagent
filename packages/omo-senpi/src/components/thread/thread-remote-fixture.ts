@@ -2,7 +2,7 @@ import { mock } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
+import { createLookupGate, type DeviceRow, type RemoteClient, type RemoteFailure, type ServiceStatus } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { RuntimePhase } from "./gateway/adapter"
 import { createInboxDrain } from "./gateway/drain"
@@ -27,7 +27,6 @@ import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./to
 import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
 import type { SessionWatchHandlers } from "./control/wait-settled"
 import { createMonitorTargetResolver } from "./tools/monitor-target"
-import { createLookupGate } from "../remote/port/lookup-gate"
 
 // The listing key (what b's connector assigned) deliberately differs from the durable id (audit class C8, #13017): a test
 // that passes with either id proves nothing about which one a tool path matched.
