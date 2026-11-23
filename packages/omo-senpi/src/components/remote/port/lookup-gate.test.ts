@@ -223,16 +223,38 @@ describe("#14748 the lookup gate: a solo lookup is never in flight with another 
     expect(run.started.map((entry) => entry.inFlight)).toEqual([1, 1])
   })
 
-  test("E44: #given another request to a device tracked by the gate (a post-create locate past its budget) #then a solo lookup waits for it too", async () => {
+  test("E44: #given a capped solo lookup whose locate still runs #when another locate is admitted (post-create, attach, watch recovery) #then it is dispatched only once the solo locate settled (review round 5)", async () => {
+    const run = locates({ capped: ["c"] })
+    await run.gate.lookupAlone("c", "id", 5_000)
+    let dispatched = false
+    const admitted = run.gate.admit(async () => {
+      dispatched = true
+      return "key-x"
+    })
+    await turns(20)
+    expect(dispatched).toBe(false)
+    run.finish("c")
+    expect(await admitted).toBe("key-x")
+    expect(dispatched).toBe(true)
+  })
+
+  test("E45: #given an admitted locate still in flight #when a caller asks alone #then the solo locate waits for it", async () => {
     const run = locates()
     let finishOther: () => void = () => {}
-    run.gate.track(new Promise<void>((resolve) => (finishOther = resolve)))
+    const other = run.gate.admit(() => new Promise<void>((resolve) => (finishOther = resolve)))
     const alone = run.gate.lookupAlone("c", "id", 5_000)
     await turns(20)
     expect(run.startedDevices()).toEqual([])
     finishOther()
+    await other
     await until(() => run.startedDevices().includes("c"), "c to start")
     run.finish("c")
     expect(await alone).toEqual({ kind: "found", key: "key-c" })
+  })
+
+  test("E46: #given a capped solo locate that never settles #when another locate is admitted #then it is dispatched after one lookup cap, never dropped", async () => {
+    const run = locates({ capped: ["c"], fenceWaitMs: 30 })
+    await run.gate.lookupAlone("c", "id", 5_000)
+    expect(await run.gate.admit(async () => "key-x")).toBe("key-x")
   })
 })

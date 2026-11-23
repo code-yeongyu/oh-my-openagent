@@ -137,11 +137,13 @@ export async function attachAddressed(
   connected: DeviceService,
   device: string,
   sessionId: string,
+  locateOn: (device: string, sessionId: string) => Promise<{ readonly key: string }> = (onDevice, id) =>
+    connected.locate(onDevice, id),
 ): Promise<{ readonly attached: RemoteAttach; readonly key: string }> {
   const on = async (key: string) => ({ attached: await connected.attach(device, key), key })
   const locate = () =>
     Promise.resolve()
-      .then(() => connected.locate(device, sessionId))
+      .then(() => locateOn(device, sessionId))
       .catch((error: unknown) => {
         // A locate that answered "none" is the answer: the address names no session there (not the attach's refusal).
         if (error instanceof LocalApiError && error.code === "session_not_found") throw error
@@ -150,7 +152,7 @@ export async function attachAddressed(
   if (DURABLE_ID.test(sessionId)) {
     // Only a locate that answered "none" means the session is gone; any other failure (b not answering, a lost connection)
     // is the refusal as it came, so a close never reports a running session not_live (review M1 of 6ce7397).
-    return await on((await connected.locate(device, sessionId)).key)
+    return await on((await locateOn(device, sessionId)).key)
   }
   try {
     return await on(sessionId)
@@ -187,7 +189,16 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
+  // omo#14748 review round 5: an attach's locate goes through the lookup gate like every other locate of this port.
+  const pool = createAttachPool(
+    svc,
+    (connected, device, sessionId) =>
+      attachAddressed(connected, device, sessionId, (onDevice, id) =>
+        lookups.admit(() => connected.locate(onDevice, id)),
+      ),
+    options.attachIdleMs,
+    options.now,
+  )
   const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
@@ -445,7 +456,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
           hold: pool.hold,
           getState: (onDevice, onSession) =>
             sessionCommand(onDevice, onSession, { type: "get_state", sessionId: onSession }),
-          locate: async (onDevice, durableSessionId) => (await (await svc()).locate(onDevice, durableSessionId)).key,
+          locate: async (onDevice, durableSessionId) => {
+            const service = await svc()
+            return (await lookups.admit(() => service.locate(onDevice, durableSessionId))).key
+          },
           delay: retryDelay,
         },
         device,
@@ -510,9 +524,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       try {
         // omo#14130 review round 3 (L1): an older service's post-create locate shares the call's budget.
         // A post-create locate that outlives the call's budget still runs on that device: a solo lookup waits for it.
-        const locating = connected.locate(device, engineId)
-        lookups.track(locating)
-        const located = await withinCallBudget(locating)
+        const located = await withinCallBudget(lookups.admit(() => connected.locate(device, engineId)))
         if (located === undefined) return { kind: "refused", reason: "request_timeout" }
         key = located.key
       } catch (error) {

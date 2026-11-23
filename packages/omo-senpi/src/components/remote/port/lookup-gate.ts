@@ -6,8 +6,11 @@ export type LookupStart = { readonly answer: Promise<RemoteLookupOutcome>; reado
 export type LookupGate = {
   readonly lookup: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
   readonly lookupAlone: (device: string, durableId: string, waitMs: number) => Promise<RemoteLookupOutcome | undefined>
-  /** Another request to a device that outlives its caller's cap: counted as in flight until it settles. */
-  readonly track: (work: Promise<unknown>) => void
+  /**
+   * Any other locate the port sends (attach, watch recovery, post-create): dispatched once the fence is open, or once a
+   * fence that stays closed has been waited on for one lookup cap, and counted as in flight until it settles.
+   */
+  readonly admit: <T>(dispatch: () => Promise<T>) => Promise<T>
 }
 
 /**
@@ -45,7 +48,12 @@ export function createLookupGate(
     return true
   }
   return {
-    track,
+    admit: async (dispatch) => {
+      await fenceOpen()
+      const work = dispatch()
+      track(work)
+      return await work
+    },
     lookup: async (device, durableId) => {
       if (!(await fenceOpen())) return { kind: "silent", reason: "lookup_timeout" }
       return await send(device, durableId).answer
