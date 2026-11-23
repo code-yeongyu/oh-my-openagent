@@ -83,6 +83,7 @@ import {
   recordSpawnedPid,
   recordSpawnedRunner,
   nextRungManagedSpec,
+  selectTaskNickname,
 } from "./manager-helpers"
 import { createIsolationWiring, type IsolationWiring } from "./isolation-wiring"
 import type { IsolationPreparation } from "../isolation"
@@ -614,6 +615,7 @@ class TaskManagerImpl implements TaskManager {
 
     let claimed: TaskRecord
     try {
+      const nickname = selectTaskNickname(spec, plan, this.#options.config.nicknames, this.#taskSequence)
       const draft = createTaskRecord(
         {
           ...(spec.admission === undefined ? {} : { task_id: spec.admission.taskId }),
@@ -623,7 +625,7 @@ class TaskManagerImpl implements TaskManager {
             name: "",
             executionMode,
             taskSeq: this.#taskSequence.next(spec.parent_session_id),
-            nicknames: this.#options.config.nicknames,
+            ...(nickname === undefined ? {} : { nickname }),
           }),
           ...(owner === undefined ? {} : { owner }),
         },

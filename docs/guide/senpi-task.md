@@ -127,8 +127,11 @@ number of exact `provider/model` IDs, agent names, or category names:
 
 The resolved spawn model takes priority, then the requested agent or category,
 then `default`. No match means no nickname. Use nonempty sets with short,
-printable labels (1–32 characters after trimming). Nicknames may repeat and
-stay fixed across model fallback and resume. They are not steering addresses:
+printable labels (1–32 characters after trimming). Each named set rotates in
+list order independently within the parent session. Models or roles mapped to
+the same set share its rotation; other spawns do not advance it. The rotation
+is in memory and starts over when the task manager is recreated. Assigned
+nicknames stay fixed across model fallback and resume. They are not steering addresses:
 continue to use the task's `name` or `task_id`.
 
 Passive consumers can read the optional top-level `nickname` string from the

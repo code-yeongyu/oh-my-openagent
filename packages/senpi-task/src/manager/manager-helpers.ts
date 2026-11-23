@@ -7,6 +7,7 @@ import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
+import type { TaskSequence } from "./task-sequence"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
 // and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
@@ -52,27 +53,40 @@ export function memberKernelToolRefusal(
   }
 }
 
+export function selectTaskNickname(
+  spec: ManagerStartSpec,
+  plan: ResolvedChildPlan,
+  nicknames: OmoTaskSettings["nicknames"],
+  sequence: TaskSequence,
+): string | undefined {
+  if (nicknames === undefined) return undefined
+  const agentType = spec.subagent_type ?? plan.agentType
+  const category = spec.category ?? plan.category
+  const model = plan.resolved_model
+  const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
+  const set =
+    ownValue(nicknames.models, modelId) ??
+    (spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
+      ? ownValue(nicknames.agents, agentType)
+      : ownValue(nicknames.categories, category)) ??
+    nicknames.default
+  if (set === undefined) return undefined
+  const pool = ownValue(nicknames.sets, set)
+  if (pool === undefined) return undefined
+  return pool[sequence.nextNicknameOrdinal(spec.parent_session_id, set) % pool.length]
+}
+
 export function buildRecordInput(input: {
   readonly spec: ManagerStartSpec
   readonly plan: ResolvedChildPlan
   readonly name: string
   readonly executionMode: ExecutionMode
   readonly taskSeq: number
-  readonly nicknames?: OmoTaskSettings["nicknames"]
+  readonly nickname?: string
 }): TaskRecordInput {
-  const { spec, plan, name, executionMode, taskSeq, nicknames } = input
+  const { spec, plan, name, executionMode, taskSeq, nickname } = input
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
-  const model = plan.resolved_model
-  const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
-  const set =
-    ownValue(nicknames?.models, modelId) ??
-    (spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
-      ? ownValue(nicknames?.agents, agentType)
-      : ownValue(nicknames?.categories, category)) ??
-    nicknames?.default
-  const pool = ownValue(nicknames?.sets, set)
-  const nickname = pool?.[taskSeq % pool.length]
   const runInBackground = spec.run_in_background === true
   return {
     name,
