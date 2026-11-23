@@ -98,7 +98,7 @@ describe("thread_create on another device survives a lost open reply", () => {
 
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     const recovered = await run("thread_create", args)
-    expect(recovered).toMatchObject({ kind: "ok" })
+    if (recovered.kind !== "ok") throw new Error(`the recovery did not answer ok: ${JSON.stringify(recovered)}`)
     const sentBefore = a.sent.length
 
     // A same-key create replay answers deduplicated (d9f50119d7); everything else is the recorded answer.
