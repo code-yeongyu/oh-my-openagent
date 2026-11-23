@@ -23,7 +23,7 @@ import {
   type ReflectionLiveSession,
 } from "./worker"
 import { describeReflectionLauncher } from "./worker/launcher-identity"
-import { readUi } from "./wiring-context"
+import { guardedStatus, readUi } from "./wiring-context"
 import type { MemoryWiringOptions, StatusUi } from "./wiring-types"
 
 export interface MemoryReflectionLiveWiring {
@@ -177,11 +177,7 @@ export function createMemoryReflectionLiveWiring(
           sessionId,
           ui === undefined
             ? undefined
-            : {
-                setStatus(key, text) {
-                  if (!signal?.aborted && options.sessions.get(sessionId)?.context === identity) ui.setStatus(key, text)
-                },
-              },
+            : guardedStatus(ui, () => !signal?.aborted && options.sessions.get(sessionId)?.context === identity),
         ),
       )
       await rpcBridge.current?.sync(signal)

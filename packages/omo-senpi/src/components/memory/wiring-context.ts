@@ -95,6 +95,29 @@ export function readUi(eventCtx: unknown): StatusUi | undefined {
 }
 
 /**
+ * A status handle that publishes only while `allow()` holds, and still belongs to its host's sequence: a refresh made
+ * through it orders against every other refresh of the same host ui (#14825 review M1). A plain `{ setStatus }` wrapper
+ * would get a sequence of its own and publish through the host unsequenced, so its older reads could overwrite newer lines.
+ */
+export function guardedStatus(ui: StatusSetter, allow: () => boolean): StatusSetter {
+  const bound = (ui as { [STATUS_HOST]?: { ui: object; deliver: (key: string, text: string | undefined) => void } })[
+    STATUS_HOST
+  ]
+  const deliver = (key: string, text: string | undefined): void => {
+    if (!allow()) return
+    if (bound === undefined) ui.setStatus(key, text)
+    else bound.deliver(key, text)
+  }
+  const host = bound?.ui ?? ui
+  return {
+    setStatus: (key, text) => {
+      if (allow()) publishStatus(host, deliver, key, text, undefined)
+    },
+    [STATUS_HOST]: { ui: host, deliver },
+  } as StatusSetter
+}
+
+/**
  * A status handle for ONE footer refresh. Call it when the refresh starts, before it reads any memory state: the
  * request it takes orders the refresh against every other refresh of the same host ui, so a refresh whose read is
  * older than a line already on screen drops its result instead of overwriting it.

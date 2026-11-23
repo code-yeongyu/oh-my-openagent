@@ -15,6 +15,7 @@ import {
 import { writeFile } from "@oh-my-opencode/memory-core/fs"
 
 import { createMemoryIdentityContext } from "./context"
+import { guardedStatus, readUi } from "./wiring-context"
 import {
   MEMORY_STATUS_KEY,
   SYNC_BLOCKED_SEGMENT,
@@ -248,6 +249,49 @@ describe("refreshMemoryStatus segments", () => {
     await refreshMemoryStatus({ ...shared, gitRepo: segmentRepo({ status: async () => "" }) })
     finishOlderRead(" M system/persona.md\n")
     await older
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
+  })
+
+  test("#given the settle publisher's guarded handle and a newer refresh through the host #when the settle read lands last #then the settle line never replaces the newer one", async () => {
+    // #14825 review M1: the agent_settled footer refresh publishes through a guarded wrapper of the host handle. That
+    // wrapper must share the host's refresh sequence, or its older read overwrites a line a newer refresh published.
+    const context = segmentContext({})
+    const recorder = recordingUi()
+    const eventCtx = { ui: recorder.ui }
+    const host = readUi(eventCtx)
+    if (host === undefined) throw new Error("readUi returned no handle")
+    const settleHandle = guardedStatus(host, () => true)
+    const shared = {
+      context,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      checkAdvisory: false,
+      now: () => SEGMENT_NOW,
+    }
+    let finishSettleRead: (porcelain: string) => void = () => {}
+    const settleRead = new Promise<string>((resolve) => {
+      finishSettleRead = resolve
+    })
+    let markSettleReading: () => void = () => {}
+    const settleReading = new Promise<void>((resolve) => {
+      markSettleReading = resolve
+    })
+
+    const settle = refreshMemoryStatus({
+      ...shared,
+      ui: { ...settleHandle, notify: () => {} },
+      gitRepo: segmentRepo({
+        status: () => {
+          markSettleReading()
+          return settleRead
+        },
+      }),
+    })
+    await settleReading
+    await refreshMemoryStatus({ ...shared, ui: host, gitRepo: segmentRepo({ status: async () => "" }) })
+    finishSettleRead(" M system/persona.md\n")
+    await settle
 
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
   })
