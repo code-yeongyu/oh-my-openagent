@@ -153,4 +153,42 @@ describe("omo#13037 A7.2.6: how the single probe's answers are read", () => {
       expect(started).toEqual(["dev-b", "dev-c"])
     },
   )
+
+  test.each([
+    ["the post-create locate", "post-create", { kind: "refused", reason: "locate_failed" }],
+    ["an attach's locate of a durable id", "attach", { kind: "refused" }],
+  ] as const)(
+    "#14748 review round 6: #given a solo locate that never settles #when %s waits past one lookup cap #then it answers its typed refusal and nothing is sent beside the solo",
+    async (_label, sender, expected) => {
+      const started: string[] = []
+      const locate = async (device: string): Promise<{ readonly key: string }> => {
+        started.push(device)
+        if (device === "dev-b") await new Promise<never>(() => {})
+        return { key: `key-${device}` }
+      }
+      const service = {
+        serviceVersion: "1.4.0",
+        carriesWakeMark: true,
+        takesSingleLocate: true,
+        closed: new Promise(() => {}),
+        locate,
+        close: () => {},
+      } as unknown as DeviceService
+      const port = sessionsPort({
+        version: "5.1.70",
+        connect: async () => ({ conn: service, owned: true }),
+        lookupCapMs: 20,
+      })
+      const id = "0195f0c2-1a2b-7c3d-8e4f-00000000c001"
+      await port.lookupAlone?.("dev-b", id, 5_000)
+
+      const answer =
+        sender === "post-create"
+          ? await port.locate("dev-c", "engine-1")
+          : await port.sessionCommand("dev-c", id, { type: "get_state", sessionId: id })
+
+      expect(answer).toMatchObject(expected)
+      expect(started).toEqual(["dev-b"])
+    },
+  )
 })
