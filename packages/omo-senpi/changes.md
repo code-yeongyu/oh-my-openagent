@@ -1,3 +1,13 @@
+## 2026-11-22 - Report thread creation replays (#14665)
+
+Successful receipt replays and retries that recover an existing thread now identify the create as deduplicated. The first prompt's delivery result is unchanged.
+
+## 2026-11-22 - Device listing and local launcher compatibility
+
+`newestRowsListing` starts with rows 7 (`engine_version`), falls back through rows 6 (`waiting`) to rows 2, and remembers the accepted version. The vendored local-API client now includes the upstream DACL and PowerShell error handling (#14511).
+
+The installer bounds its header read at 64 KB and only recognizes owned shims at offset zero. It still recognizes both historical shim headers. Install and uninstall report each `omo` or `omo.cmd` they leave alone in `launchersLeftAlone` (#13258).
+
 ## 2026-11-21 - the omo SDK signs in by device code and renames a device (#14513)
 
 `src/components/omo-sdk/account/sign-in.ts` runs `loginDevice` on the SDK's clock port, stores the credential through the credential store and runs the device-service setup `runLoginSetup` runs; `devices/index.ts` adds `rename`. `service-auth/device-flow.ts` refuses with a code (`approval_expired`, `approval_denied`, ...) and its display value carries `expiresAt`. Part of #14364.

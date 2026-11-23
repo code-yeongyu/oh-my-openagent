@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.82] - 2026-11-23
+
+### Fixed
+
+- The Senpi plugin build no longer fails every queued bundle when its shared Node minifier process is killed mid-build: a request the lost process did not answer is sent once to a fresh one, and a second loss still fails with that exit. ([#14767](https://github.com/code-yeongyu/oh-my-openagent/pull/14767))
+- `thread_create` returns `deduplicated: true` when the same arguments and idempotency key reuse the original thread. A first create still returns `false`. ([#14665](https://github.com/code-yeongyu/oh-my-openagent/pull/14665))
+- Concurrent `thread_read` calls of local terminals no longer fail together with `thread RPC request timed out`, `EPIPE` or `ECONNRESET` when another call in the same engine blocks its event loop (a cold remote read, for example). A local socket conversation's deadline now stops while the caller itself cannot run, and a read whose connection the terminal dropped during such a stall, before any response byte arrived, is dialed once more. Other commands are never retried. ([#14624](https://github.com/code-yeongyu/oh-my-openagent/pull/14624), fixes [#14444](https://github.com/code-yeongyu/oh-my-openagent/issues/14444))
+- A queued workflow node whose child never launched can run again after the workflow resumes. Nodes still queued in the same session retain their place instead of failing as orphans. ([#12109](https://github.com/code-yeongyu/oh-my-openagent/pull/12109)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- Installing or uninstalling the local launcher leaves compiled binaries, symlinks and foreign wrappers alone. The installer checks the file header rather than searching for a marker and reports each launcher it kept. ([#13258](https://github.com/code-yeongyu/oh-my-openagent/pull/13258)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- Escape cancels a stalled `memory` call. Calls that exceed their deadline report which stage stopped responding. ([#14546](https://github.com/code-yeongyu/oh-my-openagent/pull/14546)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- The shipped thread SDK lists and reads sessions on other account devices by default. An explicit `remote` still takes precedence. ([#14620](https://github.com/code-yeongyu/oh-my-openagent/pull/14620)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- Parked sessions can drain cross-device messages as soon as the host consumer is serving, without waiting for the startup sweep that woke them. ([#14621](https://github.com/code-yeongyu/oh-my-openagent/pull/14621)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- Tests: the omo-native daemon real-engine contract tests no longer fail on machines whose umask makes new directories group-writable; the test fixture now keeps its RPC directories private, which the senpi RPC host requires. ([#13161](https://github.com/code-yeongyu/oh-my-openagent/pull/13161))
+
+### Added
+
+- Set `OMO_THREAD_READ_TRACE=1` in the caller to diagnose failed local read RPCs. The diagnostic reports the command, last socket phase, elapsed time, error code, how long the caller's own event loop was blocked and how many attempts were made, without printing addresses, credentials or transcript data. It is silent by default. A socket that connects without an auth exchange and fails before its request reports `connected`, not `handshake`. ([#14624](https://github.com/code-yeongyu/oh-my-openagent/pull/14624), from [#14489](https://github.com/code-yeongyu/oh-my-openagent/pull/14489) and [#14498](https://github.com/code-yeongyu/oh-my-openagent/pull/14498))
+- Frontend QA now checks request, failure and re-entry states. `visual-qa` reports an unobserved changed flow as `UNVERIFIED` rather than passing it. ([#14545](https://github.com/code-yeongyu/oh-my-openagent/pull/14545)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+
+### Changed
+
+- OpenCode's session message-directory lookup accepts an explicit storage root so tests can use isolated fixtures without replacing the shared storage paths. The default OpenCode storage path is unchanged. ([#14594](https://github.com/code-yeongyu/oh-my-openagent/pull/14594))
+- Remote session listings can display a holder's retry wait and engine version. The client negotiates older row formats with services that do not provide them. ([#14511](https://github.com/code-yeongyu/oh-my-openagent/pull/14511)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- omo now pins senpi `2026.11.22`. ([#14270](https://github.com/code-yeongyu/oh-my-openagent/issues/14270)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+- The remote attach test waits for endpoint closure instead of a filesystem timer. The DAG ordering test uses an in-memory task store with the file store's contract; both DAG stores use the same session-capacity lock path. ([#14530](https://github.com/code-yeongyu/oh-my-openagent/pull/14530), [#14503](https://github.com/code-yeongyu/oh-my-openagent/pull/14503)) ([#14553](https://github.com/code-yeongyu/oh-my-openagent/pull/14553))
+
 ## [5.1.81] - 2026-11-21
 
 ### Changed
