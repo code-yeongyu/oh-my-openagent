@@ -22,12 +22,14 @@ permissions:
   contents: read
 
 jobs:
+  # Job timeouts are about twice each job's measured p95 (25 green PR runs + 12 green dev pushes, 2026-11-22),
+  # with a 3-minute floor for setup noise, so a regression fails loudly instead of creeping (#14573).
   # A stable, unconditional context that dev's required checks can enforce even
   # when the rest of CI takes a docs/web/release fast path.
   lint-ratchet:
     name: Lint ratchet
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +61,7 @@ jobs:
 
   ci-mode:
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -66,6 +69,7 @@ jobs:
       full_matrix: ${{ steps.classify.outputs.full_matrix }}
       runtime_touching: ${{ steps.classify.outputs.runtime_touching }}
       label_refused: ${{ steps.classify.outputs.label_refused }}
+      shard_timings_key: ${{ steps.shard-timings.outputs.cache-matched-key }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -119,6 +123,16 @@ jobs:
           fi
           jq . <<< "$MODE_JSON"
 
+      # Resolve the prefix once. Independent prefix lookups could see different dev snapshots mid-run.
+      - name: Select shard timing snapshot
+        id: shard-timings
+        if: steps.classify.outputs.run_heavy == 'true'
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ci-test-timings-${{ github.run_id }}
+          restore-keys: ci-test-timings-
+
       # The report-only temp-leak list (#9766) may only shrink: a new leak is fixed, not listed.
       - name: Report-only temp-leak list only shrinks
         if: github.event_name == 'pull_request'
@@ -137,6 +151,7 @@ jobs:
             - Generated release push: `${{ steps.classify.outputs.generated_release_push || 'unknown' }}`.
             - Web-only change: `${{ steps.classify.outputs.web_only || 'unknown' }}`.
             - Run heavy validation: `${{ steps.classify.outputs.run_heavy || 'unknown' }}`.
+            - Shard timing snapshot: `${{ steps.shard-timings.outputs.cache-matched-key || 'committed fallback' }}`.
             - Runtime-touching change: `${{ steps.classify.outputs.runtime_touching || 'unknown' }}` (informational; the OS matrix follows the full-matrix flag below).
             - `ci:full-matrix` refused: `${{ steps.classify.outputs.label_refused || 'unknown' }}` (the label needs a platform path in the diff or a `Platform-reason: <why>` line in the PR body).
             - Full 3-OS matrix: `${{ steps.classify.outputs.full_matrix || 'unknown' }}` (pull requests set it only for the `ci:full-matrix` label or a release-state head, #13802; false keeps heavy work on ubuntu; add `ci:full-matrix` for a separate run with optional `full-matrix / ...` checks that do not gate merge; keep the label and push a commit or reopen the PR to run the full matrix in required checks).
@@ -214,16 +229,12 @@ jobs:
     timeout-minutes: ${{ matrix.os == 'windows-latest' && 60 || 30 }}
     strategy:
       fail-fast: false
-      # merge_group uses these same four matrix contexts (the macOS ones come from
-      # the macos-combined status jobs), without PR labels.
+      # merge_group uses these same matrix contexts (the macOS ones come from the
+      # macos-combined status jobs, the Linux ones from linux-test-status), without PR labels.
       # Queue commits always run heavy validation on every OS leg, including
       # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
         include:
-          - os: ubuntu-latest
-            shard: "1/2"
-          - os: ubuntu-latest
-            shard: "2/2"
           - os: windows-latest
             shard: "1/2"
           - os: windows-latest
@@ -286,43 +297,10 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Every OS splits the root suite into two parallel jobs (the Windows
-      # shape): shard 1 runs omo-opencode + memory-core in one serial process,
-      # shard 2 runs the shared serial quarantine first and then the remainder.
-      # `bun test --parallel` is not used on POSIX: --isolate re-runs the heavy
-      # preload per file and OOM-kills the 7 GB runners, and --no-isolate leaks
-      # module state between files. Job-level sharding is the parallelism.
-      # Linux: memory-core's stranded-git-lock tests read the host process table. On hosted runners
-      # same-uid processes of other sessions cannot be inspected, so on Linux memory-core runs in an
-      # unprivileged PID namespace, and the step fails loudly when no namespace can be made instead
-      # of falling back to the host table (omo #10199). Even inside it, the user's own LIVE git
-      # processes return EACCES on /proc/<pid>/fd (this runner's azure 7.0 kernel, and Boat alike),
-      # so the scans stay unanswerable here; the dead-writer reclaim rows pass through the kernel
-      # git-activity lock instead (omo #10322), which is what this blind host exercises.
-      - name: Run tests
-        id: root-tests-posix-1
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: |
-          set -euo pipefail
-          if [ "$RUNNER_OS" != "Linux" ]; then
-            bun test --timeout 20000 packages/omo-opencode packages/memory-core
-            exit 0
-          fi
-          bun test --timeout 20000 packages/omo-opencode
-          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
-            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-          fi
-          if ! procs="$(unshare -Upf --mount-proc --map-current-user -- sh -c 'ls /proc | grep -c "^[0-9]"')"; then
-            echo "::error::cannot create an unprivileged PID namespace; memory-core's lock tests must not fall back to the host process table (omo #10199)"
-            exit 1
-          fi
-          if [ "$procs" -gt 8 ]; then
-            echo "::error::the PID namespace sees $procs processes, so it is not isolated from the host (omo #10199)"
-            exit 1
-          fi
-          echo "PID namespace ready ($procs processes visible)"
-          unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core
-
+      # Windows splits the root suite into two parallel jobs: shard 1 runs
+      # omo-opencode + memory-core in one process, shard 2 runs the shared serial
+      # quarantine first and then the remainder. Linux runs the same groups as
+      # the four test-linux parts below.
       - name: Run tests with Windows telemetry
         id: root-tests-windows-1
         if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
@@ -340,11 +318,6 @@ jobs:
             -ArtifactDirectory $telemetryDirectory `
             -Invocation "shard-1" `
             -TestArguments @("test", "packages/omo-opencode", "packages/memory-core")
-
-      - name: Run tests
-        id: root-tests-posix-2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && matrix.shard == '2/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        run: bash .github/scripts/ci-root-shard-2.sh
 
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
@@ -431,7 +404,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
-          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-posix-1.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-posix-2.outcome }} ${{ steps.root-tests-windows-2.outcome }}
+          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-windows-2.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
         run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
@@ -445,10 +418,188 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests sharded two ways per OS: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder (serial on POSIX, `--parallel` on Windows).
-            - Splits every OS by the same package groups so global zauc mock bootstraps stay with their consumers.
+            - Runs all non-Senpi root tests on Windows sharded two ways: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder with `--parallel`.
+            - Splits by the same package groups as the Linux parts so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The Linux root suite as four parallel parts (#14573), each test command one serial bun process: `bun test --parallel`
+  # is not used on POSIX (--isolate re-runs the heavy preload per file and OOM-kills the 7 GB runners, --no-isolate leaks
+  # module state between files), so job-level parts are the parallelism. omo-opencode is never file-sharded (global zauc
+  # mocks); the serial quarantine rides with it; the remainder is split in two by Bun's --shard on measured file times.
+  test-linux:
+    name: test-linux (${{ matrix.part }})
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [omo-opencode, memory-core, remainder-1, remainder-2]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+
+      # The full install runs the root `prepare` (`bun run build`), whose `build:lsp-daemon` step already runs
+      # `npm ci && npm run build` in packages/lsp-daemon, so its node_modules and dist exist before the tests.
+      - name: Install dependencies
+        if: matrix.part != 'memory-core'
+        run: bun install --frozen-lockfile
+
+      # memory-core needs only the vendored LSP daemon built by the shared test preload.
+      - name: Install memory-core test dependencies
+        if: matrix.part == 'memory-core'
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run build:lsp-daemon
+
+      - name: Remove stale self-package test copies
+        run: bun run script/remove-stale-self-package-tests.ts
+
+      - name: Run vendored lsp-daemon tests
+        if: matrix.part == 'omo-opencode'
+        run: npm test
+        working-directory: packages/lsp-daemon
+
+      # Each part is plain commands in its own step, so the local-receipt reader can mirror them: omo-opencode, then the
+      # serial quarantine; memory-core in an unprivileged PID namespace (memory-core's stranded-git-lock tests read the host
+      # process table, so the step fails loudly when no namespace can be made instead of falling back to the host table, omo
+      # #10199; inside it the user's own LIVE git processes still return EACCES on /proc/<pid>/fd on this kernel, so the
+      # dead-writer reclaim rows pass through the kernel git-activity lock, omo #10322); the remainder as two --shard halves.
+      - name: Run omo-opencode tests
+        id: root-tests-linux-omo-opencode
+        if: matrix.part == 'omo-opencode'
+        run: bun test --timeout 20000 packages/omo-opencode
+
+      - name: Run the serial quarantine
+        id: root-tests-linux-quarantine
+        if: matrix.part == 'omo-opencode'
+        run: bash .github/scripts/ci-root-shard-2.sh quarantine
+
+      - name: Run memory-core tests in a PID namespace
+        id: root-tests-linux-memory-core
+        if: matrix.part == 'memory-core'
+        run: |
+          set -euo pipefail
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          if ! procs="$(unshare -Upf --mount-proc --map-current-user -- sh -c 'ls /proc | grep -c "^[0-9]"')"; then
+            echo "::error::cannot create an unprivileged PID namespace; memory-core's lock tests must not fall back to the host process table (omo #10199)"
+            exit 1
+          fi
+          if [ "$procs" -gt 8 ]; then
+            echo "::error::the PID namespace sees $procs processes, so it is not isolated from the host (omo #10199)"
+            exit 1
+          fi
+          echo "PID namespace ready ($procs processes visible)"
+          unshare -Upf --mount-proc --map-current-user -- env CI=1 bun test --timeout 20000 packages/memory-core
+
+      - name: Restore selected shard timing snapshot
+        id: shard-timings
+        if: startsWith(matrix.part, 'remainder-') && needs.ci-mode.outputs.shard_timings_key != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          fail-on-cache-miss: true
+
+      - name: Copy the timing snapshot for this shard
+        if: startsWith(matrix.part, 'remainder-')
+        env:
+          TIMINGS_KEY: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          TIMINGS_EXACT_HIT: ${{ steps.shard-timings.outputs.cache-hit }}
+        run: bash .github/scripts/ci-copy-shard-timings.sh
+
+      - name: Run the first remainder half
+        id: root-tests-linux-first
+        if: matrix.part == 'remainder-1'
+        run: bash .github/scripts/ci-root-shard-2.sh first
+
+      - name: Run the second remainder half
+        id: root-tests-linux-second
+        if: matrix.part == 'remainder-2'
+        run: bash .github/scripts/ci-root-shard-2.sh second
+
+      - name: Upload root shard record
+        if: startsWith(matrix.part, 'remainder-')
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-shard-root-${{ matrix.part }}
+          path: .omo/ci-shard-record.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root test suite (ubuntu-latest, ${{ matrix.part }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - omo-opencode: the omo-opencode tree in one process, the vendored lsp-daemon tests, then the shared serial quarantine.
+            - memory-core: memory-core inside an unprivileged PID namespace.
+            - remainder-1 / remainder-2: every other root test, split by `bun test --shard` on the selected timing snapshot.
+          JOB_SUMMARY_NEXT: Open the first failing test; `test (ubuntu-latest, 1/2)` and `2/2` report this job's combined result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The required Linux root contexts. Each passes only when every test-linux part passed, and fails closed when the
+  # parts did not run although the classifier asked for heavy validation.
+  linux-test-status:
+    name: test
+    needs: [ci-mode, test-linux]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            shard: "1/2"
+          - os: ubuntu-latest
+            shard: "2/2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.test-linux.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download root shard records
+        if: needs.test-linux.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-root-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify root shard coverage
+        id: coverage
+        if: needs.test-linux.result == 'success'
+        run: bun script/ci-shard-coverage.ts root "$RUNNER_TEMP/ci-shard-records"
+      - name: Write job summary
+        if: always()
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.test-linux.result }}
+          TEST_OUTCOMES: ${{ needs.test-linux.result }} ${{ steps.coverage.outcome || 'missing' }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
   # One macOS allocation per head for the four former matrix legs. Native
   # binary parity remains independent. A full install runs prepare once and
@@ -660,6 +811,7 @@ jobs:
   typecheck:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -847,9 +999,10 @@ jobs:
     runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
     strategy:
       fail-fast: false
-      # merge_group retains this matrix, including the required ubuntu context.
+      # merge_group retains this matrix. The required ubuntu context comes from linux-senpi-status, which gathers the
+      # parallel Linux jobs (bundle check, EQ.omo, two test parts) (#14573).
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [windows-latest]
     steps:
       - uses: actions/checkout@v7
 
@@ -876,52 +1029,6 @@ jobs:
       - name: Remove stale self-package test copies
         if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
-
-      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
-      # which are backslash-separated on Windows, so the source digest is platform-dependent and
-      # a committed artifact can never match on every OS. One platform is enough to catch drift.
-      - name: Verify committed Senpi plugin bundle is current
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
-        shell: bash
-        run: |
-          set -euo pipefail
-          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
-          # The installer embeds the required-artifact list, so a stale copy demands files the
-          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
-          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
-          # The merge gate reads this map at the base tip to tell whether a PR can change a committed
-          # bundle; it is traced from the three generators above, so a stale map is a red build.
-          bun run bundle-inputs:check
-          # Every launcher's SENPI_BRAND logo comes from this generated module; it must match the icon asset.
-          bun run brand-logo:check
-
-      - name: Run Senpi compatibility tests
-        id: senpi-tests-posix
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os != 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        shell: bash
-        run: bash .github/scripts/ci-senpi-posix.sh
-
-      # EQ.omo (brain/hand plan P0-06f): E21-E24 through the real senpi CLI with the built plugin, against the
-      # linux-x64 B0 goldens. The collectors, normalizer and fake model server are the senpi EQ harness at a pinned commit.
-      - name: Run omo fused-path equivalence (EQ.omo E21-E24)
-        if: needs.ci-mode.outputs.run_heavy == 'true' && matrix.os == 'ubuntu-latest'
-        shell: bash
-        timeout-minutes: 45
-        env:
-          SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
-        run: |
-          set -euo pipefail
-          cargo build --release -p senpi-desktop-engine --locked
-          git init -q "$RUNNER_TEMP/senpi-eq"
-          git -C "$RUNNER_TEMP/senpi-eq" fetch -q --depth 1 https://github.com/code-yeongyu/senpi.git "$SENPI_EQ_HARNESS_SHA"
-          git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
-          # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
-          npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
-          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
-          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
-          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
-          node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
-            --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
 
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
@@ -972,7 +1079,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
-          TEST_OUTCOMES: ${{ steps.senpi-tests-posix.outcome }} ${{ steps.senpi-tests-windows.outcome }}
+          TEST_OUTCOMES: ${{ steps.senpi-tests-windows.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
         run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
@@ -987,13 +1094,272 @@ jobs:
             - Builds the local-path Senpi adapter package artifacts.
             - Builds the shared LSP daemon once before staging Senpi artifacts.
             - Packs the generated Pi package and runs hermetic Senpi and QA-contract tests.
-            - Covers Linux/macOS socket and Windows named-pipe daemon smoke.
+            - Covers the Windows named-pipe daemon smoke; Linux runs as the senpi-* jobs below, macOS in macos-combined.
           JOB_SUMMARY_NEXT: Inspect the first omo-senpi build, sync, directive, or package test failure for this OS.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The Linux Senpi leg as parallel jobs (#14573): none of the three needs another's output.
+  senpi-bundle-check:
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      # Linux only: digestBuildSources hashes repo-relative paths (build-extension.mjs:140,143),
+      # which are backslash-separated on Windows, so the source digest is platform-dependent and
+      # a committed artifact can never match on every OS. One platform is enough to catch drift.
+      - name: Verify committed Senpi plugin bundle is current
+        shell: bash
+        run: |
+          set -euo pipefail
+          node packages/omo-senpi/plugin/scripts/build-extension.mjs --check
+          # The installer embeds the required-artifact list, so a stale copy demands files the
+          # plugin no longer ships and refuses to install. Nothing else in CI reads it.
+          node packages/omo-senpi/plugin/scripts/build-install.mjs --check
+          # The merge gate reads this map at the base tip to tell whether a PR can change a committed
+          # bundle; it is traced from the three generators above, so a stale map is a red build.
+          bun run bundle-inputs:check
+          # Every launcher's SENPI_BRAND logo comes from this generated module; it must match the icon asset.
+          bun run brand-logo:check
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Senpi committed bundle check (ubuntu-latest)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Checks the committed Senpi extension bundle, installer, bundle-input map and brand logo against their sources.
+          JOB_SUMMARY_NEXT: Rebuild the stale artifact the first failing check names and commit it; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  senpi-eq:
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 11
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build the Senpi plugin
+        run: bun run build:senpi-plugin
+
+      # EQ.omo (brain/hand plan P0-06f): E21-E24 through the real senpi CLI with the built plugin, against the
+      # linux-x64 B0 goldens. The collectors, normalizer and fake model server are the senpi EQ harness at a pinned commit.
+      - name: Run omo fused-path equivalence (EQ.omo E21-E24)
+        shell: bash
+        timeout-minutes: 10
+        env:
+          SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
+        run: |
+          set -euo pipefail
+          cargo build --release -p senpi-desktop-engine --locked
+          git init -q "$RUNNER_TEMP/senpi-eq"
+          git -C "$RUNNER_TEMP/senpi-eq" fetch -q --depth 1 https://github.com/code-yeongyu/senpi.git "$SENPI_EQ_HARNESS_SHA"
+          git -C "$RUNNER_TEMP/senpi-eq" -c advice.detachedHead=false checkout -q FETCH_HEAD
+          # E24 observes the pinned TypeScript language server only; the runner's own servers never reach a case.
+          npm install --prefix "$RUNNER_TEMP/eq-lsp" --no-save --no-audit --no-fund typescript-language-server@5.3.0 typescript@5.9.3
+          # E24 runs the pinned comment-checker binary from the Codex plugin workspace (the root install does not carry it);
+          # the binaries ship inside the npm tarball, so --ignore-scripts still installs them and nothing is downloaded mid-case.
+          npm --prefix packages/omo-codex/plugin ci --ignore-scripts --no-audit --no-fund
+          node packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs --compare --placement fused --senpi-repo "$RUNNER_TEMP/senpi-eq" \
+            --lsp-dir "$RUNNER_TEMP/eq-lsp/node_modules/.bin" --evidence-dir "$RUNNER_TEMP/eq-omo"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: omo fused-path equivalence (EQ.omo E21-E24)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the Senpi plugin and the desktop engine, then runs E21-E24 through the real senpi CLI against the linux-x64 goldens.
+          JOB_SUMMARY_NEXT: Read the first case diff in the step log; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  senpi-tests-linux:
+    name: senpi-tests-linux (${{ matrix.part }})
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [one, two]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Remove stale self-package test copies
+        run: bun run script/remove-stale-self-package-tests.ts
+
+      - name: Restore selected shard timing snapshot
+        id: shard-timings
+        if: needs.ci-mode.outputs.shard_timings_key != ''
+        uses: actions/cache/restore@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          fail-on-cache-miss: true
+
+      - name: Copy the timing snapshot for this shard
+        env:
+          TIMINGS_KEY: ${{ needs.ci-mode.outputs.shard_timings_key }}
+          TIMINGS_EXACT_HIT: ${{ steps.shard-timings.outputs.cache-hit }}
+        run: bash .github/scripts/ci-copy-shard-timings.sh
+
+      - name: Run Senpi compatibility tests
+        shell: bash
+        run: bash .github/scripts/ci-senpi-posix.sh "${{ matrix.part }}"
+
+      - name: Upload Senpi shard record
+        uses: actions/upload-artifact@v7
+        with:
+          name: ci-shard-senpi-${{ matrix.part }}
+          path: .omo/ci-shard-record.json
+          include-hidden-files: true
+          if-no-files-found: error
+          overwrite: true
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Senpi compatibility tests (ubuntu-latest, part ${{ matrix.part }})
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Builds the Senpi plugin and runs this part of `bun test packages/omo-senpi`, split by `--shard` on the selected timing snapshot.
+            - Part one also packs the plugin, runs the LSP daemon round trip, `bun check` and the evidence-dir test.
+          JOB_SUMMARY_NEXT: Open the first failing test; `senpi-compatibility (ubuntu-latest)` reports this job's result.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The required senpi-compatibility (ubuntu-latest) context: passes only when the bundle check, EQ.omo and both
+  # test parts passed, and fails closed when they did not run although the classifier asked for heavy validation.
+  linux-senpi-status:
+    name: senpi-compatibility
+    needs: [ci-mode, senpi-bundle-check, senpi-eq, senpi-tests-linux]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.senpi-tests-linux.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download Senpi shard records
+        if: needs.senpi-tests-linux.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-senpi-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify Senpi shard coverage
+        id: coverage
+        if: needs.senpi-tests-linux.result == 'success'
+        run: bun script/ci-shard-coverage.ts senpi "$RUNNER_TEMP/ci-shard-records"
+      - name: Write job summary
+        if: always()
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ (needs.senpi-bundle-check.result == 'skipped' && needs.senpi-eq.result == 'skipped' && needs.senpi-tests-linux.result == 'skipped') && 'skipped' || 'success' }}
+          TEST_OUTCOMES: ${{ needs.senpi-bundle-check.result }} ${{ needs.senpi-eq.result }} ${{ needs.senpi-tests-linux.result }} ${{ steps.coverage.outcome || 'missing' }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
+  save-shard-timings:
+    needs: [test-linux, senpi-tests-linux]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+      - name: Download both groups' shard records
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ci-shard-*
+          path: ${{ runner.temp }}/ci-shard-records
+      - name: Verify and merge shard timings
+        run: bun script/ci-shard-coverage.ts merge "$RUNNER_TEMP/ci-shard-records" "$RUNNER_TEMP/ci-test-timings.json"
+      - name: Save shard timing snapshot
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ runner.temp }}/ci-test-timings.json
+          key: ci-test-timings-${{ github.run_id }}
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Save Linux shard timings
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Verifies and merges the root remainder and Senpi file records from this dev push.
+            - Cache key: `ci-test-timings-${{ github.run_id }}`.
+          JOB_SUMMARY_NEXT: Inspect the coverage diff or cache step; future runs can still use the previous snapshot or committed fallback.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   lazycodex-published-smoke:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -1083,6 +1449,7 @@ jobs:
   build:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 4
     permissions:
       contents: read
     steps:
@@ -1148,6 +1515,7 @@ jobs:
   omo-ai-payload-check:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v7
 
@@ -1169,7 +1537,13 @@ jobs:
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build native payload inputs
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        env:
+          OMO_BUILD_PROFILE: omo-native
+        run: bun run build
 
       - name: Build omo-native
         if: needs.ci-mode.outputs.run_heavy == 'true'
@@ -1326,7 +1700,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -1377,7 +1751,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&

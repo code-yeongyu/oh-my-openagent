@@ -29,7 +29,10 @@ export type LazyRemoteOptions = {
  * budget) and needs no change when the client gains a member; `sessions.follow` answers a stream at once and starts the load
  * when called, even if the stream is never read.
  */
-function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
+function createLazyRemoteClient(options: LazyRemoteOptions): {
+  readonly client: RemoteClient
+  readonly loaded: () => Promise<RemoteClient>
+} {
   let client: Promise<RemoteClient> | undefined
   const load = () =>
     (client ??= options.loadRuntime().then(
@@ -86,7 +89,7 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
         ),
     }
   }
-  return {
+  const lazy = {
     service: group("service"),
     devices: group("devices"),
     sessions: group("sessions"),
@@ -101,30 +104,41 @@ function createLazyRemoteClient(options: LazyRemoteOptions): RemoteClient {
       )
     },
   } as unknown as RemoteClient
+  return { client: lazy, loaded: load }
 }
 
 export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThreadSurface {
-  const client = createLazyRemoteClient(options)
+  // One runtime load serves the client and the port (the port rides the client's connection); a failed load is not kept.
+  let runtime: ReturnType<LazyRemoteOptions["loadRuntime"]> | undefined
+  const loadRuntime: LazyRemoteOptions["loadRuntime"] = () =>
+    (runtime ??= options.loadRuntime().catch((error: unknown) => {
+      runtime = undefined
+      throw error
+    }))
+  const { client, loaded } = createLazyRemoteClient({ ...options, loadRuntime })
   let port: Promise<RemoteSessionsPort> | undefined
   const load = () =>
-    (port ??= options.loadRuntime().then(
-      ({ remoteSessionsPort }) => remoteSessionsPort(options.version),
-      (error: unknown) => {
+    (port ??= loadRuntime()
+      .then(async ({ remoteSessionsPort }) => remoteSessionsPort(options.version, await loaded()))
+      .catch((error: unknown) => {
+        // Any failed load, the client's or the port factory's included, is not kept.
         port = undefined
         throw error
-      },
-    ))
+      }))
   const sessions: RemoteSessionsPort = {
     status: async () => await (await load()).status(),
     thisDevice: async () => await (await load()).thisDevice(),
     thisDeviceName: async () => (await (await load()).thisDeviceName?.()) ?? null,
     devices: async () => await (await load()).devices(),
     sessions: async (filter) => await (await load()).sessions(filter),
-    listing: async () => {
+    listing: async (filter) => {
       const loaded = await load()
-      return loaded.listing === undefined ? { rows: await loaded.sessions(), incomplete: [] } : await loaded.listing()
+      return loaded.listing === undefined
+        ? { rows: await loaded.sessions(filter), incomplete: [] }
+        : await loaded.listing(filter)
     },
     endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
+    endpointKeys: async (device) => (await (await load()).endpointKeys?.(device)) ?? { keys: [] },
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
     sessionCommand: async (device, sessionId, rpc, options) =>
       await (await load()).sessionCommand(device, sessionId, rpc, options),

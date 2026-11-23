@@ -168,7 +168,7 @@ async function pick(remote: Remote): Promise<void> {
     return send(remote, target, text)
   }
   if (action === "Interrupt") return show(ui, "interrupt", target, await run(["remote", "interrupt", target, "--json"]))
-  if (action === "Close") return show(ui, "close", target, await run(["remote", "close", target, "--json"]))
+  if (action === "Close") return close(remote, target)
   if (action === "Attach (new terminal)") attachNotice(ui, target)
 }
 
@@ -186,10 +186,43 @@ function parsed(answer: OmoRun): unknown {
   }
 }
 
+/**
+ * The picker's close (omo#14245): a close the engine refused because the thread has messages it has not read offers a
+ * forced close, which drops them and lists them.
+ */
+async function close(remote: Remote, target: string): Promise<void> {
+  const { ui, run } = remote
+  const answer = await run(["remote", "close", target, "--json"])
+  show(ui, "close", target, answer)
+  if (unreadOf(parsed(answer)) === undefined || ui.select === undefined) return
+  const choice = await ui.select(`${target} has messages it has not read`, [CLOSE_ANYWAY, "Keep it open"])
+  if (choice === CLOSE_ANYWAY) show(ui, "close", target, await run(["remote", "close", target, "--force", "--json"]))
+}
+
+const CLOSE_ANYWAY = "Close anyway (drops them)"
+
+/** A refused close's unread deliveries: their ids, `unavailable` on an engine that cannot name them, else undefined. */
+function unreadOf(value: unknown): readonly string[] | "unavailable" | undefined {
+  if (!isRecord(value) || value["kind"] !== "error" || !isRecord(value["error"])) return undefined
+  const details = value["error"]["details"]
+  const pending = isRecord(details) ? details["pending_deliveries"] : undefined
+  if (pending === "unavailable") return pending
+  return Array.isArray(pending) ? pending.map(String) : undefined
+}
+
 // Two CLI generations answer: today's session verbs nest the failure (`{kind:"error", error:{...}}`), the one-module CLI
 // (#13414 part 4c) prints a flat RemoteFailure. The TUI's omo may be either, so both are read.
-function typedFailure(value: unknown): string | undefined {
+function typedFailure(value: unknown, verb?: string, target?: string): string | undefined {
   if (!isRecord(value) || value["kind"] !== "error") return undefined
+  const unread = verb === "close" ? unreadOf(value) : undefined
+  if (unread !== undefined && isRecord(value["error"]) && typeof value["error"]["message"] === "string") {
+    // The CLI's hint names its own flag; here the option is the /remote command's.
+    const ids =
+      unread === "unavailable"
+        ? "message ids: unavailable on that device's engine"
+        : `messages it has not read: ${unread.join(", ")}`
+    return `${value["error"]["message"]}\n${ids}. /remote close ${target ?? ""} --force closes it anyway; those messages are dropped.`
+  }
   const { message, next_action: next } = isRecord(value["error"]) ? value["error"] : value
   if (typeof message !== "string") return undefined
   return typeof next === "string" && next !== "" ? `${message}\n${next}` : message
@@ -213,7 +246,7 @@ function succeeded(ui: RemoteCommandUi, verb: string, target: string, answer: Om
     return false
   }
   const value = parsed(answer)
-  const failure = typedFailure(value)
+  const failure = typedFailure(value, verb, target)
   if (answer.code === 0 && failure === undefined) return true
   const stderr = answer.stderr.trim()
   // `enable` that stops prints {state, notice} on stdout and exits 3 (omo-native remote-bootstrap.ts): the notice says why.
@@ -268,7 +301,13 @@ function sessionVerbLines(verb: string, target: string, result: Record<string, u
   }
   if (verb === "interrupt")
     return [result["interrupted"] === true ? `Interrupted ${target}.` : `Nothing was running on ${target}.`]
-  if (verb === "close") return [result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`]
+  if (verb === "close") {
+    const dropped = Array.isArray(result["dropped_deliveries"]) ? result["dropped_deliveries"].map(String) : []
+    return [
+      result["closed"] === true ? `Closed ${target}.` : `${target} was not open.`,
+      ...(dropped.length === 0 ? [] : [`Dropped ${dropped.length} message(s) it had not read: ${dropped.join(", ")}.`]),
+    ]
+  }
   if (verb === "model" && isRecord(result["model"]))
     return [`${target} now uses ${String(result["model"]["provider"])}/${String(result["model"]["id"])}.`]
   if ((verb === "enable" || verb === "disable") && typeof result["enabled"] === "boolean")

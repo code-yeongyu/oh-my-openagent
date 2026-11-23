@@ -2,7 +2,7 @@ export const ULW_EXECUTE_TEMPLATE = `You are starting an Atlas work session.
 
 ## ARGUMENTS
 
-- \`/ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship]\`
+- \`/ulw-execute [plan-name] [--worktree <path>] [--make-pr] [--ship] [--light]\`
   - \`plan-name\` (optional): name or partial match of the plan to start
   - \`--worktree <path>\` (optional): absolute path to an existing git worktree to work in
     - If specified and valid: hook pre-sets worktree_path in boulder.json
@@ -10,6 +10,7 @@ export const ULW_EXECUTE_TEMPLATE = `You are starting an Atlas work session.
     - If omitted: work directly in the current project directory (no worktree)
   - \`--make-pr\` (optional): deliver the work as a pull request. IMPLIES worktree mode - when \`--worktree\` is omitted, create a task-owned worktree before implementation. On completion push the branch, open a reviewer-readable PR, and hand off with the PR URL (merge only on explicit user ask)
   - \`--ship\` (optional): full delivery lifecycle; implies \`--make-pr\`. After the PR opens, keep working until it is MERGED (CI + review gates, feedback addressed), then clean up the worktree and sync \`.omo/\` state back
+  - \`--light\` (optional): light profile. Keeps the plan but uses one worktree for the whole plan, skips per-checkbox verification, receipts and evidence files, and verifies once at the end against the plan's acceptance criteria; the session context then carries a Light Profile block that overrides the per-step rules below
 
 ## WHAT TO DO
 

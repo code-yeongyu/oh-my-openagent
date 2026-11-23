@@ -11,6 +11,7 @@ import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from 
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // The failed rung's live handle closes its daemon session best-effort and gives up after a bounded
 // wait. Runtime fallback must not take that as proof the session is gone: the next model starts only
@@ -36,7 +37,7 @@ describe("runtime fallback over a live daemon session", () => {
     test(`#given the failed rung's close_session is ${acknowledged ? (lateReply ? "acknowledged after its close grace" : "acknowledged") : "never acknowledged"} #when fallback runs #then ${acknowledged ? "the next rung replaces it" : "the task fails and the next rung never starts beside it"}`, async () => {
       // given
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const host = await harness.fakeHost()
       const rpc = harness.runnerOver(host, { closeGraceMs: 50 })
       const launched: ManagedChildHandle[] = []

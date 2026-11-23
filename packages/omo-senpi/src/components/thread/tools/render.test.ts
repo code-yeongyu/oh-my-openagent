@@ -102,8 +102,14 @@ describe("thread_send / thread_handoff results", () => {
     }) as ThreadToolResult
 
   test("#given a delivery that started a turn #when it renders #then one outcome line names the thread and the turn only", () => {
-    expect(result("thread_send", sent({ kind: "started", turn_id: "306" }), sendArgs)).toEqual([
-      "-> planner  follow-up delivered (turn 306)",
+    expect(
+      result("thread_send", sent({ kind: "started", turn_id: "306" }, { effective_mode: "start" }), sendArgs),
+    ).toEqual(["-> planner  delivered (turn 306)"])
+  })
+
+  test("#given a follow-up that started the turn after the one it waited behind #when it renders #then it is labelled a follow-up", () => {
+    expect(result("thread_send", sent({ kind: "started", turn_id: "307" }), sendArgs)).toEqual([
+      "-> planner  follow-up delivered (turn 307)",
     ])
   })
 
@@ -193,6 +199,7 @@ describe("thread_send / thread_handoff results", () => {
       thread: PEER,
       name: "planner-2",
       status: "live",
+      state: "idle",
       cwd: "/w",
       created_at: "t",
       updated_at: null,
@@ -264,6 +271,7 @@ describe("thread_read / thread_list / thread_create results", () => {
       thread: id,
       name,
       status: "live",
+      state: "idle",
       cwd: "/w",
       created_at: "t",
       updated_at: null,
@@ -275,8 +283,8 @@ describe("thread_read / thread_list / thread_create results", () => {
       scope: "workspace",
       threads: [
         thread("a", "planner", { surface: "tui" }),
-        thread("b", "", { status: "resumable" }),
-        thread("c", "builder", { surface: "desktop", machine: "laptop", device: "dev-2", alive: false }),
+        thread("b", "", { status: "resumable", state: "inactive" }),
+        thread("c", "builder", { surface: "desktop", machine: "laptop", device: "dev-2", state: "inactive" }),
         thread("d", "four"),
         thread("e", "five"),
         thread("f", "six"),
@@ -286,11 +294,11 @@ describe("thread_read / thread_list / thread_create results", () => {
     } as ThreadToolResult
     expect(result("thread_list", listed)).toEqual([
       "7 threads in this workspace",
-      "  planner  live, tui",
-      "  b  resumable",
-      "  builder  live, desktop, laptop, not answering",
-      "  four  live",
-      "  five  live",
+      "  planner  idle, tui",
+      "  b  inactive",
+      "  builder  inactive, desktop, laptop",
+      "  four  idle",
+      "  five  idle",
       "  ... 2 more",
       "  other devices unavailable: relay_requires_paid_plan",
     ])

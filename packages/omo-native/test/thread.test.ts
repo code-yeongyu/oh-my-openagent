@@ -202,6 +202,17 @@ describe("omo thread: argv to SDK calls", () => {
     })
   })
 
+  test("#given list --state repeated and comma-separated #when run #then the SDK lists exactly those states, each once", async () => {
+    const result = await run(["list", "--state", "archived,idle", "--state", "running", "--state", "idle", "--json"])
+    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "running"] } }])
+  })
+
+  test("#given list --state with a state that is not one of the four #when run #then it is a usage error and the SDK is never loaded", async () => {
+    const result = await run(["list", "--state", "idle,live"])
+    expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
+    expect(result.stderr).toContain("--state must be one of running, idle, inactive, archived")
+  })
+
   test("#given send text that reads --json after -- #when run #then it is sent as text and the output stays human", async () => {
     const result = await run(["send", "my-tui", "--", "--json"])
     expect({ exitCode: result.exitCode, text: (result.calls[0]?.request as { text?: string }).text }).toEqual({
@@ -580,8 +591,7 @@ describe("omo thread: SDK loading", () => {
     expect(result.stderr).toContain("worker gone")
   })
 
-  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd, cli identity, and an engine status reader over host status --all", async () => {
-    const engineCalls: { args: readonly string[]; env: Record<string, string> }[] = []
+  test("#given the plugin SDK #when loaded #then it gets the agent dir, cwd and cli identity, and no engine status reader: endpoints come from the registry", async () => {
     let received: Record<string, unknown> = {}
     const loaded = await loadThreadSdk({
       pluginRoot: "/plugin",
@@ -590,12 +600,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: {
-        run: (args: string[], options: { env: Record<string, string> }) => {
-          engineCalls.push({ args, env: options.env })
-          return { exitCode: 0, stdout: '{"endpoints":[]}', stderr: "" }
-        },
-      },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {
@@ -613,11 +617,7 @@ describe("omo thread: SDK loading", () => {
       uid: 501,
       user: "qa",
     })
-    const statusAll = received.engineStatusAll as () => Promise<string>
-    expect(await statusAll()).toBe('{"endpoints":[]}')
-    expect(engineCalls).toEqual([
-      { args: ["host", "status", "--json", "--all", "--include-workers"], env: { KEEP: "1", OMO_AGENT_DIR: "/agent" } },
-    ])
+    expect("engineStatusAll" in received).toBe(false)
     expect("remote" in received).toBe(false)
   })
 
@@ -632,7 +632,6 @@ describe("omo thread: SDK loading", () => {
       cwd: "/work",
       stderr: { write: () => {} },
       reinstall: "Reinstall omo, then retry.",
-      engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
       loadSqlite: async () => ({}),
       importSdk: async () => ({
         createThreadSdk: (options: Record<string, unknown>) => {

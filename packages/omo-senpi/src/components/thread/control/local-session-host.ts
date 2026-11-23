@@ -18,7 +18,7 @@ export function workspaceNote(thread: HostedThread, callerWorkspaceRoot: string)
   if (workspaceEntries([entry], callerWorkspaceRoot).length > 0) return {}
   return {
     workspace_scope: "outside",
-    scope_next_action: `Thread ${thread_id} is in ${cwd}, outside this session's workspace: pass all_scope: true when you address it, and to see it in thread_list.`,
+    scope_next_action: `Thread ${thread_id} is in ${cwd}, outside this session's workspace: pass all_scope: true when you address it, and to see it in thread_list (tool.thread_list({ all_scope: true }) in an eval cell).`,
   }
 }
 

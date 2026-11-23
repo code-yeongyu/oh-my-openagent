@@ -223,6 +223,25 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     },
   )
 
+  test("#given a short transcript (a long preamble, then the reply) #when thread_read takes 1500 bytes on b and on this device #then both end at the reply, and next_cursor pages the older messages", async () => {
+    const preamble = (index: number): ThreadTranscriptEntry => ({
+      role: "user",
+      content: `preamble ${index} ${"p".repeat(1200)}`,
+      timestamp: Date.UTC(2026, 10, 17) + index * 1000,
+    })
+    const reply: ThreadTranscriptEntry = { role: "assistant", content: "READY", timestamp: Date.UTC(2026, 10, 18) }
+    const { run, localAt, log } = pagingAccount(sessionEntries([preamble(0), preamble(1), reply]))
+    const there = await run({ max_bytes: 1500 })
+    const here = await localAt(String(log.entries.at(-1)?.["id"]), { max_bytes: 1500 })
+    for (const result of [there, here]) {
+      expect(result).toMatchObject({ kind: "ok", truncated: true })
+      expect(itemsOf(result).at(-1)?.content).toBe(JSON.stringify("READY"))
+    }
+    expect(withoutCursor(there)).toEqual(withoutCursor(here))
+    const older = await run({ cursor: cursorOf(there), max_bytes: 1500 })
+    expect(itemsOf(older).map((item) => item.content)).toEqual([JSON.stringify(preamble(0).content)])
+  })
+
   test("#given an engine on b without get_entries #when thread_read runs twice #then it reads the whole transcript as before and asks for a page only once", async () => {
     const a = fixture.account()
     const { run } = fixture.surface(a.remote, { sessions: [LOCAL] })
@@ -241,5 +260,17 @@ describe("#14047: thread_read of a thread on another device costs its slice, not
     expect(cursor).toBeDefined()
     log.refuse = "unsupported"
     expect(await run({ cursor, max_bytes: 800 })).toMatchObject({ kind: "error", error: { code: "cursor_stale" } })
+  })
+
+  test("#given an entry cursor in the t2 shape an earlier build issued #when it pages b's thread #then it is cursor_stale, never cursor_invalid from the whole-transcript reader (#14180)", async () => {
+    const { run } = pagingAccount(sessionEntries(MESSAGES))
+    // The revision a current read binds its cursors to, with the t2 layout (revision, one entry id) around it.
+    const current = cursorOf(await run({ max_bytes: 1500 })) ?? ""
+    const revision = Buffer.from(current, "base64url").toString("utf8").split("\n")[1] ?? ""
+    const older = Buffer.from(`t2\n${revision}\ne1500`, "utf8").toString("base64url")
+    expect(await run({ cursor: older, max_bytes: 1500 })).toMatchObject({
+      kind: "error",
+      error: { code: "cursor_stale" },
+    })
   })
 })

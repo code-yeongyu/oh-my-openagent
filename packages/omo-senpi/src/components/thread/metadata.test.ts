@@ -19,6 +19,7 @@ const THREAD_TOOL_NAMES = [
   "thread_rename",
   "thread_set_model",
   "thread_set_reasoning",
+  "thread_archive",
   "thread_report",
   "thread_outbox",
   "thread_outbox_ack",
@@ -51,7 +52,7 @@ function entryToolInfos(): ToolInfo[] {
 
 describe("thread tools and the real tool-search service", () => {
   test("eval-exposed entries are not in the catalog and a session query finds none of them", () => {
-    // given the fourteen tools registered with their shipped metadata
+    // given the fifteen tools registered with their shipped metadata
     const active: string[] = []
     const service = new ToolSearchService({
       getAllTools: () => entryToolInfos(),
@@ -72,7 +73,7 @@ describe("thread tools and the real tool-search service", () => {
 })
 
 describe("thread family metadata shape", () => {
-  test("the family carries fourteen entries with unique names", () => {
+  test("the family carries fifteen entries with unique names", () => {
     expect(THREAD_TOOL_METADATA.map((entry) => entry.name)).toEqual([...THREAD_TOOL_NAMES])
     const names = THREAD_TOOL_METADATA.map((entry) => entry.name)
     expect(new Set(names).size).toBe(names.length)
@@ -90,6 +91,7 @@ describe("thread family metadata shape", () => {
       "Rename session",
       "Switch session model",
       "Set session reasoning level",
+      "Archive session",
       "Report to chat thread",
       "Read chat outbox",
       "Acknowledge chat outbox",

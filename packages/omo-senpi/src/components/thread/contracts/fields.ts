@@ -26,6 +26,15 @@ export const IdempotencyKey = Type.Optional(
   }),
 )
 
+export const CollapseKey = Type.Optional(
+  Type.String({
+    minLength: 1,
+    maxLength: 200,
+    description:
+      "Caller-chosen key for a repeating message (an alert re-sent each minute): a send replaces this sender's earlier message with the same key that the target has not taken yet, and is answered deduplicated and collapsed: true with the earlier delivery_id when the target already holds that one (this text is then not delivered), so one key never leaves more than one undelivered message. Reaches sessions on this device only.",
+  }),
+)
+
 export const ExpectedTurnId = Type.Optional(
   Type.String({
     description:
@@ -73,8 +82,23 @@ export const RelayText = Type.String({
   description: `Text relayed to or from the external thread; longer than ${RELAY_TEXT_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
+/**
+ * The delivery mode of every send that names none: the thread tools (thread_send, thread_create's first prompt,
+ * thread_handoff), the thread SDK, `omo thread send` and `omo remote send|open`. `auto` steers a running turn and starts
+ * one on an idle session, so an omitted mode never queues behind the receiver's turn; follow_up is only ever asked for.
+ */
+export const DEFAULT_THREAD_DELIVERY = "auto" as const
+
 // R6: an enum instead of a boolean because delivery has three plausible states.
 export const ThreadDeliveryMode = Type.Union([Type.Literal("auto"), Type.Literal("steer"), Type.Literal("follow_up")], {
+  default: DEFAULT_THREAD_DELIVERY,
   description:
-    "auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn.",
+    "Omitted: auto. auto steers the running turn when one is active and starts a new turn otherwise; steer requires expected_turn_id and becomes turn_conflict when the active turn changed; follow_up queues the message behind the running turn (pass it only when the message must wait for that turn to end).",
 })
+
+/**
+ * The longest drain a graceful close of a thread on another device can wait for: its record waits 45 s for the holder's
+ * answer (`remote/port/device-service.ts` SEND_WAIT_MS), less the answer's reserve. A longer drain would outlive that
+ * wait and end as an untyped lost reply while the holder still drains (omo#14324 review M1).
+ */
+export const REMOTE_GRACEFUL_MAX_WAIT_MS = 35_000

@@ -6,7 +6,8 @@ import { PEER, SESSION_ID } from "../../../../device-service-core/test/local-api
 import { pushDetached, pushFrame, pushRecords, pushSnapshot, reader, THREAD, worldWith } from "./attach.test-support"
 import { pipeAddress, serveRemoteAttach } from "../../../../omo-native/remote-attach"
 import type { RemoteClientDeps } from "./client"
-import { nextActionFor } from "./codes"
+import { attachMember } from "./attach"
+import { nextActionFor, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientOn, closeClients, failureOf, fakeClock, startModeOwner, startOwner } from "./testing/fake-service"
@@ -109,6 +110,80 @@ describe("attach rows: open", () => {
       code: "not_found",
       details: { kind: "session" },
     })
+  })
+
+  test("#given a session on a device #when attach names the device by its name in any case #then it attaches to that session; a device no form names is not_found{device}", async () => {
+    const owner = await startOwner(worldWith(STATE))
+    const client = clientOn(owner.stateDir, fakeClock())
+    for (const device of ["Studio", "studio"]) {
+      const opened = await client.attach(handleOf(device, SESSION_ID))
+      if (opened.kind !== "ok") throw new Error(`expected an attach by ${device}, got ${JSON.stringify(opened)}`)
+      expect(opened.value.snapshot.state).toMatchObject({ sessionId: "engine-1" })
+      await opened.value.detach()
+    }
+    expect(failureOf(await client.attach(handleOf("Nowhere", SESSION_ID)))).toMatchObject({
+      code: "not_found",
+      details: { kind: "device", device: "Nowhere" },
+    })
+  })
+
+  test("#given a session part that is no id shape and no listed key #when attach opens on a device whose locate would answer it #then not_found{session} and the device is never attached", async () => {
+    const owner = await startOwner({ ...worldWith(STATE), located: { [PEER]: { "my-thread": SESSION_ID } } })
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(failureOf(await client.attach(handleOf(PEER, "my-thread")))).toMatchObject({
+      code: "not_found",
+      details: { kind: "session" },
+    })
+    expect(owner.state.attaches.size).toBe(0)
+  })
+
+  test("#given an online device that missed the listing round #when attach names a session on it by a name #then host_unavailable listing_incomplete naming it, as the session members answer, never not_found", async () => {
+    const world = worldWith(STATE)
+    const owner = await startOwner({
+      ...world,
+      listing: { ...world.listing, revisions: [{ rows: [], incomplete: [PEER] }] },
+    })
+    const client = clientOn(owner.stateDir, fakeClock())
+    expect(failureOf(await client.attach(handleOf(PEER, "my-thread")))).toMatchObject({
+      code: "host_unavailable",
+      details: { reason: "listing_incomplete", devices: [PEER] },
+    })
+    expect(owner.state.attaches.size).toBe(0)
+  })
+
+  test("#given a caller deadline #when attach reads the roster and then opens #then the open runs under what is left of that one deadline", async () => {
+    const clock = fakeClock()
+    const deadlines: (number | undefined)[] = []
+    const unreached = () => Promise.reject(new Error("attach reads the roster and opens through member"))
+    const studio = {
+      id: PEER,
+      name: "Studio",
+      platform: "darwin",
+      online: true,
+      last_seen_ms: null,
+      caps: { attach: true, machine: false, control: false },
+    }
+    const attach = attachMember({
+      sender: { kind: "person", uid: "user-1" },
+      timers: clock,
+      deps: { version: "5.1.70" },
+      dial: unreached,
+      self: () => {
+        throw new Error("unreached")
+      },
+      localSessions: unreached,
+      sessionsList: unreached,
+      devicesList: async () => {
+        clock.advance(600)
+        return { kind: "ok", value: [studio] }
+      },
+      member: async (opts) => {
+        deadlines.push(opts?.deadlineMs)
+        return remoteFailure("timeout", "stopped here", nextActionFor("timeout"))
+      },
+    })
+    expect(failureOf(await attach(THREAD, { deadlineMs: 1_000 })).code).toBe("timeout")
+    expect(deadlines).toEqual([400])
   })
 
   test("#given a mistyped session id and an unknown durable id #when attach opens #then each is not_found, never unsupported", async () => {

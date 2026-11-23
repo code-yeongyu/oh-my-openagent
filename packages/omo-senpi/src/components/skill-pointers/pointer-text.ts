@@ -38,7 +38,7 @@ export function skillPointer(target: SkillPointerTarget, sessionScope: string | 
 }
 
 // The guard every conditional pointer ends with: a keyword proves a mention, so a mention that is only talk is ignored.
-export function ignoreWhenOnlyDiscussed(subject: string): string {
+function ignoreWhenOnlyDiscussed(subject: string): string {
   return `If ${subject} is only being discussed, quoted, or relayed from another session, ignore this pointer.`
 }
 

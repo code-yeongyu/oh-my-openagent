@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "Cette documentation est en anglais.",
     "mobileHeader": "Docs OmO",
     "searchPlaceholder": "Rechercher dans la doc...",
     "searchLabel": "Filtrer les sections de la documentation",
@@ -545,7 +546,6 @@
       "accent": "Mais c'est un agent.",
       "sub": "Transformez vos tokens en résultats qui comptent : recherche sur dix mille sources, une présentation que les gens comprennent vraiment, backends, frontends et code.",
       "start": "Commencer",
-      "beta": "Télécharger la bêta de bureau",
       "download": "Télécharger l'application de bureau",
       "makers": "Par <team>Sisyphus Labs</team>, l'équipe à l'origine de <dori>Dori</dori> et <term>doriterm</term>."
     },

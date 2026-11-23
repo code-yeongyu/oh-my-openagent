@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { existsSync } from "node:fs"
-import { mkdtemp, rm } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { DeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
@@ -204,6 +204,45 @@ describe("a joined device with sync on and no memory repository (#14094)", () =>
     expect(info.filter((line) => line.includes("created this device's memory repository")).length).toBeLessThanOrEqual(
       1,
     )
+  })
+
+  test("#given a repository creation longer than a writer's lock wait #when two first writes reach the seam together #then both get the one repository", async () => {
+    // given: on Windows creating the repository (git init, hooks, the seed commit through the hook checker) takes
+    // longer than the default 5 s lock wait, so a caller that queued on the writer lock behind it timed out (#14188).
+    // A 1 ms wait budget is that ordering on any platform.
+    const { paths } = await freshDevice()
+    const options = { lockWaitTimeoutMs: 1 }
+
+    // when
+    const sessions = await Promise.all([
+      prepareMemoryEngineSession("agent", paths, options),
+      prepareMemoryEngineSession("agent", paths, options),
+    ])
+
+    // then
+    expect(commitCount(paths.repo)).toBe(1)
+    expect(sessions.filter((session) => session.created === true)).toHaveLength(1)
+  })
+
+  test("#given a repository creation that fails #when two first writes reach the seam together #then both get its one failure and the next preparation creates it", async () => {
+    // given: a file where the repository directory goes makes the creation itself fail
+    const { paths } = await freshDevice()
+    await mkdir(dirname(paths.repo), { recursive: true })
+    await writeFile(paths.repo, "")
+
+    // when
+    const failures = await Promise.all([
+      settle(prepareMemoryEngineSession("agent", paths)),
+      settle(prepareMemoryEngineSession("agent", paths)),
+    ])
+    await rm(paths.repo)
+    const retried = await prepareMemoryEngineSession("agent", paths)
+
+    // then: the joiner rejects with the creator's error, not one of its own, and the failure is not remembered
+    expect(failures[0]).toBeInstanceOf(Error)
+    expect(failures[1]).toBe(failures[0])
+    expect(retried.created).toBe(true)
+    expect(commitCount(paths.repo)).toBe(1)
   })
 
   test("#given two first syncs at the same moment #when both reach the seam #then exactly one creates and logs", async () => {

@@ -1,17 +1,6 @@
 import { createInterface } from "node:readline/promises"
 
-import {
-  approveDevice,
-  type CeremonyClock,
-  disableSync,
-  enableSync,
-  joinAccount,
-} from "../memory-core/src/sync/account/index.ts"
-import { acknowledgePhraseVoid, type PhraseVoidNotice } from "../memory-core/src/sync/account/phrase-notice.ts"
-import { createRejectionCounter } from "../memory-core/src/sync/crypto/rejection.ts"
-import { createRecoveryBridge } from "../memory-core/src/sync/recovery/bridge.ts"
-import type { PasskeyAuthenticator } from "../memory-core/src/sync/recovery/ports.ts"
-import { recoverOnFreshDevice } from "../memory-core/src/sync/recovery/recover.ts"
+import { type CeremonyClock, disableSync, enableSync, joinAccount } from "../memory-core/src/sync/account/index.ts"
 import { createPhraseGenesisBridge } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
 import { type PhraseGate, readServiceFloor } from "../memory-core/src/sync/genesis/phrase-gate.ts"
 import {
@@ -25,6 +14,12 @@ import type { Command } from "commander"
 
 import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
+import { approve, spacedCode } from "./sync-approve-cli"
+import { deliverVoidNotice } from "./sync-void-notice"
+import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
+import { readEngineSyncStatus, type EngineSyncRead } from "./sync-engine-status"
+import { recover, recoverRefused } from "./sync-recover-cli"
+import { collectSyncStatus, syncStatusLines } from "./sync-status-cli"
 
 export const EXIT_UNSUPPORTED_HERE = 2
 
@@ -45,25 +40,16 @@ export interface SyncCommandDependencies {
    * fresh for every creation through the operation's signed-in chain, and any failure refuses (#13631).
    */
   readonly phraseFloor?: PhraseGate["serviceFloor"]
+  /** Reads the running engine's sync state for `omo sync status`; this machine's operator socket by default. */
+  readonly engineStatus?: () => Promise<EngineSyncRead>
 }
 
-const RECOVER_ELSEWHERE =
-  "Recovering memory with your passkey runs in the OmO desktop app, which can use the passkey on this computer. " +
-  "On a machine without it, approve this device from a device that already syncs: run `omo sync enable` here, then `omo sync approve` there."
-
 export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
-const RUN_IT_YOURSELF = "Run `omo sync enable` yourself in a terminal."
-// A1.1-L2: creation unavailable is never worded as "recovery is optional".
-const CREATION_UNAVAILABLE =
-  "Turning on memory sync isn't available on this device yet. Update OmO later, or turn it on from a Mac with Touch ID."
-const PHRASE_VOID = "The recovery phrase you saw was not saved to your account. Do not keep it."
 const CANCELLED = "Turning on memory sync was cancelled. Nothing was saved."
 
 // Review L9: an enrollment or rotation also holds this lock, so the line must not say "turning on sync".
 const RECOVERY_CEREMONY_RUNNING =
   "Another OmO window or terminal on this device is in the middle of a recovery setup. Finish or cancel it there, then run `omo sync enable` again."
-
-const spacedCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`
 
 async function run(
   dependencies: SyncCommandDependencies,
@@ -102,42 +88,6 @@ const phraseSetup = (
       dependencies.error(`memory sync refused to create a recovery phrase (${reason}) for account ${account}.`),
   },
 })
-
-/**
- * Delivers a void notice (A1.1-M4): under a refusal it is printed to stderr (it holds no secret) and NEVER
- * acknowledged; otherwise it is written to the opened terminal, and only after the person presses Enter there
- * is it acknowledged. Returns whether it was acknowledged.
- */
-async function deliverVoidNotice(
-  dependencies: SyncCommandDependencies,
-  context: SyncContext,
-  notice: PhraseVoidNotice,
-  refused: boolean,
-): Promise<boolean> {
-  // Enable only ever yields a genesis notice and the CLI has no rotate verb (contract 11.5), so one wording serves.
-  const text = PHRASE_VOID
-  if (refused) {
-    dependencies.error(text)
-    return false
-  }
-  const terminal = (dependencies.terminal ?? openControllingTerminal)()
-  if (terminal === null) {
-    dependencies.error(text)
-    return false
-  }
-  try {
-    terminal.write(`${text}\r\nPress Enter once you have read this.\r\n`)
-    if ((await terminal.readLine(false)) === null) {
-      // Review LOW (#13337): a cancelled notice says why nothing happened instead of exiting silently.
-      dependencies.error("The notice was not confirmed, so nothing changed. Run the command again to read it.")
-      return false
-    }
-  } finally {
-    terminal.close()
-  }
-  await acknowledgePhraseVoid({ ...context, purpose: notice.purpose })
-  return true
-}
 
 async function enable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const env = dependencies.env ?? process.env
@@ -189,7 +139,7 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
       dependencies.error(CANCELLED)
       return 1
     case "phrase_unavailable":
-      dependencies.error(outcome.reason === "no-surface" ? RUN_IT_YOURSELF : CREATION_UNAVAILABLE)
+      dependencies.error(phraseCreationGuidance[outcome.reason])
       return EXIT_UNSUPPORTED_HERE
     case "acknowledge_required":
     case "method_required":
@@ -236,122 +186,12 @@ async function disable(dependencies: SyncCommandDependencies, context: SyncConte
   return 0
 }
 
-// The CLI has no passkey authenticator: phrase recovery is the only key source it can drive.
-const noPasskeys: PasskeyAuthenticator = {
-  prfSupported: false,
-  create: async () => null,
-  assert: async () => null,
-  discover: async () => null,
-  signalRemoved: async () => "unsupported",
-}
-
-const RECOVER_YOURSELF = "Run `omo sync recover` yourself in a terminal."
-const RECOVERED = "Your memory is recovered on this device and memory sync is on."
-const RECOVERED_READ_ONLY =
-  "This device can read your recovered memory, but another step is still pending before it can write. Run `omo sync recover` again later."
-
-/**
- * Checker LOW (#13337 @ e6ac0bca): recover refuses under an agent harness, CI or without a controlling terminal
- * BEFORE the signed-in context (credentials, session, device keyring) is loaded.
- */
-const recoverRefused = (dependencies: SyncCommandDependencies): boolean => {
-  const env = dependencies.env ?? process.env
-  if (!agentMarkerSet(env) && (dependencies.terminalAvailable ?? controllingTerminalAvailable)()) return false
-  dependencies.error(RECOVER_YOURSELF)
-  dependencies.error(RECOVER_ELSEWHERE)
-  return true
-}
-
-async function recover(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
-  const surface = lazyTerminalSurface(dependencies.terminal ?? openControllingTerminal, context.account)
-  try {
-    const outcome = await recoverOnFreshDevice({
-      account: context.account,
-      rpId: "",
-      keyring: context.keyring,
-      bridge: createRecoveryBridge(noPasskeys, context.keyring, { phraseSurface: surface }),
-      transport: context.chain,
-      rejections: createRejectionCounter(),
-      stateDir: context.pinDir,
-      method: "phrase",
-    })
-    if (outcome.ok) {
-      dependencies.output(outcome.state === "recovered" ? RECOVERED : RECOVERED_READ_ONLY)
-      return 0
-    }
-    switch (outcome.reason) {
-      case "cancelled":
-        dependencies.error("Recovery was cancelled. Nothing changed.")
-        return 1
-      case "no-recovery-key":
-        dependencies.error(`This account has no recovery phrase. ${RECOVER_ELSEWHERE}`)
-        return EXIT_UNSUPPORTED_HERE
-      case "history-incomplete":
-        dependencies.error(
-          "That recovery phrase does not match this account's history. Your account history looks incomplete; check the phrase, or recover from another device.",
-        )
-        return 1
-      default:
-        dependencies.error(`Recovery did not complete (${outcome.reason}). Nothing secret was stored.`)
-        return 1
-    }
-  } finally {
-    surface.done()
-  }
-}
-
-async function approve(
-  dependencies: SyncCommandDependencies,
-  context: SyncContext,
-  requested: string | undefined,
-): Promise<number> {
-  if (!dependencies.interactive) {
-    dependencies.error("Approving a device needs an interactive terminal, so you can compare the code on both screens.")
-    return 1
-  }
-  const waiting = (await context.pairing.listPending()).filter((row) => row.answer === null)
-  const chosen =
-    requested === undefined
-      ? waiting.length === 1
-        ? waiting[0]
-        : undefined
-      : waiting.find((row) => row.id === requested)
-  if (chosen === undefined) {
-    if (waiting.length === 0)
-      dependencies.error("No device is waiting to join. Run `omo sync enable` on the new device first.")
-    else
-      dependencies.error(
-        `More than one device is waiting. Run \`omo sync approve <id>\` with one of: ${waiting.map((row) => row.id).join(", ")}`,
-      )
-    return 1
-  }
-  const outcome = await approveDevice({
-    ...context,
-    clock: dependencies.clock,
-    pendingId: chosen.id,
-    confirmCode: (code) => dependencies.confirm(`Does the other device show ${spacedCode(code)}?`),
-  })
-  switch (outcome.kind) {
-    case "approved":
-      dependencies.output("The device is approved and will start syncing.")
-      return 0
-    case "declined":
-      dependencies.error(
-        "Not approved. If the codes differed, someone may be intercepting the pairing; start again from the new device.",
-      )
-      return 1
-    case "expired":
-      dependencies.error("The request expired. Run `omo sync enable` on the new device again.")
-      return 1
-    case "refused":
-      dependencies.error(`Not approved: ${outcome.reason}.`)
-      return 1
-  }
-}
-
 const defaultDependencies = (): SyncCommandDependencies => ({
   context: () => signedInSyncContext({ env: process.env, cwd: process.cwd() }),
-  clock: { now: () => Date.now(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+  clock: {
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  },
   output: (line) => console.log(line),
   error: (line) => console.error(line),
   confirm: async (question) => {
@@ -378,6 +218,21 @@ export function configureSyncCommands(
     .command("disable")
     .description("Turn memory sync off for this device only; memory on this device stays")
     .action(() => run(dependencies, (context) => disable(dependencies, context)))
+  sync
+    .command("status")
+    .description("Show this device's memory sync state, the account's devices and the running engine")
+    .option("--json", "print one JSON object")
+    .action((options: { readonly json?: boolean }) =>
+      run(dependencies, async (context) => {
+        const report = await collectSyncStatus(
+          context,
+          dependencies.engineStatus ?? (() => readEngineSyncStatus(dependencies.env)),
+        )
+        if (options.json === true) dependencies.output(JSON.stringify(report))
+        else for (const line of syncStatusLines(report)) dependencies.output(line)
+        return 0
+      }),
+    )
   sync
     .command("approve [id]")
     .description("Approve a device that is waiting to join, after comparing the code on both screens")

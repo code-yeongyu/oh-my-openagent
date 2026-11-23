@@ -7,7 +7,7 @@
 //   daily-normal-opus / daily-heavy-fable / geeky-heavy-astra
 //                    each leaf's first rung + thinking level in the applied notice.
 //   daily-normal-fable52 / daily-normal-kimi  later Daily · Normal rungs.
-//   geeky-normal-astra  serves GPT-6 Astra beside the Sol ids and proves Astra heads the lane at medium.
+//   geeky-normal-astra  serves GPT-6.2 Astra beside the Sol ids and proves Astra heads the lane at medium.
 //   geeky-normal-gpt6-only-unavailable  only unranked GPT-6 Sol ids served: unavailable; the lane's Astra head is not served.
 //   geeky-normal-sol serves gpt-6.1-sol next to gpt-5.6-sol and proves the first Sol rung applies when Astra is absent.
 //   geeky-normal-api-sol / geeky-normal-copilot-sol  the gpt-5.6-sol medium fallback through the openai / github-copilot ids.

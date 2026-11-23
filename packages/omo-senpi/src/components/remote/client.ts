@@ -1,8 +1,11 @@
+import { lendConnection } from "./connection-of"
 import { existsSync } from "node:fs"
+import { deviceListing, mergeRows, resolveDevice, rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { hostname } from "node:os"
 import {
   connectDeviceService,
   deviceServiceEndpointPath,
+  deviceServiceAbsence,
   deviceServiceStateDir,
   realTimers,
   type DeviceService,
@@ -16,7 +19,7 @@ import { attachMember } from "./attach"
 import { failureFromError, nextActionFor, remoteFailure } from "./codes"
 import { BOUNDS, CONNECT_SLACK_MS, DEADLINES, withinDeadline } from "./deadlines"
 import { streamMembers } from "./follow"
-import { resolveMember } from "./resolve"
+import { deviceRefusal, resolveMember } from "./resolve"
 import type { LocalSessions } from "./local-sessions"
 import { handleOf } from "./seams"
 import { sessionMembers } from "./sessions"
@@ -107,7 +110,12 @@ const deviceRow = (row: WireDeviceRow): DeviceRow => ({
   caps: { attach: true, machine: false, control: false },
 })
 
-const unlistedDevice = (id: string): DeviceRow => ({
+/**
+ * The one row of a device the listing names but the roster misses (#13402), for every answer that shows it: offline, as
+ * sessions.list shows it, so one device never reads online in one answer and offline in another. The resolver's need-online
+ * gate does not read this row: such a device answered the listing round, so it is not known offline (resolve.ts).
+ */
+export const listingNamedDevice = (id: string): DeviceRow => ({
   id,
   name: id,
   kind: "unknown",
@@ -116,6 +124,24 @@ const unlistedDevice = (id: string): DeviceRow => ({
   last_seen_ms: null,
   caps: { attach: true, machine: false, control: false },
 })
+
+/**
+ * A --device filter as the device table prints it (id, `here`, name, a unique 6+ id prefix), through the core resolver over
+ * the roster: the device's id, or the refusal when the text names several devices. A device the roster misses is passed
+ * on as typed, because the listing may still name it (#13402); the listing then decides whether it is unknown.
+ */
+function deviceFilter(devices: readonly DeviceRow[], text: string): string | RemoteFailure {
+  const here = devices.find((row) => row.self === true && row.kind !== "local")?.id ?? null
+  const resolved = resolveDevice({ here, devices }, text, { online: false })
+  if (resolved.kind === "ok") return resolved.device.id
+  return resolved.refusal.reason === "no_device" ? text : deviceRefusal(resolved.refusal)
+}
+
+/** A row named by the one naming function (design section 6): an unnamed session shows its fallback and says so. */
+function named(row: SessionRow): SessionRow {
+  const { name, unnamed } = rowName({ name: row.title, folder: row.project })
+  return unnamed ? { ...row, name, unnamed: true } : row
+}
 
 const controlUnsupported = (): RemoteFailure =>
   remoteFailure(
@@ -184,7 +210,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
 
   // A cold connect is bounded by the handshake plus CONNECT_SLACK_MS before the member's own clock starts.
   const connected = async (opts: Opts | undefined): Promise<Outcome<DeviceService> | "not_installed"> => {
-    if (!existsSync(deviceServiceEndpointPath(stateDir))) return "not_installed"
+    if (!existsSync(deviceServiceEndpointPath(stateDir))) {
+      // A signed-in device with no endpoint is a service not serving right now, never "not installed" (#14172): retryable
+      // while it restarts or updates, and a service to start when nothing holds its state.
+      const absence = deviceServiceAbsence(stateDir, timers.now())
+      if (absence === "not_installed") return "not_installed"
+      return absence === "restarting"
+        ? remoteFailure(
+            "host_unavailable",
+            "The device service is restarting; its endpoint is not up yet.",
+            nextActionFor("host_unavailable"),
+            { details: { phase: "connect", reason: "service_restarting" } },
+          )
+        : remoteFailure(
+            "host_unavailable",
+            "The device service is set up on this device but not running.",
+            "Start the device service (omo remote bootstrap), then retry.",
+            { details: { phase: "connect", reason: "service_not_running" } },
+          )
+    }
     const outcome = await withinDeadline(
       timers,
       opts?.signal === undefined ? undefined : { signal: opts.signal },
@@ -266,58 +310,70 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     return answered.kind === "ok" ? answered.value : undefined
   }
 
+  // Design section 6's order, as thread_list runs it: read -> identity -> merge -> name -> state -> filter. Nothing is capped.
   const sessionsList = (filter?: SessionsListFilter, opts?: Opts): R<SessionsList> =>
     member(opts, DEADLINES.sessionsList, false, async (svc) => {
       // The listing's own deadline, whose clock member starts as this body does.
       const end = timers.now() + (opts?.deadlineMs ?? DEADLINES.sessionsList)
+      // A device filter is resolved before the listing is read, within this one call (the CLI's one-call budget).
+      const roster = filter?.device === undefined ? undefined : await listDevices(svc)
+      const device =
+        roster === undefined || filter?.device === undefined ? filter?.device : deviceFilter(roster, filter.device)
+      if (typeof device === "object") return device
       const [listing, devices] = await Promise.all([
         svc.sessions({
-          ...(filter?.device === undefined ? {} : { device: filter.device }),
+          ...(device === undefined ? {} : { device }),
           ...(filter?.project === undefined ? {} : { project: filter.project }),
           ...(filter?.state === undefined ? {} : { state: filter.state }),
         }),
-        listDevices(svc),
+        roster ?? listDevices(svc),
       ])
       const byId = new Map(devices.map((row) => [row.id, row]))
-      const unknown = unknownDevice(filter?.device, byId, listing)
+      const unknown = unknownDevice(device, byId, listing)
       if (unknown !== undefined) return unknown
-      const deviceOf = (id: string): DeviceRow => byId.get(id) ?? unlistedDevice(id)
-      const wanted = filter?.name?.toLowerCase()
+      const deviceOf = (id: string): DeviceRow => byId.get(id) ?? listingNamedDevice(id)
       // This device's own sessions come from its own operator endpoint (#13787): the service's listing does not carry
-      // the asking device's sessions. One it already lists by the same durable id keeps the service's row.
+      // the asking device's sessions.
       const self = devices.find((row) => row.self === true && row.kind !== "local")
-      const listed = listing.rows.map((row) => sessionRow(row, deviceOf(row.device)))
       const local =
-        self === undefined || (filter?.device !== undefined && filter.device !== self.id)
-          ? []
-          : await localRowsBefore(end, self)
-      const known = new Set(listed.flatMap((row) => (row.durable_id === undefined ? [] : [row.durable_id])))
-      const rows = [
-        ...listed,
-        ...(local ?? []).filter((row) => row.durable_id === undefined || !known.has(row.durable_id)),
-      ]
+        self === undefined || (device !== undefined && device !== self.id) ? [] : await localRowsBefore(end, self)
+      // One thread, one row: this device's rows from its own endpoint, and a listing row whose thread this device already
+      // lists is not listed again. A listing row of this device that its endpoint does not list stays: with no operator
+      // endpoint running here (or one that did not answer) it is the only row of that session.
+      const merged = mergeRows(
+        (local ?? []).map((row) => ({ key: row.durable_id ?? row.thread, device: row.device.id, row })),
+        listing.rows.map((row) => ({
+          key: rowKey({ device: row.device, session_id: row.session_id, ...durableIdOf(row) }),
+          device: row.device,
+          row: sessionRow(row, deviceOf(row.device)),
+        })),
+        null,
+      )
+      // A device that missed the round, or whose answer was cut short, lists cached rows at most: the core's one rule.
+      const round = {
+        // This device's own host did not answer: its sessions are missing from this listing.
+        incomplete: [...listing.incomplete, ...(self !== undefined && local === undefined ? [self.id] : [])],
+        states: listing.devices,
+      }
+      const unanswered = [...new Set([...Object.keys(listing.devices), ...round.incomplete])]
+        .filter((id) => deviceListing(id, round, []) === "incomplete")
+        .map(deviceOf)
+      // Only a real name is an address, so a name filter never matches a fallback.
+      const wanted = filter?.name?.toLowerCase()
+      const rows = merged
+        .map((entry) => named(entry.row))
         .filter((row) => filter?.state === undefined || row.state === filter.state)
         .filter((row) => filter?.project === undefined || row.project === filter.project)
         .filter(
           (row) =>
             (filter?.archived === undefined || row.archived === filter.archived) &&
-            (wanted === undefined || row.name.toLowerCase() === wanted),
+            (wanted === undefined || (row.unnamed !== true && row.name.toLowerCase() === wanted)),
         )
-      // A device that missed the round, or whose answer was cut short (incomplete), lists cached rows at most.
-      const unanswered = [
-        ...new Set([
-          ...listing.incomplete,
-          ...Object.entries(listing.devices)
-            .filter(([, state]) => state !== "answered")
-            .map(([id]) => id),
-          // This device's own host did not answer: its sessions are missing from this listing.
-          ...(self !== undefined && local === undefined ? [self.id] : []),
-        ]),
-      ].map(deviceOf)
       return ok({ revision: listing.revision, rows, unanswered })
     })
 
   let built: RemoteClient | undefined
+  let closed = false
   const self = (): RemoteClient => {
     if (built === undefined) throw new Error("the remote client was used before it was built")
     return built
@@ -408,6 +464,7 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
     attach: attachMember(core),
     aliases: aliasMembers(core),
     close: () => {
+      closed = true
       const open = service
       service = undefined
       void open?.then(
@@ -416,11 +473,25 @@ export function createRemoteClient(sender: RemoteSender, deps: RemoteClientDeps)
       )
     },
   }
+  // The thread runtime's port rides this client's one connection (connection-of.ts). A connect failure is thrown as the
+  // port's own connect throws it (the typed local-API error), and a closed client opens nothing again.
+  lendConnection(built, {
+    shared: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      if (!existsSync(deviceServiceEndpointPath(stateDir)))
+        throw new Error("The device service is not installed on this device.")
+      return await connection()
+    },
+    dial: async () => {
+      if (closed) throw new Error("The remote client is closed.")
+      return await dial()
+    },
+  })
   return built
 }
 
-// The listing carries one display name per session (its title); archive state has no layer yet (E-archive), so every
-// row is unarchived. The handle is the `<device>/<session>` form seam 1 parses.
+// The listing carries one display name per session (its title), and from rows 4 its model and archived flag (a service
+// before rows 4 lists neither: unarchived, model unknown). The handle is the `<device>/<session>` form seam 1 parses.
 const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   thread: handleOf(row.device, row.session_id),
   ...durableIdOf(row),
@@ -430,7 +501,8 @@ const sessionRow = (row: ListingRow, device: DeviceRow): SessionRow => ({
   project: row.project,
   path: row.path,
   state: row.state,
-  archived: false,
+  archived: row.archived === true,
+  ...(row.model === undefined ? {} : { model: `${row.model.provider}/${row.model.id}` }),
   updated_ms: row.updated_ms,
   source: row.source,
 })

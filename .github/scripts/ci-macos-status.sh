@@ -14,7 +14,7 @@ if [ "$LEG_JOB_STATUS" = "skipped" ]; then exit 0; fi
 # ran in another job, so propagate each required part's outcome explicitly.
 for outcome in $TEST_OUTCOMES; do
   if [ "$outcome" != "success" ]; then
-    echo "::error::macOS part did not succeed: $outcome"
+    echo "::error::a required part did not succeed: $outcome"
     exit 1
   fi
 done

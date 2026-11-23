@@ -108,8 +108,10 @@ No default profiles ship. A profile exists only when you write one under `profil
   "git_master": { "include_co_authored_by": true, "commit_footer": false }, // sisyphus-dev-ai co-author trailer (on by default) and opt-in commit footer (Native harness)
   "telemetry": { "enabled": true }, // telemetry (Native harness), enabled by default
   "device_service": { "enabled": true }, // the device service start-up bootstrap (Native harness), enabled by default
+  "operator_alerts": {}, // alerts when a session keeps ending its runs with an error (Native harness)
   "disabled_skills": [], // skill names hidden on every harness, unioned across layers
   "exclude_models": [], // models no category, agent, profile or task pin may run, unioned across layers (Native harness)
+  "keyword_detector": {}, // which prompt keywords switch on a mode (OpenCode and Native harnesses)
   "[opencode]": {},     // OpenCode plugin config, freeform (see configuration.md)
   "[native]": {},       // OmO Native-only overrides, typed base keys
   "[codex]": {},        // Codex-only overrides, typed base keys
@@ -123,7 +125,7 @@ Source: `packages/omo-config-core/src/schema/config.ts`.
 
 ### Harness blocks
 
-`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`), so a harness-specific override stays schema-checked.
+`[opencode]` is a freeform record: it carries the full OpenCode plugin configuration documented in [`docs/reference/configuration.md`](./configuration.md) (background tasks, tmux, hooks, skills, and every other plugin key), and the strict schema does not validate its contents. `[native]` and `[codex]` are typed blocks accepting the shared base keys (`categories`, `agents`, `git_master`, `task`, `teams`, `models`, `model_profiles`, `model_profile`, `memory`, `telemetry`, `disabled_skills`, `exclude_models`, `keyword_detector`), so a harness-specific override stays schema-checked.
 
 `[senpi]` is the legacy spelling of `[native]`, kept working for one release line. It is canonicalized to `[native]` when the config is read, so a config that cannot be rewritten still applies every value it sets, and the startup migration rewrites the key in the file once, naming it in a notice. When a file carries both blocks, `[native]` wins and the ignored `[senpi]` block is reported as a deprecation diagnostic.
 
@@ -159,6 +161,17 @@ To see the effect, run `omo doctor --models`. It prints, for every category and 
 
 Security invariant: the OpenCode plugin honors `mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` only from the user layer, including the user layer's own active profile block. Project layers cannot extend them.
 
+### `keyword_detector` (OpenCode and Native harnesses)
+
+Turns prompt keywords off. `disabled_keywords` lists the keyword types that must not fire; `enabled_expansions`, when set, lets only the listed types fire. The types are `ultrawork`, `team`, `hyperplan` and `hyperplan-ultrawork`. OmO Native arms only `ultrawork`, so it reads the `ultrawork` entries (the Codex edition does not read this key): either key can switch the `ulw` / `ultrawork` keyword off. A project file (`<project>/.omo/omo.jsonc`) turns it off for that project on every launch; the `--omo-senpi-ultrawork-disabled` launch flag still turns it off for one launch.
+
+```jsonc
+// <project>/.omo/omo.jsonc
+{
+  "keyword_detector": { "disabled_keywords": ["ultrawork"] }
+}
+```
+
 ### `telemetry` (Native harness)
 
 The optional `telemetry` block controls OmO Native product telemetry in Senpi. `telemetry.enabled` is a boolean and defaults to `true`, so telemetry ships enabled. Set it to `false` to turn telemetry off. This setting applies only to OmO Native.
@@ -187,6 +200,27 @@ Whether your other devices may control this one is a separate, per-device settin
 {
   "device_service": {
     "enabled": false
+  }
+}
+```
+
+### `operator_alerts` (Native harness)
+
+A long-lived session that fails every run (a provider rate limit or an auth error, say) can keep restarting for hours while looking busy. `operator_alerts.error_streak` tells someone. When one session ends `threshold` runs in a row with an error (default `10`), omo sends one alert to every thread in `threads` (as a `thread_send` from the failing session, so an address works the way it does for `thread_send` with `all_scope`) and POSTs it as JSON to the webhook whose URL is in the environment variable `webhook_url_env` names. The URL never goes in a config file, and omo never logs it. The block is read from your user config (`~/.omo/omo.json[c]`, with its harness block and profiles) only: a project's `.omo/omo.json` cannot set it, so a cloned repository cannot choose the variable a webhook URL is read from or add threads that receive messages sent as your session.
+
+The alert names the session (id and name), the device, the number of failed runs, how many failed in each error class (`rate_limit`, `auth`, `overloaded`, `network`, `unknown`), the first and last failure time, and the provider and model. It never carries prompt text, tool output or message content. While the streak goes on, a "still failing" alert with the new count follows at most once every `realert_minutes` (default `60`; `0` sends none). The first run that ends normally sends one "recovered" notice. A run the user aborted neither counts nor ends a streak. The block is read once, when the first run of the process settles; a change takes effect after omo restarts. Sending never holds the session: each target is tried once more after a short pause, and a target that still fails leaves a warning in the log.
+
+The webhook body is a JSON object with a one-line `text` (so a Slack incoming webhook accepts it as is) and the same facts as fields: `event` (`error_streak` or `error_streak_recovered`), `session_id`, `name`, `device`, `count`, `classes`, `aborted`, `first_at` and `last_at` (epoch milliseconds), `provider`, `model`, `repeat`, and `recovered_at` on a recovered notice.
+
+```jsonc
+{
+  "operator_alerts": {
+    "error_streak": {
+      "threshold": 10,
+      "realert_minutes": 60,
+      "threads": ["<thread id or name of the operator's session>"],
+      "webhook_url_env": "OMO_ALERT_WEBHOOK_URL"
+    }
   }
 }
 ```
@@ -382,8 +416,8 @@ Four builtin lanes ship (`packages/omo-senpi/src/components/model-profile/builti
 |----|--------------|-------|
 | `daily-normal` | Daily · Normal | `claude-opus-5-5` (medium) -> `claude-fable-5-2` (medium) -> `kimi-k3.1-pro` (max) |
 | `daily-heavy` | Daily · Heavy | `claude-fable-5-2` (high) -> `claude-fable-5-1` (xhigh) |
-| `geeky-normal` | Obsessive · Normal | `gpt-6.2-astra` (medium, ChatGPT subscription/API/OpenCode), then `gpt-6-astra` (medium, ChatGPT subscription/API/Copilot/OpenCode), then `gpt-6.2-sol-fast` and `gpt-6.2-sol` (medium, ChatGPT subscription/API), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
-| `geeky-heavy` | Obsessive · Heavy | `gpt-6.2-astra` (high), then `gpt-6-astra` (high) |
+| `geeky-normal` | Obsessive · Normal | `gpt-6.2-astra` (medium, ChatGPT subscription/API/OpenCode), then `gpt-6.2-sol-fast` and `gpt-6.2-sol` (medium, ChatGPT subscription/API), then `gpt-6.1-sol-fast` (medium, ChatGPT subscription/API), then `gpt-6.1-sol` (medium, ChatGPT subscription/API), then `gpt-5.6-sol` (medium, ChatGPT subscription/API/Copilot/OpenCode) |
+| `geeky-heavy` | Obsessive · Heavy | `gpt-6.2-astra` (high), no other rung |
 
 GPT profiles use the same provider coverage as the corresponding task lanes:
 ChatGPT subscription takes priority over the `openai` API/proxy lane. A user
