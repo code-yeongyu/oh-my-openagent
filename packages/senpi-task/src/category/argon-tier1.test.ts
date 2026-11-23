@@ -10,13 +10,7 @@ import { CATEGORY_FALLBACK_CHAINS } from "./fallback-chains"
 import { resolveCategory } from "./resolver"
 import type { SenpiModelPort, SenpiModelRegistryPort } from "./types"
 
-// #10187: Argon at its lowest thinking level leads visual-engineering and writing. The
-// rung resolves only when the live registry serves the model, so with an engine pin whose catalog
-// has no Argon row both categories keep today's head; a registry that serves it gets Argon first.
-
-const ARGON_RUNG = { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" }
-type ArgonCategory = "visual-engineering" | "writing"
-const ARGON_CATEGORIES: readonly ArgonCategory[] = ["visual-engineering", "writing"]
+const ARGON_RUNG = { providers: ["google", "google-vertex", "opencode"], model: "gemini-4-argon", variant: "low" } as const
 
 function model(provider: string, id: string): SenpiModelPort {
   return { provider, id }
@@ -34,33 +28,37 @@ function expectResolved(result: ReturnType<typeof resolveCategory<SenpiModelPort
   return result
 }
 
-describe("Argon leads visual-engineering and writing (#10187)", () => {
-  test.each<ArgonCategory>([...ARGON_CATEGORIES])(
-    "#given the builtin %s chain #then its head is the Argon low rung and the rest is the previous chain",
-    (name) => {
-      const chain = CATEGORY_FALLBACK_CHAINS[name]
-      expect(chain[0]).toEqual(ARGON_RUNG)
-      expect(DEFAULT_CATEGORIES[name]).toMatchObject({ model: "google/gemini-4-argon", variant: "low" })
-    },
-  )
+describe("visual-engineering and writing routing", () => {
+  test("writing retains its declared primary", () => {
+    expect(CATEGORY_FALLBACK_CHAINS.writing[0]).toEqual({ ...ARGON_RUNG, providers: [...ARGON_RUNG.providers] })
+    expect(DEFAULT_CATEGORIES.writing).toMatchObject({
+      model: `${ARGON_RUNG.providers[0]}/${ARGON_RUNG.model}`,
+      variant: "low",
+    })
+  })
 
-  test.each<ArgonCategory>([...ARGON_CATEGORIES])(
-    "#given a registry serving google/gemini-4-argon #when %s resolves #then Argon low is a primary hit",
-    (name) => {
-      const models = registry([
-        model("google", "gemini-4-argon"),
-        model("anthropic", "claude-fable-5-1"),
-        model("anthropic", "claude-opus-5-5"),
-      ])
+  test("visual-engineering keeps the subscription-first rung while writing keeps its own primary", () => {
+    const models = registry([
+      model(ARGON_RUNG.providers[0], ARGON_RUNG.model),
+      model("anthropic", "claude-fable-5-2"),
+      model("anthropic-subscription", "claude-fable-5-2"),
+      model("anthropic", "claude-opus-5-5"),
+    ])
 
-      const resolved = expectResolved(resolveCategory(name, {}, models))
+    const visual = expectResolved(resolveCategory("visual-engineering", {}, models))
+    const writing = expectResolved(resolveCategory("writing", {}, models))
 
-      expect(resolved.spec.provider).toBe("google")
-      expect(resolved.spec.modelId).toBe("gemini-4-argon")
-      expect(resolved.spec.variant).toBe("low")
-      expect(resolved.modelSelection.matchedFallback).toBe(false)
-    },
-  )
+    expect(visual.modelSelection).toMatchObject({
+      selectedModel: "anthropic-subscription/claude-fable-5-2",
+      matchedFallback: false,
+    })
+    expect(visual.spec.variant).toBe("max")
+    expect(writing.modelSelection).toMatchObject({
+      selectedModel: `${ARGON_RUNG.providers[0]}/${ARGON_RUNG.model}`,
+      matchedFallback: false,
+    })
+    expect(writing.spec.variant).toBe("low")
+  })
 
   test("#given a registry serving only the previous heads #when both resolve #then they land on the previous head rung", () => {
     const models = registry([model("anthropic", "claude-fable-5-1"), model("anthropic", "claude-opus-5-5")])
@@ -80,7 +78,7 @@ describe("Argon leads visual-engineering and writing (#10187)", () => {
     ])
   })
 
-  test("#given the pinned engine catalog on an Anthropic-only machine #when both resolve #then the result is today's head, so the rung takes effect only once the pin serves Argon", async () => {
+  test("the pinned engine catalog changes Writing only when it serves the Writing primary", async () => {
     const senpi = await loadSenpiBarrel()
     const root = mkdtempSync(join(tmpdir(), "senpi-task-10187-"))
     try {
@@ -103,23 +101,20 @@ describe("Argon leads visual-engineering and writing (#10187)", () => {
       const visual = expectResolved(resolveCategory("visual-engineering", {}, live))
       const writing = expectResolved(resolveCategory("writing", {}, live))
 
+      expect([visual.spec.provider, visual.spec.modelId, visual.spec.variant]).toEqual([
+        "anthropic",
+        live.getAvailable().some((entry) => entry.provider === "anthropic" && entry.id === "claude-fable-5-2")
+          ? "claude-fable-5-2"
+          : "claude-fable-5-1",
+        "max",
+      ])
       if (servesArgon) {
-        expect([visual.spec.provider, visual.spec.modelId, visual.spec.variant]).toEqual([
-          "google",
-          "gemini-4-argon",
-          "low",
-        ])
         expect([writing.spec.provider, writing.spec.modelId, writing.spec.variant]).toEqual([
           "google",
           "gemini-4-argon",
           "low",
         ])
       } else {
-        expect([visual.spec.provider, visual.spec.modelId, visual.spec.variant]).toEqual([
-          "anthropic",
-          "claude-fable-5-1",
-          "max",
-        ])
         expect([writing.spec.provider, writing.spec.modelId, writing.spec.variant]).toEqual([
           "anthropic",
           "claude-opus-5-5",

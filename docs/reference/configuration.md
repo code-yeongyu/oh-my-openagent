@@ -148,7 +148,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // writing - docs/prose
       "writing": { "model": "anthropic/claude-opus-5-5", "reasoning": "low" },
 
-      // visual-engineering - Argon low, then Fable 5.2 max, Fable 5.1 max, Opus 5.5 max and Kimi K3.1 Pro max
+      // visual-engineering - Fable 5.2 max, Fable 5.1 max, Opus 5.5 max and Kimi K3.1 Pro max
       "visual-engineering": {
         "model": "anthropic/claude-opus-5-5",
         "reasoning": "max",
@@ -345,7 +345,7 @@ The OpenCode edition and Senpi (OmO Native) ship the same categories, and Senpi 
 
 | Category | OpenCode default | Senpi default | Description |
 | --- | --- | --- | --- |
-| `visual-engineering` | `google/gemini-4-argon` (low) | `google/gemini-4-argon` (low) | Visual design, UI/UX, frontend, styling, animation, design systems. Falls back to `claude-fable-5-2` (max) first when Argon is not connected. |
+| `visual-engineering` | `anthropic/claude-fable-5-2` (max) | `anthropic-subscription/claude-fable-5-2` (max) | Visual design, UI/UX, frontend, styling, animation, design systems. Falls back to `claude-fable-5-1` (max) first. |
 | `architect` | - | `anthropic/claude-fable-5-2` (xhigh) | Senpi only. Big-picture system design and broad debugging across many sources. Falls back only to `claude-fable-5-1` (xhigh); unavailable without one of the two. |
 | `ultrabrain` | `openai/gpt-6.2-astra` (max) | `chatgpt-subscription/gpt-6.2-astra` (max) | Deep logical reasoning, complex architecture. No fallback model: unavailable without `gpt-6.2-astra`. |
 | `deep-low` | `openai/gpt-6.2-sol` (medium) | `chatgpt-subscription/gpt-6.2-sol` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. No fallback model, Fast tier included: unavailable without `gpt-6.2-sol`. |
@@ -444,7 +444,7 @@ Each harness ships its own hardcoded chain per category. A rung reads `providers
 
 | Category | Provider Priority |
 | --- | --- |
-| `visual-engineering` | `google\|google-vertex\|opencode/gemini-4-argon (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
+| `visual-engineering` | `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` → `opencode/kimi-k3 (max)` |
 | `ultrabrain` | `openai\|chatgpt-subscription\|opencode/gpt-6.2-astra (max)` |
 | `deep-low` | `openai\|chatgpt-subscription/gpt-6.2-sol (medium)` |
 | `deep-high` | `openai\|chatgpt-subscription\|opencode/gpt-6.2-astra (high)` |
@@ -458,7 +458,7 @@ Each harness ships its own hardcoded chain per category. A rung reads `providers
 
 | Category | Provider Priority |
 | --- | --- |
-| `visual-engineering` | `google\|google-vertex\|opencode/gemini-4-argon (low)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (max)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` |
+| `visual-engineering` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (max)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (max)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-opus-5-5 (max)` → `kimi-coding\|kimi-for-coding\|moonshotai\|opencode-go/kimi-k3.1-pro (max)` |
 | `architect` | `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-2 (xhigh)` → `anthropic-subscription\|anthropic\|anthropic-api\|github-copilot\|opencode/claude-fable-5-1 (xhigh)` |
 | `ultrabrain` | `chatgpt-subscription\|openai\|opencode/gpt-6.2-astra (max)` |
 | `deep-low` | `chatgpt-subscription\|openai/gpt-6.2-sol (medium)` |
