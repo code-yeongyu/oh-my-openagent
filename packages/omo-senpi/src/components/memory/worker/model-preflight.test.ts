@@ -13,6 +13,7 @@ import {
   killIfAlive,
   pidAlive,
   pidTerminalWithin,
+  probeUntil,
   readPidFileWhenWritten,
   readPidOnce,
   readPidWhenWritten,
@@ -262,6 +263,72 @@ setInterval(() => {}, 60_000)
       await probe
     }
   })
+
+  // Windows subprocess teardown can kill the whole tree and mask a missing host exit hook.
+  test.skipIf(process.platform === "win32")(
+    "explicit host exit kills a hung catalog before its watchdog",
+    async () => {
+      const item = await fixture(`
+import { writeFileSync } from "node:fs"
+setTimeout(() => process.exit(2), 20_000)
+writeFileSync(process.env.PID_FILE, String(process.pid))
+`)
+      const pidFile = join(item.root, "catalog.pid")
+      const entry = join(item.root, "host.ts")
+      const launch = item.launch
+      await writeFile(
+        entry,
+        `
+import { preflightMemoryModels } from ${JSON.stringify(import.meta.resolve("./model-preflight.ts"))}
+process.stdin.once("data", () => process.exit(0))
+void preflightMemoryModels({
+  candidates: ${JSON.stringify(candidates)},
+  launch: ${JSON.stringify(launch)},
+  env: process.env,
+  configSources: [],
+  timeoutMs: 6_000,
+}).then(() => process.exit(3))
+`,
+        "utf8",
+      )
+      const host = Bun.spawn([process.execPath, entry], {
+        cwd: item.root,
+        env: { HOME: item.root, PATH: process.env.PATH, PID_FILE: pidFile },
+        stdin: "pipe",
+        stdout: "ignore",
+        stderr: "inherit",
+        timeout: 8_000,
+      })
+      try {
+        const catalog = await readPidWhenWritten(pidFile, 4_000, launch.prefixArgs[0])
+        host.stdin.write("exit\n")
+        host.stdin.end()
+        // Exit 3 would mean the probe settled before the host received the request to exit.
+        expect(await host.exited).toBe(0)
+        const gone = await probeUntil(() => {
+          try {
+            process.kill(catalog.pid, 0)
+            return false
+          } catch (error) {
+            if (error instanceof Error && "code" in error && error.code === "ESRCH") return true
+            throw error
+          }
+        }, 2_000)
+        expect({ "catalog PID returned ESRCH after host exit": gone }).toEqual({
+          "catalog PID returned ESRCH after host exit": true,
+        })
+      } finally {
+        if (host.exitCode === null && host.signalCode === null) host.kill("SIGKILL")
+        await host.exited
+        const leaked = await readPidOnce(pidFile, launch.prefixArgs[0])
+        if (leaked !== null) {
+          killIfAlive(leaked)
+          await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
+        }
+      }
+    },
+    16_000,
+  )
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {
     useTestTimeout(30_000)
