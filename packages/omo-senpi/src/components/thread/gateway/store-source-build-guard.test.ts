@@ -119,12 +119,8 @@ test.skipIf(process.platform === "win32").each([
   },
 )
 
-test("#given an omob source build whose configured paths are isolated #when the file the worker actually opened is the shared database (a link moved after it was resolved) #then it refuses to migrate it", async () => {
-  const { home, shared } = account({ sourceBuild: true })
-  mkdirSync(gatewayRootDirectory(shared), { recursive: true })
-  new Database(gatewayDatabasePath(shared)).close()
-  const isolated = join(home, "isolated-agent")
-  mkdirSync(gatewayRootDirectory(isolated), { recursive: true })
+/** A migrate context whose worker opened `databasePath` (links resolved) for an agent dir configured as `agentDir`. */
+function openedContext(agentDir: string, databasePath: string): StoreContext {
   const db = new Database(":memory:")
   const connection: SqliteConnection = {
     exec: (sql) => db.exec(sql),
@@ -135,17 +131,52 @@ test("#given an omob source build whose configured paths are isolated #when the 
     close: () => db.close(),
   }
   cleanups.push(() => db.close())
-  const ctx = {
+  return {
     sql: new Sql(connection),
-    config: { agent_dir: isolated, test_hooks: {}, busy_timeout_ms: 1_000, lock_wait_max_ms: 5_000 },
-    databasePath: gatewayDatabasePath(shared),
+    config: { agent_dir: agentDir, test_hooks: {}, busy_timeout_ms: 1_000, lock_wait_max_ms: 5_000 },
+    databasePath,
     stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
     emit: () => undefined,
     hook: async () => undefined,
     delay: async () => undefined,
   } as unknown as StoreContext
+}
 
-  expect((await settled(migrate(ctx))).error).toMatchObject({ code: "gateway_migration_failed" })
+// The configured paths are isolated (the source build's own link was retargeted after the worker resolved it), and the
+// worker opened the shared database: by its default path, or where a link in the shared agent dir keeps it (review M9).
+test.skipIf(process.platform === "win32").each([
+  ["in the default layout", false],
+  ["outside the default layout (the shared gateway.sqlite links to <home>/data/thread.sqlite)", true],
+] as const)(
+  "#given an omob source build whose configured paths are isolated #when the file the worker actually opened is the shared database %s #then it refuses to migrate it",
+  async (_case, outside) => {
+    const { home, shared } = account({ sourceBuild: true })
+    mkdirSync(gatewayRootDirectory(shared), { recursive: true })
+    let opened = gatewayDatabasePath(shared)
+    if (outside) {
+      mkdirSync(join(home, "data"), { recursive: true })
+      opened = join(home, "data", "thread.sqlite")
+      symlinkSync(opened, gatewayDatabasePath(shared))
+    }
+    new Database(opened).close()
+    const isolated = join(home, "isolated-agent")
+    mkdirSync(gatewayRootDirectory(isolated), { recursive: true })
+
+    expect((await settled(migrate(openedContext(isolated, realpathSync(opened))))).error).toMatchObject({
+      code: "gateway_migration_failed",
+    })
+  },
+)
+
+test("#given an omob source build #when the file the worker opened is a database no shared agent dir names #then it migrates it", async () => {
+  const { home } = account({ sourceBuild: true })
+  const isolated = join(home, "isolated-agent")
+  mkdirSync(gatewayRootDirectory(isolated), { recursive: true })
+  mkdirSync(join(home, "data"), { recursive: true })
+  const unrelated = join(home, "data", "unrelated.sqlite")
+  new Database(unrelated).close()
+
+  expect((await settled(migrate(openedContext(isolated, unrelated)))).error).toBeUndefined()
 })
 
 test("#given the shared store already at this schema #when an omob source build opens it #then it opens without migrating", async () => {

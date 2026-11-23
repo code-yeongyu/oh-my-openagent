@@ -15,7 +15,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join, dirname } from "node:path"
+import { join } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
@@ -36,7 +36,7 @@ import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { isDevBuildRuntime, isSharedAgentDir } from "../../agent-home/dev-build-runtime"
+import { isDevBuildRuntime, isSharedAgentDir, isSharedStoreFile } from "../../agent-home/dev-build-runtime"
 import {
   GATEWAY_MIGRATIONS,
   GATEWAY_READER_FLOOR_KEY,
@@ -464,10 +464,11 @@ async function recordReaderFloor(ctx: StoreContext): Promise<void> {
 function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
   if (!isDevBuildRuntime()) return undefined
   const stores = [gatewayRootDirectory, gatewayDatabasePath]
-  // The configured agent dir, its gateway dir or database linked into a shared one, or the file actually opened.
-  const opened = ctx.databasePath === undefined ? undefined : dirname(dirname(ctx.databasePath))
+  // The configured agent dir or its gateway dir or database linked into a shared one; or the file the worker actually
+  // opened, compared by identity with each shared database wherever that database lives (#14622 review M9).
   const shared =
-    isSharedAgentDir(ctx.config.agent_dir, { stores }) || (opened !== undefined && isSharedAgentDir(opened, { stores }))
+    isSharedAgentDir(ctx.config.agent_dir, { stores }) ||
+    (ctx.databasePath !== undefined && isSharedStoreFile(ctx.databasePath, gatewayDatabasePath))
   if (!shared) return undefined
   return new GatewayMigrationError(
     version + 1,

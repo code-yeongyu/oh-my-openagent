@@ -78,16 +78,39 @@ export function isSharedAgentDir(
     readonly facts?: PlatformFacts
   } = {},
 ): boolean {
+  const candidates = sharedAgentDirs(options)
+  if (candidates === null) return true
+  const stores = options.stores ?? []
+  return candidates.some(
+    (candidate) =>
+      sameLocation(candidate, agentDir) || stores.some((store) => sameLocation(store(candidate), store(agentDir))),
+  )
+}
+
+/**
+ * True when `file`, a store file already opened (its path with links resolved), is the file `store` names under one
+ * of the shared agent dirs, by filesystem identity (#14622 review M9): a shared store kept outside the default layout
+ * (`~/.omo/agent/gateway/gateway.sqlite` linked to `/data/thread.sqlite`) is recognized by the file itself. Answers
+ * true when the account's homes are unknown, as `isSharedAgentDir` does.
+ */
+export function isSharedStoreFile(
+  file: string,
+  store: (agentDir: string) => string,
+  options: { readonly homes?: readonly string[] | null; readonly facts?: PlatformFacts } = {},
+): boolean {
+  const candidates = sharedAgentDirs(options)
+  return candidates === null || candidates.some((candidate) => sameLocation(store(candidate), file))
+}
+
+/** The agent dirs every released omo on this account may use, under each of its homes; null when the homes are unknown. */
+function sharedAgentDirs(options: {
+  readonly homes?: readonly string[] | null
+  readonly facts?: PlatformFacts
+}): readonly string[] | null {
   const homes =
     options.homes === undefined ? accountHomes(process.env, options.facts ?? systemPlatformFacts) : options.homes
-  if (homes === null) return true
-  const stores = options.stores ?? []
-  return homes.some((home) =>
-    [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
-      (candidate) =>
-        sameLocation(candidate, agentDir) || stores.some((store) => sameLocation(store(candidate), store(agentDir))),
-    ),
-  )
+  if (homes === null) return null
+  return homes.flatMap((home) => [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")])
 }
 
 /**
