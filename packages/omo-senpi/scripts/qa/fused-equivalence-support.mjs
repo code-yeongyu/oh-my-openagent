@@ -44,7 +44,9 @@ export function splitStatusChannels(client, settledChannels = []) {
     status: Object.fromEntries(
       [...channels].map(([name, snapshots]) => [
         name,
-        settledChannels.includes(name) ? { settled: settledSnapshot(snapshots) } : { count: snapshots.length, snapshots },
+        settledChannels.includes(name)
+          ? { settled: settledSnapshot(snapshots) }
+          : { count: snapshots.length, snapshots },
       ]),
     ),
   }
@@ -63,7 +65,9 @@ function settledSnapshot(snapshots) {
 /** Per O6 client, each status channel's snapshot count: written to the receipt next to the compare result. */
 export function statusCounts(observations) {
   return (observations?.O6 ?? []).map((client) =>
-    Object.fromEntries(Object.entries(client.status ?? {}).map(([name, channel]) => [name, channel.count ?? "settled"])),
+    Object.fromEntries(
+      Object.entries(client.status ?? {}).map(([name, channel]) => [name, channel.count ?? "settled"]),
+    ),
   )
 }
 

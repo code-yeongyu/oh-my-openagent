@@ -210,7 +210,7 @@ describe("refreshMemoryStatus segments", () => {
     await committed
 
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
-  }, 30_000)
+  })
 
   test("#given an older refresh whose read lands after a newer refresh published #when both finish #then the older line never replaces the newer one", async () => {
     // #13046: footer refreshes read memory state at different moments and finish in any order. The older refresh
@@ -250,7 +250,7 @@ describe("refreshMemoryStatus segments", () => {
     await older
 
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
-  }, 30_000)
+  })
 
   test("#given a tree left dirty with no writer holding the lock #when refresh runs #then the dirty marker still renders", async () => {
     const context = segmentContext({})
@@ -268,7 +268,7 @@ describe("refreshMemoryStatus segments", () => {
     })
 
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" }])
-  }, 30_000)
+  })
 
   test("#given a clean worktree with a backlog of fourteen steps #when refresh runs #then the backlog segment renders", async () => {
     const context = segmentContext({ sessionId: "session-a", backlogSteps: 14 })

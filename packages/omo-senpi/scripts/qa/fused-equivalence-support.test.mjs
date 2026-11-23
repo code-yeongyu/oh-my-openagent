@@ -34,7 +34,12 @@ describe("splitStatusChannels", () => {
     const settledOn = (last) =>
       splitStatusChannels(
         {
-          turn: [status("memory", undefined), status("memory", "just now"), status("memory", last), status("memory", undefined)],
+          turn: [
+            status("memory", undefined),
+            status("memory", "just now"),
+            status("memory", last),
+            status("memory", undefined),
+          ],
           surfaces: [],
         },
         ["setStatus:memory"],
