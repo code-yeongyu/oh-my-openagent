@@ -20,7 +20,6 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 
 import { MEMORY_TOOL_DESCRIPTION, MEMORY_TOOL_NAME } from "./tool-metadata"
-import { registerMemoryReadVersions } from "./read-versions"
 import { sessionIdFrom } from "./wiring-context"
 
 export { MEMORY_TOOL_NAME }
@@ -161,7 +160,6 @@ export function registerMemoryTools(
   resolveContext: MemoryContextResolver,
   options: MemoryToolsOptions = {},
 ): void {
-  registerMemoryReadVersions(pi, resolveContext)
   for (const tool of createMemoryTools(resolveContext, options)) pi.registerTool({ ...tool })
 }
 

@@ -3,8 +3,11 @@ import { readFile } from "node:fs/promises"
 import { join } from "node:path"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
 import { createMemoryIdentityContext } from "./context"
-import { createMemoryTools, registerMemoryTools } from "./tools"
+import { registerMemoryGuard } from "./guard"
+import { componentContext } from "./memory.test-support"
+import { createMemoryTools } from "./tools"
 import { boundFixture, git, seedFile } from "./tools.test-support"
+import { sessionIdFrom } from "./wiring-context"
 
 test("two sessions reading one file cannot splice a stale insert into the winner's block", async () => {
   const fixture = await boundFixture()
@@ -14,7 +17,7 @@ test("two sessions reading one file cannot splice a stale insert into the winner
   const resolve = (id?: string) => (id === "A" ? contexts.A : contexts.B)
   const ctx = (id: string) => ({ sessionManager: { getSessionId: () => id } })
   const pi = new FakeExtensionAPI()
-  registerMemoryTools(pi, resolve)
+  registerMemoryGuard(pi, componentContext(), { getContext: (ctx) => resolve(sessionIdFrom(ctx)) })
   const [tool] = createMemoryTools(resolve)
   const path = join(fixture.repo.dir, file_path)
   const read = async (id: string, range = false) => {
@@ -52,7 +55,7 @@ test("two sessions reading one file cannot splice a stale insert into the winner
   await read("B", true)
   expect((await insert("B", 3, "B1\nB2")).isError).toBeUndefined()
   expect(await readFile(path, "utf8")).toEndWith("A1\nA2\nB1\nB2\nfirst\nsecond")
-}, 30_000)
+})
 
 test("an identical insert is a success without a second commit or notice", async () => {
   const fixture = await boundFixture()
@@ -78,4 +81,4 @@ test("an identical insert is a success without a second commit or notice", async
   expect(await readFile(join(fixture.repo.dir, file_path), "utf8")).toEndWith(
     "\n---\nthe announcement\nend\nnot the announcement\nend",
   )
-}, 30_000)
+})
