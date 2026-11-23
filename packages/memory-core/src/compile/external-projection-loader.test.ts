@@ -69,7 +69,7 @@ describe("external projection renderer loader", () => {
     expect(degraded).toEqual([[expect.stringContaining(STALE_MANIFEST)]])
     expect(degraded[0]?.[0]).toContain(EXTERNAL_PROJECTION_RENDERER_FIX)
     expect(warnings).toHaveLength(1)
-  }, 30_000)
+  })
 
   it("#given a renderer import that keeps failing #when it is asked three times #then each call retries and the fix is warned once", async () => {
     // given
