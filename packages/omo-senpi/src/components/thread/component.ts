@@ -28,6 +28,7 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { loadSenpiProjector } from "./remote/senpi-projector"
 import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
@@ -410,6 +411,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           sender: { kind: "session", id: runtimeInstance ?? UNKNOWN_CALLER },
           log: (line) => ctx.logger.warn(line),
           permissionPreset: () => pi.getPermissionPreset?.(),
+          loadProjector: loadSenpiProjector,
         })
       registerRemoteMonitorTargets(pi, remote)
       const store =
