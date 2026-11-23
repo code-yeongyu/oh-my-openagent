@@ -20,7 +20,7 @@ select_green_push() {
 release_validation_contract() {
   cat <<'JSON'
 {
-  "typecheck": ["Type check", "Lint", "Lint ratchet", "Dead-code check (knip)"],
+  "typecheck": ["Verify @types/node resolves from omo-senpi", "Type check", "Lint", "Lint ratchet", "Dead-code check (knip)"],
   "test-linux (omo-opencode)": ["Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine"],
   "test-linux (memory-core)": ["Run memory-core tests in a PID namespace"],
   "test-linux (remainder-1)": ["Run the first remainder half"],
@@ -28,7 +28,7 @@ release_validation_contract() {
   "test (ubuntu-latest, 1/2)": ["Verify root shard coverage"],
   "test (ubuntu-latest, 2/2)": ["Verify root shard coverage"],
   "test (windows-latest, 1/2)": ["Run vendored lsp-daemon tests", "Run tests with Windows telemetry"],
-  "test (windows-latest, 2/2)": ["Run tests"],
+  "test (windows-latest, 2/2)": ["Run vendored lsp-daemon tests", "Run tests"],
   "macos-combined": ["Run vendored lsp-daemon tests", "Run root test shard 1", "Run root test shard 2 heavy", "Run root test shard 2 light", "Run Codex platform smoke", "Run Senpi compatibility tests"],
   "codex-compatibility (ubuntu-latest, full)": ["Run full Codex compatibility suite", "Run omo-codex component checks and tests"],
   "codex-compatibility (windows-latest, platform)": ["Build Codex platform smoke prerequisites", "Run Codex platform smoke tests (.mjs via node --test)", "Run Codex platform smoke tests (.ts via bun test)"],
@@ -61,12 +61,37 @@ require_push_validation() {
   # Like platform-jobs.jq, look through job success to the actual work.
   # Use named validation steps: setup and status-only jobs do not test anything.
   missing="$(jq -rs --argjson contract "$(release_validation_contract)" '
+    # Exact job/step exceptions for ci.yml branches that do not apply on this leg.
+    # Only a completed skip can use an exception, never failure, neutral or cancellation.
+    def allowed_skips($j):
+      {
+        # Codex: the Linux full suite and Windows platform suite run on different legs.
+        "codex-compatibility (ubuntu-latest, full)": ["Build Codex platform smoke prerequisites", "Run Codex platform smoke tests (.mjs via node --test)", "Run Codex platform smoke tests (.ts via bun test)"],
+        "codex-compatibility (windows-latest, platform)": ["Run full Codex compatibility suite", "Run omo-codex component checks and tests"],
+        # Windows does not use the POSIX cache. Telemetry and git diagnostics belong to shard 1; the plain test step belongs to shard 2.
+        "test (windows-latest, 1/2)": ["Run actions/cache@v6", "Run tests"],
+        "test (windows-latest, 2/2)": ["Run actions/cache@v6", "Run tests with Windows telemetry", "Collect timed-out git evidence", "Upload timed-out git evidence"],
+        # Linux matrix: each shard runs its own install/test commands. Only remainder shards produce coverage records and consume optional timing snapshots.
+        "test-linux (memory-core)": ["Install dependencies", "Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine", "Restore selected shard timing snapshot", "Copy the timing snapshot for this shard", "Run the first remainder half", "Run the second remainder half", "Upload root shard record"],
+        "test-linux (omo-opencode)": ["Install memory-core test dependencies", "Run memory-core tests in a PID namespace", "Restore selected shard timing snapshot", "Copy the timing snapshot for this shard", "Run the first remainder half", "Run the second remainder half", "Upload root shard record"],
+        "test-linux (remainder-1)": ["Install memory-core test dependencies", "Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine", "Run memory-core tests in a PID namespace", "Run the second remainder half", "Restore selected shard timing snapshot"],
+        "test-linux (remainder-2)": ["Install memory-core test dependencies", "Run vendored lsp-daemon tests", "Run omo-opencode tests", "Run the serial quarantine", "Run memory-core tests in a PID namespace", "Run the first remainder half", "Restore selected shard timing snapshot"],
+        # Timing data optimizes partitioning but is not required for the Senpi tests.
+        "senpi-tests-linux (one)": ["Restore selected shard timing snapshot"],
+        "senpi-tests-linux (two)": ["Restore selected shard timing snapshot"],
+        # Standalone parity: macOS compares against npm; Windows exercises empty-folder launches. Uploads are failure diagnostics.
+        "native-binary-parity (macos-15, darwin-arm64, aarch64-apple-darwin, omo-darwin-arm64, true)": ["Run the binary from an empty download folder twice", "Upload parity runs"],
+        "native-binary-parity (windows-latest, windows-x64, x86_64-pc-windows-msvc, omo-windows-x64.exe, f...": ["Build the keychain helper the binary embeds", "Compare the binary with the npm launcher", "Upload parity runs"]
+      }[$j] // [];
     if length != 1 or (.[0] | type) != "array" then error("expected paginated CI jobs") else .[0] end
     | [.[].jobs[]] as $jobs
     | $contract
     | to_entries[] as $required
     | select(any($jobs[];
         .name == $required.key and .status == "completed" and .conclusion == "success"
+        and all(.steps[]?; .status == "completed" and
+          (.conclusion == "success" or (.conclusion == "skipped" and
+            (.name as $n | allowed_skips($required.key) | index($n) != null))))
         and (.steps as $steps | all($required.value[]; . as $step |
           any($steps[]?; .name == $step and .status == "completed" and .conclusion == "success")
         ))

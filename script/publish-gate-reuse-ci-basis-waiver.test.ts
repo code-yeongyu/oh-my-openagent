@@ -195,10 +195,13 @@ describe("#given a pinned release", () => {
     "skipped-macos-codex",
     "skipped-macos-parity",
     "skipped-windows-parity",
+    "skipped-unlisted",
+    "neutral-unlisted",
+    "allowed-skip",
     "passed",
   ] as const)("the parent requires validation evidence (%s) even if the pin push is green", (validation) => {
     const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
-    expect(result.status === 0, result.output).toBe(validation === "passed")
+    expect(result.status === 0, result.output).toBe(validation === "passed" || validation === "allowed-skip")
     expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
   })
 

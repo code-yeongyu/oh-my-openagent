@@ -56,9 +56,11 @@ const versionAt = (commit, manifest) => JSON.parse(git(["show", `${commit}:${man
 // source file moved into a listed path still shows its deletion.
 function stampRefusals(base, head) {
   const fields = git(["diff", "--no-renames", "--name-status", "-z", base, head]).split("\0").filter(Boolean)
-  const versions = ["package.json", "packages/omo-native/package.json"]
-    .map((manifest) => [versionAt(base, manifest), versionAt(head, manifest)])
-    .sort(([left], [right]) => right.length - left.length)
+  const nativeManifest = "packages/omo-native/package.json"
+  const rootVersion = versionAt(base, "package.json")
+  const rootStamp = versionAt(head, "package.json")
+  const nativeVersion = versionAt(base, nativeManifest)
+  const nativeStamp = versionAt(head, nativeManifest)
   const refusals = []
   for (let index = 0; index < fields.length; index += 2) {
     const [status, path] = [fields[index], fields[index + 1]]
@@ -66,10 +68,22 @@ function stampRefusals(base, head) {
     else if (!matches(VERSION_STAMPED_PATHS, path)) continue
     else if (status !== "M") refusals.push(`${path}: ${status === "A" ? "added" : "deleted"}, a stamp only edits it`)
     else {
-      const expected = versions.reduce(
-        (text, [from, to]) => text.replaceAll(from, to),
-        git(["show", `${base}:${path}`]),
-      )
+      const original = git(["show", `${base}:${path}`])
+      let expected
+      if (path === nativeManifest) expected = original.replaceAll(nativeVersion, nativeStamp)
+      else if (path === "bun.lock") {
+        // Bun records both release lines in one file; stable versions can be identical.
+        const nativeEntry = /("packages\/omo-native":\s*\{\s*"name":\s*"omo-ai",\s*"version":\s*")([^"]+)(")/
+        const match = nativeEntry.exec(original)
+        if (match && match[2] === nativeVersion) {
+          expected =
+            original.slice(0, match.index).replaceAll(rootVersion, rootStamp) +
+            match[1] +
+            nativeStamp +
+            match[3] +
+            original.slice(match.index + match[0].length).replaceAll(rootVersion, rootStamp)
+        } else expected = original.replaceAll(rootVersion, rootStamp)
+      } else expected = original.replaceAll(rootVersion, rootStamp)
       if (git(["show", `${head}:${path}`]) !== expected) refusals.push(`${path}: changes more than the version`)
     }
   }
