@@ -2,7 +2,7 @@
 
 // allow: SIZE_OK - team-mode integration tests share one registry/runtime fixture; this release adds narrow concurrency cases and future behavior should split by integration scenario.
 
-import { afterEach, describe, expect, mock, test } from "bun:test"
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test"
 import { randomUUID } from "node:crypto"
 import { mkdir, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -19,6 +19,7 @@ import { clearAllSessionPromptParams, getSessionPromptParams } from "../../share
 import { getRuntimeStateDir, resolveBaseDir } from "./team-registry/paths"
 import { createLaunchConcurrencyProbe } from "./test-support/async-test-helpers"
 import type { TeamSpec } from "./types"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
@@ -37,6 +38,11 @@ const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
 }))
 
 mock.module("./team-runtime/resolve-member", () => ({ resolveMember: resolveMemberMock }))
+preserveModuleMocksForTestFile(import.meta.url)
+
+afterAll(() => {
+  mock.restore()
+})
 
 const { sendMessage } = await import("./team-mailbox/send")
 const { createTeamRun } = await import("./team-runtime/create")

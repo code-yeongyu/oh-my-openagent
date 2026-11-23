@@ -1,15 +1,9 @@
-import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
-
-const logMock = mock((..._args: unknown[]) => {})
-
-mock.module("../../shared/logger", () => ({
-  log: logMock,
-}))
-
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as logger from "../../shared/logger"
+import { abortWithTimeout } from "./abort-with-timeout"
 import type { OpencodeClient } from "./opencode-client"
 
-const { abortWithTimeout } = await import("./abort-with-timeout")
-mock.restore()
+const logMock = mock((..._args: unknown[]) => {})
 
 function createClient(abort: (...args: Array<unknown>) => Promise<unknown>): OpencodeClient {
   return {
@@ -30,9 +24,10 @@ function logCallsForSession(sessionID: string): unknown[][] {
 describe("abortWithTimeout", () => {
   beforeEach(() => {
     logMock.mockClear()
+    spyOn(logger, "log").mockImplementation(logMock)
   })
 
-  afterAll(() => {
+  afterEach(() => {
     mock.restore()
   })
 

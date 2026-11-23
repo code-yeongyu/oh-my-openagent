@@ -332,7 +332,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           ),
         )
       if (!inspect || admission.kind === "replay" || admission.kind === "uncertain") unanswered.delete(key)
-      if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
+      if (admission.kind === "replay") {
+        const result = currentResult(admission.result as ThreadToolResult)
+        return output(name === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result)
+      }
       if (admission.kind === "in_progress") {
         const note = unsettled.get(receiptKey(scope))
         if (note !== undefined)

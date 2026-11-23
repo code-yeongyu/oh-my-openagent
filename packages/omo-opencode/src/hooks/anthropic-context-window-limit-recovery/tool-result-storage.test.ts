@@ -2,6 +2,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, mock } from "bun
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const tempDir = mkdtempSync(join(tmpdir(), "tool-result-storage-"))
 const partDir = join(tempDir, "part", "msg1")
@@ -17,8 +18,7 @@ mock.module("./message-storage-directory", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
-mock.module("../../shared/logger", () => ({ log: () => {} }))
-
+preserveModuleMocksForTestFile(import.meta.url)
 const { truncateToolResult, recoverTruncatedOutput, cleanupTruncationBackups } = await import("./tool-result-storage")
 
 describe("tool-result-storage non-destructive truncation", () => {

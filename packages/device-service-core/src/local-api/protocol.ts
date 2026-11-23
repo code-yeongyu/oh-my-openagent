@@ -1,13 +1,11 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/protocol.ts
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/protocol.ts
 import type {
   Capability,
   ClientName,
   ErrorCode,
   PathRefusalProblem,
-  PolicyState,
   RefusedReason,
   SessionRowState,
-  ThisDeviceState,
 } from "./vocabulary.ts";
 
 export * from "./vocabulary.ts";
@@ -46,13 +44,7 @@ export type Empty = { readonly [key: string]: never };
 export type EventOf<K extends string, P> = { readonly type: "event"; readonly kind: K } & P;
 
 export type DeviceRef = { readonly id: string; readonly name: string };
-export type Policy = {
-  readonly state: PolicyState;
-  readonly generation: number;
-  readonly this_device: ThisDeviceState;
-  readonly homes_pending: number;
-  readonly unacked: readonly { readonly device: string; readonly label: string }[];
-};
+export type { Policy, PolicyBlocker } from "./policy.ts";
 export type ClientInfo = {
   readonly name: ClientName;
   readonly version: string;
@@ -145,9 +137,10 @@ export type SessionsList = {
   readonly filter?: SessionFilter;
   /**
    * 2: this query's rows may carry `kind`, `parent` and `parent_listed` (#316); 3: those and `durable_id` (#935);
-   * 4: those and `model` and `archived` (#1121); 5: those and `settled` and `settled_by`; absent, they never do.
+   * 4: those and `model` and `archived` (#1121); 5: those and `settled` and `settled_by`; 6: those and `waiting`; 7:
+   * those and `engine_version` (#1447); absent, they never do.
    */
-  readonly rows?: 2 | 3 | 4 | 5;
+  readonly rows?: 2 | 3 | 4 | 5 | 6 | 7;
 };
 // #1066: opt in, on this connection, to sessions.listing_changed. Send it only to a service at or above the release
 // that ships it (docs/local-api.md); an older service refuses the request type.

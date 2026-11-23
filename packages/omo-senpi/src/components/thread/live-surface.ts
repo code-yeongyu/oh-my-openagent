@@ -143,7 +143,7 @@ export async function requestFrame(
 ): Promise<RpcFrame> {
   return await withRpcSocket(
     socketPath,
-    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS },
+    { connect, secret: options.secret, timeoutMs: options.timeoutMs ?? REQUEST_TIMEOUT_MS, readCommand: command.type },
     async (request) => {
       const send = () =>
         typeof command.type === "string" && (command.type.startsWith("get_") || command.type === "list_sessions")
