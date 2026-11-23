@@ -84,12 +84,12 @@ export const packageDirs = async (): Promise<string[]> => {
   return [...dirs]
 }
 
-// A temp copy of the files knip can see, with each package's node_modules linked. The caller removes it.
+// A temp copy of the selected repository files, with each copied package's node_modules linked. The caller removes it.
 // realpath: on macOS tmpdir() and /tmp are symlinks into /private, and on Windows tmpdir() can be an 8.3 short
 // name (C:\Users\RUNNER~1); knip misses probes under either form, so the copy root is the native realpath.
-export const copyRepo = async (): Promise<string> => {
+export const copyRepo = async (files: readonly string[] = repoFiles()): Promise<string> => {
   const copy = realpathSync.native(mkdtempSync(join(tmpdir(), "knip-probe-")))
-  for (const file of repoFiles()) {
+  for (const file of files) {
     const src = join(REPO_ROOT, file)
     if (!existsSync(src) || lstatSync(src).isDirectory()) continue
     mkdirSync(dirname(join(copy, file)), { recursive: true })

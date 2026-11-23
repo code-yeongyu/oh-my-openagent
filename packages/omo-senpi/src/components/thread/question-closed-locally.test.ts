@@ -23,8 +23,10 @@ const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 const directories: string[] = []
 const cleanups: (() => Promise<void>)[] = []
 afterEach(async () => {
-  for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
-  for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
+  // Take this test's fixtures before awaiting: a hook that outlives its timeout resumes during the next test.
+  const owned = { cleanups: cleanups.splice(0).reverse(), directories: directories.splice(0) }
+  for (const cleanup of owned.cleanups) await cleanup()
+  for (const directory of owned.directories) rmSync(directory, { recursive: true, force: true })
 })
 
 type Handler = (payload: unknown, ctx?: unknown) => unknown
