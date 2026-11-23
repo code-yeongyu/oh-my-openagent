@@ -41,23 +41,25 @@ const EARLIER_TURN: readonly JsonObject[] = [
   { role: "assistant", content: "EARLIER" },
 ]
 
+// Each case drives a real send, whose gateway store starts a worker and opens SQLite in the case's agent dir. The send's
+// own settle bound (#13425) ends a turn that never settles; SEND_END_MS is this test's breaker for a send that never
+// ends at all, and it names what it waited for. Cleanup waits for every send to end first: its store is disposed (worker
+// terminated) only then, and Windows refuses to remove a directory a live worker still holds (EBUSY, #13986).
+const SEND_TIMEOUT_SECONDS = 10
+const SEND_END_MS = 15_000
+const pendingSends = new Set<Promise<unknown>>()
+
 const fixture = createRemoteThreadFixture()
 const dirs: string[] = []
 const savedAgentDir = process.env.OMO_CODING_AGENT_DIR
 afterEach(async () => {
+  await Promise.allSettled([...pendingSends])
   await fixture.cleanup()
   if (savedAgentDir === undefined) delete process.env.OMO_CODING_AGENT_DIR
   else process.env.OMO_CODING_AGENT_DIR = savedAgentDir
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const deferred = <T = void>() => {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 // Every microtask the follow queued has run: the probe or check finished with the page it was handed.
 const drained = () => new Promise<void>((done) => setImmediate(done))
 
@@ -153,23 +155,36 @@ async function send(script: Script) {
       throw new Error("not part of send")
     },
   } as unknown as RemoteCommandDependencies
-  const done = deferred<number>()
-  void runSession(
+  const sending = runSession(
     {} as never,
-    { verb: "send", target: "b/dur-on-b", text: TEXT, delivery: "auto", wait: true } as never,
+    {
+      verb: "send",
+      target: "b/dur-on-b",
+      text: TEXT,
+      delivery: "auto",
+      wait: true,
+      timeout_seconds: SEND_TIMEOUT_SECONDS,
+    } as never,
     false,
     dependencies,
-  ).then(done.resolve)
+  )
+  pendingSends.add(sending)
+  void sending.finally(() => pendingSends.delete(sending))
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
+  const breaker = new Promise<never>((_, reject) => {
     timer = setTimeout(
-      () => reject(new Error(`send did not settle; printed so far ${JSON.stringify(written.join(""))}`)),
-      5_000,
+      () =>
+        reject(
+          new Error(
+            `omo remote send did not end within ${SEND_END_MS} ms; printed so far ${JSON.stringify(written.join(""))}`,
+          ),
+        ),
+      SEND_END_MS,
     )
   })
   let code: number
   try {
-    code = await Promise.race([done.promise, timeout])
+    code = await Promise.race([sending, breaker])
   } finally {
     clearTimeout(timer)
   }
@@ -234,8 +249,8 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
   for (const [name, script] of orderings) {
     const row = async () => {
       const result = await send(script)
+      expect(result.code, result.errors.join("\n")).toBe(0)
       expect(result.printed).toBe("pong\n")
-      expect(result.code).toBe(0)
     }
     // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
     if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)
