@@ -4,7 +4,7 @@
  * the session loop that owns the store facade. Requests run strictly one at a time.
  */
 import { createHash, randomUUID } from "node:crypto"
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, renameSync, writeFileSync } from "node:fs"
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, realpathSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
@@ -919,6 +919,12 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     return null
   }
   const ctx = requireContext()
+  // Another process may have migrated the store since this worker opened it (#14622 review M5, M7): every op re-reads
+  // the schema and reads its data in one snapshot, and every write re-reads it under its write lock.
+  return await ops.inCheckedSnapshot(ctx, () => dispatchOp(ctx, op, args))
+}
+
+async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Promise<unknown> {
   if (op.startsWith("woken_")) return await dispatchWoken(ctx, op, args)
   switch (op) {
     case "extension_register": {
@@ -1050,8 +1056,11 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   const path = gatewayDatabasePath(config.agent_dir)
   closeSync(openSync(path, "a", 0o600))
   chmodSync(path, 0o600)
+  // The file actually opened, links resolved: the source-build guard checks this path, so a link moved after it was
+  // resolved cannot point the guard at another store than the one migrated (#14622 review M9).
+  const databasePath = realpathSync(path)
   const sqlite = await import("node:sqlite")
-  connection = new sqlite.DatabaseSync(path, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
+  connection = new sqlite.DatabaseSync(databasePath, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
   // Two processes opening a brand-new store race for the WAL switch, which does not wait on
@@ -1083,6 +1092,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   context = {
     sql,
     config,
+    databasePath,
     self,
     stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
     emit,
