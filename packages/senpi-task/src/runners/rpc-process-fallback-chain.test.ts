@@ -231,8 +231,14 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
   })
 
   test("#given an engine that keeps burning CPU without answering #when it passes the startup CPU cap #then the start fails as a runaway", async () => {
-    // given: the boot burns CPU for far longer than a 0.3 s cap and never reaches its protocol answer in time
-    const engine = processRunner(["retry_fallback_command"], { bootBusyMs: 30_000, startupCpuCapS: 0.3 })
+    // given: an engine that never answers while its CPU reading climbs 0.1 s per sample, so the cap trips after a
+    // few samples whatever share of the host's CPU the test child actually gets
+    let burnedS = 0
+    const engine = processRunner(["retry_fallback_command"], {
+      protocolInfo: "after-prompt",
+      readCpuSeconds: () => (burnedS += 0.1),
+      startupCpuCapS: 0.3,
+    })
 
     // when
     const error = await engine.runner.start(spec("st_cpu_cap", CHAINED)).then(
@@ -242,8 +248,7 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
 
     // then
     expect(String(error)).toContain("over the 0.3 s cap")
-    // Reaching 0.3 s of CPU takes longer in wall time on a loaded host; the CPU cap, not this timeout, ends the start.
-  }, 60_000)
+  })
 
   // A sampler that cannot read the CPU (another runtime, a refused handle) must not leave the wait unbounded.
   test("#given a CPU reading that always fails #when the engine never answers #then the outer bound still ends the start", async () => {
