@@ -18,6 +18,7 @@ import { clearTeamSessionRegistry, lookupTeamSession } from "../team-session-reg
 import type { TeamSpec } from "../types"
 import { clearSessionTeamRunCleanupRegistry, getSessionCreatedTeamRunIds } from "./session-cleanup"
 import { createLaunchConcurrencyProbe } from "../test-support/async-test-helpers"
+import { preserveModuleMocksForTestFile } from "../../../testing/module-mock-lifecycle"
 
 const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
   agentToUse: `${member.name}-agent`,
@@ -27,6 +28,7 @@ const resolveMemberMock = mock(async (member: TeamSpec["members"][number]) => ({
 }))
 
 mock.module("./resolve-member", () => ({ resolveMember: resolveMemberMock }))
+preserveModuleMocksForTestFile(import.meta.url)
 
 const { createTeamRun, TeamRunCreateError } = await import("./create")
 
@@ -115,6 +117,7 @@ describe("createTeamRun", () => {
   })
 
   afterAll(async () => {
+    mock.restore()
     clearSessionTeamRunCleanupRegistry()
     await Promise.all(
       temporaryDirectories.splice(0).map(async (directoryPath) => rm(directoryPath, { recursive: true, force: true })),

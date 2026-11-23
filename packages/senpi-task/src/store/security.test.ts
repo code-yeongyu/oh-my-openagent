@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 
 import { createTaskRecord, type ResolvedModelRecord, type TaskRecord } from "../state"
 import { createTaskRecordStore, resolveStateDir } from "../store"
+import { ownedTaskState } from "./__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const RESOLVED_MODEL = {
@@ -41,7 +42,7 @@ function taskWithId(taskId: string): TaskRecord {
 }
 
 function writePersistedRecord(project: string, taskId: string, fields: Record<string, unknown>): string {
-  const tasksDir = join(resolveStateDir({ project_dir: project }), "tasks")
+  const tasksDir = join(resolveStateDir(ownedTaskState(project)), "tasks")
   const path = join(tasksDir, `${taskId}.json`)
   mkdirSync(dirname(path), { recursive: true })
   writeFileSync(
@@ -73,7 +74,7 @@ describe("TaskRecordStore task id boundary", () => {
     // given
     const project = tempProject()
     const outsidePath = join(project, "outside-write.jsonl")
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const hostileIds = [
       "../outside-write",
       "nested/../../outside-write",
@@ -107,7 +108,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given an old persisted record without resolved model metadata #when listed #then the record remains valid", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_01d00001", {})
 
     // when
@@ -121,7 +122,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given persisted resolved model metadata #when listed #then structured metadata survives the parse round-trip", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const resolvedModel = { ...RESOLVED_MODEL, variant: "high", reasoning_effort: "medium" }
     writePersistedRecord(project, "st_01d00002", { resolved_model: resolvedModel })
 
@@ -136,7 +137,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given persisted resolved model metadata containing reasoning effort only #when listed #then the field survives the parse round-trip", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const resolvedModel = { ...RESOLVED_MODEL, reasoning_effort: "high" }
     const taskId = "st_1d00002b"
     writePersistedRecord(project, taskId, { resolved_model: resolvedModel })
@@ -152,7 +153,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given persisted resolved model metadata with a future field #when listed #then known metadata is parsed and the future field is ignored", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_01d00003", { resolved_model: { ...RESOLVED_MODEL, capabilities: ["vision"] } })
 
     // when
@@ -166,7 +167,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given malformed resolved model metadata #when listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const path = writePersistedRecord(project, "st_01d00004", {
       resolved_model: { ...RESOLVED_MODEL, source: "assistant" },
     })
@@ -192,7 +193,7 @@ describe("parseTaskRecord persisted boundary", () => {
 
     for (const testCase of cases) {
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const path = writePersistedRecord(project, testCase.taskId, {
         resolved_model: { ...RESOLVED_MODEL, reasoning_effort: "medium", source: "explicit", ...testCase.fields },
       })
@@ -208,7 +209,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given persisted spawn extensions and member env #when listed #then untrusted launch inputs are discarded", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_01d00006", {
       spawn_spec: {
         cwd: "/safe/project",
@@ -228,7 +229,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given a persisted killed:true error record #when listed #then the killed FACT survives the parse round-trip", () => {
     // given: a subsequent residency transition (dispose) reloads through the parser, so killed must be preserved
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     writePersistedRecord(project, "st_deadbee1", {
       status: "error",
       killed: true,
@@ -246,7 +247,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given a persisted non-boolean killed #when listed #then a typed diagnostic is reported", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const path = writePersistedRecord(project, "st_deadbee2", { killed: "yes" })
 
     // when
@@ -260,7 +261,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given malformed optional pid #when records are listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const path = writePersistedRecord(project, "st_bad00001", { pid: "not-a-number" })
 
     // when
@@ -274,7 +275,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given malformed optional tool allow #when records are listed #then diagnostic is typed and record is skipped", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const path = writePersistedRecord(project, "st_bad00002", { tool_allow: ["read", 1234] })
 
     // when
@@ -288,7 +289,7 @@ describe("parseTaskRecord persisted boundary", () => {
   test("#given invalid enum sentinel #when diagnostic is reported #then raw rejected value is redacted", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const invalidStatus = "invalid-enum-sentinel"
     writePersistedRecord(project, "st_bad00003", { status: invalidStatus })
 
@@ -307,7 +308,7 @@ describe("createTaskRecord privacy boundary", () => {
   test("#given runtime task input with prompt-shaped extras #when created and saved #then extras are not copied into the record or store", () => {
     // given
     const project = tempProject()
-    const store = createTaskRecordStore({ project_dir: project })
+    const store = createTaskRecordStore(ownedTaskState(project))
     const runtimeInput = {
       ...taskWithId("st_01d00005"),
       prompt: "do not persist this prompt",
@@ -318,7 +319,7 @@ describe("createTaskRecord privacy boundary", () => {
     const record = createTaskRecord(runtimeInput)
     store.save(record)
     const persisted = readFileSync(
-      join(resolveStateDir({ project_dir: project }), "tasks", `${record.task_id}.json`),
+      join(resolveStateDir(ownedTaskState(project)), "tasks", `${record.task_id}.json`),
       "utf8",
     )
 

@@ -239,7 +239,7 @@
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/locks/subprocess-contention.test.ts": {
-    "omo-testing/no-flake-masking": 4
+    "omo-testing/no-flake-masking": 3
   },
   "packages/memory-core/src/memfs/hooks-secret.test.ts": {
     "omo-testing/no-flake-masking": 3
@@ -326,7 +326,7 @@
     "omo-testing/no-flake-masking": 2
   },
   "packages/memory-core/src/sync/engine/engine-converge.test.ts": {
-    "omo-testing/no-flake-masking": 5
+    "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/sync/engine/engine-crash.test.ts": {
     "omo-testing/no-flake-masking": 5
@@ -430,7 +430,7 @@
   "packages/memory-core/src/sync/item/convergence.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/memory-core/src/sync/item/idempotence.r3.test.ts": {
+  "packages/memory-core/src/sync/item/idempotence.r3.test-support.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/sync/item/render-for-disk.property.test.ts": {
@@ -454,7 +454,7 @@
   "packages/memory-core/src/sync/space/adopt-deletion-gate.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/memory-core/src/sync/space/adopt-preservation.test.ts": {
+  "packages/memory-core/src/sync/space/adopt-preservation.test-support.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/memory-core/src/sync/space/adopt-readback.test.ts": {
@@ -562,9 +562,6 @@
     "omo-testing/no-flake-masking": 1
   },
   "packages/omo-native/test/computer-use-doctor.test.ts": {
-    "omo-testing/no-flake-masking": 1
-  },
-  "packages/omo-native/test/daemon-real-engine.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/omo-native/test/device-service-pin-served.test.ts": {
@@ -838,13 +835,13 @@
     "typescript/no-non-null-assertion": 1
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/session-event-handler-retry.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-after-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/claude-code-hooks/handlers/tool-execute-before-handler.test.ts": {
-    "omo-testing/no-module-mock": 4
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/hooks/comment-checker/__fixtures__/download-probe.fixture.ts": {
     "omo-testing/no-module-mock": 1
@@ -1017,9 +1014,6 @@
   "packages/omo-opencode/src/shared/opencode-coupling-audit.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
-  "packages/omo-opencode/src/shared/opencode-message-dir.test.ts": {
-    "omo-testing/no-module-mock": 2
-  },
   "packages/omo-opencode/src/shared/project-discovery-dirs.test.ts": {
     "omo-testing/no-module-mock": 1
   },
@@ -1110,13 +1104,13 @@
     "typescript/no-explicit-any": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-agent-overrides.test.ts": {
-    "omo-testing/no-module-mock": 2
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver-claude-code-agents-toggle.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/delegate-task/zauc-mocks-subagent-resolver/subagent-resolver.test.ts": {
-    "omo-testing/no-module-mock": 8
+    "omo-testing/no-module-mock": 2
   },
   "packages/omo-opencode/src/tools/hashline-edit/formatter-trigger.test.ts": {
     "typescript/no-non-null-assertion": 4
@@ -1128,14 +1122,11 @@
   "packages/omo-opencode/src/tools/session-manager/sdk-storage.ts": {
     "typescript/no-non-null-assertion": 7
   },
-  "packages/omo-opencode/src/tools/session-manager/session-paging.test.ts": {
-    "omo-testing/no-module-mock": 3
-  },
   "packages/omo-opencode/src/tools/session-manager/storage-fallback.test.ts": {
-    "omo-testing/no-module-mock": 3
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/session-manager/storage.test.ts": {
-    "omo-testing/no-module-mock": 12
+    "omo-testing/no-module-mock": 1
   },
   "packages/omo-opencode/src/tools/skill/zauc-mocks-skill-tools/short-name-resolution.test.ts": {
     "typescript/no-non-null-assertion": 1
@@ -2192,7 +2183,7 @@
     "omo-testing/no-flake-masking": 3
   },
   "script/build-omo-binary.test.ts": {
-    "omo-testing/no-flake-masking": 5,
+    "omo-testing/no-flake-masking": 4,
     "typescript/no-non-null-assertion": 11
   },
   "script/build-omo-binary.ts": {

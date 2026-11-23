@@ -5,6 +5,7 @@ import type { TaskRecord } from "../state"
 import { createTaskRecordStore } from "../store"
 import type { TaskRecordStore } from "../store"
 import { baseSpec, cleanupProjects, flush, makeManager, tempProject } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -198,7 +199,7 @@ describe("TaskManager outcome guards", () => {
     // given - the Windows EPERM class (#8050): every terminal transition is refused, so the on-disk
     // record is pinned at running and nothing re-reading the store can ever see a terminal.
     const project = tempProject()
-    const disk = createTaskRecordStore({ project_dir: project })
+    const disk = createTaskRecordStore(ownedTaskState(project))
     const refusal = Object.assign(new Error("EPERM: operation not permitted, rename"), {
       code: "EPERM",
       syscall: "rename",
@@ -251,7 +252,7 @@ describe("TaskManager background intent", () => {
 
     // then
     expect(promoted).toBe(true)
-    const reloaded = createTaskRecordStore({ project_dir: project })
+    const reloaded = createTaskRecordStore(ownedTaskState(project))
     expect(reloaded.load(taskId)?.notify_on_terminal).toBe(true)
     expect(manager.wasBackground(taskId)).toBe(true)
     expect(manager.promoteToBackground(taskId)).toBe(false)

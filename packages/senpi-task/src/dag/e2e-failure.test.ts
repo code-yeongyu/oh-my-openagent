@@ -23,7 +23,8 @@ import type {
 import { InProcessRunner, type ChildSession } from "../runners/in-process"
 import { buildChildArgs } from "../runners/rpc/spawn"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
-import { createTaskRecordStore, resolveStateDir } from "../store"
+import { createTaskRecordStore, resolveStateDir, type TaskRecordStore } from "../store"
+import { createInMemoryTaskRecordStore } from "../store/__fixtures__/in-memory-record-store"
 import type { TaskRecord } from "../state"
 import { dagFingerprint } from "./fingerprint"
 import type { DagDefinition, DagNodeInput } from "./graph"
@@ -43,6 +44,7 @@ import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-me
 import { createDagSkillMaterializer } from "./skills"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState, ownedTaskStateDir } from "../store/__fixtures__/owned-task-state"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
@@ -59,7 +61,7 @@ const sampleParameters = createReadToolDefinition(process.cwd()).parameters
 const memoryStores: DagFileStore[] = []
 
 function memoryStore(project: string): DagFileStore {
-  const store = createInMemoryDagStore(resolveStateDir({ project_dir: project }))
+  const store = createInMemoryDagStore(resolveStateDir(ownedTaskState(project)))
   memoryStores.push(store)
   return store
 }
@@ -266,12 +268,15 @@ type E2eFixtureOptions = {
   // Cases that assert ordering or diagnostics, not durability, journal in memory (#11632); the crash,
   // torn-tail and retention cases keep the fsync-backed file store, which is what proves durability.
   readonly store?: DagFileStore
+  // The ordering case also runs the real task manager on the in-memory record store (#11632); the
+  // record store's own durability stays owned by record-store.test.ts on the file store.
+  readonly taskStore?: TaskRecordStore
 }
 
 type E2eFixture = {
   readonly project: string
   readonly store: DagFileStore
-  readonly taskStore: ReturnType<typeof createTaskRecordStore>
+  readonly taskStore: TaskRecordStore
   readonly taskManager: TaskManager
   readonly manager: DagManager
   readonly runner: ManagedRunner
@@ -292,11 +297,14 @@ function e2eFixture(options: E2eFixtureOptions = {}): E2eFixture {
     options.store ??
     createDagFileStore({
       project_dir: project,
-      ...(options.maxRunsPerSession === undefined
-        ? {}
-        : { task: { dag: { max_runs_per_session: options.maxRunsPerSession } } }),
+      task: {
+        state_dir: ownedTaskStateDir(project),
+        ...(options.maxRunsPerSession === undefined
+          ? {}
+          : { dag: { max_runs_per_session: options.maxRunsPerSession } }),
+      },
     })
-  const taskStore = createTaskRecordStore({ project_dir: project })
+  const taskStore = options.taskStore ?? createTaskRecordStore(ownedTaskState(project))
   const runner = options.runner ?? new ImmediateRunner()
   const taskManager = resultPersistingManager(
     createTaskManager({
@@ -501,7 +509,12 @@ describe("DAG failure, crash, and policy end to end", () => {
       // given
       const runner = new ControlledRunner()
       const project = tempProject()
-      const fixture = e2eFixture({ runner, project, store: memoryStore(project) })
+      const fixture = e2eFixture({
+        runner,
+        project,
+        store: memoryStore(project),
+        taskStore: createInMemoryTaskRecordStore(resolveStateDir({ project_dir: project })),
+      })
       const input = definition("failure-order", [
         categoryNode("graph-first-failure"),
         categoryNode("wall-clock-first-failure"),
@@ -585,7 +598,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     const recoveredRunner = new ImmediateRunner()
     const recoveredTaskManager = resultPersistingManager(
       createTaskManager({
-        store: createTaskRecordStore({ project_dir: project }),
+        store: createTaskRecordStore(ownedTaskState(project)),
         runners: { "in-process": recoveredRunner, process: recoveredRunner },
         planner,
         config: OmoTaskSettingsSchema.parse({ default_concurrency: 16, max_depth: 1 }),
@@ -744,7 +757,7 @@ describe("DAG failure, crash, and policy end to end", () => {
     fs.appendFileSync(fixture.store.paths.event(started.snapshot.runId), '{"schemaVersion":1,"seq":999')
 
     // when
-    const reopened = createDagFileStore({ project_dir: project })
+    const reopened = createDagFileStore(ownedTaskState(project))
     const recovered = reopened.readEvents(started.snapshot.runId, 0, { limit: 256 })
 
     // then
@@ -772,7 +785,7 @@ import { createDagFileStore } from ${JSON.stringify(storeModule)}
 const project = process.argv[2]
 const stopAt = Number(process.argv[3])
 const runId = ${JSON.stringify(runId)}
-const store = createDagFileStore({ project_dir: project })
+const store = createDagFileStore(${JSON.stringify(ownedTaskState(project))})
 store.writeCheckpoint(runId, { schemaVersion: 1, checkpointSeq: 0, runId, applied: [] })
 for (let seq = 1; seq <= stopAt; seq += 1) {
   store.appendEvent({ schemaVersion: 1, runId, seq, at: new Date(seq).toISOString(), lane: "boundary", type: "dag.diagnostic.added", diagnostic: { kind: "run_flag", message: String(seq), at: new Date(seq).toISOString() } })
@@ -796,7 +809,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     // when
     child.kill("SIGKILL")
     await child.exited
-    const reopened = createDagFileStore({ project_dir: project })
+    const reopened = createDagFileStore(ownedTaskState(project))
     const beforeReplay = reopened.readCheckpoint<{
       readonly checkpointSeq: number
       readonly applied: readonly number[]
@@ -867,7 +880,7 @@ for (let seq = 1; seq <= stopAt; seq += 1) {
     const old = "2026-08-01T00:00:00.000Z"
     const store = createDagFileStore({
       project_dir: project,
-      task: { dag: { retention_days: 7 } },
+      task: { state_dir: ownedTaskStateDir(project), dag: { retention_days: 7 } },
     })
     const terminalRun = "dag-terminal-expired" as DagRunId
     const liveRun = "dag-live-old" as DagRunId
