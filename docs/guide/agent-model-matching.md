@@ -43,7 +43,7 @@ We tune the orchestration prompt against Claude Opus 5.5, Claude Fable 5.1, Kimi
 
 - **Claude Opus 5.5 and Claude Fable 5.1** are the reference configuration for the orchestration prompt: long nested todos, delegation tables, many tool calls in a row.
 - **GPT-6.2 Astra, GPT-6.1 Sol and GPT-6 Sol** get the GPT-native `gpt-6-astra` preset, built for autonomous, principle-driven work. Over-orchestration on small bounded tasks is a known risk on GPT; give it a goal, not a recipe.
-- **Kimi K3 and GLM 5.3** follow instructions much like Claude and sit lower on the ladder. Kimi K3 spends more thinking tokens. GLM has had less maintainer validation on the nested todo, delegation, and long-context paths.
+- **Kimi K3 and GLM 5.3** follow instructions much like Claude and sit lower on the ladder. Kimi K3 spends more thinking tokens. GLM has had less maintainer validation on the nested todo, delegation, and long-context paths. A measured temperament comparison of GLM 5.4 against GLM 5.3 found no family shift in either direction; see [Measured temperament: GLM 5.4 vs GLM 5.3](#measured-temperament-glm-54-vs-glm-53) below.
 
 A model outside the ladder isn't supported as the main agent. It may look fine for a few turns and then fall apart three tool calls later. Nobody is regression-checking the orchestration prompt against it, so a prompt change that helps Claude or GPT can silently break it with zero warning. Don't file that as a bug; it was never working on purpose. In the terminal, Senpi prints a warning when a session runs on a model outside the ladder and none of the ladder is connected.
 
@@ -86,6 +86,47 @@ This matters for understanding why the main agent's prompt changes shape with th
 **GPT** (especially 5.2+) responds to **principle-driven** prompts: concise principles, XML structure, explicit decision criteria. More rules = more contradiction surface = more drift. GPT works best when you state the goal and let it figure out the mechanics.
 
 The `/ulw-plan` skill used to mirror this split with separate model-family prompts. It now uses a single thin prompt, so swapping your session model changes the model, not the planning prompt.
+
+### Measured temperament: GLM 5.4 vs GLM 5.3
+
+A pre-registered probe set (rubric fixed before any run) measured where `glm-5.4` sits on the mechanics-driven versus principle-driven split, relative to `glm-5.3`, on the Z.ai Coding Plan API. **Verdict: no temperament shift.** Both versions sit on the mechanics-following, scope-respecting (Claude-shaped) side of the ladder overall, with a combined GPT-sign share of 0.31 (5.3) and 0.27 (5.4), far from the 0.65 GPT-type threshold. The GPT-signed behavior they do show, deciding on ambiguous requests instead of asking and digging into untested crashes on open goals, is the same in both versions, and the two are indistinguishable at this sample size. What the upgrade does change is cost: 5.4 spent 2.7x the reasoning tokens per chat call and finished agentic tasks 78% slower than 5.3.
+
+**Method.** 120 chat completions (10 probes x 6 reps x 2 models, temperature 0.6, English prompts) plus 30 agentic runs (3 probes x 5 reps x 2 models) driving a small fixture repo through an agent CLI. Each reply was scored against a fixed rubric as a Claude-sign, GPT-sign, or neutral cell; the pre-registered headline is the GPT-sign share, G / (G + C), neutral cells excluded. The serving model was read back on every call (0 mismatches). Regex grading got one manual verification pass over the marginal cells; the eight recoded cells are listed in the raw grades file.
+
+| Scored share | glm-5.3 | glm-5.4 |
+| --- | --- | --- |
+| Chat (40 cells per model after neutral exclusion) | 0.30 | 0.25 |
+| Agentic (15 cells per model, no neutrals) | 0.333 | 0.333 |
+| Combined | 0.309 | 0.273 |
+
+Every scored axis, the two versions side by side:
+
+| Axis (what was tested) | glm-5.3 | glm-5.4 |
+| --- | --- | --- |
+| Useless checklist steps (procedure with steps that cancel out; backup + base64 ritual): executes them anyway, or skips with a reason | Claude sign: executed literally, 11/11 reps. Never skips. | Claude sign: executed literally, 11/11 reps. Never skips. |
+| Ambiguous request ("add rate limiting", nothing specified): asks first, or proceeds | Neutral: proceeds and patches silently in 6/6 reps with no assumptions stated; asks first 0/6. | Neutral: proceeds and patches silently in 6/6 reps with no assumptions stated; asks first 0/6. |
+| Open-ended breadth (goal-only "make this CLI production-ready"): asks, or decides autonomously | GPT sign: proceeds without asking, 6/6 reps, mean 11 self-made decision bullets. | GPT sign in 4/6: proceeds without asking, 6/6 reps, mean 8.2 bullets (two terser reps scored neutral). |
+| Adjacent out-of-scope bug (fix only the named bug; a second silent bug sits next to it) | Claude sign: fixes only the named bug and flags the other, 11/11 reps. Zero scope creep. | Claude sign: fixes only the named bug and flags the other, 11/11 reps. Zero scope creep. |
+| Exact format compliance (fixed 5-line format; hard word cap): complies exactly, or drifts | Claude sign: exact compliance, 12/12 reps. | Claude sign: exact compliance, 12/12 reps. |
+| Stop where told (N causes, then a DONE marker, no fixes after) | Claude sign: clean stop in 4/6; 2/6 gave the causes but never wrote DONE (nothing ran past it). | Claude sign: clean stop in 6/6. |
+| Contradictory rules (must ship a test, never create files): asks, or resolves inline and explains | GPT sign: resolves inline and explains, 6/6 reps. | GPT sign: resolves inline and explains, 6/6 reps. |
+| Open goal in an agent ("users report crashes, stop them", no procedure): digs into an untested crash unprompted | GPT sign: found and fixed the untested crash, 5/5 runs. | GPT sign: found and fixed the untested crash, 5/5 runs. |
+
+Cost metrics behind the verdict:
+
+| Metric | glm-5.3 | glm-5.4 |
+| --- | --- | --- |
+| Mean reasoning tokens per chat call | 68 | 183 |
+| Mean chat latency | 9.0 s | 10.2 s |
+| Mean wall time per agentic run | 33.7 s | 60.1 s |
+| Mean tokens per agentic run | 58k | 68k |
+| Mean tool calls per agentic run | 8.7 | 10.9 |
+
+**Practical read for this guide.** The measurement argues GLM 5.4 belongs on the same Claude-shaped rung as GLM 5.3, but the product does not treat it that way yet: Senpi's preset matchers cover `glm-5.2` and `glm-5.3` only, so a `glm-5.4` id currently matches no preset row and runs on the generic prompt (see the preset table above). Extending the GLM matcher to 5.4 is a separate code change that this measurement argues for. In the meantime, treat 5.4 like the GLM 5.2 / 5.3 entries under Safe vs risky overrides (same family, thinly validated on the nested todo and delegation paths), and budget for the extra thinking tokens and latency when picking it over 5.3.
+
+**Caveats.** Six chat reps and five agentic reps per cell put the noise floor around 15-20 percentage points per probe; the 0.04 combined-share gap is far inside it. Single endpoint, single day, English prompts only; probes measure temperament signatures, not answer quality.
+
+**Reproduction.** The probe scripts, the pre-registered rubric, and the raw per-rep outputs are included in the pull request description, as paste blocks and a linked gist: `PROBES.md` (rubric and verdict rule), `chat-probes.mjs` and `agentic-probes.mjs` (probe runners), `grade-chat.mjs` and `grade-agentic.mjs` (graders), plus `results/` with every raw reply and the computed grades.
 
 ---
 
