@@ -184,12 +184,13 @@ export function registerMemoryStatic(input: {
         return undefined
       }
       // Read host getters while this event context is live, before journal or queue I/O.
-      const selection = !identity.oneShot && input.hasUserActivity(sessionId)
-        ? {
-            registry: resolveMemoryModelRegistry(eventCtx),
-            sessionModel: resolveMemorySessionModel(eventCtx),
-          }
-        : undefined
+      const selection =
+        !identity.oneShot && input.hasUserActivity(sessionId)
+          ? {
+              registry: resolveMemoryModelRegistry(eventCtx),
+              sessionModel: resolveMemorySessionModel(eventCtx),
+            }
+          : undefined
       observer?.phase("onSettled.journal.reconcileSession")
       const result = await journalWiringFor(identity).reconcileSession(eventCtx, observer?.signal)
       observer?.signal.throwIfAborted()

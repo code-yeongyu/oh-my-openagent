@@ -840,7 +840,7 @@ describe("session shutdown pre-drain bounds", () => {
       kibitzerChildStarter: {
         createRunner: () => ({
           start: async () => {
-          started.resolve(undefined)
+            started.resolve(undefined)
             return await new Promise<never>(() => {})
           },
         }),
