@@ -72,6 +72,8 @@ jobs:
   gate-reuse:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9932.
     runs-on: ubuntu-24.04
+    outputs:
+      exact_stamp_ci: ${{ steps.source_ci.outputs.exact_stamp_ci }}
     permissions:
       actions: read
       contents: read
@@ -158,6 +160,7 @@ jobs:
           echo "No open ci:platform-red issue."
 
       - name: Require successful CI for prepared release source
+        id: source_ci
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -356,7 +359,13 @@ jobs:
           }
 
           if [ -n "$SOURCE_SHA" ]; then
-            source ".github/scripts/release-push-proof.sh"
+            # The push proof is dispatch code: load it before the checkout moves to the source it judges.
+            proof_dir="$(mktemp -d)"
+            trap 'rm -rf "$proof_dir"' EXIT
+            git show "${GITHUB_SHA}:.github/scripts/release-push-proof.sh" > "$proof_dir/release-push-proof.sh"
+            git show "${GITHUB_SHA}:.github/scripts/release-push-proof.mjs" > "$proof_dir/release-push-proof.mjs"
+            git show "${GITHUB_SHA}:.github/scripts/release-proof-contract.json" > "$proof_dir/release-proof-contract.json"
+            source "$proof_dir/release-push-proof.sh"
             wait_for_ci "$SOURCE_SHA" "push"
             if [ -z "$PREPARED_RELEASE_SHA" ]; then exit 0; fi
             # Read the checker from the green basis, not from the delta it is judging.
@@ -368,6 +377,7 @@ jobs:
             # PR CI can be indexed by the stamp SHA while testing its merge tree.
             # A push run at the stamp tests the source we actually publish.
             wait_for_ci "$PREPARED_RELEASE_SHA" "push"
+            echo "exact_stamp_ci=${PREPARED_RELEASE_SHA}" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           wait_for_ci "$PREPARED_RELEASE_SHA"
@@ -741,7 +751,9 @@ jobs:
           # Assemble the changes/unreleased fragments into this release's CHANGELOG section and
           # delete them (same release commit), so the released commit carries the notes the GitHub
           # release body is later extracted from.
-          bun run script/stamp-release-changelog.ts "$VERSION"
+          # Replay uses the stamp commit's UTC date, even if generation crosses midnight.
+          stamp_time="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          bun run script/stamp-release-changelog.ts "$VERSION" "${stamp_time%%T*}"
           # The stamp step assembled changes/unreleased/*.md into the released CHANGELOG section, wrote their
           # log blocks into changes.md and packages/*/changes.md, and deleted the fragments; stage all of it.
           git add changes changes.md packages/*/changes.md
@@ -778,7 +790,7 @@ jobs:
           # The stamp may change only RELEASE_STATE_PATHS: ci-fast-path.mjs keeps a release-state pull request on Linux
           # when its base is platform-green and its diff is inside that list, so a stamp outside it must stop here.
           git diff --cached --no-renames --name-only -z | node script/release-state-paths.mjs --check
-          git diff --cached --quiet || git commit -m "release: v${VERSION}"
+          git diff --cached --quiet || GIT_COMMITTER_DATE="$stamp_time" git commit -m "release: v${VERSION}"
 
           echo "needs_push=true" >> "$GITHUB_OUTPUT"
           echo "release_branch=${RELEASE_BRANCH}" >> "$GITHUB_OUTPUT"
@@ -950,16 +962,61 @@ jobs:
           JOB_SUMMARY_NEXT: If this fails, merge the release-state PR or fix its checks before rerunning publish.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
+  verify-exact-pinned-stamp:
+    needs: prepare-release-state
+    if: inputs.source_sha != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    outputs:
+      independent_ci_required: ${{ steps.verify.outputs.independent_ci_required }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.prepare-release-state.outputs.release_sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Reproduce release bytes on the exact stamp
+        id: verify
+        env:
+          PIN: ${{ inputs.source_sha }}
+          STAMP: ${{ needs.prepare-release-state.outputs.release_sha }}
+        run: |
+          set -euo pipefail
+          proof="$(mktemp -d)"
+          trap 'rm -rf "$proof"' EXIT
+          for file in release-state-paths.mjs verify-release-stamp-tree.mjs; do
+            git show "${GITHUB_SHA}:script/${file}" > "$proof/$file"
+          done
+          if ! node "$proof/release-state-paths.mjs" --check-stamp "$PIN" "$STAMP"; then
+            # Never execute a generated artifact or generator from a source-changing delta.
+            # This is not proof: both tag paths must instead establish CI for the stamp SHA.
+            echo "independent_ci_required=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Keep runner tokens, package credentials and user Git config out of repo generators.
+          mkdir "$proof/home"
+          env -i PATH="$PATH" HOME="$proof/home" CI=true GIT_CONFIG_NOSYSTEM=1 \
+            node "$proof/verify-release-stamp-tree.mjs" "$(git rev-parse --verify "$PIN")" "$STAMP"
+
   dispatch-provenance-safe-publish:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9936.
     runs-on: ubuntu-24.04
-    needs: [release-metadata, prepare-release-state]
+    needs: [release-metadata, prepare-release-state, verify-exact-pinned-stamp]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha == '' &&
       inputs.operator_darwin_artifacts == '' &&
       inputs.operator_darwin_manifest_sha256 == '' &&
+      (needs.verify-exact-pinned-stamp.result == 'success' || (inputs.source_sha == '' && needs.verify-exact-pinned-stamp.result == 'skipped')) &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success'
     permissions:
@@ -973,6 +1030,7 @@ jobs:
 
       - name: Tag prepared source and dispatch provenance-safe publish
         env:
+          INDEPENDENT_CI_REQUIRED: ${{ needs.verify-exact-pinned-stamp.outputs.independent_ci_required }}
           SOURCE_SHA: ${{ inputs.source_sha }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
           RELEASE_SHA: ${{ needs.prepare-release-state.outputs.release_sha }}
@@ -1004,10 +1062,12 @@ jobs:
               git fetch --no-tags origin "$GITHUB_SHA"
               git show "${GITHUB_SHA}:script/release-state-paths.mjs" > "$proof_dir/dispatch.mjs"
             fi
-            if ! node "$proof_dir/dispatch.mjs" --check-stamp "$pin" "$RELEASE_SHA"; then
+            if [ "${INDEPENDENT_CI_REQUIRED:-}" = true ] || ! node "$proof_dir/dispatch.mjs" --check-stamp "$pin" "$RELEASE_SHA"; then
               # A reused stamp may already have exact push CI even though it cannot reuse the pin's CI.
-              git show "${GITHUB_SHA}:.github/scripts/release-push-proof.sh" > "$proof_dir/push-proof.sh"
-              source "$proof_dir/push-proof.sh"
+              git show "${GITHUB_SHA}:.github/scripts/release-push-proof.sh" > "$proof_dir/release-push-proof.sh"
+              git show "${GITHUB_SHA}:.github/scripts/release-push-proof.mjs" > "$proof_dir/release-push-proof.mjs"
+              git show "${GITHUB_SHA}:.github/scripts/release-proof-contract.json" > "$proof_dir/release-proof-contract.json"
+              source "$proof_dir/release-push-proof.sh"
               runs="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs" \
                 -f event=push -f "head_sha=${RELEASE_SHA}" -f status=success -f per_page=100)"
               push_run="$(select_green_push "$RELEASE_SHA" <<< "$runs")"
@@ -1072,11 +1132,12 @@ jobs:
     # no package is published before the tag is right.
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9928.
     runs-on: ubuntu-24.04
-    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state]
+    needs: [gate-reuse, preflight-trust, release-metadata, prepare-release-state, verify-exact-pinned-stamp]
     if: >-
       always() &&
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha != '' &&
+      (needs.verify-exact-pinned-stamp.result == 'success' || (inputs.source_sha == '' && needs.verify-exact-pinned-stamp.result == 'skipped')) &&
       needs.gate-reuse.result == 'success' &&
       needs.preflight-trust.result == 'success' &&
       needs.release-metadata.result == 'success' &&
@@ -1093,11 +1154,18 @@ jobs:
 
       - name: Tag prepared release source
         env:
+          INDEPENDENT_CI_REQUIRED: ${{ needs.verify-exact-pinned-stamp.outputs.independent_ci_required }}
+          EXACT_STAMP_CI: ${{ needs.gate-reuse.outputs.exact_stamp_ci }}
           VERSION: ${{ needs.release-metadata.outputs.version }}
           RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           LAZYCODEX_ONLY: ${{ inputs.lazycodex_only }}
         run: |
           set -euo pipefail
+
+          if [ "${INDEPENDENT_CI_REQUIRED:-}" = true ] && [ "${EXACT_STAMP_CI:-}" != "$RELEASE_SHA" ]; then
+            echo "::error::Refusing to tag a source-changing delta without successful CI on the exact stamp."
+            exit 1
+          fi
 
           if [ "$(git rev-parse HEAD)" != "$RELEASE_SHA" ]; then
             echo "::error::Checked-out source does not match prepared release SHA ${RELEASE_SHA}."

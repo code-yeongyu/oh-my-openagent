@@ -49,12 +49,15 @@ export function isReleaseStatePath(path) {
   )
 }
 
+export const isGeneratedReleasePath = (path) => matches(LINUX_VERIFIED_GENERATED_PATHS, path)
+export const isReleaseNotesPath = (path) => matches(PROSE_PATHS, path)
+
 const git = (args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
 const versionAt = (commit, manifest) => JSON.parse(git(["show", `${commit}:${manifest}`])).version
 
 // Every reason base..head is not a release stamp; empty when it is one. Renames are listed as a delete plus an add, so a
 // source file moved into a listed path still shows its deletion.
-function stampRefusals(base, head) {
+export function stampRefusals(base, head) {
   const fields = git(["diff", "--no-renames", "--name-status", "-z", base, head]).split("\0").filter(Boolean)
   const nativeManifest = "packages/omo-native/package.json"
   const rootVersion = versionAt(base, "package.json")

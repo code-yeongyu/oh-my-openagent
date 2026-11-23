@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process"
 import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { ciJobs, type Validation } from "./fixtures/publish-ci-validation"
+import { CI_YML_PATH, ciJobs, VALIDATIONS, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
 import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
 
 /**
@@ -58,13 +58,15 @@ const GH_STUB = [
   '    *"actions/workflows/ci.yml/runs"*)',
   '      local sha id=42 event=pull_request conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) event=push; conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; else id=41; fi ;; esac; done',
   '      printf \'{"workflow_runs":[{"id":%s,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$id" "$event" "$sha" "$conclusion" ;;',
-  '    *"/actions/runs/41/attempts/2/jobs?"*) printf "%s" "$PIN_JOBS" ;;',
-  '    *"/actions/runs/42/attempts/2/jobs?"*) printf "%s" "$STAMP_JOBS" ;;',
+  '    *"/actions/runs/41/attempts/2/jobs?"*) cat "$PIN_JOBS" ;;',
+  '    *"/actions/runs/42/attempts/2/jobs?"*) cat "$STAMP_JOBS" ;;',
+  '    *"/contents/.github/workflows/ci.yml?ref="*) cat "$CI_YML" ;;',
   "    *) return 1 ;;",
   "  esac",
   "}",
   "export -f gh leg_jobs",
   "sleep() { :; }",
+  `yq() { [ "$1" = -o=json ] || return 1; ${YQ_TO_JSON}; }`,
   "",
 ].join("\n")
 
@@ -90,6 +92,8 @@ interface Dispatch {
   readonly stampPushConclusion?: string
   readonly pinValidation?: Validation
   readonly stampValidation?: Validation
+  /** ci.yml served for the exact push SHA; the repository's own by default. */
+  readonly ciYml?: string
   readonly prepared?: string
   readonly receipt?: string
   readonly head?: string
@@ -146,6 +150,12 @@ function dispatch(input: Dispatch): Outcome {
   writeFileSync(script, GH_STUB + localized)
   writeFileSync(summary, "")
   writeFileSync(ghCalls, "")
+  const ciYml = join(root, "ci.yml")
+  writeFileSync(ciYml, input.ciYml ?? readFileSync(CI_YML_PATH, "utf8"))
+  const pinJobs = join(root, "pin-jobs.json")
+  writeFileSync(pinJobs, ciJobs(input.pinValidation))
+  const stampJobs = join(root, "stamp-jobs.json")
+  writeFileSync(stampJobs, ciJobs(input.stampValidation))
   const result = spawnSync("bash", ["-eo", "pipefail", script], {
     cwd: checkout,
     encoding: "utf8",
@@ -154,13 +164,16 @@ function dispatch(input: Dispatch): Outcome {
       ...fixture.gitEnv,
       GH_CALLS: ghCalls,
       GITHUB_STEP_SUMMARY: summary,
+      GITHUB_OUTPUT: join(root, "output"),
       SOURCE_SHA: input.pin ?? "",
-      GITHUB_SHA: prepared,
+      GITHUB_SHA: prepared || fixture.sha.T,
       LAZYCODEX_ONLY: "false",
       PUSH_CONCLUSION: input.pushConclusion ?? "success",
       STAMP_PUSH_CONCLUSION: input.stampPushConclusion ?? "success",
-      PIN_JOBS: ciJobs(input.pinValidation),
-      STAMP_JOBS: ciJobs(input.stampValidation),
+      PIN_JOBS: pinJobs,
+      STAMP_JOBS: stampJobs,
+      CI_YML: ciYml,
+      BUN_EXE: process.execPath,
       PREPARED_RELEASE_SHA: prepared,
       CI_BASIS_RECEIPT: input.receipt ?? "",
       CI_BASIS_HEAD: input.head ?? "",
@@ -186,24 +199,16 @@ function dispatch(input: Dispatch): Outcome {
 const RECEIPT = "ci-basis-20261116-01"
 
 describe("#given a pinned release", () => {
-  test.each([
-    "skipped-job",
-    "skipped-step",
-    "empty-response",
-    "missing-codex",
-    "skipped-senpi",
-    "skipped-macos-codex",
-    "skipped-macos-parity",
-    "skipped-windows-parity",
-    "skipped-unlisted",
-    "neutral-unlisted",
-    "allowed-skip",
-    "passed",
-  ] as const)("the parent requires validation evidence (%s) even if the pin push is green", (validation) => {
-    const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
-    expect(result.status === 0, result.output).toBe(validation === "passed" || validation === "allowed-skip")
-    expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
-  })
+  test.each(VALIDATIONS)(
+    "the parent requires closed-world validation evidence (%s) even if the pin push is green",
+    (validation) => {
+      const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
+      expect(result.status === 0, result.output).toBe(validation === "passed" || validation === "allowed-skip")
+      if (result.status !== 0 && validation !== "empty-response")
+        expect(result.output).toContain("update the release proof contract")
+      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+    },
+  )
 
   test.each(["skipped-job", "skipped-step", "passed"] as const)(
     "the child requires independent validation evidence (%s) for an exact non-stamp push",

@@ -33,7 +33,9 @@ const COMMITS = [
   [
     "A", "main", "O",
     file("script/release-state-paths.mjs", readFileSync(new URL("../release-state-paths.mjs", import.meta.url), "utf8")) +
-      file(".github/scripts/release-push-proof.sh", readFileSync(new URL("../../.github/scripts/release-push-proof.sh", import.meta.url), "utf8")),
+      ["release-push-proof.sh", "release-push-proof.mjs", "release-proof-contract.json"]
+        .map((name) => file(`.github/scripts/${name}`, readFileSync(new URL(`../../.github/scripts/${name}`, import.meta.url), "utf8")))
+        .join(""),
   ],
   ["B", "main", "A", file(".github/workflows/publish.yml", "on: workflow_dispatch\n# waiver\n")],
   ["C", "main", "B", file("src/a.ts", "c\n")],

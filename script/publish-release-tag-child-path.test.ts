@@ -5,7 +5,7 @@ import { spawnSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { ciJobs, type Validation } from "./fixtures/publish-ci-validation"
+import { CI_YML_PATH, ciJobs, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
 import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
 import {
   needsOf,
@@ -71,13 +71,14 @@ const STUBS = [
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
   '  case "$1 $2" in',
   '    "api --method") printf \'{"workflow_runs":[{"id":42,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"success"}]}\\n\' "$CI_EVENT" "$CI_HEAD" ;;',
-  '    "api --paginate") [[ "$*" == *"/actions/runs/42/attempts/2/jobs?"* ]] && printf "%s" "$CI_JOBS" ;;',
+  '    "api --paginate") [[ "$*" == *"/actions/runs/42/attempts/2/jobs?"* ]] && cat "$CI_JOBS" ;;',
+  '    "api -H") [[ "$*" == *"/contents/.github/workflows/ci.yml?ref=$CI_HEAD" ]] && cat "$CI_YML" ;;',
   '    "release list") printf "v1.0.0\\n" ;;',
   '    "release view") return 1 ;;',
   "  esac",
   "}",
   'bun() { cat >/dev/null; printf "%s\\n" "--latest=false"; }',
-  'yq() { if [ "${*: -1}" = "-" ]; then cat >/dev/null; fi; printf "%s\\n" "$PIN_SUPPORTED"; }',
+  `yq() { if [ "$1" = -o=json ]; then ${YQ_TO_JSON}; return; fi; if [ "\${*: -1}" = "-" ]; then cat >/dev/null; fi; printf "%s\\n" "$PIN_SUPPORTED"; }`,
   "",
 ].join("\n")
 
@@ -103,6 +104,7 @@ interface Run {
   readonly ciEvent?: "push" | "pull_request"
   readonly ciHead?: CommitName
   readonly validation?: Validation
+  readonly independentProof?: "missing" | CommitName
 }
 
 interface Outcome {
@@ -137,6 +139,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
   writeFileSync(script, STUBS + (input.where === PRE_PUSH ? runThroughReleaseBranchPush() : step(input.where).run))
   writeFileSync(ghCalls, "")
   writeFileSync(join(root, "output"), "")
+  writeFileSync(join(root, "ci-jobs.json"), ciJobs(input.validation))
   writeFileSync(join(root, "summary"), "")
   const result = spawnSync("bash", ["-eo", "pipefail", script], {
     cwd: checkout,
@@ -148,13 +151,18 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
       GITHUB_REPOSITORY: "test/repo",
       GITHUB_SHA: fixture.sha.A,
       CI_EVENT: input.ciEvent ?? "pull_request",
-      CI_JOBS: ciJobs(input.validation),
+      CI_JOBS: join(root, "ci-jobs.json"),
+      CI_YML: CI_YML_PATH,
+      BUN_EXE: process.execPath,
       CI_HEAD: fixture.sha[input.ciHead ?? input.prepared],
       GITHUB_OUTPUT: join(root, "output"),
       GITHUB_STEP_SUMMARY: join(root, "summary"),
       VERSION,
       DIST_TAG: "",
       RELEASE_SHA: prepared,
+      INDEPENDENT_CI_REQUIRED: String(input.independentProof !== undefined),
+      EXACT_STAMP_CI:
+        input.independentProof && input.independentProof !== "missing" ? fixture.sha[input.independentProof] : "",
       RELEASE_BRANCH: "refs/heads/release/test-source-state",
       GH_TOKEN: "",
       SOURCE_SHA: input.pin ? fixture.sha[input.pin] : "",
@@ -181,6 +189,14 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
 }
 
 describe("publish.yml child path release tag", () => {
+  test.each(["missing", "A", "C"] as const)(
+    "child tagging requires independent proof for the exact tree (%s)",
+    (proof) => {
+      const result = runStep({ where: TAG_STEP, prepared: "C", independentProof: proof })
+      expect(result.status === 0).toBe(proof === "C")
+      expect(result.originTag(`v${VERSION}`)).toBe(proof === "C" ? result.sha.C : "")
+    },
+  )
   test.each([
     ["H", "HT"],
     ["O", "OT"],
