@@ -309,10 +309,26 @@ phase `async`, attributed to the most recent extension activity on a best effort
 closes the store. If the worker ever does exit, the facade opens a fresh one on the next
 call and restores that worker's registrations.
 
-A core schema newer than this binary supports is refused with `gateway_schema_too_new`
-without applying migrations or lowering `user_version`. Extension registration/calls return
-the refusal; internal core store methods reject with an error carrying that code. Use a compatible binary
-to access that database.
+A binary that migrates the core store records a reader floor in `gateway_meta`
+(`reader_floor`): the oldest schema whose code may keep reading and writing that store. A
+step that only adds what older code never reads, or widens a CHECK to a value older code passes
+through, keeps the floor; v15 and v16 keep it at 14. An older binary that reads the floor
+(this release and later) opens a newer store whose floor it meets and keeps working at its own
+schema, so installing a newer omo does not cut those sessions off. A binary from before the
+floor, schema 14 included, refuses every newer store: its sessions keep working only while
+their store worker stays open, and any worker they open after the migration answers
+`gateway_schema_too_new`. A core schema newer than this binary supports, with no floor or a
+floor above this binary, is refused with `gateway_schema_too_new` without applying migrations
+or lowering `user_version`. Extension registration/calls return the refusal; internal core
+store methods reject with an error carrying that code. Use a compatible binary to access that
+database.
+
+An omob source build never migrates the store in a shared agent dir (`~/.omo/agent`, `~/.omo`,
+`~/.senpi/agent` under HOME, USERPROFILE or the account's home from the OS account database), nor
+a store reached through a link into one (a `gateway/` symlinked to a shared agent dir's): released
+sessions on the device read that store. When the account's home cannot be read, every store counts
+as shared. It answers `gateway_migration_failed` instead; run source builds with
+`OMO_CODING_AGENT_DIR` set to an isolated agent dir.
 
 The same `gateway_schema_too_new` refusal applies when an extension's stored
 `extension_schema.version` exceeds the caller's `migrations.length`. Registration and
