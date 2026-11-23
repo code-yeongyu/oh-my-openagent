@@ -137,6 +137,8 @@ function manualClock() {
         probe?.()
       }
     },
+    /** Whether socket-client armed its stall probe through the mocked setInterval. */
+    probed: () => probe !== undefined,
     /** Fires the timer armed last, as the event loop would once its delay passed. */
     fireLast() {
       timers.at(-1)?.()
@@ -177,6 +179,8 @@ test("#given a redialed read #then the second attempt gets only what is left of 
       },
       (request) => request({ type: "get_messages" }),
     )
+    // Fail loudly, not by hanging, if socket-client armed its probe or first timer somewhere these mocks do not reach.
+    expect({ probe: clock.probed(), armed: clock.armed }).toEqual({ probe: true, armed: [400] })
     // Read the outcome without expect().rejects, which waits on a timer this clock replaces.
     const outcome = call.then(
       () => "resolved",
@@ -193,6 +197,7 @@ test("#given a redialed read #then the second attempt gets only what is left of 
     sockets[1]?.emit("connect")
     await flush()
     const secondAttempt = clock.armed.slice(2)
+    expect(clock.armed).toEqual([400, 400, 100, 100])
     clock.run(100)
     clock.fireLast()
     const settled = await outcome
