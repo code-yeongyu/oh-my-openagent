@@ -35,9 +35,8 @@ describe("buildGoalRows", () => {
     expect(objective?.action).toEqual({ kind: "goal" })
   })
 
-  test("#given tokens spent #when built #then the goal's own total is shown", () => {
-    // given the session block counts this turn; the goal counts the whole pursuit
-    expect(texts(buildGoalRows(goal(), 40)).some((t) => t.startsWith("tokens") && t.includes("148"))).toBe(true)
+  test("#given goal usage #when built #then the displayed subtotal identifies its exclusion of cache tokens", () => {
+    expect(texts(buildGoalRows(goal(), 40)).some((t) => t.includes("148") && t.includes("excl. cache"))).toBe(true)
   })
 
   test("#given a token budget #when built #then a bar shows how much of it is gone", () => {
