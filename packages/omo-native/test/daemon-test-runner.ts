@@ -128,12 +128,23 @@ function childTreeCpuSeconds(rootPid: number): number {
   return total
 }
 
+// Every signal these tests send goes through this check first. A pid of 0 (or a negative one) addresses a whole
+// process group, and 1 is init, so a bad value parsed from a child's output could kill this test runner's own group
+// or the box: only a positive integer that is neither init, this process nor this process's group is accepted.
+const OWN_PGID = Number(spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }).stdout.trim())
+export function signalTarget(pid: unknown, what: string): number {
+  if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid <= 1 || pid === process.pid || pid === OWN_PGID) {
+    throw new Error(`refusing to signal ${what}: ${String(pid)} is not a separate process`)
+  }
+  return pid
+}
+
 // Each child leads its own process group, so a tripped bound kills every process it started, not only itself. A
 // daemon the child detaches on purpose (host ensure's shard) leaves the group and stays with the harness cleanup.
 function killGroup(child: ChildProcess): void {
   if (child.pid === undefined) return
   try {
-    process.kill(-child.pid, "SIGKILL")
+    process.kill(-signalTarget(child.pid, "the bounded child's process group"), "SIGKILL")
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
   }

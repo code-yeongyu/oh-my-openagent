@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:
 import { join, resolve } from "node:path"
 
 import { resolveSenpi } from "../bin/lib/package-paths.js"
-import { createDaemonTestRunner } from "./daemon-test-runner"
+import { createDaemonTestRunner, signalTarget } from "./daemon-test-runner"
 
 const PACKAGE_ROOT = resolve(import.meta.dir, "..")
 const LAUNCHER = join(PACKAGE_ROOT, "bin", "omo.js")
@@ -84,9 +84,9 @@ export function createDaemonEngineHarness() {
   function killShardUncleanly(supervisorPid: number): void {
     const childPid = childPidOf(supervisorPid)
     ownedPids.add(childPid)
-    process.kill(supervisorPid, "SIGSTOP")
-    process.kill(childPid, "SIGKILL")
-    process.kill(supervisorPid, "SIGKILL")
+    process.kill(signalTarget(supervisorPid, "the shard supervisor"), "SIGSTOP")
+    process.kill(signalTarget(childPid, "the shard host child"), "SIGKILL")
+    process.kill(signalTarget(supervisorPid, "the shard supervisor"), "SIGKILL")
     waitForExit(childPid)
     waitForExit(supervisorPid)
     ownedPids.delete(childPid)
@@ -113,7 +113,10 @@ export function createDaemonEngineHarness() {
     ownedPids.clear()
     // A shard supervisor the engine detached into its own process group before `host ensure` answered (a bound
     // tripped mid-start) never reached ownedPids; it still carries its sandbox in its environment.
-    for (const root of roots) for (const pid of pidsWithAgentDir(root)) attempt(() => killOwned(pid))
+    for (const root of roots)
+      attempt(() => {
+        for (const pid of pidsWithAgentDir(root)) attempt(() => killOwned(pid))
+      })
     for (const root of roots.splice(0)) attempt(() => rmSync(root, { recursive: true, force: true }))
     if (failures.length > 0) throw new AggregateError(failures, "daemon harness cleanup failed")
   }
@@ -132,8 +135,9 @@ export function waitForExit(pid: number): void {
 }
 
 function exited(pid: number): boolean {
+  const target = signalTarget(pid, "a process to wait for")
   try {
-    process.kill(pid, 0)
+    process.kill(target, 0)
   } catch {
     return true
   }
@@ -164,7 +168,12 @@ function pidsWithAgentDir(root: string): number[] {
       })
       .map(Number)
   }
-  const listing = spawnSync("ps", ["-axwwE", "-o", "pid=,command="], { encoding: "utf8" }).stdout
+  // With every environment shown the listing runs to megabytes; spawnSync's default 1 MiB buffer would cut it short
+  // and silently drop the later (newest) processes, which are exactly the ones a test just started.
+  const listed = spawnSync("ps", ["-axwwE", "-o", "pid=,command="], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
+  if (listed.status !== 0 || listed.error !== undefined)
+    throw new Error(`ps failed listing processes: ${String(listed.error ?? listed.stderr)}`)
+  const listing = listed.stdout
   return listing
     .split("\n")
     .filter((line) => line.split(/\s+/).includes(marker))
@@ -173,8 +182,9 @@ function pidsWithAgentDir(root: string): number[] {
 }
 
 function killOwned(pid: number): void {
+  const target = signalTarget(pid, "a sandbox-owned process")
   try {
-    process.kill(pid, "SIGKILL")
+    process.kill(target, "SIGKILL")
   } catch {
     return
   }

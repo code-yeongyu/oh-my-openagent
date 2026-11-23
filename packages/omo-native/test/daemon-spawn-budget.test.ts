@@ -5,7 +5,12 @@ import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
-import { createDaemonTestRunner, TREE_BOUNDED_TEST_TIMEOUT_MS, SpawnBudgetError } from "./daemon-test-runner"
+import {
+  createDaemonTestRunner,
+  signalTarget,
+  TREE_BOUNDED_TEST_TIMEOUT_MS,
+  SpawnBudgetError,
+} from "./daemon-test-runner"
 
 const { run, killChildren } = createDaemonTestRunner()
 setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
@@ -35,12 +40,15 @@ function alive(pid: number): boolean {
   return stat !== "" && !stat.startsWith("Z")
 }
 
-// Starts a detached process through a launcher that exits once the process says it is running, so the process is
-// orphaned like the supervisor the engine leaves behind, and reports its pid.
+// Starts a detached node process (the engine's runtime in these tests, OMO_RUNTIME=node) through a launcher that exits
+// once the process says it is running, so it is orphaned like the supervisor the engine leaves behind; reports its pid.
 function startOrphan(env: NodeJS.ProcessEnv): number {
   const orphan = `process.stdout.write("ready\\n"); process.stdout.on("error", () => {}); setTimeout(() => {}, 120_000)`
-  const launcher = `const c = require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(orphan)}], { detached: true, stdio: ["ignore", "pipe", "ignore"] }); c.stdout.once("data", () => { console.log(c.pid); process.exit(0) })`
-  return Number(spawnSync(process.execPath, ["-e", launcher], { env, encoding: "utf8", timeout: 60_000 }).stdout.trim())
+  const launcher = `const c = require("node:child_process").spawn("node", ["-e", ${JSON.stringify(orphan)}], { detached: true, stdio: ["ignore", "pipe", "ignore"] }); c.stdout.once("data", () => { console.log(c.pid); process.exit(0) })`
+  const launched = spawnSync("node", ["-e", launcher], { env, encoding: "utf8", timeout: 60_000 })
+  if (launched.status !== 0)
+    throw new Error(`orphan launcher failed: status ${launched.status} ${String(launched.error ?? "")}`)
+  return signalTarget(Number(launched.stdout.trim()), "the orphan fixture")
 }
 
 async function rejection(promise: Promise<unknown>): Promise<unknown> {
@@ -98,7 +106,9 @@ if (process.platform !== "win32") {
         } finally {
           try {
             process.kill(orphan, "SIGKILL")
-          } catch {}
+          } catch (error) {
+            if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+          }
         }
       })
     })
@@ -112,16 +122,31 @@ test("#given an exited child left unreaped on purpose #when the harness waits fo
   // The shell starts a child, prints its pid, and execs into sleep, which never waits: the child stays a zombie.
   const parent = spawn("sh", ["-c", "true & echo $!; exec sleep 60"], { stdio: ["ignore", "pipe", "ignore"] })
   try {
-    const zombie = Number(
-      await new Promise<string>((resolveLine, rejectLine) => {
-        parent.stdout.once("data", (chunk: Buffer) => resolveLine(chunk.toString().trim()))
-        parent.once("error", rejectLine)
-      }),
+    const zombie = signalTarget(
+      Number(
+        await new Promise<string>((resolveLine, rejectLine) => {
+          parent.stdout.once("data", (chunk: Buffer) => resolveLine(chunk.toString().trim()))
+          parent.once("error", rejectLine)
+        }),
+      ),
+      "the zombie fixture",
     )
     expect(() => waitForExit(zombie)).not.toThrow()
   } finally {
     parent.kill("SIGKILL")
   }
+})
+
+// A pid read from a child's output can be empty (a launcher that timed out) and parse as 0, which addresses this test
+// runner's own process group; init, this process and this process's group are refused too. No signal is sent here.
+test("#given a pid that is not a separate process #when it is checked as a signal target #then it is refused", () => {
+  const ownGroup = Number(
+    spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }).stdout.trim(),
+  )
+  for (const bad of [Number(""), Number("x"), -5, 1, 1.5, process.pid, ownGroup]) {
+    expect(() => signalTarget(bad, "a fixture")).toThrow("refusing to signal a fixture")
+  }
+  expect(signalTarget(process.pid + 1_000_000, "a fixture")).toBe(process.pid + 1_000_000)
 })
 
 // The test timeout is only an outer bound: it must end a broken bound with at most half of the job's limit spent, so
