@@ -118,7 +118,8 @@ export async function planFactsRouting(
     if (names.length > entry.names.length) {
       index[at] = { ...entry, names }
       // Keep the canonical identity; a newly encountered name is another alias, not a rename.
-      const existing = bucket.target.isNew ? undefined
+      const existing = bucket.target.isNew
+        ? undefined
         : parseMemoryFile(await readFile(join(repoDir, personCardPath(slug)), "utf8"))
       if (existing?.frontmatter.read_only !== "true") {
         bucket.target = {
@@ -173,14 +174,20 @@ function personCardPath(slug: string): string {
 async function renderPersonCard(repoDir: string, target: FactsPersonTarget, limits: PeopleLimits): Promise<string> {
   if (target.person === undefined) throw new Error(`Person target lacks identity: ${target.slug}`)
   if (target.isNew) {
-    const body = `${serializePeopleCard({
-      entries: [{ prefix: "IDENTITY", content: target.person.name }],
-    }, limits)}\n`
-    return renderMemoryFile({
-      description: `Person - ${target.person.name}`,
-      kind: "person",
-      aliases: [...target.person.aliases],
-    }, body)
+    const body = `${serializePeopleCard(
+      {
+        entries: [{ prefix: "IDENTITY", content: target.person.name }],
+      },
+      limits,
+    )}\n`
+    return renderMemoryFile(
+      {
+        description: `Person - ${target.person.name}`,
+        kind: "person",
+        aliases: [...target.person.aliases],
+      },
+      body,
+    )
   }
   const parsed = parseMemoryFile(await readFile(join(repoDir, personCardPath(target.slug)), "utf8"))
   const frontmatter = { ...parsed.frontmatter, aliases: [...target.person.aliases] }
