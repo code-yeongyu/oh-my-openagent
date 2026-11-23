@@ -11,6 +11,7 @@ import {
   activeRunId,
   cleanupStaleLockFixtures,
   deadPid,
+  dispatchSettledTurn,
   settleTurn,
   staleLockFixture,
 } from "./wiring-reflection-stale-lock.test-support"
@@ -139,11 +140,17 @@ function staleNotices(item: Fixture): string[] {
 describe("the stale reflection-lock reaper in a session (#11976)", () => {
   test("#given case A before the session's first settle #when session start reconciles #then the lock is released with abandoned.json(launch_interrupted)", async () => {
     // given
-    const item = await staleLockFixture()
+    const recovery = Promise.withResolvers<void>()
+    const item = await staleLockFixture(undefined, {
+      onReconcileFinished: (pass) => {
+        if (pass === 1) recovery.resolve()
+      },
+    })
     const runId = await launchInterrupted(item)
 
     // when
-    await settleTurn(item)
+    await dispatchSettledTurn(item)
+    await recovery.promise
 
     // then
     expect(await activeRunId(item)).not.toBe(runId)

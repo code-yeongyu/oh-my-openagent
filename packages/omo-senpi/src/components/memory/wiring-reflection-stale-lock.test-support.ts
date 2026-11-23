@@ -115,6 +115,7 @@ export async function staleLockFixture(
   options: {
     readonly reconcileReleases?: boolean
     readonly createFactsExtractor?: MemoryWiringOptions["createFactsExtractor"]
+    readonly onReconcileFinished?: (pass: number) => void
     /** Process and sentinel seams for the real reconciliation the runtime runs. */
     readonly reconcileSeams?: Pick<ReflectionRunReconciliationOptions, "getPidLiveness" | "waitForOutcome">
   } = {},
@@ -165,10 +166,10 @@ export async function staleLockFixture(
       reconciles.count += 1
       // Passes are numbered from 1 (the count after this call); a mark holds the count before the step under test.
       const pass = reconciles.count
-      reconciles.onStart?.(pass)
-      if (options.reconcileReleases === false) return
-      const reservation = observeContention(store, reconciles.contention, pass)
       try {
+        reconciles.onStart?.(pass)
+        if (options.reconcileReleases === false) return
+        const reservation = observeContention(store, reconciles.contention, pass)
         reconciles.results.push({
           pass,
           results: await reconcileReflectionRuns({
@@ -187,6 +188,8 @@ export async function staleLockFixture(
           error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
         })
         throw error
+      } finally {
+        options.onReconcileFinished?.(pass)
       }
     },
   } as unknown as MemoryIdentityRuntime
@@ -242,6 +245,12 @@ type Fixture = Awaited<ReturnType<typeof staleLockFixture>>
 let inputCounter = 0
 
 export async function settleTurn(item: Fixture): Promise<void> {
+  await dispatchSettledTurn(item)
+  // The turn ends before its identity reconcile does; a settled turn here includes that pass's outcome.
+  await item.work.settled()
+}
+
+export async function dispatchSettledTurn(item: Fixture): Promise<void> {
   const inputId = `input-${++inputCounter}`
   await item.pi.dispatch("input", { type: "input", source: "rpc", inputId, text: "Work on this." }, item.eventCtx)
   await item.pi.dispatch(
@@ -251,8 +260,6 @@ export async function settleTurn(item: Fixture): Promise<void> {
   )
   await item.pi.dispatch("agent_end", { aborted: false, willRetry: false }, item.eventCtx)
   await item.pi.dispatch("agent_settled", {}, item.eventCtx)
-  // The turn ends before its identity reconcile does; a settled turn here includes that pass's outcome.
-  await item.work.settled()
 }
 
 // The shape from #10377: the child finished and recorded its outcome, publish had claimed the run,
