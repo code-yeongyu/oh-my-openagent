@@ -184,8 +184,14 @@ function killGroup(child: ChildProcess): void {
 // member exits (and is reaped by init) on its own schedule. Wait, bounded, until no live member is left.
 const GROUP_EXIT_DEADLINE_MS = 10_000
 function liveGroupMembers(pgid: number): number {
-  const listing = spawnSync("ps", ["-axo", "pgid=,stat="], { encoding: "utf8" }).stdout
-  return listing
+  const listed = spawnSync("ps", ["-axo", "pgid=,stat="], { encoding: "utf8" })
+  // An empty listing from a failed ps would read as "no members left": fail instead of passing the check.
+  if (listed.status !== 0 || listed.error !== undefined) {
+    throw new Error(
+      `cannot list process group ${pgid} (ps status ${listed.status}): ${String(listed.error ?? listed.stderr)}`,
+    )
+  }
+  return listed.stdout
     .split("\n")
     .map((line) => line.trim().split(/\s+/))
     .filter(([group, stat]) => Number(group) === pgid && !stat?.startsWith("Z")).length
