@@ -89,7 +89,8 @@ export type ThreadSdkOptions = {
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
-   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
+   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
+   * shipped entry (`extension/thread-sdk.ts`) passes the account surface when its caller passes none (#14616).
    */
   readonly remote?: RemoteThreadSurface
 }

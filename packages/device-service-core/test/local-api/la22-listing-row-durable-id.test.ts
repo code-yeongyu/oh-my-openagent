@@ -20,13 +20,13 @@ const rowsEvent = (rows: readonly unknown[]) => ({
 })
 
 describe("LA22 listing rows carry an optional durable_id (#12996), asked for with rows: 3", () => {
-  test("sessions.list accepts rows 2 to 5 and refuses any other rows version", () => {
-    for (const rows of [2, 3, 4, 5])
+  test("sessions.list accepts rows 2 to 7 and refuses any other rows version", () => {
+    for (const rows of [2, 3, 4, 5, 6, 7])
       expect(validateRequest({ id: "1", type: "sessions.list", rows })).toMatchObject({
         ok: true,
         request: { rows },
       })
-    for (const rows of [1, 6, "3"])
+    for (const rows of [1, 8, "3"])
       expect(validateRequest({ id: "1", type: "sessions.list", rows }), String(rows)).toMatchObject({
         ok: false,
       })
