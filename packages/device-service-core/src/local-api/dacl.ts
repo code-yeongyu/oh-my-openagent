@@ -1,40 +1,23 @@
-// Vendored from sisyphuslabs/omo-relay-daemon@edd2ee496fc5b4166f23c4d1cbfb4ed5b9099bb6 packages/local-api/src/dacl.ts
-import { spawn } from "node:child_process";
-
-import type { SecureFile } from "./access.ts";
+// Vendored from sisyphuslabs/omo-relay-daemon@88e58154bb592d781446a62a3d8d912769675079 packages/local-api/src/dacl.ts
 import { LocalApiError } from "./errors.ts";
+import { powerShellError, runPowerShell, type PowerShellRunner } from "./powershell.ts";
+
+export { runPowerShell, type PowerShellRunner };
 
 // Windows: every state dir entry carries an EXACT protected DACL. A fresh DirectorySecurity/FileSecurity with
-// inheritance disabled, the user SID as owner and exactly one FullControl ACE for it is applied with Set-Acl (which
-// replaces the DACL; icacls /grant:r keeps foreign explicit ACEs), then read back as the raw SDDL and judged here.
+// inheritance disabled and exactly one FullControl ACE for the user SID replaces the DACL (icacls /grant:r would keep
+// foreign explicit ACEs), the user SID is made the owner, and the result is read back as the raw SDDL and judged here.
 // Inputs travel in environment variables, never inside the script text.
-export type PowerShellRunner = (
-  script: string,
-  env: { readonly [name: string]: string },
-) => Promise<{ readonly code: number; readonly out: string }>;
 
-export const runPowerShell: PowerShellRunner = async (script, env) => {
-  const encoded = Buffer.from(script, "utf16le").toString("base64");
-  // node:child_process only: omo vendors this client and also runs it under Node (LA27).
-  const proc = spawn(
-    "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded],
-    { env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"], windowsHide: true },
-  );
-  const chunks: Buffer[] = [];
-  proc.stdout.on("data", (chunk: Buffer) => chunks.push(chunk));
-  proc.stderr.resume();
-  const code = await new Promise<number>((resolve, reject) => {
-    proc.once("error", reject);
-    proc.once("close", (exitCode) => resolve(exitCode ?? -1));
-  });
-  // TextDecoder drops a leading UTF-8 BOM, as the earlier stream reader did (LA28).
-  return { code, out: new TextDecoder().decode(Buffer.concat(chunks)) };
-};
-
-// The Set-Acl script applyExactDacl runs; the device-service guard runs the same text with its read-back in one process.
+// The script applyExactDacl runs; the device-service guard runs the same text with its read-back in one process.
+// #1452: Set-Acl is not used. Its FileSystem provider writes every section of the descriptor, the SACL among them, which
+// needs SeSecurityPrivilege (a standard user has none), and it lives in Microsoft.PowerShell.Security. The owner is set
+// by icacls /setowner (which enables the restore privilege an elevated token holds disabled), and SetAccessControl on
+// the item persists only the section this script changed: the protected DACL. Same mechanism as oh-my-openagent#14101.
+// icacls runs where its stderr is not fatal, so a refusal reaches the exit-code check as "setowner failed: <icacls text>".
 export const APPLY_DACL_SCRIPT = String.raw`
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 $sid = New-Object System.Security.Principal.SecurityIdentifier($env:LA_SID)
 if ($env:LA_KIND -eq 'dir') {
   $acl = New-Object System.Security.AccessControl.DirectorySecurity
@@ -47,9 +30,10 @@ $rule = New-Object System.Security.AccessControl.FileSystemAccessRule($sid,
   [System.Security.AccessControl.FileSystemRights]::FullControl, $inherit,
   [System.Security.AccessControl.PropagationFlags]::None, [System.Security.AccessControl.AccessControlType]::Allow)
 $acl.SetAccessRuleProtection($true, $false)
-$acl.SetOwner($sid)
 $acl.AddAccessRule($rule)
-Set-Acl -LiteralPath $env:LA_PATH -AclObject $acl
+$ownerSet = & { $ErrorActionPreference = 'Continue'; & icacls.exe $env:LA_PATH /setowner "*$($env:LA_SID)" 2>&1 | ForEach-Object { "$_" } }
+if ($LASTEXITCODE -ne 0) { throw "setowner failed: $ownerSet" }
+(Get-Item -LiteralPath $env:LA_PATH -Force).SetAccessControl($acl)
 Write-Output 'applied'
 `;
 
@@ -220,7 +204,9 @@ export const currentUserSid = async (run: PowerShellRunner = runPowerShell): Pro
   const { code, out } = await run(CURRENT_USER_SID_SCRIPT, {});
   const sid = out.trim();
   if (code !== 0 || !/^S-1-[0-9-]+$/.test(sid))
-    throw new LocalApiError("insecure_state_dir", "the user SID is unreadable");
+    throw new LocalApiError("insecure_state_dir", "the user SID is unreadable", {
+      insecure_cause: "unreadable",
+    });
   return sid;
 };
 
@@ -230,9 +216,19 @@ export const applyExactDacl = async (
   kind: "dir" | "file",
   run: PowerShellRunner = runPowerShell,
 ): Promise<void> => {
-  const { code } = await run(APPLY_DACL_SCRIPT, { LA_PATH: path, LA_SID: userSid, LA_KIND: kind });
-  if (code !== 0)
-    throw new LocalApiError("insecure_state_dir", "the exact DACL could not be applied");
+  const { code, err } = await run(APPLY_DACL_SCRIPT, {
+    LA_PATH: path,
+    LA_SID: userSid,
+    LA_KIND: kind,
+  });
+  if (code !== 0) {
+    const line = powerShellError(err);
+    throw new LocalApiError(
+      "insecure_state_dir",
+      `the exact DACL could not be applied${line === "" ? "" : `: ${line}`}`,
+      { insecure_cause: "dacl_not_exact" },
+    );
+  }
 };
 
 export const describeDacl = async (
@@ -242,7 +238,9 @@ export const describeDacl = async (
   const { code, out } = await run(DESCRIBE_DACL_SCRIPT, { LA_PATH: path });
   const dacl = code === 0 ? parseSddl(out.trim()) : undefined;
   if (dacl === undefined)
-    throw new LocalApiError("insecure_state_dir", "the DACL could not be read back");
+    throw new LocalApiError("insecure_state_dir", "the DACL could not be read back", {
+      insecure_cause: "unreadable",
+    });
   return dacl;
 };
 
@@ -262,12 +260,3 @@ export const verifyExactDacl = async (
   }
   return exactDaclVerdict(dacl, userSid, kind);
 };
-
-export const windowsSecureFile =
-  (userSid: string, run: PowerShellRunner = runPowerShell): SecureFile =>
-  async (path, kind) => {
-    const target = kind === "dir" ? "dir" : "file";
-    await applyExactDacl(path, userSid, target, run);
-    if (!(await verifyExactDacl(path, userSid, target, run)))
-      throw new LocalApiError("insecure_state_dir", "the DACL is not exactly one ACE for the user");
-  };

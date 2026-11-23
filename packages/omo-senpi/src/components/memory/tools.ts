@@ -18,6 +18,7 @@ import { buildMemorySnapshot, createMemoryRpcGitRepo } from "./memory-rpc-snapsh
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { MemoryIdentityContext } from "./context"
 
+import { MEMORY_CALL_TIMEOUT_MS, boundMemoryCall, type MemoryCallStage, type MemoryCallState } from "./tool-call-bound"
 import { MEMORY_TOOL_DESCRIPTION, MEMORY_TOOL_NAME } from "./tool-metadata"
 
 export { MEMORY_TOOL_NAME }
@@ -113,7 +114,11 @@ export type MemoryToolDefinition<TParams extends TSchema> = Omit<
   ToolDefinition<TParams, MemoryToolResultDetails>,
   "execute"
 > & {
-  readonly execute: (toolCallId: string, params: Static<TParams>) => Promise<MemoryToolExecutionResult>
+  readonly execute: (
+    toolCallId: string,
+    params: Static<TParams>,
+    signal?: AbortSignal,
+  ) => Promise<MemoryToolExecutionResult>
 }
 
 export interface MemoryToolWriteNoticeOptions {
@@ -128,6 +133,8 @@ export interface MemoryToolsOptions {
   readonly lockWaitTimeoutMs?: number
   /** Writer-lock retry cadence while waiting; defaults to the memory-core default (25ms). */
   readonly lockRetryDelayMs?: number
+  /** Whole-call budget before the call reports a timeout; defaults to MEMORY_CALL_TIMEOUT_MS. */
+  readonly callTimeoutMs?: number
   /** Post-commit notice seam (plan IC-4): invoked once after each successful commit, never on errors. */
   readonly onCommit?: (commit: MemoryToolCommit) => void
   /** Visible tool-result notice; absent behaves as disabled. */
@@ -181,23 +188,40 @@ function createMemoryTool(
     parameters: MemoryToolParams,
     executionMode: "sequential",
     renderShell: "self",
-    execute: async (_toolCallId, params) => {
+    execute: async (_toolCallId, params, signal) => {
       const context = resolveContext()
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
-      try {
+      let stage: MemoryCallStage = "prepare"
+      const runWrite = async (call: MemoryCallState): Promise<MemoryToolExecutionResult> => {
         const { repo, lock, author } = await prepareEngine(context, options)
         const provenance = readToolProvenance(params)
         const result = await runMemoryTool({
           repo,
           lock,
           params: { ...params, author, ...(provenance === undefined ? {} : { provenance }) },
+          onStage: (next) => {
+            stage = next
+          },
         })
+        stage = "report"
+        // A write that lands after its call was answered as cancelled or timed out must not announce itself as an edit.
+        if (call.stopped) return okResult(result.message)
         if (result.commit !== undefined) options.onCommit?.(result.commit)
+        if (call.stopped) return okResult(result.message)
         return okResult(result.message, await writeNoticeFor(context, result.commit, options))
-      } catch (error) {
-        if (error instanceof MemoryToolError) return errorResult(error.message)
-        throw error
       }
+      const outcome = await boundMemoryCall(runWrite, {
+        command: params.command,
+        stage: () => stage,
+        timeoutMs: options.callTimeoutMs ?? MEMORY_CALL_TIMEOUT_MS,
+        ...(signal === undefined ? {} : { signal }),
+      })
+      if (outcome.kind === "stopped") return errorResult(outcome.message)
+      if (outcome.kind === "failed") {
+        if (outcome.error instanceof MemoryToolError) return errorResult(outcome.error.message)
+        throw outcome.error
+      }
+      return outcome.value
     },
     renderCall: renderMemoryWriteCall,
     renderResult: renderResultFor(options),
