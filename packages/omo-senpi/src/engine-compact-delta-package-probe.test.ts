@@ -8,7 +8,11 @@ import { describe, expect, it, onTestFinished } from "bun:test"
 import { MAX_SHARD_BIND_PATH } from "../../senpi-task/src/runners/rpc-host/shard-socket"
 import { shortSocketDir } from "../../senpi-task/src/runners/rpc-host/short-socket-dir.test-support"
 import { testTempDir } from "../test-support/temp-dir"
-import { childTreeCpuSeconds, RUNAWAY_CAP_MS, STALL_KILL_MS } from "../../omo-native/test/daemon-test-runner"
+import {
+  describeTreeBound,
+  TREE_BOUNDED_TEST_TIMEOUT_MS,
+  watchTreeProgress,
+} from "../../omo-native/test/daemon-test-runner"
 import { useTestTimeout } from "../../../test-support/test-deadline"
 
 // O01 package probe (senpi#4272, PLAN rows X06/T7): the senpi engine omo actually ships, launched from its
@@ -39,15 +43,13 @@ function probeSocketPath(): string {
 // #11845 cold-start policy (#14682): a packaged host starting on a loaded runner legitimately needs multiples of
 // its quiet-box start time (82 s at load 43 vs 2.5 s alone), so startup gets no wall-clock budget of its own.
 // It is bounded the way daemon-test-runner bounds a cold daemon: killed when its process tree stops making CPU
-// progress for STALL_KILL_MS, and capped at RUNAWAY_CAP_MS. The behaviour under test keeps its own bound,
+// progress for STALL_KILL_MS, and capped in tree CPU at RUNAWAY_CPU_CAP_S. The behaviour under test keeps its own bound,
 // measured from readiness (PROTOCOL_ANSWER_MS).
 const PROTOCOL_ANSWER_MS = 30_000
-const PROGRESS_SAMPLE_MS = 250
-const PROGRESS_EPSILON_S = 0.02
 // A host that ignores SIGTERM is killed after this grace, so a watchdog failure is reported, not hidden by teardown.
 const TEARDOWN_GRACE_MS = 5_000
-// Both phases keep their own bound: the whole startup allowance, then the full post-readiness budget, then teardown.
-const PROBE_TIMEOUT_MS = RUNAWAY_CAP_MS + PROTOCOL_ANSWER_MS + TEARDOWN_GRACE_MS + 5_000
+// Startup has no wall budget of its own, so the test timeout is only the outer bound over the progress bounds.
+const PROBE_TIMEOUT_MS = TREE_BOUNDED_TEST_TIMEOUT_MS
 
 async function stopHost(host: ReturnType<typeof spawn>, exited: Promise<number | null>): Promise<void> {
   host.kill("SIGTERM")
@@ -79,26 +81,10 @@ function waitForListening(
     // The tail carries the host's error line; the head is only the source excerpt Bun prints above it.
     const fail = (why: string) =>
       finish(new Error(`host ${why} before listening on ${socketPath}; stderr: ${seen.slice(-2000)}`))
-    const cap = setTimeout(
-      () => fail(`exceeded the ${RUNAWAY_CAP_MS}ms runaway cap while still making CPU progress`),
-      RUNAWAY_CAP_MS,
-    )
-    let lastCpu = -1
-    let lastAdvance = Date.now()
-    const sampler = setInterval(() => {
-      if (hostPid === undefined) return
-      const cpu = childTreeCpuSeconds(hostPid)
-      if (cpu < 0) return
-      if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
-        lastCpu = cpu
-        lastAdvance = Date.now()
-      } else if (Date.now() - lastAdvance >= STALL_KILL_MS) {
-        fail(`made no CPU progress for ${Math.round((Date.now() - lastAdvance) / 1000)}s`)
-      }
-    }, PROGRESS_SAMPLE_MS)
+    const stopWatch =
+      hostPid === undefined ? () => {} : watchTreeProgress(hostPid, (bound) => fail(describeTreeBound(bound)))
     function finish(error?: Error) {
-      clearTimeout(cap)
-      clearInterval(sampler)
+      stopWatch()
       stderr.off("data", onData)
       if (error) reject(error)
       else resolve()

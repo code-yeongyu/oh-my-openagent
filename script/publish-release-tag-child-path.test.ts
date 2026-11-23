@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { CI_YML_PATH, ciJobs, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
-import { type CommitName, createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import { type CommitName, createGitOrigin, type GitOrigin, runReleaseBash } from "./fixtures/publish-gate-reuse-origin"
 import {
   needsOf,
   PRE_TAG_WRITERS,
@@ -141,7 +141,7 @@ function runStep(input: Run, seed?: GitOrigin): Outcome {
   writeFileSync(join(root, "output"), "")
   writeFileSync(join(root, "ci-jobs.json"), ciJobs(input.validation))
   writeFileSync(join(root, "summary"), "")
-  const result = spawnSync("bash", ["-eo", "pipefail", script], {
+  const result = runReleaseBash(root, script, {
     cwd: checkout,
     encoding: "utf8",
     timeout: TEST_TIMEOUT_MS - 1_000,
