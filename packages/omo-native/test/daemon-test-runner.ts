@@ -83,7 +83,7 @@ export function watchTreeProgress(
 // Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
 // stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
 // macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
-function childTreeCpuSeconds(rootPid: number): number {
+export function childTreeCpuSeconds(rootPid: number): number {
   if (process.platform === "linux") {
     try {
       const ppidOf = new Map<number, number>()

@@ -60,8 +60,8 @@ export function outputPathsIn(root) {
  *   longest such gap measured in a healthy 8x build was ~3 s; the window is 10x that.
  * - a runaway: its process tree used more than BUILD_CPU_CAP_S CPU seconds, about 3x the 126 s one build used at 8x.
  */
-export const BUILD_STALL_MS = 30_000
-export const BUILD_CPU_CAP_S = 380
+const BUILD_STALL_MS = 30_000
+const BUILD_CPU_CAP_S = 380
 /**
  * Outer bound for the hook that runs the cold builds: the longest CI job that runs these files (senpi-compatibility,
  * 100 min) minus a margin. It is not the correctness check; the stall and CPU guards above are.
