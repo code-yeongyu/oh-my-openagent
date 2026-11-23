@@ -10,7 +10,6 @@ type SubagentResolverModule = typeof import("../subagent-resolver")
 
 type ClaudeCodeAgentRecord = ReturnType<typeof agentLoader.loadUserAgents>
 
-const logMock = mock((..._args: unknown[]) => {})
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
   () =>
@@ -58,7 +57,6 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -70,9 +68,6 @@ describe("resolveSubagentExecution claude_code.agents toggle", () => {
     }))
     loadProjectAgentsMock.mockImplementation(() => ({
       "claude-reviewer": { description: "Project Claude Code agent", mode: "subagent" },
-    }))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
     }))
     spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
     spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)

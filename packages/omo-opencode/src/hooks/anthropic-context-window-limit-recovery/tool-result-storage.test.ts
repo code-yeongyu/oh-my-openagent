@@ -18,9 +18,7 @@ mock.module("./message-storage-directory", () => ({
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => false,
 }))
-mock.module("../../shared/logger", () => ({ log: () => {} }))
 preserveModuleMocksForTestFile(import.meta.url)
-
 const { truncateToolResult, recoverTruncatedOutput, cleanupTruncationBackups } = await import("./tool-result-storage")
 
 describe("tool-result-storage non-destructive truncation", () => {
