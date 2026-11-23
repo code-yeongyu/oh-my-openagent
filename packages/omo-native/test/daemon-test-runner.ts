@@ -13,9 +13,11 @@ const STALL_KILL_MS = 10_000
 // 2-CPU Linux container and 11.5-17.1 s on an M-series Mac; under 4.2x and 8x oversubscription it used 8.4-10.2 s while
 // its wall time grew to 25-78 s (#14676). The cap is about 3x the largest quiet measurement.
 const RUNAWAY_CPU_CAP_S = 50
-// Bun's per-test timeout for tests bounded this way: the test-linux job limit (15 min) minus a minute, so a broken
-// bound still fails inside the job with the test's name instead of as a cancelled job.
-export const TREE_BOUNDED_TEST_TIMEOUT_MS = 14 * 60_000
+// Bun's per-test timeout for tests bounded this way, an outer bound only. The slowest healthy run measured was the
+// observe-idle case at 16x CPU oversubscription, 274 s (#14792); 7 min clears it by 1.5x and is at most half of every
+// CI job limit these files run under, so the other half covers checkout, install, builds and the earlier tests and a
+// broken bound fails with the test's name instead of a cancelled job.
+export const TREE_BOUNDED_TEST_TIMEOUT_MS = 7 * 60_000
 const PROGRESS_SAMPLE_MS = 250
 // Two scheduler quanta: less than this between samples is scheduling noise, not work.
 const PROGRESS_EPSILON_S = 0.02
@@ -137,6 +139,26 @@ function killGroup(child: ChildProcess): void {
   }
 }
 
+// The leader's close does not mean its grandchildren are gone: SIGKILL to the group is delivered at once, but each
+// member exits (and is reaped by init) on its own schedule. Wait, bounded, until no live member is left.
+const GROUP_EXIT_DEADLINE_MS = 10_000
+function liveGroupMembers(pgid: number): number {
+  const listing = spawnSync("ps", ["-axo", "pgid=,stat="], { encoding: "utf8" }).stdout
+  return listing
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([group, stat]) => Number(group) === pgid && !stat?.startsWith("Z")).length
+}
+function awaitGroupGone(pgid: number | undefined): void {
+  if (pgid === undefined) return
+  const deadline = Date.now() + GROUP_EXIT_DEADLINE_MS
+  while (liveGroupMembers(pgid) > 0) {
+    if (Date.now() > deadline)
+      throw new Error(`process group ${pgid} still has live members ${GROUP_EXIT_DEADLINE_MS}ms after SIGKILL`)
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
+  }
+}
+
 export function createDaemonTestRunner() {
   const runningChildren = new Set<ChildProcess>()
 
@@ -180,6 +202,12 @@ export function createDaemonTestRunner() {
                   // Reject once the group leader is reaped, so the caller never sees the group still running.
                   child.once("close", () => {
                     runningChildren.delete(child)
+                    try {
+                      awaitGroupGone(child.pid)
+                    } catch (error) {
+                      reject(error)
+                      return
+                    }
                     reject(
                       new SpawnBudgetError(
                         `${command} ${args.join(" ")} ${describeTreeBound(bound, options.cpuCapS)}; killed process group ${child.pid}\nstdout: ${stdout}\nstderr: ${stderr}`,

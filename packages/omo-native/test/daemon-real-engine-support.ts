@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { resolveSenpi } from "../bin/lib/package-paths.js"
@@ -101,6 +101,9 @@ export function createDaemonEngineHarness() {
     killChildren()
     for (const pid of ownedPids) killOwned(pid)
     ownedPids.clear()
+    // A shard supervisor the engine detached into its own process group before `host ensure` answered (a bound
+    // tripped mid-start) never reached ownedPids; it still carries its sandbox in its environment.
+    for (const root of roots) for (const pid of pidsWithAgentDir(root)) killOwned(pid)
     for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
   }
 
@@ -117,6 +120,28 @@ export function waitForExit(pid: number): void {
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
   }
   throw new Error(`pid ${pid} did not exit`)
+}
+
+function pidsWithAgentDir(root: string): number[] {
+  const marker = `OMO_CODING_AGENT_DIR=${root}`
+  if (process.platform === "linux") {
+    return readdirSync("/proc")
+      .filter((entry) => /^\d+$/.test(entry) && Number(entry) !== process.pid)
+      .filter((entry) => {
+        try {
+          return readFileSync(`/proc/${entry}/environ`, "utf8").split("\0").includes(marker)
+        } catch {
+          return false
+        }
+      })
+      .map(Number)
+  }
+  const listing = spawnSync("ps", ["-axwwE", "-o", "pid=,command="], { encoding: "utf8" }).stdout
+  return listing
+    .split("\n")
+    .filter((line) => line.split(/\s+/).includes(marker))
+    .map((line) => Number(line.trim().split(/\s+/)[0]))
+    .filter((pid) => pid !== process.pid)
 }
 
 function killOwned(pid: number): void {
