@@ -90,6 +90,8 @@
     "packages/omo-native/bin/lib/setup-opencode-providers.js": ["API_BY_NPM"],
     // pre-existing at origin dev 4686e425b5: unused export(s) SETUP_SOURCES, canonicalAgentDir, scanSetup, collectSetupPlans, SetupStaleError, staleSetupTargets, authWritesPending, applySetupStages
     "packages/omo-native/bin/lib/setup-stream.d.ts": ["SETUP_SOURCES", "canonicalAgentDir", "scanSetup", "collectSetupPlans", "SetupStaleError", "staleSetupTargets", "authWritesPending", "applySetupStages"],
+    // added by #14452 after the baseline: the declaration of the sibling .js, which every importer resolves to
+    "packages/omo-native/bin/lib/thread-read-cursor.d.ts": ["THREAD_TAIL_MAX_ITEMS", "encodeTranscriptCursor", "encodeEntryCursor", "decodeTranscriptCursor", "decodeEntryCursor", "isReadCursor"],
     // pre-existing at origin dev 4686e425b5: unused export(s) threadExitCode
     "packages/omo-native/bin/lib/thread.js": ["threadExitCode"],
     // pre-existing at origin dev 4686e425b5: unused export(s) UPDATE_USAGE
