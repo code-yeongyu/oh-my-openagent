@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import type { JsonObject, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import {
@@ -41,6 +42,15 @@ const EARLIER_TURN: readonly JsonObject[] = [
   { role: "assistant", content: "EARLIER" },
 ]
 
+// The send's own settle wait (#13425) bounds a case that never settles: it answers a typed timeout, and runSession's
+// finally then disposes the gateway store, so cleanup never meets a live store worker holding the case's directory
+// (EBUSY on Windows, #13986). The test timeout is only the circuit breaker above that bound.
+const SEND_TIMEOUT_SECONDS = 20
+const CASE_TIMEOUT_MS = 30_000
+// The shipped omo loads the gateway store's bundled worker sidecar from the plugin payload; from source each case would
+// transpile the worker's module graph in a fresh worker first, the cost that made a loaded Windows runner miss 5 s (#13986).
+const SHIPPED_PACKAGE_ROOT = fileURLToPath(new URL("../../omo-senpi", import.meta.url))
+
 const fixture = createRemoteThreadFixture()
 const dirs: string[] = []
 const savedAgentDir = process.env.OMO_CODING_AGENT_DIR
@@ -51,13 +61,6 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-const deferred = <T = void>() => {
-  let resolve!: (value: T) => void
-  const promise = new Promise<T>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
 // Every microtask the follow queued has run: the probe or check finished with the page it was handed.
 const drained = () => new Promise<void>((done) => setImmediate(done))
 
@@ -149,30 +152,25 @@ async function send(script: Script) {
     },
     now: () => 0,
     stateDir: "/unused",
+    packageRoot: SHIPPED_PACKAGE_ROOT,
     accountShow: async () => {
       throw new Error("not part of send")
     },
   } as unknown as RemoteCommandDependencies
-  const done = deferred<number>()
-  void runSession(
+  // Awaited to its end: the send's own timeout bounds it, and its finally has disposed the store before cleanup runs.
+  const code = await runSession(
     {} as never,
-    { verb: "send", target: "b/dur-on-b", text: TEXT, delivery: "auto", wait: true } as never,
+    {
+      verb: "send",
+      target: "b/dur-on-b",
+      text: TEXT,
+      delivery: "auto",
+      wait: true,
+      timeout_seconds: SEND_TIMEOUT_SECONDS,
+    } as never,
     false,
     dependencies,
-  ).then(done.resolve)
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<never>((_, reject) => {
-    timer = setTimeout(
-      () => reject(new Error(`send did not settle; printed so far ${JSON.stringify(written.join(""))}`)),
-      5_000,
-    )
-  })
-  let code: number
-  try {
-    code = await Promise.race([done.promise, timeout])
-  } finally {
-    clearTimeout(timer)
-  }
+  )
   return {
     code,
     printed: written.join(""),
@@ -239,6 +237,6 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
     }
     // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
     if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)
-    else test(name, row)
+    else test(name, row, CASE_TIMEOUT_MS)
   }
 })
