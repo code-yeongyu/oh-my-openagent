@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { AsyncLocalStorage } from "node:async_hooks"
 import { mkdtemp, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -12,6 +13,7 @@ import {
   killIfAlive,
   pidAlive,
   pidTerminalWithin,
+  probeUntil,
   readPidFileWhenWritten,
   readPidOnce,
   readPidWhenWritten,
@@ -217,6 +219,111 @@ process.stdout.write("builtin/fallback\\n")
 
     // then: the omitted candidate probes both catalogs on each run
     expect((await Bun.file(probeLog).text()).trim().split("\n")).toHaveLength(4)
+  })
+
+  test("a hung catalog still reaches its kill deadline after the triggering session releases its timers", async () => {
+    const item = await fixture(`
+import { writeFileSync } from "node:fs"
+writeFileSync(process.env.PID_FILE, String(process.pid))
+setInterval(() => {}, 60_000)
+`)
+    const pidFile = join(item.root, "catalog.pid")
+    const scope = new AsyncLocalStorage<Set<ReturnType<typeof setTimeout>>>()
+    const timers = new Set<ReturnType<typeof setTimeout>>()
+    const original = globalThis.setTimeout
+    globalThis.setTimeout = new Proxy(original, {
+      apply(target, receiver, args) {
+        const timer = Reflect.apply(target, receiver, args)
+        scope.getStore()?.add(timer)
+        return timer
+      },
+    })
+    let identity: Awaited<ReturnType<typeof readPidWhenWritten>> | undefined
+    const warnings: unknown[] = []
+    const probe = scope.run(timers, () =>
+      preflightMemoryModels({
+        candidates,
+        launch: item.launch,
+        env: { PATH: process.env.PATH, PID_FILE: pidFile },
+        configSources: [],
+        timeoutMs: 1_000,
+        warn: (_message, details) => warnings.push(details),
+      }),
+    )
+    try {
+      identity = await readPidWhenWritten(pidFile, 3_000, "fake-senpi.mjs")
+      for (const timer of timers) clearTimeout(timer)
+      expect(timers.size).toBe(0)
+      expect(await probe).toEqual({ kind: "unavailable", candidates })
+      expect(warnings).toContainEqual({ error: "model catalog probe timed out after 1000ms" })
+      expect(pidAlive(identity.pid)).toBe(false)
+    } finally {
+      globalThis.setTimeout = original
+      if (identity !== undefined) killIfAlive(identity)
+      await probe
+    }
+  })
+
+  // Windows subprocess teardown can kill the whole tree and mask a missing host exit hook.
+  test.skipIf(process.platform === "win32")("explicit host exit kills a hung catalog before its watchdog", async () => {
+    const item = await fixture(`
+import { writeFileSync } from "node:fs"
+setTimeout(() => process.exit(2), 20_000)
+writeFileSync(process.env.PID_FILE, String(process.pid))
+`)
+    const pidFile = join(item.root, "catalog.pid")
+    const entry = join(item.root, "host.ts")
+    const launch = item.launch
+    await writeFile(
+      entry,
+      `
+import { preflightMemoryModels } from ${JSON.stringify(import.meta.resolve("./model-preflight.ts"))}
+process.stdin.once("data", () => process.exit(0))
+void preflightMemoryModels({
+  candidates: ${JSON.stringify(candidates)},
+  launch: ${JSON.stringify(launch)},
+  env: process.env,
+  configSources: [],
+  timeoutMs: 6_000,
+}).then(() => process.exit(3))
+`,
+      "utf8",
+    )
+    const host = Bun.spawn([process.execPath, entry], {
+      cwd: item.root,
+      env: { HOME: item.root, PATH: process.env.PATH, PID_FILE: pidFile },
+      stdin: "pipe",
+      stdout: "ignore",
+      stderr: "inherit",
+      timeout: 8_000,
+    })
+    try {
+      const catalog = await readPidWhenWritten(pidFile, remainingTestTime(), launch.prefixArgs[0])
+      host.stdin.write("exit\n")
+      host.stdin.end()
+      // Exit 3 would mean the probe settled before the host received the request to exit.
+      expect(await host.exited).toBe(0)
+      const gone = await probeUntil(() => {
+        try {
+          process.kill(catalog.pid, 0)
+          return false
+        } catch (error) {
+          if (error instanceof Error && "code" in error && error.code === "ESRCH") return true
+          throw error
+        }
+      }, remainingTestTime())
+      expect({ "catalog PID returned ESRCH after host exit": gone }).toEqual({
+        "catalog PID returned ESRCH after host exit": true,
+      })
+    } finally {
+      if (host.exitCode === null && host.signalCode === null) host.kill("SIGKILL")
+      await host.exited
+      const leaked = await readPidOnce(pidFile, launch.prefixArgs[0])
+      if (leaked !== null) {
+        killIfAlive(leaked)
+        await pidTerminalWithin(leaked, HELPER_FAILSAFE_BOUND_MS)
+      }
+    }
   })
 
   test("#given a launcher whose grandchild holds the output pipes #when the probe times out #then it degrades without waiting for the grandchild", async () => {

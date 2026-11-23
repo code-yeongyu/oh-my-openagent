@@ -1,3 +1,4 @@
+import { AsyncResource } from "node:async_hooks"
 import { spawn } from "node:child_process"
 import { stat } from "@oh-my-opencode/memory-core/fs"
 
@@ -55,6 +56,10 @@ type CatalogCacheEntry = {
 }
 
 const catalogCache = new Map<string, CatalogCacheEntry>()
+// A reserved reflection belongs to its identity, not its triggering session. Its catalog
+// child must keep its kill deadline even if the session stops waiting for the launch.
+// Capture the host scope at extension import, before senpi enters a session handler.
+const catalogOwner = new AsyncResource("omo-memory-model-catalog")
 
 /**
  * Route each candidate to the cheapest child that can see it. The discovery-disabled catalog is the
@@ -115,7 +120,14 @@ async function visibleModels(input: ModelPreflightInput, mode: CatalogMode): Pro
   const now = (input.now ?? Date.now)()
   const cached = catalogCache.get(cacheKey)
   if (cached !== undefined && now - cached.probedAt < CATALOG_CACHE_TTL_MS) return cached.visible
-  const visible = await probeChildModels(input.launch, mode, input.env, input.timeoutMs ?? PREFLIGHT_TIMEOUT_MS)
+  const visible = await catalogOwner.runInAsyncScope(
+    probeChildModels,
+    undefined,
+    input.launch,
+    mode,
+    input.env,
+    input.timeoutMs ?? PREFLIGHT_TIMEOUT_MS,
+  )
   catalogCache.set(cacheKey, { visible, probedAt: now })
   return visible
 }
@@ -141,14 +153,20 @@ async function probeChildModels(
   child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk))
   child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk))
   let timedOut = false
+  const killChild = () => child.kill("SIGKILL")
+  // An explicit host exit can precede the watchdog. Never leave the probe behind then.
+  process.once("exit", killChild)
   const timeout = setTimeout(() => {
     timedOut = true
-    child.kill("SIGKILL")
+    killChild()
   }, timeoutMs)
   const code = await new Promise<number | null>((resolve, reject) => {
     child.once("error", reject)
     child.once("exit", resolve)
-  }).finally(() => clearTimeout(timeout))
+  }).finally(() => {
+    clearTimeout(timeout)
+    process.off("exit", killChild)
+  })
   const stdoutText = Buffer.concat(stdout).toString("utf8")
   const stderrText = Buffer.concat(stderr).toString("utf8")
   if (timedOut) throw new Error(`model catalog probe timed out after ${timeoutMs}ms`)
