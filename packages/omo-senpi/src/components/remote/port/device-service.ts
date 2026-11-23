@@ -17,11 +17,13 @@ import type {
   JsonObject,
   RemoteCommandOutcome,
   RemoteListing,
+  RemoteLookupOutcome,
   RemoteSessionsPort,
 } from "../../thread/remote/ports"
 import { openSessionWatch } from "../../thread/remote/remote-watch"
 import { commandWaitMs, withinCallBudget } from "../../call-budget/call-deadline"
 import { createListingRound } from "./listing-round"
+import { createLookupGate, type LookupStart } from "./lookup-gate"
 
 export type DeviceServiceSessionsOptions = {
   readonly version: string
@@ -305,8 +307,15 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
   }
   // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.
   const round = createListingRound(() => listing(), options.now ?? Date.now)
-  // omo#14748 review M1: every single-probe locate this port sent, until the service answers it (a capped lookup does not).
-  const locating = new Set<Promise<unknown>>()
+  // omo#14748 review M1/M3: one single-probe locate, sent at once; its answer is capped, the locate itself is not.
+  const startLookup = (device: string, durableId: string): LookupStart => {
+    const connected = svc()
+    const sent = connected.then((service) =>
+      service.takesSingleLocate ? service.locate(device, durableId, { single: true }) : undefined,
+    )
+    return { answer: cappedLookup(connected, sent, options.lookupCapMs ?? LOOKUP_CAP_MS), settled: sent }
+  }
+  const lookups = createLookupGate(startLookup)
   // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
   let info: ReturnType<DeviceService["thisDevice"]> | undefined
   const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
@@ -444,39 +453,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         handlers,
         watchOptions,
       ),
-    lookup: async (device, durableId) => {
-      let connected: DeviceService
-      try {
-        connected = await svc()
-      } catch (error) {
-        return { kind: "silent", reason: notSentReason(error) }
-      }
-      if (!connected.takesSingleLocate) return { kind: "unavailable" }
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const capped = new Promise<"timeout">((resolve) => {
-        timer = setTimeout(() => resolve("timeout"), options.lookupCapMs ?? LOOKUP_CAP_MS)
-        timer.unref?.()
-      })
-      try {
-        const sent = connected.locate(device, durableId, { single: true })
-        locating.add(sent)
-        const settle = () => void locating.delete(sent)
-        sent.then(settle, settle)
-        const answer = await Promise.race([sent, capped])
-        if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
-        return { kind: "found", key: answer.key }
-      } catch (error) {
-        const code = error instanceof LocalApiError ? error.code : "locate_failed"
-        return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
-      } finally {
-        clearTimeout(timer)
-      }
-    },
+    lookup: lookups.lookup,
+    lookupAlone: lookups.lookupAlone,
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
     canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
-    lookupsIdle: async () => {
-      while (locating.size > 0) await Promise.allSettled([...locating])
-    },
     wake: async (device, durableId, rpc) => {
       let record: WireRpc
       try {
@@ -571,5 +551,35 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       READ_ONLY_RECORDS.has(String(rpc["type"]))
         ? sessionCommand(device, sessionId, rpc, commandOptions)
         : round.fenced(sessionCommand)(device, sessionId, rpc, commandOptions),
+  }
+}
+
+/** A single-probe locate's answer within `capMs`: a device past the cap counts as silent (its locate runs on). */
+async function cappedLookup(
+  connected: Promise<DeviceService>,
+  sent: Promise<{ readonly key: string } | undefined>,
+  capMs: number,
+): Promise<RemoteLookupOutcome> {
+  let service: DeviceService
+  try {
+    service = await connected
+  } catch (error) {
+    return { kind: "silent", reason: notSentReason(error) }
+  }
+  if (!service.takesSingleLocate) return { kind: "unavailable" }
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const capped = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), capMs)
+    timer.unref?.()
+  })
+  try {
+    const answer = await Promise.race([sent, capped])
+    if (answer === "timeout") return { kind: "silent", reason: "lookup_timeout" }
+    return answer === undefined ? { kind: "unavailable" } : { kind: "found", key: answer.key }
+  } catch (error) {
+    const code = error instanceof LocalApiError ? error.code : "locate_failed"
+    return LOOKUP_NONE.has(code) ? { kind: "none" } : { kind: "silent", reason: code }
+  } finally {
+    clearTimeout(timer)
   }
 }

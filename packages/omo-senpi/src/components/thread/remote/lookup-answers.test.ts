@@ -70,28 +70,42 @@ describe("omo#13037 A7.2.6: how the single probe's answers are read", () => {
     expect(performance.now() - started).toBeLessThan(2_000)
   })
 
-  test("#14748 review M1: #given a locate still running after its lookup answered silent at the cap #then lookupsIdle settles only once the service answers it", async () => {
-    let answer: (value: { readonly key: string }) => void = () => {}
+  test("#14748 review M1/M3: #given a locate still running past its lookup's cap, and two callers asking alone at once #then each solo locate starts only after every earlier locate finished, and a plain lookup waits while a solo one runs", async () => {
+    let inFlight = 0
+    const inFlightAtStart: Record<string, number> = {}
+    let releaseCapped: () => void = () => {}
+    const locate = async (device: string): Promise<{ readonly key: string }> => {
+      inFlight += 1
+      inFlightAtStart[device] = inFlight
+      if (device === "dev-b") await new Promise<void>((resolve) => (releaseCapped = resolve))
+      else await Promise.resolve()
+      inFlight -= 1
+      return { key: `key-${device}` }
+    }
+    const service = {
+      serviceVersion: "1.4.0",
+      carriesWakeMark: true,
+      takesSingleLocate: true,
+      closed: new Promise(() => {}),
+      locate,
+      close: () => {},
+    } as unknown as DeviceService
     const port = sessionsPort({
       version: "5.1.70",
-      connect: async () => ({
-        conn: serviceAnswering(() => new Promise((resolve) => (answer = resolve))),
-        owned: true,
-      }),
-      lookupCapMs: 50,
+      connect: async () => ({ conn: service, owned: true }),
+      lookupCapMs: 20,
     })
-    expect(await port.lookup?.("dev-c", "0195f0c2-1a2b-7c3d-8e4f-00000000c001")).toEqual({
-      kind: "silent",
-      reason: "lookup_timeout",
-    })
-    let idle = false
-    const waiting = port.lookupsIdle?.().then(() => (idle = true))
-    await Promise.resolve()
-    expect(idle).toBe(false)
+    const id = "0195f0c2-1a2b-7c3d-8e4f-00000000c001"
+    expect(await port.lookup?.("dev-b", id)).toEqual({ kind: "silent", reason: "lookup_timeout" })
 
-    answer({ key: "S0VZ" })
-    await waiting
+    const first = port.lookupAlone?.("dev-c", id, 5_000)
+    const second = port.lookupAlone?.("dev-d", id, 5_000)
+    releaseCapped()
 
-    expect(idle).toBe(true)
+    expect(await Promise.all([first, second])).toEqual([
+      { kind: "found", key: "key-dev-c" },
+      { kind: "found", key: "key-dev-d" },
+    ])
+    expect(inFlightAtStart).toEqual({ "dev-b": 1, "dev-c": 1, "dev-d": 1 })
   })
 })

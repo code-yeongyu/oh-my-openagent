@@ -701,6 +701,22 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     ])
   })
 
+  test("#given two bare-id reads at once of closed threads on b and on c, both devices answering only a probe that is the one in flight #when both run on one port #then each finds its thread: their solo retries never overlap (#14748 review M3)", async () => {
+    const onB = "0195f0c2-1a2b-7c3d-8e4f-00000000d273"
+    const onC = "0195f0c2-1a2b-7c3d-8e4f-00000000d274"
+    const a = account({
+      wakeFeature: true,
+      ended: { b: { [onB]: "rk-on-b-closed" }, c: { [onC]: "rk-on-c-closed" } },
+      crowdedLookups: ["b", "c"],
+    })
+    const { run } = surface(a.remote)
+
+    const [readB, readC] = await Promise.all([run("thread_read", { thread: onB }), run("thread_read", { thread: onC })])
+
+    expect(readB).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+    expect(readC).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+  })
+
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
     const a = account({ rows: [{ ...B_ROW, title: "" }] })
     const { run } = surface(a.remote)

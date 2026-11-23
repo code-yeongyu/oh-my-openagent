@@ -8,45 +8,31 @@ const SOLO_LOOKUP_MS = 3_500
 
 /**
  * #14748: each device that stayed silent in the parallel round is asked again alone, as `<device>/<thread>` asks it.
- * Review M1: a capped lookup leaves its locate running on the device service, so each retry first waits for every locate
- * this port sent to finish; one that does not finish within a lookup's bound keeps the device's silent answer instead
- * of overlapping it. Review M2: a retry runs only while the call's budget still holds a lookup and the reserve the step
- * after the resolution needs; the devices it cannot ask keep their silent answer, so the refusal still names them.
+ * Review M1/M3: the port sends it only while no other locate of the port is in flight and holds every other lookup back
+ * meanwhile (`lookupAlone`, remote/port/lookup-gate.ts), so concurrent calls never overlap their retries. Review M2: a
+ * retry is asked only while the call's budget still holds its wait, a lookup and the reserve the step after the
+ * resolution needs. A device it could not ask alone keeps its silent answer, so the refusal still names it.
  */
 export async function askSilentAlone(
-  sessions: Pick<RemoteSessionsPort, "lookup" | "lookupsIdle">,
+  sessions: Pick<RemoteSessionsPort, "lookupAlone">,
   thread: string,
   answers: readonly ProbeAnswer[],
 ): Promise<readonly ProbeAnswer[]> {
-  const probe = sessions.lookup
-  if (probe === undefined) return answers
   const settled: ProbeAnswer[] = []
-  for (const entry of answers)
-    settled.push(
-      entry.answer.kind === "silent" && (await quiet(sessions))
-        ? { device: entry.device, answer: await probe(entry.device, thread) }
-        : entry,
-    )
+  for (const entry of answers) {
+    const again = entry.answer.kind === "silent" ? await alone(sessions, entry.device, thread) : undefined
+    // A retry the port could not make (`unavailable`) says nothing about the device: its silent answer stands.
+    settled.push(again === undefined || again.kind === "unavailable" ? entry : { device: entry.device, answer: again })
+  }
   return settled
 }
 
-async function quiet(sessions: Pick<RemoteSessionsPort, "lookupsIdle">): Promise<boolean> {
+async function alone(
+  sessions: Pick<RemoteSessionsPort, "lookupAlone">,
+  device: string,
+  thread: string,
+): Promise<RemoteLookupOutcome | undefined> {
   const room = waitWithinCallBudget(Number.POSITIVE_INFINITY)
-  if (room < SOLO_LOOKUP_MS) return false
-  if (sessions.lookupsIdle === undefined) return true
-  const idle = await within(sessions.lookupsIdle(), Math.min(SOLO_LOOKUP_MS, room - SOLO_LOOKUP_MS))
-  return idle && waitWithinCallBudget(Number.POSITIVE_INFINITY) >= SOLO_LOOKUP_MS
-}
-
-async function within(work: Promise<void>, ms: number): Promise<boolean> {
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<false>((resolve) => {
-    timer = setTimeout(() => resolve(false), Math.max(0, ms))
-    timer.unref?.()
-  })
-  try {
-    return await Promise.race([work.then(() => true as const), expired])
-  } finally {
-    clearTimeout(timer)
-  }
+  if (sessions.lookupAlone === undefined || room < SOLO_LOOKUP_MS) return undefined
+  return await sessions.lookupAlone(device, thread, Math.min(SOLO_LOOKUP_MS, room - SOLO_LOOKUP_MS))
 }
