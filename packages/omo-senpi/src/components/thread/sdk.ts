@@ -26,7 +26,7 @@ import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAI
 import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity } from "./control/port"
+import { controlIdentity, controlRefusalOf } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
@@ -45,7 +45,7 @@ export type {
   StoreExtensionRefusal,
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
-import type { DeliveryTarget } from "./gateway/transport"
+import type { DeliveryOutcome, DeliveryTarget, RelayDeliverySuccess } from "./gateway/transport"
 import type {
   ExternalAuthor,
   GatewayDeliveryMode,
@@ -87,7 +87,8 @@ export type ThreadSdkOptions = {
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
-   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
+   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
+   * shipped entry (`extension/thread-sdk.ts`) passes the account surface when its caller passes none (#14616).
    */
   readonly remote?: RemoteThreadSurface
 }
@@ -133,6 +134,8 @@ type Reported = Promise<
 /** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
 export type ThreadSdkSendResult =
   | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
+  /** A send to a session on another device (#14616): its device answered; there is no local row, so no `message_seq`. */
+  | (Omit<RelayDeliverySuccess, "thread_id"> & { readonly thread: string })
   | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
 
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
@@ -259,6 +262,9 @@ function fail(
 
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
 function thrown(error: unknown): Failure {
+  // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
+  const refusal = controlRefusalOf(error)
+  if (refusal !== undefined) return { kind: "error", error: refusal }
   const schema = gatewaySchemaRefusal(error)
   if (schema !== undefined) return { kind: "error", error: schema }
   const message = error instanceof Error ? error.message : String(error)
@@ -434,7 +440,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return { id: resolved.thread }
   }
 
-  function named(sent: GatewayDeliveryResult): ThreadSdkSendResult {
+  function named(sent: DeliveryOutcome): ThreadSdkSendResult {
     if (sent.kind !== "ok") return sent
     const { thread_id, ...facts } = sent
     return { ...facts, thread: thread_id }
@@ -563,9 +569,13 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
                   ...(across.all_scope === undefined ? {} : { all_scope: across.all_scope }),
                 }
         }
+        // The engine admits a command-line delivery only from its own machine, so a send to another device goes the way
+        // `omo remote send` does: this person's own input, a prompt keyed by the person principal (#14616). The process runs
+        // as that same user with the same device service, so it reaches nothing that command could not.
+        const remote = target.kind === "remote"
         const sent = await pipeline.deliver({
-          sender: { kind: "cli", uid: options.uid, user: options.user },
-          caller_id: principal,
+          sender: { kind: remote ? "person" : "cli", uid: options.uid, user: options.user },
+          caller_id: remote ? `person:${options.uid}` : principal,
           target,
           text: request.text,
           mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
@@ -574,12 +584,6 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
           args: request,
         })
-        if (sent.kind === "ok" && "device" in sent)
-          return fail(
-            "internal_error",
-            `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`,
-            "Report this: the relay transport must refuse a command-line sender before sending.",
-          )
         return named(sent)
       }),
     bind: (request) =>

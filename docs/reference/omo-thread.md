@@ -76,9 +76,10 @@ an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device par
 `here`, a device name or a unique device-id prefix; the thread part resolves among that device's
 threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
 and an address may resolve to a thread on another of the account's devices: `read` and `locate`
-reach it there. `send` resolves it too, but the other device's engine admits no command-line
-sender, so a bindingless send answers `unsupported` with `details.reason: "sender_not_allowed"`
-naming the device. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
+reach it there. `send` resolves it too and delivers it the way `omo remote send` does: the other
+device's engine admits no command-line delivery from another machine, so the text goes as this
+user's own input (a prompt under principal `person:<uid>`, no delivery envelope) and the result
+names the `device` that answered, with no local `message_seq` or `endpoint_kind`. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
 bound send's target) resolve on this device first and bind and report only sessions this device
 holds: a session only another device holds answers `unsupported` with `details.reason:
 "session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
@@ -618,7 +619,9 @@ try {
 ```
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
-CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint registry on disk; pass
+CLI's JSON; nothing throws for a refusal. Like `omo thread`, it lists, reads and addresses the threads on the
+account's other devices through this device's device service, loaded on the first call that needs another device
+and closed by `dispose()`. Endpoints come from the endpoint registry on disk; pass
 `engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
 enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
 diagnostic pass that took 8-9 s on a host with about 50 endpoints.
@@ -651,3 +654,9 @@ if (created.kind === "ok") {
   await sdk.close({ thread: "nightly-build" })
 }
 ```
+
+### Diagnose a local read RPC failure
+
+Set `OMO_THREAD_READ_TRACE=1` in the **calling process** to print a `[thread-read-rpc]` line to stderr when a local socket conversation for `list_sessions`, `get_protocol_info`, `get_messages`, or `get_entries` fails. Leave it unset for normal use. Each line contains only the requested command, the last observed socket phase, elapsed milliseconds, a fixed error code, `caller_stall_ms` (how long the calling process's own event loop was blocked over the whole call, every attempt included) and `attempts` (2 when a connection lost during such a stall was dialed again). It does not contain socket paths, IDs, credentials or transcript data.
+
+A failed listing probe does not necessarily mean the entire tool call failed: other endpoints can still answer. `response-frame` means a line delimiter arrived, not that a matching reply arrived. This diagnostic does not retry a call or change its deadline.

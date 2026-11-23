@@ -108,6 +108,24 @@ describe("#given the release stamp's content check", () => {
     expect(checkStamp(head).status).toBe(0)
   })
 
+  test("a stable pin stamps root and native beta versions independently, including the lockfile", () => {
+    const lock = (rootVersion: string, nativeVersion: string) =>
+      `{"workspaces":{"":{"version":"${rootVersion}"},"packages/omo-native":{"name":"omo-ai","version":"${nativeVersion}"}}}`
+    git("checkout", "-q", "--detach", base)
+    write("packages/omo-native/package.json", '{ "version": "1.0.0" }\n')
+    write("bun.lock", lock("1.0.0", "1.0.0"))
+    git("add", "-A")
+    git("commit", "-qm", "stable pin")
+    const pin = git("rev-parse", "HEAD")
+    write("package.json", '{ "version": "1.0.1-beta.1" }\n')
+    write("packages/omo-native/package.json", '{ "version": "1.0.1-0.beta.1" }\n')
+    write("bun.lock", lock("1.0.1-beta.1", "1.0.1-0.beta.1"))
+    git("add", "-A")
+    git("commit", "-qm", "beta stamp")
+    const run = spawnSync("node", [checker, "--check-stamp", pin, "HEAD"], { cwd: repo, encoding: "utf8" })
+    expect(run.status, run.stderr).toBe(0)
+  })
+
   test.each([
     [
       "a stamped hooks file whose Windows launch line also changes",
