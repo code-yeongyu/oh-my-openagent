@@ -1,5 +1,5 @@
-import { spawnSync } from "node:child_process"
-import { appendFileSync, cpSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from "node:child_process"
+import { appendFileSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 // A real git origin for publish-gate-reuse-ci-basis-waiver.test.ts: the gate-reuse waiver fetches,
@@ -56,6 +56,21 @@ const COMMITS = [
 ] as const
 
 export type CommitName = (typeof COMMITS)[number][0]
+
+// Git Bash's mktemp and native children must agree on a directory owned by
+// this case, even when the hermetic subprocess env has no Windows TEMP.
+export function runReleaseBash(root: string, script: string, options: SpawnSyncOptionsWithStringEncoding) {
+  const temp = mkdtempSync(join(root, "runner-temp-"))
+  try {
+    const command = process.platform === "win32" ? 'RUNNER_TEMP="$(cygpath -u "$RUNNER_TEMP")"; source "$(cygpath -u "$1")"' : 'source "$1"'
+    return spawnSync("bash", ["-eo", "pipefail", "-c", command, "bash", script], {
+      ...options,
+      env: { ...options.env, RUNNER_TEMP: temp, TMPDIR: temp, TEMP: temp, TMP: temp },
+    })
+  } finally {
+    rmSync(temp, { recursive: true, force: true })
+  }
+}
 
 export interface GitOrigin {
   readonly origin: string
