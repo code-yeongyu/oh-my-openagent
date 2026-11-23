@@ -403,7 +403,7 @@ export function createRemoteThreadFixture() {
         return key === undefined ? { kind: "none" } : { kind: "found", key }
       })()
       return { answer, settled }
-    })
+    }, 3_500)
     const lookupMade = options.noLookup !== true && options.wakeFeature === true
     const deviceReads = { thisDevice: 0, devices: 0 }
     // Account listing reads: `all` asks every device (one round across the account), `device` asks one device.

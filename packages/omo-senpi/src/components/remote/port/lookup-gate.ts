@@ -6,36 +6,51 @@ export type LookupStart = { readonly answer: Promise<RemoteLookupOutcome>; reado
 export type LookupGate = {
   readonly lookup: (device: string, durableId: string) => Promise<RemoteLookupOutcome>
   readonly lookupAlone: (device: string, durableId: string, waitMs: number) => Promise<RemoteLookupOutcome | undefined>
+  /** Another request to a device that outlives its caller's cap: counted as in flight until it settles. */
+  readonly track: (work: Promise<unknown>) => void
 }
 
 /**
  * omo#14748 review M1/M3: the locates of one sessions port, so a solo lookup is never in flight with another one. A
- * capped lookup leaves its locate running, so `lookupAlone` takes its turn among the solo lookups of every caller on the
- * port, holds every new lookup back, waits for the locates already sent to finish, and only then sends its own; waiting
- * past `waitMs` sends nothing and answers undefined. The hold lasts until its answer, and the next solo lookup again
- * waits for this one's locate to finish.
+ * capped answer leaves its locate running, so `lookupAlone` takes its turn among the solo lookups of every caller on the
+ * port, closes the fence to new lookups, waits for every locate already in flight to finish, and only then sends its
+ * own; waiting past `waitMs` sends nothing and answers undefined. The fence and the turn stay closed until the solo
+ * locate itself settles (answered, failed or cancelled), not until its capped answer returns (review round 4). A lookup
+ * that meets a closed fence waits for it at most `fenceWaitMs`, then answers silent without sending anything.
  */
-export function createLookupGate(start: (device: string, durableId: string) => LookupStart): LookupGate {
+export function createLookupGate(
+  start: (device: string, durableId: string) => LookupStart,
+  fenceWaitMs: number,
+): LookupGate {
   const inFlight = new Set<Promise<unknown>>()
-  let held: Promise<void> | undefined
+  let fence: Promise<void> | undefined
   let queue: Promise<void> = Promise.resolve()
-  const send = (device: string, durableId: string): Promise<RemoteLookupOutcome> => {
+  const track = (work: Promise<unknown>): void => {
+    inFlight.add(work)
+    const drop = () => void inFlight.delete(work)
+    work.then(drop, drop)
+  }
+  const send = (device: string, durableId: string): LookupStart => {
     const started = start(device, durableId)
-    inFlight.add(started.settled)
-    const drop = () => void inFlight.delete(started.settled)
-    started.settled.then(drop, drop)
-    return started.answer
+    track(started.settled)
+    return started
   }
   const drained = async (): Promise<void> => {
     while (inFlight.size > 0) await Promise.allSettled([...inFlight])
   }
+  const fenceOpen = async (): Promise<boolean> => {
+    // A monotonic clock: a wall-clock jump never stretches or skips the wait.
+    const deadline = performance.now() + fenceWaitMs
+    while (fence !== undefined) if (!(await within(fence, deadline - performance.now()))) return false
+    return true
+  }
   return {
+    track,
     lookup: async (device, durableId) => {
-      while (held !== undefined) await held
-      return await send(device, durableId)
+      if (!(await fenceOpen())) return { kind: "silent", reason: "lookup_timeout" }
+      return await send(device, durableId).answer
     },
     lookupAlone: async (device, durableId, waitMs) => {
-      // A monotonic clock: a wall-clock jump never stretches or skips the wait.
       const deadline = performance.now() + waitMs
       const previous = queue
       let leave: () => void = () => {}
@@ -45,15 +60,26 @@ export function createLookupGate(start: (device: string, durableId: string) => L
         return undefined
       }
       let open: () => void = () => {}
-      held = new Promise<void>((resolve) => (open = resolve))
-      try {
-        if (!(await within(drained(), deadline - performance.now()))) return undefined
-        return await send(device, durableId)
-      } finally {
-        held = undefined
+      const closed = new Promise<void>((resolve) => (open = resolve))
+      fence = closed
+      const release = () => {
+        if (fence === closed) fence = undefined
         open()
         leave()
       }
+      let started: LookupStart
+      try {
+        if (!(await within(drained(), deadline - performance.now()))) {
+          release()
+          return undefined
+        }
+        started = send(device, durableId)
+      } catch (error) {
+        release()
+        throw error
+      }
+      started.settled.then(release, release)
+      return await started.answer
     },
   }
 }

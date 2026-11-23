@@ -5,7 +5,12 @@ import { createLookupGate, type LookupStart } from "./lookup-gate"
 // #14748: the lookup gate's interleavings. Each locate is a fake the test finishes by hand: `capped` devices answer
 // silent at once while their locate keeps running, as a lookup the client capped does.
 
-type Options = { readonly capped?: readonly string[]; readonly rejects?: readonly string[]; readonly throws?: string }
+type Options = {
+  readonly capped?: readonly string[]
+  readonly rejects?: readonly string[]
+  readonly throws?: string
+  readonly fenceWaitMs?: number
+}
 
 function locates(options: Options = {}) {
   let inFlight = 0
@@ -35,7 +40,7 @@ function locates(options: Options = {}) {
   }
   const startedDevices = () => started.map((entry) => entry.device)
   return {
-    gate: createLookupGate(start),
+    gate: createLookupGate(start, options.fenceWaitMs ?? 5_000),
     started,
     startedDevices,
     finish: (device: string) => finishers.get(device)?.(),
@@ -171,5 +176,63 @@ describe("#14748 the lookup gate: a solo lookup is never in flight with another 
     await until(() => run.startedDevices().includes("e"), "e to start")
     run.finish("e")
     expect(await plain).toEqual({ kind: "found", key: "key-e" })
+  })
+
+  test("E40: #given a solo lookup answered at its cap while its locate still runs #when a plain lookup is asked #then it starts only once that locate settled (review round 4)", async () => {
+    const run = locates({ capped: ["c"] })
+    expect(await run.gate.lookupAlone("c", "id", 5_000)).toEqual({ kind: "silent", reason: "lookup_timeout" })
+    const plain = run.gate.lookup("e", "id")
+    await turns(20)
+    expect(run.startedDevices()).toEqual(["c"])
+    run.finish("c")
+    await until(() => run.startedDevices().includes("e"), "e to start")
+    run.finish("e")
+    expect(await plain).toEqual({ kind: "found", key: "key-e" })
+    expect(run.started.find((entry) => entry.device === "e")?.inFlight).toBe(1)
+  })
+
+  test("E41: #given a capped solo locate that is cancelled (rejects) afterwards #then the fence opens and a waiting lookup proceeds", async () => {
+    const run = locates({ capped: ["c"], rejects: ["c"] })
+    await run.gate.lookupAlone("c", "id", 5_000)
+    const plain = run.gate.lookup("e", "id")
+    await turns(20)
+    expect(run.startedDevices()).toEqual(["c"])
+    run.finish("c")
+    await until(() => run.startedDevices().includes("e"), "e to start")
+    run.finish("e")
+    expect(await plain).toEqual({ kind: "found", key: "key-e" })
+  })
+
+  test("E42: #given a capped solo locate that never settles #when a plain lookup meets the closed fence #then it answers silent at its own cap and sends nothing", async () => {
+    const run = locates({ capped: ["c"], fenceWaitMs: 30 })
+    await run.gate.lookupAlone("c", "id", 5_000)
+    expect(await run.gate.lookup("e", "id")).toEqual({ kind: "silent", reason: "lookup_timeout" })
+    expect(run.startedDevices()).toEqual(["c"])
+  })
+
+  test("E43: #given a capped solo lookup #when the next caller asks alone #then its locate starts only once the first one's locate settled", async () => {
+    const run = locates({ capped: ["c"] })
+    await run.gate.lookupAlone("c", "id", 5_000)
+    const next = run.gate.lookupAlone("d", "id", 5_000)
+    await turns(20)
+    expect(run.startedDevices()).toEqual(["c"])
+    run.finish("c")
+    await until(() => run.startedDevices().includes("d"), "d to start")
+    run.finish("d")
+    expect(await next).toEqual({ kind: "found", key: "key-d" })
+    expect(run.started.map((entry) => entry.inFlight)).toEqual([1, 1])
+  })
+
+  test("E44: #given another request to a device tracked by the gate (a post-create locate past its budget) #then a solo lookup waits for it too", async () => {
+    const run = locates()
+    let finishOther: () => void = () => {}
+    run.gate.track(new Promise<void>((resolve) => (finishOther = resolve)))
+    const alone = run.gate.lookupAlone("c", "id", 5_000)
+    await turns(20)
+    expect(run.startedDevices()).toEqual([])
+    finishOther()
+    await until(() => run.startedDevices().includes("c"), "c to start")
+    run.finish("c")
+    expect(await alone).toEqual({ kind: "found", key: "key-c" })
   })
 })

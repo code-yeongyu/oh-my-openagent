@@ -315,7 +315,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     )
     return { answer: cappedLookup(connected, sent, options.lookupCapMs ?? LOOKUP_CAP_MS), settled: sent }
   }
-  const lookups = createLookupGate(startLookup)
+  const lookups = createLookupGate(startLookup, options.lookupCapMs ?? LOOKUP_CAP_MS)
   // thread_list asks for this device's id and name in parallel: overlapping asks share one device.info read.
   let info: ReturnType<DeviceService["thisDevice"]> | undefined
   const deviceInfo = (): ReturnType<DeviceService["thisDevice"]> => {
@@ -509,7 +509,10 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       let key: string
       try {
         // omo#14130 review round 3 (L1): an older service's post-create locate shares the call's budget.
-        const located = await withinCallBudget(connected.locate(device, engineId))
+        // A post-create locate that outlives the call's budget still runs on that device: a solo lookup waits for it.
+        const locating = connected.locate(device, engineId)
+        lookups.track(locating)
+        const located = await withinCallBudget(locating)
         if (located === undefined) return { kind: "refused", reason: "request_timeout" }
         key = located.key
       } catch (error) {
