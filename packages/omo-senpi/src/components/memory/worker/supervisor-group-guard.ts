@@ -6,9 +6,8 @@ import { signalOwnSupervisorGroup } from "./supervisor-process-identity"
 export async function startGroupGuard(entry: string) {
   const guard = spawn(process.execPath, [entry, "--group-guard", String(process.pid)], {
     detached: false,
-    // Hold the status pipe (3) open without writing it: the supervisor cannot finish
-    // draining the bootstrap's stdio and release the lease ahead of this guard's exit.
-    stdio: [4, 3, "inherit", "ipc"],
+    // stdin receives commands; on native POSIX stdout holds the independent EOF witness.
+    stdio: [4, process.platform === "win32" ? "ignore" : 5, "inherit", "ipc"],
     windowsHide: true,
   })
   await new Promise<void>((resolve, reject) => {

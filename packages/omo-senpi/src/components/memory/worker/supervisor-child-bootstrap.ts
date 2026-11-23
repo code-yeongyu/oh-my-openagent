@@ -38,13 +38,28 @@ export async function runChildBootstrap(runDir: string, entry: string): Promise<
   if (!(await readRelease())) return
   const manifest = await readRunJson<RunLaunchManifest>(join(runDir, "launch.json"))
   const platform = getSupervisorRuntimePlatform()
-  const finishGuard =
-    platform === "posix" ? await (await import("./supervisor-group-guard")).startGroupGuard(entry) : undefined
+  let finishGuard: (() => void) | undefined
+  if (platform === "posix") {
+    // No model exists yet and the guard may not even be reading commands. Only the
+    // detached bootstrap can enforce this deadline without relying on the handshake.
+    const cancelStartup = scheduleSupervisorDeadline(manifest.hardDeadlineAt, () =>
+      signalOwnSupervisorGroup(process.pid, "SIGKILL"),
+    )
+    try {
+      finishGuard = await (await import("./supervisor-group-guard")).startGroupGuard(entry)
+      if (readSupervisorClockNow() >= manifest.hardDeadlineAt) signalOwnSupervisorGroup(process.pid, "SIGKILL")
+    } finally {
+      cancelStartup()
+    }
+  }
   const child = spawn(manifest.command, [...manifest.args], {
     cwd: manifest.cwd,
     env: manifest.env,
     detached: false,
-    stdio: ["ignore", "inherit", "inherit"],
+    stdio:
+      platform === "posix" && process.platform !== "win32"
+        ? ["ignore", "inherit", "inherit", 5]
+        : ["ignore", "inherit", "inherit"],
     // The bootstrap itself runs without a console on win32, so a console-subsystem child would
     // allocate a fresh visible one for the whole run unless it is created hidden.
     windowsHide: true,
@@ -116,6 +131,9 @@ export async function runChildBootstrap(runDir: string, entry: string): Promise<
   writeBootstrapStatus(status)
   if (finishGuard && !timedOut && !reachedDeadline(readSupervisorClockNow(), manifest.hardDeadlineAt)) {
     cancelKill()
+    // Our IPC closes on exit. The guard contains any remaining group members before
+    // its own witness descriptor disappears. The model's exit is already durable.
+    if (process.platform !== "win32") process.exit(0)
     finishGuard()
   }
 }

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process"
+import { once } from "node:events"
 import { closeSync, openSync } from "@oh-my-opencode/memory-core/fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -48,12 +49,14 @@ async function runSupervisor(runDir: string): Promise<void> {
 
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
+  const witness = platform === "posix" && process.platform !== "win32" ? await startContainmentWitness() : undefined
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
-    stdio: ["pipe", stdoutFd, stderrFd, "pipe", platform === "posix" ? "pipe" : "ignore"],
+    stdio: ["pipe", stdoutFd, stderrFd, "pipe", platform === "posix" ? "pipe" : "ignore", witness?.input ?? "ignore"],
     windowsHide: true,
   })
+  witness?.input.destroy()
   childPid = bootstrap.pid
   const commands = bootstrap.stdio[4]
   if (commands && "write" in commands) {
@@ -100,7 +103,8 @@ async function runSupervisor(runDir: string): Promise<void> {
   if (bootstrapPid === undefined) throw new Error("child bootstrap did not receive a pid")
   const childProcessStart = await getSupervisorProcessStart(bootstrapPid)
   // The pipe gate keeps the child idle until its lease ownership and ledger are durable.
-  await lease.retainFor(bootstrapPid, childProcessStart)
+  if (witness) await lease.retainFor(witness.pid, await getSupervisorProcessStart(witness.pid))
+  else await lease.retainFor(bootstrapPid, childProcessStart)
   await updateRunLedger(ledgerPath, {
     childPid: bootstrapPid,
     childProcessStart,
@@ -122,6 +126,7 @@ async function runSupervisor(runDir: string): Promise<void> {
     })
   }
   const wrapperExit = await closed
+  if (witness) await witness.waitForEof()
   const childExit = parseSupervisorChildExit(bootstrapStatus)
   if (platform === "win32" && timedOut && childExit === undefined) await hardKillFinished
   cancelTerm()
@@ -154,6 +159,24 @@ async function runSupervisor(runDir: string): Promise<void> {
   await publishRunOutcome(runDir, manifest, outcome)
   await unlinkRunArtifact(launchPath)
   process.exit(0)
+}
+
+/** A kernel EOF independent of Bun's ChildProcess stdio teardown. After spawn, only the
+ * detached group has writers. The slot belongs to the reader, not the bootstrap: a queued
+ * contender must not reclaim it just because the group leader has already been reaped. */
+async function startContainmentWitness() {
+  const reader = spawn("/bin/cat", [], { detached: true, stdio: ["pipe", "ignore", "ignore"] })
+  await once(reader, "spawn")
+  if (reader.pid === undefined) throw new Error("containment witness did not receive a pid")
+  const exit = once(reader, "exit")
+  return {
+    pid: reader.pid,
+    input: reader.stdin,
+    async waitForEof() {
+      const [code, signal] = await exit
+      if (code !== 0) throw new Error(`containment witness exited without EOF: ${code ?? signal}`)
+    },
+  }
 }
 
 async function readRecordedChildExit(

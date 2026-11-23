@@ -2,6 +2,7 @@ import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { readFile, readdir, rm, stat, writeFile } from "node:fs/promises"
 import { join } from "node:path"
+import { createLockRecord, LockContentionError, withLock } from "@oh-my-opencode/memory-core"
 import { createMemoryRunSupervisorIc8Harness, IC8_PLATFORMS, IC8_WAIT_MS } from "./memory-run-supervisor-ic8-harness"
 import { terminateProcessGroup } from "./memory-run-supervisor-ic8-process-groups"
 import { withRunTerminalGate } from "./run-terminal-gate"
@@ -28,6 +29,90 @@ const {
 afterEach(async () => harness.cleanup())
 
 describe("memory run supervisor IC-8 containment", () => {
+  test("#given a guard stalled before ready #then the startup deadline contains it and frees the slot", async () => {
+    if (process.platform === "win32") return
+    const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("stubborn")
+    await writeFile(join(runDir, "stall-before-ready"), "")
+    const signalLog = join(runDir, "external-signals.jsonl")
+    await writeFile(signalLog, "")
+    const supervisor = launchSupervisor(
+      runDir,
+      clockPath,
+      "posix",
+      join(import.meta.dir, "__fixtures__/supervisor-signal-spy.ts"),
+    )
+    const exit = waitForExit(supervisor)
+    const guardSocket = await exitSocketAccepted
+    await waitForPath(join(runDir, "guard.pid"))
+    const guardPid = Number(await readFile(join(runDir, "guard.pid"), "utf8"))
+    try {
+      await advanceClock(clockPath, 3_000)
+      const outcomePath = join(runDir, "outcome.json")
+      await waitForPath(outcomePath, 3_000).catch((cause: unknown) => {
+        throw new Error(
+          `startup outcome missing; guard socket open=${!guardSocket.destroyed}, slot held=${existsSync(slotPath(runDir))}`,
+          { cause },
+        )
+      })
+      await waitBounded(childExited, 3_000, "stalled guard to exit at the startup deadline")
+      expect(await exit).toEqual({ code: 0, signal: null })
+      expect(JSON.parse(await readFile(outcomePath, "utf8"))).toMatchObject({
+        timedOut: true,
+        childExit: { code: null, signal: "SIGKILL" },
+      })
+      expect(existsSync(join(runDir, "child-started.json"))).toBe(false)
+      expect(existsSync(slotPath(runDir))).toBe(false)
+      expect(await readFile(signalLog, "utf8")).toBe("")
+    } finally {
+      if (!guardSocket.destroyed) killFixturePid(guardPid)
+      await exit
+    }
+  })
+
+  test("#given bootstrap close with a live guard and model #then publication and admission wait for containment", async () => {
+    if (process.platform === "win32") return
+    const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("stubborn")
+    const supervisor = launchSupervisor(
+      runDir,
+      clockPath,
+      "posix",
+      join(import.meta.dir, "__fixtures__/supervisor-signal-spy.ts"),
+    )
+    const exit = waitForExit(supervisor)
+    const modelSocket = await exitSocketAccepted
+    const guard = Number(await readFile(join(runDir, "guard.pid"), "utf8"))
+    const { childPid } = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))
+    process.kill(guard, "SIGSTOP")
+    try {
+      killFixturePid(childPid)
+      await waitForPath(join(runDir, "bootstrap-closed"))
+      // A file merely remaining on disk is not enough: an actual contender may reap
+      // the dead bootstrap's slot even before the supervisor explicitly releases it.
+      const admitted = await withLock(slotPath(runDir), await createLockRecord("reflection-run"), async () => true, {
+        waitTimeoutMs: 0,
+      }).catch((error: unknown) => {
+        if (error instanceof LockContentionError) return false
+        throw error
+      })
+      if (admitted) await waitForPath(join(runDir, "outcome.json"))
+      expect({
+        admitted,
+        published: existsSync(join(runDir, "outcome.json")),
+        modelAlive: !modelSocket.destroyed,
+      }).toEqual({ admitted: false, published: false, modelAlive: true })
+    } finally {
+      process.kill(guard, "SIGCONT")
+      await waitBounded(childExited, 3_000, "guard to contain the model after bootstrap close")
+      await exit
+    }
+    expect(await exit).toEqual({ code: 0, signal: null })
+    expect(JSON.parse(await readFile(join(runDir, "outcome.json"), "utf8"))).toMatchObject({
+      timedOut: false,
+      childExit: { code: null, signal: "SIGKILL" },
+    })
+    expect(existsSync(slotPath(runDir))).toBe(false)
+  })
+
   test("#given an owned child before deadline #when the supervisor receives TERM #then its exit handler contains the group", async () => {
     if (process.platform === "win32") return
     const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("stubborn")
@@ -370,6 +455,10 @@ describe("memory run supervisor IC-8 containment", () => {
     }, 60_000)
   }
 })
+
+function slotPath(runDir: string): string {
+  return join(runDir, "runtime", "locks", "reflection-run.slot-1.lock")
+}
 
 function killFixturePid(pid: number): void {
   if (!Number.isInteger(pid) || pid <= 0) throw new RangeError("fixture pid must be a positive integer")
