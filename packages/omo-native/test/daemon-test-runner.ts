@@ -7,12 +7,12 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 // signal is CPU time of the child's whole descendant tree. Kill on CPU stall, bound the runaway in CPU time too
 // (#14676: a 120 s wall-clock runaway cap killed a `host ensure` still making progress at load 10-29), and let
 // bun's test timeout sit above both as an outer bound only.
-export const STALL_KILL_MS = 10_000
+const STALL_KILL_MS = 10_000
 // A runaway is a tree that keeps burning CPU without finishing, so it is capped in tree CPU seconds, which a loaded
 // host does not inflate the way it inflates wall time. A quiet cold `host ensure` used 6.4-8.7 s of tree CPU on a
 // 2-CPU Linux container and 11.5-17.1 s on an M-series Mac; under 4.2x and 8x oversubscription it used 8.4-10.2 s while
 // its wall time grew to 25-78 s (#14676). The cap is about 3x the largest quiet measurement.
-export const RUNAWAY_CPU_CAP_S = 50
+const RUNAWAY_CPU_CAP_S = 50
 // Bun's per-test timeout for tests bounded this way: the test-linux job limit (15 min) minus a minute, so a broken
 // bound still fails inside the job with the test's name instead of as a cancelled job.
 export const TREE_BOUNDED_TEST_TIMEOUT_MS = 14 * 60_000
@@ -65,7 +65,7 @@ export function watchTreeProgress(
 // Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
 // stays flat while it blocks on the daemon, so sampling the tree is what separates slow from stalled.
 // macOS: ps gives the same graph once per sample. CLK_TCK is 100 on every host we run on.
-export function childTreeCpuSeconds(rootPid: number): number {
+function childTreeCpuSeconds(rootPid: number): number {
   if (process.platform === "linux") {
     try {
       const ppidOf = new Map<number, number>()
