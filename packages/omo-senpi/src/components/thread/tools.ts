@@ -1,6 +1,7 @@
 import {
   TOOL_CALL_BUDGET_MS,
-  beforeCallDispatch,
+  callMutation,
+  preparesMutation,
   callSignal,
   retainOpenOutcome,
   unlessAborted,
@@ -145,8 +146,9 @@ function releasedOnAbort(remote: RemoteThreadSurface): RemoteThreadSurface {
       rpc,
       options,
     ) => {
-      if (!String(rpc.type).startsWith("get_")) beforeCallDispatch()
-      const sent = port.sessionCommand(device, sessionId, rpc, options)
+      const sent = String(rpc.type).startsWith("get_")
+        ? port.sessionCommand(device, sessionId, rpc, options)
+        : callMutation(port.sessionCommand, device, sessionId, rpc, options)
       const signal = callSignal()
       if (signal === undefined) return await sent
       const settled = await unlessAborted(sent, signal)
@@ -154,12 +156,11 @@ function releasedOnAbort(remote: RemoteThreadSurface): RemoteThreadSurface {
     }
     sessions = {
       ...port,
-      sessionCommand,
+      sessionCommand: preparesMutation(sessionCommand),
       endpointCommand: async (device, rpc, options) => {
         if (rpc.type !== "open_session") return await port.endpointCommand(device, rpc, options)
-        beforeCallDispatch()
         // execute races the caller, not the owned connection. Its finally closes only on the actual reply.
-        const opened = await port.endpointCommand(device, rpc, options)
+        const opened = await callMutation(port.endpointCommand, device, rpc, options)
         if (opened.kind === "ok") retainOpenOutcome()
         return opened
       },
@@ -266,7 +267,10 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const receipted = !(name === "thread_send" || name === "thread_handoff")
     // An earlier run under this key failed after it may have acted: only thread_create may run again, and it decides (#14060).
     let retrying: { readonly error_note: string | null } | undefined
-    if (receipted) {
+    let admitted = false
+    let dispatched = false
+    let pending: Promise<ToolOutput | undefined> | undefined
+    const begin = async (inspect: boolean): Promise<ToolOutput | undefined> => {
       // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store
       // lock held past its wait bound is `overloaded`, any other store failure `internal_error`.
       const key = receiptKey(scope)
@@ -283,14 +287,19 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       }
       let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>
-      admitting.set(key, (admitting.get(key) ?? 0) + 1)
+      if (!inspect) admitting.set(key, (admitting.get(key) ?? 0) + 1)
       try {
-        admission = await store.toolReceiptBegin({ ...scope, now: at, args_hash: hashArgs(value) })
+        admission = await store.toolReceiptBegin({
+          ...scope,
+          now: at,
+          args_hash: hashArgs(value),
+          ...(inspect ? { inspect: true } : {}),
+        })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
         const locked = isLockWaitExceeded(error)
         const schema = gatewaySchemaRefusal(error)
-        if (!locked && schema === undefined) unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
+        if (!inspect && !locked && schema === undefined) unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
         if (isCancelled(signal)) return output(CANCELLED_BEFORE_START)
         if (locked)
           return output(
@@ -310,7 +319,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       } finally {
         // The slot passes to the key's recovery entry when the failure left one; otherwise it is free again.
-        releaseAdmitting(key)
+        if (!inspect) releaseAdmitting(key)
       }
       if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
         admission = { kind: "accepted" }
@@ -322,7 +331,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
             "Retry with a new idempotency_key.",
           ),
         )
-      unanswered.delete(key)
+      if (!inspect || admission.kind === "replay" || admission.kind === "uncertain") unanswered.delete(key)
       if (admission.kind === "replay") return output(currentResult(admission.result as ThreadToolResult))
       if (admission.kind === "in_progress") {
         const note = unsettled.get(receiptKey(scope))
@@ -346,9 +355,20 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       // #14060: a thread_create that failed after the host made its thread may recover by re-running it; the create
       // itself refuses unless it finds that thread (see thread_create).
       if (admission.kind === "uncertain") {
-        if (name !== "thread_create") return output(uncertainFailure(admission.error_note))
+        if (name !== "thread_create" || (!inspect && retrying === undefined))
+          return output(uncertainFailure(admission.error_note))
         retrying = { error_note: admission.error_note }
       }
+      if (inspect) return undefined
+      admitted = true
+      running.add(key)
+      return undefined
+    }
+    const admit = () => (pending ??= begin(false))
+    const ready = async () => {
+      if (dispatched) return
+      if (isCancelled(signal)) throw NOT_STARTED
+      if (receipted && !admitted && (await admit()) !== undefined) throw NOT_STARTED
     }
     const unrecorded = (what: string) => (settleError: unknown) => {
       unsettled.set(
@@ -358,11 +378,11 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     }
     const failed = async (error: unknown): Promise<ToolOutput> => {
       const message = error instanceof Error ? error.message : String(error)
-      if (receipted)
+      if (admitted)
         await store
           .toolReceiptSettle({ ...scope, now: now(), error_note: message })
           .catch(unrecorded(`the call failed (${message})`))
-      running.delete(receiptKey(scope))
+      if (admitted) running.delete(receiptKey(scope))
       const schema = gatewaySchemaRefusal(error)
       if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:")) {
@@ -395,12 +415,13 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     // #13426: cancelled before anything mutating left this device. Nothing ran, so the receipt is dropped and the same
     // key runs again; a release the store cannot record leaves the key recoverable instead of uncertain.
     const notStarted = async (): Promise<ToolOutput> => {
-      if (receipted) {
+      if (pending !== undefined) await pending
+      if (admitted && retrying === undefined) {
         const key = receiptKey(scope)
         const released = await store.toolReceiptRelease(scope).catch(() => false)
         if (!released) unanswered.set(key, now() + GATEWAY_RECEIPT_RETENTION_MS)
-        running.delete(key)
       }
+      if (admitted) running.delete(receiptKey(scope))
       return output(CANCELLED_BEFORE_START)
     }
     // #13426: cancelled after the command left this device. The caller gets its answer now; the key stays held until the
@@ -433,9 +454,21 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     // #13426: the caller may cancel while the receipt is admitted (an await after the first check); nothing has run yet.
     if (isCancelled(signal)) return await notStarted()
     let result: ThreadToolResult
-    let dispatched = false
-    if (receipted) running.add(receiptKey(scope))
     try {
+      // Replay or recover an existing key before doing any work. For a fresh mutation the
+      // authoritative, transactional admission waits until its port has finished preparing.
+      if (receipted) {
+        if (name === "thread_read" || name === "thread_list") {
+          const prior = await admit()
+          if (isCancelled(signal)) return await notStarted()
+          if (prior !== undefined) return prior
+        } else {
+          const lookup = begin(true)
+          const prior = signal === undefined ? { value: await lookup } : await unlessAborted(lookup, signal)
+          if (prior === undefined || isCancelled(signal)) return await notStarted()
+          if (prior.value !== undefined) return prior.value
+        }
+      }
       // A send takes nothing live as the offline case: its view never raises host_unavailable.
       // A reply whose sender is on another device resolves there alone (A4.3.1), so it takes no local listing.
       const sendTo = name === "thread_send" && "thread" in value && typeof value.thread === "string" ? value.thread : ""
@@ -462,6 +495,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
           if (!dispatched && isCancelled(signal)) throw NOT_STARTED
           dispatched = true
         },
+        ready,
       )
       if (signal === undefined) result = await work
       else {
@@ -474,11 +508,21 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         result = settled.value
       }
     } catch (error) {
+      if (!dispatched && isCancelled(signal)) return await notStarted()
+      // A transport may translate an admission refusal into its own failure. The receipt wins.
+      const prior = pending === undefined ? undefined : await pending
+      if (prior !== undefined) return prior
       if (error === NOT_STARTED) return await notStarted()
       // A control's typed refusal is the call's answer, recorded like one: a retry under the same key replays it.
       const refusal = controlRefusalOf(error)
       if (refusal === undefined) return await failed(error)
       result = { kind: "error", error: refusal }
+    }
+    if (receipted && !admitted) {
+      if (isCancelled(signal)) return await notStarted()
+      const prior = await admit()
+      if (prior !== undefined) return prior
+      if (isCancelled(signal)) return await notStarted()
     }
     if (receipted) await store.toolReceiptSettle({ ...scope, now: now(), result }).catch(unrecorded("the call ran"))
     running.delete(receiptKey(scope))

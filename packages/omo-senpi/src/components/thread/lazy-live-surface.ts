@@ -1,3 +1,4 @@
+import { preparesMutation } from "../call-budget/call-deadline"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import type { LiveThreadSurface, LiveThreadSurfaceOptions } from "./live-surface"
 import { resolveThreadSocket } from "./live-surface-paths"
@@ -43,31 +44,31 @@ export function createLazyLiveThreadSurface(
         const port = await target()
         return await port.prompt(sessionId, message, options, durableId)
       },
-      interrupt: async (sessionId, request, durableId) => {
+      interrupt: preparesMutation(async (sessionId, request, durableId) => {
         const port = await target()
         return await port.interrupt(sessionId, request, durableId)
-      },
-      setSessionName: async (sessionId, name, durableId) => {
+      }),
+      setSessionName: preparesMutation(async (sessionId, name, durableId) => {
         const port = await target()
         return await port.setSessionName(sessionId, name, durableId)
-      },
-      setSessionArchived: async (sessionId, archived, durableId) => {
+      }),
+      setSessionArchived: preparesMutation(async (sessionId, archived, durableId) => {
         const port = await target()
         if (port.setSessionArchived === undefined) throw new Error("unsupported:set_session_archived")
         return await port.setSessionArchived(sessionId, archived, durableId)
-      },
-      setModel: async (sessionId, provider, modelId, durableId) => {
+      }),
+      setModel: preparesMutation(async (sessionId, provider, modelId, durableId) => {
         const port = await target()
         return await port.setModel(sessionId, provider, modelId, durableId)
-      },
+      }),
       getAvailableModels: async (sessionId) => {
         const port = await target()
         return await port.getAvailableModels(sessionId)
       },
-      setThinkingLevel: async (sessionId, level, scope, durableId) => {
+      setThinkingLevel: preparesMutation(async (sessionId, level, scope, durableId) => {
         const port = await target()
         return await port.setThinkingLevel(sessionId, level, scope, durableId)
-      },
+      }),
       getAvailableThinkingLevels: async (sessionId) => {
         const port = await target()
         return await port.getAvailableThinkingLevels(sessionId)
@@ -82,11 +83,11 @@ export function createLazyLiveThreadSurface(
         if (port.releaseSession === undefined) throw new Error("unsupported:release_session")
         return await port.releaseSession(sessionId, request, durableId)
       },
-      closeSession: async (sessionId, durableId, options) => {
+      closeSession: preparesMutation(async (sessionId, durableId, options) => {
         const port = await target()
         if (port.closeSession === undefined) throw new Error("unsupported:close_session")
         return await port.closeSession(sessionId, durableId, options)
-      },
+      }),
       watchSession: async (sessionId, handlers, durableId) => {
         const port = await target()
         if (port.watchSession === undefined) throw new Error("unsupported:subscribe_sessions")
@@ -98,7 +99,7 @@ export function createLazyLiveThreadSurface(
     socket,
     ...sessionPort(),
     listSessions: async () => (await load()).listSessions(),
-    openSession: async (params) => (await load()).openSession(params),
+    openSession: preparesMutation(async (params) => (await load()).openSession(params)),
     listView: async (request) => (await load()).listView(request),
     listTarget: async (durableId, endpoint) => (await load()).listTarget(durableId, endpoint),
     endpoint: (socket) => sessionPort(socket),

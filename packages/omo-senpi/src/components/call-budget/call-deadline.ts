@@ -13,7 +13,12 @@ export const TOOL_CALL_BUDGET_MS = 50_000
 export const READ_RESERVE_MS = 15_000
 
 // omo#13426: the tool call's abort signal rides with its deadline, so a cancelled call leaves nothing to wait for.
-type CallScope = { readonly deadline: number; signal: AbortSignal | undefined; readonly onDispatch?: () => void }
+type CallScope = {
+  readonly deadline: number | undefined
+  signal: AbortSignal | undefined
+  readonly admit?: () => Promise<void>
+  readonly onDispatch?: () => void
+}
 
 // The tools and their lazy thread-client sidecar can carry separate copies of this module.
 const key = Symbol.for("omo.thread.call-scope")
@@ -29,10 +34,42 @@ export const withCallDeadline = <T>(
   call: () => Promise<T>,
   signal?: AbortSignal,
   onDispatch?: () => void,
-): Promise<T> => scope.run({ deadline: deadlineMs, signal, onDispatch }, call)
+  admit?: () => Promise<void>,
+): Promise<T> => scope.run({ deadline: deadlineMs, signal, onDispatch, admit }, call)
 
-/** At the mutating port, after preparation and before the first write. */
-export const beforeCallDispatch = (): void => scope.getStore()?.onDispatch?.()
+/** A nested relay receipt observes the same first write as the enclosing tool, never the start of preparation. */
+export function observeCallDispatch<T>(sent: () => void, run: () => Promise<T>): Promise<T> {
+  const parent = scope.getStore()
+  return scope.run(
+    {
+      ...parent,
+      deadline: parent?.deadline,
+      signal: parent?.signal,
+      onDispatch: () => {
+        parent?.onDispatch?.()
+        sent()
+      },
+    },
+    run,
+  )
+}
+
+/** Admit only once the write is ready. The final abort check and the write start share one stack. */
+export async function dispatchCall<T>(write: () => Promise<T>): Promise<T> {
+  const current = scope.getStore()
+  if (current?.admit !== undefined) await current.admit()
+  current?.onDispatch?.()
+  return write()
+}
+
+// An injected port with no preparation starts its mutation on entry. Adapters that prepare their own
+// transport instead call dispatchCall at the wire, including through the lazy client sidecar.
+const prepares = Symbol.for("omo.thread.prepares-mutation")
+export const preparesMutation = <F extends (...args: never[]) => unknown>(fn: F): F =>
+  Object.assign(fn, { [prepares]: true })
+export function callMutation<A extends unknown[], T>(fn: (...args: A) => Promise<T>, ...args: A): Promise<T> {
+  return prepares in fn ? fn(...args) : dispatchCall(() => fn(...args))
+}
 
 /** An acknowledged open owns its remaining work and receipt, still under the original deadline. */
 export function retainOpenOutcome(): void {
@@ -46,7 +83,7 @@ export const callSignal = (): AbortSignal | undefined => scope.getStore()?.signa
 /** What is left of the enclosing call's budget: none once its signal aborted (no enclosing call: undefined). */
 function remainingMs(now: number): number | undefined {
   const current = scope.getStore()
-  if (current === undefined) return undefined
+  if (current?.deadline === undefined) return undefined
   return current.signal?.aborted === true ? 0 : current.deadline - now
 }
 

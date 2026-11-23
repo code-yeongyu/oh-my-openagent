@@ -1,4 +1,4 @@
-import { beforeCallDispatch } from "../../call-budget/call-deadline"
+import { callMutation } from "../../call-budget/call-deadline"
 import { threadLink } from "../thread-link"
 import { routingId, sessionPort, summary } from "../tools/internals"
 import { threadRow } from "../tools/thread-row"
@@ -28,8 +28,7 @@ export function createLocalControl(
     title,
     visible: async () => visible(),
     interrupt: (turnId) => {
-      beforeCallDispatch()
-      return interruptOver((request) => port.interrupt(routing, request, threadId), turnId)
+      return interruptOver((request) => callMutation(port.interrupt, routing, request, threadId), turnId)
     },
     close: async (closeOptions) => {
       // A terminal closes its own session only gracefully, and then exits by itself (omo#14313).
@@ -47,25 +46,22 @@ export function createLocalControl(
           "Update omo on this device and restart its host.",
           { command: "close_session" },
         )
-      beforeCallDispatch()
-      return await port.closeSession(routing, threadId, closeOptions)
+
+      return await callMutation(port.closeSession, routing, threadId, closeOptions)
     },
     setName: (name) => {
-      beforeCallDispatch()
-      return port.setSessionName(routing, name, threadId)
+      return callMutation(port.setSessionName, routing, name, threadId)
     },
     getAvailableModels: async () => ({ models: await port.getAvailableModels(routing), held: false }),
     getModelState: async () => sessionModelState(await port.getState(routing, threadId)),
     setModel: async (provider, id) => {
-      beforeCallDispatch()
-      const selected = await port.setModel(routing, provider, id, threadId)
+      const selected = await callMutation(port.setModel, routing, provider, id, threadId)
       return { provider: selected.provider, id: selected.id }
     },
     getAvailableThinkingLevels: () => port.getAvailableThinkingLevels(routing),
     setThinkingLevel: async (level) => {
       try {
-        beforeCallDispatch()
-        await port.setThinkingLevel(routing, level, SESSION_ONLY_THINKING_SCOPE, threadId)
+        await callMutation(port.setThinkingLevel, routing, level, SESSION_ONLY_THINKING_SCOPE, threadId)
       } catch (error) {
         if (!(error instanceof Error) || !error.message.startsWith(THINKING_LEVEL_UNSUPPORTED)) throw error
         throw refuse(
@@ -113,8 +109,7 @@ export function createLocalControl(
         )
       if (port.setSessionArchived === undefined) throw unsupported()
       try {
-        beforeCallDispatch()
-        await port.setSessionArchived(routing, archived, threadId)
+        await callMutation(port.setSessionArchived, routing, archived, threadId)
       } catch (error) {
         if (error instanceof Error && error.message === ARCHIVE_UNSUPPORTED) throw unsupported()
         throw error

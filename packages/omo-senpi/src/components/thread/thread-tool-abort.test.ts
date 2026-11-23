@@ -205,7 +205,13 @@ describe("#13426: a cancelled thread tool call stops waiting", () => {
       if (opened.kind !== "ok") throw new Error(opened.reason)
       return { endpoint: "host", outcome: { state: "engine_applied" }, response: opened.response }
     })
-    const conn = { endpointCommand: open, close } as unknown as DeviceService
+    const endpointCommand: DeviceService["endpointCommand"] = (device, rpc, opts) => {
+      const write = () => open(device, rpc)
+      return (opts?.dispatch === undefined ? write() : opts.dispatch(write)) as ReturnType<
+        DeviceService["endpointCommand"]
+      >
+    }
+    const conn = { endpointCommand, close } as unknown as DeviceService
     const port = sessionsPort({ version: "test", dialEndpoint: async () => ({ conn, owned: true }) })
     const { run, store } = surface({
       ...remote,
@@ -243,7 +249,10 @@ describe("#13426: a cancelled thread tool call stops waiting", () => {
     const { run, store, setSessionName } = surface(undefined)
     const controller = new AbortController()
     const begin = store.toolReceiptBegin.bind(store)
-    spyOn(store, "toolReceiptBegin").mockImplementationOnce(async (req) => {
+    let lost = false
+    spyOn(store, "toolReceiptBegin").mockImplementation(async (req) => {
+      if (req.inspect || lost) return await begin(req)
+      lost = true
       await begin(req)
       if (abort) controller.abort()
       throw new Error("lost admission reply after commit")

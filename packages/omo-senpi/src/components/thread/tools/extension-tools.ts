@@ -5,7 +5,7 @@
  * and calls the op through the store's session channel, which stamps that caller into the op's args
  * inside the op's transaction. There is never an argument fallback for the caller.
  */
-import { beforeCallDispatch } from "../../call-budget/call-deadline"
+import { dispatchCall } from "../../call-budget/call-deadline"
 import type { AgentToolResult } from "@code-yeongyu/senpi"
 
 import type { ThreadToolResult } from "../contracts"
@@ -49,8 +49,9 @@ export async function recordThreadCreator(
   if (typeof createdId !== "string") return created
   const creator = resolveCallerDurableId(options, view, runtimeId)
   if (creator !== undefined && creator !== createdId) {
-    beforeCallDispatch()
-    await options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId })
+    await dispatchCall(() =>
+      options.store.recordThreadCreation({ creator_durable_id: creator, created_durable_id: createdId }),
+    )
   }
   return created
 }
