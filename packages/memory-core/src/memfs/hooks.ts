@@ -1,4 +1,13 @@
-import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "../fs/resilient"
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "../fs/resilient"
 import { isAbsolute, join, resolve } from "node:path"
 import { COMMIT_MSG_HOOK_SCRIPT, type MemoryHookChecker, withMemoryHookChecker } from "./hooks-commit-msg"
 import { POST_COMMIT_HOOK_SCRIPT, PRE_COMMIT_HOOK_SCRIPT } from "./hooks-scripts"
@@ -34,7 +43,10 @@ const hookScripts = (
  * shared hooks directory of the main repository, which is where git actually looks for them. The engine passes
  * its `checker` so the hooks validate staged notes with the TypeScript reader.
  */
-export function installHooks(repoPath: string, options: { readonly checker?: MemoryHookChecker } = {}): InstalledHook[] {
+export function installHooks(
+  repoPath: string,
+  options: { readonly checker?: MemoryHookChecker } = {},
+): InstalledHook[] {
   return syncMemoryHooks(repoPath, { checker: options.checker, installMissing: true })
 }
 
@@ -61,7 +73,8 @@ function syncMemoryHooks(
     const path = join(hooksDir, name)
     const current = installed.get(name)
     if (current === undefined && !options.installMissing) return []
-    if (current !== undefined && current.trim() !== "" && !current.includes(OMO_HOOK_MARKER)) return [{ name, path, status: "foreign" }]
+    if (current !== undefined && current.trim() !== "" && !current.includes(OMO_HOOK_MARKER))
+      return [{ name, path, status: "foreign" }]
     if (current === script) return [{ name, path, status: "current" }]
     replaceAtomically(path, script)
     return [{ name, path, status: "written" }]
@@ -81,7 +94,9 @@ function readInstalled(hooksDir: string): Map<string, string> {
 function installedChecker(installed: ReadonlyMap<string, string>): MemoryHookChecker | undefined {
   for (const script of installed.values()) {
     if (!script.includes(OMO_HOOK_MARKER)) continue
-    const values = new Map([...script.matchAll(CHECKER_LINE_RE)].map((match) => [match[1], (match[2] ?? "").replaceAll("'\\''", "'")]))
+    const values = new Map(
+      [...script.matchAll(CHECKER_LINE_RE)].map((match) => [match[1], (match[2] ?? "").replaceAll("'\\''", "'")]),
+    )
     const execPath = values.get("runtime")
     const checkerScript = values.get("script")
     if (execPath !== undefined && checkerScript !== undefined) return { execPath, script: checkerScript }

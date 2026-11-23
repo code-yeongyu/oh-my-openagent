@@ -17,12 +17,19 @@ describe("migrateMemoryHooks: the one path that moves an older omo hook forward 
   it("#given an omo pre-commit from an older release with the engine checker #when migrated #then it holds this release's script and keeps that checker", async () => {
     const dir = await createRepo({ checker: CHECKER })
     const expected = await hook(dir, "pre-commit")
-    await writeFile(join(resolveHooksDir(dir), "pre-commit"), expected.replace(/^ALL_KNOWN_KEYS=.*$/m, 'ALL_KNOWN_KEYS="description read_only limit kind aliases"'))
+    await writeFile(
+      join(resolveHooksDir(dir), "pre-commit"),
+      expected.replace(/^ALL_KNOWN_KEYS=.*$/m, 'ALL_KNOWN_KEYS="description read_only limit kind aliases"'),
+    )
 
     const result = migrateMemoryHooks(dir)
 
     expect(await hook(dir, "pre-commit")).toBe(expected)
-    expect(result.map(({ name, status }) => [name, status])).toEqual([["pre-commit", "written"], ["commit-msg", "current"], ["post-commit", "current"]])
+    expect(result.map(({ name, status }) => [name, status])).toEqual([
+      ["pre-commit", "written"],
+      ["commit-msg", "current"],
+      ["post-commit", "current"],
+    ])
   })
 
   it("#given a hook the user wrote #when migrated or installed #then it is reported foreign and its bytes are untouched", async () => {

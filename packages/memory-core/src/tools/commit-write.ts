@@ -2,7 +2,13 @@ import { readFile } from "../fs/resilient"
 import { join } from "node:path"
 
 import { refuseAgreementsViolation } from "./agreements-write-guard"
-import { GitCommandError, NoEffectiveChangesError, MemorySecretError, type GitCommitAuthor, type GitMemoryRepo } from "../git"
+import {
+  GitCommandError,
+  NoEffectiveChangesError,
+  MemorySecretError,
+  type GitCommitAuthor,
+  type GitMemoryRepo,
+} from "../git"
 import { StrandedGitLockError } from "../git/repo-lock-sweep"
 import { SOUL_EDIT_RESULT_LINE, touchesSoulPath } from "../soul"
 import type { LockDomain } from "../locks"
@@ -71,7 +77,10 @@ export async function commitMemoryWrite(options: CommitMemoryWriteOptions): Prom
       // A hook refused the commit: undo this write so one refusal never leaves the repo dirty for every later write.
       if (error instanceof GitCommandError && error.argv.includes("commit") && (await repo.head()) === headBefore) {
         await repo.restorePaths(paths)
-        throw new MemoryWriteRefusedError(`the repository's commit hook refused this write, so nothing was saved: ${(error.stdout + error.stderr).trim()}`, { cause: error })
+        throw new MemoryWriteRefusedError(
+          `the repository's commit hook refused this write, so nothing was saved: ${(error.stdout + error.stderr).trim()}`,
+          { cause: error },
+        )
       }
       throw error
     }

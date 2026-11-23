@@ -96,7 +96,10 @@ const memfsRepair: MemfsSubcommand = async ({ deps, ctx, identity }) => {
   const lines = [
     `# Memfs repair: ${identity.identity}`,
     `- reinstalled ${owned.length} git hook${owned.length === 1 ? "" : "s"}`,
-    ...foreign.map(({ name, path }) => `- left ${name} as it is: ${path} was not installed by omo, so omo's memory checks for that stage do not run`),
+    ...foreign.map(
+      ({ name, path }) =>
+        `- left ${name} as it is: ${path} was not installed by omo, so omo's memory checks for that stage do not run`,
+    ),
     `- scanned ${repaired.scanned} skill file${repaired.scanned === 1 ? "" : "s"}`,
   ]
   if (report.length > 0) lines.push(...report.split("\n").map((line) => `- ${line}`))
