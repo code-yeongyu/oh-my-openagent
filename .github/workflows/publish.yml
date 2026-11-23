@@ -360,7 +360,7 @@ jobs:
 
           if [ -n "$SOURCE_SHA" ]; then
             # The push proof is dispatch code: load it before the checkout moves to the source it judges.
-            proof_dir="$(mktemp -d)"
+            proof_dir="$(mktemp -d "$RUNNER_TEMP/release-proof.XXXXXXXXXX")"
             trap 'rm -rf "$proof_dir"' EXIT
             git show "${GITHUB_SHA}:.github/scripts/release-push-proof.sh" > "$proof_dir/release-push-proof.sh"
             git show "${GITHUB_SHA}:.github/scripts/release-push-proof.mjs" > "$proof_dir/release-push-proof.mjs"
@@ -803,7 +803,7 @@ jobs:
 
           pin="$(git rev-parse --verify "$SOURCE_SHA")"
           stamp="$(git rev-parse HEAD)"
-          proof_dir="$(mktemp -d)"
+          proof_dir="$(mktemp -d "$RUNNER_TEMP/release-proof.XXXXXXXXXX")"
           trap 'rm -rf "$proof_dir"' EXIT
           # Match Node's canonical module path so the checker's CLI entry point runs.
           proof_dir="$(cd "$proof_dir" && pwd -P)"
@@ -1067,7 +1067,7 @@ jobs:
               echo "::error::Refusing to tag ${RELEASE_SHA}: its first parent is not ${SOURCE_SHA}."
               exit 1
             fi
-            proof_dir="$(mktemp -d)"
+            proof_dir="$(mktemp -d "$RUNNER_TEMP/release-proof.XXXXXXXXXX")"
             trap 'rm -rf "$proof_dir"' EXIT
             proof_dir="$(cd "$proof_dir" && pwd -P)"
             if ! git show "${GITHUB_SHA}:script/release-state-paths.mjs" > "$proof_dir/dispatch.mjs"; then
