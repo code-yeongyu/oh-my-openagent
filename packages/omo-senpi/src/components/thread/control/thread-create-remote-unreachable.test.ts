@@ -89,7 +89,13 @@ describe("thread_create on a device whose route does not reach the session it op
   // #14623 review M5: the worktree is removed only once b's engine confirms the session it holds there is unloaded. A
   // refused, timed-out or unknown unload may leave that session alive in the folder, so the folder stays and is named.
   test.each([
-    ["refuses the unload", { kind: "ok" as const, response: { type: "response", success: true, data: { outcome: "refused", reason: "attached" } } }],
+    [
+      "refuses the unload",
+      {
+        kind: "ok" as const,
+        response: { type: "response", success: true, data: { outcome: "refused", reason: "attached" } },
+      },
+    ],
     ["times out on the unload", { kind: "refused" as const, reason: "request_timeout" }],
     ["loses the unload's reply (unknown)", { kind: "uncertain" as const, reason: "reply_lost" }],
   ])(
