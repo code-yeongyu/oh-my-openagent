@@ -56,6 +56,7 @@ test("#given a v14 session whose worker opened before this binary migrated the s
   expect(read.value?.map((row) => row.mode_effective)).toContain("start")
 
   lead.runtime.beginUserTurn()
+  const heldBefore = (await notifier.store.backlogs(["lead"]))["lead"]?.held ?? 0
   const written = await h.engineFor(old).deliver({
     sender: { kind: "session", durable_id: "notifier" },
     target: "lead",
@@ -85,8 +86,9 @@ test("#given a v14 session whose worker opened before this binary migrated the s
   if (first.kind !== "ok" || second.kind !== "ok") throw new Error(JSON.stringify({ first, second }))
   expect(second.collapsed).toBe(true)
   expect(second.delivery_id).toBe(first.delivery_id)
+  // Held for lead: the v14 row and the one collapsed alert. Without the v14 row counted it would be heldBefore + 1.
   const backlog = (await notifier.store.backlogs(["lead"]))["lead"]
-  expect(backlog).toBeDefined()
+  expect(backlog?.held).toBe(heldBefore + 2)
   lead.runtime.endTurn()
   await h.quiesce()
 })

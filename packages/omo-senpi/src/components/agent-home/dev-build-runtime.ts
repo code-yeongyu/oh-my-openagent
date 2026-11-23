@@ -66,25 +66,26 @@ function accountHomes(env: NodeJS.ProcessEnv, facts: PlatformFacts): readonly st
 /**
  * True when `agentDir` may be one of the agent homes every released omo on this account shares (`resolveAgentHome`'s
  * defaults: `~/.omo/agent`, the flat `~/.omo`, `~/.senpi/agent`) under any of the account's home roots, or when
- * `store` maps it to the same store one of them uses (a `gateway/` linked into the release's, #14622 review M8). With
+ any of `stores` maps it to the same path one of them uses: a `gateway/` linked into the release's (#14622 review M8), or
+ * only its `gateway/gateway.sqlite` linked to the release database (review M9). With
  * the account's homes unknown (`null`) it answers true: a store that cannot be proven isolated is treated as shared.
  */
 export function isSharedAgentDir(
   agentDir: string,
   options: {
     readonly homes?: readonly string[] | null
-    readonly store?: (agentDir: string) => string
+    readonly stores?: readonly ((agentDir: string) => string)[]
     readonly facts?: PlatformFacts
   } = {},
 ): boolean {
   const homes =
     options.homes === undefined ? accountHomes(process.env, options.facts ?? systemPlatformFacts) : options.homes
   if (homes === null) return true
-  const store = options.store
+  const stores = options.stores ?? []
   return homes.some((home) =>
     [join(home, ".omo", "agent"), join(home, ".omo"), join(home, ".senpi", "agent")].some(
       (candidate) =>
-        sameLocation(candidate, agentDir) || (store !== undefined && sameLocation(store(candidate), store(agentDir))),
+        sameLocation(candidate, agentDir) || stores.some((store) => sameLocation(store(candidate), store(agentDir))),
     ),
   )
 }

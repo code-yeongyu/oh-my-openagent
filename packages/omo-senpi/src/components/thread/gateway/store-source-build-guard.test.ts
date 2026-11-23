@@ -6,6 +6,8 @@ import { join } from "node:path"
 
 import { gatewayDatabasePath, gatewayRootDirectory } from "./paths"
 import { GATEWAY_MIGRATIONS } from "./schema"
+import { Sql, type SqliteConnection } from "./sql"
+import { migrate, type StoreContext } from "./store-ops"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import { settled } from "./testing/settled"
 
@@ -96,6 +98,55 @@ test.skipIf(process.platform === "win32")(
     expect(userVersion(shared) ?? 0).toBe(0)
   },
 )
+
+test.skipIf(process.platform === "win32").each([
+  ["an existing shared database", true],
+  ["a shared database not created yet", false],
+] as const)(
+  "#given an omob source build whose agent dir has its own gateway/ but links gateway.sqlite to %s #when it opens the store #then it refuses to migrate it (#14622 review M9)",
+  async (_case, existing) => {
+    const h = (harness = createGatewayHarness())
+    const { home, shared } = account({ sourceBuild: true })
+    mkdirSync(gatewayRootDirectory(shared), { recursive: true })
+    if (existing) new Database(gatewayDatabasePath(shared)).close()
+    const isolated = join(home, "isolated-agent")
+    mkdirSync(gatewayRootDirectory(isolated), { recursive: true })
+    symlinkSync(gatewayDatabasePath(shared), gatewayDatabasePath(isolated))
+
+    const opened = await settled(h.store({ agentDir: isolated }).identity())
+    expect(opened.error).toMatchObject({ code: "gateway_migration_failed" })
+    expect(userVersion(shared) ?? 0).toBe(0)
+  },
+)
+
+test("#given an omob source build whose configured paths are isolated #when the file the worker actually opened is the shared database (a link moved after it was resolved) #then it refuses to migrate it", async () => {
+  const { home, shared } = account({ sourceBuild: true })
+  mkdirSync(gatewayRootDirectory(shared), { recursive: true })
+  new Database(gatewayDatabasePath(shared)).close()
+  const isolated = join(home, "isolated-agent")
+  mkdirSync(gatewayRootDirectory(isolated), { recursive: true })
+  const db = new Database(":memory:")
+  const connection: SqliteConnection = {
+    exec: (sql) => db.exec(sql),
+    function: (name, options, fn) => db.function(name, options, fn as never),
+    setAuthorizer: () => {
+      throw new Error("migrate never installs an authorizer")
+    },
+    close: () => db.close(),
+  }
+  cleanups.push(() => db.close())
+  const ctx = {
+    sql: new Sql(connection),
+    config: { agent_dir: isolated, test_hooks: {}, busy_timeout_ms: 1_000, lock_wait_max_ms: 5_000 },
+    databasePath: gatewayDatabasePath(shared),
+    stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
+    emit: () => undefined,
+    hook: async () => undefined,
+    delay: async () => undefined,
+  } as unknown as StoreContext
+
+  expect((await settled(migrate(ctx))).error).toMatchObject({ code: "gateway_migration_failed" })
+})
 
 test("#given the shared store already at this schema #when an omob source build opens it #then it opens without migrating", async () => {
   const h = (harness = createGatewayHarness())

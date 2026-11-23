@@ -15,7 +15,7 @@
 import { createHash, randomUUID } from "node:crypto"
 import { closeSync, constants, mkdirSync, openSync, readdirSync, readFileSync, rmSync, writeSync } from "node:fs"
 import { userInfo } from "node:os"
-import { join } from "node:path"
+import { join, dirname } from "node:path"
 
 import {
   GATEWAY_RECEIPT_RETENTION_MS,
@@ -31,7 +31,7 @@ import {
 import { pairLoopGuardMessage } from "../errors"
 import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
-import { gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
+import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
@@ -74,6 +74,8 @@ export type StoreContext = {
   readonly emit: (event: GatewayStoreEvent) => void
   readonly hook: (name: "beforeDbCommit" | "afterDbCommit") => Promise<void>
   readonly delay: (ms: number) => Promise<void>
+  /** The database file the worker opened, links resolved; absent on a context no worker opened. */
+  readonly databasePath?: string
   /** Present only on a context joining an extension's outer transaction. */
   readonly afterCommit?: (() => void)[]
   /** Filesystem compensations run when a joined extension transaction rolls back (e.g. removing the wake markers it created early). */
@@ -460,7 +462,13 @@ async function recordReaderFloor(ctx: StoreContext): Promise<void> {
  * reads that store, and a schema only an unreleased build knows would lock them out.
  */
 function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
-  if (!isDevBuildRuntime() || !isSharedAgentDir(ctx.config.agent_dir, { store: gatewayRootDirectory })) return undefined
+  if (!isDevBuildRuntime()) return undefined
+  const stores = [gatewayRootDirectory, gatewayDatabasePath]
+  // The configured agent dir, its gateway dir or database linked into a shared one, or the file actually opened.
+  const opened = ctx.databasePath === undefined ? undefined : dirname(dirname(ctx.databasePath))
+  const shared =
+    isSharedAgentDir(ctx.config.agent_dir, { stores }) || (opened !== undefined && isSharedAgentDir(opened, { stores }))
+  if (!shared) return undefined
   return new GatewayMigrationError(
     version + 1,
     `a source build does not migrate a gateway store released sessions may share (the account's agent dir or its gateway store, or one whose account home cannot be read) from v${version} to v${GATEWAY_MIGRATIONS.length}; run it with OMO_CODING_AGENT_DIR set to an isolated agent dir`,

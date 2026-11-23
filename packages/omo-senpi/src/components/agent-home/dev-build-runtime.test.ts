@@ -73,7 +73,7 @@ test.skipIf(process.platform === "win32")(
       symlinkSync(join(home, ".omo", "agent", "gateway"), join(home, "isolated", "gateway"))
       const gateway = (agentDir: string) => join(agentDir, "gateway")
       expect(isSharedAgentDir(join(home, "isolated"), { homes: [home] })).toBe(false)
-      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], store: gateway })).toBe(true)
+      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], stores: [gateway] })).toBe(true)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
@@ -88,7 +88,7 @@ test.skipIf(process.platform === "win32")(
       mkdirSync(join(home, "isolated"), { recursive: true })
       symlinkSync(join(home, ".omo", "agent", "gateway"), join(home, "isolated", "gateway"))
       const gateway = (agentDir: string) => join(agentDir, "gateway")
-      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], store: gateway })).toBe(true)
+      expect(isSharedAgentDir(join(home, "isolated"), { homes: [home], stores: [gateway] })).toBe(true)
     } finally {
       rmSync(home, { recursive: true, force: true })
     }
