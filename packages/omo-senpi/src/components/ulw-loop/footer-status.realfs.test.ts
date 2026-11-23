@@ -4,7 +4,6 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
-import { ULW_LOOP_FOOTER_FRAMES } from "./footer-status"
 import { createUlwLoopComponent } from "./index"
 import { activeStatus, createLogger } from "./ulw-loop.test-support"
 
@@ -26,16 +25,18 @@ type FooterScenario = {
 
 function fakeTimers(): {
   readonly fire: () => void
-  readonly set: (callback: () => void, intervalMs: number) => number
+  readonly set: (callback: () => void, delayMs: number) => number
   readonly clear: (handle: number) => void
 } {
   const callbacks = new Map<number, () => void>()
   let nextHandle = 1
   return {
     fire: () => {
-      for (const callback of [...callbacks.values()]) callback()
+      for (const [handle, callback] of [...callbacks]) {
+        if (callbacks.delete(handle)) callback()
+      }
     },
-    set: (callback, _intervalMs) => {
+    set: (callback) => {
       const handle = nextHandle
       nextHandle += 1
       callbacks.set(handle, callback)
@@ -59,9 +60,10 @@ async function createFooterScenario(sessionId: string): Promise<FooterScenario> 
   const timers = fakeTimers()
   const calls: StatusCall[] = []
   const pi = new FakeExtensionAPI()
+  const footerStatus = { timers, now: () => 180 }
   await createUlwLoopComponent({
     readStatus: async () => ({ code: 0, stdout: activeStatus() }),
-    footerStatus: { timers },
+    footerStatus,
   }).register(pi, {
     logger: createLogger(),
     config: { getFlag: () => false },
@@ -96,7 +98,7 @@ function footerFrames(ui: { calls: StatusCall[] }): readonly (string | undefined
 }
 
 describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
-  it("publishes every footer frame when the scoped plan and active goal store exist", async () => {
+  it("publishes the live footer when the scoped plan and active goal store exist", async () => {
     const sessionId = "realfs-positive"
     const scenario = await createFooterScenario(sessionId)
     try {
@@ -107,11 +109,7 @@ describe("omo-senpi ulw-loop footer real filesystem plan lookup", () => {
         { type: "session_start" },
         eventContext(scenario.cwd, sessionId, scenario.ui),
       )
-      scenario.timers.fire()
-      scenario.timers.fire()
-      scenario.timers.fire()
-
-      expect(footerFrames(scenario.ui)).toEqual(ULW_LOOP_FOOTER_FRAMES)
+      expect(footerFrames(scenario.ui)).toEqual(["⚡ ⠹ ultraworking"])
     } finally {
       scenario.cleanup()
     }

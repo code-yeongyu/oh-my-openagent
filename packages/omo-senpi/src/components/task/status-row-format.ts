@@ -12,6 +12,7 @@ import {
   type TaskRunStats,
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
+import { loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 
 const MAX_WIDGET_ROWS = 5
 const WIDGET_LINE_MAX = 70
@@ -22,8 +23,6 @@ const LIVE_IDENTITY_MIN = 12
 const LIVE_TARGET_MIN = 20
 const LIVE_ACTIVITY_MIN = 8
 const LIVE_SEPARATOR_WIDTH = 3
-export const LIVE_STATUS_REFRESH_MS = 250
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
 // A parked child is not working, so its row gets a still mark instead of a spinner frame.
 const SUSPENDED_MARK = "‖"
 
@@ -141,9 +140,7 @@ function formatLiveBackgroundRow(
   // A parked child shows no running time: the record has no park timestamp (`updated_at` moves with
   // every revival attempt), and a climbing timer is what made the row look alive.
   const elapsed = still ? undefined : formatElapsed(record.created_at, now)
-  const frame = still
-    ? SUSPENDED_MARK
-    : (SPINNER_FRAMES[Math.floor(now / LIVE_STATUS_REFRESH_MS) % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0])
+  const frame = still ? SUSPENDED_MARK : loadingSpinnerFrame(now)
   const fullIdentity = liveTaskIdentity(record)
   const fullTarget = recordStatusTarget(record)
   const fullActivity = still

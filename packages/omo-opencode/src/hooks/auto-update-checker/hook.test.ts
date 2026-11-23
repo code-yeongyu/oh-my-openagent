@@ -1,8 +1,9 @@
 /// <reference types="bun-types" />
 
 import type { PluginInput } from "@opencode-ai/plugin"
-import { afterAll, describe, expect, mock, test } from "bun:test"
+import { afterAll, describe, expect, jest, mock, test } from "bun:test"
 import { preserveModuleMocksForTestFile, restoreModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
+import { showVersionToast } from "./hook/startup-toasts"
 
 type CreateAutoUpdateCheckerHook = typeof import("./hook").createAutoUpdateCheckerHook
 type HookOptions = Parameters<CreateAutoUpdateCheckerHook>[1]
@@ -89,13 +90,13 @@ const createDeps = (overrides: Partial<HookDeps> = {}) => {
   }
 }
 
-const createHook = async (options: HookOptions = {}, overrides: Partial<HookDeps> = {}) => {
+const createHook = async (options: HookOptions = {}, overrides: Partial<HookDeps> = {}, ctx = createPluginInput()) => {
   const module = await import("./hook")
   const { deps, mocks } = createDeps(overrides)
 
   return {
     hook: module.createAutoUpdateCheckerHook(
-      createPluginInput(),
+      ctx,
       {
         showStartupToast: true,
         autoUpdate: false,
@@ -202,22 +203,92 @@ describe("auto-update-checker hook", () => {
     expect(mocks.runBackgroundUpdateCheck).not.toHaveBeenCalled()
   })
 
-  test("runs all startup checks after deferred session.created check executes", async () => {
+  test("runs the deferred startup checks and paints the version toast on the shared 90ms clock", async () => {
     // given
     resetDeferredState()
-    const { hook, mocks } = await createHook()
+    const titles: string[] = []
+    const ctx = createPluginInput()
+    ctx.client = {
+      ...ctx.client,
+      tui: {
+        ...ctx.client.tui,
+        showToast: mock(async ({ body }: { body: { title: string } }) => {
+          titles.push(body.title)
+          await new Promise<void>((resolve) => setTimeout(resolve, 20))
+        }),
+      } as PluginInput["client"]["tui"],
+    }
+    const versionToast = mock(showVersionToast)
+    const { hook, mocks } = await createHook({}, { showVersionToast: versionToast }, ctx)
 
     // when
-    triggerSessionCreated(hook)
-    await runScheduledCheck()
+    jest.useFakeTimers()
+    jest.setSystemTime(new Date(180))
+    try {
+      triggerSessionCreated(hook)
+      await runScheduledCheck()
+      jest.advanceTimersByTime(20)
+      await flushMicrotasks(8)
+      jest.advanceTimersByTime(69)
+      await flushMicrotasks(8)
+      const beforeNextFrame = titles.length
+      jest.advanceTimersByTime(1)
+      await flushMicrotasks(8)
+      void showVersionToast(ctx, "3.0.1", "Later startup")
 
-    // then
-    expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
-    expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
-    expect(mocks.refreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
-    expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
-    expect(mocks.showVersionToast).toHaveBeenCalledTimes(1)
-    expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+      // then
+      expect(titles).toEqual(["⠹ OhMyOpenCode 3.0.0", "⠸ OhMyOpenCode 3.0.0", "⠸ OhMyOpenCode 3.0.1"])
+      expect(beforeNextFrame).toBe(1)
+      expect(mocks.showConfigErrorsIfAny).toHaveBeenCalledTimes(1)
+      expect(mocks.updateAndShowConnectedProvidersCacheStatus).toHaveBeenCalledTimes(1)
+      expect(mocks.refreshModelCapabilitiesOnStartup).toHaveBeenCalledTimes(1)
+      expect(mocks.showModelCacheWarningIfNeeded).toHaveBeenCalledTimes(1)
+      expect(versionToast).toHaveBeenCalledTimes(1)
+      expect(mocks.runBackgroundUpdateCheck).toHaveBeenCalledTimes(1)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+    }
+  })
+
+  test.each([
+    { direction: "backward", step: -9_180, glyph: "⠏" },
+    { direction: "forward", step: 9_180, glyph: "⠸" },
+  ])("keeps the five-second toast window across a $direction wall-clock step", async ({ step, glyph }) => {
+    const toasts: Array<{ title: string; duration: number }> = []
+    const ctx = createPluginInput()
+    ctx.client.tui = {
+      ...ctx.client.tui,
+      showToast: mock(async ({ body }: { body: { title: string; duration: number } }) => {
+        toasts.push(body)
+      }),
+    } as PluginInput["client"]["tui"]
+
+    jest.useFakeTimers()
+    jest.setSystemTime(18_000)
+    let finished = false
+    try {
+      void showVersionToast(ctx, "3.0.0", "Startup").then(() => {
+        finished = true
+      })
+      jest.setSystemTime(18_000 + step)
+      for (let elapsed = 90; elapsed <= 4_950; elapsed += 90) {
+        jest.advanceTimersByTime(90)
+        await flushMicrotasks(8)
+      }
+      jest.advanceTimersByTime(49)
+      await flushMicrotasks(8)
+      expect(finished).toBe(false)
+      jest.advanceTimersByTime(1)
+      await flushMicrotasks(8)
+      expect(finished).toBe(true)
+      expect(toasts).toHaveLength(56)
+      expect(toasts[1]?.title).toBe(`${glyph} OhMyOpenCode 3.0.0`)
+      expect(toasts.at(-1)?.duration).toBe(100)
+    } finally {
+      jest.clearAllTimers()
+      jest.useRealTimers()
+    }
   })
 
   test("guards double execution across repeated session.created events", async () => {

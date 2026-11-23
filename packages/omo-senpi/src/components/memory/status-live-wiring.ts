@@ -49,6 +49,7 @@ export function createMemoryFooterStatusLive(options: MemoryFooterStatusLiveOpti
   }
 
   const live = createMemoryFooterLive({
+    now,
     ...(options.timers === undefined ? {} : { timers: options.timers }),
     fingerprint: async (identity) => {
       const sessionId = currentSessionId

@@ -1,14 +1,11 @@
+import { delayToNextLoadingSpinnerFrame, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
+
 import { MEMORY_STATUS_KEY } from "./status"
 
-const FRAME_INTERVAL_MS = 320
-
-/** Braille spinner frames, matching the ulw-loop footer's animation vocabulary. */
-export const MEMORY_REFLECTING_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"] as const
-
-type TimerHandle = ReturnType<typeof setInterval> | number
+type TimerHandle = ReturnType<typeof setTimeout> | number
 
 export interface MemoryFooterTimers {
-  set(callback: () => void, intervalMs: number): TimerHandle
+  set(callback: () => void, delayMs: number): TimerHandle
   clear(handle: TimerHandle): void
 }
 
@@ -18,6 +15,7 @@ export interface MemoryFooterUi {
 
 export interface MemoryFooterLiveOptions {
   readonly timers?: MemoryFooterTimers
+  readonly now?: () => number
   /**
    * Cheap change probe (headSha + dirty + backlog + streak + active). A refresh recomputes the
    * segment line only when this value moves, so agent_settled does not run git on every event.
@@ -39,7 +37,7 @@ export interface MemoryFooterLive {
    * clears its footer can animate again. Used by clearStatus, which fires on every session start.
    */
   stop(): void
-  /** Stops the interval permanently; every later call becomes a no-op. */
+  /** Stops the animation permanently; every later call becomes a no-op. */
   dispose(): void
 }
 
@@ -49,8 +47,8 @@ export interface MemoryFooterLive {
  */
 export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): MemoryFooterLive {
   const timers = options.timers ?? defaultTimers
+  const now = options.now ?? Date.now
   let timer: TimerHandle | undefined
-  let frameIndex = 0
   let activeIdentity: string | undefined
   let activeUi: MemoryFooterUi | undefined
   let disposed = false
@@ -58,9 +56,8 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
   let pending: Promise<void> = Promise.resolve()
 
   function publishFrame(): void {
-    const frame = MEMORY_REFLECTING_FRAMES[frameIndex]
-    if (disposed || activeIdentity === undefined || activeUi === undefined || frame === undefined) return
-    activeUi.setStatus(MEMORY_STATUS_KEY, `mem:${activeIdentity} ${frame} reflecting`)
+    if (disposed || activeIdentity === undefined || activeUi === undefined) return
+    activeUi.setStatus(MEMORY_STATUS_KEY, `mem:${activeIdentity} ${loadingSpinnerFrame(now())} reflecting`)
   }
 
   function stopTimer(): void {
@@ -69,12 +66,8 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
     timer = undefined
   }
 
-  function tick(): void {
-    if (disposed || activeIdentity === undefined) {
-      stopTimer()
-      return
-    }
-    frameIndex = (frameIndex + 1) % MEMORY_REFLECTING_FRAMES.length
+  function paintAndSchedule(): void {
+    timer = timers.set(paintAndSchedule, delayToNextLoadingSpinnerFrame(now()))
     publishFrame()
   }
 
@@ -101,9 +94,7 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
         activeIdentity = identity
         activeUi = ui
         if (timer !== undefined) return
-        frameIndex = 0
-        publishFrame()
-        timer = timers.set(tick, FRAME_INTERVAL_MS)
+        paintAndSchedule()
         return
       }
       const restoreIdentity = activeIdentity ?? identity
@@ -111,7 +102,6 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
       activeIdentity = undefined
       activeUi = undefined
       stopTimer()
-      frameIndex = 0
       if (restoreIdentity === undefined || restoreUi === undefined) return
       // The spinner overwrote the segment line, so the restore must bypass the dedupe cache.
       lastFingerprint = undefined
@@ -132,7 +122,6 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
       activeIdentity = undefined
       activeUi = undefined
       stopTimer()
-      frameIndex = 0
       lastFingerprint = undefined
     },
 
@@ -141,19 +130,18 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
       activeIdentity = undefined
       activeUi = undefined
       stopTimer()
-      frameIndex = 0
       lastFingerprint = undefined
     },
   }
 }
 
 const defaultTimers: MemoryFooterTimers = {
-  set(callback, intervalMs) {
-    const handle = setInterval(callback, intervalMs)
+  set(callback, delayMs) {
+    const handle = setTimeout(callback, delayMs)
     handle.unref()
     return handle
   },
   clear(handle) {
-    clearInterval(handle)
+    clearTimeout(handle)
   },
 }

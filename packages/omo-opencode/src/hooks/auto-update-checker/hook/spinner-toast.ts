@@ -1,26 +1,27 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { LOADING_SPINNER_FRAME_MS, loadingSpinnerFrame } from "@oh-my-opencode/utils/loading-spinner"
 import { ignoreToastError } from "./ignore-toast-error"
 
-const SISYPHUS_SPINNER = ["·", "•", "●", "○", "◌", "◦", " "]
-
 export async function showSpinnerToast(ctx: PluginInput, version: string, message: string): Promise<void> {
-  const totalDuration = 5000
-  const frameInterval = 100
-  const totalFrames = Math.floor(totalDuration / frameInterval)
+  let elapsedClock = performance.now()
+  const deadline = elapsedClock + 5_000
 
-  for (let i = 0; i < totalFrames; i++) {
-    const spinner = SISYPHUS_SPINNER[i % SISYPHUS_SPINNER.length]
-    await ctx.client.tui
+  while (elapsedClock < deadline) {
+    const toast = ctx.client.tui
       .showToast({
         body: {
-          title: `${spinner} OhMyOpenCode ${version}`,
+          title: `${loadingSpinnerFrame(Date.now())} OhMyOpenCode ${version}`,
           message,
           variant: "info" as const,
-          duration: frameInterval + 50,
+          duration: Math.min(LOADING_SPINNER_FRAME_MS, Math.ceil(deadline - elapsedClock)) + 50,
         },
       })
       .catch(ignoreToastError)
 
-    await new Promise((resolve) => setTimeout(resolve, frameInterval))
+    // Budget the request into the frame interval without letting toast requests overlap.
+    const nextFrame = Math.min(elapsedClock + LOADING_SPINNER_FRAME_MS, deadline)
+    const delay = Math.max(0, Math.ceil(nextFrame - performance.now()))
+    await Promise.all([toast, new Promise<void>((resolve) => setTimeout(resolve, delay))])
+    elapsedClock = performance.now()
   }
 }

@@ -9,7 +9,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 
 import { createMemoryIdentityContext, type MemoryIdentityContext } from "./context"
 import { MEMORY_STATUS_KEY, refreshMemoryStatus, type GitRepoForStatus } from "./status"
-import { type MemoryFooterTimers } from "./status-live"
+import type { MemoryFooterTimers } from "./status-live"
 import { createMemoryFooterStatusLive } from "./status-live-wiring"
 
 const roots: string[] = []
@@ -42,7 +42,9 @@ function fakeTimers(): FakeTimers {
     live: () => handles.size,
     advance(ticks) {
       for (let tick = 0; tick < ticks; tick += 1) {
-        for (const callback of [...handles.values()]) callback()
+        for (const [handle, callback] of [...handles]) {
+          if (handles.delete(handle)) callback()
+        }
       }
     },
   }
@@ -88,21 +90,22 @@ describe("memory footer status live wiring", () => {
     const context = await contextFixture()
     const timers = fakeTimers()
     const ui = recorder()
+    let now = NOW + 180
     const live = createMemoryFooterStatusLive({
       resolveContext: () => context,
       isActive: () => true,
       timers,
-      now: () => NOW,
+      now: () => now,
       createGitRepo: () => stubRepo(),
     })
 
     live.syncActive("session-1", ui.ui)
+    now += 90
     timers.advance(1)
 
-    // Literal glyphs: expectations built from MEMORY_REFLECTING_FRAMES would survive a corrupted table.
     expect(ui.calls).toEqual([
-      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠋ reflecting" },
-      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠙ reflecting" },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠹ reflecting" },
+      { key: MEMORY_STATUS_KEY, text: "mem:agent-test ⠸ reflecting" },
     ])
     live.dispose()
   })

@@ -8,6 +8,8 @@ import {
   type TaskStatus,
 } from "@oh-my-opencode/senpi-task"
 
+import { createMemoryFooterLive } from "../memory/status-live"
+import { createUlwLoopFooterStatus } from "../ulw-loop/footer-status"
 import type { CapturedUi } from "./runtime-context"
 import { createTaskStatusUi, type StatusUiManager, type StatusUiTimers } from "./status-ui"
 
@@ -119,18 +121,20 @@ describe("createTaskStatusUi.background progress", () => {
     // when the widget syncs
     statusUi.syncNow()
 
-    // then the row is painted once and nothing schedules a 250 ms repaint
+    // then the row is painted once without scheduling a live repaint
     expect(ui.widgetCalls.at(-1)?.content?.[0]).toContain("parked child")
     expect(active.size).toBe(0)
   })
 
   it("#given an idle parent with a running background task #when time advances quietly #then live status refreshes", () => {
     // given
-    let currentTime = Date.parse("2026-07-07T00:00:00.000Z")
+    let currentTime = 0
     const active = new Map<number, () => void>()
+    const delays: number[] = []
     let nextHandle = 1
     const timers: StatusUiTimers = {
-      set: (callback) => {
+      set: (callback, delay) => {
+        delays.push(delay)
         const handle = nextHandle++
         active.set(handle, callback)
         return handle
@@ -151,7 +155,15 @@ describe("createTaskStatusUi.background progress", () => {
     const manager: StatusUiManager = {
       list: () => {
         listCalls += 1
-        return listed([task])
+        return listed([
+          task,
+          record({
+            task_id: "st_earlier",
+            name: "Earlier child",
+            status: "running",
+            created_at: new Date(-180).toISOString(),
+          }),
+        ])
       },
       wasBackground: () => true,
       subscribeChild: () => () => undefined,
@@ -182,8 +194,84 @@ describe("createTaskStatusUi.background progress", () => {
     expect(second).toContain("turn 2 (3 tools)")
     expect(second).toContain("42 tok/s")
     expect(second).toContain("1s")
-    expect(second[0]).not.toBe(first[0])
+    expect(first).toStartWith("⠋ Idle child")
+    expect(second).toStartWith("⠙ Idle child")
+    expect(ui.widgetCalls.at(-1)?.content?.[1]).toStartWith("⠙ Earlier child")
+    expect(delays).toEqual([90, 80])
     expect(listCalls).toBe(1)
+  })
+
+  it("repaints staggered task, memory, and ultrawork spinners at the same wall-clock boundaries", () => {
+    let wallTime = 0
+    const now = () => wallTime
+    const pending = new Map<number, { callback: () => void; due: number }>()
+    let nextHandle = 0
+    const timers: StatusUiTimers = {
+      set(callback, delay) {
+        const handle = nextHandle++
+        pending.set(handle, { callback, due: wallTime + delay })
+        return handle
+      },
+      clear(handle) {
+        if (typeof handle === "number") pending.delete(handle)
+      },
+    }
+    function advanceTo(target: number): void {
+      for (;;) {
+        const next = [...pending].sort(([, a], [, b]) => a.due - b.due)[0]
+        if (next === undefined || next[1].due > target) break
+        const [handle, { callback, due }] = next
+        pending.delete(handle)
+        wallTime = due
+        callback()
+      }
+      wallTime = target
+    }
+
+    const frames: Record<"task" | "memory" | "loop", Array<[number, string | undefined]>> = {
+      task: [],
+      memory: [],
+      loop: [],
+    }
+    const taskUi: CapturedUi = {
+      ...fakeUi(),
+      setWidget: (_key, rows) => frames.task.push([now(), rows?.[0]?.split(" ")[0]]),
+    }
+    const task = record({ task_id: "st_phase", name: "Phase child", status: "running" })
+    const widget = createTaskStatusUi({
+      manager: { list: () => listed([task]), wasBackground: () => true },
+      runtime: { ui: () => taskUi, sessionId: () => "session-a", mode: () => "tui" },
+      timers,
+      now,
+    })
+    const footer = createMemoryFooterLive({ timers, now })
+    const loop = createUlwLoopFooterStatus({ timers, now, isGoalActive: () => true })
+
+    advanceTo(20)
+    widget.syncNow()
+    advanceTo(100)
+    footer.setActive("phase", true, {
+      setStatus: (_key, text) => frames.memory.push([now(), text?.split(" ")[1]]),
+    })
+    advanceTo(150)
+    loop.sync(
+      { ui: { setStatus: (_key: string, text?: string) => frames.loop.push([now(), text?.split(" ")[1]]) } },
+      true,
+    )
+    advanceTo(359)
+
+    const shared: typeof frames.task = [
+      [180, "⠹"],
+      [270, "⠸"],
+    ]
+    expect(frames).toEqual({
+      task: [[20, "⠋"], [90, "⠙"], ...shared],
+      memory: [[100, "⠙"], ...shared],
+      loop: [[150, "⠙"], ...shared],
+    })
+    widget.dispose()
+    footer.dispose()
+    loop.dispose()
   })
 
   it("#given a child before its first turn #when a host reattach resumes its turn #then both the footer progress line and the status row read running instead of starting", () => {
@@ -365,8 +453,8 @@ describe("createTaskStatusUi.background progress", () => {
     for (const callback of [...active.values()]) callback()
 
     expect(ui.widgetCalls.at(-1)?.content).toEqual([
-      "⠋ Investigate the unexpectedly long background child description · category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
-      "⠋ Review tests · agent:explore(chatgpt-subscription/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
+      "⠹ Investigate the unexpectedly long background child description · category:quick(chatgpt-subscription/gpt-5.6-luna-fast:high) · fallback:2 · turn 3 (7 tools) · 42 tok/s · read src/foo.ts · 1m 5s",
+      "⠹ Review tests · agent:explore(chatgpt-subscription/gpt-5.6-luna-fast) · turn 1 (2 tools) · bash bun test · 1m 5s",
     ])
     // C1: the duplicated footer task status line is gone; widget rows are the only task surface.
     expect(ui.statusCalls).toHaveLength(0)
