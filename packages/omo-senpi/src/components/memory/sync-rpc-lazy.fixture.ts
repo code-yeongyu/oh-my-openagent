@@ -1,5 +1,4 @@
-import { readFileSync } from "node:fs"
-import type { composeOmoSenpiExtension, omoSenpiComponents } from "../../extension/bundled-index"
+import { readFileSync } from "@oh-my-opencode/memory-core/fs"
 import { MemoryFakeExtensionAPI, sessionContext } from "./memory.test-support"
 import type { SyncRpcRegistration } from "./sync-rpc-ports"
 
@@ -15,12 +14,8 @@ Bun.plugin({
   },
 })
 
-const entry = new URL("../../../plugin/extensions/omo.js", import.meta.url)
-const built: {
-  readonly composeOmoSenpiExtension: typeof composeOmoSenpiExtension
-  readonly omoSenpiComponents: typeof omoSenpiComponents
-} = await import(entry.href)
-const memory = built.omoSenpiComponents.find((component) => component.name === "memory")
+const { composeOmoSenpiExtension, omoSenpiComponents } = await import("../../../plugin/extensions/omo.js")
+const memory = omoSenpiComponents.find((component) => component.name === "memory")
 if (memory === undefined) throw new Error("The packaged extension is missing memory")
 
 type Handler = Parameters<SyncRpcRegistration["handle"]>[1]
@@ -35,7 +30,7 @@ class Host extends MemoryFakeExtensionAPI {
 }
 
 const host = new Host()
-await built.composeOmoSenpiExtension([memory])(host)
+await composeOmoSenpiExtension([memory])(host)
 const registered = [...handlers.keys()].filter((name) => name.startsWith("omo.memory.sync.")).sort()
 const registrationLoads = loads
 const session = { ...sessionContext({ cwd: process.cwd() }), hasUI: false }

@@ -35,6 +35,7 @@
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
+        "src/components/memory/sync-rpc-runtime.ts",
         "src/components/memory/sync-runtime.ts",
         // spawned by path as the supervisor in spawn-supervisor-exit.test.ts
         "src/components/memory/worker/__fixtures__/supervisor-exits-unpublished.ts",

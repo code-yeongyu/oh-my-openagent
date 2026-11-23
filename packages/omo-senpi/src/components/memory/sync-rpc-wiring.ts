@@ -26,16 +26,18 @@ export function wireSyncRpc(options: SyncRpcWiringOptions) {
   let runtime: Runtime | undefined
   let pending: Promise<Runtime> | undefined
   let binding = 0
+  const loadRuntime = async () => {
+    const { createSyncRpcRuntime } = await import("#omo-memory-sync-rpc-runtime")
+    return createSyncRpcRuntime(options, phraseGate)
+  }
   const dispatchCold = async (verb: SyncRpcVerb, data: unknown, context?: SyncRpcContext) => {
     const acceptedBinding = binding
     let loaded: Runtime
     try {
-      loaded = await (pending ??= import("#omo-memory-sync-rpc-runtime")
-        .then((sidecar) => sidecar.createSyncRpcRuntime(options, phraseGate))
-        .catch((error: unknown) => {
-          pending = undefined
-          throw error
-        }))
+      loaded = await (pending ??= loadRuntime().catch((error: unknown) => {
+        pending = undefined
+        throw error
+      }))
     } catch (error) {
       options.warn?.("memory sync RPC sidecar failed to load", {
         path: verb,
