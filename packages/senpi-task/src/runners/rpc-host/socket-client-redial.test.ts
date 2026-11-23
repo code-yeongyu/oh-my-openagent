@@ -104,19 +104,29 @@ function manualClock() {
   let probe: (() => void) | undefined
   const armed: number[] = []
   const timers: (() => void)[] = []
+  const realSetTimeout = globalThis.setTimeout
+  const realClearTimeout = globalThis.clearTimeout
+  const realSetInterval = globalThis.setInterval
+  // Only the conversation's own timers and the meter's probe are taken over; any other timer in the process (the test
+  // runner's, another module's) keeps running for real, so it neither lands in `armed` nor stalls.
+  const fromSocketClient = () => /socket-client\.ts/.test(new Error().stack ?? "")
   const spies = [
     spyOn(performance, "now").mockImplementation(() => now),
-    spyOn(globalThis, "setInterval").mockImplementation(((callback: () => void) => {
+    spyOn(globalThis, "setInterval").mockImplementation(((callback: () => void, delay?: number) => {
+      if (!fromSocketClient()) return realSetInterval(callback, delay)
       probe = callback
       return { unref: () => undefined } as unknown as ReturnType<typeof setInterval>
     }) as typeof setInterval),
     spyOn(globalThis, "clearInterval").mockImplementation(() => undefined),
     spyOn(globalThis, "setTimeout").mockImplementation(((callback: () => void, delay?: number) => {
+      if (!fromSocketClient()) return realSetTimeout(callback, delay)
       armed.push(delay ?? 0)
       timers.push(callback)
       return { unref: () => undefined } as unknown as ReturnType<typeof setTimeout>
     }) as typeof setTimeout),
-    spyOn(globalThis, "clearTimeout").mockImplementation(() => undefined),
+    spyOn(globalThis, "clearTimeout").mockImplementation(((handle?: ReturnType<typeof setTimeout>) => {
+      if (!fromSocketClient()) realClearTimeout(handle)
+    }) as typeof clearTimeout),
   ]
   return {
     armed,
