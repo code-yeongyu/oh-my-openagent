@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "このドキュメントは英語で提供されています。",
     "mobileHeader": "OmO ドキュメント",
     "searchPlaceholder": "ドキュメントを検索...",
     "searchLabel": "ドキュメントのセクションを絞り込む",
