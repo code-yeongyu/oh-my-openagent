@@ -45,7 +45,7 @@ export type {
   StoreExtensionRefusal,
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
-import type { DeliveryTarget } from "./gateway/transport"
+import type { DeliveryOutcome, DeliveryTarget, RelayDeliverySuccess } from "./gateway/transport"
 import type {
   ExternalAuthor,
   GatewayDeliveryMode,
@@ -134,6 +134,8 @@ type Reported = Promise<
 /** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
 export type ThreadSdkSendResult =
   | (Omit<GatewayDeliverySuccess, "thread_id"> & { readonly thread: string })
+  /** A send to a session on another device (#14616): its device answered; there is no local row, so no `message_seq`. */
+  | (Omit<RelayDeliverySuccess, "thread_id"> & { readonly thread: string })
   | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
 
 /** Where a session lives right now, as `omo daemon adopt` needs it. */
@@ -438,7 +440,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return { id: resolved.thread }
   }
 
-  function named(sent: GatewayDeliveryResult): ThreadSdkSendResult {
+  function named(sent: DeliveryOutcome): ThreadSdkSendResult {
     if (sent.kind !== "ok") return sent
     const { thread_id, ...facts } = sent
     return { ...facts, thread: thread_id }
@@ -567,9 +569,13 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
                   ...(across.all_scope === undefined ? {} : { all_scope: across.all_scope }),
                 }
         }
+        // The engine admits a command-line delivery only from its own machine, so a send to another device goes the way
+        // `omo remote send` does: this person's own input, a prompt keyed by the person principal (#14616). The process runs
+        // as that same user with the same device service, so it reaches nothing that command could not.
+        const remote = target.kind === "remote"
         const sent = await pipeline.deliver({
-          sender: { kind: "cli", uid: options.uid, user: options.user },
-          caller_id: principal,
+          sender: { kind: remote ? "person" : "cli", uid: options.uid, user: options.user },
+          caller_id: remote ? `person:${options.uid}` : principal,
           target,
           text: request.text,
           mode: request.mode ?? DEFAULT_THREAD_DELIVERY,
@@ -578,12 +584,6 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
           args: request,
         })
-        if (sent.kind === "ok" && "device" in sent)
-          return fail(
-            "internal_error",
-            `A command-line send reached a session on device ${sent.device}, which the engine does not admit.`,
-            "Report this: the relay transport must refuse a command-line sender before sending.",
-          )
         return named(sent)
       }),
     bind: (request) =>
