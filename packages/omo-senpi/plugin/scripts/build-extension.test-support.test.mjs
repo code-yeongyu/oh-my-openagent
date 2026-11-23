@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process"
 import { Worker } from "node:worker_threads"
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
@@ -28,9 +27,38 @@ async function outputRoot() {
   return root
 }
 
-function groupMembers(pgid) {
-  const listing = spawnSync("ps", ["-axo", "pgid="], { encoding: "utf8" }).stdout
-  return listing.split("\n").filter((line) => Number(line.trim()) === pgid).length
+// The bounded build blocks in a synchronous node child that records its pid first, so a case can check that the
+// bound ended that child too. node, not sleep/ps, keeps the cases runnable on Windows.
+const SLEEPS = "setTimeout(() => {}, 600_000)"
+const SPINS = "for (;;) {}"
+function blockedBuild(body) {
+  const child = `require("node:fs").writeFileSync(process.argv[1], String(process.pid)); ${body}`
+  return [
+    'import { spawnSync } from "node:child_process"',
+    'import { fileURLToPath } from "node:url"',
+    'const pidFile = fileURLToPath(new URL("./blocked.pid", import.meta.url))',
+    `export function buildExtension() { spawnSync(process.execPath, ["-e", ${JSON.stringify(child)}, pidFile]) }`,
+    "",
+  ].join("\n")
+}
+
+function alive(pid) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch (error) {
+    return error.code === "EPERM"
+  }
+}
+
+// A killed process is reaped on its own schedule: wait, bounded, for both the build's leader and its blocked child to
+// be gone, instead of asserting at one instant.
+async function expectTreeGone(error, dir) {
+  const leader = Number(String(error).match(/process (?:group|tree) (\d+)$/)?.[1])
+  const blocked = Number(await readFile(join(dir, "blocked.pid"), "utf8"))
+  const deadline = Date.now() + 10_000
+  while ((alive(leader) || alive(blocked)) && Date.now() < deadline) await new Promise((r) => setTimeout(r, 20))
+  expect({ leader: alive(leader), blocked: alive(blocked) }).toEqual({ leader: false, blocked: false })
 }
 
 async function rejection(promise) {
@@ -103,11 +131,9 @@ test("#given the reproduction build rejects once #when it is asked for again #th
 // calls it. These builds block the same way (a synchronous child that sleeps, or one that spins), so a guard that
 // samples from inside the build's own process can never pass them. The earlier cases built with async fakes, which
 // left the event loop free and so stayed green while the guard could not fire on a real hung bundler.
-test("#given a build blocked in a synchronous child that sleeps #when it is bounded #then it fails as a stall and its process group is gone", async () => {
+test("#given a build blocked in a synchronous child that sleeps #when it is bounded #then it fails as a stall and its process tree is gone", async () => {
   // given
-  const { url } = await buildModule(
-    `import { spawnSync } from "node:child_process"\nexport function buildExtension() { spawnSync("sleep", ["600"]) }\n`,
-  )
+  const { dir, url } = await buildModule(blockedBuild(SLEEPS))
   const started = Date.now()
 
   // when
@@ -120,14 +146,12 @@ test("#given a build blocked in a synchronous child that sleeps #when it is boun
     /shared extension build stalled: no CPU or output progress for \d+s \(a hang\); killed process (?:group|tree) \d+$/,
   )
   expect(Date.now() - started).toBeLessThan(600_000)
-  expect(groupMembers(Number(String(error).match(/process group (\d+)$/)?.[1]))).toBe(0)
+  await expectTreeGone(error, dir)
 })
 
-test("#given a build blocked in a synchronous child that spins #when its tree passes the CPU cap #then it fails as a runaway and its process group is gone", async () => {
+test("#given a build blocked in a synchronous child that spins #when its tree passes the CPU cap #then it fails as a runaway and its process tree is gone", async () => {
   // given
-  const { url } = await buildModule(
-    `import { spawnSync } from "node:child_process"\nexport function buildExtension() { spawnSync(process.execPath, ["-e", "for (;;) {}"]) }\n`,
-  )
+  const { dir, url } = await buildModule(blockedBuild(SPINS))
 
   // when
   const error = await rejection(
@@ -138,15 +162,13 @@ test("#given a build blocked in a synchronous child that spins #when its tree pa
   expect(String(error)).toMatch(
     /shared extension build ran away: used \d+ CPU seconds \(cap 1\); killed process (?:group|tree) \d+$/,
   )
-  expect(groupMembers(Number(String(error).match(/process group (\d+)$/)?.[1]))).toBe(0)
+  await expectTreeGone(error, dir)
 })
 
 // The guard samples the build's process tree, not this test process, so CPU burned here must not read as progress.
 test("#given a hung build while this test process burns CPU #when it is bounded #then it still fails as a stall", async () => {
   // given
-  const { url } = await buildModule(
-    `import { spawnSync } from "node:child_process"\nexport function buildExtension() { spawnSync("sleep", ["600"]) }\n`,
-  )
+  const { url } = await buildModule(blockedBuild(SLEEPS))
   const burner = new Worker("for (;;) {}", { eval: true })
   try {
     // when
@@ -165,9 +187,7 @@ test("#given a hung build while this test process burns CPU #when it is bounded 
 // outcome (the "unmeasurable" bound of watchTreeProgress), not pass for a stall or wait for the job limit.
 test("#given a tree sampler that always fails #when a hung build is bounded #then it fails as unmeasurable and its process tree is gone", async () => {
   // given
-  const { url } = await buildModule(
-    `import { spawnSync } from "node:child_process"\nexport function buildExtension() { spawnSync("sleep", ["600"]) }\n`,
-  )
+  const { dir, url } = await buildModule(blockedBuild(SLEEPS))
 
   // when
   const error = await rejection(
@@ -183,5 +203,31 @@ test("#given a tree sampler that always fails #when a hung build is bounded #the
   expect(String(error)).toMatch(
     /shared extension build could not read its process tree's CPU for \d+s, so neither bound could be checked; killed process (?:group|tree) \d+$/,
   )
-  expect(groupMembers(Number(String(error).match(/process (?:group|tree) (\d+)$/)?.[1]))).toBe(0)
+  await expectTreeGone(error, dir)
+})
+
+// #14780 review (c914af016c) M1: a kill that throws inside the exit settle used to leave the promise neither resolved
+// nor rejected, so the hook hung until its outer bound. It must reject with that error instead.
+test("#given a build that finishes #when ending its leftover process tree throws #then the build rejects with that error", async () => {
+  // given
+  const { url } = await buildModule("export async function buildExtension() { return { mainInputs: [] } }\n")
+  const refused = new Error("kill refused")
+
+  // when
+  const error = await rejection(
+    boundBuild(
+      "shared extension build",
+      await outputRoot(),
+      {},
+      {
+        buildModule: url,
+        killTree: () => {
+          throw refused
+        },
+      },
+    ),
+  )
+
+  // then
+  expect(error).toBe(refused)
 })

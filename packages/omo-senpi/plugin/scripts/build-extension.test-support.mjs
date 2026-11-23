@@ -63,13 +63,20 @@ export function outputPathsIn(root) {
 const BUILD_STALL_MS = 30_000
 const BUILD_CPU_CAP_S = 380
 /**
- * Outer bound for the hook that runs the cold builds: half of the limit of the CI job that runs these files on this
- * platform (ci.yml: senpi-tests-linux 18 min, the macOS Senpi step 20 min, the Windows Senpi step 75 min). The other
- * half covers checkout, install and the earlier tests, so a broken guard fails here, naming the hook, instead of the
- * job being cancelled. It is not the correctness check; the stall and CPU guards above are.
+ * Outer bound for the hook that runs the cold builds. It is not the correctness check; the stall and CPU guards above
+ * are. In a GitHub Actions job it is half that job's limit on this platform (ci.yml: senpi-tests-linux 18 min, the
+ * macOS Senpi step 20 min, the Windows Senpi step 75 min), so a broken guard fails here, naming the hook, instead of
+ * the job being cancelled; the other half covers checkout, install and the earlier tests. A healthy hook there builds
+ * twice at roughly 30 s each. Outside Actions (receipt containers, a developer box) no job limit applies, and the
+ * bound has to clear the slowest healthy hook measured: 3263 s for both cold builds at 8x CPU oversubscription, which
+ * 95 min clears by 1.75x.
  */
 const CI_JOB_LIMIT_MIN = { linux: 18, darwin: 20, win32: 75 }
-export const BUILD_HOOK_OUTER_BOUND_MS = ((CI_JOB_LIMIT_MIN[process.platform] ?? CI_JOB_LIMIT_MIN.linux) / 2) * 60_000
+const OFF_ACTIONS_BOUND_MIN = 95
+export const BUILD_HOOK_OUTER_BOUND_MS =
+  (process.env["GITHUB_ACTIONS"] === "true"
+    ? (CI_JOB_LIMIT_MIN[process.platform] ?? CI_JOB_LIMIT_MIN.linux) / 2
+    : OFF_ACTIONS_BOUND_MIN) * 60_000
 const OUTPUT_SAMPLE_MS = 250
 const STDERR_TAIL_CHARS = 2_000
 const DEFAULT_BUILD_MODULE = new URL("./build-extension.mjs", import.meta.url).href
@@ -118,7 +125,13 @@ export function boundBuild(
   name,
   root,
   paths,
-  { buildModule = DEFAULT_BUILD_MODULE, stallMs = BUILD_STALL_MS, cpuCapS = BUILD_CPU_CAP_S, sample } = {},
+  {
+    buildModule = DEFAULT_BUILD_MODULE,
+    stallMs = BUILD_STALL_MS,
+    cpuCapS = BUILD_CPU_CAP_S,
+    sample,
+    killTree = killProcessTree,
+  } = {},
 ) {
   const resultPath = `${root}.build-result.json`
   const child = spawn(
@@ -172,24 +185,16 @@ export function boundBuild(
       settle(() => {
         // Reject only once the leader is reaped, so the caller never sees a tree still holding the build.
         child.once("exit", () => reject(new Error(`${name} ${why}; killed ${TREE} ${child.pid}`)))
-        killProcessTree(child)
+        killTree(child)
       })
     }
     child.on("error", (error) => settle(() => reject(error)))
     child.on("exit", (code, signal) => {
       settle(async () => {
-        // A sidecar the build left behind (the minifier server) must not outlive it.
         try {
-          killProcessTree(child)
-        } catch (error) {
-          reject(error)
-          return
-        }
-        if (code !== 0) {
-          reject(new Error(`${name} failed: code=${String(code)} signal=${String(signal)}\n${stderr}`))
-          return
-        }
-        try {
+          // A sidecar the build left behind (the minifier server) must not outlive it.
+          killTree(child)
+          if (code !== 0) throw new Error(`${name} failed: code=${String(code)} signal=${String(signal)}\n${stderr}`)
           resolve(JSON.parse(await readFile(resultPath, "utf8")))
         } catch (error) {
           reject(error)
@@ -246,7 +251,8 @@ export function createBuildFixture({ buildModule } = {}) {
     })
     return reproductionPromise
   }
-  // Run in the file's beforeAll with no hook timeout: the builds are bounded by CPU progress, not a wall clock.
+  // Run in the file's beforeAll under BUILD_HOOK_OUTER_BOUND_MS: the builds are bounded by CPU and output progress;
+  // the hook bound is only the outer limit below the CI job's.
   async function warmBuilds({ reproduction = true } = {}) {
     await sharedOutputs()
     if (reproduction) await reproductionRoot()
