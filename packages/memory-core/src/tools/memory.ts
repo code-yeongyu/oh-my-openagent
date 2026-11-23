@@ -1,6 +1,6 @@
 import { existsSync } from "../fs/resilient"
-import { mkdir, readdir, readFile, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
-import { dirname, join, relative } from "node:path"
+import { mkdir, readdir, readFile, realpath, rename, rm, stat, unlink, writeFile } from "../fs/resilient"
+import { dirname, isAbsolute, join, relative, sep } from "node:path"
 import type { GitCommitAuthor, GitMemoryRepo } from "../git"
 import {
   isMissingDescriptionError,
@@ -17,7 +17,7 @@ import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatte
 import { commitMemoryWrite, type MemoryWriteLock, type MemoryWriteNoop } from "./commit-write"
 import { staleRead, type MemoryObservedVersions } from "./observed-versions"
 import { describeRepairs, repairLeakedArguments } from "./leaked-arguments"
-import { MemoryToolError } from "./tool-errors"
+import { MemoryStaleReadError, MemoryToolError } from "./tool-errors"
 
 export type MemoryCommand =
   "create" | "str_replace" | "insert" | "delete" | "rename" | "update_description" | "apply_patch"
@@ -203,10 +203,29 @@ async function remove(
   const source = required(params.file_path, "file_path", "delete")
   const repositoryPath = validateRepositoryPath(root, source, "file_path")
   if (existsSync(repositoryPath) && (await stat(repositoryPath)).isDirectory()) {
-    await assertDirectoryEditable(repositoryPath, root, versions)
-    const tracked = await collectFiles(repositoryPath, root)
+    const files = await collectFiles(repositoryPath)
+    if (versions?.size) {
+      const scopes = new Set([repositoryPath, await realpath(repositoryPath)])
+      const regularFiles = new Set(files)
+      for (const [path, expected] of versions) {
+        for (const directory of scopes) {
+          const within = relative(directory, path)
+          if (within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) continue
+          // The walk only lists regular files. Missing paths and file-to-directory changes are stale too.
+          if (!regularFiles.has(join(repositoryPath, within))) {
+            throw new MemoryStaleReadError(path, expected, null)
+          }
+          const conflict = await staleRead(path, versions)
+          if (conflict) throw conflict
+          break
+        }
+      }
+    }
+    for (const path of files) {
+      if (path.endsWith(".md")) await loadEditable(path, relativePath(root, path))
+    }
     await rm(repositoryPath, { recursive: true, force: false })
-    return { affectedPaths: tracked }
+    return { affectedPaths: files.map((path) => relativePath(root, path)) }
   }
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   await loadEditable(path, source, versions)
@@ -350,24 +369,12 @@ async function readUtf8(path: string, source: string): Promise<string> {
   }
 }
 
-async function assertDirectoryEditable(
-  directory: string,
-  root: string,
-  versions?: MemoryObservedVersions,
-): Promise<void> {
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const path = join(directory, entry.name)
-    if (entry.isDirectory()) await assertDirectoryEditable(path, root, versions)
-    else if (entry.isFile() && entry.name.endsWith(".md")) await loadEditable(path, relativePath(root, path), versions)
-  }
-}
-
-async function collectFiles(directory: string, root: string): Promise<string[]> {
+async function collectFiles(directory: string): Promise<string[]> {
   const paths: string[] = []
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) paths.push(...(await collectFiles(path, root)))
-    else if (entry.isFile()) paths.push(relativePath(root, path))
+    if (entry.isDirectory()) paths.push(...(await collectFiles(path)))
+    else if (entry.isFile()) paths.push(path)
   }
   return paths
 }

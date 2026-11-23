@@ -85,3 +85,72 @@ for (const [name, mutation, finalPath] of cases) {
     }
   })
 }
+
+const recursiveCases = [
+  ["direct delete of a replacement directory", file_path, `${file_path}/new.md`],
+  ["ancestor delete with a replacement directory", "reference/history", `${file_path}/new.md`],
+  ["ancestor delete with a missing observation", "reference/history", "reference/history/other/new.md"],
+] as const
+
+for (const [name, target, replacement] of recursiveCases) {
+  test(`${name} refuses the stale session but allows a freshly read tree`, async () => {
+    const fixture = await boundFixture()
+    await seedFile(fixture, file_path, "original body")
+    const sessionB = createMemoryIdentityContext(fixture.context)
+    const resolve = (id?: string) => (id === "A" ? fixture.context : sessionB)
+    const context = (id: string) => ({ sessionManager: { getSessionId: () => id } })
+    const pi = new FakeExtensionAPI()
+    registerMemoryGuard(pi, componentContext(), { getContext: (ctx) => resolve(sessionIdFrom(ctx)) })
+    const [tool] = createMemoryTools(resolve)
+    const readAs = async (id: string, label: string) => {
+      const path = join(fixture.repo.dir, label)
+      const call = { toolCallId: `read ${label}`, toolName: "read", input: { path } }
+      await pi.dispatch("tool_call", call, context(id))
+      const content = [{ type: "text", text: await readFile(path, "utf8") }]
+      await pi.dispatch("tool_result", { ...call, isError: false, content }, context(id))
+    }
+    const execute = (id: string, reason: string, params: Omit<Parameters<typeof tool.execute>[1], "reason">) =>
+      tool.execute(reason, { ...params, reason }, undefined, undefined, context(id))
+
+    await readAs("A", file_path)
+    const removed = await execute("B", "remove original note", { command: "delete", file_path })
+    expect(removed.isError).toBeUndefined()
+    const sibling = "reference/history/sibling.md"
+    const newerNotes = [
+      [replacement, "new child"],
+      [sibling, "new sibling"],
+    ] as const
+    for (const [label, body] of newerNotes) {
+      const created = await execute("B", `create ${label}`, {
+        command: "create",
+        file_path: label,
+        description: "Session B",
+        file_text: body,
+      })
+      expect(created.isError).toBeUndefined()
+    }
+    const head = await fixture.repo.head()
+    const mutation = { command: "delete", file_path: target } as const
+
+    const stale = await execute("A", "stale delete", mutation)
+    expect(stale.details.errorCode).toBe("stale_read")
+    expect(stale.isError).toBe(true)
+    expect(stale.details.message).toContain(join(fixture.repo.dir, file_path))
+    expect(await fixture.repo.head()).toBe(head)
+    expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
+    for (const [label, body] of newerNotes) {
+      expect(await readFile(join(fixture.repo.dir, label), "utf8")).toBe(
+        renderMemoryFile({ description: "Session B" }, body),
+      )
+      await readAs("B", label)
+    }
+
+    // B reads the current files without A's observation of the former file at this path.
+    const fresh = await execute("B", "fresh delete", mutation)
+    expect(fresh.isError).toBeUndefined()
+    expect(await fixture.repo.head()).not.toBe(head)
+    expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
+    expect(existsSync(join(fixture.repo.dir, target))).toBe(false)
+    expect(existsSync(join(fixture.repo.dir, sibling))).toBe(target === file_path)
+  })
+}
