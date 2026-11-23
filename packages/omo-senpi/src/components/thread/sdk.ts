@@ -26,7 +26,7 @@ import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAI
 import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity } from "./control/port"
+import { controlIdentity, controlRefusalOf } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
@@ -87,7 +87,8 @@ export type ThreadSdkOptions = {
   readonly now?: () => number
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
-   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only.
+   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
+   * shipped entry (`extension/thread-sdk.ts`) passes the account surface when its caller passes none (#14616).
    */
   readonly remote?: RemoteThreadSurface
 }
@@ -259,6 +260,9 @@ function fail(
 
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
 function thrown(error: unknown): Failure {
+  // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
+  const refusal = controlRefusalOf(error)
+  if (refusal !== undefined) return { kind: "error", error: refusal }
   const schema = gatewaySchemaRefusal(error)
   if (schema !== undefined) return { kind: "error", error: schema }
   const message = error instanceof Error ? error.message : String(error)
