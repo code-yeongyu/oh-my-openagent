@@ -12,8 +12,8 @@ import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/ha
 import type { ThreadHost } from "../tools"
 import type { CarrierWakeOutcome } from "./carrier"
 import { connectCarrierHost } from "./carrier-connection"
-import type { ThreadWakeLatch, ThreadWakeOptions } from "./runtime"
-import { startFakeEngineHost, type FakeEngineHost } from "./testing/fake-engine-host"
+import { processIntakeAdmission, type ThreadWakeLatch, type ThreadWakeOptions } from "./runtime"
+import { startFakeEngineHost, type FakeEngineHost, type FakeEngineOptions } from "./testing/fake-engine-host"
 import { writeSessionFile } from "./testing/fake-wake-host"
 
 // #13037 wired into production: the thread component an engine process registers starts ONE carrier for its agent
@@ -86,10 +86,13 @@ const ENGINE_AT_MINIMUM: Pick<ThreadWakeOptions, "engineVersion" | "minimumEngin
 async function wire(
   wake: Partial<ThreadWakeOptions> = {},
   targetCwd: string = process.cwd(),
-  { sessionStores = false }: { readonly sessionStores?: boolean } = {},
+  {
+    sessionStores = false,
+    engine = {},
+  }: { readonly sessionStores?: boolean; readonly engine?: FakeEngineOptions } = {},
 ): Promise<Wired> {
   const h = (harness = createGatewayHarness())
-  const fake = (host = await startFakeEngineHost())
+  const fake = (host = await startFakeEngineHost(engine))
   const store = h.store()
   const path = writeSessionFile(join(h.agentDir, "sessions"), TARGET, { cwd: targetCwd })
   const latch: ThreadWakeLatch = {}
@@ -494,6 +497,59 @@ describe("the delivery consumer through the registered thread component", () => 
     await w.start()
     expect(await woken).toMatchObject({ kind: "open" })
     expect(opens(w.fake)).toHaveLength(1)
+  })
+
+  // #14335: after a host restart the omo host's own consumer start sweeps a parked session whose queued row came from
+  // another device. The carrier opens it on this same host, and the host answers `wake` only once the session's drain
+  // pass has ended (senpi). That drain asks this process whether the sender is admitted; the answer must not wait for
+  // the consumer start that is itself waiting on this wake.
+  test("#given a queued row from another device and a host that answers wake after the woken session's drain #when the consumer's startup pending sweep wakes it #then the drain admits the row and the wake answers without waiting for its own sweep", async () => {
+    const service = createFakeDeliveryService({ admitted: true })
+    service.ackServe({ wake: true })
+    let wakePass: ((path: string) => Promise<readonly string[]>) | undefined
+    const w = await wire(consumerWake(service, { version: "2026.12.1", minimum: "2026.12.1" }), process.cwd(), {
+      engine: {
+        wakePass: (path) => {
+          if (wakePass === undefined) throw new Error("wake arrived before the test armed its drain")
+          return wakePass(path)
+        },
+      },
+    })
+    wakePass = (path) =>
+      drainWoken(
+        w.store,
+        path,
+        processIntakeAdmission(w.options, () => w.h.agentDir),
+      )
+    const intake = await w.store.intake({
+      now: w.h.clock.now,
+      attested_device: "device-b",
+      record: {
+        sessionId: TARGET,
+        deliveryId: "d-parked",
+        text: "OMO_GATEWAY v=1\nsource=peer_agent\nd-parked",
+        displayText: "d-parked",
+        sender: { kind: "agent", session_id: "sender-on-b" },
+        deliverAs: "followUp",
+        chainCount: 1,
+      },
+      provenance: { workspace: "remote", project: "remote" },
+      target_session_kind: "interactive",
+    })
+    if (intake.kind !== "queued") throw new Error(`the row was not queued: ${intake.kind}`)
+    await w.store.intakeMarks.record({
+      sender_device: "device-b",
+      session_id: TARGET,
+      command_id: "c-parked",
+      ledger_id: intake.ledger_id,
+    })
+    const woken = w.woken()
+    const started = w.start()
+    expect(await woken).toMatchObject({ kind: "open" })
+    await started
+    const [row] = await w.store.list({ target_durable_id: TARGET })
+    expect(row?.state).not.toBe("queued")
+    expect(w.fake.frames.filter((frame) => frame.type === "wake")).toHaveLength(1)
   })
 
   // A8.1: below the engine release that drops a released session's retained record (senpi#6449), the consumer makes no

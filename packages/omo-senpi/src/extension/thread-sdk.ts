@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
 import { GATEWAY_STORE_WORKER_BUNDLE_NAME } from "../components/thread/gateway/store"
+import { createAccountRemoteSurface } from "../components/thread/remote/default-remote"
 import {
   assertThreadSdkOptions,
   createThreadSdk as createSdk,
@@ -24,9 +25,27 @@ export { readSessionFacts } from "../components/thread/session-facts"
 const sidecarAnchor = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "extensions", "omo.js"))
 const sidecarPresent = existsSync(fileURLToPath(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, sidecarAnchor)))
 
+declare const OMO_SENPI_PACKAGE_VERSION: string
+const VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "undefined" ? "0.0.0" : OMO_SENPI_PACKAGE_VERSION
+
+/**
+ * The shipped SDK reads the whole account like the agent's thread tools: a caller that passes no `remote` (a connector,
+ * a monitor script) gets the account surface over this device's device service, as principal `cli:<uid>`, and
+ * `dispose()` closes it (#14616). The `omo thread` CLI passes its own.
+ */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   assertThreadSdkOptions(options)
-  return createSdk(
-    options.workerModuleUrl !== undefined || !sidecarPresent ? options : { ...options, workerModuleUrl: sidecarAnchor },
-  )
+  const remote =
+    options.remote ??
+    createAccountRemoteSurface({
+      version: VERSION,
+      sender: { kind: "cli", uid: String(options.uid) },
+      env: options.env ?? process.env,
+      cwd: options.cwd,
+    })
+  return createSdk({
+    ...options,
+    remote,
+    ...(options.workerModuleUrl !== undefined || !sidecarPresent ? {} : { workerModuleUrl: sidecarAnchor }),
+  })
 }

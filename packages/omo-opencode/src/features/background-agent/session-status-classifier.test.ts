@@ -1,15 +1,6 @@
-import { describe, test, expect, mock, afterAll } from "bun:test"
-import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
-
-const mockLog = mock()
-mock.module("../../shared/logger", () => ({ log: mockLog }))
-preserveModuleMocksForTestFile(import.meta.url)
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { isActiveSessionStatus, isTerminalSessionStatus } = await import("./session-status-classifier")
+import { describe, test, expect, spyOn } from "bun:test"
+import * as logger from "../../shared/logger"
+import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 
 describe("isActiveSessionStatus", () => {
   describe("#given a known active session status", () => {
@@ -32,20 +23,28 @@ describe("isActiveSessionStatus", () => {
     })
 
     test('#when type is "interrupted" #then returns false and does not log', () => {
-      mockLog.mockClear()
-      expect(isActiveSessionStatus("interrupted")).toBe(false)
-      expect(mockLog).not.toHaveBeenCalled()
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      try {
+        expect(isActiveSessionStatus("interrupted")).toBe(false)
+        expect(logSpy).not.toHaveBeenCalled()
+      } finally {
+        logSpy.mockRestore()
+      }
     })
   })
 
   describe("#given an unknown session status", () => {
     test("#when type is an arbitrary unknown string #then returns false and logs warning", () => {
-      mockLog.mockClear()
-      expect(isActiveSessionStatus("some-unknown-status")).toBe(false)
-      expect(mockLog).toHaveBeenCalledWith(
-        "[background-agent] Unknown session status type encountered:",
-        "some-unknown-status",
-      )
+      const logSpy = spyOn(logger, "log").mockImplementation(() => {})
+      try {
+        expect(isActiveSessionStatus("some-unknown-status")).toBe(false)
+        expect(logSpy).toHaveBeenCalledWith(
+          "[background-agent] Unknown session status type encountered:",
+          "some-unknown-status",
+        )
+      } finally {
+        logSpy.mockRestore()
+      }
     })
 
     test("#when type is empty string #then returns false", () => {
