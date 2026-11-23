@@ -1,8 +1,9 @@
 /// <reference types="bun-types" />
 
-// The platform-red closer must close the release-blocking issue only when a dev push run proves every tracked
-// macOS/Windows job green at or after every red commit; anything weaker leaves it open (#14606 stayed open after
-// recovery). The cases run the real script against a fake gh that applies the script's own jq filters.
+// The platform-red closer must close the release-blocking issue only when every macOS/Windows job it names passed again
+// on a dev push run of that job's own workflow, at or after the commit the job was red at; anything weaker leaves it
+// open (#14606 stayed open after recovery; #14801 never closed because it named jobs from two workflows). The cases run
+// the real script against a fake gh that applies the script's own jq filters.
 
 import { afterAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
@@ -15,25 +16,57 @@ const posixBashTest = test.skipIf(process.platform === "win32" || spawnSync("bas
 const root = mkdtempSync(join(tmpdir(), "platform-red-close-"))
 afterAll(() => rmSync(root, { recursive: true, force: true }))
 
-const RED_SHA = "a1a1a1a1a1a1a1a1"
-const GREEN_SHA = "c3c3c3c3c3c3c3c3"
-const TRACKED_JOB = "test (windows-latest, 1/2)"
+const REPO = "owner/project"
 
-interface Scenario {
-  readonly openIssues: readonly number[]
-  readonly windowsTests: "success" | "failure" | "skipped"
-  readonly compareStatus: "ahead" | "identical" | "behind" | "diverged"
+type TestsOutcome = "success" | "failure" | "skipped"
+type CompareStatus = "ahead" | "identical" | "behind" | "diverged"
+
+interface TrackedWorkflow {
+  readonly workflowId: number
+  readonly redRun: number
+  readonly redSha: string
+  readonly job: string
+  readonly latestRun: number
+  readonly latestSha: string
+  readonly tests: TestsOutcome
+  readonly compareStatus: CompareStatus
 }
 
-function issueBody(): string {
+const ci = (overrides: Partial<TrackedWorkflow> = {}): TrackedWorkflow => ({
+  workflowId: 1,
+  redRun: 10,
+  redSha: "a1a1a1a1a1a1a1a1",
+  job: "test (windows-latest, 1/2)",
+  latestRun: 99,
+  latestSha: "c3c3c3c3c3c3c3c3",
+  tests: "success",
+  compareStatus: "ahead",
+  ...overrides,
+})
+
+const computerEngine = (overrides: Partial<TrackedWorkflow> = {}): TrackedWorkflow => ({
+  workflowId: 2,
+  redRun: 20,
+  redSha: "b2b2b2b2b2b2b2b2",
+  job: "computer native contract (macos-15)",
+  latestRun: 98,
+  latestSha: "d4d4d4d4d4d4d4d4",
+  tests: "success",
+  compareStatus: "ahead",
+  ...overrides,
+})
+
+// One issue block per tracked workflow, in the shape the tracker writes: the red commit in the first line, then a job
+// line whose url names the red run.
+function block(tracked: TrackedWorkflow): string {
   return [
-    `A macOS/Windows job turned red on \`dev\` after merging #10 at \`${RED_SHA}\`.`,
+    `A macOS/Windows job turned red on \`dev\` after merging #1 at \`${tracked.redSha}\`.`,
     "",
-    `- [${TRACKED_JOB}](https://job/1) on \`windows-latest\`: first red after merging #10 at \`a1a1a1a1a1\``,
+    `- [${tracked.job}](https://github.com/${REPO}/actions/runs/${tracked.redRun}/job/7) on \`windows-latest\`: first red after merging #1 at \`${tracked.redSha.slice(0, 10)}\``,
   ].join("\n")
 }
 
-function runClose(name: string, scenario: Scenario): string[] {
+function runClose(name: string, openIssues: readonly number[], tracked: readonly TrackedWorkflow[]): string[] {
   const dir = join(root, name)
   const bin = join(dir, "bin")
   const api = join(dir, "api")
@@ -43,24 +76,34 @@ function runClose(name: string, scenario: Scenario): string[] {
     writeFileSync(join(api, key.replace(/[^A-Za-z0-9]/g, "_")), JSON.stringify(body))
   answer(
     "issue list",
-    scenario.openIssues.map((number) => ({ number })),
+    openIssues.map((number) => ({ number })),
   )
-  answer("issue view", { body: issueBody(), comments: [] })
-  answer(`repos/owner/project/actions/runs/99/jobs?filter=latest&per_page=100`, {
-    jobs: [
+  const [first, ...rest] = tracked
+  answer("issue view", { body: first ? block(first) : "", comments: rest.map((each) => ({ body: block(each) })) })
+  for (const each of tracked) {
+    answer(`repos/${REPO}/actions/runs/${each.redRun}`, { id: each.redRun, workflow_id: each.workflowId })
+    answer(
+      `repos/${REPO}/actions/workflows/${each.workflowId}/runs?branch=dev&event=push&status=completed&per_page=1`,
       {
-        name: TRACKED_JOB,
-        conclusion: scenario.windowsTests === "failure" ? "failure" : "success",
-        html_url: "https://job/99",
-        labels: ["windows-latest"],
-        steps: [
-          { name: "Set up job", conclusion: "success" },
-          { name: "Run tests", conclusion: scenario.windowsTests },
-        ],
+        workflow_runs: [{ id: each.latestRun, head_sha: each.latestSha, html_url: `https://run/${each.latestRun}` }],
       },
-    ],
-  })
-  answer(`repos/owner/project/compare/${RED_SHA}...${GREEN_SHA}`, { status: scenario.compareStatus })
+    )
+    answer(`repos/${REPO}/actions/runs/${each.latestRun}/jobs?filter=latest&per_page=100`, {
+      jobs: [
+        {
+          name: each.job,
+          conclusion: each.tests === "failure" ? "failure" : "success",
+          html_url: `https://job/${each.latestRun}`,
+          labels: ["windows-latest"],
+          steps: [
+            { name: "Set up job", conclusion: "success" },
+            { name: "Run tests", conclusion: each.tests },
+          ],
+        },
+      ],
+    })
+    answer(`repos/${REPO}/compare/${each.redSha}...${each.latestSha}`, { status: each.compareStatus })
+  }
   writeFileSync(
     join(bin, "gh"),
     [
@@ -83,10 +126,8 @@ function runClose(name: string, scenario: Scenario): string[] {
       ...process.env,
       PATH: `${bin}:${process.env["PATH"]}`,
       FAKE_DIR: dir,
-      GH_REPO: "owner/project",
-      RUN_ID: "99",
-      RUN_URL: "https://run/99",
-      HEAD_SHA: GREEN_SHA,
+      GH_REPO: REPO,
+      RUN_URL: "https://run/trigger",
       OUT_DIR: join(dir, "out"),
     },
   })
@@ -99,33 +140,52 @@ const closed = (calls: readonly string[]) => calls.some((call) => call.startsWit
 
 describe("#given an open platform-red issue tracking one Windows job", () => {
   posixBashTest("#when a later dev push run ran that job's tests and passed #then the issue is closed", () => {
-    // given
-    const scenario: Scenario = { openIssues: [17], windowsTests: "success", compareStatus: "ahead" }
-    // when
-    const calls = runClose("green", scenario)
+    // given / when
+    const calls = runClose("green", [17], [ci()])
     // then
     expect(closed(calls)).toBe(true)
   })
 
   posixBashTest("#when the run's Windows leg skipped its tests #then the issue stays open", () => {
-    const calls = runClose("skipped", { openIssues: [17], windowsTests: "skipped", compareStatus: "ahead" })
+    const calls = runClose("skipped", [17], [ci({ tests: "skipped" })])
     expect(closed(calls)).toBe(false)
   })
 
   posixBashTest("#when the tracked job is still red #then the issue stays open", () => {
-    const calls = runClose("still-red", { openIssues: [17], windowsTests: "failure", compareStatus: "ahead" })
+    const calls = runClose("still-red", [17], [ci({ tests: "failure" })])
     expect(closed(calls)).toBe(false)
   })
 
-  posixBashTest("#when the green run is for a commit older than the red one #then the issue stays open", () => {
-    const calls = runClose("older-green", { openIssues: [17], windowsTests: "success", compareStatus: "behind" })
+  posixBashTest("#when the latest run is for a commit older than the red one #then the issue stays open", () => {
+    const calls = runClose("older-green", [17], [ci({ compareStatus: "behind" })])
+    expect(closed(calls)).toBe(false)
+  })
+})
+
+// #14801: the issue named CI jobs and a Computer engine job; each workflow's green run lacked the other's job.
+describe("#given an open platform-red issue tracking jobs from two workflows", () => {
+  posixBashTest(
+    "#when each workflow's latest dev push run passed its own job after its red #then the issue is closed",
+    () => {
+      const calls = runClose("two-green", [17], [ci(), computerEngine()])
+      expect(closed(calls)).toBe(true)
+    },
+  )
+
+  posixBashTest("#when one workflow's job is still red #then the issue stays open", () => {
+    const calls = runClose("two-one-red", [17], [ci(), computerEngine({ tests: "failure" })])
+    expect(closed(calls)).toBe(false)
+  })
+
+  posixBashTest("#when one workflow has not run since its red commit #then the issue stays open", () => {
+    const calls = runClose("two-not-rerun", [17], [ci(), computerEngine({ compareStatus: "behind" })])
     expect(closed(calls)).toBe(false)
   })
 })
 
 describe("#given no open platform-red issue", () => {
   posixBashTest("#then nothing is read or closed", () => {
-    const calls = runClose("none", { openIssues: [], windowsTests: "success", compareStatus: "ahead" })
+    const calls = runClose("none", [], [ci()])
     expect(calls).toEqual([
       "issue list --label ci:platform-red --state open --json number --jq map(.number) | min // empty",
     ])
