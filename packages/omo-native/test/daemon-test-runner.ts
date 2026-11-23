@@ -126,6 +126,17 @@ export function childTreeCpuSeconds(rootPid: number): number {
   return total
 }
 
+// Each child leads its own process group, so a tripped bound kills every process it started, not only itself. A
+// daemon the child detaches on purpose (host ensure's shard) leaves the group and stays with the harness cleanup.
+function killGroup(child: ChildProcess): void {
+  if (child.pid === undefined) return
+  try {
+    process.kill(-child.pid, "SIGKILL")
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+  }
+}
+
 export function createDaemonTestRunner() {
   const runningChildren = new Set<ChildProcess>()
 
@@ -140,7 +151,9 @@ export function createDaemonTestRunner() {
     options: { stallMs?: number; cpuCapS?: number } = {},
   ) {
     return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
-      const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
+      // The sampler runs in this process's event loop while the child runs asynchronously beside it, so it keeps
+      // sampling however the child blocks; spawnSync here would starve it.
+      const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"], detached: true })
       runningChildren.add(child)
       let stdout = ""
       let stderr = ""
@@ -163,14 +176,18 @@ export function createDaemonTestRunner() {
           : watchTreeProgress(
               child.pid,
               (bound) => {
-                child.kill("SIGKILL")
-                settle(() =>
-                  reject(
-                    new SpawnBudgetError(
-                      `${command} ${args.join(" ")} ${describeTreeBound(bound, options.cpuCapS)}\nstdout: ${stdout}\nstderr: ${stderr}`,
-                    ),
-                  ),
-                )
+                settle(() => {
+                  // Reject once the group leader is reaped, so the caller never sees the group still running.
+                  child.once("close", () => {
+                    runningChildren.delete(child)
+                    reject(
+                      new SpawnBudgetError(
+                        `${command} ${args.join(" ")} ${describeTreeBound(bound, options.cpuCapS)}; killed process group ${child.pid}\nstdout: ${stdout}\nstderr: ${stderr}`,
+                      ),
+                    )
+                  })
+                  killGroup(child)
+                })
               },
               options,
             )
@@ -190,7 +207,7 @@ export function createDaemonTestRunner() {
   }
 
   function killChildren(): void {
-    for (const child of runningChildren) child.kill("SIGKILL")
+    for (const child of runningChildren) killGroup(child)
     runningChildren.clear()
   }
 
