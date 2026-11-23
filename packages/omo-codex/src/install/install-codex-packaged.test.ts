@@ -1,11 +1,12 @@
 /// <reference path="../../../../bun-test.d.ts" />
 /// <reference types="bun-types" />
 
-import { expect, test } from "bun:test"
+import { afterEach, expect, test } from "bun:test"
 import { mkdir, mkdtemp, readFile, readlink, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runCodexInstaller } from "./install-codex"
+import { createCodexInstallSandbox, disposeCodexInstallSandboxes } from "../../scripts/codex-install-sandbox"
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
@@ -14,8 +15,9 @@ test(
   async () => {
     // given
     const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-"))
-    const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-packaged-home-"))
-    const binDir = await mkdtemp(join(tmpdir(), "omo-codex-packaged-bin-"))
+    const sandbox = createCodexInstallSandbox("packaged")
+    const codexHome = sandbox.codexHome
+    const binDir = sandbox.binDir
     const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
     const pluginRoot = join(codexPackageRoot, "plugin")
     const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
@@ -57,7 +59,7 @@ test(
               hooks: [
                 {
                   type: "command",
-                  command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+                  command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
                   statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
                 },
               ],
@@ -76,7 +78,7 @@ test(
               hooks: [
                 {
                   type: "command",
-                  command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+                  command: `node "\${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use`,
                   statusMessage: "LazyCodex(0.1.0): Checking Comments",
                 },
               ],
@@ -96,16 +98,16 @@ test(
     await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
     // when
-    const result = await runCodexInstaller({
-      codexHome,
-      binDir,
-      repoRoot,
-      platform: "linux",
-      astGrepInstaller: skipAstGrepInstall,
-      runCommand: async (command, args, options) => {
-        commands.push([command, args.join(" "), options.cwd])
-      },
-    })
+    const result = await runCodexInstaller(
+      sandbox.options({
+        repoRoot,
+        platform: "linux",
+        astGrepInstaller: skipAstGrepInstall,
+        runCommand: async (command, args, options) => {
+          commands.push([command, args.join(" "), options.cwd])
+        },
+      }),
+    )
 
     // then
     const pluginPath = result.installed[0]?.path ?? ""
@@ -164,8 +166,8 @@ test(
 test("#given packaged lazycodex tarball layout #when simulating Windows install #then links bin shims for that platform", async () => {
   // given
   const repoRoot = await mkdtemp(join(tmpdir(), "omo-codex-packaged-root-win-"))
-  const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-packaged-home-win-"))
-  const binDir = await mkdtemp(join(tmpdir(), "omo-codex-packaged-bin-win-"))
+  const sandbox = createCodexInstallSandbox("packaged")
+  const binDir = sandbox.binDir
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
   const lspRuntimeRoot = join(repoRoot, "packages", "lsp-daemon")
@@ -200,18 +202,20 @@ test("#given packaged lazycodex tarball layout #when simulating Windows install 
   await writeFile(join(lspRuntimeRoot, "dist", "cli.js"), "#!/usr/bin/env node\n")
 
   // when
-  const result = await runCodexInstaller({
-    codexHome,
-    binDir,
-    repoRoot,
-    platform: "win32",
-    astGrepInstaller: skipAstGrepInstall,
-    gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
-    runCommand: async () => undefined,
-  })
+  const result = await runCodexInstaller(
+    sandbox.options({
+      repoRoot,
+      platform: "win32",
+      astGrepInstaller: skipAstGrepInstall,
+      gitBashResolver: () => ({ found: true, path: "C:\\Program Files\\Git\\bin\\bash.exe", source: "program-files" }),
+      runCommand: async () => undefined,
+    }),
+  )
 
   // then
   const pluginPath = result.installed[0]?.path ?? ""
   const commandShim = await readFile(join(binDir, "omo.cmd"), "utf8")
   expect(commandShim).toContain(join(pluginPath, "dist", "cli.js"))
 })
+
+afterEach(disposeCodexInstallSandboxes)

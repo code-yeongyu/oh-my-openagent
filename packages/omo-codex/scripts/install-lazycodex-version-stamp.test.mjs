@@ -1,15 +1,23 @@
 import assert from "node:assert/strict"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
-import test from "node:test"
+import test, { afterEach } from "node:test"
 
 import { installMarketplaceLocally } from "./install-local.mjs"
-import { makeTempDir, writeJson, writePluginAt } from "./install-test-fixtures.mjs"
+import {
+  createCodexInstallSandbox,
+  disposeCodexInstallSandboxes,
+  makeTempDir,
+  writeJson,
+  writePluginAt,
+} from "./install-test-fixtures.mjs"
+
+afterEach(disposeCodexInstallSandboxes)
 
 test("#given sisyphuslabs lazycodex install #when installing locally #then stamps the distribution version", async () => {
   const repoRoot = await makeTempDir()
-  const codexHome = await makeTempDir()
-  const binDir = await makeTempDir()
+  const sandbox = createCodexInstallSandbox("version-stamp")
+  const codexHome = sandbox.codexHome
   const codexPackageRoot = join(repoRoot, "packages", "omo-codex")
   const pluginRoot = join(codexPackageRoot, "plugin")
 
@@ -30,7 +38,7 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
           hooks: [
             {
               type: "command",
-              command: 'node "${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit',
+              command: `node "\${PLUGIN_ROOT}/dist/cli.js" hook user-prompt-submit`,
               statusMessage: "LazyCodex(0.1.0): Checking Ulw-Loop Steering",
             },
           ],
@@ -45,7 +53,7 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
           hooks: [
             {
               type: "command",
-              command: 'node "${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use',
+              command: `node "\${PLUGIN_ROOT}/components/comment-checker/dist/cli.js" hook post-tool-use`,
               statusMessage: "LazyCodex(0.1.0): Checking Comments",
             },
           ],
@@ -59,14 +67,15 @@ test("#given sisyphuslabs lazycodex install #when installing locally #then stamp
     "console.log('comment checker cli')\n",
   )
 
-  const result = await installMarketplaceLocally({
-    repoRoot,
-    codexHome,
-    binDir,
-    platform: "linux",
-    runCommand: async () => {},
-    log: () => {},
-  })
+  const result = await installMarketplaceLocally(
+    sandbox.options({
+      repoRoot,
+
+      platform: "linux",
+      runCommand: async () => {},
+      log: () => {},
+    }),
+  )
 
   const cacheRoot = join(codexHome, "plugins", "cache", "sisyphuslabs", "omo", "4.7.6")
   assert.equal(result.installed[0].version, "4.7.6")

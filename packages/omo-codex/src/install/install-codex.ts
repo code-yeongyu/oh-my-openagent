@@ -210,7 +210,7 @@ export async function runCodexInstaller(options: CodexInstallOptions = {}): Prom
     log(`Found project-local legacy artifact ${artifact.path}; left in place`)
   }
 
-  await trackCodexInstallTelemetry()
+  await trackCodexInstallTelemetry(env)
 
   return {
     marketplaceName: marketplace.name,

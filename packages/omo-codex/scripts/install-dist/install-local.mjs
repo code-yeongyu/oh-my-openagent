@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:a465497695522da7b48099a2679f2130c9c786eeda71bcb82aca8bff60772402:289a4ae9e2fea14cdea7490f992b577c9dc656a74c9f0fa4133b67b99623c7d0
+// omo-codex-install:dae27b1a8a82486f324c6c8fd90293eda814e57290ba970150ed009d20f0cea7:1391aefff7bbf78007b3554027de5b17295d85084894e4655a10fe39737f72a9
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -10368,8 +10368,8 @@ function createPostHogClient(source, options = {}) {
     }
   };
 }
-function createInstallPostHog() {
-  return createPostHogClient("install");
+function createInstallPostHog(options = {}) {
+  return createPostHogClient("install", options);
 }
 var osProviderOverride2 = null, activityStateProviderOverride = null, transportFactoryOverride = null, NO_OP_POSTHOG;
 var init_posthog = __esm(() => {
@@ -24038,10 +24038,15 @@ async function installAstGrepForCodex(options) {
 }
 
 // packages/omo-codex/src/install/codex-install-telemetry.ts
-async function trackCodexInstallTelemetry() {
+init_src();
+init_product_identity();
+async function trackCodexInstallTelemetry(env = process.env) {
   try {
     await Promise.resolve().then(() => init_telemetry());
-    const posthog = createInstallPostHog();
+    const posthog = env === process.env ? createInstallPostHog() : createInstallPostHog({
+      env,
+      stateDir: resolveTelemetryStateDir(createCodexTelemetryProductConfig(), { env })
+    });
     posthog.trackActive("install_completed");
     await posthog.shutdown();
   } catch (error) {
@@ -24204,7 +24209,7 @@ async function runCodexInstaller(options = {}) {
   for (const artifact of projectCleanup.artifacts) {
     log(`Found project-local legacy artifact ${artifact.path}; left in place`);
   }
-  await trackCodexInstallTelemetry();
+  await trackCodexInstallTelemetry(env);
   return {
     marketplaceName: marketplace.name,
     installed,
