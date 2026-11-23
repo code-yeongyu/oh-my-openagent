@@ -1,4 +1,4 @@
-import type { ReattachResult, RespawnResult } from "../lifecycle/port"
+import type { ReattachResult, RespawnFailureCode, RespawnResult } from "../lifecycle/port"
 import { newestSessionPath } from "../lifecycle/session-path"
 import type { RunPauseOwner } from "../pause/ports"
 import type { TaskRecord } from "../state"
@@ -22,6 +22,16 @@ export class PausedChildOwnedElsewhereError extends Error {
     readonly ownerPid: number,
   ) {
     super(`paused child ${taskId} is still held by live host ${ownerPid}; it is never run on two hosts`)
+  }
+}
+
+export class PausedChildRespawnError extends Error {
+  constructor(
+    taskId: string,
+    readonly code: RespawnFailureCode,
+    reason: string,
+  ) {
+    super(`paused child ${taskId} restore failed (${code}): ${reason}`)
   }
 }
 
@@ -72,7 +82,7 @@ export async function restorePausedChild(ports: PausedRestorePorts, record: Task
   const respawned = await ports.respawn(current, sessionPath)
   if (!respawned.ok) {
     if (respawned.disposition === "unrecoverable") throw new PausedChildLostError(taskId, respawned.reason)
-    throw new Error(`paused child ${taskId} restore failed (${respawned.code}): ${respawned.reason}`)
+    throw new PausedChildRespawnError(taskId, respawned.code, respawned.reason)
   }
   const reattached = await ports.reattach(current, respawned.handle)
   if (!reattached.ok && reattached.kind !== "already_attached")

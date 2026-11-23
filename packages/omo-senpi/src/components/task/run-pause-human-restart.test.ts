@@ -12,7 +12,6 @@ import {
 } from "../../senpi-test-runtime"
 import { composeOmoSenpiExtension } from "../../extension/compose"
 import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
-import type { EnginePauseState } from "../../../../senpi-task/src/pause/ports"
 import { PauseRegistry } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { createTaskRecordStore } from "../../../../senpi-task/src/store"
@@ -24,7 +23,7 @@ import {
   settings,
 } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { EngineRunPauseBridge, isRunHoldChange } from "./run-pause-bridge"
-import type { LiveTaskContext } from "./runtime-context"
+import { TaskRuntimeContext, type LiveTaskContext } from "./runtime-context"
 import { remainingTestTime, useTestTimeout } from "../../../../../test-support/test-deadline"
 
 test("#given quit and reopening the same stopped native session #when the person sends the next message #then a failed child restore does not keep task admission held", async () => {
@@ -88,7 +87,7 @@ test("#given quit and reopening the same stopped native session #when the person
     const paused = Promise.withResolvers<void>()
     const released = Promise.withResolvers<void>()
     const resumeSettled = Promise.withResolvers<void>()
-    let view: EnginePauseState | undefined
+    const runtime = new TaskRuntimeContext(root)
     const effects: RunPauseEffects = {
       snapshot: () => [
         {
@@ -112,13 +111,9 @@ test("#given quit and reopening the same stopped native session #when the person
       acknowledgeInstalled: async () => undefined,
       cancel: async () => undefined,
     }
-    const bridge = new EngineRunPauseBridge(
-      new RunPauseController(pauseRegistry, effects),
-      { getPauseState: () => view },
-      () => {
-        released.resolve()
-      },
-    )
+    const bridge = new EngineRunPauseBridge(new RunPauseController(pauseRegistry, effects), runtime, () => {
+      released.resolve()
+    })
     const settingsManager = SettingsManager.inMemory({ defaultProjectTrust: "always", compaction: { enabled: false } })
     const agentDir = join(root, "agent")
     const loader = new DefaultResourceLoader({
@@ -137,12 +132,12 @@ test("#given quit and reopening the same stopped native session #when the person
               name: "pause-proof",
               register(pi) {
                 pi.on("session_start", async (_event, ctx) => {
-                  view = (ctx as LiveTaskContext).getPauseState?.()
+                  runtime.captureFrom(ctx as LiveTaskContext)
                   await bridge.restore(parent)
                   await bridge.reconciled(parent)
                 })
                 pi.on("session_hold_changed", async (event, ctx) => {
-                  view = (ctx as LiveTaskContext).getPauseState?.()
+                  runtime.captureFrom(ctx as LiveTaskContext)
                   if (!isRunHoldChange(event)) return
                   try {
                     await bridge.changed(parent, event)
@@ -231,6 +226,7 @@ test("#given quit and reopening the same stopped native session #when the person
     expect(second.pauseRegistry.require(second.parent)).toMatchObject({
       phase: "resumed",
       participants: { child: { state: "lost", lostReason: expect.stringContaining("respawn_failed") } },
+      resume: { failureNoticed: true },
     })
     expect(requests.some((body) => body.includes("Continue working."))).toBe(true)
     expect(errors).toEqual([])

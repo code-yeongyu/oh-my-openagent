@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { cleanupProjects, tempProject } from "../manager/__fixtures__/manager-fakes"
 import { AdmissionBarrier } from "./admission-barrier"
-import { PauseRegistry, type PauseParticipant } from "./registry"
+import { type PauseParticipant, PauseRegistry } from "./registry"
 
 afterEach(cleanupProjects)
 
@@ -21,6 +21,18 @@ function participant(key: string, sequence: number, phase: "pre_grant" | "parked
 }
 
 describe("durable parent pause participant ledger", () => {
+  test("reads a legacy singleton notice and carries it into the next Stop", () => {
+    const dir = tempProject()
+    const registry = new PauseRegistry(dir, new AdmissionBarrier())
+    const record = registry.begin("root", 1, [])
+    const notice = { pauseSeq: 1, resumeId: "resume-1", text: "Legacy warning" }
+    writeFileSync(join(dir, "pause", "root.json"), JSON.stringify({ ...record, pendingResumeFailureNotice: notice }))
+
+    expect(registry.require("root").pendingResumeFailureNotices).toEqual([notice])
+    registry.begin("root", 2, [])
+    expect(registry.require("root").pendingResumeFailureNotices).toEqual([notice])
+  })
+
   test("#given Stop #when its first registry write is observed #then admission was already closed", () => {
     const dir = tempProject()
     const barrier = new AdmissionBarrier()

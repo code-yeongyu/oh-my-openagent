@@ -44,6 +44,15 @@ export interface CapturedUi extends DialogUi {
   setWidget(key: string, content: string[] | undefined, options?: { placement?: "belowEditor" | "aboveEditor" }): void
 }
 
+export function notifyTaskUser(
+  context: Pick<LiveTaskContext, "mode" | "ui">,
+  notice: string,
+  level: "info" | "warning",
+): void {
+  if (context.mode === "print" || context.mode === "json") process.stderr.write(`${notice}\n`)
+  else context.ui?.notify(notice, level)
+}
+
 export type ParentTransition = "compacting" | "session_switching" | "session_shutdown" | undefined
 
 export type ParentServiceTier = "auto" | "flex" | "priority"
@@ -73,6 +82,8 @@ export class TaskRuntimeContext {
   #sessionId: string | undefined
   #sessionFile: string | undefined
   #mode: string | undefined
+  #hasSessionUi = false
+  #hasSessionMode = false
   #projectTrusted: boolean | undefined
 
   constructor(cwd: string) {
@@ -87,11 +98,23 @@ export class TaskRuntimeContext {
     if ("effectiveServiceTier" in ctx || "serviceTier" in ctx) {
       this.#parentServiceTier = asParentServiceTier(ctx.effectiveServiceTier) ?? asParentServiceTier(ctx.serviceTier)
     }
-    if (ctx.ui !== undefined) this.#ui = ctx.ui
-    if (typeof ctx.mode === "string") this.#mode = ctx.mode
     if (ctx.sessionManager !== undefined) {
-      this.#sessionId = ctx.sessionManager.getSessionId()
+      const sessionId = ctx.sessionManager.getSessionId()
+      if (sessionId !== this.#sessionId) {
+        // Partial captures retain the shared UI and mode, but they cannot authorize a Resume notice.
+        this.#hasSessionUi = false
+        this.#hasSessionMode = false
+      }
+      this.#sessionId = sessionId
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
+    }
+    if (ctx.ui !== undefined) {
+      this.#ui = ctx.ui
+      this.#hasSessionUi = ctx.sessionManager !== undefined
+    }
+    if (typeof ctx.mode === "string") {
+      this.#mode = ctx.mode
+      this.#hasSessionMode = ctx.sessionManager !== undefined
     }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
     if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
@@ -152,6 +175,20 @@ export class TaskRuntimeContext {
 
   ui(): CapturedUi | undefined {
     return this.#ui
+  }
+
+  notifyResumeFailure(parentSessionId: string, text: string): boolean {
+    if (
+      this.#sessionId !== parentSessionId ||
+      this.#transition === "session_switching" ||
+      this.#transition === "session_shutdown"
+    )
+      return false
+    const mode = this.#hasSessionMode ? this.#mode : undefined
+    const ui = this.#hasSessionUi ? this.#ui : undefined
+    if (mode !== "print" && mode !== "json" && ui === undefined) return false
+    notifyTaskUser({ mode, ui }, text, "warning")
+    return true
   }
 
   sessionId(): string | undefined {

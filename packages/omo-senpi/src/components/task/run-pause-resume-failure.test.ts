@@ -4,11 +4,13 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { cleanupProjects, tempProject } from "../../../../senpi-task/src/manager/__fixtures__/manager-fakes"
 import { AdmissionBarrier } from "../../../../senpi-task/src/pause/admission-barrier"
+import { NativeResumeRefusedError } from "../../../../senpi-task/src/pause/native-child-pause"
 import type { EnginePauseState, ObservedHold } from "../../../../senpi-task/src/pause/ports"
-import { PauseRegistry, type PauseParticipant } from "../../../../senpi-task/src/pause/registry"
+import { type PauseParticipant, PauseRegistry } from "../../../../senpi-task/src/pause/registry"
 import { RunPauseController, type RunPauseEffects } from "../../../../senpi-task/src/pause/run-controller"
 import { createEngineRunPause } from "./engine-run-pause"
 import { EngineRunPauseBridge } from "./run-pause-bridge"
+import { type CapturedUi, TaskRuntimeContext } from "./runtime-context"
 
 const roots: string[] = []
 afterEach(() => {
@@ -40,7 +42,11 @@ const queued: PauseParticipant = {
   at: "2026-01-01T00:00:00.000Z",
 }
 
-function hostOver(participants: readonly PauseParticipant[], overrides: Partial<RunPauseEffects>) {
+function hostOver(
+  participants: readonly PauseParticipant[],
+  overrides: Partial<RunPauseEffects>,
+  runtime?: TaskRuntimeContext,
+) {
   const root = mkdtempSync(join(tmpdir(), "run-pause-resume-failure-"))
   roots.push(root)
   const barrier = new AdmissionBarrier()
@@ -62,29 +68,43 @@ function hostOver(participants: readonly PauseParticipant[], overrides: Partial<
     ...overrides,
   }
   let live: EnginePauseState = stopped(7)
-  const bridge = new EngineRunPauseBridge(new RunPauseController(registry, effects), { getPauseState: () => live })
+  const notices: { parent: string; text: string }[] = []
+  const bridge = new EngineRunPauseBridge(
+    new RunPauseController(registry, effects),
+    runtime ?? {
+      getPauseState: () => live,
+      notifyResumeFailure: (parent: string, text: string) => {
+        notices.push({ parent, text })
+        return true
+      },
+    },
+  )
   return {
     barrier,
     registry,
     bridge,
     resumed,
+    notices,
     setState: (next: EnginePauseState) => {
       live = next
     },
   }
 }
 
-test("delta-2 HIGH: a lost child still held whose resume fails reopens admission, surfaces the error, and is retried by the next Resume", async () => {
+test("Resume reports multiple failures once, reopens admission, and retries only the failed participants", async () => {
   let observed: ObservedHold = { held: false, childSeq: 0 }
   let resumeFails = true
   const resumed: string[] = []
-  const h = hostOver([child], {
-    pause: async () => {
-      throw new Error("pause_for_run timed out")
+  const other = { ...child, key: "st_c", taskId: "st_c" }
+  const h = hostOver([child, other, queued], {
+    pause: async (participant) => {
+      if (participant.key === child.key) throw new Error("pause_for_run timed out")
+      return { kind: "held", childSeq: 8 }
     },
     observeHold: async () => observed,
     resume: async (participant) => {
-      if (resumeFails) throw new Error("resume_for_run timed out")
+      if (resumeFails && participant.key === child.key) throw new Error("resume_for_run timed out at /private/secret")
+      if (resumeFails && participant.key === other.key) throw new NativeResumeRefusedError("st_c", "stale")
       resumed.push(participant.key)
       return { kind: "resumed", turnId: "turn-b" }
     },
@@ -98,12 +118,98 @@ test("delta-2 HIGH: a lost child still held whose resume fails reopens admission
   expect(h.registry.require(PARENT).phase).toBe("resumed")
   expect(h.registry.require(PARENT).participants.st_b).toMatchObject({ state: "lost" })
   expect(h.registry.require(PARENT).participants.st_b?.lostReason).toContain("resume_for_run timed out")
+  expect(resumed).toEqual(["st_q"])
+  expect(h.notices).toEqual([{ parent: PARENT, text: expect.stringContaining("2 participants") }])
+  expect(h.notices[0]?.text).toContain("native_resume_refused")
+  expect(h.notices[0]?.text).not.toContain("/private/secret")
+
+  const resumeId = h.registry.require(PARENT).resume?.resumeId
+  await h.bridge.changed(PARENT, { ...released(7), change: "resumed" })
+  expect(h.notices).toHaveLength(1)
 
   resumeFails = false
   await h.bridge.changed(PARENT, { ...released(7), change: "resumed" })
-  expect(resumed).toEqual(["st_b"])
+  expect(resumed).toEqual(["st_q", "st_b", "st_c"])
+  expect(h.registry.require(PARENT).resume?.resumeId).toBe(resumeId)
+  expect(h.notices).toHaveLength(1)
   expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+})
+
+test("two partial Resumes warn only the original parent once each on return, even after recovery", async () => {
+  const runtime = new TaskRuntimeContext(tempProject())
+  const parentNotices: { text: string; level: string | undefined }[] = []
+  const unrelatedNotices: typeof parentNotices = []
+  const capture = (sessionId: string, state: EnginePauseState, notices: typeof parentNotices) => {
+    const ui: CapturedUi = {
+      notify: (text, level) => notices.push({ text, level }),
+      select: async () => undefined,
+      confirm: async () => false,
+      setStatus: () => undefined,
+      setWidget: () => undefined,
+    }
+    runtime.captureFrom({ sessionManager: { getSessionId: () => sessionId }, getPauseState: () => state, ui })
+  }
+  let resumeFails = true
+  const h = hostOver(
+    [child],
+    {
+      resume: async (_participant, request) => {
+        if (resumeFails) {
+          if (request.resumeId === "parent-resume:7") throw new NativeResumeRefusedError(child.key, "stale")
+          throw new Error("second restore failed")
+        }
+        return { kind: "resumed" }
+      },
+    },
+    runtime,
+  )
+  const resume = { ...released(7), change: "resumed" } as const
+  capture(PARENT, stopped(7), parentNotices)
+  await h.bridge.changed(PARENT, { ...stopped(7), change: "paused" })
+
+  capture("unrelated", released(1), unrelatedNotices)
+  await h.bridge.changed(PARENT, resume)
+  await h.bridge.changed(PARENT, resume)
+  resumeFails = false
+  await h.bridge.changed(PARENT, resume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+
+  const secondResume = { ...released(8), change: "resumed" } as const
+  await h.bridge.changed(PARENT, { ...stopped(8), change: "paused" })
+  resumeFails = true
+  await h.bridge.changed(PARENT, secondResume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("lost")
+  resumeFails = false
+  await h.bridge.changed(PARENT, secondResume)
+  expect(h.registry.require(PARENT).participants.st_b?.state).toBe("resumed")
+  expect(parentNotices).toEqual([])
+  expect(unrelatedNotices).toEqual([])
+
+  const returned = new EngineRunPauseBridge(h.bridge.controller, runtime)
+  runtime.captureFrom({
+    sessionManager: { getSessionId: () => PARENT },
+    getPauseState: () => released(8),
+  })
+  await returned.restore(PARENT)
+  await returned.reconciled(PARENT)
+  expect(parentNotices).toEqual([])
+  expect(unrelatedNotices).toEqual([])
+
+  capture(PARENT, released(8), parentNotices)
+  await returned.reconciled(PARENT)
+  expect(parentNotices).toEqual([
+    { text: expect.stringContaining("native_resume_refused"), level: "warning" },
+    { text: expect.stringContaining("(resume_failed)"), level: "warning" },
+  ])
+
+  capture("unrelated", released(1), unrelatedNotices)
+  await returned.reconciled("unrelated")
+  capture(PARENT, released(8), parentNotices)
+  await returned.reconciled(PARENT)
+  await returned.changed(PARENT, secondResume)
+  expect(parentNotices).toHaveLength(2)
+  expect(unrelatedNotices).toEqual([])
 })
 
 test("delta-2 HIGH: the Resume caller's result names each participant whose resume failed", async () => {
@@ -130,7 +236,9 @@ test("delta-2 HIGH: the Resume caller's result names each participant whose resu
   registry.update(PARENT, 7, "st_b", { state: "lost", lostReason: "pause_for_run timed out" })
   const result = await controller.resume(PARENT, 7, "resume-1")
   expect(result.kind).toBe("installed")
-  expect(result.failures).toEqual([{ key: "st_b", reason: expect.stringContaining("resume_for_run timed out") }])
+  expect(result.failures).toEqual([
+    { key: "st_b", reason: expect.stringContaining("resume_for_run timed out"), code: "resume_failed" },
+  ])
   expect(controller.released(PARENT, 7, "resume-1")).toBe(true)
 })
 
@@ -146,6 +254,7 @@ test("delta-2 MEDIUM: a queued admission lost to a failed propagation is still r
   await h.bridge.changed(PARENT, { ...released(7), change: "resumed" })
   expect(h.resumed).toEqual(["st_q"])
   expect(h.barrier.state(PARENT)).toEqual({ kind: "open" })
+  expect(h.notices).toEqual([])
 })
 
 test("delta-2 MEDIUM: the engine effect re-admits a lost queued admission through the admission port, never the lost-child path", async () => {

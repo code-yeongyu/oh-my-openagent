@@ -1,5 +1,11 @@
 import { log } from "@oh-my-opencode/utils"
+import {
+  PausedChildLostError,
+  PausedChildOwnedElsewhereError,
+  PausedChildRespawnError,
+} from "../manager/paused-restore"
 import type { AdmissionParticipant, ResumeCredential } from "./admission-barrier"
+import { NativePauseUnavailableError, NativeResumeRefusedError } from "./native-child-pause"
 import type { ObservedHold, RunPauseOwner, RunRef } from "./ports"
 import { PauseRegistry, type PauseParticipant } from "./registry"
 
@@ -42,7 +48,16 @@ export type RunPauseEffects = {
 
 type ResumeTransaction = { readonly pauseSeq: number; readonly resumeId: string; readonly credential: ResumeCredential }
 
-export type ResumeFailure = { readonly key: string; readonly reason: string }
+type ParticipantFailure = { readonly key: string; readonly reason: string }
+export type ResumeFailure = ParticipantFailure & {
+  readonly code:
+    | PausedChildLostError["code"]
+    | PausedChildOwnedElsewhereError["code"]
+    | PausedChildRespawnError["code"]
+    | NativePauseUnavailableError["code"]
+    | NativeResumeRefusedError["code"]
+    | "resume_failed"
+}
 export type RunResumeResult = {
   readonly kind: "installed" | "superseded"
   readonly failures?: readonly ResumeFailure[]
@@ -185,8 +200,8 @@ export class RunPauseController {
 
   // After the bounded retries a released Resume still could not reach these participants: each run
   // ends with its reason, so no child stays paused under a Stop nobody holds any more (#12249).
-  async endLost(parentSessionId: string, pauseSeq: number): Promise<readonly ResumeFailure[]> {
-    const failures: ResumeFailure[] = []
+  async endLost(parentSessionId: string, pauseSeq: number): Promise<readonly ParticipantFailure[]> {
+    const failures: ParticipantFailure[] = []
     const record = this.registry.load(parentSessionId)
     if (
       record === undefined ||
@@ -267,7 +282,16 @@ export class RunPauseController {
         reason,
       })
       this.registry.update(parentSessionId, pauseSeq, participant.key, { state: "lost", lostReason: reason })
-      return current() ? { key: participant.key, reason } : "superseded"
+      if (!current()) return "superseded"
+      const code =
+        error instanceof NativeResumeRefusedError ||
+        error instanceof NativePauseUnavailableError ||
+        error instanceof PausedChildLostError ||
+        error instanceof PausedChildOwnedElsewhereError ||
+        error instanceof PausedChildRespawnError
+          ? error.code
+          : "resume_failed"
+      return { key: participant.key, reason, code }
     }
     if (!current()) return "superseded"
     if (result.kind === "settled") this.registry.drop(parentSessionId, pauseSeq, participant.key)

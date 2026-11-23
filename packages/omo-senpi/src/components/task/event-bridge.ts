@@ -5,7 +5,7 @@ import type { TaskEngine } from "./engine"
 import { ownHostedTaskId } from "./own-task-identity"
 import type { LeadPollerLifecycle } from "./lead-poller-lifecycle"
 import type { ResumptionChannelEmitter } from "./resumption-channel-emitter"
-import type { LiveTaskContext } from "./runtime-context"
+import { notifyTaskUser, type LiveTaskContext } from "./runtime-context"
 import { wireReloadGuard, type ReloadGuardDagSource } from "./reload-guard"
 import type { SessionTransitionBridge } from "./session-transition-bridge"
 import type { TaskStatusUi } from "./status-ui"
@@ -252,10 +252,6 @@ export function wireEventBridge(
           ? { parentSessionId: sessionId, reason }
           : { parentSessionId: sessionId, reason, ownTaskId },
       )
-      const notify = (notice: string, level: "info" | "warning"): void => {
-        if (liveContext.mode === "print" || liveContext.mode === "json") process.stderr.write(`${notice}\n`)
-        else liveContext.ui?.notify(notice, level)
-      }
       // A stopped owner's session can never be resumed, so nothing kept running there to collect.
       if (summary.stopped_owner === undefined) {
         const count = continuing.filter(
@@ -264,7 +260,8 @@ export function wireEventBridge(
             engine.manager.get(record.task_id)?.status !== "cancelled",
         ).length
         if (count > 0)
-          notify(
+          notifyTaskUser(
+            liveContext,
             `${count} background task(s) keep running under session ${sessionId}; resume it (omo --resume ${sessionId}) to collect their results`,
             "info",
           )
@@ -276,7 +273,8 @@ export function wireEventBridge(
         return record?.started_at !== undefined && (record.status === "running" || record.status === "cancelled")
       }).length
       if (unstopped > 0)
-        notify(
+        notifyTaskUser(
+          liveContext,
           `${unstopped} child task(s) of stopped task ${summary.stopped_owner} could not be stopped and may still be running on the task host`,
           "warning",
         )
