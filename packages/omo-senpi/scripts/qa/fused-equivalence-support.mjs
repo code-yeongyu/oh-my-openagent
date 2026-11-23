@@ -27,7 +27,7 @@ function statusChannelOf(event) {
  * One O6 client record with its status channels moved out of the turn list. The host's loaded-surface announcements
  * (`surfaces`) are already their own ordered list in the harness's O6 shape and pass through untouched.
  */
-export function splitStatusChannels(client) {
+export function splitStatusChannels(client, settledChannels = []) {
   const listKey = Array.isArray(client.turn) ? "turn" : "events"
   const events = client[listKey]
   if (!Array.isArray(events)) throw new Error(`unexpected O6 shape from the harness: ${Object.keys(client).join(",")}`)
@@ -42,15 +42,32 @@ export function splitStatusChannels(client) {
     ...client,
     [listKey]: events.filter((event) => statusChannelOf(event) === undefined),
     status: Object.fromEntries(
-      [...channels].map(([name, snapshots]) => [name, { count: snapshots.length, snapshots }]),
+      [...channels].map(([name, snapshots]) => [
+        name,
+        settledChannels.includes(name)
+          ? { settled: settledSnapshot(snapshots) }
+          : { count: snapshots.length, snapshots },
+      ]),
     ),
   }
+}
+
+/**
+ * A channel a case compares at its settled point only (#13046): the last line the channel showed before its final
+ * clear, i.e. the state the session's own work settled on. The product leaves the order of background refreshes
+ * unordered by design; their ordering rules are pinned by the publisher's unit tests, not by this E2E golden.
+ */
+function settledSnapshot(snapshots) {
+  const shown = snapshots.filter((event) => typeof event.statusText === "string")
+  return shown.length === 0 ? null : shown[shown.length - 1].statusText
 }
 
 /** Per O6 client, each status channel's snapshot count: written to the receipt next to the compare result. */
 export function statusCounts(observations) {
   return (observations?.O6 ?? []).map((client) =>
-    Object.fromEntries(Object.entries(client.status ?? {}).map(([name, channel]) => [name, channel.count])),
+    Object.fromEntries(
+      Object.entries(client.status ?? {}).map(([name, channel]) => [name, channel.count ?? "settled"]),
+    ),
   )
 }
 

@@ -1,4 +1,5 @@
 import { MEMORY_STATUS_KEY } from "./status"
+import { sequencedStatus } from "./wiring-context"
 
 const FRAME_INTERVAL_MS = 320
 
@@ -79,6 +80,8 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
   }
 
   async function recompute(identity: string, ui: MemoryFooterUi): Promise<void> {
+    // Taken before the first read, so this recompute cannot replace a line a later refresh already published.
+    const status = sequencedStatus(ui)
     try {
       const fingerprint = await options.fingerprint?.(identity)
       // An absent probe means "always recompute"; a stable probe short-circuits the git work.
@@ -87,7 +90,7 @@ export function createMemoryFooterLive(options: MemoryFooterLiveOptions = {}): M
       lastFingerprint = fingerprint
       // The run may have started animating while the recompute was in flight; the spinner wins.
       if (disposed || text === undefined || activeIdentity !== undefined) return
-      ui.setStatus(MEMORY_STATUS_KEY, text)
+      status.setStatus(MEMORY_STATUS_KEY, text)
     } catch {
       // A footer refresh is decoration: a failed probe must never surface as a session error.
     }
