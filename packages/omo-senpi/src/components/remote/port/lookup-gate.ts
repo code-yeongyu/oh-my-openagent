@@ -1,4 +1,4 @@
-import type { RemoteLookupOutcome } from "../../thread/remote/ports"
+import { LookupFenceRefused, type RemoteLookupOutcome } from "../../thread/remote/ports"
 
 /** One single-probe locate as sent: its answer (capped by the caller) and when the locate itself finishes. */
 export type LookupStart = { readonly answer: Promise<RemoteLookupOutcome>; readonly settled: Promise<unknown> }
@@ -59,8 +59,7 @@ export function createLookupGate(
         track(sent)
         return { sent }
       })
-      if (admittedWork === undefined)
-        throw new Error("lookup_fence_timeout: a solo lookup's locate is still running on this port")
+      if (admittedWork === undefined) throw new LookupFenceRefused()
       return await admittedWork.sent
     },
     lookup: async (device, durableId) => {

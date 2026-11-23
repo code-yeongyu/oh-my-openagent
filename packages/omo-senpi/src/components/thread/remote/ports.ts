@@ -306,6 +306,17 @@ export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "
  * A session a device holds on disk but no engine runs (omo#13037 A4.2): built from that device's own probe answer, its
  * stable key and the durable id. It carries no name and no folder, and its state `ended` sends a delivery down the wake path.
  */
+/**
+ * The port's lookup fence stayed closed for a whole lookup cap (a solo lookup's locate still running): nothing was sent,
+ * so the session's state is unknown, never "gone". A caller that can wait retries it (#14748 review round 7).
+ */
+export class LookupFenceRefused extends Error {
+  constructor() {
+    super("lookup_fence_timeout: a solo lookup's locate is still running on this port")
+    this.name = "LookupFenceRefused"
+  }
+}
+
 export function endedRow(device: string, key: string, durableId: string): RemoteSessionRow {
   return {
     device,
