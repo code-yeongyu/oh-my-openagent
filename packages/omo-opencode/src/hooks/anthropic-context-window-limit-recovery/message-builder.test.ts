@@ -5,10 +5,6 @@ const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
 
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
-
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
 }))

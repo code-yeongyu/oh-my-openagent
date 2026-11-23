@@ -4,12 +4,12 @@ import { dirname } from "node:path"
 import { createHostDaemonPaths, runHostRequest } from "@code-yeongyu/senpi"
 
 import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
-import { RUNAWAY_CAP_MS } from "./daemon-test-runner"
+import { TREE_BOUNDED_TEST_TIMEOUT_MS } from "./daemon-test-runner"
 
 const { sandbox, ensureShard, forgetShard, cleanup } = createDaemonEngineHarness()
 // The engine's cold start is bounded by the runner's CPU-progress stall kill (#11845), as in
 // daemon-real-engine.test.ts. The idle contract itself is bounded from readiness by observeUntilReleased.
-setDefaultTimeout(RUNAWAY_CAP_MS + 5_000)
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
 afterEach(cleanup)
 
 const OBSERVED_IDLE_EXIT_MS = 8_000
