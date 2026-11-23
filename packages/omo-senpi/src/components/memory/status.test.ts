@@ -4,7 +4,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { rmSyncEfaultTolerant } from "./teardown.test-support"
 
-import { GitMemoryRepo, buildIdentityPaths } from "@oh-my-opencode/memory-core"
+import {
+  GitMemoryRepo,
+  acquireLock,
+  buildIdentityPaths,
+  createLockRecord,
+  memoryWriterLockPath,
+  releaseLock,
+} from "@oh-my-opencode/memory-core"
+import { writeFile } from "@oh-my-opencode/memory-core/fs"
 
 import { createMemoryIdentityContext } from "./context"
 import {
@@ -162,6 +170,101 @@ describe("refreshMemoryStatus segments", () => {
       gitRepo: segmentRepo({ status: async () => " M system/persona.md\n" }),
       now: () => SEGMENT_NOW,
       checkAdvisory: false,
+    })
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" }])
+  }, 30_000)
+
+  test("#given a writer between its file write and its commit under the memory-write lock #when refresh samples the tree #then it waits for the commit and shows no dirty marker", async () => {
+    // #13046: the dirty marker is a sample of the working tree, and a writer leaves the tree dirty from its file
+    // write until its commit, all under the memory-write lock. The writer here commits and releases only after real
+    // file I/O, so a sampler that does not take the lock reads the tree mid-write; one that does sees the commit.
+    const context = segmentContext({})
+    mkdirSync(context.identityPaths.locks, { recursive: true })
+    const lockPath = memoryWriterLockPath(context.identityPaths.locks)
+    const writer = await createLockRecord("test memory writer")
+    await acquireLock(lockPath, writer)
+    let uncommitted = true
+    let committed: Promise<void> | undefined
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      checkAdvisory: false,
+      now: () => SEGMENT_NOW,
+      gitRepo: segmentRepo({
+        headCommitTimestamp: async () => {
+          committed ??= (async () => {
+            await writeFile(join(context.identityPaths.locks, "writer-commit-marker"), "committed")
+            uncommitted = false
+            await releaseLock(lockPath, writer)
+          })()
+          return Date.parse("2026-08-10T00:00:00.000Z") / 1000
+        },
+        status: async () => (uncommitted ? " M system/persona.md\n" : ""),
+      }),
+    })
+    await committed
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
+  }, 30_000)
+
+  test("#given an older refresh whose read lands after a newer refresh published #when both finish #then the older line never replaces the newer one", async () => {
+    // #13046: footer refreshes read memory state at different moments and finish in any order. The older refresh
+    // here starts first, reads the tree while a write is still uncommitted, and finishes only after a newer refresh
+    // has read the committed tree and published; publishing its result would put a stale line back on screen.
+    const context = segmentContext({})
+    const recorder = recordingUi()
+    const shared = {
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      checkAdvisory: false,
+      now: () => SEGMENT_NOW,
+    }
+    let finishOlderRead: (porcelain: string) => void = () => {}
+    const olderRead = new Promise<string>((resolve) => {
+      finishOlderRead = resolve
+    })
+    let markOlderReading: () => void = () => {}
+    const olderReading = new Promise<void>((resolve) => {
+      markOlderReading = resolve
+    })
+
+    const older = refreshMemoryStatus({
+      ...shared,
+      gitRepo: segmentRepo({
+        status: () => {
+          markOlderReading()
+          return olderRead
+        },
+      }),
+    })
+    await olderReading
+    await refreshMemoryStatus({ ...shared, gitRepo: segmentRepo({ status: async () => "" }) })
+    finishOlderRead(" M system/persona.md\n")
+    await older
+
+    expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago" }])
+  }, 30_000)
+
+  test("#given a tree left dirty with no writer holding the lock #when refresh runs #then the dirty marker still renders", async () => {
+    const context = segmentContext({})
+    mkdirSync(context.identityPaths.locks, { recursive: true })
+    const recorder = recordingUi()
+
+    await refreshMemoryStatus({
+      context,
+      ui: recorder.ui,
+      compileWarnTokens: 30_000,
+      alreadyNotified: false,
+      checkAdvisory: false,
+      now: () => SEGMENT_NOW,
+      gitRepo: segmentRepo({ status: async () => " M system/persona.md\n" }),
     })
 
     expect(recorder.statusCalls).toEqual([{ key: MEMORY_STATUS_KEY, text: "mem:fake-agent 1m ago*" }])
