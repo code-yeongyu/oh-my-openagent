@@ -29,21 +29,36 @@ export interface StatusSetter {
 
 interface PublishedLine {
   readonly text: string | undefined
-  /** The refresh request that produced the line; an unsequenced write takes the latest request issued. */
+  /** The refresh request whose read produced the line; 0 for a line no sequenced refresh produced. */
   readonly request: number
 }
 
 interface HostStatus {
+  /** Refresh requests issued so far for this host ui; the next request takes `requests + 1`. */
   requests: number
+  /** Per key, the request count when the key was last cleared: a refresh requested at or before it is stale. */
+  readonly clearedAt: Map<string, number>
   readonly lines: Map<string, PublishedLine>
 }
 
+type Deliver = (key: string, text: string | undefined) => void
+
+interface StatusBinding {
+  readonly host: object
+  readonly deliver: Deliver
+  readonly allow: () => boolean
+}
+
 /**
- * Status lines published per host ui and key (#13046), keyed by the host ui object so every handle `readUi` returns
- * for one session shares them. Footer refreshes read memory state at different moments and land in whatever order
- * their async work settles. Two rules keep the published sequence a function of the state the refreshes read:
- * an unchanged line is never re-published, and a line read by an older refresh request never replaces one a newer
- * request already published. Clears and unsequenced writes always pass and supersede every request issued so far.
+ * Status lines published per host ui and key (#13046, #14825), keyed by the host ui object so every handle for one
+ * session shares them. Invariant: the host shows the result of the newest ALLOWED request; a refused or stale publish
+ * changes no state. Concretely:
+ * - a publish whose guard refuses it returns before reading or writing any state;
+ * - a clear delivers, and every refresh requested before it (`request <= clearedAt`) is stale from then on;
+ * - a sequenced line from a request older than the line on screen, or older than the last clear, is dropped;
+ * - an unchanged line is not re-delivered (only its request stamp moves forward);
+ * - an unsequenced line (the reflecting spinner) is delivered but never moves the request stamp or the clear boundary,
+ *   so the restore refresh that follows it still lands and a pre-clear refresh still stays dropped.
  */
 const hostStatus = new WeakMap<object, HostStatus>()
 const STATUS_HOST = Symbol("omo.memory.status-host")
@@ -51,35 +66,43 @@ const STATUS_HOST = Symbol("omo.memory.status-host")
 function statusOf(host: object): HostStatus {
   let state = hostStatus.get(host)
   if (state === undefined) {
-    state = { requests: 0, lines: new Map() }
+    state = { requests: 0, clearedAt: new Map(), lines: new Map() }
     hostStatus.set(host, state)
   }
   return state
 }
 
 function publishStatus(
-  host: object,
-  deliver: (key: string, text: string | undefined) => void,
+  binding: StatusBinding,
   key: string,
   text: string | undefined,
   request: number | undefined,
 ): void {
-  const state = statusOf(host)
+  if (!binding.allow()) return
+  const state = statusOf(binding.host)
   const last = state.lines.get(key)
-  // A clear supersedes every request issued before it, the newest in-flight one included (#14825 review L1).
-  if (text !== undefined && request !== undefined && last !== undefined) {
-    if (request < last.request || (last.text === undefined && request <= last.request)) return
+  if (text === undefined) {
+    binding.deliver(key, undefined)
+    state.clearedAt.set(key, state.requests)
+    state.lines.set(key, { text: undefined, request: last?.request ?? 0 })
+    return
   }
-  // A clear supersedes every refresh already requested; an unsequenced line (the reflecting spinner) neither
-  // supersedes nor is superseded, so the footer restore that follows the spinner still lands.
-  const stamp = request ?? (text === undefined ? state.requests : (last?.request ?? 0))
-  if (text !== undefined && last?.text === text) {
+  if (request !== undefined) {
+    if (request <= (state.clearedAt.get(key) ?? 0)) return
+    if (last !== undefined && request < last.request) return
+  }
+  const stamp = request ?? last?.request ?? 0
+  if (last?.text === text) {
     state.lines.set(key, { text, request: Math.max(last.request, stamp) })
     return
   }
-  deliver(key, text)
+  binding.deliver(key, text)
   // Recorded only once the host took it: a line the host never showed must not suppress the retry.
-  state.lines.set(key, { text, request: stamp })
+  state.lines.set(key, { text, request: Math.max(last?.request ?? 0, stamp) })
+}
+
+function bindingOf(ui: StatusSetter): StatusBinding | undefined {
+  return (ui as { [STATUS_HOST]?: StatusBinding })[STATUS_HOST]
 }
 
 export function readUi(eventCtx: unknown): StatusUi | undefined {
@@ -87,54 +110,49 @@ export function readUi(eventCtx: unknown): StatusUi | undefined {
   const ui = eventCtx.ui
   if (!isRecord(ui)) return undefined
   if (typeof ui.setStatus !== "function" || typeof ui.notify !== "function") return undefined
-  const deliver = (key: string, text: string | undefined): void => {
-    Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text])
+  const binding: StatusBinding = {
+    host: ui,
+    deliver: (key, text) => {
+      Reflect.apply(ui.setStatus as (...args: unknown[]) => unknown, ui, [key, text])
+    },
+    allow: () => true,
   }
   return {
-    setStatus: (key, text) => publishStatus(ui, deliver, key, text, undefined),
+    setStatus: (key, text) => publishStatus(binding, key, text, undefined),
     notify: (message, level) => Reflect.apply(ui.notify as (...args: unknown[]) => unknown, ui, [message, level]),
-    [STATUS_HOST]: { ui, deliver },
+    [STATUS_HOST]: binding,
   } as StatusUi
 }
 
 /**
- * A status handle that publishes only while `allow()` holds, and still belongs to its host's sequence: a refresh made
- * through it orders against every other refresh of the same host ui (#14825 review M1). A plain `{ setStatus }` wrapper
- * would get a sequence of its own and publish through the host unsequenced, so its older reads could overwrite newer lines.
+ * A status handle that publishes only while `allow()` holds and still belongs to its host's sequence (#14825 review M1):
+ * a refresh made through it orders against every other refresh of the same host ui, and a publish it refuses leaves the
+ * host's state untouched, so a later allowed refresh with the same text still reaches the host.
  */
 export function guardedStatus(ui: StatusSetter, allow: () => boolean): StatusSetter {
-  const bound = (ui as { [STATUS_HOST]?: { ui: object; deliver: (key: string, text: string | undefined) => void } })[
-    STATUS_HOST
-  ]
-  const deliver = (key: string, text: string | undefined): void => {
-    if (!allow()) return
-    if (bound === undefined) ui.setStatus(key, text)
-    else bound.deliver(key, text)
+  const inner = bindingOf(ui)
+  const binding: StatusBinding = {
+    host: inner?.host ?? ui,
+    deliver: inner?.deliver ?? ((key, text) => ui.setStatus(key, text)),
+    allow: () => allow() && (inner?.allow() ?? true),
   }
-  const host = bound?.ui ?? ui
   return {
-    setStatus: (key, text) => {
-      if (allow()) publishStatus(host, deliver, key, text, undefined)
-    },
-    [STATUS_HOST]: { ui: host, deliver },
+    setStatus: (key, text) => publishStatus(binding, key, text, undefined),
+    [STATUS_HOST]: binding,
   } as StatusSetter
 }
 
 /**
  * A status handle for ONE footer refresh. Call it when the refresh starts, before it reads any memory state: the
  * request it takes orders the refresh against every other refresh of the same host ui, so a refresh whose read is
- * older than a line already on screen drops its result instead of overwriting it.
+ * older than a line already on screen, or than the last clear, drops its result instead of overwriting it.
  */
 export function sequencedStatus(ui: StatusSetter): StatusSetter {
-  const bound = (ui as { [STATUS_HOST]?: { ui: object; deliver: (key: string, text: string | undefined) => void } })[
-    STATUS_HOST
-  ]
-  const host = bound?.ui ?? ui
-  const deliver = bound?.deliver ?? ((key: string, text: string | undefined) => ui.setStatus(key, text))
-  const state = statusOf(host)
+  const binding = bindingOf(ui) ?? { host: ui, deliver: (key, text) => ui.setStatus(key, text), allow: () => true }
+  const state = statusOf(binding.host)
   state.requests += 1
   const request = state.requests
-  return { setStatus: (key, text) => publishStatus(host, deliver, key, text, request) }
+  return { setStatus: (key, text) => publishStatus(binding, key, text, request) }
 }
 
 export function isRecord(value: unknown): value is Record<string, unknown> {

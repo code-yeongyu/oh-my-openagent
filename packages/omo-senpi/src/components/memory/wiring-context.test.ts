@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import { branchEntryCount, readUi } from "./wiring-context"
+import { branchEntryCount, readUi, guardedStatus, sequencedStatus } from "./wiring-context"
 
 describe("branchEntryCount", () => {
   it("#given a session manager exposing getEntryCount #when the count is read #then entries are never materialized", () => {
@@ -90,5 +90,44 @@ describe("readUi status publishing (#13046)", () => {
     ui?.setStatus("memory", "mem:project just now")
 
     expect(published).toEqual(["mem:project just now"])
+  })
+})
+
+describe("memory status publishing invariant (#14825)", () => {
+  function host() {
+    const calls: Array<[string, string | undefined]> = []
+    const ui = readUi({
+      ui: { setStatus: (key: string, text: string | undefined) => calls.push([key, text]), notify: () => {} },
+    })
+    if (ui === undefined) throw new Error("readUi returned no handle")
+    return { ui, calls }
+  }
+
+  it("#given a guarded refresh its guard refuses #when a newer allowed refresh computes the same line #then that line reaches the host", () => {
+    const { ui, calls } = host()
+    sequencedStatus(ui).setStatus("memory", "OLD")
+    let allowed = false
+    const refused = sequencedStatus(guardedStatus(ui, () => allowed))
+    refused.setStatus("memory", "NEW")
+    allowed = true
+    sequencedStatus(ui).setStatus("memory", "NEW")
+
+    expect(calls).toEqual([
+      ["memory", "OLD"],
+      ["memory", "NEW"],
+    ])
+  })
+
+  it("#given a refresh requested before a clear #when an unsequenced spinner frame lands after the clear #then the pre-clear refresh still stays dropped", () => {
+    const { ui, calls } = host()
+    const beforeClear = sequencedStatus(ui)
+    ui.setStatus("memory", undefined)
+    ui.setStatus("memory", "mem:a ⠋ reflecting")
+    beforeClear.setStatus("memory", "mem:a just now")
+
+    expect(calls).toEqual([
+      ["memory", undefined],
+      ["memory", "mem:a ⠋ reflecting"],
+    ])
   })
 })

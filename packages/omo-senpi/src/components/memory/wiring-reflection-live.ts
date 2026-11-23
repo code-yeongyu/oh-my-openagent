@@ -111,6 +111,9 @@ export function createMemoryReflectionLiveWiring(
     const ui = readUi(lastEventCtx.current)
     footerLive.syncActive(activeSession.current, ui)
     await footerLive.refresh(activeSession.current, ui)
+    // syncActive started the footer restore that replaces the spinner; a refresh that finds the fingerprint already
+    // recorded returns early, so the completion is delivered only once that restore has landed too.
+    await footerLive.settled()
     await rpcBridge.current?.sync()
   }
 
