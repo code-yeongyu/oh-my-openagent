@@ -53,6 +53,11 @@ function processRunner(
     readonly retryFallback?: "refuse" | "hang" | "exit"
     readonly protocolInfo?: "after-prompt" | "no-data"
     readonly fallbackChainDeadlineMs?: number
+    readonly bootBusyMs?: number
+    readonly startupStallMs?: number
+    readonly startupCpuCapS?: number
+    readonly startupOuterBoundMs?: number
+    readonly readCpuSeconds?: (pid: number) => number | null
   } = {},
 ): FakeEngine {
   const log = join(tempDir(), "commands.jsonl")
@@ -70,6 +75,10 @@ function processRunner(
     ...(options.fallbackChainDeadlineMs === undefined
       ? {}
       : { fallbackChainDeadlineMs: options.fallbackChainDeadlineMs }),
+    ...(options.startupStallMs === undefined ? {} : { startupStallMs: options.startupStallMs }),
+    ...(options.startupCpuCapS === undefined ? {} : { startupCpuCapS: options.startupCpuCapS }),
+    ...(options.startupOuterBoundMs === undefined ? {} : { startupOuterBoundMs: options.startupOuterBoundMs }),
+    ...(options.readCpuSeconds === undefined ? {} : { readCpuSeconds: options.readCpuSeconds }),
     spawnChild: (descriptor) => {
       const child = spawnFakeChild({
         ...descriptor.env,
@@ -78,6 +87,7 @@ function processRunner(
         FAKE_ACK_COMMAND: "1",
         ...(options.retryFallback === undefined ? {} : { FAKE_RETRY_FALLBACK: options.retryFallback }),
         ...(options.protocolInfo === undefined ? {} : { FAKE_PROTOCOL_INFO: options.protocolInfo }),
+        ...(options.bootBusyMs === undefined ? {} : { FAKE_BOOT_BUSY_MS: String(options.bootBusyMs) }),
       })
       children.push(child)
       if (child.stdout === null) throw new Error("fake child stdout was not piped")
@@ -200,10 +210,78 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
     expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback"])
   })
 
-  test.each([
-    { retryFallback: "hang", command: "set_retry_fallback" },
-    { protocolInfo: "after-prompt", command: "get_protocol_info" },
-  ] as const)(
+  // #13165: the wait for the engine's first answer is bounded by its CPU progress. An engine that is alive but idle and
+  // never answers its protocol probe still fails as a chain timeout, now named as a stall, within the stall window.
+  test("#given an engine that never answers get_protocol_info #when it makes no CPU progress for the stall window #then the start fails as a stall and nothing else is sent", async () => {
+    // given
+    const engine = processRunner(["retry_fallback_command"], { protocolInfo: "after-prompt", startupStallMs: 1_000 })
+    const started = Date.now()
+
+    // when
+    const error = await engine.runner.start(spec("st_stall", CHAINED)).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    )
+    await engine.runner.settleTeardowns()
+
+    // then
+    expect(String(error)).toContain("made no CPU progress")
+    expect(Date.now() - started).toBeLessThan(15_000)
+    expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info"])
+  })
+
+  test("#given an engine that keeps burning CPU without answering #when it passes the startup CPU cap #then the start fails as a runaway", async () => {
+    // given: the boot burns CPU for far longer than a 0.3 s cap and never reaches its protocol answer in time
+    const engine = processRunner(["retry_fallback_command"], { bootBusyMs: 30_000, startupCpuCapS: 0.3 })
+
+    // when
+    const error = await engine.runner.start(spec("st_cpu_cap", CHAINED)).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    )
+
+    // then
+    expect(String(error)).toContain("over the 0.3 s cap")
+    // Reaching 0.3 s of CPU takes longer in wall time on a loaded host; the CPU cap, not this timeout, ends the start.
+  }, 60_000)
+
+  // A sampler that cannot read the CPU (another runtime, a refused handle) must not leave the wait unbounded.
+  test("#given a CPU reading that always fails #when the engine never answers #then the outer bound still ends the start", async () => {
+    // given
+    const engine = processRunner(["retry_fallback_command"], {
+      protocolInfo: "after-prompt",
+      readCpuSeconds: () => null,
+      startupOuterBoundMs: 1_000,
+    })
+
+    // when
+    const error = await engine.runner.start(spec("st_outer", CHAINED)).then(
+      () => undefined,
+      (caught: unknown) => caught,
+    )
+
+    // then
+    expect(String(error)).toContain("startup outer bound")
+  })
+
+  // #13165: on a slow Windows runner the engine's cold start alone outlasted the chain deadline, so a child that
+  // would have taken its chain failed as chain_not_held: timeout. The deadline is for the chain exchange, not the boot.
+  test("#given an engine whose cold start outlasts the chain deadline #when it then answers and takes the chain #then the child starts", async () => {
+    // given: the engine burns CPU booting for longer than the whole chain deadline before it reads a command
+    const engine = processRunner(["retry_fallback_command"], { bootBusyMs: 1_500, fallbackChainDeadlineMs: 300 })
+
+    // when
+    await engine.runner.start(spec("st_slow_boot", CHAINED))
+
+    // then
+    expect(engine.commands().map((command) => command.type)).toEqual([
+      "get_protocol_info",
+      "set_retry_fallback",
+      "prompt",
+    ])
+  })
+
+  test.each([{ retryFallback: "hang", command: "set_retry_fallback" }] as const)(
     "#given an engine that never answers $command #when its deadline expires #then the start fails and no prompt or later chain is sent",
     async (options) => {
       // given
@@ -231,9 +309,7 @@ describe("a process-runner child's own fallback chain (#9582)", () => {
         await engine.runner.settleTeardowns()
 
         // then: read the final transcript after the child has stopped.
-        expect(engine.commands().map((command) => command.type)).toEqual(
-          options.command === "get_protocol_info" ? ["get_protocol_info"] : ["get_protocol_info", "set_retry_fallback"],
-        )
+        expect(engine.commands().map((command) => command.type)).toEqual(["get_protocol_info", "set_retry_fallback"])
       } finally {
         clock.restore()
         clearTimeout(watchdog)
