@@ -17,6 +17,21 @@ export function bundleCandidates(moduleUrl: string): readonly string[] {
   return [join(root, "bin", "darwin", "omo-keychain"), join(root, "omo-keychain")]
 }
 
+/** Every candidate in trust-neutral search order; each one is still pinned and signature-verified by `locateHelper`. */
+export function storeCandidates(input: {
+  readonly registered: readonly string[]
+  readonly moduleUrl: string
+  readonly execPath: string
+  readonly home: string
+}): readonly string[] {
+  return [
+    ...input.registered,
+    ...bundleCandidates(input.moduleUrl),
+    ...(new URL(input.moduleUrl).pathname.startsWith("/$bunfs/") ? [join(dirname(input.execPath), "omo-keychain")] : []),
+    ...machineCandidates(input.home),
+  ]
+}
+
 /**
  * Other signature-valid copies on this machine, tried after the bundle's own (addendum rows 9 and 10): the desktop
  * app's copies and a bun-global omo-ai install. These are macOS paths, so they are joined with POSIX separators on

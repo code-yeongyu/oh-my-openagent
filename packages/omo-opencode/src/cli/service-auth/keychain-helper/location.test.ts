@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { bundleCandidates, locateHelper, machineCandidates } from "./location"
+import { bundleCandidates, locateHelper, machineCandidates, storeCandidates } from "./location"
 import type { SignatureVerdict } from "./signature"
 
 const verdicts =
@@ -49,5 +49,38 @@ describe("keychain helper location (#11262 design 1, addendum rows 9-10)", () =>
 
   test("#given no candidate on the machine #when locating #then the helper is missing", async () => {
     expect(await locateHelper(["/a", "/b"], verdicts({}))).toEqual({ kind: "missing" })
+  })
+
+  // #13102: a compiled entry that registers nothing must still find the helper beside its own executable.
+  test("#given a compiled bundle under /$bunfs and no registered candidate #when the store searches #then the helper beside the executable is found before machine-wide copies", async () => {
+    const runtime = join(tmpdir(), "OmO (Nightly).app", "Contents", "Resources", "omo-runtime", "darwin-arm64")
+    const beside = join(runtime, "omo-keychain")
+    const candidates = storeCandidates({
+      registered: [],
+      moduleUrl: "file:///$bunfs/root/omo.js",
+      execPath: join(runtime, "omo"),
+      home: "/Users/someone",
+    })
+    expect(candidates.indexOf(beside)).toBeGreaterThan(-1)
+    expect(candidates.indexOf(beside)).toBeLessThan(candidates.indexOf(machineCandidates("/Users/someone")[0] ?? ""))
+    expect(await locateHelper(candidates, verdicts({ [beside]: "valid" }))).toEqual({ kind: "found", path: beside })
+  })
+
+  test("#given a registered entry candidate #when the store searches #then it still comes first", () => {
+    const candidates = storeCandidates({
+      registered: ["/entry/omo-keychain"],
+      moduleUrl: "file:///$bunfs/root/omo.js",
+      execPath: "/x/omo",
+      home: "/h",
+    })
+    expect(candidates[0]).toBe("/entry/omo-keychain")
+  })
+
+  test("an ordinary package install does not search beside the Node interpreter", () => {
+    const moduleUrl = pathToFileURL(join(tmpdir(), "pkg", "bin", "lib", "service-auth.generated.js")).href
+    expect(storeCandidates({ registered: [], moduleUrl, execPath: "/opt/node/bin/node", home: "/h" })).toEqual([
+      ...bundleCandidates(moduleUrl),
+      ...machineCandidates("/h"),
+    ])
   })
 })

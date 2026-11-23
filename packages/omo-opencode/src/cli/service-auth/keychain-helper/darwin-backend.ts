@@ -7,7 +7,7 @@ import { type ApprovalCache, processApprovalCache } from "./approval-cache"
 import { ACL_DENIAL_MESSAGE, HelperReadError, readThroughHelper, type Row8bChoice } from "./darwin-read"
 import { lockedDarwinStore, type LockedDarwinStore } from "./darwin-store"
 import type { HelperLease } from "./client"
-import { bundleCandidates, machineCandidates } from "./location"
+import { storeCandidates } from "./location"
 import { type MarkerProbe, probeOwnerMarker } from "./owner-marker"
 import { keychainProcessState } from "./process-state"
 import { promptLockAt } from "./prompt-lock"
@@ -40,11 +40,14 @@ export function registerHelperCandidates(paths: readonly string[]): void {
 export const helperAccess = (): Promise<HelperAccess> =>
   sharedHelperAccess(() => {
     const { entryCandidates } = keychainProcessState()
-    return resolveHelperAccess([
-      ...entryCandidates,
-      ...bundleCandidates(import.meta.url),
-      ...machineCandidates(homedir()),
-    ])
+    return resolveHelperAccess(
+      storeCandidates({
+        registered: entryCandidates,
+        moduleUrl: import.meta.url,
+        execPath: process.execPath,
+        home: homedir(),
+      }),
+    )
   })
 
 export function sharedHelperAccess(resolve: () => Promise<HelperAccess>): Promise<HelperAccess> {
