@@ -5,6 +5,7 @@ import { appendEntries, emptyChain } from "../crypto/chain.ts"
 import { createRejectionCounter } from "../crypto/rejection.ts"
 import { pinTrustAnchor } from "../crypto/trust-pin.ts"
 import { entryOf, deviceKeyring } from "../genesis/vector.test-support.ts"
+import { disableSync, isDeviceSyncOff } from "./device-switch.ts"
 import { enableSync } from "./enable.ts"
 import { createAccountHttp } from "./http.ts"
 import { createPairingHttp } from "./pairing-http.ts"
@@ -82,6 +83,19 @@ for (const member of ["pinned", "joiner", "resume", "creator"] as const) {
     ).toBe(200)
   })
 }
+
+test("#given this device's sync was turned off #when enable turns its switch on again #then the device is on locally too", async () => {
+  const f = await fixture()
+  cleanups.push(f.close)
+  await disableSync({ ...f.input, pairing: { ...f.input.pairing, disableDeviceSync: async () => ({ ok: true }) } })
+  expect(await isDeviceSyncOff(f.input.pinDir, ACCOUNT)).toBe(true)
+  expect(await enableSync(f.input)).toMatchObject({ kind: "joined" })
+  expect(f.server.switches).toEqual([
+    '/v1/account/sync {"enabled":true}',
+    '/v1/devices/service-first/sync {"enabled":true}',
+  ])
+  expect(await isDeviceSyncOff(f.input.pinDir, ACCOUNT)).toBe(false)
+})
 
 for (const missing of ["serviceOrigin", "rpId", "userName"] as const) {
   test(`a genesis-capable first device missing ${missing} is refused with both switches left off`, async () => {

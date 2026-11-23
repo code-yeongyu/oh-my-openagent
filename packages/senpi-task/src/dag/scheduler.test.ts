@@ -25,14 +25,15 @@ import {
   type DagSchedulerOptions,
 } from "./scheduler"
 import { createDagJournal } from "./journal"
-import { createDagFileStore, type DagFileStore } from "./store"
+import { createInMemoryDagStore, journalFilesOnDisk } from "./__fixtures__/in-memory-store"
+import type { DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 
 // bunfig preloads test-setup.ts to raise the default timeout, but Bun honours a preload's
 // setDefaultTimeout only for the FIRST test file of a run; every later file silently reverts to
-// the built-in 5000ms. These wave/residency cases drive a fake manager plus a real file store,
-// which overshoots 5s on a windows runner and times out the whole barrier suite. Set the floor
-// here, where Bun does honour it.
+// the built-in 5000ms. The journal is in memory now (#11632), but results.ts still writes result
+// artifacts to disk with fsync (#11629), so a loaded windows runner can still push a multi-node case
+// past 5s. Set the floor here, where Bun does honour it.
 setDefaultTimeout(process.platform === "win32" ? 60_000 : 20_000)
 
 const cleanupRoots: string[] = []
@@ -67,14 +68,28 @@ function within<T>(promise: Promise<T>, ms = 200): Promise<T> {
   })
 }
 
+const memoryStores: DagFileStore[] = []
+
 afterEach(() => {
+  const journaled = memoryStores.splice(0).flatMap(journalFilesOnDisk)
   for (const root of cleanupRoots.splice(0)) fs.rmSync(root, { recursive: true, force: true })
+  expect(journaled).toEqual([])
 })
 
 function tempProject(): string {
   const directory = fs.mkdtempSync(join(tmpdir(), "senpi-dag-scheduler-"))
   cleanupRoots.push(directory)
   return directory
+}
+
+// These cases assert scheduler semantics, never journal durability (store.test.ts and the e2e cases own
+// that), so the journal lives in memory: a file-backed commit costs contended host I/O, which made a
+// different case time out on each run of this file on a loaded host (#11632). Result artifacts still
+// land under the temp project because results.ts bypasses the store (#11629).
+function memoryStore(): DagFileStore {
+  const store = createInMemoryDagStore(join(tempProject(), "senpi-task"))
+  memoryStores.push(store)
+  return store
 }
 
 function node(id: string, dependsOn: readonly string[] = []) {
@@ -495,7 +510,7 @@ function schedulerFixture(
   subscriberRing?: number,
   nodeSpawnPolicy?: DagNodeSpawnPolicy,
 ) {
-  const baseStore = createDagFileStore({ project_dir: tempProject() })
+  const baseStore = memoryStore()
   let runLockDepth = 0
   let resultPathCallsUnderLock = 0
   const store: DagFileStore = {
@@ -1017,7 +1032,7 @@ describe("DAG scheduler cancellation", () => {
     // given
     const manager = new FakeTaskManager({ autoComplete: false })
     const input = definition([node("a"), node("b", ["a"])])
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = memoryStore()
     const initialRecord: DagRunRecordV1 = { ...recordFor(input), status: "paused" }
     store.writeCheckpoint(runId, initialRecord)
     const scheduler = createDagScheduler({ store, taskManager: manager, initialRecord })
@@ -1402,7 +1417,7 @@ function settledFixture(
   // Lease-ownership seams: injected so a lease test cannot pass by coincidence with the real pid.
   lease: { readonly hostPid?: number; readonly isProcessAlive?: (pid: number) => boolean } = {},
 ) {
-  const store = createDagFileStore({ project_dir: tempProject() })
+  const store = memoryStore()
   const base = recordFor(input)
   const initialRecord: DagRunRecordV1 = {
     ...base,
@@ -1990,11 +2005,10 @@ describe("DAG scheduler control-event replay", () => {
     await scheduler.retryNode(runId, ["broken" as DagNodeId]).run
     const live = durable()
 
-    // when - drop the checkpoint, forcing every control event to replay through the reducer from the
+    // when - hide the checkpoint, forcing every control event to replay through the reducer from the
     // pre-retry record (the state the crashed process would reopen with)
-    fs.unlinkSync(store.paths.run(runId))
     const replayed = createDagJournal<DagRunRecordV1>({
-      store,
+      store: { ...store, readCheckpoint: () => null },
       runId,
       initialCheckpoint: initialRecord,
       applyEvent: (checkpoint, event) => applyDagSchedulerEvent(checkpoint, event),

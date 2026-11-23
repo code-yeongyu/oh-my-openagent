@@ -5,6 +5,7 @@ import { createTaskManager } from "./manager"
 import type { ManagedRunner, TaskManager } from "./types"
 import { baseSpec, cleanupProjects, makeHandle, settings, tempProject } from "./__fixtures__/manager-fakes"
 import { HeldSecondStart, managerOver, plan, PRIMARY } from "./__fixtures__/fallback-launch-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -12,7 +13,7 @@ describe("runtime fallback: the next rung's start races a user stop", () => {
   for (const stop of ["cancel", "interrupt"] as const) {
     test(`#given the next rung's start is in flight #when the task is ${stop === "cancel" ? "cancelled" : "interrupted"} #then the late child is discarded and never becomes resident`, async () => {
       const project = tempProject()
-      const store = createTaskRecordStore({ project_dir: project })
+      const store = createTaskRecordStore(ownedTaskState(project))
       const runner = new HeldSecondStart()
       const manager = managerOver(store, runner, project)
       const started = await manager.start(baseSpec())
@@ -41,7 +42,7 @@ describe("runtime fallback: a stop that lands just before the handoff is written
   for (const stop of ["cancel", "interrupt"] as const) {
     test(`#given the failed rung's outcome is being handed off #when the task is ${stop === "cancel" ? "cancelled" : "interrupted"} just before the handoff write #then the stop stands, nothing is handed off, and the lane is free`, async () => {
       const project = tempProject()
-      const backing = createTaskRecordStore({ project_dir: project })
+      const backing = createTaskRecordStore(ownedTaskState(project))
       let manager: TaskManager | undefined
       let armed = false
       let stopped: Promise<unknown> | undefined

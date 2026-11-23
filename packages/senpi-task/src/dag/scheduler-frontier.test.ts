@@ -20,6 +20,7 @@ import { persistDagNodeResult } from "./results"
 import { createDagScheduler, type DagSchedulerOptions } from "./scheduler"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNodeId, DagRunEvent, DagRunId } from "./types"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // See scheduler.test.ts: Bun honours a preload's setDefaultTimeout only for the first test file
 // of a run; every later file silently reverts to 5000ms, which undershoots these file-store cases
@@ -285,7 +286,7 @@ function frontierFixture(
   manager: FrontierFakeManager,
   options: { readonly runId?: DagRunId; readonly store?: DagFileStore } = {},
 ) {
-  const store = options.store ?? createDagFileStore({ project_dir: tempProject() })
+  const store = options.store ?? createDagFileStore(ownedTaskState(tempProject()))
   const id = options.runId ?? runId
   const initialRecord = recordFor(input, id)
   store.writeCheckpoint(id, initialRecord)
@@ -334,7 +335,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
   test("#given a live journal lock #when a scheduler starts #then an unrelated timer runs before admission", async () => {
     // given
     let time = 0
-    const store = createDagFileStore({ project_dir: tempProject() }, { now: () => (time += 1_000) })
+    const store = createDagFileStore(ownedTaskState(tempProject()), { now: () => (time += 1_000) })
     const manager = new FrontierFakeManager()
     const { scheduler, events } = frontierFixture(definition([node("work")]), manager, { store })
     const started = manager.whenStarted("work")
@@ -459,7 +460,7 @@ describe("DAG scheduler dependency-frontier admission", () => {
   test("#given a sibling run holding every resident slot of the session #when a second run starts #then its node queues for residency and is admitted once a sibling child settles (#8396)", async () => {
     // given - ONE task manager (one parent session) with cap 2; run A saturates it with two leaves.
     const manager = new FrontierFakeManager({ residencyLimit: 2 })
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const runA = frontierFixture(definition([node("a1"), node("a2")]), manager, {
       runId: "run-frontier-a" as DagRunId,
       store,

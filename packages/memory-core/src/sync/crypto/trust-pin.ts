@@ -186,7 +186,7 @@ export const pinTrustAnchor = async (
 export const forgetTrustAnchor = (stateDir: string, account: string): Promise<void> =>
   retireSyncDevice({ pinDir: stateDir, account })
 
-/** The genesis digest of the newest retired pin for `account`, or null when none parses. */
+/** The genesis digest of the newest retired pin for `account`, or null when there is no retired pin; a newest pin that does not parse throws (PIN_UNREADABLE). */
 const newestRetiredRoot = async (stateDir: string, account: string): Promise<string | null> => {
   const prefix = `${accountKey(account)}.retired-`
   let names: string[]
@@ -201,9 +201,18 @@ const newestRetiredRoot = async (stateDir: string, account: string): Promise<str
     .filter((name) => name.startsWith(prefix) && Number.isSafeInteger(stamp(name)))
     .sort((a, b) => stamp(b) - stamp(a))
   for (const name of retired) {
-    const raw = await readFile(join(rootDir(stateDir), name, PIN_FILE), "utf8").catch(() => null)
-    const anchor = raw === null ? null : parsePin(raw, account)
-    if (anchor !== null) return anchor.genesisDigest
+    // Only a missing pin falls through to the next older one (#14098); any other read error propagates, so
+    // `rootChangeNotice` reports the check as skipped instead of comparing against an older root.
+    const raw = await readFile(join(rootDir(stateDir), name, PIN_FILE), "utf8").catch((error: unknown) => {
+      if (isMissing(error)) return null
+      throw error
+    })
+    if (raw === null) continue
+    // The newest pin that exists decides (#14157): one that does not parse (corrupt, truncated, another
+    // account's) makes the root unknown, so the check is skipped rather than compared with an older root.
+    const anchor = parsePin(raw, account)
+    if (anchor === null) throw Object.assign(new Error("retired pin does not parse"), { code: "PIN_UNREADABLE" })
+    return anchor.genesisDigest
   }
   return null
 }

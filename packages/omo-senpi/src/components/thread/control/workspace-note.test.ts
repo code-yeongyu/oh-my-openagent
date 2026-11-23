@@ -9,6 +9,7 @@ test("#given a caller with no workspace root #when a local thread is created #th
     thread_id: "t-1",
     name: "x",
     status: "live" as const,
+    state: "idle" as const,
     cwd: "/tmp/elsewhere",
     created_at: "2026-11-14T00:00:00.000Z",
     updated_at: null,

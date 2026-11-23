@@ -6,7 +6,7 @@ import { cliDeviceServiceHandoff } from "./device-service-handoff"
 import { deviceServiceBootstrapSetup, omoBinaryPath, runLoginSetup } from "./remote-bootstrap"
 import { backgroundRemote } from "./remote-background-enable"
 import { prepareRemoteAttach, type RemoteVerbDependencies, runRemoteVerb } from "./remote-cli"
-import { coldWakeSetup } from "./remote-cold-wake"
+import { coldWakeSetup, refreshColdWakeAtLaunch } from "./remote-cold-wake"
 import { remoteOptOut } from "./remote-opt-out"
 import { localRemoteDependencies } from "./remote-local"
 
@@ -36,6 +36,13 @@ function remoteDependencies(packageRoot?: string): RemoteVerbDependencies {
   }
 }
 
+/**
+ * A launch of this runtime brings an installed session host unit an older runtime wrote to it (omo#14191). The runtime is
+ * the running executable itself, never `OMO_BIN` or the caller's agent dir (#14194 review H1).
+ */
+export const refreshSessionHostUnit = (isOlder: (installedRuntimeVersion: string) => boolean): Promise<void> =>
+  refreshColdWakeAtLaunch({ runtime: process.execPath, isOlder }, (line) => process.stderr.write(`${line}\n`))
+
 /** The launchers' entry for `omo remote attach`: the engine argv to run in place of this command, or undefined (exit code set). */
 export async function runRemoteAttachCommand(args: readonly string[]): Promise<readonly string[] | undefined> {
   const prepared = await prepareRemoteAttach(remoteDependencies(), args.slice(2))
@@ -58,6 +65,16 @@ export async function setUpRemoteAfterLogin(): Promise<void> {
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return
   const dependencies = remoteDependencies()
   await runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
+}
+
+/**
+ * The same setup for `omo account sign-in`, whose stdout carries JSON lines only: the setup's human lines go to stderr
+ * and its outcome is returned for the `signed_in` event.
+ */
+export async function setUpRemoteAfterSignIn(): Promise<"on" | "kept_off" | "not_on" | "background"> {
+  if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return "not_on"
+  const dependencies = { ...remoteDependencies(), output: (line: string) => process.stderr.write(`${line}\n`) }
+  return runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }
 
 /** `packageRoot`: the compiled binary's provisioned runtime directory (its staged `plugin/`); the npm launcher passes nothing. */

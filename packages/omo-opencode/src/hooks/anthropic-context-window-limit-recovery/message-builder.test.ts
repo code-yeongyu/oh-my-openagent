@@ -1,12 +1,9 @@
 import { afterAll, beforeEach, describe, expect, mock, test } from "bun:test"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 
 const replaceEmptyTextPartsAsync = mock(() => Promise.resolve(false))
 const injectTextPartAsync = mock(() => Promise.resolve(false))
 const findMessagesWithEmptyTextPartsFromSDK = mock(() => Promise.resolve([] as string[]))
-
-mock.module("../../shared/logger", () => ({
-  log: () => {},
-}))
 
 mock.module("../../shared/opencode-storage-detection", () => ({
   isSqliteBackend: () => true,
@@ -27,6 +24,7 @@ const textPartInjectorMockFactory = () => ({
 })
 mock.module("./storage/text-part-injector", textPartInjectorMockFactory)
 mock.module("./storage/text-part-injector.ts", textPartInjectorMockFactory)
+preserveModuleMocksForTestFile(import.meta.url)
 
 const messageBuilderModulePromise = import("./message-builder")
 

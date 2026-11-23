@@ -30,3 +30,14 @@ export function createPrDeliveryBlock(flags: PrDeliveryFlags, worktreePath: stri
 
   return `\n${heading}\n\nDeliver this work as a pull request.\n${worktreeInstruction}\n- On completion: commit, push the branch, and open a reviewer-readable PR (plain-language summary, changes grouped by area, QA evidence with artifact paths, risks).\n${completionInstruction}`
 }
+
+/** `--light` (#14388): keep the plan, drop the per-step ceremony, verify once at the end. */
+export function createLightProfileBlock(): string {
+  return `
+## Light Profile (--light)
+
+Keep the plan, Boulder state, goal, todos and delegation. Drop the per-step ceremony:
+- ONE worktree for the whole plan: create it once (or use \`--worktree\`) and run every wave in it; no per-wave or per-lane worktrees, and under \`--make-pr\`/\`--ship\` one PR for the whole plan.
+- No per-checkbox gates: a checkbox is \`[x]\` when its worker reports done with its own tests passing. No per-checkbox adversarial verifier, no adversarial-class probes, no per-step ledger receipts or evidence files.
+- Verify ONCE at the end: after the last checkbox, one worker runs the plan's verification commands and one real-surface QA against the plan's acceptance criteria, captured as one artifact. The ledger holds only a \`run-start\` entry with \`"profile": "light"\` and that one \`final-verification\` entry. A failed final pass goes back to workers and runs again; stop after the same failure twice or three failed passes.`
+}

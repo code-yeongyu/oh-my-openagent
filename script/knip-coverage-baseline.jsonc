@@ -1803,6 +1803,8 @@
         "scripts/qa/thread-tools/lib/gateway.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/harness.mjs",
+        // run by name from run-all.mjs, which knip does not trace
+        "scripts/qa/thread-tools/default-delivery.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/loop-guard.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -2001,7 +2003,7 @@
         "scripts/qa/task-resume-e2e-scenarios.mjs": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) runTaskResumeScenarios
         "scripts/qa/task-resume-e2e.mjs": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids, liveRecordRpcChildPids
+        // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids
         "scripts/qa/task-rpc-e2e-helpers.mjs": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) runOne
         "scripts/qa/task-rpc-reconcile-batch.mjs": ["exports"],
@@ -2343,8 +2345,6 @@
         "src/extension/wake-queue-source.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
         "src/index.ts": ["exports"],
-        // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-        "src/install/local-launcher.ts": ["exports"],
         // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
         "src/omo-native-capture-path.audit.test.ts": ["exports"],
       },

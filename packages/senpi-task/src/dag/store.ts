@@ -98,6 +98,7 @@ export type DagStorePaths = {
   readonly runCoordinationLock: (runId: DagRunId) => string
   readonly keyLock: (parentSessionId: string, runKey: string) => string
   readonly taskOwnerLock: (taskOwner: string) => string
+  readonly sessionRunsLock: (parentSessionId: string) => string
 }
 
 export type DagFileStore = {
@@ -112,7 +113,7 @@ export type DagFileStore = {
   readonly readKey: (parentSessionId: string, runKey: string) => DagKeyRecord | null
   readonly writeResult: (runId: DagRunId, nodeId: string, result: string) => string
   readonly readResult: (runId: DagRunId, nodeId: string) => string | null
-  /** Legacy name for the journal lock, including its original on-disk path. */
+  /** Exclusively acquires the original run lock path. Nested legacy acquisitions are refused. */
   readonly withRunLock: <T>(runId: DagRunId, operation: () => T) => T
   readonly withRunCoordinationLock: <T>(runId: DagRunId, operation: () => T | Promise<T>) => Promise<T>
   readonly withJournalLock: <T>(runId: DagRunId, operation: () => T) => T
@@ -177,7 +178,7 @@ export function readDagDirectory(directory: string): readonly fs.Dirent[] {
 
 export function createDagFileStore(config: DagStoreConfig, options: StoreOptions = {}): DagFileStore {
   const stateDir = resolveStateDir(config)
-  const paths = createPaths(stateDir)
+  const paths = createDagStorePaths(stateDir)
   const diagnosticLog: DagStoreDiagnostic[] = []
   const recoveredPaths = new Set<string>()
   const now = options.now ?? Date.now
@@ -306,7 +307,10 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         throw error
       }
     },
-    withRunLock: (runId, operation) => store.withJournalLock(runId, operation),
+    withRunLock(runId, operation) {
+      if (heldJournalLocks.has(runId)) throw new Error(`Timed out acquiring DAG lock: ${paths.runLock(runId)}`)
+      return store.withJournalLock(runId, operation)
+    },
     withRunCoordinationLock(runId, operation) {
       assertSafeSegment(runId, "run id")
       return withAsyncLock(paths.runCoordinationLock(runId), runId, operation, isProcessAlive, now, fsyncWrites)
@@ -343,7 +347,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
         runId,
         () =>
           withAsyncLock(
-            sessionCapacityLock(paths, parentSessionId),
+            paths.sessionRunsLock(parentSessionId),
             undefined,
             () =>
               withHeldJournalLock(runId, () => {
@@ -376,7 +380,7 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
       }
       if (heldSessionLocks.has(parentSessionId)) return checkCapacity()
       return withLock(
-        sessionCapacityLock(paths, parentSessionId),
+        paths.sessionRunsLock(parentSessionId),
         undefined,
         checkCapacity,
         isProcessAlive,
@@ -410,7 +414,9 @@ export function createDagFileStore(config: DagStoreConfig, options: StoreOptions
   return store
 }
 
-function createPaths(stateDir: string): DagStorePaths {
+// Exported for the in-memory store (#11621): a test double with its own copy of the layout drifted from
+// this one (no result-path containment, raw task-owner lock names), so both build paths here.
+export function createDagStorePaths(stateDir: string): DagStorePaths {
   const root = join(stateDir, "dag")
   const keys = join(root, "keys")
   const runs = join(root, "runs")
@@ -451,6 +457,7 @@ function createPaths(stateDir: string): DagStorePaths {
     journalLock: (runId) => join(locks, `${runId}.lock`),
     keyLock: (parentSessionId, runKey) => join(locks, `key-${dagKeyHash(parentSessionId, runKey)}.lock`),
     taskOwnerLock: (taskOwner) => join(locks, `task-owner-${sha256(taskOwner)}.lock`),
+    sessionRunsLock: (parentSessionId) => join(locks, `session-runs-${sha256(parentSessionId)}.lock`),
   }
 }
 
@@ -483,18 +490,7 @@ function writeCheckpointWithinSessionLimit(
     writeJsonAtomic(path, checkpoint, platform, fsyncWrites)
   }
   if (heldSessionLocks.has(parentSessionId)) return verifyCapacityAndWrite()
-  withLock(
-    sessionCapacityLock(paths, parentSessionId),
-    undefined,
-    verifyCapacityAndWrite,
-    isProcessAlive,
-    now,
-    fsyncWrites,
-  )
-}
-
-function sessionCapacityLock(paths: DagStorePaths, parentSessionId: string): string {
-  return join(paths.locks, `session-runs-${sha256(parentSessionId)}.lock`)
+  withLock(paths.sessionRunsLock(parentSessionId), undefined, verifyCapacityAndWrite, isProcessAlive, now, fsyncWrites)
 }
 
 // Only runs that can still hold a scheduler count: a finished run waits for retention, not a slot.
@@ -685,7 +681,14 @@ function readJsonFile(path: string, runId?: DagRunId, now: () => number = Date.n
   }
 }
 
-function assertSupportedSchema(value: unknown, path: string, runId: DagRunId | undefined, now: () => number): void {
+// Exported for the in-memory store the retry tests journal to (#11621): a test double that skips these
+// refusals would pass journal state the file store rejects, so both stores call the SAME validator.
+export function assertSupportedSchema(
+  value: unknown,
+  path: string,
+  runId: DagRunId | undefined,
+  now: () => number,
+): void {
   if (!isRecord(value) || typeof value.schemaVersion !== "number") {
     throw corrupt(path, runId, "missing schemaVersion", now)
   }
@@ -1113,7 +1116,8 @@ function pruneRunArtifacts(
   fs.rmSync(paths.run(runId), { force: true })
 }
 
-function assertSafeSegment(value: string, label: string): void {
+// Exported with assertSupportedSchema above, for the same reason.
+export function assertSafeSegment(value: string, label: string): void {
   if (!isSafeDagPathSegment(value)) {
     throw new Error(`Invalid ${label}`)
   }

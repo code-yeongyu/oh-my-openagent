@@ -106,6 +106,7 @@ const runRecover = async (dependencies: Partial<SyncCommandDependencies>, setup:
         pairing: {
           setAccountSync: unused,
           setDeviceSync: unused,
+          disableDeviceSync: unused,
           listPending: unused,
           openPending: unused,
           readPending: unused,

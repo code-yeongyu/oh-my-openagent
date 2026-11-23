@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, mock, test } from "bun:test"
 import { deliverySender } from "./gateway/provenance"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
@@ -7,7 +8,10 @@ import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type Th
 import type { GatewayEndpointRef } from "./gateway/adapter"
 import { type BindInput, hashArgs, normalizeBindInput } from "./gateway/bindings"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
+import { gatewayDatabasePath } from "./gateway/paths"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
+import { storeMigratedByNewerBuild } from "./gateway/testing/newer-schema"
+import type { ThreadToolFailure } from "./errors"
 import { parseThreadLinkUrl } from "./thread-link"
 import {
   createThreadTools,
@@ -49,11 +53,12 @@ function fixture() {
     const index = sessions.findIndex((entry) => entry.sessionId === sessionId)
     sessions[index] = { ...sessions[index], name }
   })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => ({
-    provider,
-    id: modelId,
-    name: "Selected model",
-  }))
+  let model = { provider: "openai", id: "gpt-previous" }
+  const getState = async () => ({ isStreaming: false, model, thinkingLevel: "off" })
+  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => {
+    model = { provider, id: modelId }
+    return { ...model, name: "Selected model" }
+  })
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(
     async (_sessionId: string, _level: string, _scope?: "session" | "turn", _durableId?: string) => {},
@@ -65,7 +70,7 @@ function fixture() {
     listSessions: async () => sessions,
     openSession: async () => session,
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async () => ({ isStreaming: false }),
+    getState,
     prompt,
     interrupt: async () => ({ interrupted: false }),
     setSessionName,
@@ -82,6 +87,7 @@ function fixture() {
     store: tempStore(),
     sessions,
     models,
+    getState,
     setSessionName,
     setModel,
     getAvailableModels,
@@ -128,7 +134,7 @@ describe("thread tool registration", () => {
     expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
   })
 
-  test("registers exactly the fourteen contract tools with eval exposure", () => {
+  test("registers exactly the fifteen contract tools with eval exposure", () => {
     const tools: Record<string, unknown>[] = []
     const f = fixture()
     registerThreadTools(
@@ -146,6 +152,7 @@ describe("thread tool registration", () => {
       "thread_rename",
       "thread_set_model",
       "thread_set_reasoning",
+      "thread_archive",
       "thread_report",
       "thread_outbox",
       "thread_outbox_ack",
@@ -242,7 +249,7 @@ describe("thread tool registration", () => {
     })
   })
 
-  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then each read returns the next slice until the end", async () => {
+  test("#given a live transcript longer than one byte window #when thread_read follows next_cursor #then the first read ends at the newest message and each next one returns the slice before it until the start", async () => {
     // given
     const f = fixture()
     const transcript = Array.from({ length: 12 }, (_, index) => ({
@@ -271,7 +278,10 @@ describe("thread tool registration", () => {
 
     // then
     expect(pages.length).toBeGreaterThan(1)
-    expect(pages.flatMap((page) => page.contents)).toEqual(transcript.map((message) => JSON.stringify(message.content)))
+    expect(pages[0]?.contents.at(-1)).toBe(JSON.stringify(transcript.at(-1)?.content))
+    expect(pages.reverse().flatMap((page) => page.contents)).toEqual(
+      transcript.map((message) => JSON.stringify(message.content)),
+    )
   })
 })
 
@@ -410,6 +420,88 @@ describe("thread session controls", () => {
     })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
+  })
+
+  test.each([
+    ["openai/gpt-x", "gpt-x", undefined],
+    ["openai/gpt-x:max", "gpt-x", "max"],
+    ["openai/gpt-other:max", "gpt-other:max", undefined],
+  ])("#14445: set_model resolves %s on the one-provider target", async (model, id, level) => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-other:max" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({
+      kind: "ok",
+      thread: "dur-peer",
+      model: { provider: "openai", id },
+    })
+    expect(f.setThinkingLevel.mock.calls).toEqual(
+      level === undefined ? [] : [["route-peer", level, "turn", "dur-peer"]],
+    )
+  })
+
+  test("#14445: set_model identifies a provider missing from the one-provider target", async () => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-y" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "apitopia/glm-5.1:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "model_not_found",
+        details: { reason: "provider_not_configured", provider: "apitopia", available_providers: ["openai"] },
+      },
+    })
+    expect(f.setModel).not.toHaveBeenCalled()
+  })
+
+  test("#14445: set_model leaves the active model unchanged when the requested thinking level is refused", async () => {
+    const f = fixture()
+    f.models.splice(1, 1)
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "thinking_level_unsupported", details: { supported: ["off", "high"] } },
+    })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-previous" })
+  })
+
+  test("#14445: set_model reports a partial commit when the previous model cannot be restored", async () => {
+    const f = fixture()
+    const setModel = f.setModel.getMockImplementation()
+    if (setModel === undefined) throw new Error("Fixture must implement setModel")
+    f.setModel.mockImplementation(async (session, provider, id, durableId) => {
+      if (id === "gpt-previous") throw new Error("Previous model is no longer available")
+      return setModel(session, provider, id, durableId)
+    })
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "partial_commit",
+        details: {
+          previous_model: { provider: "openai", id: "gpt-previous" },
+          selected_model: { provider: "openai", id: "gpt-x" },
+        },
+      },
+    })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-x" })
+  })
+
+  test("#14445: set_model does not apply thinking to the old model when the switch is held", async () => {
+    const f = fixture()
+    f.setModel.mockResolvedValueOnce({ provider: "openai", id: "gpt-x", name: "Selected model" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "partial_commit", details: { reason: "model_switch_unconfirmed" } },
+    })
+    expect(f.setThinkingLevel).not.toHaveBeenCalled()
   })
 
   test("set_model reports no match with at most twenty available provider/id values", async () => {
@@ -771,7 +863,7 @@ const TUI_SOCKET = "/tmp/t-0123456789abcdef.sock"
 const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 
 /** A host session (the caller) and a terminal session, each on its own endpoint, with a recording gateway port. */
-function gatewayFixture() {
+function gatewayFixture(store?: GatewayStore) {
   const f = fixture()
   const hostSession: ThreadHostSession = {
     sessionId: "rpc-1",
@@ -832,7 +924,7 @@ function gatewayFixture() {
       host,
       stateDirectory: f.stateDirectory,
       sessionsDirectory: () => join(f.stateDirectory, "sessions"),
-      store: f.store,
+      store: store ?? f.store,
       callerSessionId: () => callerId,
       callerWorkspaceRoot: () => process.cwd(),
       callerName: () => callerName,
@@ -1249,6 +1341,73 @@ describe("tool receipts the store could not settle", () => {
   })
 })
 
+describe("thread tools over a gateway store a newer omo build migrated", () => {
+  function newerStore(ahead: number) {
+    const agentDir = mkdtempSync(join(tmpdir(), "thread-tools-newer-schema-"))
+    directories.push(agentDir)
+    const versions = storeMigratedByNewerBuild(agentDir, ahead)
+    const store = createGatewayStore({ agentDir })
+    stores.push(store)
+    return { store, agentDir, ...versions }
+  }
+
+  test.each([1, 3])(
+    "#given the agent dir's store is %i schema version(s) past this binary's #when thread_send and a receipted tool run #then each answers gateway_schema_too_new naming both schemas and the update command, and the store keeps its schema",
+    async (ahead) => {
+      // given: the old-binary fixture, a store a newer build migrated past every schema this build knows (N+1 is the next schema)
+      const n = newerStore(ahead)
+      const g = gatewayFixture(n.store)
+      const refusal = {
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      }
+
+      // when
+      const sent = await g.run("thread_send", { thread: "my-tui", message: "hello" }, "dur-host", "call-1")
+      const renamed = await g.run("thread_rename", { thread: "my-tui", name: "renamed" }, "dur-host", "call-2")
+
+      // then
+      // the hint carries the command (read before toMatchObject, which writes its asymmetric matchers into the received object)
+      for (const result of [sent, renamed]) {
+        const error = (result as { readonly error: ThreadToolFailure }).error
+        expect(error.next_action).toContain(String(error.details?.update_command))
+      }
+      expect(sent).toMatchObject(refusal)
+      expect(renamed).toMatchObject(refusal)
+      // A read-write connection: the refused store closed its WAL connection, which removed -wal and -shm, and a
+      // read-only connection cannot recreate them (macOS's system SQLite answers SQLITE_CANTOPEN). It only reads.
+      const db = new Database(gatewayDatabasePath(n.agentDir))
+      try {
+        expect(db.query("PRAGMA user_version").get()).toEqual({ user_version: n.gateway })
+      } finally {
+        db.close()
+      }
+    },
+  )
+
+  test.each([
+    ["thread_outbox_ack", { binding_id: "bnd-1", cursor: 3, provider_message_id: "m-1" }],
+    ["thread_report", { kind: "milestone", text: "done step 1" }],
+    ["thread_outbox", { binding_id: "bnd-1", after_cursor: 0 }],
+  ] as const)(
+    "#given the agent dir's store is one schema version past this binary's #when the relay tool %s runs #then it answers gateway_schema_too_new naming both schemas and omo update",
+    async (name, args) => {
+      const n = newerStore(1)
+      const g = gatewayFixture(n.store)
+      expect(await g.run(name, args, "dur-host", "call-relay")).toMatchObject({
+        kind: "error",
+        error: {
+          code: "gateway_schema_too_new",
+          details: { gateway_schema: n.gateway, binary_schema: n.binary, update_command: "omo update" },
+        },
+      })
+    },
+  )
+})
+
 describe("receipts stored before one field named a session (#14044 4a)", () => {
   /** Writes a settled receipt through the real store under the key a retry of `args` uses, as an earlier build would. */
   async function stored(
@@ -1329,7 +1488,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: "2026-11-01T00:00:00.000Z",
       link: "[old create](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
     }
     const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
     expect(replayed).toStrictEqual({
@@ -1337,7 +1496,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
         kind: "ok",
         ...row,
         requested_skills: ["lead"],
-        deduplicated: false,
+        deduplicated: true,
         prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
       },
       list: { kind: "ok", threads: [row], scope: "workspace" },
@@ -1356,7 +1515,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
-  test("#given receipts stored in the current shape #when the same keys are retried #then each replays byte-identical to what was stored", async () => {
+  test("#given current receipts #when replayed #then only the successful create's deduplication flag changes", async () => {
     // given: results a current build wrote, success and refusal alike
     const f = fixture()
     const row = {
@@ -1368,7 +1527,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       updated_at: null,
       link: "[peer](omo-thread://v1/dur-peer)",
       surface: "daemon",
-      alive: true,
+      state: "idle",
       controls: ["send", "read"],
     }
     const receipts = [
@@ -1413,7 +1572,11 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
 
     // then
-    expect(replayed).toEqual(receipts.map((receipt) => JSON.stringify(receipt.result)))
+    expect(replayed).toEqual(
+      receipts.map(({ operation, result }) =>
+        JSON.stringify(operation === "thread_create" ? { ...result, deduplicated: true } : result),
+      ),
+    )
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

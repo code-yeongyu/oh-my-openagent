@@ -45,9 +45,10 @@ const ANTHROPIC_MODELS = [
   "claude-sonnet-5",
   "claude-sonnet-5-5",
 ]
-const GPT_PROVIDERS = ["chatgpt-subscription", "openai", "github-copilot", "opencode"]
-// deep-high's first rung is GPT-6.2 Astra, which Copilot does not serve, so Copilot first appears on its GPT-6 Astra rung.
-const DEEP_HIGH_PROVIDERS = ["chatgpt-subscription", "openai", "opencode", "github-copilot"]
+// The GPT-6.2 Astra lanes list the providers serving that exact model; Copilot does not serve GPT-6.2.
+const ASTRA_PROVIDERS = ["chatgpt-subscription", "openai", "opencode"]
+// GPT-6.2 Sol is served only on the two OpenAI lanes.
+const SOL_PROVIDERS = ["chatgpt-subscription", "openai"]
 
 describe("resolveCategoryCoverage", () => {
   describe("#given a zai-only registry", () => {
@@ -73,7 +74,7 @@ describe("resolveCategoryCoverage", () => {
           "github-copilot",
           "opencode",
         ])
-        expect(providersOf("deep-high")).toEqual(DEEP_HIGH_PROVIDERS)
+        expect(providersOf("deep-high")).toEqual(ASTRA_PROVIDERS)
         expect(providersOf("writing")).not.toContain("zai")
       })
     })
@@ -94,9 +95,9 @@ describe("resolveCategoryCoverage", () => {
           "writing",
         ])
         expect(coverage.unusable).toEqual([
-          { name: "deep-high", providers: DEEP_HIGH_PROVIDERS },
-          { name: "deep-low", providers: GPT_PROVIDERS },
-          { name: "ultrabrain", providers: ["chatgpt-subscription", "openai", "github-copilot", "opencode"] },
+          { name: "deep-high", providers: ASTRA_PROVIDERS },
+          { name: "deep-low", providers: SOL_PROVIDERS },
+          { name: "ultrabrain", providers: ASTRA_PROVIDERS },
         ])
       })
     })
@@ -125,7 +126,6 @@ describe("resolveCategoryCoverage", () => {
         expect(coverage.unusable.find((gap) => gap.name === "deep-high")?.providers).toEqual([
           "chatgpt-subscription",
           "opencode",
-          "github-copilot",
         ])
       })
     })

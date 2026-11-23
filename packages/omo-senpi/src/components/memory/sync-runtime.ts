@@ -3,6 +3,7 @@ import { caseFold, loadLoroRuntime } from "@oh-my-opencode/memory-core/sync-engi
 export {
   deviceKeyringFromMaterial,
   GitSpaceConfig,
+  isDeviceSyncOff,
   listRemotes,
   loadTrustAnchor,
   openAccountSession,
@@ -12,6 +13,7 @@ export {
 } from "@oh-my-opencode/memory-core/sync-engine"
 export {
   acknowledgePhraseVoid,
+  disableSync,
   enableSync,
   joinAccount,
   approveDevice,

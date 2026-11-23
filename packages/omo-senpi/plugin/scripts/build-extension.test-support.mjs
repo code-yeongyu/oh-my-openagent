@@ -15,6 +15,7 @@ export function outputPathsIn(root) {
     onboardingScanRuntimeOutputPath: join(root, "omo-onboarding-scan.js"),
     toolkitSdkOutputPath: join(root, "runtime", "agent-toolkit-sdk", "sdk.js"),
     bunshinTsOutputPath: join(root, "runtime", "bunshin-ts", "sdk.js"),
+    omoSdkOutputPath: join(root, "runtime", "omo-sdk", "sdk.js"),
     rollbackRuntimeOutputPath: join(root, "runtime", "rollback-migrate.js"),
     memoryDoctorOutputPath: join(root, "omo-memory-doctor.js"),
     memoryMemfsOutputPath: join(root, "omo-memory-memfs.js"),
@@ -50,17 +51,26 @@ export function outputPathsIn(root) {
  * of each check rebuilding its own reproduction. It stays a separate build so the comparison still
  * proves the build reproduces its outputs.
  */
-export function createBuildFixture() {
+export function createBuildFixture({ build = buildExtension } = {}) {
   const perTestRoots = []
   let sharedBuildPromise = null
   let reproductionPromise = null
+  // #13965: a build that rejects (its test timed out and the runner killed the shared minifier) must not be
+  // cached, or every later case in the file fails on the same rejection in under a millisecond.
   async function sharedOutputs() {
     sharedBuildPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
       const paths = outputPathsIn(root)
-      const build = await buildExtension(paths)
-      return { root, ...paths, ...build }
-    })()
+      try {
+        return { root, ...paths, ...(await build(paths)) }
+      } catch (error) {
+        await rm(root, { recursive: true, force: true })
+        throw error
+      }
+    })().catch((error) => {
+      sharedBuildPromise = null
+      throw error
+    })
     return sharedBuildPromise
   }
   async function mutableOutputs() {
@@ -73,9 +83,17 @@ export function createBuildFixture() {
   async function reproductionRoot() {
     reproductionPromise ??= (async () => {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-reproduction-"))
-      await buildExtension(outputPathsIn(root))
-      return root
-    })()
+      try {
+        await build(outputPathsIn(root))
+        return root
+      } catch (error) {
+        await rm(root, { recursive: true, force: true })
+        throw error
+      }
+    })().catch((error) => {
+      reproductionPromise = null
+      throw error
+    })
     return reproductionPromise
   }
   return {
@@ -88,8 +106,8 @@ export function createBuildFixture() {
     },
     cleanupFile: async () => {
       const roots = await Promise.all([
-        sharedBuildPromise === null ? undefined : sharedBuildPromise.then((shared) => shared.root),
-        reproductionPromise,
+        sharedBuildPromise?.then((shared) => shared.root).catch(() => undefined),
+        reproductionPromise?.catch(() => undefined),
       ])
       await Promise.all(roots.filter((root) => root != null).map((root) => rm(root, { recursive: true, force: true })))
     },

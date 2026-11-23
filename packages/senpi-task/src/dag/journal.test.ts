@@ -4,6 +4,8 @@ import * as fs from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
+
 import {
   dagDefinitionAmendedEvent,
   dagNodeRetriedEvent,
@@ -95,7 +97,7 @@ describe("createDagJournal WAL ordering and replay", () => {
   test("#given the run coordination lock is held #when a journal commits #then the run lock does not delay the WAL", async () => {
     // given
     let time = 0
-    const store = createDagFileStore({ project_dir: tempProject() }, { now: () => (time += 30_001) })
+    const store = createDagFileStore(ownedTaskState(tempProject()), { now: () => (time += 30_001) })
     const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
 
     // when
@@ -111,8 +113,8 @@ describe("createDagJournal WAL ordering and replay", () => {
     let time = 0
     const project = tempProject()
     const options = { now: () => (time += 1_000) }
-    const store = createDagFileStore({ project_dir: project }, options)
-    const peerStore = createDagFileStore({ project_dir: project }, options)
+    const store = createDagFileStore(ownedTaskState(project), options)
+    const peerStore = createDagFileStore(ownedTaskState(project), options)
     const journalOptions = { runId, initialCheckpoint: initialCheckpoint(), applyEvent }
     const first = createDagJournal({ store, ...journalOptions })
     const second = createDagJournal({ store: peerStore, ...journalOptions })
@@ -143,7 +145,7 @@ describe("createDagJournal WAL ordering and replay", () => {
 
   test("#given three mutations #when appended #then subscribers see durable events in order and checkpoint seq reaches three", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const delivered: number[] = []
     const durableAtDelivery: number[] = []
@@ -172,7 +174,7 @@ describe("createDagJournal WAL ordering and replay", () => {
   test("#given checkpoint replacement crashes after WAL append #when reopened on the same store #then replay never reaches the previous journal subscriber", async () => {
     // given
     const project = tempProject()
-    const durableStore = createDagFileStore({ project_dir: project })
+    const durableStore = createDagFileStore(ownedTaskState(project))
     let failOnce = true
     const crashingStore: DagFileStore = {
       ...durableStore,
@@ -227,7 +229,7 @@ describe("createDagJournal WAL ordering and replay", () => {
 
   test("#given a queued node transition #when appended #then the journal preserves its queue position", () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const nodeId = "node-a" as DagNodeId
 
@@ -254,13 +256,13 @@ describe("createDagJournal WAL ordering and replay", () => {
   test("#given a durable checkpoint and WAL #when reopened #then sequence numbers continue from the greater persisted tail", () => {
     // given
     const project = tempProject()
-    const firstStore = createDagFileStore({ project_dir: project })
+    const firstStore = createDagFileStore(ownedTaskState(project))
     const first = createDagJournal({ store: firstStore, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     first.append(dagRunStartedEvent({ generation: 1 }))
     first.append(dagRunStartedEvent({ generation: 2 }))
 
     // when
-    const reopenedStore = createDagFileStore({ project_dir: project })
+    const reopenedStore = createDagFileStore(ownedTaskState(project))
     const reopened = createDagJournal({
       store: reopenedStore,
       runId,
@@ -278,7 +280,7 @@ describe("createDagJournal WAL ordering and replay", () => {
 describe("createDagJournal subscribers", () => {
   test("#given a durable commit subscription #when it is removed before another journal commits #then no phantom delivery remains", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const first = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const reopened = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const delivered: number[] = []
@@ -298,7 +300,7 @@ describe("createDagJournal subscribers", () => {
 
   test("#given a subscriber blocked on its first event #when its ring overflows #then it receives one coalesced overflow with the last delivered recovery seq", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({
       store,
       runId,
@@ -344,7 +346,7 @@ describe("createDagJournal subscribers", () => {
 
   test("#given a viewer recovering a subscriber overflow #when it catches up from the recovery cursor #then every WAL seq is applied once without gaps", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({
       store,
       runId,
@@ -403,7 +405,7 @@ describe("createDagJournal subscribers", () => {
 
   test("#given a slow async listener #when another mutation is appended #then the mutation completes before the listener catches up", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const release = deferred()
     const listenerStarted = deferred()
@@ -426,7 +428,7 @@ describe("createDagJournal subscribers", () => {
 
   test("#given an active subscription #when it is removed #then later events are not delivered", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const delivered: number[] = []
     const unsubscribe = journal.subscribe((event) => {
@@ -447,7 +449,7 @@ describe("createDagJournal subscribers", () => {
 
 describe("createDagJournal new event replay", () => {
   test("#given a WAL with dag.node.retried, dag.node.steered, and dag.definition.amended #when the checkpoint is rebuilt from the WAL #then replayed checkpoint equals the original", () => {
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({
       store,
       runId,
@@ -490,7 +492,7 @@ describe("createDagJournal new event replay", () => {
 
   test("#given a checkpoint crash on a new boundary event #when reopened #then replay recovers the uncheckpointed tail and seq continues", () => {
     const project = tempProject()
-    const durableStore = createDagFileStore({ project_dir: project })
+    const durableStore = createDagFileStore(ownedTaskState(project))
     let failOnce = true
     const crashingStore: DagFileStore = {
       ...durableStore,
@@ -536,7 +538,7 @@ describe("createDagJournal new event replay", () => {
   })
 
   test("#given a subscriber #when new boundary events are appended #then it receives them with monotonic seq", async () => {
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const journal = createDagJournal({
       store,
       runId,
@@ -563,7 +565,7 @@ describe("createDagJournal new event replay", () => {
 describe("DAG journal refresh", () => {
   test("#given a foreign instance committed #when refresh is called #then the cached snapshot catches up without an own append", () => {
     // given - two instances over one run: caches are instance-local by design (#7412).
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const first = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
     const second = createDagJournal({ store, runId, initialCheckpoint: initialCheckpoint(), applyEvent })
 

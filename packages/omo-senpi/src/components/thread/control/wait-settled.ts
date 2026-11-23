@@ -38,6 +38,9 @@ const RUN_RECORDS: ReadonlySet<string> = new Set([
   "tool_execution_end",
   "turn_end",
   "agent_end",
+  // A retry after a provider error belongs to the run: the session reads idle between attempts.
+  "auto_retry_start",
+  "auto_retry_end",
 ])
 
 const turnOf = (record: JsonObject): string | undefined =>

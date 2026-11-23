@@ -35,6 +35,8 @@ export function nonBlockingTtyReadable(fd: number, retryMs = 20): Readable {
     destroy(error, callback) {
       if (retry !== undefined) clearTimeout(retry)
       retry = undefined
+      // The last bytes typed may be recovery-phrase words: leave none in the reused buffer (#14098).
+      chunk.fill(0)
       callback(error)
     },
   })

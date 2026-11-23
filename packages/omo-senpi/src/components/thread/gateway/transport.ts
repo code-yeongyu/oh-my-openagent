@@ -28,6 +28,8 @@ export type OutboundDelivery = {
   /** As the caller wrote it; each transport validates it the way its receiver does (`^\d+$`). */
   readonly expected_turn_id?: string
   readonly idempotency_key: string
+  /** Replaces the sender's earlier undelivered delivery to the same target under this key (#14428); the local transport only. */
+  readonly collapse_key?: string
   /**
    * Set only by a sender that follows its own answer (`omo remote send --wait`): the relay transport carries it as the
    * started or queued prompt's `clientMessageId`, which senpi stamps on the user entry it stores, so the follow

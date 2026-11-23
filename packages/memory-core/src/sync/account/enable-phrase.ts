@@ -12,6 +12,7 @@ import {
   type PhraseGenesisPlace,
   writePhraseGenesisMarker,
 } from "../genesis/phrase-marker.ts"
+import { turnDeviceSyncOn } from "./device-switch.ts"
 import type { EnableOutcome, EnableSyncInput } from "./enable.ts"
 import { principalOf } from "./join.ts"
 import type { PairingHttp } from "./pairing-http.ts"
@@ -120,7 +121,7 @@ export const createPhraseGenesis = async (
   }
   await storeGenesisIntent(captured, intent)
   await captured.pairing.setAccountSync(true)
-  await captured.pairing.setDeviceSync(captured.serviceDeviceId, true)
+  await turnDeviceSyncOn(captured)
   checkSyncOperation(captured)
   return commitIntent(captured, intent)
 }

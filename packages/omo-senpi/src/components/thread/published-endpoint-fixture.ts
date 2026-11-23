@@ -54,11 +54,17 @@ export async function publishedWorld() {
   }
   const tools = createThreadTools(options)
   let sequence = 0
-  async function send(thread = "target") {
+  async function send(thread = "target", extra: Readonly<Record<string, unknown>> = {}) {
     const tool = tools.find((entry) => entry.name === "thread_send")
     if (tool === undefined) throw new Error("missing send")
     return (
-      await tool.execute(`send-${++sequence}`, { thread, message: "hello" }, undefined, undefined, undefined as never)
+      await tool.execute(
+        `send-${++sequence}`,
+        { thread, message: "hello", ...extra },
+        undefined,
+        undefined,
+        undefined as never,
+      )
     ).details.result
   }
   async function owner(name: string, cwd = dir, durableId = "target", terminal = false) {

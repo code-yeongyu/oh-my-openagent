@@ -241,7 +241,7 @@ async function holdWriteLock(databasePath: string) {
 }
 
 describe("thread component control endpoint registration", () => {
-  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm and shutdown hooks exist", () => {
+  test("#given an engine without pi.session #when the component registers #then no control endpoint is registered and only the run, message, startup-arm, shutdown and monitor-target (tool_call) hooks exist", () => {
     const f = eventApi()
     createThreadComponent({
       host: host(),
@@ -256,6 +256,7 @@ describe("thread component control endpoint registration", () => {
       "message_start",
       "session_shutdown",
       "session_start",
+      "tool_call",
     ])
   })
 
@@ -1154,7 +1155,7 @@ describe("thread component settle never waits on the gateway store", () => {
   })
 })
 
-const FOURTEEN = [
+const FIFTEEN = [
   "thread_create",
   "thread_list",
   "thread_read",
@@ -1165,6 +1166,7 @@ const FOURTEEN = [
   "thread_rename",
   "thread_set_model",
   "thread_set_reasoning",
+  "thread_archive",
   "thread_report",
   "thread_outbox",
   "thread_outbox_ack",
@@ -1172,13 +1174,13 @@ const FOURTEEN = [
 ]
 
 describe("thread component production registration", () => {
-  test("registers all fourteen tools when a test host is supplied", () => {
+  test("registers all fifteen tools when a test host is supplied", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(FOURTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(FIFTEEN)
   })
 
   // Placement contract (engine `ToolDefinition.runs`): thread tools run on the loop side of a split session.
@@ -1197,7 +1199,7 @@ describe("thread component production registration", () => {
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools.map((tool) => tool.name)).toEqual(FOURTEEN)
+    expect(f.tools.map((tool) => tool.name)).toEqual(FIFTEEN)
   })
 
   // #14054: `omo -p` never exited after any thread tool call, because the default remote surface's device-service
@@ -1257,12 +1259,12 @@ console.log("SHUT DOWN")
     }
   }, 30_000)
 
-  test("registers all fourteen tools when a test host is supplied and no host flag exists", () => {
+  test("registers all fifteen tools when a test host is supplied and no host flag exists", () => {
     const f = api()
     createThreadComponent({ host: host(), stateDirectory: "/tmp/thread-test-state" }).register(
       f.pi as never,
       context([]) as never,
     )
-    expect(f.tools).toHaveLength(14)
+    expect(f.tools).toHaveLength(15)
   })
 })

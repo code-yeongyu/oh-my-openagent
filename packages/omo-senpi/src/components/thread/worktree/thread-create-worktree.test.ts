@@ -120,6 +120,29 @@ describe("thread_create with worktree on another device", () => {
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toHaveLength(1)
   })
 
+  test("#given this device's relay sign-in lapsed after the open #when thread_create addresses its worktree session on b #then host_unavailable names the sign-in, not an update", async () => {
+    const a = account()
+    const far = withFarWorktree(a.remote, kit.folder("thread-wt-far-"))
+    const signedOut = {
+      ...far.remote,
+      sessions: {
+        ...far.remote.sessions,
+        locate: async () => ({ kind: "refused", reason: "sign_in_required" }) as const,
+      },
+    }
+    const { run } = surface(signedOut)
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-signed-out",
+      device: "studio",
+      cwd: "/repo/on/b",
+      worktree: {},
+    })
+    expect(failure(result)).toMatchObject({
+      code: "host_unavailable",
+      details: { device: "b", reason: "sign_in_required" },
+    })
+  })
+
   test("#given b refuses the worktree (branch exists there) #when thread_create targets b #then b's typed failure is the answer, naming b", async () => {
     const repo = kit.repository()
     const a = account()
