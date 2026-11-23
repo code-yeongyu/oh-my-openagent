@@ -38,6 +38,8 @@ release_validation_contract() {
   "senpi-compatibility (ubuntu-latest)": ["Verify Senpi shard coverage"],
   "senpi-bundle-check": ["Verify committed Senpi plugin bundle is current"],
   "senpi-eq": ["Run omo fused-path equivalence (EQ.omo E21-E24)"],
+  "native-binary-parity (macos-15, darwin-arm64, aarch64-apple-darwin, omo-darwin-arm64, true)": ["Compare the binary with the npm launcher"],
+  "native-binary-parity (windows-latest, windows-x64, x86_64-pc-windows-msvc, omo-windows-x64.exe, f...": ["Run the binary from an empty download folder twice"],
   "build": ["Build", "Verify build output", "Verify generated schema artifacts are committed", "Verify dist bundle tests"],
   "omo-ai-payload-check": ["Verify omo-ai payload", "Verify packed omo-ai consumer", "Dry-run publish"]
 }

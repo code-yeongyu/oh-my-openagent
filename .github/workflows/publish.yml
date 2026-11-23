@@ -183,6 +183,10 @@ jobs:
               echo "::error::source_sha ${SOURCE_SHA} is not on dev."
               exit 1
             fi
+            if ! git merge-base --is-ancestor refs/remotes/origin/master "$SOURCE_SHA"; then
+              echo "::error::Pinned source ${SOURCE_SHA} does not contain origin/master; refusing a release that cannot fast-forward the mirror."
+              exit 1
+            fi
             if [ -n "$PREPARED_RELEASE_SHA" ] && {
               [ "$PREPARED_RELEASE_SHA" != "$GITHUB_SHA" ] ||
               [ "$(git rev-parse HEAD^1)" != "$SOURCE_SHA" ] ||

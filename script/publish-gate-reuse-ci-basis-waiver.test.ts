@@ -84,6 +84,7 @@ beforeAll(() => {
 afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }))
 
 interface Dispatch {
+  readonly mirrorTip?: string
   readonly pin?: string
   readonly pushConclusion?: string
   readonly stampPushConclusion?: string
@@ -127,6 +128,7 @@ function dispatch(input: Dispatch): Outcome {
       if (result.status !== 0) throw new Error(result.stderr)
     }
     git(["fetch", "origin"])
+    git(["update-ref", "refs/remotes/origin/master", input.mirrorTip ?? fixture.sha.A])
     git(["checkout", "--detach", prepared || "origin/dev"])
   }
   for (const path of STEP_FILES) {
@@ -191,6 +193,8 @@ describe("#given a pinned release", () => {
     "missing-codex",
     "skipped-senpi",
     "skipped-macos-codex",
+    "skipped-macos-parity",
+    "skipped-windows-parity",
     "passed",
   ] as const)("the parent requires validation evidence (%s) even if the pin push is green", (validation) => {
     const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
@@ -214,6 +218,13 @@ describe("#given a pinned release", () => {
       expect(result.status).not.toBe(0)
       expect(result.ghCalls).toBe("")
     }
+  })
+
+  test("a pin on dev that cannot fast-forward master is refused before CI lookup or stamping", () => {
+    const result = dispatch({ pin: fixture.sha.B, prepared: "", mirrorTip: fixture.sha.D })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain("does not contain origin/master")
+    expect(result.ghCalls).toBe("")
   })
 
   test("#when only non-push CI is green #then neither dispatch can proceed", () => {

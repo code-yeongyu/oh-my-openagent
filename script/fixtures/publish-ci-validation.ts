@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 
-export type Validation = "passed" | "skipped-job" | "skipped-step" | "empty-response" | "missing-codex" | "skipped-senpi" | "skipped-macos-codex"
+export type Validation = "passed" | "skipped-job" | "skipped-step" | "empty-response" | "missing-codex" | "skipped-senpi" | "skipped-macos-codex" | "skipped-macos-parity" | "skipped-windows-parity"
 
 const required: Record<string, string[]> = JSON.parse(
   execFileSync("bash", ["-c", "source .github/scripts/release-push-proof.sh && release_validation_contract"], {
@@ -17,7 +17,7 @@ export function ciJobs(validation: Validation = "passed"): string {
     steps: [...steps, "Write job summary"].map((step) => ({
       name: step,
       status: "completed",
-      conclusion: (validation === "skipped-step" && step === "Type check") || (validation === "skipped-macos-codex" && step === "Run Codex platform smoke") ? "skipped" : "success",
+      conclusion: (validation === "skipped-step" && step === "Type check") || (validation === "skipped-macos-codex" && step === "Run Codex platform smoke") || (validation === "skipped-macos-parity" && step === "Compare the binary with the npm launcher") || (validation === "skipped-windows-parity" && step === "Run the binary from an empty download folder twice") ? "skipped" : "success",
     })),
   }))
 
