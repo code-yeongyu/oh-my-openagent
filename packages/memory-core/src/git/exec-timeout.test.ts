@@ -134,7 +134,16 @@ describe("a timed-out git (omo #10199 field incident)", () => {
       const record: { pid: number; argv: string[]; timeoutMs: number; processes: string } = JSON.parse(
         await readFile(join(diagnostics, file ?? ""), "utf8"),
       )
-      expect(record.argv).toEqual(["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${resolveHooksDir(root)}`, "add", "-A", "--", "n000.md"])
+      expect(record.argv).toEqual([
+        "-c",
+        "core.fsmonitor=false",
+        "-c",
+        `core.hooksPath=${resolveHooksDir(root)}`,
+        "add",
+        "-A",
+        "--",
+        "n000.md",
+      ])
       expect(record.timeoutMs).toBe(2_000)
       // #12145: the record proves the table was captured before the signal. Under host load the
       // snapshot itself can time out, so the field holds the failure form instead; assert the

@@ -298,7 +298,16 @@ describe("createNodeGitExec", () => {
       execOptions({ ProgramFiles: "C:\\Program Files" }),
     )
 
-    const expected = ["-c", "core.fsmonitor=false", "-c", `core.hooksPath=${resolveHooksDir(process.cwd())}`, "-c", "user.name=fixture-writer", "status", "--porcelain"]
+    const expected = [
+      "-c",
+      "core.fsmonitor=false",
+      "-c",
+      `core.hooksPath=${resolveHooksDir(process.cwd())}`,
+      "-c",
+      "user.name=fixture-writer",
+      "status",
+      "--porcelain",
+    ]
     expect(argvs).toEqual([expected, expected])
   })
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { execFileSync, spawn } from "node:child_process"
+import { spawn } from "node:child_process"
 import { randomUUID } from "node:crypto"
 import { existsSync } from "node:fs"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises"
@@ -10,6 +10,7 @@ import {
   GitMemoryRepo,
   buildDefaultSeedFiles,
   buildIdentityPaths,
+  resolveHooksDir,
   type FactsPeopleRouting,
   type MemoryIdentity,
 } from "@oh-my-opencode/memory-core"
@@ -46,6 +47,14 @@ async function memory(): Promise<{
 
 async function batchCommits(repo: GitMemoryRepo, batchId: string): Promise<number> {
   return (await repo.log()).filter((commit) => commit.trailers["Omo-Facts-Batch"] === batchId).length
+}
+
+async function installRejectingHook(repoPath: string): Promise<string> {
+  const hooksDir = resolveHooksDir(repoPath)
+  const preCommit = join(hooksDir, "pre-commit")
+  await mkdir(hooksDir, { recursive: true })
+  await writeFile(preCommit, "#!/bin/sh\nexit 1\n", { mode: 0o755 })
+  return preCommit
 }
 
 function runChild(root: string): Promise<{ readonly code: number | null; readonly output: string }> {
@@ -88,10 +97,7 @@ describe("facts/applied recovery envelopes", () => {
   test("#given an apply that throws mid-write #when a fresh process reconciles memory #then the kept envelope settles into one commit and is removed", async () => {
     useTestTimeout(60_000)
     const { root, identity, repo } = await memory()
-    const hooks = join(root, "failing-hooks")
-    await mkdir(hooks)
-    await writeFile(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 })
-    execFileSync("git", ["-C", identity.paths.repo, "config", "core.hooksPath", hooks], { windowsHide: true })
+    const preCommit = await installRejectingHook(repo.dir)
 
     const batchId = randomUUID()
     await expect(
@@ -103,7 +109,7 @@ describe("facts/applied recovery envelopes", () => {
     expect(ledger.applyRecovery).toBeDefined()
     expect(await batchCommits(repo, batchId)).toBe(0)
 
-    execFileSync("git", ["-C", identity.paths.repo, "config", "--unset", "core.hooksPath"], { windowsHide: true })
+    await rm(preCommit)
     const run = await runChild(root)
     expect(run).toEqual({ code: 0, output: "" })
 
@@ -115,15 +121,12 @@ describe("facts/applied recovery envelopes", () => {
   test("#given a kept envelope #when a same-batchId retry finds the memory-write lock busy #then the envelope and its recovery survive for maintenance to finish", async () => {
     useTestTimeout(60_000)
     const { root, identity, repo } = await memory()
-    const hooks = join(root, "failing-hooks")
-    await mkdir(hooks)
-    await writeFile(join(hooks, "pre-commit"), "#!/bin/sh\nexit 1\n", { mode: 0o755 })
-    execFileSync("git", ["-C", identity.paths.repo, "config", "core.hooksPath", hooks], { windowsHide: true })
+    const preCommit = await installRejectingHook(repo.dir)
     const batchId = randomUUID()
     await expect(
       applyFactsWithRetriesUnderLock({ identity, batchId, records: [PROJECT], people: PEOPLE }),
     ).rejects.toThrow()
-    execFileSync("git", ["-C", identity.paths.repo, "config", "--unset", "core.hooksPath"], { windowsHide: true })
+    await rm(preCommit)
 
     const envelope = join(identity.paths.facts, "applied", batchId)
     const retried = await withFactsWriterLock(

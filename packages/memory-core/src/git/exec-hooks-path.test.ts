@@ -104,11 +104,15 @@ describe("createNodeGitExec hooksPath", () => {
       // when: the same violation goes through the exec boundary
       await writeFiles(fixture.dir, { "system/bad-two.md": BAD_FRONTMATTER })
       await fixture.runGit(["git", "add", "-A"])
-      const result = await exec.run(["commit", "-m", "exec commit"], { cwd: fixture.dir, timeoutMs: 30_000, env: fixture.env })
+      const result = await exec.run(["commit", "-m", "exec commit"], {
+        cwd: fixture.dir,
+        timeoutMs: 30_000,
+        env: fixture.env,
+      })
 
       // then: the memory pre-commit hook runs and rejects the commit
       expect(result.code).not.toBe(0)
       expect(`${result.stdout}\n${result.stderr}`).toContain("Frontmatter validation failed")
-    }, 60_000)
+    })
   }
 })
