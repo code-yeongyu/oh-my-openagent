@@ -106,7 +106,7 @@ describe("LspManager", () => {
 
 		try {
 			await manager.getClient("/root/a", server);
-			manager.releaseClient("/root/a", server.id);
+			manager.releaseClient("/root/a", server);
 
 			// when
 			const listener = findAddedListener("SIGTERM", beforeSigterm);

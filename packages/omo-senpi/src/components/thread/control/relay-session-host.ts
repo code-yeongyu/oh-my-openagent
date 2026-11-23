@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
-import { rowFolder, rowStatus } from "../remote/ports"
+import { rowCreatedAt, rowFolder, rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -62,7 +62,7 @@ function listedThread(row: RemoteSessionRow): HostedThread {
       ? {}
       : { ...retryWait(rowState(row) === "running", row.waiting), ...holderVersion(row.engine_version) }),
     cwd: rowFolder(row),
-    created_at: seen,
+    created_at: rowCreatedAt(row),
     updated_at: seen,
     device: row.device,
     ...(row.source === "cache" && row.as_of !== undefined ? { as_of: new Date(row.as_of).toISOString() } : {}),
