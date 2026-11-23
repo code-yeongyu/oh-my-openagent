@@ -1,4 +1,4 @@
-import { readFile, readFileSync, writeFile, writeFileSync } from "../fs/resilient"
+import { lstat, readFile, readFileSync, writeFile, writeFileSync } from "../fs/resilient"
 import { join } from "node:path"
 import { createNodeGitExec, type GitCommitAuthor, type GitExec, type GitMemoryRepo } from "../git"
 import { decodeScalarSource } from "./frontmatter-scalar"
@@ -114,6 +114,8 @@ async function normalizeOne(
   stripped: string[],
 ): Promise<"unchanged" | "rewritten" | NormalizeFrontmatterSkip["reason"]> {
   const absolute = join(root, path)
+  // Normalize the tracked file itself, never the target of a symlink.
+  if ((await lstat(absolute)).isSymbolicLink()) return "unchanged"
   const content = await readFile(absolute, "utf8")
   if (describeFrontmatterGrammarViolation(content) === null) return "unchanged"
 

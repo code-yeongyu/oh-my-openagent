@@ -10,7 +10,7 @@ import {
   type ParsedMemoryFile,
 } from "../memfs/frontmatter"
 import { describeDescriptionViolation } from "../memfs/frontmatter-validation"
-import { validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
+import { MemoryPathError, validateMemoryPath, validateRepositoryPath } from "../memfs/paths"
 import { MemoryPatchHunkError, MemoryPatchParseError, applyMemoryPatch } from "./patch-apply"
 import type { ClaimReceipt } from "../provenance"
 import { isLegacyUserHeader, readHeader, stampReceipt } from "./claim-frontmatter"
@@ -62,6 +62,8 @@ export type MemoryToolLock = MemoryWriteLock
 
 export interface RunMemoryToolOptions {
   readonly expectedVersions?: MemoryObservedVersions
+  /** Read-time canonical path for each observed lexical alias. */
+  readonly observedAliases?: ReadonlyMap<string, string>
   repo: GitMemoryRepo
   lock: MemoryToolLock
   params: MemoryToolParams
@@ -82,7 +84,7 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
       ...(params.provenance === undefined ? {} : { provenance: params.provenance }),
       successLabel: `Memory ${params.command}`,
       noChangesMessage: `${params.command} made no changes`,
-      apply: async () => applyCommand(repo.dir, params, options.expectedVersions),
+      apply: async () => applyCommand(options, params),
     })
     return {
       message: `${result.message}${describeRepairs(repairs)}`,
@@ -100,9 +102,8 @@ export async function runMemoryTool(options: RunMemoryToolOptions): Promise<Memo
 }
 
 async function applyCommand(
-  root: string,
+  { repo: { dir: root }, expectedVersions: versions, observedAliases }: RunMemoryToolOptions,
   params: MemoryToolParams,
-  versions?: MemoryObservedVersions,
 ): Promise<AppliedCommand | MemoryWriteNoop> {
   switch (params.command) {
     case "create":
@@ -112,7 +113,7 @@ async function applyCommand(
     case "insert":
       return insert(root, params, versions)
     case "delete":
-      return remove(root, params, versions)
+      return remove(root, params, { versions, observedAliases })
     case "rename":
       return move(root, params, versions)
     case "update_description":
@@ -198,21 +199,32 @@ async function insert(
 async function remove(
   root: string,
   params: MemoryToolParams,
-  versions?: MemoryObservedVersions,
+  {
+    versions,
+    observedAliases,
+  }: {
+    readonly versions: MemoryObservedVersions | undefined
+    readonly observedAliases: ReadonlyMap<string, string> | undefined
+  },
 ): Promise<AppliedCommand> {
   const source = required(params.file_path, "file_path", "delete")
   const repositoryPath = validateRepositoryPath(root, source, "file_path")
   if (existsSync(repositoryPath) && (await stat(repositoryPath)).isDirectory()) {
-    const files = await collectFiles(repositoryPath)
+    const entries = await collectDeleteEntries(repositoryPath)
     if (versions?.size) {
       const scopes = new Set([repositoryPath, await realpath(repositoryPath)])
-      const regularFiles = new Set(files)
+      const regularFiles = new Set(entries.filter((entry) => entry.isFile).map((entry) => entry.path))
       for (const [path, expected] of versions) {
         for (const directory of scopes) {
           const within = relative(directory, path)
           if (within === ".." || within.startsWith(`..${sep}`) || isAbsolute(within)) continue
-          // The walk only lists regular files. Missing paths and file-to-directory changes are stale too.
-          if (!regularFiles.has(join(repositoryPath, within))) {
+          const canonical = observedAliases?.get(path)
+          // Walk membership proves regular files; aliases must still resolve to their read-time target.
+          const matches =
+            canonical === undefined
+              ? regularFiles.has(join(repositoryPath, within))
+              : await matchesAlias(root, path, canonical)
+          if (!matches) {
             throw new MemoryStaleReadError(path, expected, null)
           }
           const conflict = await staleRead(path, versions)
@@ -221,16 +233,29 @@ async function remove(
         }
       }
     }
-    for (const path of files) {
-      if (path.endsWith(".md")) await loadEditable(path, relativePath(root, path))
+    for (const { path, isFile } of entries) {
+      if (isFile && path.endsWith(".md")) await loadEditable(path, relativePath(root, path))
     }
     await rm(repositoryPath, { recursive: true, force: false })
-    return { affectedPaths: files.map((path) => relativePath(root, path)) }
+    return { affectedPaths: entries.map(({ path }) => relativePath(root, path)) }
   }
   const path = validateMemoryPath(root, source, { fieldName: "file_path" })
   await loadEditable(path, source, versions)
   await unlink(path)
   return affected(root, path)
+}
+
+async function matchesAlias(root: string, path: string, canonical: string): Promise<boolean> {
+  try {
+    if (validateRepositoryPath(root, `memory/${relativePath(root, path)}`) !== path) return false
+  } catch (error) {
+    if (error instanceof MemoryPathError) return false
+    throw error
+  }
+  return (
+    (await realpath(path).catch(() => undefined)) === canonical &&
+    (await stat(canonical).catch(() => undefined))?.isFile() === true
+  )
 }
 
 async function move(
@@ -369,14 +394,16 @@ async function readUtf8(path: string, source: string): Promise<string> {
   }
 }
 
-async function collectFiles(directory: string): Promise<string[]> {
-  const paths: string[] = []
+type DeleteEntry = { readonly path: string; readonly isFile: boolean }
+
+async function collectDeleteEntries(directory: string): Promise<DeleteEntry[]> {
+  const entries: DeleteEntry[] = []
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) paths.push(...(await collectFiles(path)))
-    else if (entry.isFile()) paths.push(path)
+    if (entry.isDirectory()) entries.push(...(await collectDeleteEntries(path)))
+    else if (entry.isFile() || entry.isSymbolicLink()) entries.push({ path, isFile: entry.isFile() })
   }
-  return paths
+  return entries
 }
 
 // `prior` is the note before an edit; every edit drops a legacy user header (stampReceipt), so it is reported here.

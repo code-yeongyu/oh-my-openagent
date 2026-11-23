@@ -41,10 +41,8 @@ export function createMemoryReadVersionCapture() {
       const calls = starts.get(context)
       const observation = calls?.get(toolCallId)
       calls?.delete(toolCallId)
-      const versions = context.observedVersions
-      if (observation === undefined || versions === undefined || payload.isError || !Array.isArray(payload.content))
-        return
-      return recordReadVersion(versions, observation, payload.content, payload.details)
+      if (observation === undefined || payload.isError || !Array.isArray(payload.content)) return
+      return recordReadVersion(context, observation, payload.content, payload.details)
     },
     forget(context: MemoryIdentityContext, toolCallId: string) {
       starts.get(context)?.delete(toolCallId)
@@ -53,11 +51,12 @@ export function createMemoryReadVersionCapture() {
 }
 
 async function recordReadVersion(
-  versions: Map<string, string>,
+  { observedVersions: versions, observedAliases: aliases }: MemoryIdentityContext,
   { target, canonicalPath, ranged, stamp }: ReadObservation,
   content: readonly unknown[],
   details: unknown,
 ): Promise<void> {
+  if (versions === undefined) return
   const [part] = content
   let version = "changed during read"
   if (
@@ -75,6 +74,8 @@ async function recordReadVersion(
   }
   versions.set(target, version)
   versions.set(canonicalPath, version)
+  aliases?.delete(canonicalPath)
+  if (target !== canonicalPath) aliases?.set(target, canonicalPath)
 }
 
 async function fileStamp(path: string): Promise<string | undefined> {

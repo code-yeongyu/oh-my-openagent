@@ -195,12 +195,14 @@ function createMemoryTool(
       if (context === undefined) return errorResult(`${MEMORY_TOOL_NAME}: ${UNBOUND_IDENTITY_MESSAGE}`)
       try {
         const expectedVersions = context.observedVersions && new Map(context.observedVersions)
+        const observedAliases = context.observedAliases?.size ? new Map(context.observedAliases) : undefined
         const { repo, lock, author } = await prepareEngine(context, options)
         const provenance = readToolProvenance(params)
         const result = await runMemoryTool({
           repo,
           lock,
           ...(expectedVersions === undefined ? {} : { expectedVersions }),
+          ...(observedAliases === undefined ? {} : { observedAliases }),
           params: { ...params, author, ...(provenance === undefined ? {} : { provenance }) },
         })
         if (result.commit !== undefined) options.onCommit?.(result.commit)

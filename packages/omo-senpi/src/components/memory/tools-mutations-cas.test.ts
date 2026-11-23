@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { existsSync } from "node:fs"
-import { readFile } from "node:fs/promises"
+import { readFile, symlink, unlink, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { renderMemoryFile } from "@oh-my-opencode/memory-core"
 import { FakeExtensionAPI } from "../../../test-support/fake-extension-api"
@@ -152,5 +152,83 @@ for (const [name, target, replacement] of recursiveCases) {
     expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
     expect(existsSync(join(fixture.repo.dir, target))).toBe(false)
     expect(existsSync(join(fixture.repo.dir, sibling))).toBe(target === file_path)
+  })
+}
+
+const symlinkCases = [
+  ["unchanged", null],
+  ["retargeted to a file with identical bytes", "retarget"],
+  ["target content changed", "edit"],
+  ["alias removed", "unlink"],
+  ["canonical target removed", "remove-target"],
+] as const
+
+for (const [name, change] of symlinkCases) {
+  test(`recursive delete after reading a symlink: ${name}`, async () => {
+    const fixture = await boundFixture()
+    const tree = "reference/history"
+    const alias = `${tree}/alias.md`
+    const alternate = "reference/alternate.md"
+    const original = renderMemoryFile({ description: "Seed" }, "original body")
+    await seedFile(fixture, file_path, "original body")
+    await seedFile(fixture, alternate, "original body")
+    const path = join(fixture.repo.dir, alias)
+    await symlink("nested/notes.md", path, "file")
+    const commit = (changed: string, reason: string) =>
+      fixture.repo.commitWrite([changed], reason, { agentId: "writer-b", authorName: "Writer B" })
+    await commit(alias, "seed alias")
+
+    const pi = new FakeExtensionAPI()
+    const context = { sessionManager: { getSessionId: () => "A" } }
+    const resolve = () => fixture.context
+    registerMemoryGuard(pi, componentContext(), { getContext: resolve })
+    const [tool] = createMemoryTools(resolve)
+    const call = { toolCallId: "read alias", toolName: "read", input: { path } }
+    await pi.dispatch("tool_call", call, context)
+    const content = [{ type: "text", text: await readFile(path, "utf8") }]
+    await pi.dispatch("tool_result", { ...call, isError: false, content }, context)
+
+    switch (change) {
+      case "retarget":
+        await unlink(path)
+        await symlink("../alternate.md", path, "file")
+        await commit(alias, "retarget alias")
+        break
+      case "edit":
+        await writeFile(join(fixture.repo.dir, file_path), renderMemoryFile({ description: "Seed" }, "newer body"))
+        await commit(file_path, "edit canonical note")
+        break
+      case "unlink":
+        await unlink(path)
+        await commit(alias, "remove alias")
+        break
+      case "remove-target":
+        await unlink(join(fixture.repo.dir, file_path))
+        await commit(file_path, "remove canonical note")
+        break
+      case null:
+        break
+    }
+    const head = await fixture.repo.head()
+    const deleted = await tool.execute(
+      "delete tree",
+      { command: "delete", file_path: tree, reason: "delete tree" },
+      undefined,
+      undefined,
+      context,
+    )
+
+    if (change === null) {
+      expect(deleted.details).toMatchObject({ message: expect.stringContaining("Memory delete committed") })
+      expect(await fixture.repo.head()).not.toBe(head)
+      expect(existsSync(join(fixture.repo.dir, tree))).toBe(false)
+    } else {
+      expect(deleted.details.errorCode).toBe("stale_read")
+      expect(deleted.isError).toBe(true)
+      expect(await fixture.repo.head()).toBe(head)
+      expect(existsSync(join(fixture.repo.dir, tree))).toBe(true)
+    }
+    expect(await git(fixture.repo, ["status", "--porcelain"])).toBe("")
+    expect(await readFile(join(fixture.repo.dir, alternate), "utf8")).toBe(original)
   })
 }
