@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
-import { spawnSync } from "node:child_process"
+import { spawn, spawnSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 
-import { createDaemonEngineHarness } from "./daemon-real-engine-support"
+import { createDaemonEngineHarness, waitForExit } from "./daemon-real-engine-support"
 import { createDaemonTestRunner, TREE_BOUNDED_TEST_TIMEOUT_MS, SpawnBudgetError } from "./daemon-test-runner"
 
 const { run, killChildren } = createDaemonTestRunner()
@@ -38,7 +38,7 @@ function alive(pid: number): boolean {
 // Starts a detached process through a launcher that exits once the process says it is running, so the process is
 // orphaned like the supervisor the engine leaves behind, and reports its pid.
 function startOrphan(env: NodeJS.ProcessEnv): number {
-  const orphan = `process.stdout.write("ready\\n"); process.stdout.on("error", () => {}); setInterval(() => {}, 1000)`
+  const orphan = `process.stdout.write("ready\\n"); process.stdout.on("error", () => {}); setTimeout(() => {}, 120_000)`
   const launcher = `const c = require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(orphan)}], { detached: true, stdio: ["ignore", "pipe", "ignore"] }); c.stdout.once("data", () => { console.log(c.pid); process.exit(0) })`
   return Number(spawnSync(process.execPath, ["-e", launcher], { env, encoding: "utf8", timeout: 60_000 }).stdout.trim())
 }
@@ -91,13 +91,38 @@ if (process.platform !== "win32") {
         const harness = createDaemonEngineHarness()
         const { env } = harness.sandbox()
         const orphan = startOrphan(env)
-        expect(alive(orphan)).toBe(true)
-        harness.cleanup()
-        expect(alive(orphan)).toBe(false)
+        try {
+          expect(alive(orphan)).toBe(true)
+          harness.cleanup()
+          expect(alive(orphan)).toBe(false)
+        } finally {
+          try {
+            process.kill(orphan, "SIGKILL")
+          } catch {}
+        }
       })
     })
   })
 }
+
+// A child that has exited but that nobody reaped (a container whose init does not reap promptly) is a zombie: signal 0
+// still reaches it, yet the harness must treat it as gone instead of failing the teardown.
+test("#given an exited child left unreaped on purpose #when the harness waits for it #then it counts as exited", async () => {
+  if (process.platform === "win32") return
+  // The shell starts a child, prints its pid, and execs into sleep, which never waits: the child stays a zombie.
+  const parent = spawn("sh", ["-c", "true & echo $!; exec sleep 60"], { stdio: ["ignore", "pipe", "ignore"] })
+  try {
+    const zombie = Number(
+      await new Promise<string>((resolveLine, rejectLine) => {
+        parent.stdout.once("data", (chunk: Buffer) => resolveLine(chunk.toString().trim()))
+        parent.once("error", rejectLine)
+      }),
+    )
+    expect(() => waitForExit(zombie)).not.toThrow()
+  } finally {
+    parent.kill("SIGKILL")
+  }
+})
 
 // The test timeout is only an outer bound: it must end a broken bound with at most half of the job's limit spent, so
 // the rest covers setup and the earlier tests of every CI job that runs these files. Read from the workflow, not copied.

@@ -97,29 +97,57 @@ export function createDaemonEngineHarness() {
     ownedPids.delete(pid)
   }
 
+  // Every step runs even when an earlier one fails, so one stuck pid never leaves the others or the sandbox behind;
+  // the failures are reported together at the end.
   function cleanup(): void {
-    killChildren()
-    for (const pid of ownedPids) killOwned(pid)
+    const failures: unknown[] = []
+    const attempt = (step: () => void): void => {
+      try {
+        step()
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+    attempt(killChildren)
+    for (const pid of ownedPids) attempt(() => killOwned(pid))
     ownedPids.clear()
     // A shard supervisor the engine detached into its own process group before `host ensure` answered (a bound
     // tripped mid-start) never reached ownedPids; it still carries its sandbox in its environment.
-    for (const root of roots) for (const pid of pidsWithAgentDir(root)) killOwned(pid)
-    for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
+    for (const root of roots) for (const pid of pidsWithAgentDir(root)) attempt(() => killOwned(pid))
+    for (const root of roots.splice(0)) attempt(() => rmSync(root, { recursive: true, force: true }))
+    if (failures.length > 0) throw new AggregateError(failures, "daemon harness cleanup failed")
   }
 
   return { sandbox, ensureShard, runStatus, killShardUncleanly, forgetShard, cleanup }
 }
 
+// A zombie has exited: only its parent (or an init that may never get to it in a container) can reap it, and signal 0
+// still reaches it, so it counts as gone.
 export function waitForExit(pid: number): void {
   for (let attempt = 0; attempt < 100; attempt += 1) {
-    try {
-      process.kill(pid, 0)
-    } catch {
-      return
-    }
+    if (exited(pid)) return
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20)
   }
   throw new Error(`pid ${pid} did not exit`)
+}
+
+function exited(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+  } catch {
+    return true
+  }
+  if (process.platform === "linux") {
+    try {
+      const stat = readFileSync(`/proc/${pid}/stat`, "utf8")
+      return stat.slice(stat.lastIndexOf(")") + 2).startsWith("Z")
+    } catch {
+      return true
+    }
+  }
+  return spawnSync("ps", ["-o", "stat=", "-p", String(pid)], { encoding: "utf8" })
+    .stdout.trim()
+    .startsWith("Z")
 }
 
 function pidsWithAgentDir(root: string): number[] {
