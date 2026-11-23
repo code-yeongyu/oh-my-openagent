@@ -2,7 +2,6 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { fileURLToPath } from "node:url"
 
 import type { JsonObject, RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import {
@@ -42,19 +41,19 @@ const EARLIER_TURN: readonly JsonObject[] = [
   { role: "assistant", content: "EARLIER" },
 ]
 
-// The send's own settle wait (#13425) bounds a case that never settles: it answers a typed timeout, and runSession's
-// finally then disposes the gateway store, so cleanup never meets a live store worker holding the case's directory
-// (EBUSY on Windows, #13986). The test timeout is only the circuit breaker above that bound.
-const SEND_TIMEOUT_SECONDS = 20
-const CASE_TIMEOUT_MS = 30_000
-// The shipped omo loads the gateway store's bundled worker sidecar from the plugin payload; from source each case would
-// transpile the worker's module graph in a fresh worker first, the cost that made a loaded Windows runner miss 5 s (#13986).
-const SHIPPED_PACKAGE_ROOT = fileURLToPath(new URL("../../omo-senpi", import.meta.url))
+// Each case drives a real send, whose gateway store starts a worker and opens SQLite in the case's agent dir. The send's
+// own settle bound (#13425) ends a turn that never settles; SEND_END_MS is this test's breaker for a send that never
+// ends at all, and it names what it waited for. Cleanup waits for every send to end first: its store is disposed (worker
+// terminated) only then, and Windows refuses to remove a directory a live worker still holds (EBUSY, #13986).
+const SEND_TIMEOUT_SECONDS = 10
+const SEND_END_MS = 15_000
+const pendingSends = new Set<Promise<unknown>>()
 
 const fixture = createRemoteThreadFixture()
 const dirs: string[] = []
 const savedAgentDir = process.env.OMO_CODING_AGENT_DIR
 afterEach(async () => {
+  await Promise.allSettled([...pendingSends])
   await fixture.cleanup()
   if (savedAgentDir === undefined) delete process.env.OMO_CODING_AGENT_DIR
   else process.env.OMO_CODING_AGENT_DIR = savedAgentDir
@@ -152,13 +151,11 @@ async function send(script: Script) {
     },
     now: () => 0,
     stateDir: "/unused",
-    packageRoot: SHIPPED_PACKAGE_ROOT,
     accountShow: async () => {
       throw new Error("not part of send")
     },
   } as unknown as RemoteCommandDependencies
-  // Awaited to its end: the send's own timeout bounds it, and its finally has disposed the store before cleanup runs.
-  const code = await runSession(
+  const sending = runSession(
     {} as never,
     {
       verb: "send",
@@ -171,6 +168,26 @@ async function send(script: Script) {
     false,
     dependencies,
   )
+  pendingSends.add(sending)
+  void sending.finally(() => pendingSends.delete(sending))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const breaker = new Promise<never>((_, reject) => {
+    timer = setTimeout(
+      () =>
+        reject(
+          new Error(
+            `omo remote send did not end within ${SEND_END_MS} ms; printed so far ${JSON.stringify(written.join(""))}`,
+          ),
+        ),
+      SEND_END_MS,
+    )
+  })
+  let code: number
+  try {
+    code = await Promise.race([sending, breaker])
+  } finally {
+    clearTimeout(timer)
+  }
   return {
     code,
     printed: written.join(""),
@@ -232,11 +249,11 @@ describe("omo remote send prints its own turn's answer exactly once, whatever th
   for (const [name, script] of orderings) {
     const row = async () => {
       const result = await send(script)
+      expect(result.code, result.errors.join("\n")).toBe(0)
       expect(result.printed).toBe("pong\n")
-      expect(result.code).toBe(0)
     }
     // Ordering D (deltas before the reply, settle after the probe's read) loses the answer: a separate defect.
     if (name.startsWith("D started")) test.todo(`${name} (oh-my-openagent#13512)`, row)
-    else test(name, row, CASE_TIMEOUT_MS)
+    else test(name, row)
   }
 })
