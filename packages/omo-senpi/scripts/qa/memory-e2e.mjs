@@ -50,7 +50,8 @@ const sandboxes = []
 function baseEnv(sandbox, extra = {}) {
   const env = isolatedChildEnv(process.env, sandbox.agentDir)
   for (const name of Object.keys(env)) {
-    if (name.startsWith("MOCK_DUMP_") || name === "MOCK_SCRIPT_PATH") delete env[name]
+    if (name.toUpperCase().startsWith("GIT_") || name.startsWith("MOCK_DUMP_") || name === "MOCK_SCRIPT_PATH")
+      delete env[name]
   }
   return {
     ...env,
@@ -60,6 +61,8 @@ function baseEnv(sandbox, extra = {}) {
     XDG_DATA_HOME: sandbox.xdgDataHome,
     XDG_CACHE_HOME: sandbox.xdgCacheHome,
     XDG_STATE_HOME: join(sandbox.root, "xdg-state"),
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_CONFIG_GLOBAL: join(sandbox.homeDir, ".gitconfig"),
     ...extra,
   }
 }
@@ -183,8 +186,12 @@ function waitForCompletion(dir, existing) {
   })
 }
 
-function gitLog(repo) {
-  const run = spawnSync("git", ["log", "--format=%s | %ae", "HEAD"], { cwd: repo, encoding: "utf8" })
+function runGit(sandbox, repo, args) {
+  return spawnSync("git", args, { cwd: repo, env: baseEnv(sandbox), encoding: "utf8" })
+}
+
+function gitLog(sandbox, repo) {
+  const run = runGit(sandbox, repo, ["log", "--format=%s | %ae", "HEAD"])
   return run.status === 0 ? run.stdout.trim() : ""
 }
 
@@ -214,7 +221,7 @@ async function scenario1() {
   const repos = memoryRepos(join(sandbox.root, "memory"))
   record("S1 repo created", repos.length === 1, repos.join(", ") || "no identity repo under OMO_MEMORY_HOME")
   if (repos.length !== 1) return
-  const log = gitLog(repos[0])
+  const log = gitLog(sandbox, repos[0])
   record("S1 commit landed", log.includes("seed harness fact for QA"), log || "<empty git log>")
   record("S1 author is identity", log.includes("@omo.local"), log.split("\n")[0] ?? "")
 
@@ -285,11 +292,10 @@ async function scenario2() {
     childSteps: [],
   }
   writeFileSync(join(repo, "mock-script.json"), `${JSON.stringify(childScript, null, 2)}\n`)
-  const scriptCommit = spawnSync("git", ["add", "mock-script.json"], { cwd: repo })
-  if (scriptCommit.status !== 0) return record("S2 child script staging", false, scriptCommit.stderr?.toString() ?? "")
-  const scriptCommitResult = spawnSync("git", ["commit", "-m", "qa: child script"], { cwd: repo })
-  if (scriptCommitResult.status !== 0)
-    return record("S2 child script commit", false, scriptCommitResult.stderr?.toString() ?? "")
+  const scriptCommit = runGit(sandbox, repo, ["add", "mock-script.json"])
+  if (scriptCommit.status !== 0) return record("S2 child script staging", false, scriptCommit.stderr ?? "")
+  const scriptCommitResult = runGit(sandbox, repo, ["commit", "-m", "qa: child script"])
+  if (scriptCommitResult.status !== 0) return record("S2 child script commit", false, scriptCommitResult.stderr ?? "")
 
   writeMockScript(sandbox, { parentSteps: [{ type: "text", text: "triggering turn" }], childSteps: [] })
   writeOmoConfig(sandbox, { trigger: { step_count: 1, on_compaction: false } })
@@ -310,7 +316,7 @@ async function scenario2() {
   )
   record("S2 outcome merged", completion.outcome === "merged", JSON.stringify(completion))
   record("S2 quick category recorded", completion.category === "quick", completion.category)
-  const log = gitLog(repo)
+  const log = gitLog(sandbox, repo)
   record("S2 merge commit landed", /merge\(reflection\)/.test(log), log.split("\n").slice(0, 3).join(" || "))
   record(
     "S2 dreamed fact merged into parent repo",
