@@ -97,17 +97,23 @@ if (process.platform !== "win32") {
       // leaves a supervisor the harness never learned the pid of. Cleanup must still find it by its sandbox.
       test("#given a detached process started in a sandbox #when the harness cleans up #then it is killed although its pid was never recorded", () => {
         const harness = createDaemonEngineHarness()
-        const { env } = harness.sandbox()
-        const orphan = startOrphan(env)
+        let orphan: number | undefined
+        let cleaned = false
         try {
+          const { env } = harness.sandbox()
+          orphan = startOrphan(env)
           expect(alive(orphan)).toBe(true)
+          cleaned = true
           harness.cleanup()
           expect(alive(orphan)).toBe(false)
         } finally {
-          try {
-            process.kill(orphan, "SIGKILL")
-          } catch (error) {
-            if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+          if (!cleaned) harness.cleanup()
+          if (orphan !== undefined) {
+            try {
+              process.kill(orphan, "SIGKILL")
+            } catch (error) {
+              if ((error as NodeJS.ErrnoException).code !== "ESRCH") throw error
+            }
           }
         }
       })
@@ -139,15 +145,18 @@ test("#given an exited child left unreaped on purpose #when the harness waits fo
 
 // A pid read from a child's output can be empty (a launcher that timed out) and parse as 0, which addresses this test
 // runner's own process group; init, this process and this process's group are refused too. No signal is sent here.
-test("#given a pid that is not a separate process #when it is checked as a signal target #then it is refused", () => {
-  const ownGroup = Number(
-    spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }).stdout.trim(),
-  )
-  for (const bad of [Number(""), Number("x"), -5, 1, 1.5, process.pid, ownGroup]) {
-    expect(() => signalTarget(bad, "a fixture")).toThrow("refusing to signal a fixture")
-  }
-  expect(signalTarget(process.pid + 1_000_000, "a fixture")).toBe(process.pid + 1_000_000)
-})
+if (process.platform !== "win32") {
+  test("#given a pid that is not a separate process #when it is checked as a signal target #then it is refused", () => {
+    const lookup = spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" })
+    expect(lookup.status).toBe(0)
+    const ownGroup = Number(lookup.stdout.trim())
+    expect(Number.isSafeInteger(ownGroup) && ownGroup > 1).toBe(true)
+    for (const bad of [Number(""), Number("x"), -5, 1, 1.5, process.pid, ownGroup]) {
+      expect(() => signalTarget(bad, "a fixture")).toThrow("refusing to signal a fixture")
+    }
+    expect(signalTarget(process.pid + 1_000_000, "a fixture")).toBe(process.pid + 1_000_000)
+  })
+}
 
 // The test timeout is only an outer bound: it must end a broken bound with at most half of the job's limit spent, so
 // the rest covers setup and the earlier tests of every CI job that runs these files. Read from the workflow, not copied.

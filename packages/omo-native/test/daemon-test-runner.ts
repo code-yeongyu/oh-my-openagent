@@ -130,10 +130,24 @@ function childTreeCpuSeconds(rootPid: number): number {
 
 // Every signal these tests send goes through this check first. A pid of 0 (or a negative one) addresses a whole
 // process group, and 1 is init, so a bad value parsed from a child's output could kill this test runner's own group
-// or the box: only a positive integer that is neither init, this process nor this process's group is accepted.
-const OWN_PGID = Number(spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" }).stdout.trim())
+// or the box: only a positive integer that is neither init, this process nor this process's group is accepted. The
+// group is looked up on first use (never at import: the Windows suite imports this file and has no ps), and when it
+// cannot be read every target is refused.
+let ownProcessGroup: number | undefined
+function ownPgid(): number {
+  if (ownProcessGroup !== undefined) return ownProcessGroup
+  if (process.platform === "win32") throw new Error("process groups are not signalled on win32")
+  const lookup = spawnSync("ps", ["-o", "pgid=", "-p", String(process.pid)], { encoding: "utf8" })
+  const pgid = Number(lookup.stdout?.trim())
+  if (lookup.status !== 0 || lookup.error !== undefined || !Number.isSafeInteger(pgid) || pgid <= 1) {
+    throw new Error(`cannot read this process's group (ps status ${lookup.status}): refusing every signal target`)
+  }
+  ownProcessGroup = pgid
+  return pgid
+}
+
 export function signalTarget(pid: unknown, what: string): number {
-  if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid <= 1 || pid === process.pid || pid === OWN_PGID) {
+  if (typeof pid !== "number" || !Number.isSafeInteger(pid) || pid <= 1 || pid === process.pid || pid === ownPgid()) {
     throw new Error(`refusing to signal ${what}: ${String(pid)} is not a separate process`)
   }
   return pid
