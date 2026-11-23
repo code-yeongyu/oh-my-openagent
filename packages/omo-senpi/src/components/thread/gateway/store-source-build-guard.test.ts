@@ -43,10 +43,13 @@ function account(options: { readonly sourceBuild: boolean }): { readonly home: s
   return { home, shared }
 }
 
+// Opened read-write without create, never read-only: the store worker leaves the file in WAL mode, and SQLite on macOS
+// refuses a read-only open of a WAL database whose -shm file is gone (SQLITE_CANTOPEN). Reading
+// user_version writes no schema; the header bytes alone are not enough, since a migration may still sit in the WAL.
 function userVersion(agentDir: string): number | undefined {
   const path = gatewayDatabasePath(agentDir)
   if (!existsSync(path)) return undefined
-  const db = new Database(path, { readonly: true })
+  const db = new Database(path, { readwrite: true, create: false })
   try {
     return (db.query("PRAGMA user_version").get() as { user_version: number }).user_version
   } finally {
