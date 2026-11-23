@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
 
-import { createDaemonTestRunner, RUNAWAY_CAP_MS, SpawnBudgetError } from "./daemon-test-runner"
+import { createDaemonTestRunner, TREE_BOUNDED_TEST_TIMEOUT_MS, SpawnBudgetError } from "./daemon-test-runner"
 
 const { run, killChildren } = createDaemonTestRunner()
-setDefaultTimeout(RUNAWAY_CAP_MS + 5_000)
+setDefaultTimeout(TREE_BOUNDED_TEST_TIMEOUT_MS)
 afterEach(killChildren)
 
 if (process.platform !== "win32") {
@@ -31,6 +31,18 @@ if (process.platform !== "win32") {
           stallMs: 1_500,
         })
         expect(result.exitCode).toBe(0)
+      })
+
+      test("#given a child that keeps burning CPU #when its tree passes the runaway CPU cap #then it is killed as a runaway", async () => {
+        let rejection: unknown
+        try {
+          // Spins forever: never stalls, so only the CPU cap can end it, however loaded the host is.
+          await run("node", ["-e", "for(;;){}"], process.env, { cpuCapS: 2 })
+        } catch (error) {
+          rejection = error
+        }
+        expect(rejection).toBeInstanceOf(SpawnBudgetError)
+        expect(String(rejection)).toContain("over the 2s runaway CPU cap")
       })
     })
   })

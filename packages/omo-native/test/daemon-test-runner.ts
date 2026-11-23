@@ -4,15 +4,62 @@ import { type ChildProcess, spawn, spawnSync } from "node:child_process"
 // #11845: a starved-but-working child must not die at a wall-clock deadline. A cold daemon start on a
 // CPU-starved shard container legitimately needs multiples of its quiet-box wall time, and the CLI spends
 // its whole life blocked in spawnSync while the daemon tree does the work — so the only honest progress
-// signal is CPU time of the child's whole descendant tree. Kill on CPU stall, bound the runaway, and let
-// bun's test timeout sit above both.
+// signal is CPU time of the child's whole descendant tree. Kill on CPU stall, bound the runaway in CPU time too
+// (#14676: a 120 s wall-clock runaway cap killed a `host ensure` still making progress at load 10-29), and let
+// bun's test timeout sit above both as an outer bound only.
 export const STALL_KILL_MS = 10_000
-export const RUNAWAY_CAP_MS = 120_000
+// A runaway is a tree that keeps burning CPU without finishing, so it is capped in tree CPU seconds, which a loaded
+// host does not inflate the way it inflates wall time. A quiet cold `host ensure` used 6.4-8.7 s of tree CPU on a
+// 2-CPU Linux container and 11.5-17.1 s on an M-series Mac; under 4.2x and 8x oversubscription it used 8.4-10.2 s while
+// its wall time grew to 25-78 s (#14676). The cap is about 3x the largest quiet measurement.
+export const RUNAWAY_CPU_CAP_S = 50
+// Bun's per-test timeout for tests bounded this way: the test-linux job limit (15 min) minus a minute, so a broken
+// bound still fails inside the job with the test's name instead of as a cancelled job.
+export const TREE_BOUNDED_TEST_TIMEOUT_MS = 14 * 60_000
 const PROGRESS_SAMPLE_MS = 250
 // Two scheduler quanta: less than this between samples is scheduling noise, not work.
 const PROGRESS_EPSILON_S = 0.02
 export class SpawnBudgetError extends Error {
   override name = "SpawnBudgetError"
+}
+
+export type TreeBound =
+  | { readonly kind: "stalled"; readonly stalledForS: number; readonly cpuS: number }
+  | { readonly kind: "runaway"; readonly cpuS: number }
+
+export function describeTreeBound(bound: TreeBound, cpuCapS = RUNAWAY_CPU_CAP_S): string {
+  switch (bound.kind) {
+    case "stalled":
+      return `made no CPU progress for ${bound.stalledForS}s (tree cpu ${bound.cpuS.toFixed(2)}s): stalled, not slow`
+    case "runaway":
+      return `burned ${bound.cpuS.toFixed(2)}s of tree CPU without finishing, over the ${cpuCapS}s runaway CPU cap`
+  }
+}
+
+// Samples the CPU time of the tree rooted at pid and calls onBound once, when the tree stops advancing for stallMs
+// or passes cpuCapS. Neither bound reads the wall clock as a budget, so host load cannot trip them. Returns stop().
+export function watchTreeProgress(
+  pid: number,
+  onBound: (bound: TreeBound) => void,
+  { stallMs = STALL_KILL_MS, cpuCapS = RUNAWAY_CPU_CAP_S }: { stallMs?: number; cpuCapS?: number } = {},
+): () => void {
+  let lastCpu = -1
+  let lastAdvance = Date.now()
+  const sampler = setInterval(() => {
+    const cpu = childTreeCpuSeconds(pid)
+    if (cpu < 0) return
+    if (cpu > cpuCapS) {
+      clearInterval(sampler)
+      onBound({ kind: "runaway", cpuS: cpu })
+    } else if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
+      lastCpu = cpu
+      lastAdvance = Date.now()
+    } else if (Date.now() - lastAdvance >= stallMs) {
+      clearInterval(sampler)
+      onBound({ kind: "stalled", stalledForS: Math.round((Date.now() - lastAdvance) / 1000), cpuS: cpu })
+    }
+  }, PROGRESS_SAMPLE_MS)
+  return () => clearInterval(sampler)
 }
 
 // Linux: sum utime+stime+cutime+cstime over the /proc subtree rooted at the child. The CLI's own utime
@@ -85,9 +132,13 @@ export function createDaemonTestRunner() {
   // A cold `node` start on a loaded host can take longer than any fixed per-spawn budget (#9679), so each child
   // runs until it closes. The bounds are progress-shaped (#11845): a child whose descendant tree stops making
   // CPU progress for stallMs is killed as stalled; a child that keeps making progress is bounded only by the
-  // runaway cap. Both rejections name the command and its output.
-  function run(command: string, args: readonly string[], env: NodeJS.ProcessEnv, options: { stallMs?: number } = {}) {
-    const stallMs = options.stallMs ?? STALL_KILL_MS
+  // runaway CPU cap. Both rejections name the command and its output.
+  function run(
+    command: string,
+    args: readonly string[],
+    env: NodeJS.ProcessEnv,
+    options: { stallMs?: number; cpuCapS?: number } = {},
+  ) {
     return new Promise<{ exitCode: number; stdout: string; stderr: string }>((resolvePromise, reject) => {
       const child = spawn(command, [...args], { env, stdio: ["ignore", "pipe", "pipe"] })
       runningChildren.add(child)
@@ -103,43 +154,26 @@ export function createDaemonTestRunner() {
       const settle = (finish: () => void): void => {
         if (settled) return
         settled = true
-        clearInterval(sampler)
-        clearTimeout(capTimer)
+        stopWatch()
         finish()
       }
-      const capTimer = setTimeout(() => {
-        child.kill("SIGKILL")
-        settle(() =>
-          reject(
-            new SpawnBudgetError(
-              `${command} ${args.join(" ")} exceeded the ${RUNAWAY_CAP_MS}ms runaway cap while still making CPU progress\nstdout: ${stdout}\nstderr: ${stderr}`,
-            ),
-          ),
-        )
-      }, RUNAWAY_CAP_MS)
-      let lastCpu = -1
-      let lastAdvance = Date.now()
-      const sampler = setInterval(() => {
-        if (child.pid === undefined) return
-        const cpu = childTreeCpuSeconds(child.pid)
-        if (cpu < 0) return
-        if (cpu >= lastCpu + PROGRESS_EPSILON_S) {
-          lastCpu = cpu
-          lastAdvance = Date.now()
-          return
-        }
-        if (Date.now() - lastAdvance >= stallMs) {
-          child.kill("SIGKILL")
-          const stalledFor = Math.round((Date.now() - lastAdvance) / 1000)
-          settle(() =>
-            reject(
-              new SpawnBudgetError(
-                `${command} ${args.join(" ")} made no CPU progress for ${stalledFor}s (tree cpu ${cpu.toFixed(2)}s): stalled, not slow\nstdout: ${stdout}\nstderr: ${stderr}`,
-              ),
-            ),
-          )
-        }
-      }, PROGRESS_SAMPLE_MS)
+      const stopWatch =
+        child.pid === undefined
+          ? () => {}
+          : watchTreeProgress(
+              child.pid,
+              (bound) => {
+                child.kill("SIGKILL")
+                settle(() =>
+                  reject(
+                    new SpawnBudgetError(
+                      `${command} ${args.join(" ")} ${describeTreeBound(bound, options.cpuCapS)}\nstdout: ${stdout}\nstderr: ${stderr}`,
+                    ),
+                  ),
+                )
+              },
+              options,
+            )
       child.on("error", (error) => {
         settle(() => {
           runningChildren.delete(child)
