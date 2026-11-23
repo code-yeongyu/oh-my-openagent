@@ -26,10 +26,12 @@ export function taskSnapshot(
   const finalResponse = bounded(record.final_response, MAX_SNAPSHOT_TEXT_LENGTH)
   const errorMessage = bounded(record.error_message, MAX_SNAPSHOT_TEXT_LENGTH)
   const awaitingInput = awaitingInputDetails(record)
+  const nickname = bounded(record.nickname, 32).value
   return {
     ...recordSummary(record, true),
     task_id: boundedRequired(record.task_id, MAX_TASK_ID_LENGTH),
     name: bounded(record.name, MAX_SNAPSHOT_TEXT_LENGTH).value,
+    ...(nickname === undefined ? {} : { nickname }),
     task_summary: bounded(record.task_summary, MAX_SNAPSHOT_TEXT_LENGTH).value,
     description: description.value,
     agent_type: bounded(record.agent_type, MAX_SNAPSHOT_TEXT_LENGTH).value,

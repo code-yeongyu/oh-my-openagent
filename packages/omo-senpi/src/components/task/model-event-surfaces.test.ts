@@ -2,9 +2,29 @@ import { describe, expect, it } from "bun:test"
 
 import { taskRecord } from "./event-bridge.test-fixtures"
 import { wireHarness } from "./event-bridge.test-harness"
-import { formatTaskRow } from "./status-row-format"
+import { backgroundWidgetRows, formatTaskRow } from "./status-row-format"
 
 describe("effective model surfaces (F12)", () => {
+  it("exposes nicknames independently of the handle in task views and update snapshots", async () => {
+    const record = taskRecord({ task_id: "st_nickname", nickname: "Selene", name: "worker", status: "running" })
+    const legacy = taskRecord({ task_id: "st_legacy", name: "old-worker", status: "running" })
+    expect(formatTaskRow(record)).toContain("Selene · Inspect native task events (st_nickname) name:worker")
+    expect(backgroundWidgetRows([record, legacy], new Map(), Date.parse(record.created_at))[0]).toContain("Selene")
+    const { pi } = wireHarness("parent-session", {
+      records: { [record.task_id]: record, [legacy.task_id]: legacy },
+      withRpc: true,
+    })
+    await pi.dispatch("session_start", {}, {})
+    const payload = pi.rpcEvents.find((event) => event.name === "omo.task.updated")?.data as {
+      tasks: Array<Record<string, unknown>>
+    }
+    expect(payload.tasks.find((task) => task.task_id === record.task_id)).toMatchObject({
+      nickname: "Selene",
+      name: "worker",
+    })
+    expect(payload.tasks.find((task) => task.task_id === legacy.task_id)).not.toHaveProperty("nickname")
+  })
+
   it("#given a child switched by an operator #when /tasks renders #then the row names the live model with the operator mark", () => {
     const record = taskRecord({
       task_id: "st_operator_switch",

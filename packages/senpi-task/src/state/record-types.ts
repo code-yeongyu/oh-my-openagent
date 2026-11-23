@@ -89,6 +89,8 @@ export type PendingSteeringEntry = {
 export type TaskRecordInput = {
   readonly task_id?: string
   readonly name?: string
+  /** Spawn-time presentation label; never an address or identity. */
+  readonly nickname?: string
   readonly task_summary?: string
   readonly description?: string
   readonly parent_session_id: string

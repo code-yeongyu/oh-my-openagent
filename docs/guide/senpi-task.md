@@ -99,6 +99,42 @@ There is no `team_wait` tool. When the next step depends on a reply, send with `
 
 ## Configuration
 
+### Worker nicknames
+
+`task.nicknames` is optional. Define each set once and reference it from any
+number of exact `provider/model` IDs, agent names, or category names:
+
+```jsonc
+{
+  "task": {
+    "nicknames": {
+      "sets": {
+        "moon": ["Selene", "Io", "Callisto"],
+        "sun": ["Helios", "Flare", "Corona"],
+        "general": ["Atlas", "Kite", "Moss"]
+      },
+      "models": {
+        "chatgpt-subscription/gpt-6-luna": "moon",
+        "chatgpt-subscription/gpt-6.2-sol": "sun"
+      },
+      "agents": { "explore": "moon" },
+      "categories": { "writing": "general" },
+      "default": "general"
+    }
+  }
+}
+```
+
+The resolved spawn model takes priority, then the requested agent or category,
+then `default`. No match means no nickname. Use nonempty sets with short,
+printable labels (1–32 characters after trimming). Nicknames may repeat and
+stay fixed across model fallback and resume. They are not steering addresses:
+continue to use the task's `name` or `task_id`.
+
+Passive consumers can read the optional top-level `nickname` string from the
+linked native task record or an `omo.task.updated` task snapshot. Older or
+unconfigured tasks omit it.
+
 ### Checkout isolation
 
 The task tool accepts `isolated`, `apply`, and `merge` on a single request or

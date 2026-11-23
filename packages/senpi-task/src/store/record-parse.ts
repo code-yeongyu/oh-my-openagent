@@ -47,6 +47,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
   const status = readTaskStatus(value)
   const updatedAt = readString(value, "updated_at")
   const name = readOptionalString(value, "name")
+  const nickname = readOptionalString(value, "nickname")
   const taskSummary = readOptionalString(value, "task_summary")
   const description = readOptionalString(value, "description")
   const agentType = readOptionalString(value, "agent_type")
@@ -136,6 +137,7 @@ export function parseTaskRecord(value: unknown, path: string, warnings?: string[
     ...(terminalAt === undefined && !TERMINAL_STATUSES.has(status) ? {} : { terminal_at: terminalAt ?? updatedAt }),
     ...(name === undefined ? {} : { name }),
     ...(taskSummary === undefined ? {} : { task_summary: taskSummary }),
+    ...(nickname === undefined ? {} : { nickname }),
     ...(description === undefined ? {} : { description }),
     ...(agentType === undefined ? {} : { agent_type: agentType }),
     ...(category === undefined ? {} : { category }),

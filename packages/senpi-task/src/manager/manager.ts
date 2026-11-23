@@ -623,6 +623,7 @@ class TaskManagerImpl implements TaskManager {
             name: "",
             executionMode,
             taskSeq: this.#taskSequence.next(spec.parent_session_id),
+            nicknames: this.#options.config.nicknames,
           }),
           ...(owner === undefined ? {} : { owner }),
         },

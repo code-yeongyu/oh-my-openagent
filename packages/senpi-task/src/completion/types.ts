@@ -22,6 +22,7 @@ export type CompletionDetails = {
   readonly runRef?: RunRef
   readonly task_id: string
   readonly name: string
+  readonly nickname?: string
   readonly status: TaskStatus
   readonly category?: string
   readonly agent_type?: string

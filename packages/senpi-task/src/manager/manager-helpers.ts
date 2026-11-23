@@ -1,4 +1,5 @@
 import { join } from "node:path"
+import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 
 import { isSpawnSpecV1, type BackgroundMode, type SpawnSpecV1, type TaskRecord, type TaskRecordInput } from "../state"
 import type { ResolvedModelRecord } from "../state"
@@ -57,13 +58,25 @@ export function buildRecordInput(input: {
   readonly name: string
   readonly executionMode: ExecutionMode
   readonly taskSeq: number
+  readonly nicknames?: OmoTaskSettings["nicknames"]
 }): TaskRecordInput {
-  const { spec, plan, name, executionMode, taskSeq } = input
+  const { spec, plan, name, executionMode, taskSeq, nicknames } = input
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
+  const model = plan.resolved_model
+  const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
+  const set =
+    ownValue(nicknames?.models, modelId) ??
+    (spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
+      ? ownValue(nicknames?.agents, agentType)
+      : ownValue(nicknames?.categories, category)) ??
+    nicknames?.default
+  const pool = ownValue(nicknames?.sets, set)
+  const nickname = pool?.[taskSeq % pool.length]
   const runInBackground = spec.run_in_background === true
   return {
     name,
+    ...(nickname === undefined ? {} : { nickname }),
     task_seq: taskSeq,
     // The spawn-time mode. A foreground task later handed off with promoteToBackground becomes
     // "promoted", which notify_on_terminal alone cannot distinguish from a background spawn.
@@ -88,6 +101,10 @@ export function buildRecordInput(input: {
     ...(plan.toolAllowlist !== undefined ? { tool_allow: plan.toolAllowlist } : {}),
     ...(plan.toolDenylist !== undefined ? { tool_deny: plan.toolDenylist } : {}),
   }
+}
+
+function ownValue<T>(record: Readonly<Record<string, T>> | undefined, key: string | undefined): T | undefined {
+  return record !== undefined && key !== undefined && Object.hasOwn(record, key) ? record[key] : undefined
 }
 
 // Background mode after promoteToBackground runs. A task already running in the background keeps

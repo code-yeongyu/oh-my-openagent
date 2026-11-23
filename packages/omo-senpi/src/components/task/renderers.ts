@@ -62,12 +62,14 @@ export const renderTeamMemberLiveness: MessageRenderer<TeamMemberLivenessDetails
 
 function completionNotice(detail: CompletionDetails): NoticeSpec {
   const status = normalizeRendererText(detail.status)
+  const name = normalizeRendererText(detail.name)
+  const label = detail.nickname === undefined ? name : `${normalizeRendererText(detail.nickname)} · ${name}`
   const response = normalizeRendererText(detail.final_response).trim()
   const continuation = normalizeRendererText(detail.continuation_hint).trim()
   const resultFile =
     detail.final_response_file === undefined ? undefined : normalizeRendererText(detail.final_response_file)
   return {
-    title: `${statusGlyph(detail.status)} Task complete · ${normalizeRendererText(detail.name)}`,
+    title: `${statusGlyph(detail.status)} Task complete · ${label}`,
     tone: statusTone(detail.status),
     why: response.length === 0 ? `Task ${status}.` : response,
     extra: [
