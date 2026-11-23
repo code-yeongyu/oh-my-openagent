@@ -345,7 +345,7 @@ The OpenCode edition and Senpi (OmO Native) ship the same categories, and Senpi 
 
 | Category | OpenCode default | Senpi default | Description |
 | --- | --- | --- | --- |
-| `visual-engineering` | `anthropic/claude-fable-5-2` (max) | `anthropic/claude-fable-5-2` (max) | Visual design, UI/UX, frontend, styling, animation, design systems. Falls back to `claude-fable-5-1` (max) first. |
+| `visual-engineering` | `anthropic/claude-fable-5-2` (max) | `anthropic-subscription/claude-fable-5-2` (max) | Visual design, UI/UX, frontend, styling, animation, design systems. Falls back to `claude-fable-5-1` (max) first. |
 | `architect` | - | `anthropic/claude-fable-5-2` (xhigh) | Senpi only. Big-picture system design and broad debugging across many sources. Falls back only to `claude-fable-5-1` (xhigh); unavailable without one of the two. |
 | `ultrabrain` | `openai/gpt-6.2-astra` (max) | `chatgpt-subscription/gpt-6.2-astra` (max) | Deep logical reasoning, complex architecture. No fallback model: unavailable without `gpt-6.2-astra`. |
 | `deep-low` | `openai/gpt-6.2-sol` (medium) | `chatgpt-subscription/gpt-6.2-sol` (medium) | Default deep lane: 3D graphics, computer use, browser use, backend, logic, algorithms, CAPTCHA solving, multimodal, and complex research whose decisions the child can settle from evidence. No fallback model, Fast tier included: unavailable without `gpt-6.2-sol`. |

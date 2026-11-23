@@ -37,10 +37,11 @@ describe("visual-engineering and writing routing", () => {
     })
   })
 
-  test("visual-engineering and writing choose different primaries when both are available", () => {
+  test("visual-engineering keeps the subscription-first rung while writing keeps its own primary", () => {
     const models = registry([
       model(ARGON_RUNG.providers[0], ARGON_RUNG.model),
       model("anthropic", "claude-fable-5-2"),
+      model("anthropic-subscription", "claude-fable-5-2"),
       model("anthropic", "claude-opus-5-5"),
     ])
 
@@ -48,7 +49,7 @@ describe("visual-engineering and writing routing", () => {
     const writing = expectResolved(resolveCategory("writing", {}, models))
 
     expect(visual.modelSelection).toMatchObject({
-      selectedModel: "anthropic/claude-fable-5-2",
+      selectedModel: "anthropic-subscription/claude-fable-5-2",
       matchedFallback: false,
     })
     expect(visual.spec.variant).toBe("max")
