@@ -306,7 +306,9 @@ try {
 ```
 
 `pluginRoot` is `<omo-ai install>/plugin`. Every method resolves to the same data union as the
-CLI's JSON; nothing throws for a refusal. Endpoints come from the endpoint registry on disk; pass
+CLI's JSON; nothing throws for a refusal. Like `omo thread`, it lists, reads and addresses the threads on the
+account's other devices through this device's device service, loaded on the first call that needs another device
+and closed by `dispose()`. Endpoints come from the endpoint registry on disk; pass
 `engineStatusAll` (a function returning the stdout of `omo host status --all --include-workers --json`) only to
 enumerate from that report instead. Neither the SDK nor `omo thread` runs that command itself: it is a full
 diagnostic pass that took 8-9 s on a host with about 50 endpoints.

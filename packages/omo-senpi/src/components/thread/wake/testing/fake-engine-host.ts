@@ -97,6 +97,12 @@ export type FakeEngineOptions = {
   readonly openRefusal?: (path: string) => Reply | undefined
   /** Answers `warm`; absent, the host warms its default profile. */
   readonly warm?: () => Reply
+  /**
+   * Runs the woken session's drain pass for `wake` and answers with what it admitted, only once that pass has ended, as
+   * senpi's host does (`host-session-control.ts`: the answer to `wake` is the outcome of the pass that covered it).
+   * Absent, `wake` answers at once with nothing admitted.
+   */
+  readonly wakePass?: (path: string) => Promise<readonly string[]>
 }
 
 /**
@@ -135,7 +141,7 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
     ...(errorData === undefined ? {} : { errorData }),
   })
 
-  const answer = (socket: Socket, frame: Frame): Reply => {
+  const answer = (socket: Socket, frame: Frame): Reply | Promise<Reply> => {
     const held = holders.get(socket) ?? new Set<string>()
     holders.set(socket, held)
     switch (frame.type) {
@@ -174,8 +180,12 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
         }
       case "warm":
         return options.warm?.() ?? { success: true, data: { state: "warmed" } }
-      case "wake":
-        return pathOf(frame) === undefined ? refuse("unknown_session") : { success: true, data: { admitted: [] } }
+      case "wake": {
+        const path = pathOf(frame)
+        if (path === undefined) return refuse("unknown_session")
+        if (options.wakePass === undefined) return { success: true, data: { admitted: [] } }
+        return options.wakePass(path).then((admitted) => ({ success: true, data: { admitted } }))
+      }
       case "release_session": {
         const path = pathOf(frame)
         if (path === undefined) return refuse("unknown_session")
@@ -235,8 +245,10 @@ export async function startFakeEngineHost(options: FakeEngineOptions = {}): Prom
           const frame = JSON.parse(buffer.slice(0, newline)) as Frame
           buffer = buffer.slice(newline + 1)
           if (frame.type !== "get_protocol_info") frames.push(frame)
-          const reply = answer(socket, frame)
-          socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...reply })}\n`)
+          void Promise.resolve(answer(socket, frame)).then((reply) => {
+            if (!socket.destroyed)
+              socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, ...reply })}\n`)
+          })
         }
       })
     }),
