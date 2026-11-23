@@ -521,7 +521,13 @@ export async function buildExtension(options = {}) {
     buildDefines,
     sdkExternalSpecifiers,
   )
-  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, sdkExternalSpecifiers)
+  // #14616: the SDK's default account surface loads the plugin's thread client and device-account sidecars at run time
+  // through the plugin manifest's import map, so neither is inlined into it.
+  const threadSdkInputs = await buildEntry(threadSdkEntryPath, threadSdkOutput, buildDefines, [
+    ...sdkExternalSpecifiers,
+    "#omo-thread-client-runtime",
+    "#omo-device-account-runtime",
+  ])
   // Bundling inlines assets.ts but its markdown is read from disk at runtime next to the bundle,
   // so the persona and the computer-use prelude are staged into the directory the loader runs from.
   await Promise.all([
