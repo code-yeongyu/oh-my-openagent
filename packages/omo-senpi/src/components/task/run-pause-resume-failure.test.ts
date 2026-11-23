@@ -187,8 +187,16 @@ test("two partial Resumes warn only the original parent once each on return, eve
   expect(unrelatedNotices).toEqual([])
 
   const returned = new EngineRunPauseBridge(h.bridge.controller, runtime)
-  capture(PARENT, released(8), parentNotices)
+  runtime.captureFrom({
+    sessionManager: { getSessionId: () => PARENT },
+    getPauseState: () => released(8),
+  })
   await returned.restore(PARENT)
+  await returned.reconciled(PARENT)
+  expect(parentNotices).toEqual([])
+  expect(unrelatedNotices).toEqual([])
+
+  capture(PARENT, released(8), parentNotices)
   await returned.reconciled(PARENT)
   expect(parentNotices).toEqual([
     { text: expect.stringContaining("native_resume_refused"), level: "warning" },

@@ -82,6 +82,8 @@ export class TaskRuntimeContext {
   #sessionId: string | undefined
   #sessionFile: string | undefined
   #mode: string | undefined
+  #hasSessionUi = false
+  #hasSessionMode = false
   #projectTrusted: boolean | undefined
 
   constructor(cwd: string) {
@@ -99,14 +101,21 @@ export class TaskRuntimeContext {
     if (ctx.sessionManager !== undefined) {
       const sessionId = ctx.sessionManager.getSessionId()
       if (sessionId !== this.#sessionId) {
-        this.#ui = undefined
-        this.#mode = undefined
+        // Partial captures retain the shared UI and mode, but they cannot authorize a Resume notice.
+        this.#hasSessionUi = false
+        this.#hasSessionMode = false
       }
       this.#sessionId = sessionId
       this.#sessionFile = ctx.sessionManager.getSessionFile?.()
     }
-    if (ctx.ui !== undefined) this.#ui = ctx.ui
-    if (typeof ctx.mode === "string") this.#mode = ctx.mode
+    if (ctx.ui !== undefined) {
+      this.#ui = ctx.ui
+      this.#hasSessionUi = ctx.sessionManager !== undefined
+    }
+    if (typeof ctx.mode === "string") {
+      this.#mode = ctx.mode
+      this.#hasSessionMode = ctx.sessionManager !== undefined
+    }
     if (typeof ctx.isIdle === "function") this.#idle = ctx.isIdle()
     if (typeof ctx.isProjectTrusted === "function") this.#projectTrusted = ctx.isProjectTrusted()
   }
@@ -175,8 +184,10 @@ export class TaskRuntimeContext {
       this.#transition === "session_shutdown"
     )
       return false
-    if (this.#mode !== "print" && this.#mode !== "json" && this.#ui === undefined) return false
-    notifyTaskUser({ mode: this.#mode, ui: this.#ui }, text, "warning")
+    const mode = this.#hasSessionMode ? this.#mode : undefined
+    const ui = this.#hasSessionUi ? this.#ui : undefined
+    if (mode !== "print" && mode !== "json" && ui === undefined) return false
+    notifyTaskUser({ mode, ui }, text, "warning")
     return true
   }
 
