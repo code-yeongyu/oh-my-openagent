@@ -60,9 +60,10 @@ an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device par
 `here`, a device name or a unique device-id prefix; the thread part resolves among that device's
 threads only). Names match after Unicode normalization, case folding and whitespace collapsing,
 and an address may resolve to a thread on another of the account's devices: `read` and `locate`
-reach it there. `send` resolves it too, but the other device's engine admits no command-line
-sender, so a send answers `unsupported` with `details.reason: "sender_not_allowed"`
-naming the device. `self` names the calling session, which `omo thread`
+reach it there. `send` resolves it too and delivers it the way `omo remote send` does: the other
+device's engine admits no command-line delivery from another machine, so the text goes as this
+user's own input (a prompt under principal `person:<uid>`, no delivery envelope) and the result
+names the `device` that answered, with no local `message_seq` or `endpoint_kind`. `self` names the calling session, which `omo thread`
 (principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without
 `--all-scope` only sessions in the current directory's workspace resolve (the
 same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
