@@ -4,15 +4,18 @@
 // materialized from ci.yml at the run's exact SHA, must equal RELEASE_PROOF_CONTRACT, and must have passed.
 
 import { readFileSync } from "node:fs"
+import { createHash } from "node:crypto"
 import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // Every job and step the release accepts, and the only completed skips it accepts (each with its reason).
 // A skips entry without steps lets the whole job be skipped; with steps, only those steps of a successful job.
 // Failure, neutral and cancellation are never accepted. Change it together with ci.yml.
-const { jobs: RELEASE_PROOF_CONTRACT, allowedSkips: ALLOWED_SKIPS } = JSON.parse(
-  readFileSync(new URL("./release-proof-contract.json", import.meta.url), "utf8"),
-)
+const {
+  jobs: RELEASE_PROOF_CONTRACT,
+  allowedSkips: ALLOWED_SKIPS,
+  workflowSha256,
+} = JSON.parse(readFileSync(new URL("./release-proof-contract.json", import.meta.url), "utf8"))
 export { ALLOWED_SKIPS, RELEASE_PROOF_CONTRACT }
 
 // The Actions runner adds these around a job's declared steps; nothing else is accepted.
@@ -212,6 +215,21 @@ export function verifyPushValidation(workflow, pages, contract = RELEASE_PROOF_C
       problems.push(`ci.yml declares steps for ${name} that differ from the contract: ${describe(job.steps)}`)
   }
   if (problems.length > 0) return problems
+
+  // Names alone cannot distinguish real checks from no-ops, or bind if, env,
+  // uses, inputs, defaults and continue-on-error. Pin the parsed definition
+  // as a whole (including inherited settings); leave array order significant.
+  const definition = JSON.stringify(workflow, (_, value) =>
+    isMapping(value)
+      ? Object.fromEntries(
+          Object.keys(value)
+            .sort()
+            .map((key) => [key, value[key]]),
+        )
+      : value,
+  )
+  if (createHash("sha256").update(definition).digest("hex") !== workflowSha256)
+    return ["ci.yml executable definition differs from the reviewed release proof contract"]
 
   if (
     !Array.isArray(pages) ||

@@ -55,6 +55,38 @@ export const isReleaseNotesPath = (path) => matches(PROSE_PATHS, path)
 const git = (args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
 const versionAt = (commit, manifest) => JSON.parse(git(["show", `${commit}:${manifest}`])).version
 
+// The release metadata, not the stamp's own manifests, specifies what will
+// be published. Inspect the pin's inventory too: deletion is not an opt-out.
+export function versionRefusals(pin, stamp, version, nativeVersion) {
+  if (!version || !nativeVersion) return ["missing expected release metadata versions"]
+  const required = new Set([
+    "package.json",
+    "packages/omo-native/package.json",
+    "packages/omo-senpi/package.json",
+    "packages/omo-senpi/plugin/package.json",
+    "packages/omo-codex/package.json",
+    "packages/omo-codex/plugin/package.json",
+    "packages/omo-codex/plugin/.codex-plugin/plugin.json",
+  ])
+  for (const commit of [pin, stamp]) {
+    for (const path of git(["ls-tree", "-rz", "--name-only", commit, "--", "packages"]).split("\0")) {
+      if (/^packages\/(?:oh-my-opencode-[^/]+|omo-codex\/plugin\/components\/[^/]+)\/package\.json$/.test(path))
+        required.add(path)
+    }
+  }
+  const errors = []
+  for (const path of required) {
+    const expected = path === "packages/omo-native/package.json" ? nativeVersion : version
+    if (versionAt(stamp, path) !== expected) errors.push(`${path}: expected release version ${expected}`)
+  }
+  for (const [name, value] of Object.entries(
+    JSON.parse(git(["show", `${stamp}:package.json`])).optionalDependencies ?? {},
+  )) {
+    if (value !== version) errors.push(`package.json: expected optional dependency ${name} at ${version}`)
+  }
+  return errors
+}
+
 // Every reason base..head is not a release stamp; empty when it is one. Renames are listed as a delete plus an add, so a
 // source file moved into a listed path still shows its deletion.
 export function stampRefusals(base, head) {
@@ -102,10 +134,14 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
       .split("\0")
       .filter((path) => path.length > 0 && !isReleaseStatePath(path))
       .map((path) => `${path}: outside RELEASE_STATE_PATHS`)
+  } else if (mode === "--check-versions" && base !== undefined && head !== undefined) {
+    refusals = versionRefusals(base, head, process.argv[5], process.argv[6])
   } else if (mode === "--check-stamp" && base !== undefined && head !== undefined) {
     refusals = stampRefusals(base, head)
   } else {
-    throw new Error("usage: release-state-paths.mjs --check < paths | --check-stamp <base> <head>")
+    throw new Error(
+      "usage: release-state-paths.mjs --check < paths | --check-stamp <pin> <stamp> | --check-versions <pin> <stamp> <version> <native-version>",
+    )
   }
   if (refusals.length > 0) {
     process.stderr.write(`Not a release stamp (script/release-state-paths.mjs):\n${refusals.join("\n")}\n`)

@@ -3,9 +3,9 @@ import { execFileSync } from "node:child_process"
 import { lstatSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { isGeneratedReleasePath, isReleaseNotesPath, stampRefusals } from "./release-state-paths.mjs"
+import { isGeneratedReleasePath, isReleaseNotesPath, stampRefusals, versionRefusals } from "./release-state-paths.mjs"
 
-const [pin, stamp] = process.argv.slice(2)
+const [pin, stamp, version, nativeVersion] = process.argv.slice(2)
 const run = (cmd, args, cwd = process.cwd()) =>
   execFileSync(cmd, args, { cwd, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
 const git = (...args) => run("git", args)
@@ -13,7 +13,7 @@ if (![pin, stamp].every((sha) => /^[0-9a-f]{40}$/.test(sha))) throw new Error("e
 if (git("rev-parse", "HEAD").trim() !== stamp || git("rev-parse", `${stamp}^1`).trim() !== pin)
   throw new Error("stamp checkout or parent mismatch")
 git("diff", "--quiet", stamp, "--")
-const refused = stampRefusals(pin, stamp)
+const refused = [...versionRefusals(pin, stamp, version, nativeVersion), ...stampRefusals(pin, stamp)]
 if (refused.length) throw new Error(refused.join("\n"))
 
 const changed = git("diff", "--no-renames", "--name-only", "-z", pin, stamp).split("\0").filter(Boolean)
@@ -31,7 +31,6 @@ const scratch = mkdtempSync(join(tmpdir(), "release-stamp-proof-"))
 const basis = join(scratch, "pin")
 try {
   git("worktree", "add", "--quiet", "--detach", basis, pin)
-  const version = JSON.parse(git("show", `${stamp}:package.json`)).version
   const date = new Date(Number(git("show", "-s", "--format=%ct", stamp)) * 1000).toISOString().slice(0, 10)
   run("bun", ["script/stamp-release-changelog.ts", version, date], basis)
   run("git", ["add", "-A"], basis)

@@ -963,7 +963,7 @@ jobs:
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   verify-exact-pinned-stamp:
-    needs: [prepare-release-state]
+    needs: [prepare-release-state, release-metadata]
     if: inputs.source_sha != ''
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -988,6 +988,8 @@ jobs:
         env:
           PIN: ${{ inputs.source_sha }}
           STAMP: ${{ needs.prepare-release-state.outputs.release_sha }}
+          VERSION: ${{ needs.release-metadata.outputs.version }}
+          NATIVE_VERSION: ${{ needs.release-metadata.outputs.omo_ai_version }}
         run: |
           set -euo pipefail
           proof="$(mktemp -d)"
@@ -995,6 +997,7 @@ jobs:
           for file in release-state-paths.mjs verify-release-stamp-tree.mjs; do
             git show "${GITHUB_SHA}:script/${file}" > "$proof/$file"
           done
+          node "$proof/release-state-paths.mjs" --check-versions "$PIN" "$STAMP" "$VERSION" "$NATIVE_VERSION"
           if ! node "$proof/release-state-paths.mjs" --check-stamp "$PIN" "$STAMP"; then
             # Never execute a generated artifact or generator from a source-changing delta.
             # This is not proof: both tag paths must instead establish CI for the stamp SHA.
@@ -1004,7 +1007,7 @@ jobs:
           # Keep runner tokens, package credentials and user Git config out of repo generators.
           mkdir "$proof/home"
           env -i PATH="$PATH" HOME="$proof/home" CI=true GIT_CONFIG_NOSYSTEM=1 \
-            node "$proof/verify-release-stamp-tree.mjs" "$(git rev-parse --verify "$PIN")" "$STAMP"
+            node "$proof/verify-release-stamp-tree.mjs" "$(git rev-parse --verify "$PIN")" "$STAMP" "$VERSION" "$NATIVE_VERSION"
 
       - name: Write job summary
         if: always()

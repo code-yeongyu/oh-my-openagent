@@ -66,6 +66,30 @@ describe("closed-world push validation", () => {
 
   test.each<Mutation>([
     [
+      "a no-op behind the original name",
+      (w) => {
+        const step = w.jobs["senpi-eq"]?.steps.find((s) => s.name === "Build the Senpi plugin")
+        if (!step) throw new Error("missing Senpi build fixture")
+        step.run = "true"
+      },
+    ],
+    [
+      "an advisory Senpi build",
+      (w) => {
+        const step = w.jobs["senpi-eq"]?.steps.find((s) => s.name === "Build the Senpi plugin")
+        if (!step) throw new Error("missing Senpi build fixture")
+        step["continue-on-error"] = true
+      },
+    ],
+    [
+      "a condition that skips the Senpi build",
+      (w) => {
+        const step = w.jobs["senpi-eq"]?.steps.find((s) => s.name === "Build the Senpi plugin")
+        if (!step) throw new Error("missing Senpi build fixture")
+        step.if = "false"
+      },
+    ],
+    [
       "an added job",
       (w: Workflow) => void (w.jobs["new-check"] = { "runs-on": "ubuntu-26.04", steps: [{ run: "true" }] }),
     ],
