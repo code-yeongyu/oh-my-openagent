@@ -12,6 +12,8 @@ export type LockRecord = {
   readonly created_at: string
   readonly purpose: string
   readonly run_id?: string
+  /** Detached reflection group. A present but unreadable group keeps the slot held. */
+  readonly posix_pgid?: number | null
   // This process runs its memory-core git under the kernel git-activity lock (omo #10322), so an
   // idle activity lock proves none of its git processes outlived it.
   readonly git_activity_lock?: true
@@ -51,6 +53,9 @@ export function parseLockRecord(content: string): LockRecord | null {
     created_at: candidate.created_at,
     purpose: candidate.purpose,
     ...(candidate.run_id === undefined ? {} : { run_id: candidate.run_id }),
+    ...(candidate.posix_pgid === undefined
+      ? {}
+      : { posix_pgid: typeof candidate.posix_pgid === "number" ? candidate.posix_pgid : null }),
     ...(candidate.git_activity_lock === true ? { git_activity_lock: true as const } : {}),
   }
 }

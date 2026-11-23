@@ -32,6 +32,9 @@ if (process.env.FIXTURE_SUPERVISOR_DIR) {
   const emit = ChildProcess.prototype.emit
   ChildProcess.prototype.emit = function (event: string | symbol, ...args: unknown[]) {
     const result = emit.call(this, event, ...args)
+    if (event === "spawn" && this.spawnfile === "/bin/cat") {
+      writeFileSync(join(runDir, "reader.pid"), String(this.pid))
+    }
     if (event === "close" && this.spawnargs.includes("--child-bootstrap")) {
       writeFileSync(join(runDir, "bootstrap-closed"), "")
     }

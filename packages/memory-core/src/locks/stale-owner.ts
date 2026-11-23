@@ -21,12 +21,18 @@ function errorCode(error: unknown): string | undefined {
 export async function isLockOwnerProvenDead(owner: LockRecord): Promise<boolean> {
   if (owner.hostname !== hostname()) return false
   const liveness = getPidLiveness(owner.pid)
-  if (liveness === "dead") return true
   if (liveness === "unknown") return false
-
-  const actualStart = await getProcessStartIdentity(owner.pid)
-  if (actualStart === null || owner.process_start === "unavailable") return false
-  return startIdentitiesConflict(owner.process_start, actualStart)
+  if (liveness === "alive") {
+    const actualStart = await getProcessStartIdentity(owner.pid)
+    if (actualStart === null || !startIdentitiesConflict(owner.process_start, actualStart)) return false
+  }
+  const pgid = owner.posix_pgid
+  if (pgid === undefined) return true
+  // Signal 0 is only an existence probe. Only ESRCH proves the whole group is gone;
+  // an orphan, a recycled group number, EPERM or an invalid record keeps the slot.
+  return process.platform !== "win32" && pgid !== null && Number.isSafeInteger(pgid) && pgid > 1 && pgid <= 0x7fffffff
+    ? getPidLiveness(-pgid) === "dead"
+    : false
 }
 
 // The recovery lock's only remover is its holder's nonce-matched releaseLock, so a holder

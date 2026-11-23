@@ -40,7 +40,7 @@ export type CountingLease = {
   /** Exit handlers cannot await; only this owner's nonce may be removed. */
   readonly releaseSync: () => boolean
   /** Keep the slot occupied if the supervisor dies while its gated child survives. */
-  readonly retainFor: (pid: number, processStart: string | null) => Promise<void>
+  readonly retainFor: (pid: number, processStart: string | null, posixGroup?: number) => Promise<void>
 }
 
 export interface CountingLeaseDomain {
@@ -153,7 +153,7 @@ async function takeAnySlot(
       return {
         slot,
         release: () => releaseLock(lockPath, record),
-        retainFor: async (pid, processStart) => {
+        retainFor: async (pid, processStart, posixGroup) => {
           const staging = `${lockPath}.handoff-${record.nonce}`
           try {
             await writeFile(
@@ -162,6 +162,7 @@ async function takeAnySlot(
                 ...record,
                 pid,
                 process_start: processStart ?? "unavailable",
+                posix_pgid: posixGroup,
                 git_activity_lock: undefined,
               })}\n`,
               { mode: 0o600 },

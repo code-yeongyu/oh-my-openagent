@@ -88,12 +88,7 @@ describe("memory run supervisor IC-8 containment", () => {
       await waitForPath(join(runDir, "bootstrap-closed"))
       // A file merely remaining on disk is not enough: an actual contender may reap
       // the dead bootstrap's slot even before the supervisor explicitly releases it.
-      const admitted = await withLock(slotPath(runDir), await createLockRecord("reflection-run"), async () => true, {
-        waitTimeoutMs: 0,
-      }).catch((error: unknown) => {
-        if (error instanceof LockContentionError) return false
-        throw error
-      })
+      const admitted = await slotAdmitsContender(runDir)
       if (admitted) await waitForPath(join(runDir, "outcome.json"))
       expect({
         admitted,
@@ -111,6 +106,40 @@ describe("memory run supervisor IC-8 containment", () => {
       childExit: { code: null, signal: "SIGKILL" },
     })
     expect(existsSync(slotPath(runDir))).toBe(false)
+  })
+
+  test("#given a reader dead before EOF #then stale reclaim waits for the last group member", async () => {
+    if (process.platform === "win32") return
+    const { runDir, clockPath, childExited, exitSocketAccepted } = await makeRun("stubborn")
+    const supervisor = launchSupervisor(
+      runDir,
+      clockPath,
+      "posix",
+      join(import.meta.dir, "__fixtures__/supervisor-signal-spy.ts"),
+    )
+    const exit = waitForExit(supervisor)
+    const modelSocket = await exitSocketAccepted
+    const guard = Number(await readFile(join(runDir, "guard.pid"), "utf8"))
+    const reader = Number(await readFile(join(runDir, "reader.pid"), "utf8"))
+    const { childPid } = JSON.parse(await readFile(join(runDir, "ledger.json"), "utf8"))
+    process.kill(guard, "SIGSTOP")
+    try {
+      killFixturePid(childPid)
+      await waitForPath(join(runDir, "bootstrap-closed"))
+      killFixturePid(reader)
+      // The reader, supervisor and group leader are all gone; the socket peer isn't.
+      expect(await exit).toEqual({ code: 1, signal: null })
+      expect({
+        admitted: await slotAdmitsContender(runDir),
+        modelAlive: !modelSocket.destroyed,
+        published: existsSync(join(runDir, "outcome.json")),
+      }).toEqual({ admitted: false, modelAlive: true, published: false })
+    } finally {
+      process.kill(guard, "SIGCONT")
+      await waitBounded(childExited, 3_000, "guard to contain the surviving owned model")
+      await exit
+    }
+    expect(await slotAdmitsContender(runDir, 3_000)).toBe(true)
   })
 
   test("#given an owned child before deadline #when the supervisor receives TERM #then its exit handler contains the group", async () => {
@@ -138,6 +167,7 @@ describe("memory run supervisor IC-8 containment", () => {
       timedOut: false,
       childExit: { code: 23, signal: null },
     })
+    expect(existsSync(slotPath(runDir))).toBe(false)
   })
 
   for (const duringGrace of [false, true]) {
@@ -458,6 +488,16 @@ describe("memory run supervisor IC-8 containment", () => {
 
 function slotPath(runDir: string): string {
   return join(runDir, "runtime", "locks", "reflection-run.slot-1.lock")
+}
+
+async function slotAdmitsContender(runDir: string, waitTimeoutMs = 0): Promise<boolean> {
+  const contender = await createLockRecord("reflection-run")
+  try {
+    return await withLock(slotPath(runDir), contender, async () => true, { waitTimeoutMs })
+  } catch (error) {
+    if (error instanceof LockContentionError) return false
+    throw error
+  }
 }
 
 function killFixturePid(pid: number): void {

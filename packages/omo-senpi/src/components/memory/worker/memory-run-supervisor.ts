@@ -49,7 +49,10 @@ async function runSupervisor(runDir: string): Promise<void> {
 
   const stdoutFd = openSync(manifest.stdoutPath, "w")
   const stderrFd = openSync(manifest.stderrPath, "w")
-  const witness = platform === "posix" && process.platform !== "win32" ? await startContainmentWitness() : undefined
+  const witness =
+    platform === "posix" && process.platform !== "win32"
+      ? await startContainmentWitness(() => requestGroupSignal?.("SIGKILL"))
+      : undefined
   const bootstrap = spawn(process.execPath, [fileURLToPath(import.meta.url), "--child-bootstrap", runDir], {
     env: process.env,
     detached: true,
@@ -103,7 +106,9 @@ async function runSupervisor(runDir: string): Promise<void> {
   if (bootstrapPid === undefined) throw new Error("child bootstrap did not receive a pid")
   const childProcessStart = await getSupervisorProcessStart(bootstrapPid)
   // The pipe gate keeps the child idle until its lease ownership and ledger are durable.
-  if (witness) await lease.retainFor(witness.pid, await getSupervisorProcessStart(witness.pid))
+  // The supervisor releases on EOF. If it dies instead, reclaim must also prove
+  // the detached group empty, even if the reader and bootstrap have both died.
+  if (witness) await lease.retainFor(process.pid, await getSupervisorProcessStart(process.pid), bootstrapPid)
   else await lease.retainFor(bootstrapPid, childProcessStart)
   await updateRunLedger(ledgerPath, {
     childPid: bootstrapPid,
@@ -161,19 +166,19 @@ async function runSupervisor(runDir: string): Promise<void> {
   process.exit(0)
 }
 
-/** A kernel EOF independent of Bun's ChildProcess stdio teardown. After spawn, only the
- * detached group has writers. The slot belongs to the reader, not the bootstrap: a queued
- * contender must not reclaim it just because the group leader has already been reaped. */
-async function startContainmentWitness() {
+/** Only the detached group has writers after spawn. Reader failure requests containment,
+ * but neither that request nor the reader's disappearance proves EOF. */
+async function startContainmentWitness(onFailure: () => void) {
   const reader = spawn("/bin/cat", [], { detached: true, stdio: ["pipe", "ignore", "ignore"] })
   await once(reader, "spawn")
-  if (reader.pid === undefined) throw new Error("containment witness did not receive a pid")
-  const exit = once(reader, "exit")
+  const exit = once(reader, "exit").then(([code, signal]) => {
+    if (code !== 0) onFailure()
+    return { code, signal }
+  })
   return {
-    pid: reader.pid,
     input: reader.stdin,
     async waitForEof() {
-      const [code, signal] = await exit
+      const { code, signal } = await exit
       if (code !== 0) throw new Error(`containment witness exited without EOF: ${code ?? signal}`)
     },
   }
