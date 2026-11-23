@@ -152,13 +152,33 @@ describe("thread SDK runtime", () => {
       join(sessionsDir, "epoch_dur-off.jsonl"),
       `${JSON.stringify({ type: "session", id: "dur-off", cwd: process.cwd(), timestamp: "2026-10-02T00:00:00Z" })}\n`,
     )
+    // The account surface is injected, so the outcome never depends on whether this host runs a device service: one
+    // account whose lookup answered and lists no such thread (not_found), one whose lookup never answered (host_unavailable).
     const probe = [
       `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,
-      `const sdk = createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined })`,
+      "const account = (listing) => ({",
+      "  client: {",
+      "    service: { status: async () => ({ kind: 'ok', value: { state: 'connected', since_ms: 0, device: { id: 'a', name: 'a' }, origin_configured: true, enabled: true, service_version: 'probe' } }) },",
+      "    devices: { list: async () => ({ kind: 'ok', value: [",
+      "      { id: 'a', name: 'a', kind: 'device', platform: 'linux', online: true, last_seen_ms: null, self: true },",
+      "      { id: 'b', name: 'b', kind: 'device', platform: 'linux', online: true, last_seen_ms: null },",
+      "    ] }) },",
+      "  },",
+      "  sessions: { listing, sessions: async () => (await listing()).rows, close: async () => {} },",
+      "})",
+      "const other = { device: 'b', session_id: 'rk-other', durable_id: 'dur-other', title: 'other', project: '/w', path: '/w', state: 'idle', updated_ms: 1 }",
+      "const answered = account(async () => ({ rows: [other], incomplete: [] }))",
+      "const unanswered = account(async () => { throw new Error('lookup_timeout') })",
+      `const open = (remote) => createThreadSdk({ agentDir: ${JSON.stringify(agentDir)}, cwd: process.cwd(), uid: 501, user: "probe", engineStatusAll: async () => undefined, remote })`,
+      "const sdk = open(answered)",
       "const sent = await sdk.send({ thread: 'dur-off', text: 'ping', all_scope: true })",
       "const missing = await sdk.send({ thread: 'no-such-thread', text: 'ping', all_scope: true })",
       "await sdk.dispose()",
-      "console.log(JSON.stringify({ sent: sent.kind === 'ok' ? sent.delivery.kind : sent.error.code, missing: missing.kind === 'error' ? missing.error.code : missing.kind, principal: sdk.principal }))",
+      "const silent = open(unanswered)",
+      "const unreached = await silent.send({ thread: 'no-such-thread', text: 'ping', all_scope: true })",
+      "await silent.dispose()",
+      "const code = (result) => result.kind === 'error' ? result.error.code : result.kind",
+      "console.log(JSON.stringify({ sent: sent.kind === 'ok' ? sent.delivery.kind : sent.error.code, missing: code(missing), unreached: code(unreached), principal: sdk.principal }))",
     ].join("\n")
 
     // when: a connector script run inline, whose `--input-type` the store worker must not inherit
@@ -178,6 +198,7 @@ describe("thread SDK runtime", () => {
     expect(JSON.parse(stdout.trim())).toEqual({
       sent: "queued_offline",
       missing: "not_found",
+      unreached: "host_unavailable",
       principal: "cli:501",
     })
   })
