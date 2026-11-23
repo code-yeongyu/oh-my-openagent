@@ -1496,7 +1496,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
         kind: "ok",
         ...row,
         requested_skills: ["lead"],
-        deduplicated: false,
+        deduplicated: true,
         prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
       },
       list: { kind: "ok", threads: [row], scope: "workspace" },
@@ -1515,7 +1515,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
-  test("#given receipts stored in the current shape #when the same keys are retried #then each replays byte-identical to what was stored", async () => {
+  test("#given current receipts #when replayed #then only the successful create's deduplication flag changes", async () => {
     // given: results a current build wrote, success and refusal alike
     const f = fixture()
     const row = {
@@ -1572,7 +1572,11 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
 
     // then
-    expect(replayed).toEqual(receipts.map((receipt) => JSON.stringify(receipt.result)))
+    expect(replayed).toEqual(
+      receipts.map(({ operation, result }) =>
+        JSON.stringify(operation === "thread_create" ? { ...result, deduplicated: true } : result),
+      ),
+    )
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

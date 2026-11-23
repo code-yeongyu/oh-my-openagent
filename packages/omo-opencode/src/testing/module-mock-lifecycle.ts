@@ -1,5 +1,6 @@
 import { createRequire } from "node:module"
-import { pathToFileURL } from "node:url"
+import { dirname } from "node:path"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 type MockModuleFactory = () => Record<string, unknown>
 
@@ -105,7 +106,7 @@ function defaultGetCallerUrl(): string {
 
 function defaultResolveSpecifier(specifier: string, callerUrl: string): string {
   try {
-    return import.meta.resolve(specifier, callerUrl)
+    return Bun.resolveSync(specifier, dirname(fileURLToPath(callerUrl)))
   } catch (error) {
     if (error instanceof Error) {
       return specifier
@@ -303,9 +304,9 @@ export function installModuleMockLifecycle(
 
     const activeMockStack = activeMocks.get(restoreSpecifier) ?? []
     const nextActiveMockStack = activeMockStack.filter((activeMock) => activeMock.ownerUrl !== callerUrl)
-    nextActiveMockStack.push({ specifier, factory, ownerUrl: callerUrl })
+    nextActiveMockStack.push({ specifier: restoreSpecifier, factory, ownerUrl: callerUrl })
     activeMocks.set(restoreSpecifier, nextActiveMockStack)
-    return delegateModule(specifier, factory)
+    return delegateModule(restoreSpecifier, factory)
   }
 
   mockApi.restore = (): unknown => {
