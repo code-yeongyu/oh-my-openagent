@@ -323,7 +323,7 @@ function aliasFailedAfterPrompt(
     error: {
       ...failure,
       message: `${failure.message} Thread ${thread.thread_id} exists and its first prompt was already delivered${receipt}: ${prompt.delivery.kind}.`,
-      next_action: `Do not send the first prompt again. Set the alias once the cause above is fixed with thread_rename (tool.thread_rename({ thread: "${thread.thread_id}", alias, all_scope: true }) in an eval cell). ${failure.next_action}`,
+      next_action: `Do not send the first prompt again. Once the cause above is fixed, set the alias in an eval cell with thread_rename: tool.thread_rename({ thread: "${thread.thread_id}", alias, all_scope: true }). ${failure.next_action}`,
       details: { ...failure.details, thread: thread.thread_id, prompt },
     },
   }
