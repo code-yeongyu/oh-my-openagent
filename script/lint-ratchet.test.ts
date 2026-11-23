@@ -129,6 +129,15 @@ it("never counts the omo-testing rules for minified bundle output", () => {
   expect(countsTowardRatchet("omo-testing(no-flake-masking)", "packages/omo-senpi/plugin/extensions/bundle.js")).toBe(
     false,
   )
+  const historicalWorker = "packages/omo-senpi/src/components/thread/gateway/testing/v14/gateway-store-worker.mjs"
+  expect(countsTowardRatchet("omo-testing/no-flake-masking", historicalWorker)).toBe(false)
+  expect(countsTowardRatchet("typescript/no-explicit-any", historicalWorker)).toBe(true)
+  expect(
+    countsTowardRatchet(
+      "omo-testing/no-flake-masking",
+      "packages/omo-senpi/src/components/thread/gateway/testing/harness.ts",
+    ),
+  ).toBe(true)
 })
 
 it("still counts the omo-testing rules in real test files, and every other rule everywhere", () => {
