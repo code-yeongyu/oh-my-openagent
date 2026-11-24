@@ -169,7 +169,7 @@ async function runSupervisor(runDir: string): Promise<void> {
 /** Only the detached group has writers after spawn. Reader failure requests containment,
  * but neither that request nor the reader's disappearance proves EOF. */
 async function startContainmentWitness(onFailure: () => void) {
-  const reader = spawn("/bin/cat", [], { detached: true, stdio: ["pipe", "ignore", "ignore"] })
+  const reader = spawn("/bin/cat", [], { detached: true, stdio: ["pipe", "ignore", "ignore"], windowsHide: true })
   await once(reader, "spawn")
   const exit = once(reader, "exit").then(([code, signal]) => {
     if (code !== 0) onFailure()
