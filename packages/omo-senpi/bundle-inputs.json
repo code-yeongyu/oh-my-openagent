@@ -2602,6 +2602,7 @@
     "packages/thread-address-core/package.json",
     "packages/thread-address-core/src/device.ts",
     "packages/thread-address-core/src/index.ts",
+    "packages/thread-address-core/src/ladder.ts",
     "packages/thread-address-core/src/listing.ts",
     "packages/thread-address-core/src/name.ts",
     "packages/thread-address-core/src/parse.ts",
