@@ -6,7 +6,8 @@
 # "at `<sha>`", in its body and in every comment. A job's newest such block gives its red commit and, from the job url,
 # the run, hence the workflow, it belongs to. One issue can name jobs from several workflows (CI and Computer engine for
 # #14801), and a run of one workflow never contains another workflow's jobs, so each job is judged on the latest
-# completed dev push run of its OWN workflow in which that job concluded (success or failure). The issue closes only when, for every named job, that run:
+# completed dev push run of its OWN workflow in which that job concluded (success, failure, timed_out, action_required or
+# startup_failure). The issue closes only when, for every named job, that run:
 #   - ran the job's tests and it succeeded (platform-jobs.jq; a skipped-test leg proves nothing), and
 #   - is at or after the job's red commit, so a run that has not re-run since the red cannot close it.
 # Anything short of that leaves the issue open and says why in the step log.
@@ -55,10 +56,20 @@ while IFS=$'\t' read -r job red_run red_sha; do
   run="" result=""
   while read -r candidate candidate_sha candidate_url; do
     jobs="$OUT_DIR/jobs-$candidate"
-    [ -f "$jobs" ] || gh api "repos/$GH_REPO/actions/runs/$candidate/jobs?filter=latest&per_page=100" --jq "$platform_jobs_filter" > "$jobs"
+    if [ ! -f "$jobs" ]; then
+      gh api "repos/$GH_REPO/actions/runs/$candidate/jobs?filter=latest&per_page=100" --jq "$platform_jobs_filter" > "$jobs"
+      gh api "repos/$GH_REPO/actions/runs/$candidate/jobs?filter=latest&per_page=100" --jq '.total_count // 0' > "$jobs.total"
+    fi
     candidate_result="$(awk -F '\t' -v n="$job" '$1 == n && !found { print $2; found = 1 }' "$jobs")"
+    # Only the first 100 jobs are read: a job missing from them may be on a later page, so it is not known to be absent.
+    if [ -z "$candidate_result" ] && [ "$(cat "$jobs.total")" -gt 100 ]; then
+      echo "#$issue tracks '$job', which is not among the first 100 of run $candidate's $(cat "$jobs.total") jobs; leaving it open."
+      exit 0
+    fi
+    # A timed-out, approval-blocked or never-started job is red; only a run where the job did not conclude (cancelled,
+    # skipped, neutral, still running, absent or without tests) is passed over for an older one.
     case "$candidate_result" in
-      success | failure)
+      success | failure | timed_out | action_required | startup_failure)
         run="$candidate" run_sha="$candidate_sha" green_run_url="$candidate_url" result="$candidate_result"
         break
         ;;
@@ -69,7 +80,7 @@ while IFS=$'\t' read -r job red_run red_sha; do
     exit 0
   fi
   if [ "$result" != success ]; then
-    echo "#$issue tracks '$job', which failed in run $run, the newest dev push run where it concluded; leaving it open."
+    echo "#$issue tracks '$job', which ended '$result' in run $run, the newest dev push run where it concluded; leaving it open."
     exit 0
   fi
   status="$(gh api "repos/$GH_REPO/compare/$red_sha...$run_sha" --jq '.status')"

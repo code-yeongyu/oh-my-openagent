@@ -31,9 +31,22 @@ interface TrackedWorkflow {
   readonly tests: TestsOutcome
   readonly compareStatus: CompareStatus
   // A newer completed dev push run listed before latestRun, in which the tracked job did not conclude (#14856), or
-  // concluded with this outcome.
-  readonly newer?: "cancelled" | "absent" | "failure"
+  // concluded with this outcome. "none" is a job with no conclusion yet; "beyond-first-page" is a run of more than 100
+  // jobs whose first page lacks the tracked job.
+  readonly newer?: NewerOutcome
+  // latestRun cancelled the tracked job, so no listed run concluded it.
+  readonly latestCancelled?: boolean
 }
+
+type NewerOutcome =
+  | "cancelled"
+  | "absent"
+  | "failure"
+  | "timed_out"
+  | "action_required"
+  | "startup_failure"
+  | "none"
+  | "beyond-first-page"
 
 const ci = (overrides: Partial<TrackedWorkflow> = {}): TrackedWorkflow => ({
   workflowId: 1,
@@ -108,24 +121,31 @@ function runClose(
       )
     if (each.newer !== undefined)
       answer(`repos/${REPO}/actions/runs/${newerRun}/jobs?filter=latest&per_page=100`, {
+        total_count: each.newer === "beyond-first-page" ? 150 : 1,
         jobs:
-          each.newer === "absent"
+          each.newer === "absent" || each.newer === "beyond-first-page"
             ? []
             : [
                 {
                   name: each.job,
-                  conclusion: each.newer,
+                  conclusion: each.newer === "none" ? null : each.newer,
                   html_url: `https://job/${newerRun}`,
                   labels: ["windows-latest"],
-                  steps: [{ name: "Run tests", conclusion: each.newer === "failure" ? "failure" : "cancelled" }],
+                  steps: [
+                    {
+                      name: "Run tests",
+                      conclusion: each.newer === "none" ? null : each.newer === "failure" ? "failure" : "cancelled",
+                    },
+                  ],
                 },
               ],
       })
     answer(`repos/${REPO}/actions/runs/${each.latestRun}/jobs?filter=latest&per_page=100`, {
+      total_count: 1,
       jobs: [
         {
           name: each.job,
-          conclusion: each.tests === "failure" ? "failure" : "success",
+          conclusion: each.latestCancelled ? "cancelled" : each.tests === "failure" ? "failure" : "success",
           html_url: `https://job/${each.latestRun}`,
           labels: ["windows-latest"],
           steps: [
@@ -225,6 +245,41 @@ describe("#given the newest completed dev push run did not conclude the tracked 
   posixBashTest("#when the newest run failed the job after an older green #then the issue stays open", () => {
     expect(closed(runClose("newest-red-older-green", [17], [ci({ newer: "failure" })]))).toBe(false)
   })
+
+  // #14857 review: a timed-out, approval-blocked or never-started job is red, never "no evidence".
+  for (const newer of ["timed_out", "action_required", "startup_failure"] as const)
+    posixBashTest(
+      `#when the newest run ended the job '${newer}' after an older green #then the issue stays open`,
+      () => {
+        expect(closed(runClose(`newest-${newer}-older-green`, [17], [ci({ newer })]))).toBe(false)
+      },
+    )
+
+  // A job with no conclusion yet is passed over: the older green decides, and it closes only when the compare passes.
+  posixBashTest(
+    "#when the newest job has no conclusion and the older green is after the red #then the issue is closed",
+    () => {
+      expect(closed(runClose("newest-none-older-green", [17], [ci({ newer: "none" })]))).toBe(true)
+    },
+  )
+
+  posixBashTest(
+    "#when the newest job has no conclusion and the older green is before the red #then the issue stays open",
+    () => {
+      expect(
+        closed(runClose("newest-none-older-green-behind", [17], [ci({ newer: "none", compareStatus: "behind" })])),
+      ).toBe(false)
+    },
+  )
+
+  posixBashTest(
+    "#when the newest run has more than 100 jobs and its first page lacks the job #then the issue stays open",
+    () => {
+      const result = runClose("newest-beyond-first-page", [17], [ci({ newer: "beyond-first-page" })])
+      expect(closed(result)).toBe(false)
+      expect(result.stdout).toContain("not among the first 100")
+    },
+  )
 })
 
 // #14801: the issue named CI jobs and a Computer engine job; each workflow's green run lacked the other's job.
@@ -245,6 +300,16 @@ describe("#given an open platform-red issue tracking jobs from two workflows", (
   posixBashTest("#when one workflow has not run since its red commit #then the issue stays open", () => {
     const result = runClose("two-not-rerun", [17], [ci(), computerEngine({ compareStatus: "behind" })])
     expect(closed(result)).toBe(false)
+  })
+
+  posixBashTest("#when one job concluded in none of its workflow's listed runs #then the issue stays open", () => {
+    const result = runClose(
+      "two-one-unconcluded",
+      [17],
+      [ci(), computerEngine({ newer: "cancelled", latestCancelled: true })],
+    )
+    expect(closed(result)).toBe(false)
+    expect(result.stdout).toContain("concluded in none")
   })
 })
 
