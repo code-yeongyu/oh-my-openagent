@@ -1,12 +1,12 @@
 import { afterEach, describe, expect, it } from "bun:test"
 
-import { connect } from "../../vendor/bunshin-ts/index.js"
-import { createRelayTransport } from "../../vendor/bunshin-ts-relay/index.js"
+import { connect } from "../../../../vendor/bunshin-ts/index.js"
+import { createRelayTransport } from "../../../../vendor/bunshin-ts-relay/index.js"
 import {
   startFakeDeviceService,
   type FakeDeviceService,
   type OpExecutor,
-} from "../../scripts/qa/bunshin-ts-fake-service"
+} from "../../../../scripts/qa/bunshin-ts-fake-service"
 
 import { createLazyBunshinClient } from "./bunshin-ts-default-client"
 import { BunshinSessionError } from "./bunshin-ts-errors"

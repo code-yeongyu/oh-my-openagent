@@ -6,7 +6,7 @@ import {
   MachineWireError,
   type BunshinClient,
   type StandaloneMachine,
-} from "../../vendor/bunshin-ts/index.js"
+} from "../../../../vendor/bunshin-ts/index.js"
 
 import { createLazyBunshinClient } from "./bunshin-ts-default-client"
 import { BunshinSessionError, pickTransport } from "./bunshin-ts-pick-transport"

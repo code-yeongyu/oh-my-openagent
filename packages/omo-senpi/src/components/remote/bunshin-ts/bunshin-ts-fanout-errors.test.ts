@@ -9,7 +9,7 @@ import {
   type BunshinClient,
   type StandaloneMachine,
   type StandaloneMachineHub,
-} from "../../vendor/bunshin-ts/index.js"
+} from "../../../../vendor/bunshin-ts/index.js"
 
 import { createLazyBunshinClient } from "./bunshin-ts-default-client"
 import { BunshinSessionError } from "./bunshin-ts-errors"
