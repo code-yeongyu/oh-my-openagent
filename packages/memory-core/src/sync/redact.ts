@@ -317,8 +317,39 @@ function findPemBlock(value: string, from = 0): { readonly start: number; readon
  *
  * The userinfo character class deliberately excludes `/` and `@` so the match
  * cannot run past an authority boundary and swallow a path segment.
+ *
+ * The scheme is matched backwards from each "://" instead of by a leading
+ * `[a-z][a-z0-9+.-]*` (#14864): a regex scheme can start at every letter of a
+ * long run and rescan the run each time, quadratic in the run's length. The
+ * walk back stops at the previous match's end, as the global regex's resume
+ * point did, and the scheme starts at the first letter of the run, which is the
+ * leftmost start the regex would have tried, so the matches are the same.
  */
-const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)([^/@\s:]{1,256})(?::([^/@\s]{0,256}))?@/gi
+const URL_SCHEME_CHARACTER = /[a-z0-9+.-]/i
+const URL_SCHEME_FIRST = /[a-z]/i
+const URL_USERINFO_AFTER_SCHEME = /([^/@\s:]{1,256})(?::([^/@\s]{0,256}))?@/y
+
+export function maskUrlUserinfo(value: string): string {
+  let redacted = ""
+  let cursor = 0
+  let from = 0
+  for (let separator = value.indexOf("://", from); separator >= 0; separator = value.indexOf("://", from)) {
+    let start = separator
+    while (start > cursor && URL_SCHEME_CHARACTER.test(value.charAt(start - 1))) start--
+    while (start < separator && !URL_SCHEME_FIRST.test(value.charAt(start))) start++
+    URL_USERINFO_AFTER_SCHEME.lastIndex = separator + 3
+    const userinfo = start < separator ? URL_USERINFO_AFTER_SCHEME.exec(value) : null
+    if (userinfo === null) {
+      from = separator + 1
+      continue
+    }
+    const scheme = value.slice(start, separator + 3)
+    redacted += `${value.slice(cursor, start)}${scheme}${userinfo[2] === undefined ? MASK : `${MASK}:${MASK}`}@`
+    cursor = URL_USERINFO_AFTER_SCHEME.lastIndex
+    from = cursor
+  }
+  return `${redacted}${value.slice(cursor)}`
+}
 
 /**
  * scp-style `user@host:path` (no scheme), anchored on a word boundary so a
@@ -337,11 +368,7 @@ const SCP_USERINFO = /(^|[\s'"(<])([^\s:/@]{1,256})@([^\s:/@]{1,256}):/g
  */
 export function redactUrl(value: string): string {
   if (!value) return ""
-  const withUrlCredentials = value.includes("://")
-    ? value.replace(URL_USERINFO, (_match, scheme: string, _user: string, password?: string) =>
-        password === undefined ? `${scheme}${MASK}@` : `${scheme}${MASK}:${MASK}@`,
-      )
-    : value
+  const withUrlCredentials = value.includes("://") ? maskUrlUserinfo(value) : value
   const withScpCredentials = withUrlCredentials.includes("@")
     ? withUrlCredentials.replace(
         SCP_USERINFO,
