@@ -4,7 +4,7 @@ import {
   type BunshinClient,
   type FleetEvent,
   type FleetEventSource,
-} from "../../vendor/bunshin-ts/index.js"
+} from "../../../../vendor/bunshin-ts/index.js"
 
 import { deviceOperationError } from "./bunshin-ts-errors"
 import { pickTransport } from "./bunshin-ts-pick-transport"

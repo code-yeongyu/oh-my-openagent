@@ -60,21 +60,10 @@ type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
 
 // Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
 // removes a use also removes its row.
-export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: [BUNSHIN_TS_RELAY],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: [BUNSHIN_TS_RELAY], removedBy: "omo PR 4c-3" },
-}
+export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
 export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
-  "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
-    uses: ["createRelayTransport"],
-    removedBy: "omo PR 4c-3",
-  },
-  "packages/omo-senpi/src/extension/bunshin-ts-sdk.ts": { uses: ["createRelayTransport"], removedBy: "omo PR 4c-3" },
 }
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.

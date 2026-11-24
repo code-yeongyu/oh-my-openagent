@@ -5,7 +5,7 @@ import { dirname, join } from "node:path"
 
 import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 
-import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
+import type { MachineHubTransport } from "../../../../vendor/bunshin-ts/index.js"
 
 import { BunshinSessionError, pickTransport, type PickTransportDeps } from "./bunshin-ts-pick-transport"
 

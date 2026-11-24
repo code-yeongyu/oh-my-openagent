@@ -2,8 +2,8 @@ import { homedir } from "node:os"
 
 import { deviceServiceStateDir } from "@oh-my-opencode/device-service-core/state-dir"
 
-import type { MachineHubTransport } from "../../vendor/bunshin-ts/index.js"
-import { createRelayTransport, relayStatus } from "../../vendor/bunshin-ts-relay/index.js"
+import type { MachineHubTransport } from "../../../../vendor/bunshin-ts/index.js"
+import { createRelayTransport, relayStatus } from "../../../../vendor/bunshin-ts-relay/index.js"
 
 import { BunshinSessionError } from "./bunshin-ts-errors"
 
