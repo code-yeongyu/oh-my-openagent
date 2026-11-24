@@ -469,14 +469,25 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
   })
 
-  test("#given b's thread is not running and this device cannot wake it there #when thread_send names it #then not_resumable at once naming the reopen, and no command waits on b (#14184)", async () => {
+  // omo#14799: b's engine restarted and parked the thread (its row reads ended, nothing runs it), and this device has
+  // no wake path. A read and a send each reopen it on b from its file and reach it there, never answering not_resumable.
+  test("#given b restarted and parked a thread this device cannot wake #when thread_read and then thread_send name it #then b reopens it from its file, the read returns its transcript and the delivery starts a turn there (omo#14799)", async () => {
     const a = account({ rows: [{ ...B_ROW, state: "ended" }], live: [] })
     const { run } = surface(a.remote)
-    expect(await run("thread_send", { thread: "dur-on-b", message: "hi" })).toMatchObject({
-      kind: "error",
-      error: { code: "not_resumable", details: { device: "b", thread: "dur-on-b" } },
+    const read = await run("thread_read", { thread: "dur-on-b" })
+    expect(read).toMatchObject({ kind: "ok", thread: "dur-on-b" })
+    expect(read.kind === "ok" && "items" in read ? read.items.length : 0).toBeGreaterThan(0)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "after the restart" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      delivery: { kind: "started" },
     })
-    expect(a.sent.filter((entry) => entry.via === "session" || entry.via === "wake")).toEqual([])
+    // One reopen, by b's own file; the second call finds the session running and opens nothing more.
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
+    ).toEqual([B_FILE])
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "admit_external_message")).toHaveLength(1)
+    expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
   })
 
   test("#given b's thread was closed here and reopened elsewhere under a new relay key, while this device's listing still names the old key #when thread_send names it #then the send is delivered to the key the session runs under now, never the old one (#14179 review M1)", async () => {
@@ -546,10 +557,7 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
     },
   )
 
-  test.each([
-    ["this device cannot wake it", {}, "not_resumable"],
-    ["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"],
-  ] as const)(
+  test.each([["b holds no session file for it", { wakeFeature: true, sessionFiles: {} }, "not_found"]] as const)(
     "#given b parked a thread its listing still reads live, and %s #when thread_send names it #then a typed refusal from b's find_session answer after one re-ask, and nothing is woken (#14240)",
     async (_case, extra, code) => {
       const a = account({ live: [], unlistedReason: "route_unlisted", ...extra })
@@ -565,6 +573,20 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
       expect(a.sent.filter((entry) => entry.rpc?.["type"] === "find_session")).toHaveLength(1)
     },
   )
+
+  test("#given b parked a thread its listing still reads live, and this device cannot wake it #when thread_send names it #then b reopens it from its file after one re-ask and the delivery starts there, nothing woken (omo#14799)", async () => {
+    const a = account({ live: [], unlistedReason: "route_unlisted" })
+    const { run } = surface(a.remote)
+    expect(await run("thread_send", { thread: "dur-on-b", message: "wake up" })).toMatchObject({
+      kind: "ok",
+      thread: "dur-on-b",
+      delivery: { kind: "started" },
+    })
+    expect(
+      a.sent.filter((entry) => entry.rpc?.["type"] === "open_session").map((entry) => entry.rpc?.["sessionPath"]),
+    ).toEqual([B_FILE])
+    expect(a.sent.filter((entry) => entry.via === "wake")).toEqual([])
+  })
 
   // #14298: the target is LIVE on b, held by an engine that is not the one its listing row names (two engines on b, the
   // thread run under another key), so b's host refuses the listed key route_unlisted. The send must reach the engine

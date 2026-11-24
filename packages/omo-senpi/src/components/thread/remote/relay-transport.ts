@@ -17,6 +17,7 @@ import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
+import { reopenParkedRow } from "./reopen-parked"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
 
 export type RelayTransportOptions = {
@@ -456,10 +457,14 @@ export function createRelayTransport(
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
       const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
       if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
+      // omo#14799: with no wake path, the parked session is reopened on its device and sent to there.
+      const reopened = await reopenParkedRow(remote, listed, view)
+      if ("row" in reopened) return { row: reopened.row, ended: false }
+      if (reopened.result.kind === "error") return reopened.result
       return fail(
-        "not_resumable",
-        `${thread} on device ${listed.device} is not running, and this device cannot wake it there.`,
-        "Open it again with thread_create (tool.thread_create({ thread }) in an eval cell), then send.",
+        "internal_error",
+        `Reopening ${thread} on device ${listed.device} answered no row.`,
+        "Retry the send.",
         details,
       )
     }

@@ -115,9 +115,10 @@ describe("#13215: a session another device holds but lists nowhere answers read 
     return { run: surface(b.remote).run, lookups: b.lookups }
   }
 
-  test("#given a closed session on b that b lists nowhere #when thread_read names it by session id on device a #then the id probe finds it on b and it answers not_resumable, never not_found", async () => {
+  // omo#14799: a read of it answers its transcript on both legs; the remote leg reopens it on b to read it.
+  test("#given a closed session on b that b lists nowhere #when thread_read names it by session id on device a #then the id probe finds it on b, b reopens it and the read answers its transcript, never not_resumable or not_found", async () => {
     const remote = unlisted("remote")
-    expect(errorOf(await remote.run("thread_read", { thread: CLOSED }))).toMatchObject({ code: "not_resumable" })
+    expect(await remote.run("thread_read", { thread: CLOSED })).toMatchObject({ kind: "ok", device: "b" })
     expect(remote.lookups).toEqual([{ device: "b", durable_id: CLOSED }])
   })
 
