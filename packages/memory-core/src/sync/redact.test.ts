@@ -145,11 +145,11 @@ describe("redactUrl", () => {
   })
 
   describe("#given malformed PEM-shaped input", () => {
-    // Linear by WORK, not by time (#14858; #12693 replaced a wall-clock bound with a fastest-of-5 time ratio, which still
+    // Linear by WORK, not by time (#14860; #12693 replaced a wall-clock bound with a fastest-of-5 time ratio, which still
     // timed the host and went red at 9.56 on a slow macOS runner). The PEM scan walks the input with String.indexOf, so
     // the characters indexOf examines are its work: four times the input must cost about four times the work. A scan
     // that restarts after every failed candidate costs about sixteen times.
-    it("#then redaction work grows linearly with the input and real PEM blocks remain masked", () => {
+    it("#then the PEM scan's work grows linearly with the input and real PEM blocks remain masked", () => {
       const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
       const work = (input: string) => {
         // Patched only for this synchronous call and restored in finally (also when redactUrl throws); nothing awaits in
@@ -183,6 +183,21 @@ describe("redactUrl", () => {
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
       expect(redactUrl(pem)).toBe("***")
     }, 30_000)
+
+    // Catastrophic-backtracking guard for the regex passes (secret patterns, seams, split credentials), which run inside
+    // V8's regex engine where no work can be counted (#14860). Here time is the behaviour under test, and the bound sits
+    // far from both sides: redactUrl on this 400k-character input takes ~15-25 ms on a fast Mac (~65 ms at the 2.7x of
+    // the slowest macOS runner measured), and one quadratic pattern ("A+X") makes it ~9.7 s. The bound is 2 s.
+    it("#then the regex passes finish far below a catastrophic-backtracking bound", () => {
+      const input = `-----BEGIN ${"A".repeat(200_000)}-----${"B".repeat(200_000)}`
+      let fastest = Number.POSITIVE_INFINITY
+      for (let run = 0; run < 2; run++) {
+        const started = performance.now()
+        expect(redactUrl(input)).toBe(input)
+        fastest = Math.min(fastest, performance.now() - started)
+      }
+      expect(fastest).toBeLessThan(2_000)
+    }, 60_000)
   })
 
   describe("#given an empty url", () => {
