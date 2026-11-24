@@ -7,6 +7,7 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
+import { commandTargets, liveKey, PEER, personWorld } from "./remote-person-world"
 
 // #13432: the session verbs take a device the way the device table prints it - its id, its NAME (compared as thread
 // names are), or a unique id prefix - through the one device resolver. #14305: `sessions --device` takes the same
@@ -17,8 +18,6 @@ const SIGNED_IN = {
   exitCode: 0,
   stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
 }
-const PEER = "dev-peer-1"
-const ENDPOINT = "ZW5kcG9pbnQta2V5LTAwMD"
 const dirs: string[] = []
 const owners: FakeOwner[] = []
 afterEach(async () => {
@@ -26,22 +25,7 @@ afterEach(async () => {
   for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true })
 })
 
-// The peer's engine answers a command the way a session host does: here an unloaded close.
-const CLOSED = { outcome: "unloaded", interrupted: false }
-const openable = (base: World = defaultWorld()): World => ({
-  ...base,
-  sessions: base.sessions.map((session) =>
-    session.device === PEER ? { ...session, delegated: { data: CLOSED, frames: [] } } : session,
-  ),
-  endpoints: { [PEER]: [ENDPOINT] },
-  primary: { [PEER]: ENDPOINT },
-  endpointCommand: {
-    data: { sessionId: "engine-routing-1", state: { sessionId: "engine-new", cwd: "/work" } },
-    outcome: [{ state: "engine_applied", retryable: false }],
-  },
-})
-
-async function run(args: readonly string[], world: World = openable()) {
+async function run(args: readonly string[], world: World = personWorld()) {
   const stateDir = mkdtempSync(join(tmpdir(), "omo-13432-owner-"))
   chmodSync(stateDir, 0o700)
   dirs.push(stateDir)
@@ -76,15 +60,9 @@ async function run(args: readonly string[], world: World = openable()) {
     },
     args,
   )
-  const targets = [...owner.state.bindings.values()].map((binding) => binding.target)
+  const targets = commandTargets(owner.state.bindings)
   const opened = targets.filter((target) => target.includes("/endpoint/")).map((target) => target.split("/")[0])
   return { code, err, out, opened, targets }
-}
-
-const liveKey = (): string => {
-  const session = defaultWorld().sessions.find((row) => row.device === PEER)
-  if (session === undefined) throw new Error("the default world holds a session on the peer")
-  return session.session_id
 }
 
 describe("omo remote session verbs take the device the table prints", () => {
