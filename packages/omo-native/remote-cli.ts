@@ -151,9 +151,13 @@ export async function prepareRemoteAttach(
   if (signedOut !== undefined) return signedOut
   const service = await connectVerb(dependencies)
   if (typeof service === "number") return service
-  const remote = personRemoteOn({ ...dependencies, localSessions: dependencies.localSessions ?? thisDeviceSessions }, service, {
-    serveAttach: (attach, label) => serveRemoteAttach(attach, { label }),
-  })
+  const remote = personRemoteOn(
+    { ...dependencies, localSessions: dependencies.localSessions ?? thisDeviceSessions },
+    service,
+    {
+      serveAttach: (attach, label) => serveRemoteAttach(attach, { label }),
+    },
+  )
   const failed = async (refusal: { readonly message: string; readonly next_action: string; readonly code: string }) => {
     await remote.close()
     service.close()

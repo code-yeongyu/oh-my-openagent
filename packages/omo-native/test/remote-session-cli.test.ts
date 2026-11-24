@@ -116,12 +116,7 @@ describe("omo remote send waits for the answer", () => {
 
   test("#given a turn interrupted before it finished #when send waits #then it fails with a typed line", async () => {
     const result = await onEngine(["send", TYPED, "hi"], {
-      turn: [
-        { type: "turn_start" },
-        delta("part"),
-        { type: "agent_end", aborted: true },
-        { type: "agent_settled" },
-      ],
+      turn: [{ type: "turn_start" }, delta("part"), { type: "agent_end", aborted: true }, { type: "agent_settled" }],
     })
     expect(result.code).toBe(REMOTE_EXIT.failed)
     expect(result.err.join("\n")).toContain("interrupted")
