@@ -28,7 +28,7 @@ const OFFENDERS: readonly string[] = [
   "remote-opt-out.ts -> ./bin/lib/agent-dir.js",
   "remote-permission-preset.ts -> ../omo-senpi/src/components/thread/contracts/permission-presets",
   "remote-session-args.ts -> ../omo-senpi/src/components/thread/contracts/fields",
-  // 4c-3: the bootstrap internal entry takes service.bootstrap on the service client.
+  // The bootstrap body the internal entry hands the service client (service.bootstrap runs it; design B4).
   "remote-bootstrap.ts -> ../device-service-core/src/index.ts",
   "remote-bootstrap.ts -> ./package.json",
 ]
