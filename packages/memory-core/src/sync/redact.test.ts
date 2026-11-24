@@ -1,5 +1,11 @@
 import { describe, expect, it } from "bun:test"
-import { containsSecretLikeMaterial, redactSecretLikeMaterial, redactUrl, scanSecretLikeMaterial } from "./redact"
+import {
+  containsSecretLikeMaterial,
+  maskUrlUserinfo,
+  redactSecretLikeMaterial,
+  redactUrl,
+  scanSecretLikeMaterial,
+} from "./redact"
 
 describe("redactUrl", () => {
   describe("#given an https url carrying a token", () => {
@@ -314,5 +320,69 @@ describe("scanSecretLikeMaterial / redactSecretLikeMaterial", () => {
       expect(matches.map((match) => match.class)).toContain("pem_block")
       expect(redactSecretLikeMaterial(pem)).toBe("note *** tail")
     })
+  })
+})
+
+// #14864: the URL userinfo step matches the scheme backwards from each "://" instead of with a leading regex class that
+// rescanned a long letter run from every letter (quadratic). The old pattern is the oracle: on every generated input it
+// is fast for, the new step must produce exactly what it produced.
+describe("maskUrlUserinfo", () => {
+  const OLD_URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/)([^/@\s:]{1,256})(?::([^/@\s]{0,256}))?@/gi
+  const oracle = (value: string) =>
+    value.replace(OLD_URL_USERINFO, (_match, scheme: string, _user: string, password?: string) =>
+      password === undefined ? `${scheme}***@` : `${scheme}***:***@`,
+    )
+
+  const realShapes = [
+    "https://user:pass@example.com/x",
+    "https://user@example.com",
+    "chrome-extension://u:p@abc/path",
+    "git+ssh://git@github.com:a/b.git",
+    "HtTpS://User:Pw@Host",
+    "http://u:p@[::1]:8080/",
+    "https://example.com/no-userinfo",
+    "file:///etc/passwd",
+    "see https://a:b@h and ftp://c@d.",
+    "https://u:@h",
+    "https://:p@h",
+    `https://${"u".repeat(300)}@h`,
+    `${"s".repeat(40)}://u:p@h`,
+    "weird+.-scheme9://u:p@h",
+    "1http://u:p@h",
+    "-x://u@h",
+    "x://a://b@",
+    "a://b://c@d",
+    "https://ü:é@höst/ä",
+    "s://u:p@h s://v@h",
+  ]
+
+  it("#given real URL shapes #then the output is the old pattern's", () => {
+    for (const value of realShapes) expect(maskUrlUserinfo(value)).toBe(oracle(value))
+  })
+
+  it("#given a generated corpus #then every input is masked exactly as the old pattern masked it", () => {
+    const seed = 14864
+    let state = seed
+    const next = () => {
+      state = (state * 1103515245 + 12345) % 2147483648
+      return state / 2147483648
+    }
+    const alphabet = ["a", "Z", "q", "9", "+", ".", "-", ":", "/", "@", " ", "\n", "é", "ü", "://", "https://", "u:p@"]
+    for (let index = 0; index < 20_000; index++) {
+      let value = ""
+      const length = 1 + Math.floor(next() * 30)
+      for (let part = 0; part < length; part++) value += alphabet[Math.floor(next() * alphabet.length)]
+      const expected = oracle(value)
+      if (maskUrlUserinfo(value) !== expected)
+        throw new Error(`seed ${seed}, input #${index} ${JSON.stringify(value)}: expected ${JSON.stringify(expected)}`)
+    }
+  })
+
+  it("#given a long letter run next to '://' #then masking stays far below a catastrophic-backtracking bound", () => {
+    for (const value of [`x://${"u".repeat(200_000)}`, `${"u".repeat(200_000)}://`, `https://${"u".repeat(200_000)}:`]) {
+      const started = performance.now()
+      expect(redactUrl(value)).toBe(value)
+      expect(performance.now() - started).toBeLessThan(2_000)
+    }
   })
 })
