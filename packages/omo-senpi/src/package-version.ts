@@ -37,7 +37,10 @@ function nearestVersion(start: string): string | undefined {
  * release stamp changes no committed bundle (#14867). A layout with neither is a broken install and throws instead of
  * reporting a made-up version.
  */
-export function omoSenpiPackageVersion(moduleUrl: string = import.meta.url, execPath: string = process.execPath): string {
+export function omoSenpiPackageVersion(
+  moduleUrl: string = import.meta.url,
+  execPath: string = process.execPath,
+): string {
   const start = dirname(fileURLToPath(moduleUrl))
   const version = nearestVersion(start) ?? versionOf(join(dirname(execPath), "plugin", "package.json"))
   if (version !== undefined) return version

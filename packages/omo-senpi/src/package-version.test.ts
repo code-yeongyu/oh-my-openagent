@@ -56,7 +56,9 @@ describe("omoSenpiPackageVersion", () => {
     const orphan = join(scratch, "orphan", "omo.js")
     mkdirSync(dirname(orphan), { recursive: true })
     writeFileSync(orphan, "export {}\n")
-    expect(() => omoSenpiPackageVersion(pathToFileURL(orphan).href, orphan)).toThrow("omo-senpi package manifest not found")
+    expect(() => omoSenpiPackageVersion(pathToFileURL(orphan).href, orphan)).toThrow(
+      "omo-senpi package manifest not found",
+    )
   })
 })
 
