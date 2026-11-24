@@ -108,7 +108,6 @@ test.each([
   },
 )
 
-
 // An extension's import path must not depend on whether the binding-era tables still exist: a store a train build already
 // migrated may have dropped `bindings`, every other store keeps it empty. Both answer null and the import runs the same.
 test.each([

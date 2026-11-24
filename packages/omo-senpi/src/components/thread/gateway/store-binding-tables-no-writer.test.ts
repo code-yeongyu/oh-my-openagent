@@ -18,7 +18,8 @@ const SHIPPED_WORKER = new URL("../../../../plugin/extensions/gateway-store-work
 
 /** Every SQL write statement in `text` with its target: a table name, or `${` when the target is computed. */
 function sqlWrites(text: string): readonly { readonly verb: string; readonly target: string }[] {
-  const writes = /\b(INSERT(?:\s+OR\s+[A-Z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM)\s+("?)(\$\{|[A-Za-z_]\w*)/g
+  const writes =
+    /\b(INSERT(?:\s+OR\s+[A-Z]+)?\s+INTO|REPLACE\s+INTO|UPDATE(?:\s+OR\s+[A-Z]+)?|DELETE\s+FROM)\s+("?)(\$\{|[A-Za-z_]\w*)/g
   return [...text.matchAll(writes)].map((match) => ({
     verb: (match[1] ?? "").split(/\s+/)[0] ?? "",
     target: match[3] ?? "",
