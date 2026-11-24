@@ -1,3 +1,4 @@
+import { dispatchCall, preparesMutation } from "../../call-budget/call-deadline"
 import { normalizeThreadName } from "../addressing"
 import type { AliasError, AliasHolder, AliasRegistry, AliasResult } from "./ports"
 
@@ -80,18 +81,18 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
     }
     let response: Response
     try {
-      response = await (access.fetch ?? fetch)(
-        new Request(new URL(ROUTES[route], access.origin).href, {
-          method: "POST",
-          headers: {
-            authorization: `Bearer ${token}`,
-            "content-type": "application/json",
-            "omo-contract-version": CONTRACT_VERSION,
-          },
-          body: JSON.stringify({ scheme: SCHEME, ...body }),
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        }),
-      )
+      const request = new Request(new URL(ROUTES[route], access.origin).href, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          "omo-contract-version": CONTRACT_VERSION,
+        },
+        body: JSON.stringify({ scheme: SCHEME, ...body }),
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+      const post = () => (access.fetch ?? fetch)(request)
+      response = await (route === "of" || route === "resolve" ? post() : dispatchCall(post))
     } catch (error) {
       return unavailable(error instanceof Error && error.name === "TimeoutError" ? "timeout" : "network")
     }
@@ -115,7 +116,7 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
       : { kind: "ok", value: { alias, holder } }
   }
   return {
-    claim: async ({ alias, holder, idempotency_key }) => {
+    claim: preparesMutation(async ({ alias, holder, idempotency_key }) => {
       const key = normalizeThreadName(alias)
       const rule = brokenRule(key)
       if (rule !== undefined) return failed("alias_invalid", "That alias breaks an alias rule.", { reason: rule })
@@ -129,8 +130,8 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
           idempotency_key,
         }),
       )
-    },
-    rename: async ({ session_id, from, to, idempotency_key }) => {
+    }),
+    rename: preparesMutation(async ({ session_id, from, to, idempotency_key }) => {
       const toKey = normalizeThreadName(to)
       const rule = brokenRule(toKey)
       if (rule !== undefined) return failed("alias_invalid", "That alias breaks an alias rule.", { reason: rule })
@@ -145,7 +146,7 @@ export function createServiceAliasRegistry(access: ServiceAccess): AliasRegistry
           idempotency_key,
         }),
       )
-    },
+    }),
     release: async ({ session_id, alias }) => {
       const key = normalizeThreadName(alias)
       if (brokenRule(key) !== undefined) return { kind: "ok", value: { released: false } }

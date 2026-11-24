@@ -276,6 +276,7 @@ describe("thread error taxonomy", () => {
       "relay_requires_paid_plan",
       "alias_taken",
       "gateway_schema_too_new",
+      "cancelled",
     ])
     expect(new Set(THREAD_ERROR_CODES).size).toBe(THREAD_ERROR_CODES.length)
   })

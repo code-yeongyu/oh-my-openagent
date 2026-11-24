@@ -17,7 +17,7 @@ import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
 import { chainCountLimitFailure, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
-import { outsideCallDeadline } from "../../call-budget/call-deadline"
+import { callMutation, observeCallDispatch, outsideCallDeadline } from "../../call-budget/call-deadline"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
@@ -280,10 +280,12 @@ export function createRelayTransport(
       )
       await retryDelay(wait, disposed.signal)
       if (disposed.signal.aborted) return
-      const sent = await remote.sessions.sessionCommand(row.device, row.session_id, record).catch((error: unknown) => ({
-        kind: "uncertain" as const,
-        reason: error instanceof Error ? error.message : String(error),
-      }))
+      const sent = await callMutation(remote.sessions.sessionCommand, row.device, row.session_id, record).catch(
+        (error: unknown) => ({
+          kind: "uncertain" as const,
+          reason: error instanceof Error ? error.message : String(error),
+        }),
+      )
       const conflict = steerConflict(sent)
       if (conflict !== undefined) {
         // An explicit steer the draft held until its turn ended, answered as reply data or as a refused command (#14320).
@@ -330,7 +332,7 @@ export function createRelayTransport(
     callerId: string,
     idempotencyKey: string,
     args: unknown,
-    run: (later: Later, sending: () => void) => Promise<SendOutcome>,
+    run: (later: Later) => Promise<SendOutcome>,
   ): Promise<SendOutcome> {
     const scope = { principal: `session:${callerId}`, operation: "thread_send:remote", idempotency_key: idempotencyKey }
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
@@ -378,13 +380,14 @@ export function createRelayTransport(
       if (!(await store.toolReceiptRelease(scope).catch(() => false))) await settle()
     }
     try {
-      result = await run(
-        (task) => {
-          tasks.push(task)
-        },
+      result = await observeCallDispatch(
         () => {
           sent = true
         },
+        () =>
+          run((task) => {
+            tasks.push(task)
+          }),
       )
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -484,10 +487,8 @@ export function createRelayTransport(
     delivery: OutboundDelivery,
     listed: RemoteSessionRow,
     later: Later,
-    sending: () => void,
     retry?: {
       readonly ids: Awaited<ReturnType<typeof chain>> | undefined
-      readonly announced: boolean
       readonly refusal: SendOutcome
     },
   ): Promise<SendOutcome> {
@@ -524,8 +525,7 @@ export function createRelayTransport(
       if (probed.kind !== "ok") {
         const refusal = probeFailure(probed, row.device)
         // A live-listed row its host parked is re-addressed through the holder whatever the mode (#14240).
-        if (parkedHere(probed))
-          return await send(delivery, listed, later, sending, { ids: undefined, announced: false, refusal })
+        if (parkedHere(probed)) return await send(delivery, listed, later, { ids: undefined, refusal })
         // Only a steer or the default needs the probe to pick its lane. An explicit follow_up is delivered whatever the
         // target is doing, so a lost or refused probe leaves its lane unknown instead of failing the send.
         if (delivery.mode !== "follow_up") return refusal
@@ -613,24 +613,21 @@ export function createRelayTransport(
       delivery_id,
       effective_mode: resentLane ?? effectiveLaneOfAnswer(kind),
     })
-    // One delivery is announced once: a retry after the first attempt's admission was refused does not announce it again.
-    if (retry?.announced !== true) sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
-    let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+    let sent = await callMutation(remote.sessions.sessionCommand, row.device, row.session_id, record)
     if (delivery.mode === "auto" && lane === "steer" && steerConflict(sent) !== undefined) {
       // The turn the probe saw ended before the record arrived. The default never fails on that race: it takes the lane the
       // target has now (started when idle, queued behind a turn that began since), as a local drain re-decides at admission.
       // The receiver may answer it as reply data or as a refused command (#14320); both take this one re-send.
       lane = "follow_up"
       record = recordFor(lane)
-      sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
+      sent = await callMutation(remote.sessions.sessionCommand, row.device, row.session_id, record)
     }
     // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
     // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
     if (sent.kind !== "ok" && parkedHere(sent))
-      return await send(delivery, listed, later, sending, {
+      return await send(delivery, listed, later, {
         ids,
-        announced: true,
         refusal: outcomeFailure(sent, row.device),
       })
     if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
@@ -710,8 +707,9 @@ export function createRelayTransport(
   }
 
   const woken = (row: RemoteSessionRow, record: JsonObject) =>
-    remote.sessions.wake?.(row.device, row.durable_id ?? row.session_id, record) ??
-    Promise.resolve({ kind: "unavailable" as const })
+    remote.sessions.wake === undefined
+      ? Promise.resolve({ kind: "unavailable" as const })
+      : callMutation(remote.sessions.wake, row.device, row.durable_id ?? row.session_id, record)
 
   /** The wake path's answers (5.1), mapped once: the consumer's envelope, the service's own refusals, a lost reply. */
   function wakeAnswer(
@@ -770,11 +768,7 @@ export function createRelayTransport(
   // that session's user, not a peer), kept by design (#12885). The same preflight as a session's steer, the same
   // idempotency through the tool receipt store, and the same outcome mapping as every other relay request. A person's
   // steer that names no turn steers the one this preflight reads (#13016): the state is read once, here.
-  const prompt = async (
-    delivery: OutboundDelivery,
-    row: RemoteSessionRow,
-    sending: () => void,
-  ): Promise<SendOutcome> => {
+  const prompt = async (delivery: OutboundDelivery, row: RemoteSessionRow): Promise<SendOutcome> => {
     const online = await resolveTypedDevice(remote.client, row.device, { exactId: true })
     if (online.kind === "error") return online
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
@@ -823,8 +817,7 @@ export function createRelayTransport(
         },
         1,
       )
-      sending()
-      const steered = await remote.sessions.sessionCommand(row.device, row.session_id, steer)
+      const steered = await callMutation(remote.sessions.sessionCommand, row.device, row.session_id, steer)
       const refusal = refusedSteer(steered)
       if (refusal !== undefined)
         return fail(
@@ -837,8 +830,8 @@ export function createRelayTransport(
       return ok({ kind: "steered", turn_id: String(engine.turnEpoch) })
     }
     // One round trip: the engine starts a followUp prompt on an idle session and queues it behind a running turn.
-    sending()
-    const sent = await remote.sessions.sessionCommand(
+    const sent = await callMutation(
+      remote.sessions.sessionCommand,
       row.device,
       row.session_id,
       remote.chain.stamp(
@@ -906,9 +899,7 @@ export function createRelayTransport(
           { device: row.device, field: "collapse_key" },
         )
       if (delivery.sender.kind === "person")
-        return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (_later, sending) =>
-          prompt(delivery, row, sending),
-        )
+        return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, () => prompt(delivery, row))
       if (delivery.mode === "steer" && delivery.expected_turn_id === undefined)
         return fail(
           "invalid_arguments",
@@ -921,8 +912,8 @@ export function createRelayTransport(
           "A gateway send needs the calling session's durable id.",
           "Retry from a session that passes its execution context.",
         )
-      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (later, sending) =>
-        send(delivery, row, later, sending),
+      return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (later) =>
+        send(delivery, row, later),
       )
     },
     dispose: () => disposed.abort(),

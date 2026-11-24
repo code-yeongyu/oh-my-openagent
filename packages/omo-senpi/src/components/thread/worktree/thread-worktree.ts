@@ -1,3 +1,4 @@
+import { dispatchCall } from "../../call-budget/call-deadline"
 import { execFile } from "node:child_process"
 import { createHash, randomBytes } from "node:crypto"
 import { mkdir, stat } from "node:fs/promises"
@@ -98,7 +99,7 @@ export async function createThreadWorktree(options: {
     return folderFailure("worktree_path_exists", `${path} already exists.`, { path, branch })
   let createdFolder: string | undefined
   try {
-    createdFolder = await mkdir(dirname(path), { recursive: true })
+    createdFolder = await dispatchCall(() => mkdir(dirname(path), { recursive: true }))
   } catch (error) {
     const reason = errnoReason(error) ?? "permission_denied"
     return folderFailure(reason, `The worktrees folder ${dirname(path)} cannot be created (${reason}).`, { path })

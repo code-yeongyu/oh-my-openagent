@@ -1,3 +1,4 @@
+import { dispatchCall } from "../../call-budget/call-deadline"
 import { createHash, randomUUID } from "node:crypto"
 
 import { resolveTarget, type ThreadAddressEntry } from "../addressing"
@@ -178,40 +179,42 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     )
     const deliveryId = randomUUID()
     const idempotencyKey = request.idempotency_key ?? `auto:${deliveryId}`
-    const outcome = await store.enqueue({
-      provenance: facts.provenance,
-      now: now(),
-      delivery_id: deliveryId,
-      target_durable_id: target.durable_id,
-      sender_principal: facts.principal,
-      rate_principal: facts.rate_principal,
-      sender_node: facts.node,
-      sender_turn: facts.turn,
-      cause_delivery_id: facts.cause,
-      ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
-      ...(request.authority === undefined ? {} : { authority: request.authority }),
-      claimed_root_id: request.root_id ?? null,
-      origin: facts.origin(deliveryId),
-      actor: facts.actor,
-      body: request.text,
-      mode,
-      expected_turn_id: request.expected_turn_id ?? null,
-      binding: facts.binding,
-      receipt: {
-        idempotency_key: idempotencyKey,
-        args_hash: deliveryArgsHash({
-          target: target.durable_id,
-          text: request.text,
-          mode,
-          expected_turn_id: request.expected_turn_id ?? null,
-          binding: facts.binding,
-          author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
-          ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
-        }),
-      },
-      endpoint_kind: endpoint?.kind ?? null,
-      ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
-    })
+    const outcome = await dispatchCall(() =>
+      store.enqueue({
+        provenance: facts.provenance,
+        now: now(),
+        delivery_id: deliveryId,
+        target_durable_id: target.durable_id,
+        sender_principal: facts.principal,
+        rate_principal: facts.rate_principal,
+        sender_node: facts.node,
+        sender_turn: facts.turn,
+        cause_delivery_id: facts.cause,
+        ...(request.inbound_hop === undefined ? {} : { inbound_hop: request.inbound_hop }),
+        ...(request.authority === undefined ? {} : { authority: request.authority }),
+        claimed_root_id: request.root_id ?? null,
+        origin: facts.origin(deliveryId),
+        actor: facts.actor,
+        body: request.text,
+        mode,
+        expected_turn_id: request.expected_turn_id ?? null,
+        binding: facts.binding,
+        receipt: {
+          idempotency_key: idempotencyKey,
+          args_hash: deliveryArgsHash({
+            target: target.durable_id,
+            text: request.text,
+            mode,
+            expected_turn_id: request.expected_turn_id ?? null,
+            binding: facts.binding,
+            author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
+            ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
+          }),
+        },
+        endpoint_kind: endpoint?.kind ?? null,
+        ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
+      }),
+    )
     if (outcome.kind === "busy")
       return fail("overloaded", "The gateway store is locked by a suspended writer; nothing was sent.", {
         budget: "store_lock",

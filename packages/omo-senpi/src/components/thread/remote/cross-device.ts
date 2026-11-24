@@ -1,3 +1,4 @@
+import { callMutation } from "../../call-budget/call-deadline"
 import { mergeRows, rowKey, type DeviceListing } from "@oh-my-opencode/thread-address-core"
 import type { ThreadDevice, ThreadState, ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
@@ -100,7 +101,7 @@ export async function claimCreatedAlias(
   let claimed: Awaited<ReturnType<AliasRegistry["claim"]>>
   try {
     const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
-    claimed = await remote.aliases.claim({
+    claimed = await callMutation(remote.aliases.claim, {
       alias,
       holder: { session_id: result.thread, device: holderDevice },
       idempotency_key: `create:${result.thread}`,
@@ -145,12 +146,12 @@ export async function renameAlias(
   const holderDevice = device ?? (await accountDevices(remote.client)).here ?? ""
   const changed =
     from === undefined
-      ? await remote.aliases.claim({
+      ? await callMutation(remote.aliases.claim, {
           alias,
           holder: { session_id: threadId, device: holderDevice },
           idempotency_key: key,
         })
-      : await remote.aliases.rename({ session_id: threadId, from, to: alias, idempotency_key: key })
+      : await callMutation(remote.aliases.rename, { session_id: threadId, from, to: alias, idempotency_key: key })
   if (changed.kind !== "error") return undefined
   // The account can be gone by the claim or rename even when aliasesOf answered (a token that expired in between).
   return signedOut(changed.error) ? { local: "sign_in" } : aliasFailure(changed.error)

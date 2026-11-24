@@ -1,3 +1,4 @@
+import { preparesMutation, callMutation } from "../../call-budget/call-deadline"
 import type { AliasRegistry, AliasResult, RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
 import type { RemoteFailure, RemoteSender } from "../types"
@@ -137,19 +138,24 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
         ? { rows: await loaded.sessions(filter), incomplete: [] }
         : await loaded.listing(filter)
     },
-    endpointCommand: async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
+    endpointCommand: preparesMutation(
+      async (device, rpc, options) => await (await load()).endpointCommand(device, rpc, options),
+    ),
     endpointKeys: async (device) => (await (await load()).endpointKeys?.(device)) ?? { keys: [] },
     locate: async (device, engineId, knownKey) => await (await load()).locate(device, engineId, knownKey),
-    sessionCommand: async (device, sessionId, rpc, options) =>
-      await (await load()).sessionCommand(device, sessionId, rpc, options),
+    sessionCommand: preparesMutation(
+      async (device, sessionId, rpc, options) => await (await load()).sessionCommand(device, sessionId, rpc, options),
+    ),
     read: async (device, sessionId, tail) => await (await load()).read(device, sessionId, tail),
     watch: async (device, sessionId, handlers, watchOptions) =>
       await (await load()).watch(device, sessionId, handlers, watchOptions),
     // A loaded port without the omo#13037 lookup or wake answers as the port contract reads an absent member.
     lookup: async (device, durableId) => (await (await load()).lookup?.(device, durableId)) ?? { kind: "unavailable" },
     canLookup: async () => (await (await load()).canLookup?.()) === true,
-    wake: async (device, durableId, rpc) =>
-      (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
+    wake: preparesMutation(
+      async (device, durableId, rpc) =>
+        (await (await load()).wake?.(device, durableId, rpc)) ?? { kind: "unavailable" },
+    ),
     canWake: async () => (await (await load()).canWake?.()) === true,
     close: async () => {
       client.close()
@@ -185,8 +191,8 @@ export function createLazyRemoteSurface(options: LazyRemoteOptions): RemoteThrea
     return await use(loaded)
   }
   const aliases: AliasRegistry = {
-    claim: async (input) => await withRegistry((loaded) => loaded.claim(input)),
-    rename: async (input) => await withRegistry((loaded) => loaded.rename(input)),
+    claim: preparesMutation(async (input) => await withRegistry((loaded) => callMutation(loaded.claim, input))),
+    rename: preparesMutation(async (input) => await withRegistry((loaded) => callMutation(loaded.rename, input))),
     release: async (input) => await withRegistry((loaded) => loaded.release(input)),
     resolve: async (alias) => await withRegistry((loaded) => loaded.resolve(alias)),
     aliasesOf: async (sessionIds) => await withRegistry((loaded) => loaded.aliasesOf(sessionIds)),

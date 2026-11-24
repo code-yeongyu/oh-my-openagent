@@ -193,13 +193,15 @@ type StoredReceipt = {
   readonly args_hash: string
   readonly status: string
   readonly owner_instance: string
+  readonly expires_at: number
+  readonly error_note: string | null
   readonly result: string | null
 }
 
 function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): StoredReceipt | undefined {
   const found = ctx.sql.one(
-    ["args_hash", "status", "owner_instance", "result"],
-    "SELECT args_hash, status, owner_instance, result FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+    ["args_hash", "status", "owner_instance", "result", "expires_at", "error_note"],
+    "SELECT args_hash, status, owner_instance, result, expires_at, error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
     [key.principal, key.operation, key.idempotency_key],
   )
   if (found === undefined) return undefined
@@ -207,6 +209,8 @@ function selectReceipt(ctx: StoreContext, key: Omit<ReceiptKey, "args_hash">): S
     args_hash: String(found.args_hash),
     status: String(found.status),
     owner_instance: String(found.owner_instance),
+    expires_at: Number(found.expires_at),
+    error_note: nullableString(found.error_note),
     result: nullableString(found.result),
   }
 }
@@ -278,8 +282,14 @@ export type ToolReceiptBegin =
  */
 export async function toolReceiptBegin(
   ctx: StoreContext,
-  request: ReceiptKey & { readonly now: number },
+  request: ReceiptKey & { readonly now: number; readonly inspect?: boolean },
 ): Promise<ToolReceiptBegin> {
+  if (request.inspect) {
+    const receipt = selectReceipt(ctx, request)
+    return receipt === undefined || receipt.expires_at <= request.now
+      ? { kind: "accepted" }
+      : priorToolReceipt(ctx, request, receipt)
+  }
   return await transaction(ctx, "tool_receipt_begin", (): ToolReceiptBegin => {
     const cleared = deleteExpiredReceipt(ctx, request, request.now)
     const admission = admitToolReceipt(ctx, request)
@@ -308,29 +318,29 @@ function admitToolReceipt(ctx: StoreContext, request: ReceiptKey & { readonly no
     )
     return { kind: "accepted" }
   }
+  const prior = priorToolReceipt(ctx, request, receipt)
+  if (receipt.status === "prepared" && prior.kind === "uncertain") {
+    write(
+      ctx,
+      "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?",
+      [prior.error_note, request.now, request.principal, request.operation, request.idempotency_key],
+    )
+  }
+  return prior
+}
+
+function priorToolReceipt(ctx: StoreContext, request: ReceiptKey, receipt: StoredReceipt): ToolReceiptBegin {
   if (receipt.args_hash !== request.args_hash) return { kind: "conflict" }
   if (receipt.status === "completed")
     return { kind: "replay", result: receipt.result === null ? null : JSON.parse(receipt.result) }
   if (receipt.status === "prepared" && receipt.owner_instance === ctx.config.instance_id) return { kind: "in_progress" }
-  if (receipt.status === "prepared") {
-    write(
-      ctx,
-      "UPDATE receipts SET status = 'uncertain', error_note = ?, updated_at = ? WHERE principal = ? AND operation = ? AND idempotency_key = ?",
-      [
-        "the process that began this call ended before recording its outcome",
-        request.now,
-        request.principal,
-        request.operation,
-        request.idempotency_key,
-      ],
-    )
+  return {
+    kind: "uncertain",
+    error_note:
+      receipt.status === "prepared"
+        ? "the process that began this call ended before recording its outcome"
+        : receipt.error_note,
   }
-  const note = ctx.sql.one(
-    ["error_note"],
-    "SELECT error_note FROM receipts WHERE principal = ? AND operation = ? AND idempotency_key = ?",
-    [request.principal, request.operation, request.idempotency_key],
-  )
-  return { kind: "uncertain", error_note: nullableString(note?.error_note) }
 }
 
 export async function toolReceiptSettle(
