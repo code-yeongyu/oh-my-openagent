@@ -229,6 +229,10 @@ export const KNOWN_MODELS = Object.freeze({
     "minimax-m3",
     "qwen3.6-flash",
   ]),
+  // Vertex Model Garden (ADC) lane. DeepSeek V4.1 Flash is published under its MaaS id
+  // `deepseek-v4.1-flash-maas`; the engine routes it when Application Default
+  // Credentials are present (senpi#6270).
+  "vertex-garden": Object.freeze(["deepseek-v4.1-flash-maas"]),
   xai: Object.freeze(["grok-4.20-0309-non-reasoning", "grok-4.6", "grok-4.7"]),
   xiaomi: Object.freeze(["mimo-v2.5-pro", "mimo-v2.6-flash", "mimo-v2.6-pro"]),
   // Engine Z.AI ids. `zai-coding-plan` is the OpenCode id: kept so older sessions still export
