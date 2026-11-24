@@ -1,0 +1,522 @@
+{
+  "workflowSha256": "425899999d7b98fe9f360539d9db6c86742d1d8a04a1caf670b7080a226725c8",
+  "jobs": {
+    "Lint ratchet": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Install dependencies",
+      "Lint ratchet",
+      "Write job summary"
+    ],
+    "ci-mode": [
+      "Run actions/checkout@v7",
+      "Classify CI mode",
+      "Select shard timing snapshot",
+      "Report-only temp-leak list only shrinks",
+      "Write job summary"
+    ],
+    "block-master-pr": [
+      "Check PR target branch",
+      "Write job summary"
+    ],
+    "test (windows-latest, 1/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Create the second local user for the DACL tests",
+      "Run vendored lsp-daemon tests",
+      "Run tests with Windows telemetry",
+      "Run tests",
+      "Upload Windows post-test telemetry",
+      "Collect timed-out git evidence",
+      "Upload timed-out git evidence",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test (windows-latest, 2/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Create the second local user for the DACL tests",
+      "Run vendored lsp-daemon tests",
+      "Run tests with Windows telemetry",
+      "Run tests",
+      "Upload Windows post-test telemetry",
+      "Collect timed-out git evidence",
+      "Upload timed-out git evidence",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test-linux (omo-opencode)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Install memory-core test dependencies",
+      "Remove stale self-package test copies",
+      "Run vendored lsp-daemon tests",
+      "Run omo-opencode tests",
+      "Run the serial quarantine",
+      "Run memory-core tests in a PID namespace",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run the first remainder half",
+      "Run the second remainder half",
+      "Upload root shard record",
+      "Write job summary"
+    ],
+    "test-linux (memory-core)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Install memory-core test dependencies",
+      "Remove stale self-package test copies",
+      "Run vendored lsp-daemon tests",
+      "Run omo-opencode tests",
+      "Run the serial quarantine",
+      "Run memory-core tests in a PID namespace",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run the first remainder half",
+      "Run the second remainder half",
+      "Upload root shard record",
+      "Write job summary"
+    ],
+    "test-linux (remainder-1)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Install memory-core test dependencies",
+      "Remove stale self-package test copies",
+      "Run vendored lsp-daemon tests",
+      "Run omo-opencode tests",
+      "Run the serial quarantine",
+      "Run memory-core tests in a PID namespace",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run the first remainder half",
+      "Run the second remainder half",
+      "Upload root shard record",
+      "Write job summary"
+    ],
+    "test-linux (remainder-2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Install memory-core test dependencies",
+      "Remove stale self-package test copies",
+      "Run vendored lsp-daemon tests",
+      "Run omo-opencode tests",
+      "Run the serial quarantine",
+      "Run memory-core tests in a PID namespace",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run the first remainder half",
+      "Run the second remainder half",
+      "Upload root shard record",
+      "Write job summary"
+    ],
+    "test (ubuntu-latest, 1/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download root shard records",
+      "Verify root shard coverage",
+      "Write job summary"
+    ],
+    "test (ubuntu-latest, 2/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download root shard records",
+      "Verify root shard coverage",
+      "Write job summary"
+    ],
+    "macos-combined": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Run vendored lsp-daemon tests",
+      "Run root test shard 1 memory-core sync",
+      "Run root test shard 1 rest",
+      "Run root test shard 2 heavy",
+      "Run root test shard 2 light",
+      "Run Codex platform smoke",
+      "Run Senpi compatibility tests",
+      "Upload macOS JUnit reports",
+      "Write job summary"
+    ],
+    "test (macos-latest, 1/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Write job summary"
+    ],
+    "test (macos-latest, 2/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Write job summary"
+    ],
+    "codex-compatibility (macos-latest, platform)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Write job summary"
+    ],
+    "senpi-compatibility (macos-latest)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Write job summary"
+    ],
+    "typecheck": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Verify @types/node resolves from omo-senpi",
+      "Type check",
+      "Lint",
+      "Lint ratchet",
+      "Dead-code check (knip)",
+      "Write job summary"
+    ],
+    "codex-compatibility (ubuntu-latest, full)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Run full Codex compatibility suite",
+      "Run omo-codex component checks and tests",
+      "Build Codex platform smoke prerequisites",
+      "Run Codex platform smoke tests (.mjs via node --test)",
+      "Run Codex platform smoke tests (.ts via bun test)",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "codex-compatibility (windows-latest, platform)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Run full Codex compatibility suite",
+      "Run omo-codex component checks and tests",
+      "Build Codex platform smoke prerequisites",
+      "Run Codex platform smoke tests (.mjs via node --test)",
+      "Run Codex platform smoke tests (.ts via bun test)",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "senpi-compatibility (windows-latest)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Run Senpi compatibility tests with Windows telemetry",
+      "Upload Windows Senpi telemetry",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "senpi-bundle-check": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Verify committed Senpi plugin bundle is current",
+      "Write job summary"
+    ],
+    "senpi-eq": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build the Senpi plugin",
+      "Run omo fused-path equivalence (EQ.omo E21-E24)",
+      "Write job summary"
+    ],
+    "senpi-tests-linux (one)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run Senpi compatibility tests",
+      "Upload Senpi shard record",
+      "Write job summary"
+    ],
+    "senpi-tests-linux (two)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Restore selected shard timing snapshot",
+      "Copy the timing snapshot for this shard",
+      "Run Senpi compatibility tests",
+      "Upload Senpi shard record",
+      "Write job summary"
+    ],
+    "senpi-compatibility (ubuntu-latest)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download Senpi shard records",
+      "Verify Senpi shard coverage",
+      "Write job summary"
+    ],
+    "save-shard-timings": [
+      "Run actions/checkout@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download both groups' shard records",
+      "Verify and merge shard timings",
+      "Save shard timing snapshot",
+      "Write job summary"
+    ],
+    "lazycodex-published-smoke": [
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run published lazycodex-ai smoke commands",
+      "Run actions/checkout@v7",
+      "Install published payloads into an isolated CODEX_HOME",
+      "Write job summary"
+    ],
+    "build": [
+      "Run actions/checkout@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build",
+      "Verify build output",
+      "Verify generated schema artifacts are committed",
+      "Verify dist bundle tests",
+      "Write job summary"
+    ],
+    "omo-ai-payload-check": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build native payload inputs",
+      "Build omo-native",
+      "Verify omo-ai payload",
+      "Verify packed omo-ai consumer",
+      "Dry-run publish",
+      "Write job summary"
+    ],
+    "native-binary-parity (macos-15, darwin-arm64, aarch64-apple-darwin, omo-darwin-arm64, true)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build the desktop engine the binary embeds",
+      "Build the keychain helper the binary embeds",
+      "Build the standalone binary and the npm launcher payload",
+      "Compare the binary with the npm launcher",
+      "Run the binary from an empty download folder twice",
+      "Upload parity runs",
+      "Write job summary"
+    ],
+    "native-binary-parity (windows-latest, windows-x64, x86_64-pc-windows-msvc, omo-windows-x64.exe, f...": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build the desktop engine the binary embeds",
+      "Build the keychain helper the binary embeds",
+      "Build the standalone binary and the npm launcher payload",
+      "Compare the binary with the npm launcher",
+      "Run the binary from an empty download folder twice",
+      "Upload parity runs",
+      "Write job summary"
+    ],
+    "auto-commit-schema": [
+      "Run actions/checkout@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Build",
+      "Auto-commit schema changes",
+      "Write job summary"
+    ],
+    "draft-release": [
+      "Run actions/checkout@v7",
+      "Run git fetch --force --tags",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Generate release notes",
+      "Create or update draft release",
+      "Write job summary"
+    ]
+  },
+  "allowedSkips": [
+    {
+      "job": "block-master-pr",
+      "reason": "Guards pull requests that target master; push runs skip it."
+    },
+    {
+      "job": "auto-commit-schema",
+      "reason": "Commits regenerated schema on master pushes only."
+    },
+    {
+      "job": "save-shard-timings",
+      "reason": "Saves timing snapshots on dev pushes only; it validates nothing."
+    },
+    {
+      "job": "draft-release",
+      "reason": "Drafts release notes on heavy dev pushes only; it validates nothing."
+    },
+    {
+      "job": "ci-mode",
+      "steps": [
+        "Report-only temp-leak list only shrinks"
+      ],
+      "reason": "Compares against a pull request base; push runs have none."
+    },
+    {
+      "job": "codex-compatibility (ubuntu-latest, full)",
+      "steps": [
+        "Build Codex platform smoke prerequisites",
+        "Run Codex platform smoke tests (.mjs via node --test)",
+        "Run Codex platform smoke tests (.ts via bun test)"
+      ],
+      "reason": "The Linux leg runs the full suite; the platform smoke runs on the Windows leg."
+    },
+    {
+      "job": "codex-compatibility (windows-latest, platform)",
+      "steps": [
+        "Run full Codex compatibility suite",
+        "Run omo-codex component checks and tests"
+      ],
+      "reason": "The Windows leg runs the platform smoke; the full suite runs on the Linux leg."
+    },
+    {
+      "job": "test (windows-latest, 1/2)",
+      "steps": [
+        "Run actions/cache@v6",
+        "Run tests"
+      ],
+      "reason": "Windows does not use the POSIX cache; shard 1 runs its tests through the telemetry step."
+    },
+    {
+      "job": "test (windows-latest, 2/2)",
+      "steps": [
+        "Run actions/cache@v6",
+        "Run tests with Windows telemetry",
+        "Collect timed-out git evidence",
+        "Upload timed-out git evidence"
+      ],
+      "reason": "Windows does not use the POSIX cache; telemetry and git diagnostics belong to shard 1."
+    },
+    {
+      "job": "test-linux (memory-core)",
+      "steps": [
+        "Install dependencies",
+        "Run vendored lsp-daemon tests",
+        "Run omo-opencode tests",
+        "Run the serial quarantine",
+        "Restore selected shard timing snapshot",
+        "Copy the timing snapshot for this shard",
+        "Run the first remainder half",
+        "Run the second remainder half",
+        "Upload root shard record"
+      ],
+      "reason": "Each Linux shard runs only its own install and test commands; memory-core keeps no shard record."
+    },
+    {
+      "job": "test-linux (omo-opencode)",
+      "steps": [
+        "Install memory-core test dependencies",
+        "Run memory-core tests in a PID namespace",
+        "Restore selected shard timing snapshot",
+        "Copy the timing snapshot for this shard",
+        "Run the first remainder half",
+        "Run the second remainder half",
+        "Upload root shard record"
+      ],
+      "reason": "Each Linux shard runs only its own test commands; only remainder shards keep shard records."
+    },
+    {
+      "job": "test-linux (remainder-1)",
+      "steps": [
+        "Install memory-core test dependencies",
+        "Run vendored lsp-daemon tests",
+        "Run omo-opencode tests",
+        "Run the serial quarantine",
+        "Run memory-core tests in a PID namespace",
+        "Run the second remainder half",
+        "Restore selected shard timing snapshot"
+      ],
+      "reason": "Each Linux shard runs only its own test commands; timing snapshots are optional partitioning data."
+    },
+    {
+      "job": "test-linux (remainder-2)",
+      "steps": [
+        "Install memory-core test dependencies",
+        "Run vendored lsp-daemon tests",
+        "Run omo-opencode tests",
+        "Run the serial quarantine",
+        "Run memory-core tests in a PID namespace",
+        "Run the first remainder half",
+        "Restore selected shard timing snapshot"
+      ],
+      "reason": "Each Linux shard runs only its own test commands; timing snapshots are optional partitioning data."
+    },
+    {
+      "job": "senpi-tests-linux (one)",
+      "steps": [
+        "Restore selected shard timing snapshot"
+      ],
+      "reason": "Timing snapshots are optional partitioning data for the Senpi tests."
+    },
+    {
+      "job": "senpi-tests-linux (two)",
+      "steps": [
+        "Restore selected shard timing snapshot"
+      ],
+      "reason": "Timing snapshots are optional partitioning data for the Senpi tests."
+    },
+    {
+      "job": "native-binary-parity (macos-15, darwin-arm64, aarch64-apple-darwin, omo-darwin-arm64, true)",
+      "steps": [
+        "Run the binary from an empty download folder twice",
+        "Upload parity runs"
+      ],
+      "reason": "macOS compares against the npm launcher; empty-folder launches run on Windows; uploads are failure diagnostics."
+    },
+    {
+      "job": "native-binary-parity (windows-latest, windows-x64, x86_64-pc-windows-msvc, omo-windows-x64.exe, f...",
+      "steps": [
+        "Build the keychain helper the binary embeds",
+        "Compare the binary with the npm launcher",
+        "Upload parity runs"
+      ],
+      "reason": "The keychain helper and npm comparison are macOS-only; uploads are failure diagnostics."
+    }
+  ]
+}

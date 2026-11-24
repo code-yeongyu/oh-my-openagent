@@ -290,6 +290,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         ...(row.source === "cache" ? { as_of: row.as_of } : {}),
         ...(row.model === undefined ? {} : { model: { provider: row.model.provider, id: row.model.id } }),
         ...(row.archived === true ? { archived: true as const } : {}),
+        // Rows 6/7 (omo-relay-spec #313, #314): copied as sent; a row without them carries none, and nothing is inferred.
+        ...("waiting" in row && row.waiting !== undefined ? { waiting: row.waiting } : {}),
+        ...("engine_version" in row && typeof row.engine_version === "string"
+          ? { engine_version: row.engine_version }
+          : {}),
       })),
       // A device the round did not mark answered (page_cap, timed_out, undelivered, ...) listed only part of its rows, or
       // none: it is incomplete like the devices the round names so, never read as that device's whole listing (#14295).

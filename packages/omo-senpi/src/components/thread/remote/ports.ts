@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {
@@ -276,11 +280,17 @@ export type RemoteThreadSurface = {
   readonly permissionPreset?: () => string | undefined
 }
 
+// A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
+const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
 /**
- * A listing row's durable id (decision 0027 D2), "" when its device publishes none. What a row is listed and addressed by
- * is thread-address-core `rowKey` (the durable id, else `<device id>/<listing key>`); this is the durable id alone.
+ * A listing row's creation time. The row carries none and its `updated_ms` is not one (#14474), so it is the time a
+ * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
  */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+export function rowCreatedAt(row: RemoteSessionRow): string {
+  const match = UUID_V7.exec(row.durable_id ?? "")
+  return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
+}
 
 /**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
@@ -289,10 +299,15 @@ export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? 
 export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
   row.state === "ended" || row.source === "cache" ? "resumable" : "live"
 
+/** A row's working folder: its `path` (the folder the device lists), else the folder's name when that is unknown (#14429). */
+export const rowFolder = (row: RemoteSessionRow): string =>
+  row.path !== "" && row.path !== "unknown" ? row.path : row.project
+
 /**
  * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service
  * can carry the wake, since an ended row goes down the wake path; with the wake off it would go down the live path and
- * attach to a key no engine runs. Every probe site (holderTarget, replyOnDevice, lookupAcross) asks this first.
+ * attach to a key no engine runs. Every probe site (address/holder.ts holderTarget, address/probe.ts probeAcross and
+ * pinned) asks this first.
  */
 export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "canWake">): Promise<boolean> {
   return (await sessions.canWake?.().catch(() => false)) === true

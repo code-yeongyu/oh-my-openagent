@@ -53,11 +53,12 @@ function fixture() {
     const index = sessions.findIndex((entry) => entry.sessionId === sessionId)
     sessions[index] = { ...sessions[index], name }
   })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => ({
-    provider,
-    id: modelId,
-    name: "Selected model",
-  }))
+  let model = { provider: "openai", id: "gpt-previous" }
+  const getState = async () => ({ isStreaming: false, model, thinkingLevel: "off" })
+  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => {
+    model = { provider, id: modelId }
+    return { ...model, name: "Selected model" }
+  })
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(
     async (_sessionId: string, _level: string, _scope?: "session" | "turn", _durableId?: string) => {},
@@ -69,7 +70,7 @@ function fixture() {
     listSessions: async () => sessions,
     openSession: async () => session,
     getMessages: async () => [{ role: "user", content: "hello" }],
-    getState: async () => ({ isStreaming: false }),
+    getState,
     prompt,
     interrupt: async () => ({ interrupted: false }),
     setSessionName,
@@ -86,6 +87,7 @@ function fixture() {
     store: tempStore(),
     sessions,
     models,
+    getState,
     setSessionName,
     setModel,
     getAvailableModels,
@@ -418,6 +420,88 @@ describe("thread session controls", () => {
     })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
+  })
+
+  test.each([
+    ["openai/gpt-x", "gpt-x", undefined],
+    ["openai/gpt-x:max", "gpt-x", "max"],
+    ["openai/gpt-other:max", "gpt-other:max", undefined],
+  ])("#14445: set_model resolves %s on the one-provider target", async (model, id, level) => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-other:max" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model })).toEqual({
+      kind: "ok",
+      thread: "dur-peer",
+      model: { provider: "openai", id },
+    })
+    expect(f.setThinkingLevel.mock.calls).toEqual(
+      level === undefined ? [] : [["route-peer", level, "turn", "dur-peer"]],
+    )
+  })
+
+  test("#14445: set_model identifies a provider missing from the one-provider target", async () => {
+    const f = fixture()
+    f.models.splice(1, 1, { provider: "openai", id: "gpt-y" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "apitopia/glm-5.1:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "model_not_found",
+        details: { reason: "provider_not_configured", provider: "apitopia", available_providers: ["openai"] },
+      },
+    })
+    expect(f.setModel).not.toHaveBeenCalled()
+  })
+
+  test("#14445: set_model leaves the active model unchanged when the requested thinking level is refused", async () => {
+    const f = fixture()
+    f.models.splice(1, 1)
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "thinking_level_unsupported", details: { supported: ["off", "high"] } },
+    })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-previous" })
+  })
+
+  test("#14445: set_model reports a partial commit when the previous model cannot be restored", async () => {
+    const f = fixture()
+    const setModel = f.setModel.getMockImplementation()
+    if (setModel === undefined) throw new Error("Fixture must implement setModel")
+    f.setModel.mockImplementation(async (session, provider, id, durableId) => {
+      if (id === "gpt-previous") throw new Error("Previous model is no longer available")
+      return setModel(session, provider, id, durableId)
+    })
+    f.setThinkingLevel.mockImplementation(async () => {
+      throw new Error("thinking_level_unsupported:Thinking level max is not supported by the active model.")
+    })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: {
+        code: "partial_commit",
+        details: {
+          previous_model: { provider: "openai", id: "gpt-previous" },
+          selected_model: { provider: "openai", id: "gpt-x" },
+        },
+      },
+    })
+    expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-x" })
+  })
+
+  test("#14445: set_model does not apply thinking to the old model when the switch is held", async () => {
+    const f = fixture()
+    f.setModel.mockResolvedValueOnce({ provider: "openai", id: "gpt-x", name: "Selected model" })
+
+    expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
+      kind: "error",
+      error: { code: "partial_commit", details: { reason: "model_switch_unconfirmed" } },
+    })
+    expect(f.setThinkingLevel).not.toHaveBeenCalled()
   })
 
   test("set_model reports no match with at most twenty available provider/id values", async () => {
@@ -1412,7 +1496,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
         kind: "ok",
         ...row,
         requested_skills: ["lead"],
-        deduplicated: false,
+        deduplicated: true,
         prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
       },
       list: { kind: "ok", threads: [row], scope: "workspace" },
@@ -1431,7 +1515,7 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     expect(f.prompt).not.toHaveBeenCalled()
   })
 
-  test("#given receipts stored in the current shape #when the same keys are retried #then each replays byte-identical to what was stored", async () => {
+  test("#given current receipts #when replayed #then only the successful create's deduplication flag changes", async () => {
     // given: results a current build wrote, success and refusal alike
     const f = fixture()
     const row = {
@@ -1488,7 +1572,11 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
 
     // then
-    expect(replayed).toEqual(receipts.map((receipt) => JSON.stringify(receipt.result)))
+    expect(replayed).toEqual(
+      receipts.map(({ operation, result }) =>
+        JSON.stringify(operation === "thread_create" ? { ...result, deduplicated: true } : result),
+      ),
+    )
     expect(f.setSessionName).not.toHaveBeenCalled()
   })
 })

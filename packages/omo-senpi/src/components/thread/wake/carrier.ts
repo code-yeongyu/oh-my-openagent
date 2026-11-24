@@ -10,6 +10,7 @@ import { readEngineState, type EngineView } from "./engine-state"
 import { WAKE_MEMORY_FLOOR_BYTES } from "./memory-headroom"
 import { waitBlocksDelivery } from "../gateway/session-wait-types"
 import { resolveWakeTarget, type WakeSessionKind } from "./session-target"
+import { ledgerDevice } from "../delivery-ledger"
 
 /** A person's wait that arose after admission is closed after this long with only the carrier attached (A3.2.6). */
 const PERSON_WAIT_CLOSE_MS = 30 * 60_000
@@ -129,12 +130,6 @@ function fileSize(path: string): number {
   } catch {
     return -1
   }
-}
-
-/** The sender's device as the intake's ledger id names it (`device:<device>/<id>`), when it does. */
-function deviceOfLedger(ledgerId: string): string | undefined {
-  const cut = ledgerId.indexOf("/")
-  return ledgerId.startsWith("device:") && cut > "device:".length ? ledgerId.slice("device:".length, cut) : undefined
 }
 
 /**
@@ -487,7 +482,7 @@ export function createCarrier(options: CarrierOptions): Carrier {
         continue
       }
       if (!remoteWake) continue
-      const device = deviceOfLedger(row.ledger_id)
+      const device = ledgerDevice(row.ledger_id)
       if (device === undefined) continue
       if (options.admitIntake === undefined) return "open"
       const admission = await options.admitIntake(device).catch((): IntakeAdmission => "unknown")

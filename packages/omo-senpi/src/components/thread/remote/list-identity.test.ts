@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { resolveAddress } from "../address"
 import type { ThreadToolResult } from "../contracts"
 import { createRelaySessionHost } from "../control/relay-session-host"
 import { B_ROW, createRemoteThreadFixture } from "../thread-remote-fixture"
-import { relayAddressBook } from "./address-book"
+import { UNKNOWN_CALLER } from "../tools/ports"
 import { listAcross } from "./cross-device"
 import type { RemoteListing, RemoteThreadSurface } from "./ports"
 
@@ -44,6 +45,24 @@ describe("thread_list row identity (#14305 U6)", () => {
   })
 })
 
+describe("thread_list row times (#14474)", () => {
+  test("#given b lists a session whose thread id is a UUIDv7 #when thread_list runs #then created_at is the time in the id and updated_at the row's own", async () => {
+    // 0x019a8d7c5e00 ms is 2025-11-16T16:25:29.344Z; B_ROW's updated_ms is 2023-11-14T22:13:20.000Z.
+    const v7 = { ...B_ROW, session_id: "rk-v7", durable_id: "019a8d7c-5e00-7abc-8def-0123456789ab", title: "v7 on b" }
+    const listed = onB(await surface(account({ rows: [v7] }).remote).run("thread_list", {}))
+    expect(listed.map((thread) => [thread.created_at, thread.updated_at])).toEqual([
+      ["2025-11-16T16:25:29.344Z", "2023-11-14T22:13:20.000Z"],
+    ])
+  })
+
+  test("#given b lists a session whose thread id is no UUIDv7 #when thread_list runs #then created_at stays the row's time", async () => {
+    const listed = onB(await surface(account().remote).run("thread_list", {}))
+    expect(listed.map((thread) => [thread.created_at, thread.updated_at])).toEqual([
+      ["2023-11-14T22:13:20.000Z", "2023-11-14T22:13:20.000Z"],
+    ])
+  })
+})
+
 describe("thread_list row names (#14305 U6)", () => {
   test("#given b lists a session with no name #when thread_list runs with and without a state filter #then the row shows the same fallback both times and says unnamed", async () => {
     const { run } = surface(account({ rows: [{ ...B_ROW, title: "" }] }).remote)
@@ -59,7 +78,7 @@ describe("thread_list row names (#14305 U6)", () => {
   })
 
   test("#given b lists a session with no name #when its folder name is used as an address #then it is no address: only a real name is", async () => {
-    const a = account({ rows: [{ ...B_ROW, title: "", project: "/work/notes" }] })
+    const a = account({ rows: [{ ...B_ROW, title: "", path: "/work/notes", project: "/work/notes" }] })
     const { run } = surface(a.remote)
     expect(onB(await run("thread_list", {})).map((thread) => thread.name)).toEqual(["notes"])
     expect(await run("thread_set_model", { thread: "notes", model: "opus" })).toMatchObject({
@@ -84,9 +103,9 @@ describe("one per-device listing state for the list and the resolver (#14305 U6)
   })
 })
 
-describe("thread_list keeps the last-listed memory the relay address book reads (#14172, review M1)", () => {
-  test("#given thread_list listed a thread on b #when the next round misses b and the relay address book resolves that thread #then it answers host_unavailable listing_incomplete naming b, never nothing", async () => {
-    const a = account()
+describe("thread_list feeds the module's one last-listed memory (#14172, review M1 of #14386)", () => {
+  test("#given thread_list listed a thread on b #when the next round misses b and that thread is addressed #then the resolver answers host_unavailable listing_incomplete naming b alone, never not_found", async () => {
+    const a = account({ devices: [{ device: "c", label: "c-mac", online: true }] })
     const listing = a.remote.sessions.listing
     if (listing === undefined) throw new Error("the fixture's sessions port has no listing")
     let round: (filter?: { readonly device?: string }) => Promise<RemoteListing> = listing
@@ -96,9 +115,15 @@ describe("thread_list keeps the last-listed memory the relay address book reads 
     }
     const listed = await listAcross(remote, { kind: "ok", threads: [], scope: "all" }, true)
     expect(rows(listed).map((thread) => thread.thread)).toContain("dur-on-b")
-    round = async () => ({ rows: [], incomplete: ["b"] })
-    const book = await relayAddressBook(remote, "dur-on-b")
-    expect(book.incomplete).toMatchObject({
+    // b and c both miss this round: only the memory of thread_list's round ties the thread to b.
+    round = async () => ({ rows: [], incomplete: ["b", "c"] })
+    const missed = await resolveAddress(
+      { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
+      "dur-on-b",
+      { all_scope: true },
+    )
+    expect(missed).toMatchObject({
+      kind: "error",
       code: "host_unavailable",
       details: { reason: "listing_incomplete", devices: ["b"] },
     })

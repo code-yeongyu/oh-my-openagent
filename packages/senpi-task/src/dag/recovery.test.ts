@@ -23,6 +23,7 @@ import { createDagRecovery } from "./recovery"
 import { createDagFileStore, type DagFileStore } from "./store"
 import type { DagNode, DagNodeId, DagRunEvent, DagRunId } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 const cleanupRoots: string[] = []
 const TERMINAL_TASK_STATUSES = new Set<TaskStatus>(["completed", "error", "cancelled", "interrupted", "lost"])
@@ -301,7 +302,7 @@ describe("RecoveryTaskManager owner identity", () => {
 
 describe("DAG crash recovery", () => {
   test("#given a paused graph with live work #when Resume installs it #then installation returns before graph settlement", async () => {
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const checkpoint = recoverableRecord(
       definition([node("only")]),
       {
@@ -323,7 +324,7 @@ describe("DAG crash recovery", () => {
   })
 
   test("#given a user-stop checkpoint #when session recovery runs #then it does not claim or restart the graph", async () => {
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const checkpoint = recoverableRecord(
       definition([node("only")]),
       {
@@ -340,7 +341,7 @@ describe("DAG crash recovery", () => {
   test("#given a paused run after wave one #when the session restarts #then completed work is reused, the running child folds, and the incomplete wave resumes", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     const input = definition([node("done"), node("running"), node("next", ["done", "running"])])
     const record = recoverableRecord(
@@ -390,7 +391,7 @@ describe("DAG crash recovery", () => {
   test("#given no injected liveness probe #when a paused run's previous holder is this live process #then the default probe skips it as a live lease", async () => {
     // given - the default probe is the lifecycle port's signal-0 existence check, so THIS pid reads alive
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -416,7 +417,7 @@ describe("DAG crash recovery", () => {
   test("#given no injected liveness probe #when a paused run's previous holder pid does not exist #then the default probe claims the run", async () => {
     // given - 2_147_483_647 is above every reachable pid, so the signal-0 probe reports it dead
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -442,7 +443,7 @@ describe("DAG crash recovery", () => {
   test("#given a paused own-session run whose previous holder is THIS host pid and no in-process holder is registered #when the same host resumes the session #then it is claimed and resumed instead of waiting on itself", async () => {
     // given - the probe says EVERY pid is alive: a signal-0 probe on our own pid is always true, so the
     // claim must be decided by identity, not liveness (#8006 saved-session reopen in one host process)
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -476,7 +477,7 @@ describe("DAG crash recovery", () => {
   test("#given a paused own-session run whose previous holder is THIS host pid #when this process still schedules the run #then it is skipped as live_lease naming our own pid", async () => {
     // given - the same-runtime pause + re-attach: the original scheduler is still registered in this
     // process, and a recovery-built second scheduler would fold the same children twice
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -508,7 +509,7 @@ describe("DAG crash recovery", () => {
   test("#given scheduled nodes with and without durable owners #when resumed #then the owner is attached and only never-dispatched work starts", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -542,7 +543,7 @@ describe("DAG crash recovery", () => {
   test("#given an attached node whose task, owner, result, and transcript vanished #when resumed #then it fails closed without dispatch", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -572,7 +573,7 @@ describe("DAG crash recovery", () => {
   test("#given reconcile marked an in-process child lost #when its paused DAG resumes #then task_lost is folded and never re-dispatched", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -606,7 +607,7 @@ describe("DAG crash recovery", () => {
       // given - the lost record has no task-level launch stamp. Its persisted owner identity
       // must match the checkpoint's execAttempt so forgetting the bump would reuse the lost task.
       const projectDir = tempProject()
-      const store = createDagFileStore({ project_dir: projectDir })
+      const store = createDagFileStore(ownedTaskState(projectDir))
       const manager = new RecoveryTaskManager()
       store.writeCheckpoint(
         runId,
@@ -659,7 +660,7 @@ describe("DAG crash recovery", () => {
   test("#given a paused run with one in-flight and one queued node lost by the dead process #when resumed #then only the in-flight node fails task_lost and the queued node runs fresh", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -705,7 +706,7 @@ describe("DAG crash recovery", () => {
   test("#given a lost child with started_at but a still-scheduled DAG node #when resumed across the admission batch crash gap #then task_lost is folded without readmission", async () => {
     // given - TaskManager persisted start before runner.start; the owner died before the
     // scheduler's whole admission batch settled and attached the running task to its node.
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -752,7 +753,7 @@ describe("DAG crash recovery", () => {
     "#given a retained prior-attempt taskId and a newer %o owner #when resumed #then recovery uses the selected owner's outcome and retry identity",
     async ({ status, launched }) => {
       // given - retried kept the old taskId until the replacement's admission batch attaches it.
-      const store = createDagFileStore({ project_dir: tempProject() })
+      const store = createDagFileStore(ownedTaskState(tempProject()))
       const manager = new RecoveryTaskManager()
       store.writeCheckpoint(
         runId,
@@ -811,7 +812,7 @@ describe("DAG crash recovery", () => {
     async (failure) => {
       // given - real manager ports stamp launch before the RPC runner; legacy reconciliation owns loss.
       const project = tempProject()
-      const taskStore = createTaskRecordStore({ project_dir: project })
+      const taskStore = createTaskRecordStore(ownedTaskState(project))
       const pending: TaskRecord = {
         ...createTaskRecord(
           {
@@ -872,7 +873,7 @@ describe("DAG crash recovery", () => {
         runners: { "in-process": runner, process: runner },
         rpcRespawnRunner: {
           start: async () => {
-            launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
+            launchObservations.push(createTaskRecordStore(ownedTaskState(project)).load(pending.task_id))
             taskStore.mutate(pending.task_id, (fresh) => ({ ...fresh, child_session_id: handle.sessionId }))
             return handle
           },
@@ -901,13 +902,13 @@ describe("DAG crash recovery", () => {
       // when - no scoped parent: exercise the legacy global sweep and its failed-respawn branch.
       const reconciled = await lifecycle.reconcileOnSessionStart()
       lifecycle.dispose?.()
-      const lost = createTaskRecordStore({ project_dir: project }).load(pending.task_id)
+      const lost = createTaskRecordStore(ownedTaskState(project)).load(pending.task_id)
       if (lost === null) throw new Error("expected persisted lost task")
       expect(reconciled.outcomes).toContainEqual(expect.objectContaining({ task_id: pending.task_id, kind: "lost" }))
       expect(lost.status).toBe("lost")
       const manager = new RecoveryTaskManager()
       manager.add(lost)
-      const store = createDagFileStore({ project_dir: project })
+      const store = createDagFileStore(ownedTaskState(project))
       store.writeCheckpoint(
         runId,
         recoverableRecord(
@@ -951,7 +952,7 @@ describe("DAG crash recovery", () => {
   test("#given a pending child freshly launched by scoped lifecycle recovery #when lost while its DAG node is still scheduled #then the persisted launch folds task_lost without dispatch", async () => {
     // given - use the real lifecycle ports, manager and record store, not a hand-stamped record.
     const project = tempProject()
-    const taskStore = createTaskRecordStore({ project_dir: project })
+    const taskStore = createTaskRecordStore(ownedTaskState(project))
     const pending = {
       ...createTaskRecord(
         {
@@ -974,7 +975,7 @@ describe("DAG crash recovery", () => {
     const launchObservations: Array<TaskRecord | null> = []
     const runner = {
       start: async () => {
-        launchObservations.push(createTaskRecordStore({ project_dir: project }).load(pending.task_id))
+        launchObservations.push(createTaskRecordStore(ownedTaskState(project)).load(pending.task_id))
         return makeHandle(pending.task_id).handle
       },
     }
@@ -1006,12 +1007,12 @@ describe("DAG crash recovery", () => {
           error_message: "host died",
         }).record,
     )
-    const lost = createTaskRecordStore({ project_dir: project }).load(pending.task_id)
+    const lost = createTaskRecordStore(ownedTaskState(project)).load(pending.task_id)
     if (lost === null) throw new Error("expected persisted lost task")
     expect(lost.status).toBe("lost")
     const manager = new RecoveryTaskManager()
     manager.add(lost)
-    const store = createDagFileStore({ project_dir: project })
+    const store = createDagFileStore(ownedTaskState(project))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1044,7 +1045,7 @@ describe("DAG crash recovery", () => {
     "#given a never-started lost node at execAttempt %s #when resumed #then automatic readmission stops at the execution-attempt cap",
     async (execAttempt) => {
       // given - display attempt is deliberately unrelated to the persisted execution counter.
-      const store = createDagFileStore({ project_dir: tempProject() })
+      const store = createDagFileStore(ownedTaskState(tempProject()))
       const manager = new RecoveryTaskManager()
       store.writeCheckpoint(
         runId,
@@ -1085,7 +1086,7 @@ describe("DAG crash recovery", () => {
     // paused); adoption retargets it to the journal contract: an adopted run carries a real
     // dag.run.resumed event, not just a rewritten checkpoint.
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1115,8 +1116,8 @@ describe("DAG crash recovery", () => {
   test("#given two managers race a paused run #when the first claim holder is live #then exactly one resumes and the other observes the live lease", async () => {
     // given
     const projectDir = tempProject()
-    const storeA = createDagFileStore({ project_dir: projectDir })
-    const storeB = createDagFileStore({ project_dir: projectDir })
+    const storeA = createDagFileStore(ownedTaskState(projectDir))
+    const storeB = createDagFileStore(ownedTaskState(projectDir))
     const input = definition([node("active")])
     storeA.writeCheckpoint(
       runId,
@@ -1151,7 +1152,7 @@ describe("DAG crash recovery", () => {
   test("#given a crash after a terminal transition reaches the WAL but before its reducer #when recovery reopens #then output artifact metadata and run stats are rebuilt", async () => {
     // given
     const projectDir = tempProject()
-    const baseStore = createDagFileStore({ project_dir: projectDir })
+    const baseStore = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     const completed = {
       ...taskRecord(owner("wal-artifact"), "completed", "task-wal-artifact"),
@@ -1190,7 +1191,7 @@ describe("DAG crash recovery", () => {
         isProcessAlive: () => false,
       }).resumePausedRuns(parentSessionId),
     ).rejects.toThrow("injected crash after terminal WAL append")
-    const reopenedStore = createDagFileStore({ project_dir: projectDir })
+    const reopenedStore = createDagFileStore(ownedTaskState(projectDir))
     const [outcome] = await createDagRecovery({
       store: reopenedStore,
       taskManager: manager,
@@ -1234,7 +1235,7 @@ describe("DAG crash recovery", () => {
   test("#given a crash after a recovered task transition reaches the WAL #when the engine reopens #then artifact metadata is rebuilt from the durable copy", async () => {
     // given
     const projectDir = tempProject()
-    const baseStore = createDagFileStore({ project_dir: projectDir })
+    const baseStore = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     const completed = {
       ...taskRecord(owner("artifact"), "completed", "task-artifact"),
@@ -1292,7 +1293,7 @@ describe("DAG crash recovery", () => {
 
     // when
     await expect(firstRecovery.resumePausedRuns(parentSessionId)).rejects.toThrow("injected terminal checkpoint crash")
-    const reopenedStore = createDagFileStore({ project_dir: projectDir })
+    const reopenedStore = createDagFileStore(ownedTaskState(projectDir))
     const [outcome] = await createDagRecovery({
       store: reopenedStore,
       taskManager: manager,
@@ -1337,7 +1338,7 @@ describe("DAG crash recovery", () => {
   test("#given a live run #when shutdown pause starts #then admission stops before pause persistence and its lease is released", () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1377,7 +1378,7 @@ describe("DAG recovery attempt-scoped ownership", () => {
   test("#given a pre-change checkpoint with legacy owner fingerprints #when resumed #then it completes and the legacy fingerprint is reused verbatim", async () => {
     // given - no amendHistory, no execAttempt, owner fingerprints from the legacy two-field formula
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     const input = definition([node("legacy-done"), node("legacy-next", ["legacy-done"])])
     const legacyRecord = recoverableRecord(
@@ -1414,7 +1415,7 @@ describe("DAG recovery attempt-scoped ownership", () => {
   test("#given a reattach whose observed taskId differs #when resumed #then the display attempt bumps without a new execution and the owner fingerprint still matches", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -1461,7 +1462,7 @@ describe("DAG recovery attempt-scoped ownership", () => {
   test("#given a retried pending node with execAttempt #when resumed #then it starts fresh under the attempt-scoped fingerprint", async () => {
     // given
     const projectDir = tempProject()
-    const store = createDagFileStore({ project_dir: projectDir })
+    const store = createDagFileStore(ownedTaskState(projectDir))
     const manager = new RecoveryTaskManager()
     store.writeCheckpoint(
       runId,
@@ -1505,7 +1506,7 @@ describe("DAG recovery attempt-scoped ownership", () => {
 describe("resumePausedRuns immediate fork-source adoption", () => {
   test("#given a foreign paused run with a dead lease holder #when a fork from that session resumes #then it adopts, re-homes, and completes the run", async () => {
     // given
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1538,7 +1539,7 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
 
   test("#given a foreign paused run whose lease holder is alive #when a fork from that session resumes #then the run is left untouched", async () => {
     // given a foreign session that is still running (its pause is mid-resume or residency-held)
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1569,7 +1570,7 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
 
   test("#given a foreign paused run with no recorded lease holder #when a fork from that session resumes #then abandonment is unproven and the run is left untouched", async () => {
     // given a paused record that never went through the shutdown pause (no pid on record)
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1599,7 +1600,7 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
 
   test("#given a foreign paused run whose lease holder is this process #when its fork resumes #then self-adoption is safe and the run completes", async () => {
     // given a run this very process paused under a previous session id (alive, but it is us)
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     store.writeCheckpoint(
       runId,
       recoverableRecord(
@@ -1631,7 +1632,7 @@ describe("resumePausedRuns immediate fork-source adoption", () => {
 describe("DAG recovery state directory loss", () => {
   test("#given the runs directory vanished after the store opened #when shutdown pauses and startup resumes runs #then recovery sees no runs instead of an ENOENT crash", async () => {
     // given - a worktree cleanup (git clean, rm -rf .omo) removes the state dir while the session is live
-    const store = createDagFileStore({ project_dir: tempProject() })
+    const store = createDagFileStore(ownedTaskState(tempProject()))
     fs.rmSync(store.paths.runs, { recursive: true, force: true })
     const recovery = createDagRecovery({ store, taskManager: new RecoveryTaskManager(), hostPid: 101 })
 

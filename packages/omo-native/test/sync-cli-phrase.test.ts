@@ -8,12 +8,7 @@ import { phraseMarkerExists } from "../../memory-core/src/sync/account/testing/p
 import { phraseNoticeStatus } from "../../memory-core/src/sync/account/phrase-notice"
 import { enableSync } from "../../memory-core/src/sync/account/enable"
 import { failAnchorListingAfterPin } from "../../memory-core/src/sync/crypto/testing/retired-pin-listing.test-support"
-import {
-  configureSyncCommands,
-  EXIT_UNSUPPORTED_HERE,
-  PHRASE_GENESIS_FLAG,
-  type SyncCommandDependencies,
-} from "../sync-cli"
+import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import type { SyncContext } from "../sync-context"
 import type { PhraseTerminal } from "../sync-phrase-tty"
 
@@ -101,7 +96,7 @@ const runEnable = async (
 for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
   test(`#given ${marker} is set (even empty) #when enable must create a phrase #then it refuses before any terminal opens, writes nothing and exits 2`, async () => {
     const terminal = scriptedTerminal()
-    const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1", [marker]: "" }, terminal: terminal.open })
+    const r = await runEnable({ env: { [marker]: "" }, terminal: terminal.open })
     expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
     expect(r.err).toContain("Run `omo sync enable` yourself in a terminal.")
     expect(terminal.opened()).toBe(0)
@@ -113,7 +108,7 @@ for (const marker of ["PI_CODING_AGENT", "AI_AGENT", "CI"] as const) {
 test("#given the terminal check reports no controlling terminal #when enable must create a phrase #then it refuses before opening any terminal and writes nothing", async () => {
   const terminal = scriptedTerminal()
   const r = await runEnable({
-    env: { [PHRASE_GENESIS_FLAG]: "1" },
+    env: {},
     terminal: terminal.open,
     terminalAvailable: () => false,
   })
@@ -123,19 +118,22 @@ test("#given the terminal check reports no controlling terminal #when enable mus
   expect(r.f.entries).toEqual([])
 })
 
-test("#given the phrase flag off #when enable must create a phrase #then it says creation is unavailable and never calls recovery optional", async () => {
-  const terminal = scriptedTerminal()
-  const r = await runEnable({ env: {}, terminal: terminal.open })
-  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
-  expect(r.err.at(-1)).toContain("Recovery phrase setup is disabled in this CLI")
-  expect(terminal.opened()).toBe(0)
-  expect(r.f.entries).toEqual([])
-  expect(r.f.server.switches).toEqual([])
+test("#given the retired OMO_MEMORY_SYNC_PHRASE_GENESIS flag unset or 0 and a service that accepts phrase keys #when enable must create a phrase #then the service's answer alone decides and the genesis is created (#14432)", async () => {
+  for (const env of [{}, { OMO_MEMORY_SYNC_PHRASE_GENESIS: "0" }]) {
+    const terminal = scriptedTerminal()
+    const r = await runEnable({ env, terminal: terminal.open }, undefined, {
+      server: { acceptsPhraseKeys: true },
+      productionFloor: true,
+    })
+    expect(r.err).toEqual([])
+    expect(r.exit).toBe(0)
+    expect(r.out).toContain("Memory sync is on for this device.")
+  }
 })
 
 test("#given a person at the terminal #when enable creates a phrase genesis #then the words appear only on the terminal, never in stdout or stderr", async () => {
   const terminal = scriptedTerminal()
-  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open })
+  const r = await runEnable({ env: {}, terminal: terminal.open })
   expect(r.exit).toBe(0)
   expect(r.out).toContain("Memory sync is on for this device.")
   const shown = shownWords(terminal.written)
@@ -150,7 +148,7 @@ test("#given a person at the terminal #when enable creates a phrase genesis #the
 test("#given a phrase genesis that pinned but could not read the retired pins #when enable completes #then stderr names the skipped check once and it exits 0", async () => {
   const terminal = scriptedTerminal()
   try {
-    const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open }, async (f) => {
+    const r = await runEnable({ env: {}, terminal: terminal.open }, async (f) => {
       failAnchorListingAfterPin(f.input.pinDir)
     })
     mock.restore()
@@ -171,7 +169,7 @@ for (const [label, acceptsPhraseKeys] of [
 ] as const) {
   test(`#given no injected floor port and accepts_phrase_keys ${label} on the service state route #when enable must create a phrase #then ${acceptsPhraseKeys === true ? "the phrase genesis is created" : "it is refused as unavailable and nothing is written"}`, async () => {
     const terminal = scriptedTerminal()
-    const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: terminal.open }, undefined, {
+    const r = await runEnable({ env: {}, terminal: terminal.open }, undefined, {
       server: acceptsPhraseKeys === undefined ? {} : { acceptsPhraseKeys },
       productionFloor: true,
     })
@@ -224,7 +222,7 @@ test("#given a void notice on the terminal #when the person cancels it instead o
     error: (line) => void err.push(line),
     confirm: async () => false,
     interactive: true,
-    env: { [PHRASE_GENESIS_FLAG]: "1" },
+    env: {},
     terminal: open,
     terminalAvailable: () => true,
     phraseFloor: async () => "on",
@@ -250,7 +248,7 @@ const writeVoidMarker = async (f: Awaited<ReturnType<typeof fixture>>) =>
 
 test("#given an undelivered void notice and an agent marker #when enable runs #then the notice goes to stderr, is NOT acknowledged, and the person is told to run it themselves", async () => {
   const terminal = scriptedTerminal()
-  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1", CI: "" }, terminal: terminal.open }, writeVoidMarker)
+  const r = await runEnable({ env: { CI: "" }, terminal: terminal.open }, writeVoidMarker)
   expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
   expect(r.err).toContain("The recovery phrase you saw was not saved to your account. Do not keep it.")
   expect(r.err).toContain("Run `omo sync enable` yourself in a terminal.")
@@ -260,14 +258,14 @@ test("#given an undelivered void notice and an agent marker #when enable runs #t
 
 test("#given the person cancels before the words are shown #when enable runs #then it says nothing was saved and exits 1", async () => {
   const open = (): PhraseTerminal => ({ write: () => undefined, readLine: async () => null, close: () => undefined })
-  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1" }, terminal: open })
+  const r = await runEnable({ env: {}, terminal: open })
   expect(r.exit).toBe(1)
   expect(r.err).toContain("Turning on memory sync was cancelled. Nothing was saved.")
   expect(r.f.entries).toEqual([])
 })
 
 test("#given a device already in the chain whose earlier shown phrase was never saved #when enable runs #then it reports sync on and still delivers the void notice", async () => {
-  const r = await runEnable({ env: { [PHRASE_GENESIS_FLAG]: "1", CI: "" } }, async (f) => {
+  const r = await runEnable({ env: { CI: "" } }, async (f) => {
     expect(await enableSync(f.input)).toEqual({ kind: "joined", created: true })
     await writeVoidMarker(f)
   })
@@ -275,4 +273,51 @@ test("#given a device already in the chain whose earlier shown phrase was never 
   expect(r.out).toContain("Memory sync is on for this device.")
   expect(r.err).toContain("The recovery phrase you saw was not saved to your account. Do not keep it.")
   expect(await phraseMarkerExists(r.f.input.pinDir, r.f.keyring.principal().id)).toBe(true)
+})
+
+const BLOCKERS = [
+  { label: "Work MacBook", kind: "desktop", platform: "macos", last_sync_at: "2026-11-19T10:00:00Z" },
+  { kind: "cli" },
+  { label: "build box", kind: "cli", platform: "linux", last_sync_at: "2026-11-18T10:00:00Z" },
+]
+
+test("#given the service names devices that block phrase keys on its state route #when enable must create a phrase #then it names each device to update first, opens no terminal and writes nothing (per-account phrase gate)", async () => {
+  const terminal = scriptedTerminal()
+  const r = await runEnable({ env: {}, terminal: terminal.open }, undefined, {
+    server: { acceptsPhraseKeys: false, extraState: { phrase_key_blockers: BLOCKERS } },
+    productionFloor: true,
+  })
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err.filter((line) => line.startsWith("Update OmO"))).toEqual([
+    "Update OmO on Work MacBook first (it is older than 5.1.74), then run `omo sync enable` again.",
+    "Update OmO on build box first (it is older than 5.1.74), then run `omo sync enable` again.",
+  ])
+  expect(terminal.opened()).toBe(0)
+  expect(r.f.entries).toEqual([])
+  expect(r.f.server.switches).toEqual([])
+})
+
+test("#given the service refuses the phrase append naming a device to update #when enable runs the ceremony #then the words are void and stderr names that device (per-account phrase gate)", async () => {
+  const terminal = scriptedTerminal()
+  const r = await runEnable({ env: {}, terminal: terminal.open }, async (f) => {
+    f.server.phrase.accept = false
+    f.server.phrase.detail = { reason: "devices_need_update", devices: [{ ...BLOCKERS[0], lastSyncAt: "x" }] }
+  })
+  expect(r.exit).toBe(EXIT_UNSUPPORTED_HERE)
+  expect(r.err).toContain(
+    "Update OmO on Work MacBook first (it is older than 5.1.74), then run `omo sync enable` again.",
+  )
+  expect(r.f.entries).toEqual([])
+})
+
+test("#given a hostile blocker list with escape sequences and far too many rows #when enable is refused #then each printed label is stripped of control characters and the list is capped (review L2)", async () => {
+  const hostile = Array.from({ length: 50 }, (_, i) => ({ label: `\u001b[2J\u001b]8;;x\u0007box ${i}`, kind: "cli" }))
+  const r = await runEnable({ env: {}, terminal: scriptedTerminal().open }, undefined, {
+    server: { acceptsPhraseKeys: false, extraState: { phrase_key_blockers: hostile } },
+    productionFloor: true,
+  })
+  const lines = r.err.filter((line) => line.startsWith("Update OmO"))
+  expect(lines.length).toBe(20)
+  expect(lines.some((line) => /[\u0000-\u001f\u007f-\u009f]/.test(line))).toBe(false)
+  expect(lines[0]).toContain("box 0")
 })

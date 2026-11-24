@@ -62,6 +62,7 @@ export class ManualClock implements Clock {
   private at = 1_800_000_000_000
   private timers: { readonly due: number; readonly fn: () => void; cancelled: boolean }[] = []
   private waiting: (() => void)[] = []
+  private released = false
 
   /** Resolves once some timer is scheduled: subscribe-first, so a test advances only after the engine waits. */
   untilPending(): Promise<void> {
@@ -75,10 +76,24 @@ export class ManualClock implements Clock {
 
   after(ms: number, fn: () => void): () => void {
     const timer = { due: this.at + ms, fn, cancelled: false }
-    this.timers.push(timer)
-    for (const wake of this.waiting.splice(0)) wake()
+    if (this.released) {
+      queueMicrotask(() => {
+        if (!timer.cancelled) fn()
+      })
+    } else {
+      this.timers.push(timer)
+      for (const wake of this.waiting.splice(0)) wake()
+    }
     return () => {
       timer.cancelled = true
+    }
+  }
+
+  /** Teardown of manual cycles: release pending and future backoffs without advancing time. */
+  releaseWaits(): void {
+    this.released = true
+    for (const timer of this.timers.splice(0)) {
+      if (!timer.cancelled) timer.fn()
     }
   }
 
@@ -147,7 +162,11 @@ export interface Device {
    * A fresh engine over the same directories; `fault` crashes it at a journal marker. `moveTo` binds
    * it to another memory space (and names the space it leaves when the journal records none).
    */
-  restart(fault?: EngineFault, moveTo?: { readonly space: string; readonly legacySpace?: string }): Promise<void>
+  restart(
+    fault?: EngineFault,
+    moveTo?: { readonly space: string; readonly legacySpace?: string },
+    switchTo?: AccountLink,
+  ): Promise<void>
   syncCommits(): Promise<string[]>
   workingTempFiles(): Promise<string[]>
   /** Cycle render journals left under .git/omo-sync/renders (none once every cycle ended). */
@@ -158,8 +177,15 @@ export interface Device {
   dispose(): Promise<void>
 }
 
+/** The account a device's session is signed in to and that account's server (#14481: a sign-out then a sign-in to another). */
+export interface AccountLink {
+  readonly server: FakeSyncServer
+  readonly account: string
+}
+
 export interface DeviceOptions {
   readonly batchBytes?: number
+  readonly tempRoot?: string
   /** Start from a copy of another device's memory dir (its .git and journal included). */
   readonly memoryFrom?: string
   /** Use the production item store over the #10203 device (Loro) instead of the line-set fake. */
@@ -170,6 +196,8 @@ export interface DeviceOptions {
   readonly freeze?: FreezeSettler
   /** The memory space the device's session is bound to; FAKE_SPACE by default. */
   readonly space?: string
+  /** The account the device's session is signed in to; ACCOUNT by default. */
+  readonly account?: string
 }
 
 export async function makeDevice(
@@ -178,7 +206,23 @@ export async function makeDevice(
   fault?: EngineFault,
   options: DeviceOptions = {},
 ): Promise<Device> {
-  const base = await mkdtemp(join(tmpdir(), `omo-sync-${name}-`))
+  const base = await mkdtemp(join(options.tempRoot ?? tmpdir(), `omo-sync-${name}-`))
+  try {
+    return await setupDevice(base, server, name, fault, options)
+  } catch (error) {
+    // The caller cannot dispose a device it never received.
+    await rm(base, { recursive: true, force: true })
+    throw error
+  }
+}
+
+async function setupDevice(
+  base: string,
+  server: FakeSyncServer,
+  name: string,
+  fault: EngineFault | undefined,
+  options: DeviceOptions,
+): Promise<Device> {
   const root = join(base, "memory")
   const stateDir = join(base, "device")
   await mkdir(stateDir, { recursive: true })
@@ -187,8 +231,9 @@ export async function makeDevice(
   const repo = await gitRepo(root, options.memoryFrom !== undefined)
   const clock = new ManualClock()
   let bound: { readonly space: string; readonly legacySpace?: string } = { space: options.space ?? FAKE_SPACE }
+  let link: AccountLink = { server, account: options.account ?? ACCOUNT }
   const build = (f?: EngineFault) => {
-    const verifier = new FakeVerifier(ACCOUNT, bound.space)
+    const verifier = new FakeVerifier(link.account, bound.space)
     const store: ItemStore =
       options.realStore === true
         ? createDeviceItemStore({
@@ -202,10 +247,11 @@ export async function makeDevice(
     const engine = new SyncEngine({
       repo,
       store,
-      transport: lockGuarded(server.transport(`device:${name}`), lock),
+      transport: lockGuarded(link.server.transport(`device:${name}`), lock),
       verifier,
-      sealer: new FakeSealer(ACCOUNT, bound.space),
+      sealer: new FakeSealer(link.account, bound.space),
       space: bound.space,
+      account: link.account,
       ...(bound.legacySpace === undefined ? {} : { legacySpace: bound.legacySpace }),
       lock,
       clock,
@@ -232,8 +278,11 @@ export async function makeDevice(
     async read(key) {
       return readFile(join(root, key), "utf8").catch(() => null)
     },
-    async restart(f, moveTo) {
+    async restart(f, moveTo, switchTo) {
       if (moveTo !== undefined) bound = moveTo
+      if (switchTo !== undefined) link = switchTo
+      // Production opens the journal dir before the engine loads (open.ts): a restart does too.
+      await mkdir(join(root, ".git", "omo-sync"), { recursive: true })
       Object.assign(device, build(f))
     },
     async syncCommits() {

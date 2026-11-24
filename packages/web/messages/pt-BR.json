@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "Esta documentação está em inglês.",
     "mobileHeader": "Docs do OmO",
     "searchPlaceholder": "Buscar nos docs...",
     "searchLabel": "Filtrar seções da documentação",

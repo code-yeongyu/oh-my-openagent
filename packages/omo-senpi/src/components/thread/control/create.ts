@@ -1,5 +1,6 @@
 import { isAbsolute } from "node:path"
 
+import { toThreadAddressEntries } from "../address-book"
 import { checkNameConflict } from "../addressing"
 import type {
   ThreadCreateInput,
@@ -19,8 +20,8 @@ import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
 import { resolveAddress } from "../address/lazy"
 import {
+  addressBook,
   failure,
-  resolveEntries,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -119,7 +120,7 @@ export async function createThread(
         { invalid: skills.names },
       )
     const loaded = skills?.kind === "ok" ? skills.names : undefined
-    const entries = resolveEntries(options, current)
+    const entries = toThreadAddressEntries(addressBook(options, current))
     const callerCwd = options.callerWorkspaceRoot()
     const plan = await planCreate(options.remote, value, {
       host: createLocalSessionHost(options.host, entries),
@@ -158,11 +159,12 @@ export async function createThread(
     const createdId =
       plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
     const earlier = createdId === undefined ? undefined : await existingHere(options, current, createdId, callerId)
+    const deduplicated = earlier?.kind === "live" || earlier?.kind === "file"
     // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
     // A reopen checks its name after the open, against every thread but itself (keepName): its own name is no conflict.
     // A reopen on another device sets the name inside the open, so it checks before it, as a create does (#14274 review M1).
     const checksNameBeforeOpen = plan.creates || plan.host.device !== undefined
-    if (checksNameBeforeOpen && name !== undefined && earlier?.kind !== "live" && earlier?.kind !== "file") {
+    if (checksNameBeforeOpen && name !== undefined && !deduplicated) {
       const conflict = checkNameConflict(
         (await plan.host.visible()).filter((thread) => thread.thread_id !== plan.reopenedId),
         name,
@@ -185,14 +187,18 @@ export async function createThread(
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
     else
       try {
-        outcome = await plan.host.open({
-          ...plan.request,
-          ...(openName === undefined ? {} : { name: openName }),
-          ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
-          ...(preset === undefined ? {} : { permissionPreset: preset }),
-          ...(plan.creates ? launch.profile : {}),
-          ...(createdId === undefined ? {} : { durableSessionId: createdId }),
-        })
+        outcome = await plan.host.open(
+          {
+            ...plan.request,
+            ...(openName === undefined ? {} : { name: openName }),
+            ...(plan.creates && loaded !== undefined ? { initialSkills: loaded } : {}),
+            ...(preset === undefined ? {} : { permissionPreset: preset }),
+            ...(plan.creates ? launch.profile : {}),
+            ...(createdId === undefined ? {} : { durableSessionId: createdId }),
+          },
+          // #14397 review L1: every create, a prompt-only and an alias-only one included, is checked for reach.
+          { confirmReach: plan.creates },
+        )
       } catch (error) {
         const found = await reopened()
         if (found === undefined) throw error
@@ -201,7 +207,7 @@ export async function createThread(
     if (outcome.kind === "error") return outcome
     opened = outcome.thread
     const created: ThreadToolResult = {
-      ...openedResult(outcome.thread, false),
+      ...openedResult(outcome.thread, deduplicated),
       ...(plan.creates && loaded !== undefined ? { requested_skills: loaded } : {}),
       ...workspaceNote(outcome.thread, callerCwd),
     }

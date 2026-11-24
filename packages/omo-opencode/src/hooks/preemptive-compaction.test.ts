@@ -1,6 +1,8 @@
 /// <reference types="bun-types" />
 
-import { afterAll, describe, it, expect, mock, beforeEach, afterEach } from "bun:test"
+import { describe, it, expect, mock, beforeEach, afterEach, spyOn } from "bun:test"
+import * as logger from "../shared/logger"
+import { createPreemptiveCompactionHook } from "./preemptive-compaction"
 
 const ANTHROPIC_CONTEXT_ENV_KEY = "ANTHROPIC_1M_CONTEXT"
 const VERTEX_CONTEXT_ENV_KEY = "VERTEX_ANTHROPIC_1M_CONTEXT"
@@ -23,16 +25,6 @@ function resetContextLimitEnv(): void {
 }
 
 const logMock = mock(() => {})
-
-mock.module("../shared/logger", () => ({
-  log: logMock,
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { createPreemptiveCompactionHook } = await import("./preemptive-compaction")
 
 function createMockCtx() {
   return {
@@ -74,11 +66,13 @@ describe("preemptive-compaction", () => {
   beforeEach(() => {
     ctx = createMockCtx()
     logMock.mockClear()
+    spyOn(logger, "log").mockImplementation(logMock)
     delete process.env[ANTHROPIC_CONTEXT_ENV_KEY]
     delete process.env[VERTEX_CONTEXT_ENV_KEY]
   })
 
   afterEach(() => {
+    mock.restore()
     resetContextLimitEnv()
   })
 

@@ -20,6 +20,7 @@ import {
 } from "./__fixtures__/manager-fakes"
 import { createTaskManager } from "./manager"
 import { SUBPROCESS_DEADLINE_MS, describeChild, runSignalledChild } from "./__fixtures__/signalled-child"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 function firstAllocationFailsStore(inner: TaskRecordStore): TaskRecordStore {
   let armed = true
@@ -124,7 +125,7 @@ describe("TaskManager claim characterization", () => {
   test("#given an id-shaped requested name #when an unnamed task claims its fallback #then every saved sibling name is unique", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const invariantStore: TaskRecordStore = {
       ...inner,
       save(record) {
@@ -143,7 +144,7 @@ describe("TaskManager claim characterization", () => {
     // first id cannot be pinned to the clock. Probe the allocator, then assert the RELATIONSHIP the
     // test is about: an id-shaped requested name forces the unnamed sibling past it, names unique.
     const probe = await managerWithStore(
-      createTaskRecordStore({ project_dir: tempProject() }),
+      createTaskRecordStore(ownedTaskState(tempProject())),
       new FakeRunner(),
       new FakeRunner(),
       clock,
@@ -235,7 +236,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a foreign winner for the first candidate #when started #then it claims the next id", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 
@@ -253,7 +254,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a requested name and a foreign winner #when started #then only the loser keeps the requested name", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 
@@ -272,7 +273,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a real manager under collision #when team members spawn #then no member start is rejected", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
     const spec = normalizeSenpiTeamSpec(
@@ -301,7 +302,7 @@ describe("TaskManager claim characterization", () => {
   test("#given an allocation failure #when the requested name is retried #then its reservation was released", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const { manager } = managerWithStore(firstAllocationFailsStore(inner))
 
     // when
@@ -321,7 +322,7 @@ describe("TaskManager claim characterization", () => {
   test("#given bookkeeping fails after a claim #when process mode starts #then it records a terminal failure", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const transitions: TaskTransition[] = []
     const bookkeeping = replaceFailsOnceStore(inner, transitions)
     const { manager } = managerWithStore(bookkeeping.store)
@@ -345,7 +346,7 @@ describe("TaskManager claim characterization", () => {
   test("#given a whitespace requested name #when a collision is claimed #then the fallback follows the final id", async () => {
     // given
     const project = tempProject()
-    const inner = createTaskRecordStore({ project_dir: project })
+    const inner = createTaskRecordStore(ownedTaskState(project))
     const collision = collisionStore(inner)
     const { manager } = managerWithStore(collision.store)
 

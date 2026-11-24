@@ -1,7 +1,6 @@
 import { createInterface } from "node:readline/promises"
 
-import { approveDevice, disableSync, enableSync, joinAccount } from "../memory-core/src/sync/account/index.ts"
-import { acknowledgePhraseVoid, type PhraseVoidNotice } from "../memory-core/src/sync/account/phrase-notice.ts"
+import { type CeremonyClock, disableSync, enableSync, joinAccount } from "../memory-core/src/sync/account/index.ts"
 import { createPhraseGenesisBridge } from "../memory-core/src/sync/genesis/phrase-bridge.ts"
 import { type PhraseGate, readServiceFloor } from "../memory-core/src/sync/genesis/phrase-gate.ts"
 import {
@@ -9,27 +8,53 @@ import {
   controllingTerminalAvailable,
   lazyTerminalSurface,
   openControllingTerminal,
+  type PhraseTerminal,
 } from "./sync-phrase-tty"
 import type { Command } from "commander"
 
 import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
-import { CREATION_UNAVAILABLE, phraseCreationGuidance, RUN_IT_YOURSELF } from "./sync-creation-guidance"
+import { approve, spacedCode } from "./sync-approve-cli"
+import { ownership, ownershipUseRefused } from "./sync-ownership-cli"
+import { deliverVoidNotice } from "./sync-void-notice"
+import {
+  CREATION_UNAVAILABLE,
+  phraseCreationGuidance,
+  RUN_IT_YOURSELF,
+  updateDeviceFirst,
+} from "./sync-creation-guidance"
+import { readEngineSyncStatus, type EngineSyncRead } from "./sync-engine-status"
+import { recover, recoverRefused } from "./sync-recover-cli"
+import { collectSyncStatus, syncStatusLines } from "./sync-status-cli"
 
-import { EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "./sync-command-dependencies"
-import { recover, recoverRefused } from "./sync-recover-command"
+export const EXIT_UNSUPPORTED_HERE = 2
 
-export { EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies }
+export interface SyncCommandDependencies {
+  readonly context: () => Promise<SyncContext>
+  readonly clock: CeremonyClock
+  readonly output: (line: string) => void
+  readonly error: (line: string) => void
+  readonly confirm: (question: string) => Promise<boolean>
+  readonly interactive: boolean
+  /** The environment the agent, CI and terminal refusal markers are read from. */
+  readonly env?: Readonly<Record<string, string | undefined>>
+  /** Opens the controlling terminal; null when there is none. Words never go anywhere else. */
+  readonly terminal?: () => PhraseTerminal | null
+  readonly terminalAvailable?: () => boolean
+  /**
+   * The service floor reader; tests inject one. Absent, the gate reads the service's own `accepts_phrase_keys`
+   * fresh for every creation through the operation's signed-in chain, and any failure refuses (#13631).
+   */
+  readonly phraseFloor?: PhraseGate["serviceFloor"]
+  /** Reads the running engine's sync state for `omo sync status`; this machine's operator socket by default. */
+  readonly engineStatus?: () => Promise<EngineSyncRead>
+}
 
-export const PHRASE_GENESIS_FLAG = "OMO_MEMORY_SYNC_PHRASE_GENESIS"
-const PHRASE_VOID = "The recovery phrase you saw was not saved to your account. Do not keep it."
 const CANCELLED = "Turning on memory sync was cancelled. Nothing was saved."
 
 // Review L9: an enrollment or rotation also holds this lock, so the line must not say "turning on sync".
 const RECOVERY_CEREMONY_RUNNING =
   "Another OmO window or terminal on this device is in the middle of a recovery setup. Finish or cancel it there, then run `omo sync enable` again."
-
-const spacedCode = (code: string): string => `${code.slice(0, 3)} ${code.slice(3)}`
 
 async function run(
   dependencies: SyncCommandDependencies,
@@ -62,48 +87,13 @@ const phraseSetup = (
   // Checked before any secret exists: an agent harness, CI, or no controlling terminal never sees words (sec 7).
   refused: agentMarkerSet(env) || !(dependencies.terminalAvailable ?? controllingTerminalAvailable)(),
   gate: {
-    enabled: env[PHRASE_GENESIS_FLAG] === "1",
+    // Creation follows the service's own accepts_phrase_keys answer alone; there is no client flag (#14432).
+    enabled: true,
     serviceFloor: dependencies.phraseFloor ?? readServiceFloor,
     refused: (reason, account) =>
       dependencies.error(`memory sync refused to create a recovery phrase (${reason}) for account ${account}.`),
   },
 })
-
-/**
- * Delivers a void notice (A1.1-M4): under a refusal it is printed to stderr (it holds no secret) and NEVER
- * acknowledged; otherwise it is written to the opened terminal, and only after the person presses Enter there
- * is it acknowledged. Returns whether it was acknowledged.
- */
-async function deliverVoidNotice(
-  dependencies: SyncCommandDependencies,
-  context: SyncContext,
-  notice: PhraseVoidNotice,
-  refused: boolean,
-): Promise<boolean> {
-  // Enable only ever yields a genesis notice and the CLI has no rotate verb (contract 11.5), so one wording serves.
-  const text = PHRASE_VOID
-  if (refused) {
-    dependencies.error(text)
-    return false
-  }
-  const terminal = (dependencies.terminal ?? openControllingTerminal)()
-  if (terminal === null) {
-    dependencies.error(text)
-    return false
-  }
-  try {
-    terminal.write(`${text}\r\nPress Enter once you have read this.\r\n`)
-    if ((await terminal.readLine(false)) === null) {
-      // Review LOW (#13337): a cancelled notice says why nothing happened instead of exiting silently.
-      dependencies.error("The notice was not confirmed, so nothing changed. Run the command again to read it.")
-      return false
-    }
-  } finally {
-    terminal.close()
-  }
-  await acknowledgePhraseVoid({ ...context, purpose: notice.purpose })
-  return true
-}
 
 async function enable(dependencies: SyncCommandDependencies, context: SyncContext): Promise<number> {
   const env = dependencies.env ?? process.env
@@ -155,7 +145,9 @@ async function enable(dependencies: SyncCommandDependencies, context: SyncContex
       dependencies.error(CANCELLED)
       return 1
     case "phrase_unavailable":
-      dependencies.error(phraseCreationGuidance[outcome.reason])
+      if (outcome.devices !== undefined && outcome.devices.length > 0)
+        for (const device of outcome.devices) dependencies.error(updateDeviceFirst(device.label))
+      else dependencies.error(phraseCreationGuidance[outcome.reason])
       return EXIT_UNSUPPORTED_HERE
     case "acknowledge_required":
     case "method_required":
@@ -202,58 +194,12 @@ async function disable(dependencies: SyncCommandDependencies, context: SyncConte
   return 0
 }
 
-async function approve(
-  dependencies: SyncCommandDependencies,
-  context: SyncContext,
-  requested: string | undefined,
-): Promise<number> {
-  if (!dependencies.interactive) {
-    dependencies.error("Approving a device needs an interactive terminal, so you can compare the code on both screens.")
-    return 1
-  }
-  const waiting = (await context.pairing.listPending()).filter((row) => row.answer === null)
-  const chosen =
-    requested === undefined
-      ? waiting.length === 1
-        ? waiting[0]
-        : undefined
-      : waiting.find((row) => row.id === requested)
-  if (chosen === undefined) {
-    if (waiting.length === 0)
-      dependencies.error("No device is waiting to join. Run `omo sync enable` on the new device first.")
-    else
-      dependencies.error(
-        `More than one device is waiting. Run \`omo sync approve <id>\` with one of: ${waiting.map((row) => row.id).join(", ")}`,
-      )
-    return 1
-  }
-  const outcome = await approveDevice({
-    ...context,
-    clock: dependencies.clock,
-    pendingId: chosen.id,
-    confirmCode: (code) => dependencies.confirm(`Does the other device show ${spacedCode(code)}?`),
-  })
-  switch (outcome.kind) {
-    case "approved":
-      dependencies.output("The device is approved and will start syncing.")
-      return 0
-    case "declined":
-      dependencies.error(
-        "Not approved. If the codes differed, someone may be intercepting the pairing; start again from the new device.",
-      )
-      return 1
-    case "expired":
-      dependencies.error("The request expired. Run `omo sync enable` on the new device again.")
-      return 1
-    case "refused":
-      dependencies.error(`Not approved: ${outcome.reason}.`)
-      return 1
-  }
-}
-
 const defaultDependencies = (): SyncCommandDependencies => ({
   context: () => signedInSyncContext({ env: process.env, cwd: process.cwd() }),
-  clock: { now: () => Date.now(), sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)) },
+  clock: {
+    now: () => Date.now(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+  },
   output: (line) => console.log(line),
   error: (line) => console.error(line),
   confirm: async (question) => {
@@ -281,6 +227,21 @@ export function configureSyncCommands(
     .description("Turn memory sync off for this device only; memory on this device stays")
     .action(() => run(dependencies, (context) => disable(dependencies, context)))
   sync
+    .command("status")
+    .description("Show this device's memory sync state, the account's devices and the running engine")
+    .option("--json", "print one JSON object")
+    .action((options: { readonly json?: boolean }) =>
+      run(dependencies, async (context) => {
+        const report = await collectSyncStatus(
+          context,
+          dependencies.engineStatus ?? (() => readEngineSyncStatus(dependencies.env)),
+        )
+        if (options.json === true) dependencies.output(JSON.stringify(report))
+        else for (const line of syncStatusLines(report)) dependencies.output(line)
+        return 0
+      }),
+    )
+  sync
     .command("approve [id]")
     .description("Approve a device that is waiting to join, after comparing the code on both screens")
     .action((id: string | undefined) => run(dependencies, (context) => approve(dependencies, context, id)))
@@ -294,6 +255,28 @@ export function configureSyncCommands(
       }
       await run(dependencies, (context) => recover(dependencies, context))
     })
+  const owner = sync
+    .command("ownership")
+    .description("Choose what happens to memory sync cannot place in an account")
+    .action(() => run(dependencies, (context) => ownership(dependencies, context.account, null)))
+  owner
+    .command("use")
+    .description("Upload that memory to the signed-in account (asks first)")
+    .option("--repo <path>", "the memory repository, when more than one waits")
+    .action(async (options: { readonly repo?: string }) => {
+      if (ownershipUseRefused(dependencies)) {
+        process.exitCode = EXIT_UNSUPPORTED_HERE
+        return
+      }
+      await run(dependencies, (context) => ownership(dependencies, context.account, "use", options.repo))
+    })
+  owner
+    .command("set-aside")
+    .description("Set that memory aside on this device; nothing is uploaded")
+    .option("--repo <path>", "the memory repository, when more than one waits")
+    .action((options: { readonly repo?: string }) =>
+      run(dependencies, (context) => ownership(dependencies, context.account, "set_aside", options.repo)),
+    )
 }
 
 export async function runSyncCommand(args: readonly string[]): Promise<void> {

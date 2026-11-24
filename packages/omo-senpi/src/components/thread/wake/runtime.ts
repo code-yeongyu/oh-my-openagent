@@ -248,6 +248,12 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
       return "unknown"
     }
   }
+  /** Tells the service which intake marks are drained now; a report that fails is retried at the next drain. */
+  const reportDrained = (): Promise<void> =>
+    serving?.consumer
+      .reportDrained()
+      .catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`)) ??
+    Promise.resolve()
   const carrier = createCarrier({
     store,
     sessionsDirectory,
@@ -269,10 +275,7 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
     memoryFloor: () => readWakeMemoryFloor(),
     schedule: options.schedule ?? unrefSchedule,
     onEvent: (event) => {
-      if (ENDED.has(event.outcome.kind))
-        void serving?.consumer
-          .reportDrained()
-          .catch((error: unknown) => input.warn(`thread wake: drained marks not reported: ${String(error)}`))
+      if (ENDED.has(event.outcome.kind)) void reportDrained()
     },
   })
   // A send calls this from the sending session's handler: the renewal timer and the woken session's connection the
@@ -280,6 +283,8 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
   const wake = (durableId: string): Promise<void> =>
     scope.runInAsyncScope(async () => {
       const outcome = await carrier.wake(durableId)
+      // The rows a close settled during this wake leave drained marks no carry ending will report (#14273 follow-up).
+      if (outcome.kind === "nothing_queued") await reportDrained()
       if (outcome.kind === "failed")
         input.warn(`thread wake: ${durableId} was not started after ${outcome.attempts} attempts`)
       options.onWake?.(durableId, outcome)
@@ -365,8 +370,13 @@ function startRunning(agentDir: string, env: Env, input: ThreadWakeStart, scope:
   return {
     wake,
     admitIntake: async (device) => {
-      // The settled truth of this process's consumer: a restart in flight is awaited, so the answer is never a stale
-      // unknown from the moment before it.
+      // A consumer the service has acknowledged answers on its port at once (#14335). Its start is not over until the
+      // startup pending sweep has woken every parked session, and a session this host opens is drained here: senpi
+      // answers that wake only once the drain pass ends, and the drain asks this question, so waiting for the start
+      // would wait on itself until the carrier's request timed out, one parked session after another.
+      if (consumer?.serving() === true) return await carrierAdmission(device)
+      // No consumer serves yet: the settled truth of this process's consumer, so a restart in flight is awaited and the
+      // answer is never a stale unknown from the moment before it.
       await Promise.allSettled([ready, starting])
       return serving === undefined ? "unknown" : await serving.admitIntake(device)
     },

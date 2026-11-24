@@ -217,7 +217,6 @@ export async function recoverHarness(input: {
     resumeSync: async () => {
       resumes += 1
     },
-    env: {},
     logger: { error: (message, fields) => void logs.push(JSON.stringify({ message, fields })) },
     warn: (message, fields) => void warnings.push(JSON.stringify({ message, fields })),
   })

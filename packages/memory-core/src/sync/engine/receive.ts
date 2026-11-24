@@ -82,7 +82,7 @@ export async function receive(deps: EngineDeps, journal: SyncJournal): Promise<R
     return null
   }
   for (;;) {
-    const page = await deps.transport.pull(after, PAGE)
+    const page = await deps.transport.pull(after, PAGE, state.eventHead)
     if (page.snapshot !== null && page.snapshot.coversSeq >= expected) {
       const s = page.snapshot
       const entry: PulledEntry = {

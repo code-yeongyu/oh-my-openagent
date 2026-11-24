@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// Live proof of the receiver-selected ultrawork directive (omo#8168 / omo#9642 follow-up): the REAL
-// senpi binary, an isolated agent dir, the built plugin, and the keyless mock provider under two model
-// ids. The GPT-6.2 Astra id must receive SENPI_ASTRA_ULTRAWORK_DIRECTIVE and every other id the baseline,
-// read back from the session JSONL (the only place the hidden custom message is distinguishable).
+// Live proof of the receiver-selected ultrawork directive (omo#8168 / omo#9642 / omo#14441): the REAL
+// senpi binary, an isolated agent dir, the built plugin, and the keyless mock provider under one model
+// id per kind of receiver. Every GPT id (Astra, its -fast and -ultrafast tiers, Sol, the GPT-5 family)
+// must receive the GPT directive and every other id the default one, read back from the session JSONL
+// (the only place the hidden custom message is distinguishable). A last scenario arms a session on a
+// non-GPT model and continues it on a GPT one: the request the GPT model receives must then carry the
+// GPT directive in place of the default the transcript holds.
 import { spawnSync } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { delimiter, dirname, join, resolve } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
@@ -16,9 +20,17 @@ const scriptDir = dirname(fileURLToPath(import.meta.url))
 const mockProviderEntry = join(scriptDir, "mock-provider", "index.ts")
 
 const SCENARIOS = [
-  { name: "astra-receiver", model: "gpt-6.2-astra", expect: "astra" },
-  { name: "baseline-receiver", model: "mock-1", expect: "baseline" },
+  { model: "gpt-6.2-astra", expect: "gpt" },
+  { model: "gpt-6.2-astra-ultrafast", expect: "gpt" },
+  { model: "gpt-6.2-sol", expect: "gpt" },
+  { model: "gpt-6-astra", expect: "gpt" },
+  { model: "gpt-5.6-sol", expect: "gpt" },
+  { model: "claude-fable-5-2", expect: "default" },
+  { model: "mock-1", expect: "default" },
 ]
+const SWITCH = { from: "claude-fable-5-2", to: "gpt-6.2-astra-ultrafast" }
+
+const sha256 = (text) => createHash("sha256").update(text).digest("hex")
 
 function collectFiles(dir, out) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -63,55 +75,104 @@ function findOnPath(bin) {
   return null
 }
 
+function runSenpi(resolvedSenpi, sandbox, args) {
+  return spawnSync(resolvedSenpi, ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", ...args], {
+    cwd: sandbox.cwd,
+    env: {
+      ...isolatedChildEnv(process.env, sandbox.agentDir),
+      SENPI_CODING_AGENT_DIR: sandbox.agentDir,
+      XDG_CONFIG_HOME: sandbox.xdgConfigHome,
+      OMO_SENPI_QA: "1",
+    },
+    encoding: "utf8",
+    timeout: 90_000,
+  })
+}
+
+function writeRunOutput(evidenceDir, name, run) {
+  if (evidenceDir === undefined) return
+  mkdirSync(evidenceDir, { recursive: true })
+  writeFileSync(join(evidenceDir, `${name}.stdout.txt`), `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`)
+}
+
 function runScenario(resolvedSenpi, scenario, directives, evidenceDir) {
   const sandbox = createSandbox()
   try {
     seedSandbox(sandbox)
     writeFileSync(
       join(sandbox.cwd, "mock-script.json"),
-      `${JSON.stringify({ steps: [{ type: "text", text: `${scenario.name} e2e complete` }] }, null, 2)}\n`,
+      `${JSON.stringify({ steps: [{ type: "text", text: `${scenario.model} e2e complete` }] }, null, 2)}\n`,
     )
-    const run = spawnSync(
-      resolvedSenpi,
-      ["-e", mockProviderEntry, "-p", "--provider", "omo-mock", "--model", scenario.model, "ulw say hello"],
-      {
-        cwd: sandbox.cwd,
-        env: {
-          ...isolatedChildEnv(process.env, sandbox.agentDir),
-          SENPI_CODING_AGENT_DIR: sandbox.agentDir,
-          XDG_CONFIG_HOME: sandbox.xdgConfigHome,
-          OMO_SENPI_QA: "1",
-        },
-        encoding: "utf8",
-        timeout: 90_000,
-      },
-    )
+    const run = runSenpi(resolvedSenpi, sandbox, ["--model", scenario.model, "ulw say hello"])
     const delivered = hiddenDirectives(sandbox.agentDir)
     const failures = []
     if (run.status !== 0) failures.push(`senpi-exit-${run.status}`)
     if (delivered.length !== 1) failures.push(`directive-count-${delivered.length}`)
     const content = delivered[0] ?? ""
-    const expected = directives[scenario.expect]
-    const other = directives[scenario.expect === "astra" ? "baseline" : "astra"]
-    if (content !== expected) failures.push(`directive-mismatch:expected-${scenario.expect}`)
-    if (content === other) failures.push(`directive-is-${scenario.expect === "astra" ? "baseline" : "astra"}`)
-    if (/omo-ultrawork-astra/.test(content)) failures.push("marker-leaked")
-    if (evidenceDir !== undefined) {
-      mkdirSync(evidenceDir, { recursive: true })
-      writeFileSync(join(evidenceDir, `${scenario.name}.delivered.txt`), content)
-      writeFileSync(
-        join(evidenceDir, `${scenario.name}.stdout.txt`),
-        `${run.stdout ?? ""}\n--- stderr ---\n${run.stderr ?? ""}`,
-      )
+    if (content !== directives[scenario.expect]) failures.push(`directive-mismatch:expected-${scenario.expect}`)
+    for (const [name, directive] of Object.entries(directives)) {
+      if (name !== scenario.expect && content === directive) failures.push(`directive-is-${name}`)
     }
+    writeRunOutput(evidenceDir, scenario.model, run)
+    if (evidenceDir !== undefined) writeFileSync(join(evidenceDir, `${scenario.model}.delivered.txt`), content)
     return {
-      name: scenario.name,
       model: scenario.model,
+      expect: scenario.expect,
       result: failures.length === 0 ? "PASS" : "FAIL",
       failures,
-      deliveredChars: content.length,
-      expectedChars: expected.length,
+      deliveredSha256: sha256(content),
     }
+  } finally {
+    rmSync(sandbox.root, { recursive: true, force: true })
+  }
+}
+
+/** Every string anywhere in a recorded request, so a directive is found whatever shape carries it. */
+function stringLeaves(value, out = []) {
+  if (typeof value === "string") out.push(value)
+  else if (Array.isArray(value)) for (const item of value) stringLeaves(item, out)
+  else if (typeof value === "object" && value !== null) for (const item of Object.values(value)) stringLeaves(item, out)
+  return out
+}
+
+function runSwitchScenario(resolvedSenpi, directives, evidenceDir) {
+  const sandbox = createSandbox()
+  try {
+    seedSandbox(sandbox)
+    writeFileSync(join(sandbox.cwd, "mock-record-context"), "")
+    writeFileSync(
+      join(sandbox.cwd, "mock-script.json"),
+      `${JSON.stringify({ steps: [{ type: "text", text: "switch e2e reply" }] }, null, 2)}\n`,
+    )
+    const armed = runSenpi(resolvedSenpi, sandbox, ["--model", SWITCH.from, "ulw say hello"])
+    const continued = runSenpi(resolvedSenpi, sandbox, ["--model", SWITCH.to, "--continue", "say it again"])
+    const recordPath = join(sandbox.cwd, "mock-context.jsonl")
+    const requests = existsSync(recordPath)
+      ? readFileSync(recordPath, "utf8")
+          .split("\n")
+          .filter((line) => line.trim() !== "")
+          .map((line) => JSON.parse(line))
+      : []
+    const carried = requests.map((request) => {
+      const text = stringLeaves(request.messages).join("\n")
+      return {
+        model: request.model,
+        default: text.includes(directives.default.trimEnd()),
+        gpt: text.includes(directives.gpt.trimEnd()),
+      }
+    })
+    const failures = []
+    if (armed.status !== 0) failures.push(`armed-exit-${armed.status}`)
+    if (continued.status !== 0) failures.push(`continued-exit-${continued.status}`)
+    if (carried.length !== 2) failures.push(`request-count-${carried.length}`)
+    const [first, second] = carried
+    if (first?.model !== SWITCH.from || first?.default !== true || first?.gpt !== false) failures.push("armed-request")
+    if (second?.model !== SWITCH.to || second?.gpt !== true || second?.default !== false) {
+      failures.push("continued-request")
+    }
+    writeRunOutput(evidenceDir, "switch-armed", armed)
+    writeRunOutput(evidenceDir, "switch-continued", continued)
+    return { ...SWITCH, result: failures.length === 0 ? "PASS" : "FAIL", failures, requests: carried }
   } finally {
     rmSync(sandbox.root, { recursive: true, force: true })
   }
@@ -131,15 +192,19 @@ function main() {
   // The same derivation embed-directive.mjs --check holds generated-directive.ts to.
   const directives = readDirectives()
   const scenarios = SCENARIOS.map((scenario) => runScenario(resolvedSenpi, scenario, directives, evidenceDir))
+  const receiverSwitch = runSwitchScenario(resolvedSenpi, directives, evidenceDir)
   const afterDigest = digestDirectory(realAgentDir)
   const report = {
-    result: scenarios.every((scenario) => scenario.result === "PASS") ? "PASS" : "FAIL",
+    result: [...scenarios, receiverSwitch].every((scenario) => scenario.result === "PASS") ? "PASS" : "FAIL",
     scenarios,
-    baselineChars: directives.baseline.length,
-    astraChars: directives.astra.length,
+    receiverSwitch,
+    directiveSha256: Object.fromEntries(Object.entries(directives).map(([name, text]) => [name, sha256(text)])),
     realSenpiUntouched: beforeDigest === afterDigest,
   }
-  if (evidenceDir !== undefined) writeFileSync(join(evidenceDir, "e2e.json"), `${JSON.stringify(report, null, 2)}\n`)
+  if (evidenceDir !== undefined) {
+    mkdirSync(evidenceDir, { recursive: true })
+    writeFileSync(join(evidenceDir, "e2e.json"), `${JSON.stringify(report, null, 2)}\n`)
+  }
   console.log(JSON.stringify(report))
 }
 

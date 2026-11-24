@@ -45,7 +45,9 @@ describe("GPT-6.2 capabilities", () => {
   test("treats GPT-6.2 Astra as the Astra tier and GPT-6.2 Sol as not", () => {
     expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-astra")).toBe(true)
     expect(isGpt6AstraModel("openai/gpt-6.2-astra-fast")).toBe(true)
+    expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-astra-ultrafast")).toBe(true)
     expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-sol")).toBe(false)
+    expect(isGpt6AstraModel("chatgpt-subscription/gpt-6.2-sol-ultrafast")).toBe(false)
   })
 })
 
