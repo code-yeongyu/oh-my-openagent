@@ -52,6 +52,13 @@ function runBuild(args: readonly string[]): BuildResult {
   }
 }
 
+function packageStatus(): string {
+  return spawnSync("git", ["status", "--porcelain", "--", "packages/omo-native"], {
+    cwd: repoRoot,
+    encoding: "utf8",
+  }).stdout
+}
+
 function listRelativeFiles(root: string, prefix = ""): string[] {
   return readdirSync(join(root, prefix), { withFileTypes: true }).flatMap((entry) => {
     const relative = prefix === "" ? entry.name : `${prefix}/${entry.name}`
@@ -74,11 +81,14 @@ describe("build:omo-native staged payload", () => {
   describe("#given a full plugin build", () => {
     describe("#when the payload is staged to a temp output dir", () => {
       test(
-        "#then every required artifact is present with preserved modes and no dev clutter",
+        "#then every required artifact is present with preserved modes, no dev clutter, and the package tree untouched",
         () => {
           const outputDir = join(makeTempDir(), "plugin")
+          const statusBefore = packageStatus()
           const result = runBuild(["--output", outputDir])
           expect(result.exitCode, `build failed:\n${result.output.slice(-2000)}`).toBe(0)
+          // A build staged outside the package must not write into packages/omo-native (plugin staging isolation).
+          expect(packageStatus()).toBe(statusBefore)
 
           const required = [
             join("extensions", "omo.js"),

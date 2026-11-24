@@ -194,7 +194,7 @@ test("#given a store one schema ahead of this build #when this build's worker op
   await openAndMigrate(h)
   const ahead = GATEWAY_MIGRATIONS.length + 1
   const db = new Database(path)
-  db.exec(`PRAGMA user_version = ${ahead}`)
+  db.exec(`PRAGMA user_version = ${ahead}; INSERT OR REPLACE INTO gateway_meta VALUES ('reader_floor', '${ahead}')`)
   db.close()
   const newer = snapshot(path)
 
