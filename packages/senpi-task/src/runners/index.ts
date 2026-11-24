@@ -27,6 +27,8 @@ export { buildSubagentPrompt, type SubagentPromptInput } from "./in-process/suba
 export { createChildResourceLoader } from "./in-process/child-loader"
 export { RpcProcessRunner } from "./rpc-process"
 export type { RpcProcessRunnerOptions } from "./rpc-process"
+export { DevinAcpRunner } from "./devin-acp"
+export type { DevinAcpRunnerOptions } from "./devin-acp"
 export { isHostSessionHandle, RpcHostRunner } from "./rpc-host"
 export {
   ensureTaskDaemon,
