@@ -30,6 +30,9 @@ interface TrackedWorkflow {
   readonly latestSha: string
   readonly tests: TestsOutcome
   readonly compareStatus: CompareStatus
+  // A newer completed dev push run listed before latestRun, in which the tracked job did not conclude (#14856), or
+  // concluded with this outcome.
+  readonly newer?: "cancelled" | "absent" | "failure"
 }
 
 const ci = (overrides: Partial<TrackedWorkflow> = {}): TrackedWorkflow => ({
@@ -82,12 +85,37 @@ function runClose(name: string, openIssues: readonly number[], tracked: readonly
   answer("issue view", { body: first ? block(first) : "", comments: rest.map((each) => ({ body: block(each) })) })
   for (const each of tracked) {
     answer(`repos/${REPO}/actions/runs/${each.redRun}`, { id: each.redRun, workflow_id: each.workflowId })
-    answer(
-      `repos/${REPO}/actions/workflows/${each.workflowId}/runs?branch=dev&event=push&status=completed&per_page=1`,
-      {
-        workflow_runs: [{ id: each.latestRun, head_sha: each.latestSha, html_url: `https://run/${each.latestRun}` }],
-      },
-    )
+    const newerRun = each.latestRun + 1000
+    const completedRuns = {
+      workflow_runs: [
+        ...(each.newer === undefined
+          ? []
+          : [{ id: newerRun, head_sha: "e5e5e5e5e5e5e5e5", html_url: `https://run/${newerRun}` }]),
+        { id: each.latestRun, head_sha: each.latestSha, html_url: `https://run/${each.latestRun}` },
+      ],
+    }
+    // The run listing the closer reads, and the newest-run-only listing it read before #14856 (kept so the old script
+    // fails these cases for the intended reason).
+    for (const perPage of [20, 1])
+      answer(
+        `repos/${REPO}/actions/workflows/${each.workflowId}/runs?branch=dev&event=push&status=completed&per_page=${perPage}`,
+        { workflow_runs: completedRuns.workflow_runs.slice(0, perPage) },
+      )
+    if (each.newer !== undefined)
+      answer(`repos/${REPO}/actions/runs/${newerRun}/jobs?filter=latest&per_page=100`, {
+        jobs:
+          each.newer === "absent"
+            ? []
+            : [
+                {
+                  name: each.job,
+                  conclusion: each.newer,
+                  html_url: `https://job/${newerRun}`,
+                  labels: ["windows-latest"],
+                  steps: [{ name: "Run tests", conclusion: each.newer === "failure" ? "failure" : "cancelled" }],
+                },
+              ],
+      })
     answer(`repos/${REPO}/actions/runs/${each.latestRun}/jobs?filter=latest&per_page=100`, {
       jobs: [
         {
@@ -159,6 +187,30 @@ describe("#given an open platform-red issue tracking one Windows job", () => {
   posixBashTest("#when the latest run is for a commit older than the red one #then the issue stays open", () => {
     const calls = runClose("older-green", [17], [ci({ compareStatus: "behind" })])
     expect(closed(calls)).toBe(false)
+  })
+})
+
+// #14856: the newest completed dev push run was cancelled (superseded), so the tracked job never concluded there.
+describe("#given the newest completed dev push run did not conclude the tracked job", () => {
+  posixBashTest(
+    "#when it was cancelled and the run before passed the job #then the issue is closed on that run",
+    () => {
+      expect(closed(runClose("newest-cancelled", [17], [ci({ newer: "cancelled" })]))).toBe(true)
+    },
+  )
+
+  posixBashTest("#when it lacks the job and the run before passed it #then the issue is closed on that run", () => {
+    expect(closed(runClose("newest-absent", [17], [ci({ newer: "absent" })]))).toBe(true)
+  })
+
+  posixBashTest("#when it was cancelled and the run before failed the job #then the issue stays open", () => {
+    expect(closed(runClose("newest-cancelled-prev-red", [17], [ci({ newer: "cancelled", tests: "failure" })]))).toBe(
+      false,
+    )
+  })
+
+  posixBashTest("#when the newest run failed the job after an older green #then the issue stays open", () => {
+    expect(closed(runClose("newest-red-older-green", [17], [ci({ newer: "failure" })]))).toBe(false)
   })
 })
 

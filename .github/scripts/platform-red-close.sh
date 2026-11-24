@@ -6,7 +6,7 @@
 # "at `<sha>`", in its body and in every comment. A job's newest such block gives its red commit and, from the job url,
 # the run, hence the workflow, it belongs to. One issue can name jobs from several workflows (CI and Computer engine for
 # #14801), and a run of one workflow never contains another workflow's jobs, so each job is judged on the latest
-# completed dev push run of its OWN workflow. The issue closes only when, for every named job, that run:
+# completed dev push run of its OWN workflow in which that job concluded (success or failure). The issue closes only when, for every named job, that run:
 #   - ran the job's tests and it succeeded (platform-jobs.jq; a skipped-test leg proves nothing), and
 #   - is at or after the job's red commit, so a run that has not re-run since the red cannot close it.
 # Anything short of that leaves the issue open and says why in the step log.
@@ -45,13 +45,27 @@ fi
 evidence=""
 while IFS=$'\t' read -r job red_run red_sha; do
   workflow="$(gh api "repos/$GH_REPO/actions/runs/$red_run" --jq '.workflow_id')"
-  read -r run run_sha green_run_url < <(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs?branch=dev&event=push&status=completed&per_page=1" \
-    --jq '.workflow_runs[0] | "\(.id) \(.head_sha) \(.html_url)"')
-  jobs="$OUT_DIR/jobs-$run"
-  [ -f "$jobs" ] || gh api "repos/$GH_REPO/actions/runs/$run/jobs?filter=latest&per_page=100" --jq "$platform_jobs_filter" > "$jobs"
-  result="$(awk -F '\t' -v n="$job" '$1 == n && !found { print $2; found = 1 }' "$jobs")"
+  # The newest completed dev push run in which this job CONCLUDED decides (#14856): a cancelled or superseded run, or
+  # one where the job was skipped, absent or ran no tests, is no evidence either way, so an older run is read instead.
+  run="" result=""
+  while read -r candidate candidate_sha candidate_url; do
+    jobs="$OUT_DIR/jobs-$candidate"
+    [ -f "$jobs" ] || gh api "repos/$GH_REPO/actions/runs/$candidate/jobs?filter=latest&per_page=100" --jq "$platform_jobs_filter" > "$jobs"
+    candidate_result="$(awk -F '\t' -v n="$job" '$1 == n && !found { print $2; found = 1 }' "$jobs")"
+    case "$candidate_result" in
+      success | failure)
+        run="$candidate" run_sha="$candidate_sha" green_run_url="$candidate_url" result="$candidate_result"
+        break
+        ;;
+    esac
+  done < <(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs?branch=dev&event=push&status=completed&per_page=20" \
+    --jq '.workflow_runs[] | "\(.id) \(.head_sha) \(.html_url)"')
+  if [ -z "$run" ]; then
+    echo "#$issue tracks '$job', which concluded in none of its workflow's 20 latest completed dev push runs; leaving it open."
+    exit 0
+  fi
   if [ "$result" != success ]; then
-    echo "#$issue tracks '$job', which is '${result:-absent}' in its workflow's latest dev push run $run; leaving it open."
+    echo "#$issue tracks '$job', which failed in run $run, the newest dev push run where it concluded; leaving it open."
     exit 0
   fi
   status="$(gh api "repos/$GH_REPO/compare/$red_sha...$run_sha" --jq '.status')"
