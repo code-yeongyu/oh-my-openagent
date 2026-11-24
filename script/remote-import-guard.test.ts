@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test"
+import { execFileSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -127,6 +128,8 @@ describe("remote import guard G1 matcher", () => {
     'import type { DeviceService } from "@oh-my-opencode/device-service-core"\nexport const run = 1\n',
   )
   write(`${senpi}/src/components/remote/tui/entry.ts`, 'import { createRemoteClient } from "../index.ts"\n')
+  execFileSync("git", ["init", "-q"], { cwd: root })
+  execFileSync("git", ["add", "packages"], { cwd: root })
   const fixture = findings(root)
 
   test("#given each import shape #then S1 matches the vendored client even through a type-only import", () => {
