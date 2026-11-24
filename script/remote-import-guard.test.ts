@@ -106,6 +106,13 @@ describe("remote import guard G1 matcher", () => {
   write(`${senpi}/src/components/remote/sessions.ts`, "export const sessions = 1\n")
   write(`${senpi}/src/components/remote/port/device-service.ts`, "export const port = 1\n")
   write(`${senpi}/src/components/thread/tool-entry.ts`, 'import { createRemoteClient } from "../remote/index.ts"\n')
+  write(`${senpi}/src/components/remote/lazy.ts`, 'export { createLazyRemoteSurface } from "./port/lazy-remote.ts"\n')
+  write(`${senpi}/src/components/remote/port/lazy-remote.ts`, "export const createLazyRemoteSurface = 1\n")
+  write(`${senpi}/src/components/thread/tool-lazy.ts`, 'import { createLazyRemoteSurface } from "../remote/lazy.ts"\n')
+  write(
+    `${senpi}/src/components/thread/tool-lazy-inner.ts`,
+    'import { createLazyRemoteSurface } from "../remote/port/lazy-remote.ts"\n',
+  )
   write(`${senpi}/src/components/thread/tool-member.ts`, 'import { sessions } from "../remote/sessions.ts"\n')
   write(`${senpi}/src/components/thread/tool-port.ts`, 'import type { port } from "../remote/port/device-service.ts"\n')
   write(
@@ -147,9 +154,11 @@ describe("remote import guard G1 matcher", () => {
     expect(Object.fromEntries(fixture.nonLiteralImports)).toEqual({ [`${senpi}/src/dynamic.ts`]: 1 })
   })
 
-  test("#given each import shape #then S3 holds surfaces to the module's index, type-only included, tests and non-surfaces exempt", () => {
+  test("#given each import shape #then S3 holds surfaces to the module's two entries (index.ts, lazy.ts), type-only included, tests and non-surfaces exempt", () => {
+    // tool-entry (index.ts) and tool-lazy (lazy.ts) pass; tool-lazy-inner reaches the same surface past its entry.
     expect(asRecord(fixture.s3)).toEqual({
       [`${senpi}/src/components/thread/tool-l1.ts`]: ["packages/device-service-core/src/"],
+      [`${senpi}/src/components/thread/tool-lazy-inner.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
