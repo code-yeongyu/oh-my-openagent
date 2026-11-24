@@ -37,7 +37,12 @@ import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { isDevBuildRuntime, isSharedAgentDir, isSharedStoreFile } from "../../agent-home/dev-build-runtime"
+import {
+  isDevBuildRuntime,
+  isSharedAgentDir,
+  isSharedStoreFile,
+  isUnlaunchedSourceRun,
+} from "../../agent-home/dev-build-runtime"
 import {
   GATEWAY_MIGRATIONS,
   GATEWAY_READER_FLOOR_KEY,
@@ -452,11 +457,12 @@ async function recordReaderFloor(ctx: StoreContext): Promise<void> {
 }
 
 /**
- * An omob source build never moves the shared agent dir's store forward (#14382): every released session on the device
- * reads that store, and a schema only an unreleased build knows would lock them out.
+ * An omob source build, or a run from TypeScript source no launcher started (a bare `bun test`), never moves the shared
+ * agent dir's store forward (#14382): every released session on the device reads that store, and a schema only an
+ * unreleased build knows would lock them out.
  */
 function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
-  if (!isDevBuildRuntime()) return undefined
+  if (!isDevBuildRuntime() && !isUnlaunchedSourceRun(import.meta.url)) return undefined
   const stores = [gatewayRootDirectory, gatewayDatabasePath]
   // The configured agent dir or its gateway dir or database linked into a shared one; or the file the worker actually
   // opened, compared by identity with each shared database wherever that database lives (#14622 review M9).
