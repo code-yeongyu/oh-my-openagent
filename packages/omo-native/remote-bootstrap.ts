@@ -1,3 +1,4 @@
+import { realpathSync } from "node:fs"
 import { isAbsolute, resolve } from "node:path"
 
 import {
@@ -56,10 +57,22 @@ export function deviceServiceBootstrapSetup(options: {
   }
 }
 
+const isNpmLauncher = (argv1: string): boolean => {
+  let target = argv1
+  try {
+    target = realpathSync(argv1)
+  } catch {
+    // A path that does not resolve is judged as written.
+  }
+  return target.replaceAll("\\", "/").endsWith("/bin/omo.js")
+}
+
 /**
  * The binary the unit renders and the service refreshes its token with: the omo that ran this command - this compiled
  * binary, or this npm launcher script when the launcher itself runs the verb - never an older runtime's OMO_BIN the
- * environment carries (omo#14258); OMO_BIN answers only for the engine, which is not an omo.
+ * environment carries (omo#14258); OMO_BIN answers only for the engine, which is not an omo. A global npm install started
+ * under node keeps its npm-prefix bin symlink as argv[1], so the launcher is recognized by the file the path
+ * resolves to, and the unit keeps naming the path as invoked.
  */
 export function omoBinaryPath(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -70,7 +83,7 @@ export function omoBinaryPath(
   const bun: unknown = Reflect.get(globalThis, "Bun")
   const embedded: unknown = typeof bun === "object" && bun !== null ? Reflect.get(bun, "embeddedFiles") : undefined
   if (running.compiled ?? (Array.isArray(embedded) && embedded.length > 0)) return execPath
-  if (argv1 !== undefined && argv1.replaceAll("\\", "/").endsWith("/bin/omo.js")) return resolve(argv1)
+  if (argv1 !== undefined && isNpmLauncher(argv1)) return resolve(argv1)
   const declared = env.OMO_BIN
   if (declared !== undefined && isAbsolute(declared)) return declared
   return resolve(argv1 ?? execPath)
