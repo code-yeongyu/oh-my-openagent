@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import type { PlatformFacts } from "@oh-my-opencode/omo-opencode/account-home"
 
-import { isDevBuildRuntime, isSharedAgentDir } from "./dev-build-runtime"
+import { isDevBuildRuntime, isSharedAgentDir, isUnlaunchedSourceRun } from "./dev-build-runtime"
 
 // Edge cases of the source-build guard (#14382, #14622 reviews M2-M4, M8): which agent dirs count as the account's shared
 // store, which runtimes count as a source build, and how the OS account home is read without trusting the environment.
@@ -138,6 +138,16 @@ test.each([
   } finally {
     rmSync(payload, { recursive: true, force: true })
   }
+})
+
+test.each([
+  ["a .ts module with no OMO_PACKAGE_DIR", "file:///repo/src/store-ops.ts", {}, true],
+  ["a .ts module with a blank OMO_PACKAGE_DIR", "file:///repo/src/store-ops.ts", { OMO_PACKAGE_DIR: " " }, true],
+  ["a .ts module a launcher started", "file:///repo/src/store-ops.ts", { OMO_PACKAGE_DIR: "/payload" }, false],
+  ["a bundled .mjs worker with no OMO_PACKAGE_DIR", "file:///plugin/extensions/gateway-store-worker.mjs", {}, false],
+  ["a bundled .js extension with no OMO_PACKAGE_DIR", "file:///plugin/extensions/omo.js", {}, false],
+] as const)("#given %s #then isUnlaunchedSourceRun is %p", (_case, url, env, expected) => {
+  expect(isUnlaunchedSourceRun(url, env)).toBe(expected)
 })
 
 const facts = (passwd: () => string): PlatformFacts => ({
