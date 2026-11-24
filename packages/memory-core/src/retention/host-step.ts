@@ -130,6 +130,9 @@ async function previewRetention(
   const counts = `runs ${past.runs}, completions ${other.completions}, journals ${past.journals}, sidecars ${past.sidecars}, ledgers ${other.ledgers}, legacy ${other.legacy}`
   const lines = total === 0 ? [] : [`WOULD FIX ${identity} retention would remove ${total} (${counts})`]
   if (maxBytes <= 0) return lines
+  // A deadline that fired while retention's bytes were walked leaves them unknown: no cap line, as when the
+  // total size cannot be measured (#13061 review).
+  if (past.bytes === undefined || other.bytes === undefined) return lines
   const measured = await measureRuntimeSizeWithinBudget(paths.runtime, {
     budgetMs: policy.passBudgetMs,
     now: now(),
@@ -138,7 +141,7 @@ async function previewRetention(
   if ("sizeUnknown" in measured) return lines
   // The pass runs the cap only after retention has removed what is past its window (pass.ts), so the preview
   // compares the size retention would leave with the cap (#12959).
-  const afterRetention = Math.max(0, measured.size.bytes - (past.bytes ?? 0) - (other.bytes ?? 0))
+  const afterRetention = Math.max(0, measured.size.bytes - past.bytes - other.bytes)
   if (afterRetention <= maxBytes) return lines
   const excess = describeRuntimeCapExcess({
     overCapBytes: afterRetention - maxBytes,
@@ -149,6 +152,8 @@ async function previewRetention(
       reflectionEnabled: true,
       journalFloorMs: policy.retentionDays * DAY_MS,
       signal,
+      // The cap runs after retention, so what retention removes is not evictable a second time (#13061 review).
+      freedByRetention: new Map([...(past.freed ?? []), ...(other.freed ?? [])]),
     }),
     unreflectedBytes: policy.discardUnreflectedJournals
       ? 0

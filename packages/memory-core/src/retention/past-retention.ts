@@ -25,8 +25,39 @@ export interface RuntimePastRetention {
   readonly sidecars: number
   /** Journals no retention row classifies (kept, design r2 2.3 `unclassified`). */
   readonly unclassifiedJournals: number
-  /** Bytes retention would free for the counted items; present only when `measureBytes` is set (#12959). */
+  /**
+   * Bytes retention would free for the counted items; present only when `measureBytes` is set and every
+   * charged path was measured before the deadline fired (#12959).
+   */
   readonly bytes?: number
+  /** Each path the pass would remove with its bytes, alongside {@link bytes} (#13061 review). */
+  readonly freed?: ReadonlyMap<string, number>
+}
+
+/**
+ * Sums the bytes of each path the pass would remove. A deadline that fires mid-walk leaves the sum unknown
+ * instead of failing the count, so the preview keeps its retention line and drops only the cap line.
+ */
+function createByteCharge(measureBytes: boolean | undefined, signal: AbortSignal | undefined) {
+  const freed = new Map<string, number>()
+  let unknown = false
+  return {
+    async charge(path: string): Promise<void> {
+      if (measureBytes !== true || unknown) return
+      try {
+        freed.set(path, (freed.get(path) ?? 0) + (await measureTreeBytes(path, signal)))
+      } catch (error) {
+        if (signal?.aborted !== true) throw error
+        unknown = true
+      }
+    },
+    result(): { bytes?: number; freed?: ReadonlyMap<string, number> } {
+      if (measureBytes !== true || unknown) return {}
+      let bytes = 0
+      for (const value of freed.values()) bytes += value
+      return { bytes, freed }
+    },
+  }
 }
 
 /** Folded runs the next pass would remove, by its rules (reflection-runs.ts), minus what only the pass decides. */
@@ -55,6 +86,10 @@ async function pastRetentionRunNames(input: {
   return names
 }
 
+async function holdsOnlyJournalFiles(dir: string): Promise<boolean> {
+  return (await listNames(dir)).every((name) => name === "state.json" || name === "transcript.jsonl")
+}
+
 export async function countRuntimePastRetention(input: {
   readonly paths: MemoryIdentityPaths
   readonly policy: RuntimeRetentionPolicy
@@ -67,10 +102,8 @@ export async function countRuntimePastRetention(input: {
   readonly measureBytes?: boolean
 }): Promise<RuntimePastRetention> {
   const cutoff = input.now() - input.policy.retentionDays * DAY_MS
-  let bytes = 0
-  const charge = async (path: string): Promise<void> => {
-    if (input.measureBytes === true) bytes += await measureTreeBytes(path, input.signal)
-  }
+  const bytes = createByteCharge(input.measureBytes, input.signal)
+  const charge = bytes.charge
   const runNames = await pastRetentionRunNames(input)
   for (const name of runNames) await charge(join(input.paths.reflection, "runs", name))
   const runs = runNames.length
@@ -91,12 +124,14 @@ export async function countRuntimePastRetention(input: {
     if (verdict === undefined) continue
     if (typeof verdict !== "string") {
       journals += 1
-      // Fully and partly reflected journals lose transcript.jsonl only; a never-reflected one loses the directory.
-      const freed =
-        verdict.kind === "never"
-          ? join(input.paths.transcripts, sessionId)
-          : join(input.paths.transcripts, sessionId, "transcript.jsonl")
-      await charge(freed)
+      // Every class loses transcript.jsonl. A never-reflected journal also loses state.json, and its directory
+      // only when nothing else is in it: the pass unlinks those two files and its rmdir fails on anything more.
+      const dir = join(input.paths.transcripts, sessionId)
+      if (verdict.kind === "never" && (await holdsOnlyJournalFiles(dir))) await charge(dir)
+      else {
+        await charge(join(dir, "transcript.jsonl"))
+        if (verdict.kind === "never") await charge(join(dir, "state.json"))
+      }
     } else if (verdict === "unclassified") unclassifiedJournals += 1
   }
 
@@ -110,7 +145,7 @@ export async function countRuntimePastRetention(input: {
       await charge(join(root, name))
     }
   }
-  return { runs, journals, sidecars, unclassifiedJournals, ...(input.measureBytes === true ? { bytes } : {}) }
+  return { runs, journals, sidecars, unclassifiedJournals, ...bytes.result() }
 }
 
 /**
@@ -150,8 +185,10 @@ export interface RuntimePastRetentionOtherStores {
   readonly ledgers: number
   /** Legacy `reflection-sessions` entries, plus one for `recall/runs`. */
   readonly legacy: number
-  /** Bytes retention would free for the counted items; present only when `measureBytes` is set (#12959). */
+  /** As {@link RuntimePastRetention.bytes} (#12959). */
   readonly bytes?: number
+  /** As {@link RuntimePastRetention.freed} (#13061 review). */
+  readonly freed?: ReadonlyMap<string, number>
 }
 
 /**
@@ -168,10 +205,8 @@ export async function countRuntimePastRetentionOtherStores(input: {
   /** Also sum the bytes of what is counted, for the `--fix --dry-run` size-cap line (#12959). */
   readonly measureBytes?: boolean
 }): Promise<RuntimePastRetentionOtherStores> {
-  let bytes = 0
-  const charge = async (path: string): Promise<void> => {
-    if (input.measureBytes === true) bytes += await measureTreeBytes(path, input.signal)
-  }
+  const bytes = createByteCharge(input.measureBytes, input.signal)
+  const charge = bytes.charge
   const highWater = await scanReflectionRunHighWater(input.paths)
   // The pass removes runs before completions, so a run it removes no longer keeps its completion (`run-present`).
   const removedRuns = new Set(await pastRetentionRunNames(input))
@@ -230,5 +265,5 @@ export async function countRuntimePastRetentionOtherStores(input: {
     legacy += 1
     await charge(recallRuns)
   }
-  return { completions, ledgers, legacy, ...(input.measureBytes === true ? { bytes } : {}) }
+  return { completions, ledgers, legacy, ...bytes.result() }
 }

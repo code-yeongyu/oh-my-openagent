@@ -6,7 +6,7 @@
 // the newest folded run, reservations, live sessions, owned sidecars and contended locks are never
 // evicted; completions are not evictable at all. The abort signal is honoured between items.
 
-import { join } from "node:path"
+import { join, sep } from "node:path"
 
 import { lstat } from "../fs/resilient"
 import type { MemoryIdentityPaths } from "../identity/layout"
@@ -246,6 +246,21 @@ export interface RuntimeCapEvictableOptions {
   readonly journalFloorMs?: number
   /** The doctors' measurement deadline: once it fires the measure rejects with the abort (#12538 review r3 M2). */
   readonly signal?: AbortSignal
+  /**
+   * Paths retention removes before the cap runs, with their bytes (`--fix --dry-run`, #13061 review). A
+   * candidate inside one is gone by then and counts as zero; one holding them counts only what is left.
+   */
+  readonly freedByRetention?: ReadonlyMap<string, number>
+}
+
+function bytesLeftAfterRetention(path: string, measured: number, freed: ReadonlyMap<string, number> | undefined) {
+  if (freed === undefined) return measured
+  let left = measured
+  for (const [freedPath, bytes] of freed) {
+    if (freedPath === path || path.startsWith(`${freedPath}${sep}`)) return 0
+    if (freedPath.startsWith(`${path}${sep}`)) left -= bytes
+  }
+  return Math.max(0, left)
 }
 
 /**
@@ -264,7 +279,8 @@ export async function measureRuntimeCapEvictableBytes(options: RuntimeCapEvictab
   for (const tier of await tiers({ ...options, maxBytes: 0 }, guard, {}, { suspendedSince: undefined, heldBytes: 0 })) {
     for (const candidate of await tier()) {
       options.signal?.throwIfAborted()
-      bytes += await measureTreeBytes(candidate.measuredPath)
+      const measured = await measureTreeBytes(candidate.measuredPath)
+      bytes += bytesLeftAfterRetention(candidate.measuredPath, measured, options.freedByRetention)
     }
   }
   return bytes

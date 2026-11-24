@@ -8,6 +8,8 @@ import { buildIdentityPaths } from "../identity/layout"
 import { acquireLock, createLockRecord, releaseLock } from "../locks"
 import { HOST_SWEEP_LOCK_FILE, HOST_SWEEP_STATE_FILE, sweepHostIdentities } from "../reflection/host-sweep"
 import { createRetentionHostSweepStep, resolveForeignIdentityDiscardUnreflected } from "./host-step"
+import { countRuntimePastRetention } from "./past-retention"
+import { DEFAULT_RUNTIME_RETENTION } from "./policy"
 import { measureTreeBytes } from "./size"
 import { ageTree, completion, daysAgo, journal, now, reflectionRun, writeJson } from "./retention.test-support"
 
@@ -281,6 +283,98 @@ describe("retention as a host-sweep step (6b driver 2 / --fix; A34, A38 driver h
     )
     expect(dry.lines[1]).toStartWith("WOULD FIX id-journal size cap: cap exceeded by ")
     expect(dry.lines).toHaveLength(2)
+  })
+
+  test("#given past-retention folded runs and a cap the newer runs cannot meet #when --dry-run then --fix run #then the preview does not count the removed runs as evictable (#13061 review)", async () => {
+    // given
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-evictable-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-evict")
+    await mkdir(paths.repo, { recursive: true })
+    const old = join(paths.reflection, "runs", "reflection-run-1")
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(8) })
+    await writeFile(join(old, "padding.bin"), Buffer.alloc(256 * 1024))
+    await ageTree(old, daysAgo(8))
+    const middle = await reflectionRun(paths, "reflection-run-5", { finishedAt: daysAgo(2) })
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    // After retention removes run-1 the store is still over by more than run-5, the only run the cap may evict.
+    const maxBytes =
+      (await measureTreeBytes(paths.runtime)) - (await measureTreeBytes(old)) - (await measureTreeBytes(middle)) - 1024
+    const settings = { runtime: { max_bytes: maxBytes } }
+
+    // when
+    const dry = await sweepHostIdentities({
+      memoryRoot,
+      steps: [createRetentionHostSweepStep({ settings, now, dryRun: true })],
+      dryRun: true,
+      now,
+    })
+    await sweepHostIdentities({ memoryRoot, steps: [createRetentionHostSweepStep({ settings, now })], now })
+
+    // then
+    if (dry.status !== "swept") throw new Error("expected a sweep")
+    expect(dry.lines[1]).toStartWith("WOULD FIX id-evict size cap: cap exceeded by ")
+    expect(dry.lines[1]).toContain("the next maintenance pass evicts up to ")
+    expect(await measureTreeBytes(paths.runtime)).toBeGreaterThan(maxBytes)
+  })
+
+  test("#given a never-reflected journal holding a file the pass keeps #when --dry-run runs #then only state.json and transcript.jsonl count as freed, so the size-cap line stays (#13061 review)", async () => {
+    // given
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-cap-never-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-never")
+    await mkdir(paths.repo, { recursive: true })
+    const dir = await journal(paths, "j-never", "never", daysAgo(60))
+    // The pass unlinks state.json and transcript.jsonl, and its rmdir then fails on this file (journals.ts).
+    await writeFile(join(dir, "kept.bin"), Buffer.alloc(256 * 1024))
+    await ageTree(dir, daysAgo(60))
+    const unlinked =
+      (await measureTreeBytes(join(dir, "state.json"))) + (await measureTreeBytes(join(dir, "transcript.jsonl")))
+    const settings = {
+      runtime: {
+        max_bytes: (await measureTreeBytes(paths.runtime)) - unlinked - 1,
+        discard_unreflected_journals: true,
+      },
+    }
+
+    // when
+    const dry = await sweepHostIdentities({
+      memoryRoot,
+      steps: [createRetentionHostSweepStep({ settings, now, dryRun: true })],
+      dryRun: true,
+      now,
+    })
+
+    // then
+    if (dry.status !== "swept") throw new Error("expected a sweep")
+    expect(dry.lines[0]).toBe(
+      "WOULD FIX id-never retention would remove 1 (runs 0, completions 0, journals 1, sidecars 0, ledgers 0, legacy 0)",
+    )
+    expect(dry.lines[1]).toStartWith("WOULD FIX id-never size cap: cap exceeded by ")
+  })
+
+  test("#given a past-retention run and a deadline that has already fired #when the bytes are counted #then the count stays and the bytes are unknown (#13061 review)", async () => {
+    // given
+    const memoryRoot = await mkdtemp(join(tmpdir(), "memory-host-dry-deadline-"))
+    roots.push(memoryRoot)
+    const paths = buildIdentityPaths(memoryRoot, "id-deadline")
+    await reflectionRun(paths, "reflection-run-1", { finishedAt: daysAgo(8) })
+    await reflectionRun(paths, "reflection-run-9", { finishedAt: daysAgo(1) })
+    const policy = DEFAULT_RUNTIME_RETENTION
+
+    // when
+    const past = await countRuntimePastRetention({
+      paths,
+      policy,
+      now,
+      signal: AbortSignal.abort(),
+      measureBytes: true,
+    })
+
+    // then
+    expect(past.runs).toBe(1)
+    expect(past.bytes).toBeUndefined()
+    expect(past.freed).toBeUndefined()
   })
 
   test("#given global retention_days 30 and an agent override of 3 #when the host sweep step visits #then each identity keeps the windows its global layer sets (REVIEW-5 M1)", async () => {
