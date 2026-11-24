@@ -145,24 +145,33 @@ describe("redactUrl", () => {
   })
 
   describe("#given malformed PEM-shaped input", () => {
-    // A wall-clock bound times the host, not the scan (#12693). Four times the input takes about four times as long
-    // for a linear scan and about sixteen times for a quadratic one; the fastest of several runs keeps load spikes out.
-    it("#then redaction time grows linearly with the input and real PEM blocks remain masked", () => {
+    // Linear by WORK, not by time (#14858; #12693 replaced a wall-clock bound with a fastest-of-5 time ratio, which still
+    // timed the host and went red at 9.56 on a slow macOS runner). The PEM scan walks the input with String.indexOf, so
+    // the characters indexOf examines are its work: four times the input must cost about four times the work. A scan
+    // that restarts after every failed candidate costs about sixteen times.
+    it("#then redaction work grows linearly with the input and real PEM blocks remain masked", () => {
       const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
-      const fastest = (input: string) => {
-        let best = Number.POSITIVE_INFINITY
-        for (let run = 0; run < 5; run++) {
-          const started = performance.now()
-          expect(redactUrl(input)).toBe(input)
-          best = Math.min(best, performance.now() - started)
+      const work = (input: string) => {
+        const indexOf = String.prototype.indexOf
+        let scanned = 0
+        String.prototype.indexOf = function (this: string, search: string, position?: number) {
+          const from = Math.max(0, Math.min(position ?? 0, this.length))
+          const found = indexOf.call(this, search, from)
+          scanned += (found < 0 ? this.length : found + search.length) - from
+          return found
         }
-        return best
+        try {
+          expect(redactUrl(input)).toBe(input)
+        } finally {
+          String.prototype.indexOf = indexOf
+        }
+        return scanned
       }
-      const small = hostile(12_500)
-      const large = hostile(50_000)
-      redactUrl(large)
 
-      expect(fastest(large) / fastest(small)).toBeLessThan(8)
+      const small = work(hostile(12_500))
+      const large = work(hostile(50_000))
+      expect(small).toBeGreaterThan(0)
+      expect(large / small).toBeLessThan(8)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
       expect(redactUrl(pem)).toBe("***")
