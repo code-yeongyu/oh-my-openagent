@@ -8,8 +8,8 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { type FakeOwner, startFakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld } from "../../device-service-core/test/local-api/conformance/world.ts"
 import type { RemoteClient } from "../../omo-senpi/src/components/remote/index"
+import type { FakeClock } from "../../omo-senpi/src/components/remote/testing/fake-service"
 import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import type { RemoteThreadSurface } from "../../omo-senpi/src/components/thread/remote/ports"
 import { createLocalSessions } from "../../omo-senpi/src/components/remote/local-sessions"
 import type { ThreadHost } from "../../omo-senpi/src/components/thread/tools/ports"
 import type { BootstrapSetup, DeviceLink } from "../remote-bootstrap"
@@ -83,9 +83,11 @@ export async function run(
   stateDir?: string,
   account = SIGNED_IN,
   bootstrap = testBootstrap(),
-  remote?: RemoteThreadSurface,
   extra: {
-    readonly packageRoot?: string
+    /** The verb's connection (the conformance owner's by default): a test wraps it to stand in for an engine's answer. */
+    readonly connect?: () => ReturnType<typeof connectDeviceService>
+    /** The person client's clock: a waiting send's --timeout runs on it. */
+    readonly timers?: FakeClock
     readonly coldWake?: ColdWake
     readonly linkDevice?: DeviceLink
     readonly client?: () => RemoteClient
@@ -129,7 +131,6 @@ export async function run(
       },
       optOut: { read: () => false, record: () => {}, clear: () => {} },
       localSessions: async () => createLocalSessions(async () => noLocalSessions),
-      ...(remote === undefined ? {} : { remote: () => remote }),
       ...extra,
     },
     args,
