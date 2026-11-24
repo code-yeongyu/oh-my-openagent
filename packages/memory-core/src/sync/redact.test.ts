@@ -145,28 +145,55 @@ describe("redactUrl", () => {
   })
 
   describe("#given malformed PEM-shaped input", () => {
-    // A wall-clock bound times the host, not the scan (#12693). Four times the input takes about four times as long
-    // for a linear scan and about sixteen times for a quadratic one; the fastest of several runs keeps load spikes out.
-    it("#then redaction time grows linearly with the input and real PEM blocks remain masked", () => {
+    // Linear by WORK, not by time (#14860; #12693 replaced a wall-clock bound with a fastest-of-5 time ratio, which still
+    // timed the host and went red at 9.56 on a slow macOS runner). The PEM scan walks the input with String.indexOf, so
+    // the characters indexOf examines are its work: four times the input must cost about four times the work. A scan
+    // that restarts after every failed candidate costs about sixteen times.
+    it("#then the PEM scan's work grows linearly with the input and real PEM blocks remain masked", () => {
       const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
-      const fastest = (input: string) => {
-        let best = Number.POSITIVE_INFINITY
-        for (let run = 0; run < 5; run++) {
-          const started = performance.now()
-          expect(redactUrl(input)).toBe(input)
-          best = Math.min(best, performance.now() - started)
+      const work = (input: string) => {
+        // Patched only for this synchronous call and restored in finally (also when redactUrl throws); nothing awaits in
+        // between, so no other test of this file or worker runs while it is installed.
+        const indexOf = String.prototype.indexOf
+        let scanned = 0
+        String.prototype.indexOf = function (this: string, search: string, position?: number) {
+          const from = Math.max(0, Math.min(position ?? 0, this.length))
+          const found = indexOf.call(this, search, from)
+          scanned += (found < 0 ? this.length : found + search.length) - from
+          return found
         }
-        return best
+        try {
+          expect(redactUrl(input)).toBe(input)
+        } finally {
+          String.prototype.indexOf = indexOf
+        }
+        return scanned
       }
-      const small = hostile(12_500)
-      const large = hostile(50_000)
-      redactUrl(large)
 
-      expect(fastest(large) / fastest(small)).toBeLessThan(8)
+      const small = work(hostile(12_500))
+      const large = work(hostile(50_000))
+      // A scan that stops going through indexOf (a regex, includes, a manual loop) counts nothing; fail loudly so this
+      // guard can never pass on zero work.
+      if (small <= 0 || large <= small)
+        throw new Error(
+          `the PEM scan no longer goes through String.indexOf (work ${small} -> ${large}): re-instrument this test`,
+        )
+      expect(large / small).toBeLessThan(8)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
       expect(redactUrl(pem)).toBe("***")
     }, 30_000)
+
+    // Catastrophic-backtracking guard for the regex passes (secret patterns, seams, split credentials), which run inside
+    // V8's regex engine where no work can be counted (#14860). Here time is the behaviour under test, and the bound sits
+    // far from both sides: redactUrl on this 400k-character input takes ~15-25 ms on a fast Mac (~65 ms at the 2.7x of
+    // the slowest macOS runner measured), and one quadratic pattern ("A+X") makes it ~9.7 s. The bound is 2 s.
+    it("#then the regex passes finish far below a catastrophic-backtracking bound", () => {
+      const input = `-----BEGIN ${"A".repeat(200_000)}-----${"B".repeat(200_000)}`
+      const started = performance.now()
+      expect(redactUrl(input)).toBe(input)
+      expect(performance.now() - started).toBeLessThan(2_000)
+    })
   })
 
   describe("#given an empty url", () => {
