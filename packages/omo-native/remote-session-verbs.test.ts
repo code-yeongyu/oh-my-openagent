@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { deviceServiceEndpointPath } from "../device-service-core/src/index.ts"
-import { describe, expect, test, onTestFinished } from "bun:test"
+import { afterEach, beforeEach, describe, expect, test, onTestFinished } from "bun:test"
 import type { DeviceService } from "../device-service-core/src/index.ts"
 import { createRemoteThreadFixture, fakeRemoteClient } from "../omo-senpi/src/components/thread/thread-remote-fixture"
 import type { RemoteCommandDependencies } from "./remote-cli"
@@ -190,6 +190,19 @@ describe("omo remote session verbs close what they opened", () => {
 // #13425: a waiting send settles typed inside a bound; the queue notice and session end reach --json too.
 describe("omo remote send bounded settle (#13425)", () => {
   const remoteFixture = createRemoteThreadFixture()
+  // The send writes its receipt to the gateway store at canonicalAgentDir(): never the account's live ~/.omo/agent.
+  let savedAgentDir: string | undefined
+  let isolatedAgentDir = ""
+  beforeEach(() => {
+    savedAgentDir = process.env.OMO_CODING_AGENT_DIR
+    isolatedAgentDir = mkdtempSync(join(tmpdir(), "omo-remote-send-agent-"))
+    process.env.OMO_CODING_AGENT_DIR = isolatedAgentDir
+  })
+  afterEach(() => {
+    if (savedAgentDir === undefined) delete process.env.OMO_CODING_AGENT_DIR
+    else process.env.OMO_CODING_AGENT_DIR = savedAgentDir
+    rmSync(isolatedAgentDir, { recursive: true, force: true })
+  })
 
   test("#given the session closes before the turn settles #when the send waits under --json #then one JSON value answers session_ended", async () => {
     const account = remoteFixture.account({
