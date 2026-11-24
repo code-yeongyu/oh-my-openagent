@@ -68,18 +68,6 @@ export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
 export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-attach-dialogs.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach-presentation.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-attach.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
   "packages/omo-native/remote-bootstrap.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",

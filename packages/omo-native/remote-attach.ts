@@ -4,7 +4,7 @@ import { createServer, type Server, type Socket } from "node:net"
 import { tmpdir } from "node:os"
 import { join, win32 } from "node:path"
 
-import type { JsonObject, RemoteAttach } from "../device-service-core/src/index.ts"
+import type { JsonObject, RemoteAttach } from "../omo-senpi/src/components/remote/index"
 import { isRecord, LOCAL_SESSION_ID, Presentation } from "./remote-attach-presentation"
 
 export { LOCAL_SESSION_ID }

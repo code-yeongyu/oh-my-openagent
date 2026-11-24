@@ -7,7 +7,7 @@ import type {
   RemoteAttach,
   RemoteAttachEvent,
   SnapshotBody,
-} from "../device-service-core/src/index.ts"
+} from "../omo-senpi/src/components/remote/index"
 import { outcomeFailure, outcomeOf } from "../omo-senpi/src/components/thread/remote/outcome"
 import { MirroredDialogs, pendingIds } from "./remote-attach-dialogs"
 
