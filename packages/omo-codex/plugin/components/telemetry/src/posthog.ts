@@ -7,6 +7,7 @@ import {
 	type TelemetryOsProvider,
 	type TelemetryTransportFactory,
 } from "@oh-my-opencode/telemetry-core";
+import { isCodexTelemetryConfigEnabled } from "../../../shared/src/config-loader.ts";
 
 import {
 	createComponentTelemetryProductConfig,
@@ -75,6 +76,10 @@ function createDailyActiveCaptureStateInput(stateDir: string, now: Date | undefi
 }
 
 function createPluginPostHogClient(options: CreatePluginPostHogOptions = {}): PostHogClient {
+	if (!isCodexTelemetryConfigEnabled(options.env ?? process.env)) {
+		return NO_OP_POSTHOG;
+	}
+
 	const clientInput = {
 		diagnostics: writeComponentTelemetryDiagnostic,
 		env: options.env ?? process.env,

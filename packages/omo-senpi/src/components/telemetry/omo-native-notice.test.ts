@@ -61,6 +61,24 @@ describe("OmO Native telemetry notice", () => {
     })
   })
 
+  it("#given enabled telemetry #when the notice is shown #then every telemetry destination is named", async () => {
+    await withTempAgentDir(async (agentDir) => {
+      // given
+      const pi = register(agentDir)
+      const notifications: string[] = []
+      const ctx = { ui: { notify: (message: string) => notifications.push(message) } }
+
+      // when
+      await pi.dispatch("session_start", {}, ctx)
+
+      // then
+      expect(notifications).toHaveLength(1)
+      for (const host of ["https://us.i.posthog.com", "https://t.omo.dev"]) {
+        expect(notifications[0]).toContain(host)
+      }
+    })
+  })
+
   it("#given the unconfigured project key #when session_start fires #then no first-run notice is sent", async () => {
     await withTempAgentDir(async (agentDir) => {
       // given
