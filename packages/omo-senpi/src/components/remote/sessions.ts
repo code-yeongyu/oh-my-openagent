@@ -24,7 +24,8 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
-import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
+import { idShaped } from "@oh-my-opencode/thread-address-core"
+import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
@@ -399,7 +400,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return ok({ device: ref.id, session: keyed.value.target.session, row: byDurable, deviceRow })
     // #13748: a session just opened is not in the listing yet; only an id-shaped session part passes to its device,
     // where the port's attach locates it and its own typed refusal answers. Anything else is this resolver's refusal.
-    if (idShapedSession(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
+    if (idShaped(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
     return (
       listingIncomplete(
         thread,
