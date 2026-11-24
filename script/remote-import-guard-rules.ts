@@ -65,9 +65,7 @@ export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {
 }
 
 export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-cli.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
-  "packages/omo-native/remote-session-verbs.ts": { uses: ["createDeviceServiceSessions"], removedBy: "omo PR 4c-2" },
   "packages/omo-senpi/src/extension/bunshin-ts-pick-transport.ts": {
     uses: ["createRelayTransport"],
     removedBy: "omo PR 4c-3",
@@ -93,8 +91,9 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
+  // This device's operator endpoint leg opens sockets, so it is loaded lazily, outside remote-local's graph (omo#13440).
   "packages/omo-native/remote-cli.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
+    uses: [REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
@@ -107,14 +106,6 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
   },
   "packages/omo-native/remote-local.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-render.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-session-verbs.ts": {
-    uses: [DEVICE_SERVICE_CORE, REMOTE],
     removedBy: "omo#13414 U6 (CLI + attach onto the module)",
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
