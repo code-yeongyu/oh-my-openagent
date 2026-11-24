@@ -162,6 +162,100 @@ test("the event stream delivers sync.advanced heads and reports the connection",
   expect(await server.untilStreamsClosed()).toBe(0)
 })
 
+test("#given the service's client floor refuses this build #when the event stream opens with a 426 #then it reports the stream down, waits the floor retry instead of 5 s, and reconnects once the floor is lifted (#14483, review L2)", async () => {
+  let opened = 0
+  const floored = createHttpTransport({
+    baseUrl: "http://sync.example",
+    token: () => "tok",
+    floorRetryMs: 5,
+    fetch: (async () => {
+      opened += 1
+      if (opened === 1)
+        return Response.json(
+          { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+          { status: 426 },
+        )
+      return new Response(`data: ${JSON.stringify({ type: "sync.advanced", head: { seq: 3 } })}\n\n`, {
+        headers: { "content-type": "text/event-stream" },
+      })
+    }) as unknown as typeof fetch,
+  })
+  const connected: boolean[] = []
+  let stop: () => void = () => undefined
+  const heads: number[] = []
+  const advanced = new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("waited 10s for the stream to come back after the 426, never did")),
+      10_000,
+    )
+    stop = floored.subscribe({
+      onAdvanced: (head) => {
+        heads.push(head)
+        clearTimeout(timer)
+        resolve()
+      },
+      onConnected: (up) => connected.push(up),
+      onStateChanged: () => undefined,
+    })
+  })
+  await advanced
+  stop()
+  expect(connected.slice(0, 2)).toEqual([false, true])
+  expect(heads).toEqual([3])
+  expect(opened).toBe(2)
+})
+
+test("#given repeated 426 floor waits on one subscription #when each wait ends on its timer #then no abort listener is left behind on the subscription's signal (#14483 review M1)", async () => {
+  const added: unknown[] = []
+  const removed: unknown[] = []
+  const realAdd = AbortSignal.prototype.addEventListener
+  const realRemove = AbortSignal.prototype.removeEventListener
+  AbortSignal.prototype.addEventListener = function (type: string, listener: unknown, options?: unknown) {
+    if (type === "abort") added.push(listener)
+    return realAdd.call(this, type, listener as EventListener, options as AddEventListenerOptions)
+  }
+  AbortSignal.prototype.removeEventListener = function (type: string, listener: unknown, options?: unknown) {
+    if (type === "abort") removed.push(listener)
+    return realRemove.call(this, type, listener as EventListener, options as EventListenerOptions)
+  }
+  let opened = 0
+  let stop: () => void = () => undefined
+  try {
+    const floored = createHttpTransport({
+      baseUrl: "http://sync.example",
+      token: () => "tok",
+      floorRetryMs: 1,
+      fetch: (async () => {
+        opened += 1
+        return Response.json(
+          { error: { code: "client_update_required", message: "update OmO to keep syncing", retryable: false } },
+          { status: 426 },
+        )
+      }) as unknown as typeof fetch,
+    })
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("waited 10s for 4 floor waits, never reached")), 10_000)
+      stop = floored.subscribe({
+        onAdvanced: () => undefined,
+        onConnected: () => {
+          if (opened >= 4) {
+            clearTimeout(timer)
+            resolve()
+          }
+        },
+        onStateChanged: () => undefined,
+      })
+    })
+  } finally {
+    stop()
+    AbortSignal.prototype.addEventListener = realAdd
+    AbortSignal.prototype.removeEventListener = realRemove
+  }
+  const finishedWaits = Math.max(0, opened - 1)
+  expect(finishedWaits).toBeGreaterThanOrEqual(3)
+  expect(removed.filter((listener) => added.includes(listener)).length).toBeGreaterThanOrEqual(finishedWaits)
+})
+
 // #12280 R-A9 (wire): a revoke through the real route freezes the account; the stream announces it as
 // `sync.state.changed`, the state route shows the flag, and a push is refused `stale_base`.
 test("#given a subscribed device #when another device is signed out through the sign-out route #then the stream delivers a state change and pushes are refused stale_base", async () => {

@@ -21,6 +21,25 @@ export const b64urlOfHex = (hex: string): string => Buffer.from(hex, "hex").toSt
 export const hexOfB64url = (b64url: string): string => Buffer.from(b64url, "base64url").toString("hex")
 
 const STREAM_RETRY_MS = 5_000
+/** How long the event stream waits after a 426 client-floor refusal before it asks again (#14483). */
+const STREAM_FLOOR_RETRY_MS = 15 * 60_000
+
+/**
+ * Waits `ms`, or less when the stream is closed, so a long floor wait never outlives its subscription. The abort listener
+ * is removed when the timer fires, so repeated waits leave nothing behind on the subscription's signal (#14483 review M1).
+ */
+const pause = (ms: number, signal: AbortSignal): Promise<void> =>
+  new Promise((resolve) => {
+    const onAbort = () => {
+      clearTimeout(timer)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      signal.removeEventListener("abort", onAbort)
+      resolve()
+    }, ms)
+    signal.addEventListener("abort", onAbort, { once: true })
+  })
 
 export class SyncHttpError extends Error {
   override readonly name = "SyncHttpError"
@@ -54,6 +73,8 @@ export interface HttpTransportOptions {
   /** The device's bearer token, read per request so a refresh takes effect. */
   readonly token: () => string | Promise<string>
   readonly fetch?: typeof fetch
+  /** How long the event stream waits after a 426 before it reconnects; tests shorten it. */
+  readonly floorRetryMs?: number
 }
 
 interface WireRow {
@@ -170,11 +191,20 @@ async function streamLoop(
 ): Promise<void> {
   while (!signal.aborted) {
     let up = false
+    let wait = STREAM_RETRY_MS
     try {
       const response = await doFetch(`${options.baseUrl}/v1/me/events`, {
         headers: { ...syncRequestHeaders(await bearer(options)), accept: "text/event-stream" },
         signal,
       })
+      if (response.status === 426) {
+        // The client floor refuses this build until OmO is updated (#14483): no 5 s reconnect loop, but a slow retry,
+        // so a floor the service lifts without a client update brings the stream (and an end to polling) back.
+        handlers.onConnected(false)
+        wait = options.floorRetryMs ?? STREAM_FLOOR_RETRY_MS
+        await pause(wait, signal)
+        continue
+      }
       if (!response.ok || response.body === null) throw new SyncHttpError("stream", response.status, true)
       up = true
       handlers.onConnected(true)
@@ -197,7 +227,7 @@ async function streamLoop(
     }
     if (up) handlers.onConnected(false)
     if (signal.aborted) return
-    await new Promise((resolve) => setTimeout(resolve, STREAM_RETRY_MS))
+    await pause(wait, signal)
   }
 }
 
