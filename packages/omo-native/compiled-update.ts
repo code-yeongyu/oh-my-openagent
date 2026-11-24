@@ -1,15 +1,18 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
+import { dirname } from "node:path"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { isProvisionedExecutable } from "./compile-runtime"
 import {
   BinaryUpdateError,
   installReleaseBinary,
+  refreshInstallManifest,
   releaseVersionOf,
   type BinaryInstallRequest,
   type BinaryUpdateCode,
 } from "./compiled-update-install"
 export { releaseVersionOf } from "./compiled-update-install"
+import { pruneProvisionedRuntimes } from "./runtime-prune"
 
 export const RELEASES_URL = "https://github.com/code-yeongyu/oh-my-openagent/releases"
 const RELEASES_API = "https://api.github.com/repos/code-yeongyu/oh-my-openagent/releases?per_page=100"
@@ -190,8 +193,12 @@ export async function compiledUpdate(options: {
   }
   const command = replaceCommand(`${RELEASES_URL}/download/v${target}/${asset}`, options.destination, options.platform)
   if (isPrintOnlyUpdate(options.args ?? [])) {
+    const hint =
+      options.platform === "win32"
+        ? `\nRunning \`omo update\` (without --print) performs a verified in-process install with SHA-256 checks and automatic rollback.`
+        : ""
     return {
-      output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}`,
+      output: `omo ${target} is available (running ${current}). Replace this binary with:\n${command}${hint}`,
       exitCode: 0,
     }
   }
@@ -202,6 +209,16 @@ export async function compiledUpdate(options: {
       version: target,
       platform: options.platform,
     })
+    // Post-install: keep the install manifest accurate after the in-process update.
+    await refreshInstallManifest(options.destination, target, asset)
+    // Post-install: prune old provisioned runtimes (~200 MB each) under ~/.omo/binary-runtime/.
+    if (options.provisioned !== undefined) {
+      try {
+        pruneProvisionedRuntimes({ root: dirname(dirname(options.provisioned)), current: target })
+      } catch {
+        /* best-effort — pruning failure must not affect the update result */
+      }
+    }
     return { output: `omo updated ${current} -> ${target}`, exitCode: 0 }
   } catch (error) {
     const errorCode = error instanceof BinaryUpdateError ? error.code : "install_failed"

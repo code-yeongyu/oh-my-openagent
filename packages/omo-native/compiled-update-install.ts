@@ -1,7 +1,8 @@
 import { execFile } from "node:child_process"
 import { createHash, randomUUID } from "node:crypto"
-import { access, chmod, constants, link, open, realpath, rename, rm } from "node:fs/promises"
-import { dirname } from "node:path"
+import { access, chmod, constants, link, open, readFile, readdir, realpath, rename, rm, writeFile } from "node:fs/promises"
+import { homedir } from "node:os"
+import { basename, dirname, join } from "node:path"
 import { promisify } from "node:util"
 import { acquireBinaryUpdateLock, BINARY_UPDATE_TIMEOUT_MS } from "./compiled-update-lock"
 
@@ -78,6 +79,110 @@ async function download(version: string, asset: string, fetchAsset: FetchAsset):
   throw new BinaryUpdateError("download_failed", `could not download ${asset} ${version}`, { cause })
 }
 
+/**
+ * Remove stale `.new-*` and `.old-*` staging files left by a previous update that
+ * failed during cleanup. On Windows, a held or corrupted staging file can produce
+ * errors (EFAULT, EBUSY) that block the next update before it starts. Sweeping
+ * them first is safe: a UUID-named file can never be the current binary.
+ */
+async function sweepStaleArtifacts(destination: string, platform: NodeJS.Platform): Promise<void> {
+  const directory = dirname(destination)
+  const prefix = basename(destination)
+  let entries: string[]
+  try {
+    entries = await readdir(directory)
+  } catch {
+    return
+  }
+  const stale = entries.filter(
+    (entry) =>
+      entry.startsWith(`${prefix}.new-`) || entry.startsWith(`${prefix}.old-`) || entry === `${prefix}.new`,
+  )
+  for (const entry of stale) {
+    const path = join(directory, entry)
+    try {
+      await rm(path, { force: true })
+    } catch (error) {
+      // Windows may keep a handle open after a rename of a loaded executable.
+      // EFAULT can surface when the OS or AV holds a dangling kernel reference.
+      const code = (error as NodeJS.ErrnoException).code ?? ""
+      if (platform === "win32" && /^(EPERM|EBUSY|EACCES|EFAULT)$/.test(code)) continue
+      // A missing file (concurrent cleaner already removed it) is fine.
+      if (code === "ENOENT") continue
+    }
+  }
+}
+
+// Retry budget for Windows rename during swap: a held executable (running omo, AV scan)
+// can fail with EBUSY/EPERM/EACCES. 15 attempts with escalating delays ≈ 35s total.
+const SWAP_RETRY_DELAYS = [1000, 1000, 1000, 1000, 1000, 2000, 2000, 2000, 2000, 2000, 4000, 4000, 4000, 4000, 4000]
+const SWAP_TASKKILL_ATTEMPT = 8
+const SWAP_RETRY_CODES = /^(EPERM|EBUSY|EACCES)$/
+
+async function retryRename(from: string, to: string, binaryName: string, platform: NodeJS.Platform): Promise<void> {
+  if (platform !== "win32") {
+    await rename(from, to)
+    return
+  }
+  for (let attempt = 0; attempt < SWAP_RETRY_DELAYS.length; attempt++) {
+    try {
+      await rename(from, to)
+      return
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code ?? ""
+      if (!SWAP_RETRY_CODES.test(code) || attempt === SWAP_RETRY_DELAYS.length - 1) throw error
+      if (attempt === SWAP_TASKKILL_ATTEMPT) {
+        try {
+          await execFile("taskkill.exe", ["/F", "/IM", binaryName], { windowsHide: true })
+        } catch {
+          /* best-effort — the process may have already exited */
+        }
+      }
+      await new Promise((resolve) => setTimeout(resolve, SWAP_RETRY_DELAYS[attempt]))
+    }
+  }
+}
+
+/**
+ * Refresh `~/.omo/install.json` so the install receipt stays accurate after an
+ * in-process binary update. Best-effort: failures are silently ignored so they
+ * never affect the update result.
+ */
+export async function refreshInstallManifest(
+  destination: string,
+  version: string,
+  asset?: string,
+  homeDir: string = homedir(),
+): Promise<void> {
+  const manifestPath = join(homeDir, ".omo", "install.json")
+  let raw: string
+  try {
+    raw = await readFile(manifestPath, "utf8")
+  } catch {
+    return // no manifest to refresh — likely a first install via shell script hasn't happened yet
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return // malformed — don't touch it
+  }
+  if (typeof parsed !== "object" || parsed === null) return
+  const record = parsed as Record<string, unknown>
+  record.version = version
+  record.installedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z")
+  if (asset !== undefined && "asset" in record) record.asset = asset
+  if ("binPath" in record) record.binPath = destination
+  // Atomic write: temp file → rename (matching the shell installer pattern).
+  const tmp = `${manifestPath}.${randomUUID()}`
+  try {
+    await writeFile(tmp, `${JSON.stringify(record, null, 2)}\n`, { encoding: "utf8", mode: 0o600 })
+    await rename(tmp, manifestPath)
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** Preserve signed release bytes; a fetch-written file has no browser quarantine attribute. */
 export async function installReleaseBinary(
   options: BinaryInstallRequest & {
@@ -104,6 +209,7 @@ export async function installReleaseBinary(
   }
   if (lock === undefined)
     throw new BinaryUpdateError("update_in_progress", `another binary update holds ${JSON.stringify(lockPath)}`)
+  await sweepStaleArtifacts(destination, platform)
   const next = `${destination}.new-${randomUUID()}`
   const previous = `${destination}.old-${randomUUID()}`
   let backedUp = false
@@ -143,10 +249,10 @@ export async function installReleaseBinary(
     const installed = await lock.run(async () => {
       try {
         // POSIX keeps the old inode linked until verification, with no gap at the installed pathname.
-        if (platform === "win32") await rename(destination, previous)
+        if (platform === "win32") await retryRename(destination, previous, basename(destination), platform)
         else await link(destination, previous)
         backedUp = true
-        await rename(next, destination)
+        await retryRename(next, destination, basename(destination), platform)
         swapped = true
         try {
           const result = await probe(destination, ["--version"])
@@ -185,15 +291,22 @@ export async function installReleaseBinary(
     throw new BinaryUpdateError("install_failed", cause instanceof Error ? cause.message : String(cause), { cause })
   } finally {
     try {
-      await rm(next, { force: true })
+      try {
+        await rm(next, { force: true })
+      } catch (cause) {
+        const code = (cause as NodeJS.ErrnoException).code ?? ""
+        if (code !== "ENOENT" && !(platform === "win32" && /^(EPERM|EBUSY|EACCES|EFAULT)$/.test(code))) throw cause
+      }
       if (backedUp && !preserveBackup) {
         try {
           await rm(previous, { force: true })
         } catch (cause) {
           // Windows can rename a loaded image but cannot delete it until its processes exit.
+          // EFAULT (bad address) can surface when a dangling kernel handle or AV-held
+          // reference outlives the rename, especially on Windows 11.
           if (
             platform !== "win32" ||
-            !["EPERM", "EBUSY", "EACCES"].includes((cause as NodeJS.ErrnoException).code ?? "")
+            !/^(EPERM|EBUSY|EACCES|EFAULT)$/.test((cause as NodeJS.ErrnoException).code ?? "")
           )
             throw cause
         }
