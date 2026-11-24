@@ -64,7 +64,25 @@ function landingFixture({ extraChangelogEdit = false, squash = false } = {}) {
   if (extraChangelogEdit) write("changes.md", "# Extra log\n")
   git("add", ".")
   git("commit", "-qm", "Merge release: v5.1.51 stamp into dev")
-  return { root, base, stamp, head: git("rev-parse", "HEAD") }
+  return { root, git, write, base, stamp, head: git("rev-parse", "HEAD") }
+}
+
+// CI checks out refs/pull/<n>/merge: the landing merged into the base tip, which may have moved since the cut.
+function checkoutMergeRef(
+  fixture: ReturnType<typeof landingFixture>,
+  { devGainsFragment }: { devGainsFragment: boolean },
+) {
+  const { git, write, head } = fixture
+  git("checkout", "-q", "dev")
+  if (devGainsFragment) {
+    write("changes/unreleased/3.md", "After the landing branch was cut. (#3)\n")
+    git("add", ".")
+    git("commit", "-qm", "post-cut change (#3)")
+  }
+  const baseTip = git("rev-parse", "HEAD")
+  git("checkout", "-q", "--detach")
+  git("merge", "-q", "--no-ff", "-m", "Merge landing into dev", head)
+  return baseTip
 }
 
 function runGate(root: string, env: Record<string, string>) {
@@ -115,6 +133,24 @@ describe("release-state landing", () => {
     expect(result.status, result.stdout + result.stderr).toBe(0)
     expect(result.stdout).toMatch(/release-state landing[\s\S]*changelog-gate: PASS[\s\S]*package logs PASS/)
   })
+
+  test.each([{ devGainsFragment: false }, { devGainsFragment: true }])(
+    "on the merge ref the landing passes, devGainsFragment=$devGainsFragment",
+    ({ devGainsFragment }) => {
+      const fixture = landingFixture()
+      const baseTip = checkoutMergeRef(fixture, { devGainsFragment })
+
+      const result = runGate(fixture.root, {
+        CHANGELOG_GATE_BASE: baseTip,
+        CHANGELOG_GATE_HEAD_SHA: fixture.head,
+        CHANGELOG_GATE_LANDING_PR: landedPr(fixture.stamp),
+      })
+
+      // then: a fragment the base gained after the landing branch was cut belongs to the next release
+      expect(result.status, result.stdout + result.stderr).toBe(0)
+      expect(result.stdout).toMatch(/release-state landing[\s\S]*changelog-gate: PASS[\s\S]*package logs PASS/)
+    },
+  )
 
   test.each([
     {

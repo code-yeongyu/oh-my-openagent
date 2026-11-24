@@ -47,7 +47,7 @@ jobs:
           second="$(git rev-parse --verify -q "${HEAD_SHA}^2" || true)"
           pr=""
           if [ -n "$second" ]; then
-            pr="$(gh api "repos/${REPO}/commits/${second}/pulls" --jq "[.[] | select(.head.sha == \"${second}\") | {number, state: (.state | ascii_upcase), headSha: .head.sha, headRepo: .head.repo.full_name, branch: .head.ref, title, body: (.body // \"\")}] | first // empty" || true)"
+            pr="$(gh api "repos/${REPO}/commits/${second}/pulls" --jq "[.[] | select(.head.sha == \"${second}\" and .head.repo.full_name == \"${REPO}\" and .state == \"open\") | {number, state: (.state | ascii_upcase), headSha: .head.sha, headRepo: .head.repo.full_name, branch: .head.ref, title, body: (.body // \"\")}] | first // empty" || true)"
           fi
           {
             echo "pr<<LANDING_PR_EOF"

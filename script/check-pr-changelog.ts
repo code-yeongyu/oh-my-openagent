@@ -121,7 +121,16 @@ function run(): number {
   const cutSide = landing?.landing === true ? landing.stamp : mergedIntoBase ? prSide : undefined
   const cut = cutSide === undefined ? mergeBase : git("merge-base", baseHead, cutSide).trim()
   const baseFragments = dirNames(cut)
-  const postCutBase = landing?.landing === true ? landing.firstParent : mergedIntoBase ? baseSide : undefined
+  // On the merge ref (prHead is its PR side) the base side is the base tip the landing merges into, so fragments the
+  // base gained after the landing branch was cut are in its tree; without a merge ref, the landing's own first parent.
+  const postCutBase =
+    landing?.landing === true
+      ? prHead === prSide
+        ? baseSide
+        : landing.firstParent
+      : mergedIntoBase
+        ? baseSide
+        : undefined
   const postCut = postCutBase === undefined ? [] : dirNames(postCutBase).filter((name) => !baseFragments.includes(name))
   const headFragments = dirNames(head).filter((name) => !postCut.includes(name))
   const ownPath = prNumber > 0 ? fragmentPath(prNumber) : null
@@ -166,7 +175,8 @@ function run(): number {
     addedFiles,
     modifiedFiles,
     deletedFiles,
-    // The SAME release predicate as the shared gate (#10682 review HIGH): the release marker on a release branch.
+    // The SAME release predicate as the shared gate (#10682 review HIGH): the release marker on a release branch, or a
+    // judged release-state landing (#14818), whose in-repo and open-release-PR conditions release-state-landing.ts checks.
     isRelease: isReleaseWorkflow,
     fragment: addedFragment?.content ?? null,
     existsAtHead: (path) => existsAt(head, path),
