@@ -71,12 +71,15 @@ describe("#given platform-jobs.jq", () => {
     expect(classify([statusJob(name), macosJob("macos-combined-1", "success")])[name]).toBe("no-tests")
   })
 
-  posixBashTest("#when the run predates the split #then its single macos-combined job is judged by the same rule", () => {
-    const name = "test (macos-latest, 1/2)"
-    expect(classify([statusJob(name), macosJob("macos-combined", "success")])[name]).toBe("success")
-    expect(classify([statusJob(name), macosJob("macos-combined", "failure")])[name]).toBe("success")
-    expect(classify([statusJob(name), macosJob("macos-combined", "skipped")])[name]).toBe("no-tests")
-  })
+  posixBashTest(
+    "#when the run predates the split #then its single macos-combined job is judged by the same rule",
+    () => {
+      const name = "test (macos-latest, 1/2)"
+      expect(classify([statusJob(name), macosJob("macos-combined", "success")])[name]).toBe("success")
+      expect(classify([statusJob(name), macosJob("macos-combined", "failure")])[name]).toBe("success")
+      expect(classify([statusJob(name), macosJob("macos-combined", "skipped")])[name]).toBe("no-tests")
+    },
+  )
 
   posixBashTest("#when a status job's own part failed #then it is failure", () => {
     const failed = { ...statusJob("codex-compatibility (macos-latest, platform)"), conclusion: "failure" }
