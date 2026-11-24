@@ -13,6 +13,7 @@ const win2ConfigPath = new URL("../bunfig.win2.toml", import.meta.url)
 const win2ParallelConfigPath = new URL("../bunfig.win2.parallel.toml", import.meta.url)
 const win2WindowsParallelConfigPath = new URL("../bunfig.win2.parallel.windows.toml", import.meta.url)
 const win2RestConfigPath = new URL("../bunfig.win2.parallel.rest.toml", import.meta.url)
+const macosShard1bConfigPath = new URL("../bunfig.macos-shard-1b.toml", import.meta.url)
 
 function quarantinedTestPaths(config: string): readonly string[] {
   return [...config.matchAll(/"([^"]+\.test\.ts)"/g)].map((match) => match[1] ?? "")
@@ -31,7 +32,7 @@ function rootTestJob(): string {
 
 function linuxTestJobs(): string {
   const start = workflow.indexOf("  test-linux:\n")
-  const end = workflow.indexOf("\n  macos-combined:", start)
+  const end = workflow.indexOf("\n  macos-combined-1:", start)
   if (start < 0 || end < 0) throw new Error("Linux root test jobs not found")
   return workflow.slice(start, end)
 }
@@ -41,6 +42,33 @@ function senpiCompatibilityJob(): string {
   const end = workflow.indexOf("\n  lazycodex-published-smoke:", start)
   if (start < 0 || end < 0) throw new Error("Senpi compatibility job not found")
   return workflow.slice(start, end)
+}
+
+interface TestBunfig {
+  readonly preload: unknown
+  readonly pathIgnorePatterns: readonly string[]
+  readonly loader: unknown
+}
+
+function testBunfig(path: URL): TestBunfig {
+  const parsed: unknown = Bun.TOML.parse(readFileSync(path, "utf8"))
+  if (typeof parsed !== "object" || parsed === null) throw new Error(`${path.pathname} is not a TOML table`)
+  const test: unknown = Reflect.get(parsed, "test")
+  if (typeof test !== "object" || test === null) throw new Error(`${path.pathname} has no [test] table`)
+  const patterns: unknown = Reflect.get(test, "pathIgnorePatterns")
+  if (!Array.isArray(patterns) || !patterns.every((pattern) => typeof pattern === "string")) {
+    throw new Error(`${path.pathname} has no string test.pathIgnorePatterns`)
+  }
+  return { preload: Reflect.get(test, "preload"), pathIgnorePatterns: patterns, loader: Reflect.get(parsed, "loader") }
+}
+
+// The directories the macOS shard-1a step passes to `bun test` (#14849), read from its ci.yml command.
+function macosShard1aTrees(): readonly string[] {
+  const run = /id: root-tests-posix-1a\n[\s\S]*?\n {10}bun test --timeout 20000 ([^\n]*?) --reporter=/.exec(
+    workflow,
+  )?.[1]
+  if (run === undefined) throw new Error("macOS shard 1a step not found")
+  return run.split(" ")
 }
 
 function quotedPatterns(config: string): readonly string[] {
@@ -118,6 +146,20 @@ describe("root test CI partition", () => {
     const rest = quotedPatterns(readFileSync(win2RestConfigPath, "utf8"))
 
     expect(rest).toEqual([...parallel, "script/**"])
+  })
+
+  test("#given the macOS shard-1b bunfig #when it is read #then it is bunfig.toml plus exactly the shard-1a trees", () => {
+    const root = testBunfig(new URL("../bunfig.toml", import.meta.url))
+    const shard1b = testBunfig(macosShard1bConfigPath)
+    const trees = macosShard1aTrees()
+
+    expect(trees.length).toBeGreaterThan(0)
+    expect(shard1b.pathIgnorePatterns).toEqual([
+      ...root.pathIgnorePatterns,
+      ...trees.map((tree) => `${tree.replace(/\/+$/, "")}/**`),
+    ])
+    expect(shard1b.preload).toEqual(root.preload)
+    expect(shard1b.loader).toEqual(root.loader)
   })
 
   test("#given the shard-2 remainder bunfigs #when a shard-2 leg runs the remainder #then each keeps every bunfig.root.toml exclusion", () => {

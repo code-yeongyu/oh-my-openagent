@@ -50,6 +50,7 @@ export function isReleaseStatePath(path) {
 }
 
 export const isGeneratedReleasePath = (path) => matches(LINUX_VERIFIED_GENERATED_PATHS, path)
+export const isVersionStampedPath = (path) => matches(VERSION_STAMPED_PATHS, path)
 export const isReleaseNotesPath = (path) => matches(PROSE_PATHS, path)
 
 const git = (args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
