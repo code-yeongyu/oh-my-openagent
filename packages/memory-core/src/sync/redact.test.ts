@@ -378,11 +378,34 @@ describe("maskUrlUserinfo", () => {
     }
   })
 
-  it("#given a long letter run next to '://' #then masking stays far below a catastrophic-backtracking bound", () => {
-    for (const value of [`x://${"u".repeat(200_000)}`, `${"u".repeat(200_000)}://`, `https://${"u".repeat(200_000)}:`]) {
-      const started = performance.now()
+  it("#given inputs that made the regex scheme quadratic #then doubling the input at most doubles the characters read", () => {
+    const shapes: ReadonlyArray<(size: number) => string> = [
+      (size) => `x://${"u".repeat(size)}`,
+      (size) => `${"u".repeat(size)}://`,
+      (size) => `https://${"u".repeat(size)}:`,
+      (size) => `${"u".repeat(size)}${"9://".repeat(size)}`,
+      (size) => "a://".repeat(size),
+    ]
+    const charAt = String.prototype.charAt
+    let reads = 0
+    const readsFor = (value: string) => {
+      reads = 0
       expect(redactUrl(value)).toBe(value)
-      expect(performance.now() - started).toBeLessThan(2_000)
+      return reads
+    }
+    String.prototype.charAt = function (this: string, position?: number) {
+      reads++
+      return charAt.call(this, position)
+    }
+    try {
+      for (const shape of shapes) {
+        const small = readsFor(shape(5_000))
+        const large = readsFor(shape(10_000))
+        expect(small).toBeGreaterThan(0)
+        expect(large).toBeLessThanOrEqual(2 * small + 16)
+      }
+    } finally {
+      String.prototype.charAt = charAt
     }
   })
 })
