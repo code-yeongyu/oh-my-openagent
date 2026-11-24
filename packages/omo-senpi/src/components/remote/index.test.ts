@@ -11,9 +11,16 @@ import * as remote from "./index"
 describe("remote module barrel", () => {
   test("#given the barrel #when its runtime exports are listed #then they are exactly the public values", () => {
     expect(Object.keys(remote).sort()).toEqual([
+      "LocalApiError",
       "REMOTE_CODES",
+      "SESSION_ROW_STATES",
+      "accountStateNotice",
       "canonicalizeThreadHandle",
+      "classifyAccountShow",
+      "connectLocalService",
       "describeThread",
+      "deviceServiceEndpointPath",
+      "deviceServiceStateDir",
       "exitCodeOf",
       "handleOf",
       "personSurface",

@@ -10,7 +10,7 @@ import {
   SessionHostLaunch,
   uninstallColdWake,
   type UnitState,
-} from "../device-service-core/src/index.ts"
+} from "../omo-senpi/src/components/remote/admin"
 
 // omo#13594: the cold-wake unit of this device. `omo remote bootstrap` and `enable` install it, `disable` removes it, and a
 // bootstrap on a device whose remote sessions are off removes it too, so it never comes back while they stay off.

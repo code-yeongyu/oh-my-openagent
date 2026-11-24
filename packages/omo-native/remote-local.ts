@@ -4,19 +4,15 @@ import {
   type AccountShowResult,
   accountStateNotice,
   classifyAccountShow,
-} from "../device-service-core/src/account-state.ts"
-import {
-  connectDeviceService,
+  connectLocalService,
   type DeviceService,
   deviceServiceEndpointPath,
   deviceServiceStateDir,
+  exitCodeOf,
   LocalApiError,
   SESSION_ROW_STATES,
   type SessionFilter,
   type SessionRowState,
-} from "../device-service-core/src/device-service.ts"
-import {
-  exitCodeOf,
   type LocalSessions,
   personSurface,
   type RemoteClient,
@@ -86,7 +82,7 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
     accountShow: () => readAccountInProcess(error),
     stateDir,
     ...(packageRoot === undefined ? {} : { packageRoot }),
-    connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
+    connect: () => connectLocalService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
     output: (line) => process.stdout.write(`${line}\n`),
     write: (text) => process.stdout.write(text),

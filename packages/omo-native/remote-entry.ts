@@ -1,4 +1,4 @@
-import { deviceServiceStateDir } from "../device-service-core/src/device-service.ts"
+import { deviceServiceStateDir } from "../omo-senpi/src/components/remote/index"
 import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
 import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"

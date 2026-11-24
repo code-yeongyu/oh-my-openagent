@@ -20,6 +20,22 @@ export { resolveTypedAddress } from "./device-address"
 export { personSurface } from "./person-surface"
 export { relayUnavailable } from "./relay-availability"
 export type * from "./types"
+// What `omo remote`'s local-only path reads beside the client: the account state, this device's state dir and endpoint,
+// the session-row states, and the local API's connection and errors. All local-only (remote-local-reachability.test.ts).
+export {
+  type AccountShowResult,
+  accountStateNotice,
+  classifyAccountShow,
+} from "../../../../device-service-core/src/account-state"
+export {
+  deviceServiceEndpointPath,
+  deviceServiceStateDir,
+  LocalApiError,
+  SESSION_ROW_STATES,
+  type SessionFilter,
+  type SessionRowState,
+} from "@oh-my-opencode/device-service-core/device-service"
+export { connectLocalService } from "./local-service"
 // The device-service wire types a surface names in its own signatures (a command's result, an attach, the connection), so
 // a surface takes them from here, not from device-service-core (guard S3).
 export type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"

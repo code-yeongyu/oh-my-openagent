@@ -52,7 +52,7 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
   s3: {
     surface: isRemoteSurface,
     layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY],
-    entries: [`${REMOTE}index.ts`, `${REMOTE}lazy.ts`],
+    entries: [`${REMOTE}index.ts`, `${REMOTE}lazy.ts`, `${REMOTE}admin.ts`],
   },
 }
 
@@ -62,33 +62,10 @@ type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
 // removes a use also removes its row.
 export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
-export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-local.ts": { uses: ["connectDeviceService"], removedBy: "omo PR 4c-1" },
-}
+export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
 export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
-  "packages/omo-native/remote-bootstrap.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  // This device's operator endpoint leg opens sockets, so it is loaded lazily, outside remote-local's graph (omo#13440).
-  "packages/omo-native/remote-cli.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-cold-wake.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-entry.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
-  "packages/omo-native/remote-local.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U6 (CLI + attach onto the module)",
-  },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",

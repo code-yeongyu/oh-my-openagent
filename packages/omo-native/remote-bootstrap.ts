@@ -7,7 +7,7 @@ import {
   DEVICE_SERVICE_VERSION,
   deviceServiceHost,
   installDeviceService,
-} from "../device-service-core/src/index.ts"
+} from "../omo-senpi/src/components/remote/admin"
 import packageJson from "./package.json" with { type: "json" }
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import type { RemoteOptOut } from "./remote-opt-out"

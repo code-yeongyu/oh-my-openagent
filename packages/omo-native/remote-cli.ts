@@ -124,8 +124,7 @@ export function disableNotSavedNotice(reason: string, switchedOff: boolean): str
 
 // This device's own sessions (`sessions` lists them) come from its operator endpoint, a socket: loaded here, on first
 // use, outside remote-local's graph (omo#13440), and handed to the person client.
-const thisDeviceSessions = async () =>
-  (await import("../omo-senpi/src/components/remote/local-sessions")).createLocalSessions()
+const thisDeviceSessions = async () => (await import("../omo-senpi/src/components/remote/admin")).createLocalSessions()
 
 export type RemoteAttachLaunch = { readonly engineArgs: readonly string[] }
 

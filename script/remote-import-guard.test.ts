@@ -154,7 +154,7 @@ describe("remote import guard G1 matcher", () => {
     expect(Object.fromEntries(fixture.nonLiteralImports)).toEqual({ [`${senpi}/src/dynamic.ts`]: 1 })
   })
 
-  test("#given each import shape #then S3 holds surfaces to the module's two entries (index.ts, lazy.ts), type-only included, tests and non-surfaces exempt", () => {
+  test("#given each import shape #then S3 holds surfaces to the module's three entries (index.ts, lazy.ts, admin.ts), type-only included, tests and non-surfaces exempt", () => {
     // tool-entry (index.ts) and tool-lazy (lazy.ts) pass; tool-lazy-inner reaches the same surface past its entry.
     expect(asRecord(fixture.s3)).toEqual({
       [`${senpi}/src/components/thread/tool-l1.ts`]: ["packages/device-service-core/src/"],
