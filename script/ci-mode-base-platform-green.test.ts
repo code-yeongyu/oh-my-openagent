@@ -42,6 +42,8 @@ type Case = {
   readonly extraCommit?: boolean
   readonly pinOffBase?: boolean
   readonly fork?: boolean
+  readonly runHeadSha?: "pin" | "other"
+  readonly silentChecker?: boolean
 }
 
 function runClassify(name: string, input: Case): { readonly fullMatrix: string; readonly log: string } {
@@ -52,6 +54,8 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
     extraCommit = false,
     pinOffBase = false,
     fork = false,
+    runHeadSha = "pin",
+    silentChecker = false,
   } = input
   const dir = join(root, name)
   const repo = join(dir, "repo")
@@ -74,6 +78,7 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
   writeFileSync(join(repo, "source.ts"), "export const a = 1\n")
   git("add", "-A")
   git("commit", "-qm", "pin")
+  const pin = git("rev-parse", "HEAD")
   git("checkout", "-q", "-b", "stamp")
   if (extraCommit) {
     writeFileSync(join(repo, "CHANGELOG.md"), "# notes\n")
@@ -101,10 +106,19 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
     "merge",
   )
 
+  const pinRunRecord = (conclusion: string) => ({
+    id: 45252882440,
+    created_at: "2026-11-22T00:00:00Z",
+    conclusion,
+    head_sha: runHeadSha === "pin" ? pin : "0".repeat(40),
+    head_branch: "dev",
+    event: "push",
+    status: "completed",
+  })
   const runs = {
     "in-progress": [],
-    success: [{ id: 45252882440, created_at: "2026-11-22T00:00:00Z", conclusion: "success" }],
-    failure: [{ id: 45252882440, created_at: "2026-11-22T00:00:00Z", conclusion: "failure" }],
+    success: [pinRunRecord("success")],
+    failure: [pinRunRecord("failure")],
     "api-error": [],
   }[pinRun]
   writeFileSync(join(dir, "runs.json"), JSON.stringify({ workflow_runs: runs }))
@@ -127,7 +141,12 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
     [
       "#!/bin/bash",
       pinRun === "api-error" ? 'echo "gh: Server Error (HTTP 502)" >&2; exit 1' : "",
-      'case "$2" in *"/jobs?"*) f="$FAKE_DIR/jobs.json" ;; *) f="$FAKE_DIR/runs.json" ;; esac',
+      // Answers the runs query only for the pin's dev push runs, so a probe at any other commit fails the case.
+      'case "$2" in',
+      '  *"/jobs?"*) f="$FAKE_DIR/jobs.json" ;;',
+      `  *"/runs?"*) for want in head_sha=${pin} branch=dev event=push; do [[ "&\${2#*\\?}&" == *"&$want&"* ]] || { echo "gh: unexpected query $2" >&2; exit 1; }; done; f="$FAKE_DIR/runs.json" ;;`,
+      '  *) echo "gh: unexpected endpoint $2" >&2; exit 1 ;;',
+      "esac",
       'jq -r "$4" "$f"',
       "",
     ].join("\n"),
@@ -135,6 +154,8 @@ function runClassify(name: string, input: Case): { readonly fullMatrix: string; 
   chmodSync(join(bin, "gh"), 0o755)
   writeFileSync(join(dir, "event.json"), JSON.stringify({ pull_request: { changed_files: 3, body: "", labels: [] } }))
   writeFileSync(join(dir, "output"), "")
+  // A checker whose main-module guard does not fire exits 0 without judging; only its sentinel is a pass.
+  if (silentChecker) writeFileSync(join(repo, "script/release-stamp-strict.mjs"), "")
 
   const run = spawnSync("bash", ["-c", classifyStep()], {
     cwd: repo,
@@ -182,6 +203,8 @@ posixBashTest.each([
   ["the GitHub API errors", "api-error", { pinRun: "api-error" }],
   ["the head comes from a fork", "fork", { fork: true }],
   ["the pin is not on the base branch", "off-base", { pinOffBase: true }],
+  ["the returned run is for another commit", "other-sha", { runHeadSha: "other" }],
+  ["the strict checker exits 0 without its sentinel", "silent-checker", { silentChecker: true }],
 ] as const)("#given %s #then the run keeps the full matrix", (_name, dir, input) => {
   expect(runClassify(dir, input).fullMatrix).toBe("true")
 })

@@ -1,12 +1,20 @@
 #!/usr/bin/env node
 
 import { execFileSync } from "node:child_process"
+import { realpathSync } from "node:fs"
 import { pathToFileURL } from "node:url"
-import { isGeneratedReleasePath, isReleaseNotesPath, isVersionStampedPath } from "./release-state-paths.mjs"
+import {
+  isGeneratedReleasePath,
+  isReleaseNotesPath,
+  isVersionStampedPath,
+  stampRefusals,
+} from "./release-state-paths.mjs"
 
 // The proof ci.yml needs before a release-state pull request skips the macOS/Windows matrix (#14847): the stamp commit
 // changes nothing but versions over the pinned source. Stricter than `release-state-paths.mjs --check-stamp`, which
-// publish.yml keeps: package.json is compared as JSON, bun.lock line by line, and generated bundles are content-checked.
+// publish.yml keeps and which must also pass: on top of that byte-exact version replacement (which also refuses duplicate
+// JSON keys and reformatting), package.json is compared as JSON, bun.lock line by line, and generated bundles are
+// content-checked. Only the STRICT_STAMP_OK line on stdout is a pass; ci.yml requires it, not just exit 0.
 
 const git = (args) => execFileSync("git", args, { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
 const show = (commit, path) => git(["show", `${commit}:${path}`])
@@ -38,19 +46,24 @@ function lineDifference(before, after, allowed) {
   return at === -1 ? undefined : `line ${at + 1} changes more than a version`
 }
 
-// bun.lock: inside the workspaces section only a workspace's `"version"` line or a dependency on one of our own
-// platform packages may move; every external package entry (name, version, integrity) sits under the top-level
-// "packages" key and must stay byte-identical.
-function lockDifference(before, after) {
-  return lineDifference(before, after, (pinLine, stampLine, index, pin) => {
-    const packagesStart = pin.indexOf('  "packages": {')
-    const versionLine = /^\s*"version": "[^"]+",?$/
-    const ownDependency = /^\s*"((?:oh-my-opencode|oh-my-openagent)-[^"]+)": "[^"]+",?$/
-    const sameOwnDependency = ownDependency.exec(pinLine)?.[1]
-    const movable =
-      (versionLine.test(pinLine) && versionLine.test(stampLine)) ||
-      (sameOwnDependency !== undefined && ownDependency.exec(stampLine)?.[1] === sameOwnDependency)
-    return (packagesStart === -1 || index < packagesStart) && movable
+// bun.lock: inside the workspaces section only a workspace entry's own `"version"` line (one level inside the entry) may
+// move from a pinned version to its stamp, and a dependency on one of our own platform packages only from the pin's root
+// version to the stamp's; every external package entry (name, version, integrity) sits under the top-level "packages"
+// key and must stay byte-identical. A lockfile without both section headers is refused.
+function lockDifference(before, after, versions) {
+  const pin = before.split("\n")
+  const workspacesStart = pin.indexOf('  "workspaces": {')
+  const packagesStart = pin.indexOf('  "packages": {')
+  if (workspacesStart === -1 || packagesStart < workspacesStart) return "has no workspaces section before its packages"
+  const [rootVersion, rootStamp] = versions[0]
+  const bumped = (line, from, to) => line.replace(`"${from}"`, `"${to}"`)
+  return lineDifference(before, after, (pinLine, stampLine, index) => {
+    if (index <= workspacesStart || index >= packagesStart) return false
+    const workspaceVersion = /^ {6}"version": "([^"]+)",?$/.exec(pinLine)?.[1]
+    if (workspaceVersion !== undefined)
+      return versions.some(([from, to]) => workspaceVersion === from && stampLine === bumped(pinLine, from, to))
+    const ownDependency = /^ {8}"(?:oh-my-opencode|oh-my-openagent)-[^"]+": "([^"]+)",?$/.exec(pinLine)?.[1]
+    return ownDependency === rootVersion && stampLine === bumped(pinLine, rootVersion, rootStamp)
   })
 }
 
@@ -69,7 +82,7 @@ function strictStampRefusals(pin, stamp) {
     [versionAt(pin, "packages/omo-native/package.json"), versionAt(stamp, "packages/omo-native/package.json")],
   ]
   const fields = git(["diff", "--no-renames", "--name-status", "-z", pin, stamp]).split("\0").filter(Boolean)
-  const refusals = []
+  const refusals = [...stampRefusals(pin, stamp)]
   for (let index = 0; index < fields.length; index += 2) {
     const [status, path] = [fields[index], fields[index + 1]]
     if (isReleaseNotesPath(path)) continue
@@ -80,7 +93,7 @@ function strictStampRefusals(pin, stamp) {
     const [before, after] = [show(pin, path), show(stamp, path)]
     let reason
     if (/(?:^|\/)package\.json$/.test(path) && isVersionStampedPath(path)) reason = manifestDifference(before, after)
-    else if (path === "bun.lock") reason = lockDifference(before, after)
+    else if (path === "bun.lock") reason = lockDifference(before, after, versions)
     else if (isVersionStampedPath(path) || isGeneratedReleasePath(path))
       reason = bundleDifference(before, after, versions)
     else reason = "outside the release stamp's files"
@@ -89,7 +102,8 @@ function strictStampRefusals(pin, stamp) {
   return refusals
 }
 
-if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Node runs a symlinked entry point from its real path, so compare against that.
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) {
   const [pin, stamp] = process.argv.slice(2)
   if (pin === undefined || stamp === undefined) throw new Error("usage: release-stamp-strict.mjs <pin> <stamp>")
   const refusals = strictStampRefusals(pin, stamp)
@@ -97,4 +111,5 @@ if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.a
     process.stderr.write(`Not a strict release stamp (script/release-stamp-strict.mjs):\n${refusals.join("\n")}\n`)
     process.exit(1)
   }
+  process.stdout.write("STRICT_STAMP_OK\n")
 }

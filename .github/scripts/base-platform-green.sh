@@ -8,7 +8,8 @@ set -euo pipefail
 
 filter="$(cat "$(dirname "$0")/platform-jobs.jq")"
 read -r run_id conclusion <<< "$(gh api "repos/$GH_REPO/actions/workflows/ci.yml/runs?branch=dev&event=push&status=completed&head_sha=$BASE_SHA&per_page=20" \
-  --jq '.workflow_runs | sort_by(.created_at) | last | "\(.id // "") \(.conclusion // "")"')"
+  --jq '[.workflow_runs[] | select(.head_sha == env.BASE_SHA and .head_branch == "dev" and .event == "push" and .status == "completed")]
+    | sort_by(.created_at) | last | "\(.id // "") \(.conclusion // "")"')"
 if [ -z "$run_id" ] || [ "$conclusion" != success ]; then
   echo "base-platform-green: no successful completed dev push run at $BASE_SHA (run ${run_id:-none}, ${conclusion:-none})" >&2
   echo false

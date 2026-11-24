@@ -105,7 +105,8 @@ jobs:
 
           # A release-state pull request skips the macOS/Windows matrix only when its stamp commit is ONE commit on the pinned
           # source, that pin is on the base branch, the pin's completed dev push run passed with every macOS/Windows leg run
-          # and green, the head is not a fork, and the stamp changes nothing but versions (release-stamp-strict.mjs). Any
+          # and green, the head is not a fork, and the stamp changes nothing but versions (release-stamp-strict.mjs prints
+          # STRICT_STAMP_OK; exit 0 without it is no proof). Any
           # failure, API error or unfinished run keeps the full matrix (#14847).
           BASE_PLATFORM_GREEN=false
           if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" =~ ^release/v.+-source-state$ ]] &&
@@ -114,7 +115,7 @@ jobs:
             STAMP_PARENTS="$(git show -s --format=%P "$PR_HEAD_SHA")"
             if [ "$(wc -w <<< "$STAMP_PARENTS")" -eq 1 ] &&
                git merge-base --is-ancestor "$STAMP_PARENTS" "$BASE_SHA" &&
-               node script/release-stamp-strict.mjs "$STAMP_PARENTS" "$PR_HEAD_SHA" &&
+               [ "$(node script/release-stamp-strict.mjs "$STAMP_PARENTS" "$PR_HEAD_SHA")" = STRICT_STAMP_OK ] &&
                [ "$(GH_REPO="$GITHUB_REPOSITORY" BASE_SHA="$STAMP_PARENTS" bash .github/scripts/base-platform-green.sh || true)" = true ]; then
               BASE_PLATFORM_GREEN=true
             fi
