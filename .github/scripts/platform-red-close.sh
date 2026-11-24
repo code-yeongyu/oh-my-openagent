@@ -47,6 +47,11 @@ while IFS=$'\t' read -r job red_run red_sha; do
   workflow="$(gh api "repos/$GH_REPO/actions/runs/$red_run" --jq '.workflow_id')"
   # The newest completed dev push run in which this job CONCLUDED decides (#14856): a cancelled or superseded run, or
   # one where the job was skipped, absent or ran no tests, is no evidence either way, so an older run is read instead.
+  # One page of the 20 newest; written to a file first so a failing gh call stops the step under set -e (a process
+  # substitution would hide it), and nothing is closed. Fewer runs, or none, just means fewer candidates.
+  runs="$OUT_DIR/runs-$workflow"
+  gh api "repos/$GH_REPO/actions/workflows/$workflow/runs?branch=dev&event=push&status=completed&per_page=20" \
+    --jq '.workflow_runs[] | "\(.id) \(.head_sha) \(.html_url)"' > "$runs"
   run="" result=""
   while read -r candidate candidate_sha candidate_url; do
     jobs="$OUT_DIR/jobs-$candidate"
@@ -58,8 +63,7 @@ while IFS=$'\t' read -r job red_run red_sha; do
         break
         ;;
     esac
-  done < <(gh api "repos/$GH_REPO/actions/workflows/$workflow/runs?branch=dev&event=push&status=completed&per_page=20" \
-    --jq '.workflow_runs[] | "\(.id) \(.head_sha) \(.html_url)"')
+  done < "$runs"
   if [ -z "$run" ]; then
     echo "#$issue tracks '$job', which concluded in none of its workflow's 20 latest completed dev push runs; leaving it open."
     exit 0
