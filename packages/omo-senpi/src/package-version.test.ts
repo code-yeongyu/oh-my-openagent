@@ -45,11 +45,18 @@ describe("omoSenpiPackageVersion", () => {
     expect(omoSenpiPackageVersion(urlOf(root, "runtime/thread-sdk/sdk.js"))).toBe("2.0.0")
   })
 
+  test("#given a bundle inlined into a compiled executable #when read #then it is the plugin manifest's beside the executable", () => {
+    // The desktop app's compiled omo inlines extensions/omo-device-account.js (its boot-time memory-sync claim), so
+    // the bundle runs from Bun's virtual filesystem, with the runtime bundle's plugin beside the executable.
+    const root = plugin("compiled", "4.0.0")
+    expect(omoSenpiPackageVersion("file:///$bunfs/root/omo", join(dirname(root), "omo"))).toBe("4.0.0")
+  })
+
   test("#given a bundle with no omo-senpi manifest above it #when read #then it throws instead of guessing", () => {
     const orphan = join(scratch, "orphan", "omo.js")
     mkdirSync(dirname(orphan), { recursive: true })
     writeFileSync(orphan, "export {}\n")
-    expect(() => omoSenpiPackageVersion(pathToFileURL(orphan).href)).toThrow("omo-senpi package manifest not found")
+    expect(() => omoSenpiPackageVersion(pathToFileURL(orphan).href, orphan)).toThrow("omo-senpi package manifest not found")
   })
 })
 
