@@ -47,5 +47,9 @@ export function prepareWorkpoolLaunch(input: {
   const managedSpec = { ...built, ...(spec.admission === undefined ? {} : { admission: spec.admission }) }
   const record = { ...claimed, spawn_spec: buildSpawnSpecV1(managedSpec) }
   if (prior === null) options.store.save(record)
-  return { record, managedSpec, runner: options.runners[executionMode], model: record.model }
+  const runner = options.runners[executionMode]
+  if (runner === undefined) {
+    throw new WorkpoolError("store_corrupt", `No runner is configured for execution mode "${executionMode}".`)
+  }
+  return { record, managedSpec, runner, model: record.model }
 }

@@ -85,6 +85,9 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       })
 
       for (const agent of BUILTIN_AGENT_NAMES) {
+        // devin-acp resolves against Devin's own model catalog, never the senpi registry, so the
+        // listed-providers invariant cannot apply to it; it is covered separately below.
+        if (agent === "devin") continue
         test(`#when the ${agent} agent resolves #then no ${name} model is selected`, () => {
           const result = resolveAgent(agent, BUILTIN_AGENTS, registry(models))
 
@@ -93,6 +96,22 @@ describe("builtin chains resolve only on their listed providers (#9146)", () => 
       }
     })
   }
+
+  describe("#given only a gateway provider is connected", () => {
+    test("#when the devin agent resolves #then it still lands on its own catalog, never a gateway model", () => {
+      const result = resolveAgent("devin", BUILTIN_AGENTS, registry(OPENROUTER_ONLY))
+
+      expect(result.kind).toBe("resolved")
+      if (result.kind !== "resolved") throw new Error("Expected resolved")
+      expect(result.model).toBe("devin/adaptive")
+      expect(result.resolved_model).toEqual({
+        source: "agent",
+        provider: "devin",
+        model_id: "adaptive",
+        display: "devin/adaptive",
+      })
+    })
+  })
 
   describe("#given the reported plan-consultant spawn: no override, OpenRouter the only lane serving Opus 5.5", () => {
     test("#when the builtin agent resolves #then it is never source agent on openrouter/anthropic/claude-opus-5.5 at max", () => {

@@ -26,6 +26,7 @@ import type { ReconcileOutcome } from "./types"
 import { suspendHandle } from "./shutdown"
 
 export { deferred } from "./revive-rollback"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 export type { SuspendedResidency } from "./revive-rollback"
 
 export const REVIVABLE_STATUSES = new Set(["pending", "running", "interrupted"])
@@ -90,7 +91,7 @@ async function reclaimResidentExclusive(
     await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
     return { task_id: claimed.task_id, kind: "resumed", reason: "non-revivable orphan disposed" }
   }
-  const rollbackResidency: SuspendedResidency = claimed.execution_mode === "process" ? "rpc_detached" : "persisted_only"
+  const rollbackResidency: SuspendedResidency = isOsProcessExecutionMode(claimed.execution_mode) ? "rpc_detached" : "persisted_only"
   if (context.config.reattach_on_reconcile === false) {
     if ((claimed.pending_steering?.length ?? 0) > 0) {
       await destroyResidentTask(context, claimed.task_id, "reconcile_lost")
@@ -146,7 +147,7 @@ export async function reviveClaimed(
   // A host session has no pid of its own; only the child-process runner ever leaves one behind. A
   // previous process's child is ended first, a cancelled one included: finishing a cancel never leaves
   // its process running.
-  if (fresh.execution_mode === "process" && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
+  if (isOsProcessExecutionMode(fresh.execution_mode) && fresh.pid !== undefined && !isHostSessionRecord(fresh)) {
     const terminated = await terminateOldRpc(context, fresh)
     if (interrupted()) return rollbackOrDeferred(context, fresh.task_id, rollbackResidency, "foreign_live_owner", fresh)
     if (!terminated) {
@@ -229,7 +230,7 @@ export async function reviveClaimed(
         context,
         {
           ...handle,
-          kind: handle.kind ?? (fresh.execution_mode === "process" ? "rpc" : "in-process"),
+          kind: handle.kind ?? (isOsProcessExecutionMode(fresh.execution_mode) ? "rpc" : "in-process"),
           terminate: () => handle.terminate?.() ?? Promise.resolve(),
         },
         "revived_after_shutdown",
@@ -281,7 +282,7 @@ export async function reviveClaimed(
         context,
         {
           ...handle,
-          kind: handle.kind ?? (fresh.execution_mode === "process" ? "rpc" : "in-process"),
+          kind: handle.kind ?? (isOsProcessExecutionMode(fresh.execution_mode) ? "rpc" : "in-process"),
           terminate: () => handle.terminate?.() ?? Promise.resolve(),
         },
         "revived_after_shutdown",

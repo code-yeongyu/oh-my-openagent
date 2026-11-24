@@ -6,7 +6,7 @@ import type { LaunchContext, LaunchOutcome } from "./launch-task"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import { RunPauseAdmissionHeld } from "./run-pause"
 import { enterStartAdmission } from "./start-admission"
-import type { ManagedRunner } from "./types"
+import type { ManagedRunnerMap } from "./types"
 
 export type HeldAdmissionResult = { readonly kind: "resumed" } | { readonly kind: "settled" }
 
@@ -15,7 +15,7 @@ type HeldAdmissionPorts = {
   readonly barrier: AdmissionBarrier
   readonly concurrency: TaskConcurrency
   readonly hostPid: number
-  readonly runners: Readonly<Record<"in-process" | "process", ManagedRunner>>
+  readonly runners: ManagedRunnerMap
   launch(context: LaunchContext): void
 }
 
@@ -24,7 +24,7 @@ class HeldAdmissionError extends Error {
   constructor(
     readonly taskId: string,
     readonly reason:
-      "record_missing" | "allocation_missing" | "already_started" | "spawn_spec_unavailable" | "owner_changed",
+      "record_missing" | "allocation_missing" | "already_started" | "spawn_spec_unavailable" | "owner_changed" | "runner_unavailable",
   ) {
     super(`held admission ${taskId}: ${reason}`)
   }
@@ -111,7 +111,19 @@ export class HeldAdmissions {
       const context: LaunchContext = {
         record: owned,
         managedSpec: { ...prepared, admission: entered.scope },
-        runner: warm?.runner ?? this.#ports.runners[owned.execution_mode === "in-process" ? "in-process" : "process"],
+        runner: (() => {
+          const selected =
+            warm?.runner ??
+            this.#ports.runners[
+              owned.execution_mode === "in-process"
+                ? "in-process"
+                : owned.execution_mode === "devin-acp"
+                  ? "devin-acp"
+                  : "process"
+            ]
+          if (selected === undefined) throw new HeldAdmissionError(taskId, "runner_unavailable")
+          return selected
+        })(),
         model: allocation.model,
       }
       this.#contexts.set(taskId, context)

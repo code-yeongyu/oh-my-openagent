@@ -9,6 +9,7 @@ import type { DestroyCause, ResidentHandle } from "./port"
 import { withinTeardownBudget } from "./teardown-budget"
 import { suspendHandle } from "./shutdown"
 import { newestSessionPath } from "./session-path"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 /**
  * THE single-writer destruction port. This is the ONLY function in the package that invokes a
@@ -116,7 +117,7 @@ export async function destroyResidentTask(
       ) {
         context.registry.forget(taskId, { path: "park" })
         context.store.transition(taskId, {
-          type: record.execution_mode === "process" ? "detach_rpc" : "persist_only",
+          type: isOsProcessExecutionMode(record.execution_mode) ? "detach_rpc" : "persist_only",
           timestamp: nowIso(context),
         })
         return
@@ -205,7 +206,7 @@ async function terminateOrphan(context: LifecycleContext, taskId: string, orphan
     await endHostSessionChild(context, record)
     return
   }
-  const pid = record === null ? orphan?.pid : record.execution_mode === "process" ? record.pid : undefined
+  const pid = record === null ? orphan?.pid : isOsProcessExecutionMode(record.execution_mode) ? record.pid : undefined
   if (pid === undefined) return
   if (context.signaller.isAlive(pid)) {
     context.signaller.signal(pid, "SIGTERM")
@@ -248,7 +249,7 @@ function recordRevivalFailure(context: LifecycleContext, taskId: string): void {
     const { host_pid: _hostPid, ...rest } = fresh
     return {
       ...rest,
-      residency_state: fresh.execution_mode === "process" ? "rpc_detached" : "persisted_only",
+      residency_state: isOsProcessExecutionMode(fresh.execution_mode) ? "rpc_detached" : "persisted_only",
       updated_at: nowIso(context),
     }
   })

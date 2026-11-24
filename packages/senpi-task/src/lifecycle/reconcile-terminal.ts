@@ -4,6 +4,7 @@ import { destroyResidentTask } from "./destroy"
 import { newestSessionPath } from "./session-path"
 import type { ReconcileOutcome } from "./types"
 import { holdsClaim } from "./revive-rollback"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 export async function reconcileLegacyTerminal(
   context: LifecycleContext,
@@ -31,7 +32,7 @@ export async function reconcileLegacyTerminal(
 
 /** Release a terminal resident without relaunching its completed child session. */
 export async function detachTerminalResident(context: LifecycleContext, record: TaskRecord): Promise<ReconcileOutcome> {
-  if (record.execution_mode === "process" && record.pid !== undefined) {
+  if (isOsProcessExecutionMode(record.execution_mode) && record.pid !== undefined) {
     const terminated = await terminateClaimedPid(context, record)
     if (!reconciliationActive(context))
       return { task_id: record.task_id, kind: "deferred", reason: "session_unavailable" }
@@ -54,7 +55,7 @@ export async function detachTerminalResident(context: LifecycleContext, record: 
     )
       return fresh
     const transition = transitionTaskRecord(fresh, {
-      type: fresh.execution_mode === "process" ? "detach_rpc" : "persist_only",
+      type: isOsProcessExecutionMode(fresh.execution_mode) ? "detach_rpc" : "persist_only",
       timestamp: nowIso(context),
     })
     if (!transition.applied) return fresh

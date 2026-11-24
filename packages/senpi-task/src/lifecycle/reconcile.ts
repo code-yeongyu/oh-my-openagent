@@ -19,6 +19,7 @@ import { reconcileProvisionalExit, settleProvisionalExitLoss } from "./provision
 import { hasForeignLiveOwner } from "./reconcile-owner"
 import { holdsClaim, rollbackOrDeferred } from "./revive-rollback"
 import { suspendHandle } from "./shutdown"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 const HEARTBEAT_FRESH_MS = 30_000
 
@@ -222,7 +223,7 @@ async function reconcileLegacyRecordExclusive(
   // "the daemon is gone" parks it - the pid-shaped path below would mark it lost for having no pid.
   if (isHostSessionRecord(record)) return reconcileHostSessionOrphan(context, record)
 
-  if (record.execution_mode !== "process") {
+  if (!isOsProcessExecutionMode(record.execution_mode)) {
     await markLost(context, record.task_id, "in-process task from a previous process cannot be reattached")
     return { task_id: record.task_id, kind: "lost", reason: "previous-process in-process" }
   }

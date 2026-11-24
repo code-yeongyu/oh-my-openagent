@@ -101,6 +101,7 @@ function toExecutionMode(value: string | undefined): ExecutionMode | undefined {
   switch (value) {
     case "in-process":
     case "process":
+    case "devin-acp":
       return value
     default:
       return undefined

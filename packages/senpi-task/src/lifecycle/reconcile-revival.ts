@@ -50,9 +50,13 @@ export async function reconcileScopedRevival(
   }
   // A daemon-hosted child NAMES its transcript on the record. The disk scan below only knows the
   // child's own session dir, so without this a parked host session reads as "terminal with no
-  // transcript" and gets disposed - throwing away a session the daemon can still reopen.
+  // transcript" and gets disposed - throwing away a session the daemon can still reopen. A
+  // devin-acp child has no senpi transcript either: its resumable session is the ACP session id on
+  // the record, which respawnDevinAcp reloads through session/load.
   const transcriptFor = (record: TaskRecord): string | undefined =>
-    hostSessionResumePath(record) ?? sessionPathFor(record.task_id)
+    hostSessionResumePath(record) ??
+    (record.execution_mode === "devin-acp" ? record.child_session_id : undefined) ??
+    sessionPathFor(record.task_id)
 
   // Reclamation runs first and OUTSIDE admission. These records already occupy their slot, and a
   // killed orphan can release one for the admission batch that follows.

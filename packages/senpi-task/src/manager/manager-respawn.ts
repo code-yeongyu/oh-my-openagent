@@ -14,7 +14,7 @@ import {
   sessionTailNeedsContinuation,
 } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
-import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
+import type { ManagedRunner, ManagedRunnerMap, ManagedStartSpec, TrustedRespawnLaunchResolver } from "./types"
 import { modelSelector } from "../runners/in-process/runtime-fallback-settings"
 import { HOST_RESPAWN_CONTINUATION } from "../runners/rpc-host/reconcile-turn"
 import { reconcileDaemonTurn } from "./reconcile-daemon-turn"
@@ -30,17 +30,69 @@ export async function respawnManagedTask(input: {
   readonly record: TaskRecord
   readonly sessionPath: string | undefined
   readonly stateDir: string
-  readonly runners: Readonly<Record<"in-process" | "process", ManagedRunner>>
+  readonly runners: ManagedRunnerMap
   readonly rpcRunner: RpcRespawnRunner
   readonly trustedLaunch?: TrustedRespawnLaunchResolver
   // Restoring a paused child (senpi#3811): rebuild it from its transcript and start no turn; the run
   // re-holds it before anything else reaches it.
   readonly paused?: boolean
 }): Promise<RespawnResult> {
+  if (input.record.execution_mode === "devin-acp") return respawnDevinAcp(input)
   if (input.sessionPath === undefined) return respawnFresh(input)
   if (input.record.execution_mode === "in-process")
     return respawnInProcess({ ...input, sessionPath: input.sessionPath })
   return respawnProcess({ ...input, sessionPath: input.sessionPath })
+}
+
+// A devin-acp child resumes its ACP session by id (record.child_session_id, persisted from
+// handle.sessionId) through session/load - there is no transcript file to find. When the session is
+// gone or was never recorded, the runner starts fresh and replays the persisted spawn prompt.
+async function respawnDevinAcp(input: {
+  readonly beforeLaunch: () => void
+  readonly record: TaskRecord
+  readonly stateDir: string
+  readonly runners: ManagedRunnerMap
+  readonly paused?: boolean
+}): Promise<RespawnResult> {
+  const rebuilt = buildRespawnManagedSpec(input.record, input.stateDir)
+  if (!rebuilt.ok) return failure("unrecoverable", rebuilt.code, rebuilt.reason)
+  const runner = input.runners["devin-acp"]
+  if (runner === undefined) {
+    return failure("unrecoverable", "session_unavailable", "devin-acp runner is not configured")
+  }
+  const acpSessionId = input.record.child_session_id
+  let handle: ManagedChildHandle | undefined
+  if (acpSessionId !== undefined && runner.resume !== undefined) {
+    try {
+      input.beforeLaunch()
+      handle = await runner.resume(rebuilt.spec, acpSessionId)
+      if (input.paused !== true) await handle.followUp(CONTINUATION_MESSAGE)
+      return { ok: true, handle }
+    } catch (error) {
+      log("senpi-task devin-acp resume failed; falling back to fresh spawn", {
+        taskId: input.record.task_id,
+        error: String(error),
+      })
+      if (handle !== undefined) await discardManagedHandleBestEffort(handle)
+      handle = undefined
+    }
+  }
+  try {
+    input.beforeLaunch()
+    // A paused restore must not replay the spawn prompt: startSession opens the ACP session bare
+    // when the runner supports it; runners without it fall back to start (prompt included).
+    const pausedStart = runner as ManagedRunner & {
+      startSession?: (spec: ManagedStartSpec) => Promise<ManagedChildHandle>
+    }
+    handle =
+      input.paused === true && pausedStart.startSession !== undefined
+        ? await pausedStart.startSession(rebuilt.spec)
+        : await runner.start(rebuilt.spec)
+    return { ok: true, handle }
+  } catch (error) {
+    if (handle !== undefined) await discardManagedHandleBestEffort(handle)
+    return classifyResumeFailure(error)
+  }
 }
 
 async function respawnFresh(input: {

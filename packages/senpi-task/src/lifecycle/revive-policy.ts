@@ -1,4 +1,5 @@
 import type { TaskRecord } from "../state"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 export type ReviveDriftPolicy = "recorded_warn" | "recorded_silent" | "refuse"
 // Owner OQ5 is pending. This internal policy constant is the one-line owner switch, not config.
@@ -55,7 +56,7 @@ export function isColdRevivalCandidate(record: TaskRecord): boolean {
   }
   return (
     ((record.execution_mode === "in-process" && record.residency_state === "persisted_only") ||
-      (record.execution_mode === "process" && record.residency_state === "rpc_detached")) &&
+      (isOsProcessExecutionMode(record.execution_mode) && record.residency_state === "rpc_detached")) &&
     (record.status === "completed" || record.status === "error" || record.status === "interrupted")
   )
 }

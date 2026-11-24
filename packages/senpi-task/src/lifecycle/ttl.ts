@@ -12,6 +12,7 @@ import { isHostSessionRecord } from "./host-session"
 import { clearHostSessionEnd, endHostSessionChild } from "./host-session-end"
 import type { CleanupResult } from "./types"
 import { expireSuspendedChild } from "./suspended-expiry"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 /**
  * Delete terminal records + artifacts older than task.ttl_ms. Non-terminal records are always kept
@@ -233,7 +234,7 @@ async function endExpiredChild(context: LifecycleContext, record: TaskRecord): P
     const end = await endHostSessionChild(context, record)
     return end.kind === "pending" ? { pending: end.settled } : end.kind === "ended"
   }
-  const orphanPid = record.execution_mode === "process" ? record.pid : undefined
+  const orphanPid = isOsProcessExecutionMode(record.execution_mode) ? record.pid : undefined
   if (orphanPid !== undefined && context.signaller.isAlive(orphanPid)) {
     await destroyResidentTask(context, record.task_id, "ttl", { pid: orphanPid })
   }
@@ -251,7 +252,7 @@ function shouldRetain(context: LifecycleContext, record: TaskRecord, cutoff: num
   const retainedAt = record.terminal_at ?? record.updated_at
   if (Date.parse(retainedAt) > cutoff) return true
   if (!expiringQueue && hasUndeliveredTerminalNotification(record)) return true
-  if (record.status === "lost" && record.execution_mode === "process") {
+  if (record.status === "lost" && isOsProcessExecutionMode(record.execution_mode)) {
     // The lost-record pid-dead proof rule: breadcrumbs are kept until the process is proven dead.
     return record.pid === undefined || context.signaller.isAlive(record.pid)
   }

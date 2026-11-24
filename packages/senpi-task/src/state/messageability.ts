@@ -1,4 +1,5 @@
 import type { HostSessionIdentity, Messageability, ResidencyState, RunnerKind, TaskStatus } from "./types"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 export function messageability(
   status: TaskStatus,
@@ -36,7 +37,7 @@ export function messageability(
     }
   }
   // Child-process runner: revive if terminal (legacy RPC behavior)
-  if (residencyState === "rpc_detached" && executionMode === "process" && runnerKind !== "host-session") {
+  if (residencyState === "rpc_detached" && isOsProcessExecutionMode(executionMode) && runnerKind !== "host-session") {
     switch (status) {
       case "completed":
       case "error":

@@ -30,6 +30,7 @@ import {
   SessionHeldElsewhereError,
 } from "../runners/rpc-host/session-wire"
 import { InputUncertainError, InputConflictError } from "../runners/input-effects"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 const TASK_OUTPUT_SUGGESTION = "Use task_output to read the final result."
 const NOT_FOUND_SUGGESTION = "Use /tasks to see available tasks, or task_output to read a known task."
@@ -162,7 +163,7 @@ export function createSteeringEngine(port: SteeringPort): SteeringEngine {
     }
     const handle = port.liveHandle(record.task_id)
     if (handle === undefined) {
-      if (record.residency_state === "rpc_detached" && record.execution_mode === "process") {
+      if (record.residency_state === "rpc_detached" && isOsProcessExecutionMode(record.execution_mode)) {
         return reviveDetachedTerminalOnSend(port, record, input.message, nowIso, beginSend, endSend, reservation)
       }
       return {

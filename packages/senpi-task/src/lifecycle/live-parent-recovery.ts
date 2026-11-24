@@ -11,6 +11,7 @@ import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
 import { expireSuspendedChild, isSuspensionExpiry } from "./suspended-expiry"
 import type { ReconcileResult } from "./types"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 // Five minutes matches the sustained deferred-revival backoff (300 s), well beyond the 1/4/16 s
 // daemon-loss and 20 s generation-drain budgets. A live parent must get an answer, not wait for
@@ -87,7 +88,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
       if (!isSuspendedResidency(record.residency_state) && context.registry.get(record.task_id) === undefined) {
         context.store.mutate(record.task_id, (fresh) =>
           eligible(fresh) && fresh.residency_claim === record.residency_claim
-            ? { ...fresh, residency_state: fresh.execution_mode === "process" ? "rpc_detached" : "persisted_only" }
+            ? { ...fresh, residency_state: isOsProcessExecutionMode(fresh.execution_mode) ? "rpc_detached" : "persisted_only" }
             : fresh,
         )
       }

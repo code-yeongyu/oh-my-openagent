@@ -54,6 +54,7 @@ import {
 } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { failOwnedRun, launchRunOf, ownsRun } from "./launch-fence"
+import { isOsProcessExecutionMode } from "./execution-mode"
 import { runtimeFallbackCandidates } from "./credential-failure"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
 import { createWorkpoolAdmission } from "./workpool-admission"
@@ -727,6 +728,16 @@ class TaskManagerImpl implements TaskManager {
     }
     releaseResidency?.()
     const runner = this.#options.runners[executionMode]
+    if (runner === undefined) {
+      return this.#failSpawn({
+        claimed,
+        registration,
+        spec,
+        executionMode,
+        lease,
+        error_message: `no runner configured for execution mode "${executionMode}"`,
+      })
+    }
     const context: LaunchContext = { record: finalRecord, managedSpec, runner, model: effectivePlan.model }
     spec.admission?.transfer()
     const startParts = {
@@ -1436,7 +1447,7 @@ class TaskManagerImpl implements TaskManager {
     })
     if (park)
       this.#options.store.transition(record.task_id, {
-        type: record.execution_mode === "process" ? "detach_rpc" : "persist_only",
+        type: isOsProcessExecutionMode(record.execution_mode) ? "detach_rpc" : "persist_only",
         timestamp: nowIso(this.#now),
       })
     else if (queued > 0) this.#steering.dropPending(record.task_id, "target_gone")

@@ -22,6 +22,13 @@ const INVOCATION_ALLOWLIST = [
   "src/runners/rpc/start-cleanup.ts",
   "src/runners/in-process/child-handle.ts",
   "src/manager/child-handle.ts",
+  // The devin-acp runner defines teardown on its own handle seam by the same principle: client.ts
+  // owns the spawned `devin acp` process kill, handle.ts wires terminate/dispose onto the
+  // ManagedChildHandle, and runner.ts only drains clients inside settleTeardowns (itself invoked by
+  // lifecycle shutdown). No autonomous post-admission destruction trigger lives here.
+  "src/runners/devin-acp/client.ts",
+  "src/runners/devin-acp/handle.ts",
+  "src/runners/devin-acp/runner.ts",
 ]
 
 const FORBIDDEN_PATTERNS = [".dispose(", ".terminate(", "process.kill("]

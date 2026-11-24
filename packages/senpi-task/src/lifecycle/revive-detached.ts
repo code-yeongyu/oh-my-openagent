@@ -70,8 +70,12 @@ export async function reviveDetachedTerminal(
     return { ok: false, reason: "task is not a continuable parked child" }
   if (observed.isolation !== undefined) return refused("isolated_not_revivable")
   if (observed.host_pid !== undefined && observed.host_pid !== context.hostPid) return refused("foreign_owner")
-  const sessionPath = newestSessionPath(context, taskId)
-  if (sessionPath === undefined) return { ok: false, reason: "task transcript is unavailable" }
+  // A devin-acp child keeps no senpi transcript on disk: its resumable session is the ACP session
+  // id on the record, which respawnDevinAcp reloads through session/load (or fresh-starts when the
+  // id is absent). Every other mode still requires a transcript file.
+  const devinAcp = observed.execution_mode === "devin-acp"
+  const sessionPath = devinAcp ? observed.child_session_id : newestSessionPath(context, taskId)
+  if (sessionPath === undefined && !devinAcp) return { ok: false, reason: "task transcript is unavailable" }
   const spec = observed.spawn_spec
   if (spec === undefined || (observed.execution_mode === "in-process" && !isSpawnSpecV1(spec))) {
     return { ok: false, reason: "persisted spawn spec unavailable" }

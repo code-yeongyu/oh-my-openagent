@@ -8,6 +8,7 @@ import { DEFAULT_HOST_SESSION_RETRY_POLICY, isHostSessionRecord } from "./host-s
 import { terminateOldRpc } from "./revive-rollback"
 import { recoveryFailureNotice } from "../completion/recovery-failure-notice"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
+import { isOsProcessExecutionMode } from "../manager/execution-mode"
 
 type StopRetry = { token: string; attempt: number; retryAt: number }
 const stopRetries = new WeakMap<LifecycleContext, Map<string, StopRetry>>()
@@ -174,7 +175,7 @@ export async function expireSuspendedChild(
 
 async function stopLocalChild(context: LifecycleContext, record: TaskRecord): Promise<boolean> {
   if (context.failedTeardowns.has(record.task_id)) return false
-  if (record.execution_mode === "process" && !(await terminateOldRpc(context, record))) return false
+  if (isOsProcessExecutionMode(record.execution_mode) && !(await terminateOldRpc(context, record))) return false
   // Expiry owns the queue and the terminal result after the stop. Teardown must not publish a
   // separate lost result through forget(end) before that result includes the undelivered count.
   await destroyResidentTask(context, record.task_id, "revive_failure")
