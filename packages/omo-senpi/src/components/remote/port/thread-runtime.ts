@@ -1,8 +1,7 @@
 import { userInfo } from "node:os"
 import { createServiceAliasRegistry, type ServiceAccess } from "../../thread/remote/alias-registry"
-import type { RemoteSessionsPort, RemoteThreadSurface } from "../../thread/remote/ports"
+import type { RemoteThreadSurface } from "../../thread/remote/ports"
 import type { RemoteClient } from "../client"
-import { connectionOf, dialOf } from "../connection-of"
 import {
   remoteClientForCli,
   remoteClientForConnector,
@@ -11,20 +10,14 @@ import {
   remoteClientForSession,
 } from "../factories"
 import type { RemoteSender } from "../types"
-import { createDeviceServiceSessions } from "./device-service"
+import { remoteSessionsPort } from "./sessions-port"
 import { createLazyRemoteSurface } from "./lazy-remote"
 
 // What the thread client sidecar (`#omo-thread-client-runtime`, live-surface.ts) takes from the remote module: the thread
 // tools' port over this device's device service is built here, in L2, so no thread file opens a device-service
 // connection itself (guard G1, design v8-core r2).
 
-// The port borrows the client's shared connection (#13768 L3): one connection per engine, closed by the client.
-export const remoteSessionsPort = (version: string, client: RemoteClient): RemoteSessionsPort =>
-  createDeviceServiceSessions({
-    version,
-    connect: async () => ({ conn: await connectionOf(client), owned: false }),
-    dialEndpoint: async () => ({ conn: await dialOf(client), owned: true }),
-  })
+export { remoteSessionsPort }
 
 // Built through its sender's factory, as every client is (remote/index.ts).
 export function remoteClient(version: string, sender: RemoteSender): RemoteClient {

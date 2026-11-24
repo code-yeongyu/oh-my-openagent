@@ -34,8 +34,9 @@ export async function runSession(
   })
   if (resolved.kind === "error") return answer.refuse(resolved.error, args.target)
   const { row } = resolved.where
-  // A listing key the person typed names the session in every answer (its handle), as before the address module
-  // (#14305); any other address names it by its durable id. The output names it by its address.
+  // A listing key the person typed names the session in every --json answer (its handle, at `thread`), as before the
+  // address module (#14305 delta review 2, M2); any other address names it by its durable id. The output names it by
+  // its address.
   const typedKey = args.target === row.session_id || args.target.endsWith(`/${row.session_id}`)
   const thread = handleOf(row.device, typedKey ? row.session_id : (row.durable_id ?? row.session_id))
   const label = resolved.address
@@ -45,7 +46,9 @@ export async function runSession(
       return sendTo(remote.client, thread, label, args, answer)
     case "model": {
       const set = await sessions.setModel(thread, args.model)
-      return set.kind === "error" ? answer.refuse(set, label) : answer.ok(set.value, [`${label} now uses ${set.value.model}.`])
+      return set.kind === "error"
+        ? answer.refuse(set, label)
+        : answer.ok({ thread, ...set.value }, [`${label} now uses ${set.value.model}.`])
     }
     case "interrupt": {
       const interrupted = await sessions.interrupt(thread)
@@ -59,7 +62,7 @@ export async function runSession(
         ...(args.wait_ms === undefined ? {} : { wait_ms: args.wait_ms }),
       })
       if (closed.kind === "error") return answer.refuse(withForceHint(closed, label), label)
-      return answer.ok(closed.value, closeLines(label, closed.value))
+      return answer.ok({ thread, ...closed.value }, closeLines(label, closed.value))
     }
   }
 }
@@ -74,5 +77,8 @@ function withForceHint<R extends Refusal>(refusal: R, label: string): R {
   const ids = Array.isArray(pending)
     ? `messages it has not read: ${pending.join(", ")}`
     : "message ids: unavailable on that device's engine"
-  return { ...refusal, next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.` }
+  return {
+    ...refusal,
+    next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
+  }
 }
