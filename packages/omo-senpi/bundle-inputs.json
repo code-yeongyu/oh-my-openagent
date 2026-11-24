@@ -1282,6 +1282,7 @@
     "packages/omo-senpi/src/components/memory/sync-rpc-wiring.ts",
     "packages/omo-senpi/src/components/memory/sync-runner.ts",
     "packages/omo-senpi/src/components/memory/sync-runtime.ts",
+    "packages/omo-senpi/src/components/memory/sync-service-refusal.ts",
     "packages/omo-senpi/src/components/memory/sync-session-deferred.ts",
     "packages/omo-senpi/src/components/memory/sync-start-launch.ts",
     "packages/omo-senpi/src/components/memory/sync-status-copy.ts",
