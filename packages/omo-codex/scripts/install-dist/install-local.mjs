@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:ce0d400dac6e88454d7ec56c087298b04cb2c34cf12db77faa3d59a7352b6a2a:ca23a536dfdd39b89ec4c50bcaef1e9df05c65f110c55a5882b003dd90cdbd9c
+// omo-codex-install:04e5d793819b8aca7954f31e5eedd3e57bb54fb979d1621ceb0edc982d086181:9aa7270d6e60795d954394250e6739397b3308b36178c796a363d1d101dfc506
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -19670,7 +19670,7 @@ var OmoAgentDefInputSchema = object({
   variant: string2().optional(),
   reasoningEffort: OmoReasoningEffortSchema.optional(),
   tools: record(string2(), boolean2()).optional(),
-  execution_mode: _enum(["in-process", "process"]).optional(),
+  execution_mode: _enum(["in-process", "process", "devin-acp"]).optional(),
   background: boolean2().optional(),
   max_depth: number2().int().nonnegative().optional(),
   allowed_subagents: array(string2()).optional(),

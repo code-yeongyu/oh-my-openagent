@@ -857,7 +857,8 @@
             "type": "string",
             "enum": [
               "in-process",
-              "process"
+              "process",
+              "devin-acp"
             ]
           },
           "background": {
@@ -3636,7 +3637,8 @@
                 "type": "string",
                 "enum": [
                   "in-process",
-                  "process"
+                  "process",
+                  "devin-acp"
                 ]
               },
               "background": {
@@ -6185,7 +6187,8 @@
                 "type": "string",
                 "enum": [
                   "in-process",
-                  "process"
+                  "process",
+                  "devin-acp"
                 ]
               },
               "background": {
@@ -8734,7 +8737,8 @@
                 "type": "string",
                 "enum": [
                   "in-process",
-                  "process"
+                  "process",
+                  "devin-acp"
                 ]
               },
               "background": {
@@ -11289,7 +11293,8 @@
                   "type": "string",
                   "enum": [
                     "in-process",
-                    "process"
+                    "process",
+                    "devin-acp"
                   ]
                 },
                 "background": {
@@ -13838,7 +13843,8 @@
                       "type": "string",
                       "enum": [
                         "in-process",
-                        "process"
+                        "process",
+                        "devin-acp"
                       ]
                     },
                     "background": {
@@ -16387,7 +16393,8 @@
                       "type": "string",
                       "enum": [
                         "in-process",
-                        "process"
+                        "process",
+                        "devin-acp"
                       ]
                     },
                     "background": {
@@ -18936,7 +18943,8 @@
                       "type": "string",
                       "enum": [
                         "in-process",
-                        "process"
+                        "process",
+                        "devin-acp"
                       ]
                     },
                     "background": {
