@@ -152,6 +152,8 @@ describe("redactUrl", () => {
     it("#then redaction work grows linearly with the input and real PEM blocks remain masked", () => {
       const hostile = (size: number) => `-----BEGIN ${"A".repeat(size)}-----${"B".repeat(size)}`
       const work = (input: string) => {
+        // Patched only for this synchronous call and restored in finally (also when redactUrl throws); nothing awaits in
+        // between, so no other test of this file or worker runs while it is installed.
         const indexOf = String.prototype.indexOf
         let scanned = 0
         String.prototype.indexOf = function (this: string, search: string, position?: number) {
@@ -170,7 +172,12 @@ describe("redactUrl", () => {
 
       const small = work(hostile(12_500))
       const large = work(hostile(50_000))
-      expect(small).toBeGreaterThan(0)
+      // A scan that stops going through indexOf (a regex, includes, a manual loop) counts nothing; fail loudly so this
+      // guard can never pass on zero work.
+      if (small <= 0 || large <= small)
+        throw new Error(
+          `the PEM scan no longer goes through String.indexOf (work ${small} -> ${large}): re-instrument this test`,
+        )
       expect(large / small).toBeLessThan(8)
 
       const pem = "-----BEGIN PRIVATE KEY-----secret-----END PRIVATE KEY-----"
