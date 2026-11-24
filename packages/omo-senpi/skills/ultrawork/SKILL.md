@@ -135,19 +135,24 @@ under ulw-execute its orchestrator rule also governs the Execution
 loop: dispatched workers do the CHANGE and RUN steps (QA included),
 and you verify the evidence they capture.
 
-## 0. Survey the skills, gather context, then size the work
+## 0. Read every related skill, gather ALL context, then size the work
 This section records into the notepad, so run section 2's `NOTE=`
 command first; section 2 then initialises that same file.
-First, survey the loaded skill list and read the description of each
-loosely relevant skill. Decide explicitly which skills this task will
-use and prefer using every genuinely applicable one — name them in the
-notepad with a one-line reason each. Skipping a skill that fits the
-task is a defect. Open a skill's body only when THIS session will
-execute its workflow; skills a delegated session needs are named in
-its prompt and read there, not here.
-Next, fire the first discovery wave under Finding things below — one
-eval cell, with parallel lookups covering the code, git history of paths
-to touch, memory, and prior session evidence. Record the current problem,
+First, SEARCH SKILLS WIDELY: the loaded skill list plus any skill
+search or catalog this surface offers, matched on the task's domain,
+surfaces, tools and file types, not only the request's words. OPEN AND
+READ THE BODY of every skill that is even slightly related — when in
+doubt, read it; an extra read is cheap, a skipped skill that applied is
+a defect. Name in the notepad the skills this task will follow, with a
+one-line reason each. Skills a delegated session needs are named in
+its prompt and read there.
+Next, GATHER EVERY PIECE OF CONTEXT THE TASK NEEDS, FROM EVERY TOOL
+THAT HOLDS IT, before planning or changing anything: fire the first
+discovery wave under Finding things below — one eval cell, with
+parallel lookups covering the code (LSP, ast-grep, rg), git history of
+paths to touch, memory, prior session evidence, issue and PR trackers,
+docs and the web for outside APIs, and other sessions or machines the
+task names. Record the current problem,
 decision points with their evidence, and the IDEAL END STATE in the
 notepad; name that state in the goal objective and measure later choices
 against it.
