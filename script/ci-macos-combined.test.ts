@@ -40,7 +40,8 @@ function script(name: string): string {
 
 const parts = [
   ["lsp", "lsp-daemon-tests"],
-  ["shard1", "root-tests-posix-1"],
+  ["shard1a", "root-tests-posix-1a"],
+  ["shard1b", "root-tests-posix-1b"],
   ["shard2a", "root-tests-posix-2a"],
   ["shard2b", "root-tests-posix-2b"],
   ["codex", "codex-platform-tests"],
@@ -85,8 +86,11 @@ describe("combined macOS CI execution contract (#9974)", () => {
       run: "npm test",
       "working-directory": "packages/lsp-daemon",
     })
-    expect(steps.find((step) => step.id === "root-tests-posix-1")?.run).toBe(
-      'mkdir -p "$CI_JUNIT_DIR"\nbun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"\n',
+    expect(steps.find((step) => step.id === "root-tests-posix-1a")?.run).toBe(
+      'mkdir -p "$CI_JUNIT_DIR"\nbun test --timeout 20000 packages/memory-core/src/sync/ packages/memory-core/src/memfs/ --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1a.xml"\n',
+    )
+    expect(steps.find((step) => step.id === "root-tests-posix-1b")?.run).toBe(
+      'mkdir -p "$CI_JUNIT_DIR"\nbun --config=bunfig.macos-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"\n',
     )
     expect(steps.find((step) => step.id === "root-tests-posix-2a")?.run).toBe(
       "bash .github/scripts/ci-root-shard-2.sh heavy",
@@ -123,7 +127,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
   })
 
   test.each([
-    ["macos-test-1-status", "test", "lsp", "shard1"],
+    ["macos-test-1-status", "test", "lsp", "shard1a", "shard1b"],
     ["macos-test-2-status", "test", "lsp", "shard2a", "shard2b"],
     ["macos-codex-status", "codex-compatibility", "codex"],
     ["macos-senpi-status", "senpi-compatibility", "senpi"],

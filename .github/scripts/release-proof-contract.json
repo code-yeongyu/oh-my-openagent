@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "188bb3df31455190881af11e495e5dd6600a2f171b2fa686aeb402953cd67678",
+  "workflowSha256": "ec6910b9030f776fbd950bfa056184c02f5c4f99b57907fd766ce0f82a034576",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -153,7 +153,8 @@
       "Run actions/cache@v6",
       "Install dependencies",
       "Run vendored lsp-daemon tests",
-      "Run root test shard 1",
+      "Run root test shard 1 memory-core sync",
+      "Run root test shard 1 rest",
       "Run root test shard 2 heavy",
       "Run root test shard 2 light",
       "Run Codex platform smoke",
