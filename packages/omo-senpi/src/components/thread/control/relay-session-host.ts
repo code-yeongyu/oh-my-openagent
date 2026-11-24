@@ -3,7 +3,7 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { rowCreatedAt, rowFolder, rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
-import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
+import { openContext } from "../open-context"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
 import { replyData } from "../remote/remote-ops"
@@ -156,7 +156,8 @@ export function createRelaySessionHost(
           "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
           { device },
         )
-      const { name, initialSkills, permissionPreset, worktree, ...asked } = request
+      const { name, initialSkills, refuseApprovals, permissionPreset, worktree, ...asked } = request
+      const context = openContext(initialSkills, refuseApprovals)
       const made =
         worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
       if (made?.kind === "error") return made
@@ -165,9 +166,7 @@ export function createRelaySessionHost(
         type: "open_session",
         retain_on_disconnect: true,
         ...open,
-        ...(initialSkills === undefined || initialSkills.length === 0
-          ? {}
-          : { context: { [INITIAL_SKILLS_CONTEXT_KEY]: JSON.stringify(initialSkills) } }),
+        ...(context === undefined ? {} : { context }),
         ...(permissionPreset === undefined ? {} : { permissionPreset }),
       }
       const reopens = request.sessionPath !== undefined

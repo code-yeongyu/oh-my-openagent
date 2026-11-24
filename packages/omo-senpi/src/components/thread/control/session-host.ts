@@ -18,6 +18,8 @@ export type SessionOpenRequest = {
   readonly forkFrom?: string
   readonly name?: string
   readonly initialSkills?: readonly string[]
+  /** Nobody answers the session's prompts: the open carries the engine's refusal label (`open-context.ts`, #14649). */
+  readonly refuseApprovals?: boolean
   readonly permissionPreset?: string
   readonly provider?: string
   readonly modelId?: string
