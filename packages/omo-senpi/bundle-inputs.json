@@ -1697,6 +1697,7 @@
     "packages/omo-senpi/src/components/thread/control/session-host.ts",
     "packages/omo-senpi/src/components/thread/control/wait-settled.ts",
     "packages/omo-senpi/src/components/thread/create-receivers.ts",
+    "packages/omo-senpi/src/components/thread/delivery-ledger.ts",
     "packages/omo-senpi/src/components/thread/disk-list.ts",
     "packages/omo-senpi/src/components/thread/endpoint-controls.ts",
     "packages/omo-senpi/src/components/thread/endpoint-registry.ts",
