@@ -4,7 +4,8 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { engineCode, nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES, withinDeadline } from "./deadlines"
 import { attachAddressed } from "./port/device-service"
-import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice } from "./resolve"
+import { idShaped } from "@oh-my-opencode/thread-address-core"
+import { budget, listingIncomplete, resolveRemoteDevice } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import type {
   AttachEvent,
@@ -424,7 +425,7 @@ export async function openAttachment(core: ClientCore, thread: ThreadHandle, opt
   // (its key or durable id), and a miss is judged as the session members judge it: listing_incomplete while the device
   // missed the round, else not_found{session}.
   let session = target.session
-  if (!resolved.value.ref.here && !idShapedSession(target.session)) {
+  if (!resolved.value.ref.here && !idShaped(target.session)) {
     const listed =
       resolved.value.listed !== undefined
         ? ok(resolved.value.listed)

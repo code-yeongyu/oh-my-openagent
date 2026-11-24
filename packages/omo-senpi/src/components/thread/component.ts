@@ -37,6 +37,7 @@ import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
 import type { SameDeviceWake } from "./gateway/same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
+import { ledgerDevice } from "./delivery-ledger"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -170,29 +171,10 @@ function deliveryOf(message: EngineMessage):
       typeof details?.sender?.name === "string" && details.sender.name.trim() !== ""
         ? details.sender.name.trim()
         : undefined,
-    device: deliveryDevice(id),
+    device: ledgerDevice(id),
     // senpi admits a `prompt`/`steer`/`follow_up` sent over the session's RPC socket as this same message, under the
     // client's `clientMessageId` and with this sender it stamps itself (`session-control-input-commands.js`).
     rpcInput: details?.sender?.kind === "external" && details.sender.platform === "rpc",
-  }
-}
-
-/**
- * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
- * it (URI-encoded); `rpc:local/<id>` and a bare row id name no device (amendment A4.3.1 of #13037). Those are this
- * device's deliveries, or another device's admitted on a connection that declared no remote origin (#14048), so a reply
- * that finds no such session here resolves account-wide (`tools.ts` `locate`).
- */
-function deliveryDevice(id: string): string | undefined {
-  if (!id.startsWith("device:")) return undefined
-  const rest = id.slice("device:".length)
-  const slash = rest.indexOf("/")
-  const part = slash === -1 ? rest : rest.slice(0, slash)
-  // A device part that is not valid URI encoding is kept as written: it names no listed device, so a reply to it is not_found.
-  try {
-    return decodeURIComponent(part)
-  } catch {
-    return part
   }
 }
 

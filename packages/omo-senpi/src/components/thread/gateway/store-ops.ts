@@ -31,12 +31,19 @@ import {
 import { pairLoopGuardMessage } from "../errors"
 import { backlogRefusal } from "./backlog"
 import { readLegacyMailbox } from "./legacy-mailbox"
-import { gatewayInboxDirectory } from "./paths"
+import { gatewayDatabasePath, gatewayInboxDirectory, gatewayRootDirectory } from "./paths"
 import { isClaimantDead, sameProcess } from "./process-identity"
 import { deleteExpiredReceipt, sweepRetentionIfDue } from "./store-retention"
 import { resultFromRow } from "./result"
 import { isProvenance } from "./provenance-record"
-import { GATEWAY_MIGRATIONS, GATEWAY_TABLE_REBUILDS, GatewaySchemaVersionError } from "./schema"
+import { isDevBuildRuntime, isSharedAgentDir, isSharedStoreFile } from "../../agent-home/dev-build-runtime"
+import {
+  GATEWAY_MIGRATIONS,
+  GATEWAY_READER_FLOOR_KEY,
+  GATEWAY_TABLE_REBUILDS,
+  GatewaySchemaVersionError,
+  gatewayReaderFloor,
+} from "./schema"
 import { lockWaitExceeded } from "./lock-wait"
 import { isBusyError, type Sql, type SqlRow, type SqlValue } from "./sql"
 import type {
@@ -67,6 +74,8 @@ export type StoreContext = {
   readonly emit: (event: GatewayStoreEvent) => void
   readonly hook: (name: "beforeDbCommit" | "afterDbCommit") => Promise<void>
   readonly delay: (ms: number) => Promise<void>
+  /** The database file the worker opened, links resolved; absent on a context no worker opened. */
+  readonly databasePath?: string
   /** Present only on a context joining an extension's outer transaction. */
   readonly afterCommit?: (() => void)[]
   /** Filesystem compensations run when a joined extension transaction rolls back (e.g. removing the wake markers it created early). */
@@ -180,6 +189,7 @@ function selectRow(ctx: StoreContext, deliveryId: string): DeliveryRow | undefin
 }
 
 export function write(ctx: StoreContext, sql: string, params: readonly SqlValue[] = []): number {
+  endReadSnapshot(ctx)
   const changed = ctx.sql.run(sql, params)
   ctx.stats.writes += changed
   return changed
@@ -200,12 +210,13 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
     ctx.sql.exec("SAVEPOINT gateway_enqueue")
     return true
   }
+  endReadSnapshot(ctx)
   const started = Date.now()
   for (;;) {
     try {
       ctx.sql.exec("BEGIN IMMEDIATE")
       ctx.stats.transactions++
-      return true
+      return lockedSchemaCheck(ctx)
     } catch (error) {
       if (!isBusyError(error)) throw error
       ctx.emit({ kind: "busy", op })
@@ -223,6 +234,44 @@ async function beginImmediate(ctx: StoreContext, op: string, retryUntilLocked: b
       await ctx.delay(ctx.config.busy_timeout_ms)
     }
   }
+}
+
+/** Connections holding the read snapshot an op's schema check opened (#14622 review M7). */
+const readSnapshots = new WeakSet<Sql>()
+
+/**
+ * Runs one store op inside the read snapshot its schema check opens (#14622 review M7): a migration another process
+ * commits after the check stays invisible to the op's reads, so they never meet a schema the check did not accept. A
+ * write leaves the snapshot first (`beginImmediate`, `write`) and checks the schema again under its write lock.
+ */
+export async function inCheckedSnapshot<T>(ctx: StoreContext, body: () => T | Promise<T>): Promise<T> {
+  ctx.sql.exec("BEGIN")
+  readSnapshots.add(ctx.sql)
+  try {
+    schemaVersion(ctx)
+    return await body()
+  } finally {
+    endReadSnapshot(ctx)
+  }
+}
+
+function endReadSnapshot(ctx: StoreContext): void {
+  // The snapshot only ever read, so ending it cannot fail on a write conflict.
+  if (readSnapshots.delete(ctx.sql)) ctx.sql.exec("COMMIT")
+}
+
+/**
+ * Checks the store's schema under the write lock just taken (#14622 review M5): a newer binary may have migrated the
+ * store after this worker opened it, and a store this binary no longer meets is refused before anything is written.
+ */
+function lockedSchemaCheck(ctx: StoreContext): true {
+  try {
+    schemaVersion(ctx)
+  } catch (error) {
+    rollbackQuietly(ctx)
+    throw error
+  }
+  return true
 }
 
 function rollbackQuietly(ctx: StoreContext): void {
@@ -357,12 +406,74 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
+function storedReaderFloor(ctx: StoreContext): number | undefined {
+  const tables = ctx.sql.one(
+    ["n"],
+    "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'gateway_meta'",
+  )
+  if (Number(tables?.n ?? 0) === 0) return undefined
+  const found = ctx.sql.one(["value"], "SELECT value FROM gateway_meta WHERE key = ?", [GATEWAY_READER_FLOOR_KEY])
+  // Fail closed on anything but a plain positive integer: "", " 14", "-1" or "1e1" is no floor (#14622 edge cases).
+  const value = found?.value
+  if (typeof value === "number") return Number.isSafeInteger(value) && value > 0 ? value : undefined
+  return typeof value === "string" && /^[1-9][0-9]*$/.test(value) ? Number(value) : undefined
+}
+
+/**
+ * The store's schema version. A store newer than this binary stays usable when the binary that migrated it recorded a
+ * reader floor this binary meets (#14382); otherwise, or with no floor recorded, it is refused typed.
+ */
 function schemaVersion(ctx: StoreContext): number {
   const version = Number(
     ctx.sql.one(["user_version"], "SELECT user_version FROM pragma_user_version()")?.user_version ?? 0,
   )
-  if (version > GATEWAY_MIGRATIONS.length) throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
+  if (version > GATEWAY_MIGRATIONS.length) {
+    const floor = storedReaderFloor(ctx)
+    if (floor === undefined || floor > GATEWAY_MIGRATIONS.length) {
+      throw new GatewaySchemaVersionError(version, GATEWAY_MIGRATIONS.length)
+    }
+  }
   return version
+}
+
+function writeReaderFloor(ctx: StoreContext, version: number): void {
+  write(
+    ctx,
+    "INSERT INTO gateway_meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+    [GATEWAY_READER_FLOOR_KEY, String(gatewayReaderFloor(version))],
+  )
+}
+
+/**
+ * Records this binary's reader floor on a store at exactly its schema that lacks it (one a binary from before the floor
+ * migrated); a store already carrying it takes no write lock.
+ */
+async function recordReaderFloor(ctx: StoreContext): Promise<void> {
+  const floor = gatewayReaderFloor(GATEWAY_MIGRATIONS.length)
+  const current = () => schemaVersion(ctx) === GATEWAY_MIGRATIONS.length && storedReaderFloor(ctx) !== floor
+  if (!current()) return
+  await transaction(ctx, "migrate", () => {
+    if (current()) writeReaderFloor(ctx, GATEWAY_MIGRATIONS.length)
+  })
+}
+
+/**
+ * An omob source build never moves the shared agent dir's store forward (#14382): every released session on the device
+ * reads that store, and a schema only an unreleased build knows would lock them out.
+ */
+function sourceBuildMigrationRefusal(ctx: StoreContext, version: number): GatewayMigrationError | undefined {
+  if (!isDevBuildRuntime()) return undefined
+  const stores = [gatewayRootDirectory, gatewayDatabasePath]
+  // The configured agent dir or its gateway dir or database linked into a shared one; or the file the worker actually
+  // opened, compared by identity with each shared database wherever that database lives (#14622 review M9).
+  const shared =
+    isSharedAgentDir(ctx.config.agent_dir, { stores }) ||
+    (ctx.databasePath !== undefined && isSharedStoreFile(ctx.databasePath, gatewayDatabasePath))
+  if (!shared) return undefined
+  return new GatewayMigrationError(
+    version + 1,
+    `a source build does not migrate a gateway store released sessions may share (the account's agent dir or its gateway store, or one whose account home cannot be read) from v${version} to v${GATEWAY_MIGRATIONS.length}; run it with OMO_CODING_AGENT_DIR set to an isolated agent dir`,
+  )
 }
 
 /**
@@ -382,10 +493,14 @@ export class GatewayMigrationError extends Error {
 }
 
 export async function migrate(ctx: StoreContext): Promise<void> {
-  if (schemaVersion(ctx) >= GATEWAY_MIGRATIONS.length) return
+  const opened = schemaVersion(ctx)
+  if (opened < GATEWAY_MIGRATIONS.length) {
+    const refusal = sourceBuildMigrationRefusal(ctx, opened)
+    if (refusal !== undefined) throw refusal
+  }
   for (;;) {
     const version = schemaVersion(ctx)
-    if (version >= GATEWAY_MIGRATIONS.length) return
+    if (version >= GATEWAY_MIGRATIONS.length) return await recordReaderFloor(ctx)
     // A CHECK-widening rebuild (v7 `bindings`, v15 `deliveries`) must run with foreign_keys OFF, which SQLite only
     // honors when the pragma is set OUTSIDE the transaction (a table drop would otherwise fire foreign-key actions from
     // extension tables referencing the rebuilt table). The pragma is restored to its prior value afterwards, and
@@ -412,6 +527,8 @@ export async function migrate(ctx: StoreContext): Promise<void> {
           }
         }
         ctx.sql.exec(`PRAGMA user_version = ${current + 1}`)
+        // The floor commits with the version it belongs to, so no reader ever sees a raised version with a stale floor.
+        writeReaderFloor(ctx, current + 1)
       })
     } finally {
       if (needsForeignKeysOff) ctx.sql.exec(`PRAGMA foreign_keys = ${priorForeignKeys === 0 ? "OFF" : "ON"}`)
