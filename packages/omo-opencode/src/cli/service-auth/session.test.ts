@@ -258,6 +258,29 @@ describe("credential lifecycle", () => {
     expect(store.clear).toHaveBeenCalledTimes(0)
   })
 
+  test("a corrupt stored item is still cleared by logout, and logout does not report success", async () => {
+    const secrets = memorySecrets()
+    const api = fakeApi(() => new Response(null, { status: 204 }))
+    const base = secrets.store(api)
+    await base.write({ ...grant, ...privateKeys })
+    const store = {
+      ...base,
+      readAuthoritative: mock(async () => {
+        throw new InvalidCredentialState("stored sign-in is unreadable")
+      }),
+      clear: mock(base.clear.bind(base)),
+    } satisfies CredentialStore
+    const signedOut = await createSession({
+      beforeKeysDiscarded: async () => undefined,
+      api,
+      store,
+      home: await temporaryHome(),
+    }).logout()
+    expect(signedOut).toBe(false)
+    expect(store.clear).toHaveBeenCalledTimes(1)
+    expect(secrets.values.size).toBe(0)
+  })
+
   test("logout reports success and clears the item when the service answers device_revoked", async () => {
     const secrets = memorySecrets()
     const api = fakeApi(() => refusal("device_revoked", undefined, 410))
