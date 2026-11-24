@@ -1,7 +1,7 @@
 import type { ThreadSummary } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
-import { rowFolder, rowStatus } from "../remote/ports"
+import { rowCreatedAt, rowFolder, rowStatus } from "../remote/ports"
 import { threadToolFailure, type ThreadToolFailure } from "../errors"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
@@ -13,7 +13,7 @@ import { openedEngineId, openRefusal } from "./open-reply"
 import { threadLink } from "../thread-link"
 import type { ThreadHostSession } from "../tools/ports"
 import type { ThreadWorktree } from "../worktree/thread-worktree"
-import { rowState, threadModel } from "../tools/thread-state"
+import { holderVersion, retryWait, rowState, threadModel } from "../tools/thread-state"
 import {
   openedThread,
   type HostedThread,
@@ -57,8 +57,12 @@ function listedThread(row: RemoteSessionRow): HostedThread {
     status: rowStatus(row),
     state: rowState(row),
     ...threadModel(row.model),
+    // Only a row its device answered this round names a live holder: a cached snapshot shows neither field (#14278).
+    ...(row.source === "cache"
+      ? {}
+      : { ...retryWait(rowState(row) === "running", row.waiting), ...holderVersion(row.engine_version) }),
     cwd: rowFolder(row),
-    created_at: seen,
+    created_at: rowCreatedAt(row),
     updated_at: seen,
     device: row.device,
     ...(row.source === "cache" && row.as_of !== undefined ? { as_of: new Date(row.as_of).toISOString() } : {}),

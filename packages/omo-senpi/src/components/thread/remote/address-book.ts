@@ -1,5 +1,12 @@
 import type { ThreadAddressEntry } from "../addressing"
-import { rowFolder, rowStatus, type RemoteListing, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowCreatedAt,
+  rowFolder,
+  rowStatus,
+  type RemoteListing,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 
 // Decision 0027 section 1: the relay transport's address book. The account listing becomes entries of the SAME shape the
 // local book yields, so one resolver judges local and remote threads together: an exact durable id, then an account
@@ -16,7 +23,7 @@ export function relayAddressEntry(row: RemoteSessionRow, aliases?: readonly stri
     name: row.title,
     status: rowStatus(row),
     cwd: rowFolder(row),
-    created_at: updated,
+    created_at: rowCreatedAt(row),
     updated_at: updated,
     device: row.device,
     ...(aliases === undefined ? {} : { aliases }),

@@ -5,6 +5,7 @@ import { GATE_CONFIG } from "./changelog-gate.config.ts"
 import { isUserFacingPath as isShippedPath, shippingPolicy } from "./changelog-shipping-policy.mjs"
 import { checkPackageLogs } from "./package-log-gate.ts"
 import { isReleaseStatePr } from "./release-pr-marker.ts"
+import { CHANGELOG_PATHSPECS, judgeReleaseStateLanding, parseLandedPr } from "./release-state-landing.ts"
 
 function run(): number {
   const base = process.env["CHANGELOG_GATE_BASE"]
@@ -16,7 +17,7 @@ function run(): number {
   // The release-state PR is what only publish.yml produces: a release branch pushed to this repository
   // (CHANGELOG_GATE_RELEASE) carrying publish.yml's own title/body/branch marker (#10709). Its author is NOT part of it:
   // publish.yml reuses whatever open PR sits on its fixed branch, so whoever opened that PR first decides nothing (#11704).
-  const isReleaseWorkflow =
+  const isMarkedRelease =
     process.env["CHANGELOG_GATE_RELEASE"] === "1" &&
     GATE_CONFIG.releaseBranchPattern.test(branch) &&
     isReleaseStatePr({
@@ -51,6 +52,35 @@ function run(): number {
   }
   const baseHead = baseBranchHead ?? git("rev-parse", "--verify", "--end-of-options", `${base}^{commit}`).trim()
   const mergeBase = git("merge-base", baseHead, head).trim()
+  const [, baseSide, prSide, ...extraParents] = git("rev-list", "--parents", "-n", "1", head).trim().split(" ")
+  // #14818: a PR that lands an open release-state PR's unchanged stamp is judged as that release PR. The facts about
+  // the landed PR come from the workflow; every git fact is re-derived here, and any gap means "not a landing".
+  const prHead = process.env["CHANGELOG_GATE_HEAD_SHA"] ?? ""
+  const landing =
+    prHead !== "" && (prHead === head || prHead === prSide)
+      ? judgeReleaseStateLanding(
+          {
+            headSha: prHead,
+            repo: process.env["CHANGELOG_GATE_REPO"] ?? "",
+            baseHead,
+            landedPr: parseLandedPr(process.env["CHANGELOG_GATE_LANDING_PR"]),
+          },
+          {
+            parents: (rev) => git("rev-list", "--parents", "-n", "1", rev).trim().split(" ").slice(1),
+            isAncestor,
+            changelogDiff: (from, to) =>
+              git("diff", "--no-renames", "--full-index", "--binary", from, to, "--", ...CHANGELOG_PATHSPECS),
+          },
+        )
+      : null
+  if (landing !== null) {
+    console.log(
+      landing.landing
+        ? `changelog-gate: release-state landing of ${landing.stamp}`
+        : `changelog-gate: not a release-state landing - ${landing.reason}`,
+    )
+  }
+  const isReleaseWorkflow = isMarkedRelease || landing?.landing === true
   const list = (filter: string) =>
     git("diff", "--no-renames", "--name-only", "--diff-filter=" + filter, "-z", mergeBase, head)
       .split("\0")
@@ -85,12 +115,23 @@ function run(): number {
   }
   // CI checks out refs/pull/<n>/merge: the PR merged into the base tip. There the release owes the fragments at its
   // cut (the PR side's merge base), and fragments the base gained after the cut belong to the next release (#11554).
-  const [, baseSide, prSide, ...extraParents] = git("rev-list", "--parents", "-n", "1", head).trim().split(" ")
   const mergedIntoBase =
     baseSide !== undefined && prSide !== undefined && extraParents.length === 0 && isAncestor(baseSide, baseHead)
-  const cut = mergedIntoBase ? git("merge-base", baseHead, prSide).trim() : mergeBase
+  // A landing's cut is its stamp's: the fragments the base gained after the pin stay for the next release.
+  const cutSide = landing?.landing === true ? landing.stamp : mergedIntoBase ? prSide : undefined
+  const cut = cutSide === undefined ? mergeBase : git("merge-base", baseHead, cutSide).trim()
   const baseFragments = dirNames(cut)
-  const postCut = mergedIntoBase ? dirNames(baseSide).filter((name) => !baseFragments.includes(name)) : []
+  // On the merge ref (prHead is its PR side) the base side is the base tip the landing merges into, so fragments the
+  // base gained after the landing branch was cut are in its tree; without a merge ref, the landing's own first parent.
+  const postCutBase =
+    landing?.landing === true
+      ? prHead === prSide
+        ? baseSide
+        : landing.firstParent
+      : mergedIntoBase
+        ? baseSide
+        : undefined
+  const postCut = postCutBase === undefined ? [] : dirNames(postCutBase).filter((name) => !baseFragments.includes(name))
   const headFragments = dirNames(head).filter((name) => !postCut.includes(name))
   const ownPath = prNumber > 0 ? fragmentPath(prNumber) : null
   const addedFragment = ownPath && addedFiles.includes(ownPath) ? { content: git("show", `${head}:${ownPath}`) } : null
@@ -134,7 +175,8 @@ function run(): number {
     addedFiles,
     modifiedFiles,
     deletedFiles,
-    // The SAME release predicate as the shared gate (#10682 review HIGH): the release marker on a release branch.
+    // The SAME release predicate as the shared gate (#10682 review HIGH): the release marker on a release branch, or a
+    // judged release-state landing (#14818), whose in-repo and open-release-PR conditions release-state-landing.ts checks.
     isRelease: isReleaseWorkflow,
     fragment: addedFragment?.content ?? null,
     existsAtHead: (path) => existsAt(head, path),
