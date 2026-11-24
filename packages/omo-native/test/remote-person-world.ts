@@ -35,6 +35,15 @@ const openedRow = (rows: readonly ListingRow[]): ListingRow => {
   return { ...live, session_id: NEW_KEY, title: "review", durable_id: ENGINE_ID }
 }
 
+// Rows as a current device lists them: each with the durable id the thread tools name it by.
+const DURABLE: Readonly<Record<string, string>> = {
+  [PEER]: "0bb00001-0000-7000-8000-000000000001",
+  "dev-peer-2": "0cc00001-0000-7000-8000-000000000001",
+}
+export const durableOf = (device: string): string | undefined => DURABLE[device]
+const withDurable = (row: ListingRow): ListingRow =>
+  row.durable_id !== undefined || DURABLE[row.device] === undefined ? row : { ...row, durable_id: DURABLE[row.device] }
+
 export const liveKey = (): string => {
   const live = defaultWorld().sessions.find((session) => session.device === PEER)
   if (live === undefined) throw new Error("the default world holds a session on the peer")
@@ -56,9 +65,10 @@ export const personWorld = (base: World = defaultWorld()): World => {
     located: { [PEER]: { [ENGINE_ID]: NEW_KEY } },
     listing: {
       ...base.listing,
-      revisions: base.listing.revisions.map((revision, index, all) =>
-        index < all.length - 1 ? revision : { ...revision, rows: [...revision.rows, openedRow(revision.rows)] },
-      ),
+      revisions: base.listing.revisions.map((revision, index, all) => {
+        const rows = revision.rows.map(withDurable)
+        return index < all.length - 1 ? { ...revision, rows } : { ...revision, rows: [...rows, openedRow(rows)] }
+      }),
     },
     sessions: [
       ...base.sessions.map((session) => (session === live ? replying : session)),

@@ -7,7 +7,7 @@ import { connectDeviceService } from "../../device-service-core/src/index.ts"
 import { startFakeOwner, type FakeOwner } from "../../device-service-core/test/local-api/conformance/fake-owner.ts"
 import { defaultWorld, type World } from "../../device-service-core/test/local-api/conformance/world.ts"
 import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
-import { commandTargets, liveKey, PEER, personWorld } from "./remote-person-world"
+import { commandTargets, durableOf, liveKey, PEER, personWorld } from "./remote-person-world"
 
 // #13432: the session verbs take a device the way the device table prints it - its id, its NAME (compared as thread
 // names are), or a unique id prefix - through the one device resolver. #14305: `sessions --device` takes the same
@@ -78,11 +78,11 @@ describe("omo remote session verbs take the device the table prints", () => {
     expect(await run(["open", PEER])).toMatchObject({ code: REMOTE_EXIT.ok, opened: [PEER] })
   })
 
-  test("#given a name/session address #when close runs #then the close reaches that session and the output names the device by its id", async () => {
+  test("#given a name/session address #when close runs #then the close reaches that session and the output names it by its address (device id and durable id)", async () => {
     const result = await run(["close", `studio/${liveKey()}`])
     expect(result.code).toBe(REMOTE_EXIT.ok)
     expect(result.targets).toContain(`${PEER}/${liveKey()}`)
-    expect(result.out).toEqual([`Closed ${PEER}/${liveKey()}.`])
+    expect(result.out).toEqual([`Closed ${PEER}/${durableOf(PEER)}.`])
   })
 
   test("#given a device no row matches #when open runs #then it fails with not_found and opens nothing", async () => {
