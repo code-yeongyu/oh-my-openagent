@@ -14,9 +14,11 @@ import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT } from "./remote-exit"
 import { statusLines } from "./remote-render"
 
-// `omo remote bootstrap`: the device service bootstrap every interactive omo start runs in the background (the
-// omo-senpi device-service component starts it). One JSON line with --json: {state: "connected", status} or
-// {state, notice}; the component shows the notice for every stop but signed_out, store_unavailable and not_published.
+// The device service bootstrap; `bootstrapOnce` is its one body. The omo-senpi device-service component runs it in the
+// background at every interactive omo start through `omo __device-service-bootstrap --json`
+// (device-service-bootstrap-entry.ts, on the service client); `omo remote bootstrap` runs it for a person. One JSON
+// line with --json: {state: "connected", status} or {state, notice}; the component shows the notice for every stop but
+// signed_out, store_unavailable and not_published.
 
 /** Everything the bootstrap needs besides the account read, the state dir and the connection `omo remote` already has. */
 export type BootstrapSetup = Omit<BootstrapDependencies, "accountShow" | "stateDir" | "connect">
