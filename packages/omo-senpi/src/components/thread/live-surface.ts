@@ -1,5 +1,4 @@
 import { createConnection, type Socket } from "node:net"
-import { holderVersion } from "./tools/thread-state"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import {
@@ -10,6 +9,7 @@ import {
   type RpcObject,
 } from "@oh-my-opencode/senpi-task/rpc-socket-client"
 import { resolveThreadSocket } from "./live-surface-paths"
+import { holderVersion } from "./tools/thread-state"
 import type { SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { readDiskSessionAsync, type AddressBookHost, type DiskSession } from "./address-book"
