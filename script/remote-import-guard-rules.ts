@@ -12,6 +12,12 @@ const REMOTE = "packages/omo-senpi/src/components/remote/"
 // surface importing another surface file (the TUI's own files) is not reaching the layer. Scope: S3 sees direct static
 // imports, require() and literal import() only; a route through another module, or bin/lib/thread.js loading built
 // bundles by a non-literal import() (frozen by NON_LITERAL_IMPORT_OFFENDERS), is outside it.
+// The `omo-ai/remote` SDK (#13413) shares the CLI files' remote- prefix. Its entry, remote-sdk.ts, is a caller like any
+// surface (the barrel only). remote-sdk-api.ts is its published declaration surface: it names components/remote's leaf
+// types directly, type-only, so the shipped declarations stay that small closure (#13782); S3 allows that and nothing else.
+const REMOTE_SDK_DECLARATIONS = "packages/omo-native/remote-sdk-api.ts"
+export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set(["packages/omo-native/remote-sdk.ts", REMOTE_SDK_DECLARATIONS])
+
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||
   file.startsWith(`${REMOTE}tui/`) ||
@@ -49,7 +55,12 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     "packages/omo-native/device-service-handoff.ts",
     "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
-  s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
+  s3: {
+    surface: isRemoteSurface,
+    layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY],
+    entry: `${REMOTE}index.ts`,
+    declarations: { files: new Set([REMOTE_SDK_DECLARATIONS]), reaches: REMOTE },
+  },
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }

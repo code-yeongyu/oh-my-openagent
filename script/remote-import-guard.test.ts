@@ -51,6 +51,51 @@ describe("remote import guard G1 over packages/**", () => {
   })
 })
 
+// omo#13413: the omo SDK's devices.list is the remote module's devices.list, so the account has one device listing for a
+// script. A second path (the account service's own listing, or a remote client built past the barrel) fails here.
+describe("the omo SDK's one device listing", () => {
+  const root = join(import.meta.dir, "..")
+  const resolve = createResolver(root)
+  const sdkFiles = scanRepository(root).filter(
+    (fact) =>
+      (fact.file.startsWith("packages/omo-senpi/src/components/omo-sdk/") ||
+        fact.file === "packages/omo-senpi/src/extension/omo-sdk.ts") &&
+      !REMOTE_IMPORT_RULES.testFile(fact.file),
+  )
+
+  test("#given the omo SDK's sources #then none imports the account service's device listing", () => {
+    const listings = sdkFiles.flatMap((fact) =>
+      fact.edges
+        .filter(
+          (edge) =>
+            edge.names.some((named) => named.name === "listLiveDevices") ||
+            (edge.whole && edge.specifier.includes("service-auth")),
+        )
+        .map((edge) => `${fact.file} <- ${edge.specifier}`),
+    )
+    expect(listings).toEqual([])
+  })
+
+  test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
+    const reaches = sdkFiles.flatMap((fact) =>
+      fact.edges
+        .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+        .map((edge) => ({
+          file: fact.file,
+          target: resolve(fact.file, edge.specifier),
+          values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
+        })),
+    )
+    expect(reaches).toEqual([
+      {
+        file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
+        target: "packages/omo-senpi/src/components/remote/index.ts",
+        values: ["remoteClientForSession"],
+      },
+    ])
+  })
+})
+
 describe("remote import guard G1 matcher", () => {
   const root = mkdtempSync(join(tmpdir(), "remote-import-guard-"))
   afterAll(() => rmSync(root, { recursive: true, force: true }))
@@ -118,6 +163,12 @@ describe("remote import guard G1 matcher", () => {
     'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
   )
   write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  // The SDK's declaration surface may name the module's types directly, type-only; any value, or another layer, is a reach.
+  write(
+    "packages/omo-native/remote-sdk-api.ts",
+    'import type { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\nimport type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
+  )
+  write("packages/omo-native/remote-sdk.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
   write(
     `${senpi}/src/components/remote/tui/command.ts`,
     'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
@@ -153,6 +204,8 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+      "packages/omo-native/remote-sdk-api.ts": ["packages/device-service-core/src/"],
+      "packages/omo-native/remote-sdk.ts": ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/command.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })

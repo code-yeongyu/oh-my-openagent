@@ -38,6 +38,8 @@ export type AccountAccess = {
   /** Why no account call may run here at all (a closed SDK, a desktop launch); undefined when one may. */
   readonly blockedReason: () => OmoResult<never> | undefined
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
+  /** Aborted by `close`: every call checks it before it starts and passes it to what it waits on. */
+  readonly signal: AbortSignal
   readonly close: () => void
 }
 
@@ -45,6 +47,9 @@ const resolveOrigin = (api: string | undefined, env: Env): string =>
   serviceOrigin(api ?? env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
 
 const SIGN_IN = "sign this device in to OmO, then retry"
+
+export const closedRefusal = <T>(): OmoResult<T> =>
+  refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
 
 // Every message here is the SDK's own text: a service or store message can carry a credential, so none is passed on.
 export function failure<T>(error: unknown): OmoResult<T> {
@@ -114,8 +119,7 @@ export function createAccountAccess(options: {
       log: () => undefined,
     }))
   const blockedReason = (): OmoResult<never> | undefined => {
-    if (lifetime.signal.aborted)
-      return refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
+    if (lifetime.signal.aborted) return closedRefusal()
     if (desktopLaunch())
       return refused(
         "desktop_sign_in",
@@ -139,6 +143,7 @@ export function createAccountAccess(options: {
         return failure(error)
       }
     },
+    signal: lifetime.signal,
     close: () => lifetime.abort(),
   }
 }
