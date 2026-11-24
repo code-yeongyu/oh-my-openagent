@@ -256,7 +256,8 @@ describe("full-matrix classification", () => {
       },
     )
 
-    // The paths of the real v5.1.80 stamp (f23e7ad390), one per kind prepare-release-state writes.
+    // The paths of the real v5.1.80 stamp (f23e7ad390), one per kind prepare-release-state writes, minus the generated
+    // bundles it rebuilt then: since #14867 they read the version at runtime and a stamp leaves them unchanged.
     const stampPaths = [
       "CHANGELOG.md",
       "changes/unreleased/14255.md",
@@ -266,10 +267,6 @@ describe("full-matrix classification", () => {
       "packages/oh-my-opencode-windows-x64/package.json",
       "packages/omo-codex/plugin/package-lock.json",
       "packages/omo-codex/plugin/components/bootstrap/hooks/hooks.json",
-      "packages/omo-senpi/plugin/extensions/gateway-store-worker.mjs",
-      "packages/omo-senpi/plugin/runtime/agent-toolkit-sdk/sdk.js",
-      "packages/omo-codex/scripts/install-dist/install-local.mjs",
-      "packages/omo-native/bin/lib/service-auth.generated.js",
     ]
     const releaseState = { eventName: "pull_request", headRef: "release/v5.1.80-source-state" }
 
@@ -285,6 +282,10 @@ describe("full-matrix classification", () => {
       [
         "the pull request also changes source the stamp never writes",
         { changedPaths: [...stampPaths, "packages/omo-native/sync-status-cli.ts"], basePlatformGreen: true },
+      ],
+      [
+        "the pull request also rewrites a generated bundle",
+        { changedPaths: [...stampPaths, "packages/omo-senpi/plugin/extensions/omo.js"], basePlatformGreen: true },
       ],
       ["the diff could not be read", { changedPaths: [], diffAvailable: false, basePlatformGreen: true }],
     ])("#then it keeps the full matrix when %s", (_name, input) => {

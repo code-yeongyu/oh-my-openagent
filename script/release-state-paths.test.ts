@@ -25,11 +25,11 @@ function check(paths: readonly string[]) {
 }
 
 describe("#given the release stamp's path check", () => {
-  test("#then a stamp of manifests, changelog and regenerated bundles passes", () => {
+  test("#then a stamp of manifests and changelog passes", () => {
     const run = check([
       "CHANGELOG.md",
       "packages/oh-my-opencode-linux-x64/package.json",
-      "packages/omo-senpi/plugin/extensions/a.mjs",
+      "packages/omo-senpi/package.json",
     ])
     expect(run.status).toBe(0)
   })
@@ -44,6 +44,12 @@ describe("#given the release stamp's path check", () => {
     ["hand-written launcher code beside the generated auth bundle", "packages/omo-native/bin/lib/launcher.js"],
     ["a plugin file the bundle check does not rebuild", "packages/omo-senpi/plugin/extensions/dream-persona.md"],
     ["a runtime bundle the bundle check does not compare", "packages/omo-senpi/plugin/runtime/dag/sdk.js"],
+    // #14867: the committed bundles read the version at runtime, so a stamp never rewrites one.
+    ["a Senpi extension bundle", "packages/omo-senpi/plugin/extensions/omo.js"],
+    ["a Senpi runtime SDK bundle", "packages/omo-senpi/plugin/runtime/thread-sdk/sdk.js"],
+    ["the Senpi rollback migrator bundle", "packages/omo-senpi/plugin/runtime/rollback-migrate.js"],
+    ["the Codex installer bundle", "packages/omo-codex/scripts/install-dist/install-local.mjs"],
+    ["the service-auth bundle", "packages/omo-native/bin/lib/service-auth.generated.js"],
   ])("#then %s is outside the stamp", (_name, path) => {
     expect(check(["package.json", path]).status).toBe(1)
   })
