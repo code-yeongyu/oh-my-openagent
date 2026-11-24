@@ -131,15 +131,15 @@ describe("LspManager pending-stop tombstones", () => {
     const { manager, log } = managerHarness({ maxResidentClients: 1, stopDelayMs: SLOW_STOP_MS })
     try {
       await manager.getClient("/root-a", SERVER)
-      manager.releaseClient("/root-a", SERVER.id)
+      manager.releaseClient("/root-a", SERVER)
 
       // when: admitting root-b synchronously evicts idle root-a (void stop), and root-a is
       // re-acquired in the same window while the evicted client's stop is still pending.
       const rootBPromise = manager.getClient("/root-b", SERVER)
       const rootAPromise = manager.getClient("/root-a", SERVER)
       await Promise.all([rootBPromise, rootAPromise])
-      manager.releaseClient("/root-b", SERVER.id)
-      manager.releaseClient("/root-a", SERVER.id)
+      manager.releaseClient("/root-b", SERVER)
+      manager.releaseClient("/root-a", SERVER)
 
       // then
       expect(log.entries.filter((event) => event.endsWith("/root-a"))).toEqual([
@@ -158,10 +158,10 @@ describe("LspManager pending-stop tombstones", () => {
     const { manager, log } = managerHarness({ stopDelayMs: SLOW_STOP_MS })
     try {
       await manager.getClient("/root-a", SERVER)
-      manager.releaseClient("/root-a", SERVER.id)
+      manager.releaseClient("/root-a", SERVER)
 
       // when
-      manager.invalidateClient("/root-a", SERVER.id)
+      manager.invalidateClient("/root-a", SERVER)
       await manager.getClient("/root-a", SERVER)
 
       // then
@@ -185,7 +185,7 @@ describe("LspManager pending-stop tombstones", () => {
       const racing = manager.getClient("/root-fail", SERVER)
       await expect(failing).rejects.toThrow("initialize boom")
       await racing
-      manager.releaseClient("/root-fail", SERVER.id)
+      manager.releaseClient("/root-fail", SERVER)
 
       // then
       expect(log.entries).toEqual([
@@ -208,7 +208,7 @@ describe("LspManager dead-client respawn budget", () => {
       // when
       for (let attempt = 0; attempt < 8; attempt += 1) {
         await manager.getClient("/root-crash", SERVER).then(
-          () => manager.releaseClient("/root-crash", SERVER.id),
+          () => manager.releaseClient("/root-crash", SERVER),
           () => undefined,
         )
       }
@@ -242,12 +242,12 @@ describe("LspManager dead-client respawn budget", () => {
       // when: cooldown elapses (60s default) and the server stays alive again.
       clock.value += 60_001
       const recovered = await manager.getClient("/root-crash", SERVER)
-      manager.releaseClient("/root-crash", SERVER.id)
+      manager.releaseClient("/root-crash", SERVER)
 
       // then
       expect(clients.length).toBe(3)
       await expect(manager.getClient("/root-crash", SERVER)).resolves.toBe(recovered)
-      manager.releaseClient("/root-crash", SERVER.id)
+      manager.releaseClient("/root-crash", SERVER)
     } finally {
       await manager.stopAll()
     }
