@@ -177,6 +177,7 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/plugin/scripts/build-extension-runtimes.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/build-extension.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/bundle-inputs.test.mjs": 1,
+  "packages/omo-senpi/plugin/scripts/bundle-version.test.mjs": 1,
   "packages/omo-senpi/plugin/skills/browser/scripts/omowright.mjs": 1,
   "packages/omo-senpi/plugin/skills/lsp-setup/scripts/verify-lsp.ts": 1,
   "packages/omo-senpi/scripts/qa/agent-toolkit-catalog-qa.mjs": 1,

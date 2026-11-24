@@ -1,9 +1,14 @@
 import { spawn } from "node:child_process"
 import { cp, mkdtemp, readdir, readFile, rm, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { killGroup, watchTreeProgress } from "../../../omo-native/test/daemon-test-runner.ts"
+
+// The bundles read their version from the plugin manifest above them (#14867), so a build root stands in for the
+// plugin directory and carries that manifest beside its outputs.
+const pluginManifestPath = join(dirname(dirname(fileURLToPath(import.meta.url))), "package.json")
 
 export function outputPathsIn(root) {
   return {
@@ -236,6 +241,7 @@ export function createBuildFixture({ buildModule } = {}) {
       const root = await mkdtemp(join(tmpdir(), "omo-senpi-extension-test-shared-"))
       const paths = outputPathsIn(root)
       try {
+        await cp(pluginManifestPath, join(root, "package.json"))
         return { root, ...paths, ...(await boundBuild("shared extension build", root, paths, { buildModule })) }
       } catch (error) {
         await rm(root, { recursive: true, force: true })

@@ -1,7 +1,35 @@
+import type { BunPlugin } from "bun"
+import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 import { assertReleaseKeySet } from "./service-auth-release-key"
 
 const root = fileURLToPath(new URL("..", import.meta.url))
+const nativeManifest = resolve(root, "packages", "omo-native", "package.json")
+const packagePaths = resolve(root, "packages", "omo-native", "bin", "lib", "package-paths.js")
+
+// The launcher sources import omo-native's package.json, which a compiled binary inlines when it is built from the
+// release commit. This committed npm bundle instead reads the manifest that ships beside it, through the launcher's
+// own package-paths.js (`<package>/bin/lib/../../package.json`), on first use: a release stamp, which only bumps the
+// manifest, then leaves the bundle byte-identical (#14867).
+const runtimeManifest: BunPlugin = {
+  name: "omo-native-runtime-manifest",
+  setup(build) {
+    build.onResolve({ filter: /^\.\.?\/.*package\.json$/ }, (args) =>
+      resolve(args.resolveDir, args.path) === nativeManifest
+        ? { path: "omo-native-manifest", namespace: "omo-native-manifest" }
+        : undefined,
+    )
+    build.onLoad({ filter: /.*/, namespace: "omo-native-manifest" }, () => ({
+      loader: "js",
+      resolveDir: root,
+      contents: [
+        `import { packageManifest } from ${JSON.stringify(packagePaths)}`,
+        "let manifest",
+        "export default new Proxy({}, { get: (_, key) => (manifest ??= packageManifest())[key] })",
+      ].join("\n"),
+    }))
+  },
+}
 
 export async function buildServiceAuth(check = false, out?: string): Promise<void> {
   const target = out ?? `${root}packages/omo-native/bin/lib/service-auth.generated.js`
@@ -10,6 +38,7 @@ export async function buildServiceAuth(check = false, out?: string): Promise<voi
     target: "node",
     format: "esm",
     minify: { whitespace: true, syntax: true },
+    plugins: [runtimeManifest],
   })
   if (!result.success) throw new Error("Service auth bundle failed", { cause: result.logs })
   const output = result.outputs[0]

@@ -67,12 +67,13 @@ describe("omo-senpi bundle purity", () => {
       expect(toolkitSdkInputs.length).toBeGreaterThan(0)
       expect(toolkitSdkInputs.filter((input) => input.replaceAll("\\\\", "/").includes("node_modules/"))).toEqual([])
       // The bunshin-ts SDK is its entry files, the two vendored packages and their one npm dependency; no senpi runtime.
-      // Plus device-service-core's state-dir rule (#13597), a node-builtins-only file, so the transport pick never guesses.
+      // Plus device-service-core's state-dir rule (#13597), a node-builtins-only file, so the transport pick never guesses,
+      // and the package version reader (#14867), node builtins only, which reads SDK_VERSION from the plugin manifest.
       const bunshinTsInputs = built.bunshinTsInputs.map((input) => input.replaceAll("\\", "/"))
       expect(
         bunshinTsInputs.filter(
           (input) =>
-            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts)$/.test(
+            !/(src\/extension\/bunshin-ts-[a-z-]+\.ts|\/vendor\/bunshin-ts(-relay)?\/index\.js|\/node_modules\/@sinclair\/typebox\/.+|(^|\/)packages\/device-service-core\/src\/state-dir\.ts|(^|\/)packages\/omo-senpi\/src\/package-version\.ts)$/.test(
               input,
             ),
         ),

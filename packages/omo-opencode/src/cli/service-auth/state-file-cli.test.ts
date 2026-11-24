@@ -13,13 +13,16 @@ import { fakeApi, grant, minted, temporaryHome } from "./test-support"
 // loads a service-auth bundle built from THIS source into a temp copy of the launcher tree (the tracked bundle is
 // regenerated only at the release-train top).
 const root = resolve(import.meta.dir, "../../../../..")
-const launcherTree = mkdtempSync(join(tmpdir(), "omo-state-file-launcher-"))
+// The copy is an omo-ai package root: bin/ beside the manifest the bundle reads its version from (#14867).
+const launcherPackage = mkdtempSync(join(tmpdir(), "omo-state-file-launcher-"))
+const launcherTree = join(launcherPackage, "bin")
 cpSync(join(root, "packages", "omo-native", "bin"), launcherTree, { recursive: true })
+cpSync(join(root, "packages", "omo-native", "package.json"), join(launcherPackage, "package.json"))
 const launcher = join(launcherTree, "omo.js")
 beforeAll(async () => {
   await buildServiceAuth(false, join(launcherTree, "lib", "service-auth.generated.js"))
 }, 120_000)
-afterAll(() => rmSync(launcherTree, { recursive: true, force: true }))
+afterAll(() => rmSync(launcherPackage, { recursive: true, force: true }))
 
 type Run = {
   readonly args: readonly string[]

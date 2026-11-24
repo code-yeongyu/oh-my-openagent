@@ -1885,6 +1885,7 @@
     "packages/omo-senpi/src/install/local-launcher.ts",
     "packages/omo-senpi/src/install/plugin-artifacts.ts",
     "packages/omo-senpi/src/install/senpi-settings.ts",
+    "packages/omo-senpi/src/package-version.ts",
     "packages/omo-senpi/tsconfig.json",
     "packages/omo-senpi/vendor/bunshin-ts-relay/index.js",
     "packages/omo-senpi/vendor/bunshin-ts/index.js",

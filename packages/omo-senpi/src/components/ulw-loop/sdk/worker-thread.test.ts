@@ -16,6 +16,7 @@ import { Worker } from "node:worker_threads"
 import { remainingTestTime } from "../../../../../../test-support/test-deadline"
 
 const bundle = fileURLToPath(new URL("../../../../plugin/runtime/agent-toolkit-sdk/sdk.js", import.meta.url))
+const pluginManifest = fileURLToPath(new URL("../../../../plugin/package.json", import.meta.url))
 const roots: string[] = []
 afterEach(() => {
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
@@ -27,7 +28,10 @@ for (const sessionId of ["worker-session", undefined]) {
     roots.push(root)
     const cwd = join(root, "workspace")
     mkdirSync(cwd)
-    const sdkPath = join(root, "sdk.mjs")
+    // The shipped layout: the SDK sits under plugin/runtime/<sdk>/ and reads its version from plugin/package.json (#14867).
+    copyFileSync(pluginManifest, join(root, "package.json"))
+    mkdirSync(join(root, "runtime", "agent-toolkit-sdk"), { recursive: true })
+    const sdkPath = join(root, "runtime", "agent-toolkit-sdk", "sdk.mjs")
     copyFileSync(bundle, sdkPath)
     expect(existsSync(join(root, "node_modules"))).toBe(false)
     const source = readFileSync(sdkPath, "utf8")

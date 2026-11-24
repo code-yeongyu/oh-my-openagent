@@ -10,6 +10,7 @@ import {
   type ThreadSdk,
   type ThreadSdkOptions,
 } from "../components/thread/sdk"
+import { omoSenpiPackageVersion } from "../package-version"
 
 export type { LocatedThread, ThreadSdk, ThreadSdkOptions } from "../components/thread/sdk"
 // `omo host status --all` stamps each terminal row's `last_activity_at` with the same reader `omo thread list` uses.
@@ -25,8 +26,7 @@ export { readSessionFacts } from "../components/thread/session-facts"
 const sidecarAnchor = pathToFileURL(join(dirname(fileURLToPath(import.meta.url)), "..", "..", "extensions", "omo.js"))
 const sidecarPresent = existsSync(fileURLToPath(new URL(`./${GATEWAY_STORE_WORKER_BUNDLE_NAME}`, sidecarAnchor)))
 
-declare const OMO_SENPI_PACKAGE_VERSION: string
-const VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "undefined" ? "0.0.0" : OMO_SENPI_PACKAGE_VERSION
+const VERSION = omoSenpiPackageVersion()
 
 /**
  * The shipped SDK reads the whole account like the agent's thread tools: a caller that passes no `remote` (a connector,

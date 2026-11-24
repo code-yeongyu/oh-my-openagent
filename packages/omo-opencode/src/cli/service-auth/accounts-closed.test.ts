@@ -15,8 +15,11 @@ const root = resolve(import.meta.dir, "../../../../..")
 // launcher tree. The tracked bin/lib/service-auth.generated.js is stale at this head (the train top regenerates it)
 // and predates this change, so a pass through the temp copy proves the source-built bundle is what loaded. No env
 // var or flag selects the bundle path: the copy puts the built file exactly where bin/omo.js imports it by relative path.
-const sourceLauncherTree = mkdtempSync(join(tmpdir(), "omo-source-launcher-"))
+// The copy is an omo-ai package root: bin/ beside the manifest the bundle reads its version from (#14867).
+const sourcePackage = mkdtempSync(join(tmpdir(), "omo-source-launcher-"))
+const sourceLauncherTree = join(sourcePackage, "bin")
 cpSync(join(root, "packages", "omo-native", "bin"), sourceLauncherTree, { recursive: true })
+cpSync(join(root, "packages", "omo-native", "package.json"), join(sourcePackage, "package.json"))
 const entries = {
   launcher: join(sourceLauncherTree, "omo.js"),
   compiled: join(root, "packages", "omo-native", "compile-entry.ts"),
@@ -25,7 +28,7 @@ const entries = {
 beforeAll(async () => {
   await buildServiceAuth(false, join(sourceLauncherTree, "lib", "service-auth.generated.js"))
 }, 120_000)
-afterAll(() => rmSync(sourceLauncherTree, { recursive: true, force: true }))
+afterAll(() => rmSync(sourcePackage, { recursive: true, force: true }))
 // #12639: only these closed login forms still refuse, and the refusal names the terminal route (#13265).
 const refusedInvocations = [
   ["login", "--accounts", "https://example.invalid"],
