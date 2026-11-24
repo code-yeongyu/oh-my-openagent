@@ -66,6 +66,29 @@ async function run(args: readonly string[], fake = fakeSdk(), extra: Record<stri
 }
 
 describe("omo thread: argv to SDK calls", () => {
+  test("CLI read rejects a malformed cursor before loading the session gateway", async () => {
+    let sqliteProbes = 0
+    const result = await run(
+      ["read", "missing", "--cursor", Buffer.from("t1t:1.bad:0:201").toString("base64url"), "--json"],
+      fakeSdk(),
+      {
+        loadSqlite: async () => {
+          sqliteProbes++
+        },
+      },
+    )
+    expect(sqliteProbes).toBe(0)
+    expect(result.loaded).toBe(0)
+    expect(result.exitCode).toBe(THREAD_EXIT.refused)
+    expect(JSON.parse(result.stdout)).toMatchObject({ kind: "error", error: { code: "cursor_invalid" } })
+  })
+
+  test("CLI read passes a well-formed cursor unchanged to the SDK", async () => {
+    const cursor = Buffer.from("t3\nrev\nbefore\nfloor").toString("base64url")
+    const result = await run(["read", "peer", "--cursor", cursor, "--json"])
+    expect(result.calls).toEqual([{ method: "read", request: { thread: "peer", cursor, max_bytes: undefined } }])
+  })
+
   test("#given list --json #when run #then the SDK lists in the workspace scope and stdout is its whole result: threads, devices and remote_unavailable", async () => {
     const list = {
       kind: "ok",

@@ -12,6 +12,7 @@
  * `cursor_stale`, as on every other source.
  */
 
+import { decodeEntryCursor, encodeEntryCursor } from "../../../../omo-native/bin/lib/thread-read-cursor.js"
 import { THREAD_READ_DEFAULT_BYTES } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import { takeWithinBudget } from "./read-budget"
@@ -36,28 +37,9 @@ export type EntryPageRead =
 /** How many newest messages a tail must hold (unless the session has fewer) to answer every read. */
 export const CONTEXT_TAIL_MESSAGES = THREAD_TAIL_DEFAULT_ITEMS
 
-const CURSOR_VERSION = "t3"
-/** Entry cursors earlier builds issued (`t2`: revision and one entry id); their positions mean something else now (#14180). */
-const RETIRED_CURSOR_VERSIONS = new Set(["t2"])
-
-type EntryCursor = { readonly revision: string; readonly before: string; readonly floor: string }
-
-function encodeCursor({ revision, before, floor }: EntryCursor): string {
-  return Buffer.from(`${CURSOR_VERSION}\n${revision}\n${before}\n${floor}`, "utf8").toString("base64url")
-}
-
-function decodeCursor(raw: string): EntryCursor | null {
-  const parts = Buffer.from(raw, "base64url").toString("utf8").split("\n")
-  if (parts.length !== 4 || parts[0] !== CURSOR_VERSION) return null
-  const [, revision = "", before = "", floor = ""] = parts
-  return before === "" || floor === "" ? null : { revision, before, floor }
-}
-
-/** Whether a cursor came from this reader (the other sources' cursors are answered by their own reader). */
+/** Whether the current or a previous entry reader issued this cursor. */
 export function isEntryCursor(raw: string): boolean {
-  if (decodeCursor(raw) !== null) return true
-  // A retired version is still this reader's cursor: `selectEntryPage` answers it cursor_stale, never cursor_invalid.
-  return RETIRED_CURSOR_VERSIONS.has(Buffer.from(raw, "base64url").toString("utf8").split("\n")[0] ?? "")
+  return decodeEntryCursor(raw) !== null
 }
 
 /** A cursor whose position the transcript no longer has, or that a holder which pages nothing cannot answer. */
@@ -79,8 +61,8 @@ export function selectEntryPage(
   let floor = Math.max(0, messages.length - CONTEXT_TAIL_MESSAGES)
   let end = messages.length
   if (read.cursor !== undefined) {
-    const cursor = decodeCursor(read.cursor)
-    if (cursor === null || cursor.revision !== revision) return staleEntryCursor()
+    const cursor = decodeEntryCursor(read.cursor)
+    if (cursor === null || cursor === "retired" || cursor.revision !== revision) return staleEntryCursor()
     floor = messages.findIndex((entry) => entry.id === cursor.floor)
     end = messages.findIndex((entry) => entry.id === cursor.before)
     if (floor === -1 || end < floor) return staleEntryCursor()
@@ -100,7 +82,7 @@ export function selectEntryPage(
     truncated,
     next_cursor:
       truncated && before !== undefined && first !== undefined
-        ? encodeCursor({ revision, before, floor: first })
+        ? encodeEntryCursor({ revision, before, floor: first })
         : null,
   }
 }
