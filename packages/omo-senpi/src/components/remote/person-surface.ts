@@ -1,6 +1,6 @@
 import type { RemoteThreadSurface } from "../thread/remote/ports"
 import type { RemoteClient } from "./client"
-import { remoteSessionsPort } from "./port/thread-runtime"
+import { remoteSessionsPort } from "./port/sessions-port"
 
 /**
  * Seam 5 (#13414 4c-2): the thread surface over a person client, for the one typed-address resolver (resolveTypedAddress
