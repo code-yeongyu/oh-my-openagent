@@ -1,6 +1,5 @@
 export {
   HERE,
-  ID_PREFIX_SHAPE,
   SESSION_ID_SHAPE,
   THREAD_ID_SHAPE,
   formatAddress,
