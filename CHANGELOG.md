@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [5.1.83] - 2026-11-24
+
+### Fixed
+
+- A project on TypeScript 7 or later gets TypeScript diagnostics after an edit through its own `tsc --lsp --stdio`, with nothing else installed. The compiler is taken from the edited file's project, so a monorepo package on TypeScript 7 is served by its own `tsc` even when the session starts at the repository root, while a sibling package on an older TypeScript keeps typescript-language-server. A diagnostics scan of a whole directory sends each file to its own project's server, so a scan at the repository root covers both kinds of package, and a package whose server is slow to start no longer holds up the others, nor does giving up on it stop a server another request is still waiting for. A file is judged by where it really lives: a symlink inside the session never lends it another project's compiler, and a `bin/tsc` belonging to another kind of project, or a `node_modules/.bin/tsc` left behind without its `typescript` package, never hides the TypeScript installed for the package. A `typescript` command you configured is never replaced. A project on an older TypeScript, or none, still resolves typescript-language-server exactly as before. ([#14656](https://github.com/code-yeongyu/oh-my-openagent/pull/14656))
+
+### Changed
+
+- Ultrawork: verifying a UI deliverable asks for a play-through, a script that walks the product to several places or states and screenshots each, re-run after each feature. The default directive's existing verification sentences are rewritten in place and it is 6 bytes shorter. ([#14654](https://github.com/code-yeongyu/oh-my-openagent/pull/14654))
+
 ## [5.1.82] - 2026-11-23
 
 **What senpi 2026.11.23 changes for you.**
