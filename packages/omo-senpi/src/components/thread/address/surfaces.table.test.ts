@@ -118,7 +118,10 @@ function remoteClientOn(td: TwoDevices): ClientCore {
     timers: fakeClock(),
     deps: {
       version: "5.1.70",
-      ...(td.remote.aliases === undefined ? {} : { aliasRegistry: async () => td.remote.aliases! }),
+      ...(() => {
+        const aliases = td.remote.aliases
+        return aliases === undefined ? {} : { aliasRegistry: async () => aliases }
+      })(),
     },
     dial: unreached,
     member: unreached,
@@ -128,7 +131,9 @@ function remoteClientOn(td: TwoDevices): ClientCore {
     sessionsList: async (filter) => {
       const devices = await roster()
       const byId = new Map(devices.map((row) => [row.id, row]))
-      const listing = await td.remote.sessions.listing!()
+      const listingOf = td.remote.sessions.listing
+      if (listingOf === undefined) throw new Error("the two-device fixture always carries a listing")
+      const listing = await listingOf()
       const wanted = filter?.device
       if (wanted !== undefined && !byId.has(wanted) && !listing.rows.some((row) => row.device === wanted))
         return remoteFailure("not_found", `No device ${wanted}.`, "Call devices.list.", {
