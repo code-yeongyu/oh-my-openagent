@@ -5,8 +5,14 @@
 # the two parallel jobs that run the macOS tests (ci-macos-status.sh), so a passing one with no test step of its own is
 # proof only when both macOS jobs actually ran (each ended success or failure); when either was skipped, cancelled or
 # absent the status job is "no-tests".
+# A run made before the split has one job, "macos-combined", and neither part; it is judged by the same rule with that
+# single job, so platform-red-first-red.sh still finds green pre-split runs in its 30-run lookback. Remove the legacy
+# branch once 30 ci.yml runs on dev have completed after the split merged.
 .jobs as $jobs
-| ["macos-combined-1", "macos-combined-2"] as $macosNames
+| (["macos-combined-1", "macos-combined-2"]) as $splitNames
+| (if ($jobs | any(.name as $name | $splitNames | index($name)))
+   or ($jobs | any(.name == "macos-combined") | not)
+   then $splitNames else ["macos-combined"] end) as $macosNames
 | ([$macosNames[] as $name | [$jobs[] | select(.name == $name)] | first]) as $macos
 | ($macos | all(. != null and (.conclusion == "success" or .conclusion == "failure"))) as $macosRan
 | $jobs[]
