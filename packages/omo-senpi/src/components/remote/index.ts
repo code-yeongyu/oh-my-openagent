@@ -20,3 +20,8 @@ export { resolveTypedAddress } from "./device-address"
 export { personSurface } from "./person-surface"
 export { relayUnavailable } from "./relay-availability"
 export type * from "./types"
+// The device-service wire types a surface names in its own signatures (a command's result, an attach, the connection), so
+// a surface takes them from here, not from device-service-core (guard S3).
+export type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
+// The thread tools' lazy remote surface (#13414 U5): built on the module's port and the client its sender names.
+export { createLazyRemoteSurface } from "./port/lazy-remote"

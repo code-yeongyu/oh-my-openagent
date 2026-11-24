@@ -13,6 +13,7 @@ describe("remote module barrel", () => {
     expect(Object.keys(remote).sort()).toEqual([
       "REMOTE_CODES",
       "canonicalizeThreadHandle",
+      "createLazyRemoteSurface",
       "describeThread",
       "exitCodeOf",
       "handleOf",
