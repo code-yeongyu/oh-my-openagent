@@ -1,6 +1,7 @@
 import type { AgentDefinition } from "../types"
 
 import { CODE_REVIEWER_AGENT } from "./code-reviewer"
+import { DEVIN_AGENT } from "./devin"
 import { EXPLORE_AGENT } from "./explore"
 import { GATE_REVIEWER_AGENT } from "./gate-reviewer"
 import { LIBRARIAN_AGENT } from "./librarian"
@@ -29,6 +30,7 @@ export const ULW_REVIEWER_AGENT_DEFAULTS: readonly AgentDefinition[] = [
 export const BUILTIN_AGENT_DEFAULTS: readonly AgentDefinition[] = [
   ...CURATED_READONLY_AGENT_DEFAULTS,
   ...ULW_REVIEWER_AGENT_DEFAULTS,
+  DEVIN_AGENT,
 ] as const
 
 export const BUILTIN_AGENTS: Readonly<Record<string, AgentDefinition>> = Object.fromEntries(

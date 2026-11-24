@@ -1,7 +1,17 @@
-export type ExecutionMode = "in-process" | "process"
+// "devin-acp" routes the child through DevinAcpRunner: a spawned `devin acp` process speaking ACP,
+// selected per agent (never by task.default_execution_mode, whose schema stays auto|in-process|process).
+export type ExecutionMode = "in-process" | "process" | "devin-acp"
 
 /** What omo.json may say: either mode, or `auto` = let the shared task daemon decide. */
 export type ConfiguredExecutionMode = ExecutionMode | "auto"
+
+/**
+ * Modes whose child is a real OS process the lifecycle can detach, signal by pid, and respawn.
+ * "devin-acp" shares every one of those semantics with "process"; only the runner differs.
+ */
+export function isOsProcessExecutionMode(mode: string | undefined): boolean {
+  return mode === "process" || mode === "devin-acp"
+}
 
 /** Which runner a `process` child gets (omo.json `task.process_runner`). */
 export type ProcessRunnerKind = "host" | "child-process"

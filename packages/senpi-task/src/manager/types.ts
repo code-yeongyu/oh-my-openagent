@@ -85,6 +85,13 @@ export type ManagedRunner = {
   resume?(spec: ManagedStartSpec, sessionPath: string): Promise<ManagedChildHandle>
 }
 
+// "devin-acp" is optional so managers built without a Devin runner (tests, non-omo consumers)
+// still typecheck; a devin-acp record reaching one fails closed at dispatch instead of silently
+// falling back to a senpi runner.
+export type ManagedRunnerMap = Readonly<Record<"in-process" | "process", ManagedRunner>> & {
+  readonly "devin-acp"?: ManagedRunner
+}
+
 export type ManagerStartSpec = {
   readonly admission?: StartAdmission
   readonly resumeCredential?: ResumeCredential
@@ -289,7 +296,7 @@ export type TaskManagerOptions = {
   // parent checkout, so a wiring that forgot it can never break the isolation promise.
   readonly isolation?: IsolationRuntime
   readonly store: TaskRecordStore
-  readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
+  readonly runners: ManagedRunnerMap
   readonly planner: ChildPlanner
   readonly config: OmoTaskSettings
   readonly cwd: string

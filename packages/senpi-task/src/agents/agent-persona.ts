@@ -18,6 +18,7 @@ function toExecutionMode(value: string | undefined): AgentPersona["agentExecutio
   switch (value) {
     case "in-process":
     case "process":
+    case "devin-acp":
       return value
     default:
       return undefined

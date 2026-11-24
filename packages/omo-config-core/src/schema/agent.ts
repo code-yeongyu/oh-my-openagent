@@ -39,7 +39,7 @@ const OmoAgentDefInputSchema = z
     /** @deprecated Use reasoning. */
     reasoningEffort: OmoReasoningEffortSchema.optional(),
     tools: z.record(z.string(), z.boolean()).optional(),
-    execution_mode: z.enum(["in-process", "process"]).optional(),
+    execution_mode: z.enum(["in-process", "process", "devin-acp"]).optional(),
     background: z.boolean().optional(),
     max_depth: z.number().int().nonnegative().optional(),
     allowed_subagents: z.array(z.string()).optional(),

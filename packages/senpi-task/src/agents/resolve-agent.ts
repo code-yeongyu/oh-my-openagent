@@ -13,6 +13,7 @@ import { agentPersona } from "./agent-persona"
 import { BUILTIN_AGENTS } from "./builtin"
 import { AGENT_FALLBACK_CHAINS } from "./builtin/fallback-chains"
 import { canonicalAgentName } from "./builtin/legacy-agent-names"
+import type { ExecutionMode } from "../manager/execution-mode"
 import type { AgentDefinition } from "./types"
 
 export type ResolveAgentOptions = {
@@ -28,7 +29,7 @@ export type AgentPersona = {
   // The definition's disallowedTools, carried so the record's tool_deny -> ChildSpec.toolDenylist
   // -> senpi excludeTools chain can actually deny (previously dropped here, leaking denied tools).
   readonly toolDenylist?: readonly string[]
-  readonly agentExecutionMode?: "in-process" | "process"
+  readonly agentExecutionMode?: ExecutionMode
   readonly allowedSubagents?: readonly string[]
   readonly maxDepth?: number
 }
@@ -96,6 +97,32 @@ export function resolveAgent<TModel extends SenpiModelPort>(
       agent: name,
       model: options.modelOverride,
       modelSource: "user",
+      availableAgents,
+      ...persona,
+    }
+  }
+
+  // A devin-acp child runs on Devin's own model catalog, not the senpi registry: the configured
+  // model string passes through verbatim ("adaptive" lets Devin route) and no chain or registry
+  // lookup applies. `categories` is meaningless here and is ignored for this mode.
+  if (persona.agentExecutionMode === "devin-acp") {
+    const configured = definition.model ?? firstConfiguredModel(definition) ?? "adaptive"
+    const builtin = Object.hasOwn(BUILTIN_AGENTS, name) ? BUILTIN_AGENTS[name] : undefined
+    const modelSource: ModelSelectionSource =
+      builtin !== undefined && definition.model === builtin.model && definition.models === builtin.models
+        ? "builtin"
+        : "user"
+    return {
+      kind: "resolved",
+      agent: name,
+      model: qualifiedDevinModel(configured),
+      modelSource,
+      resolved_model: {
+        source: "agent",
+        provider: "devin",
+        model_id: configured,
+        display: `devin/${configured}`,
+      },
       availableAgents,
       ...persona,
     }
@@ -245,6 +272,14 @@ function firstConfiguredModel(definition: AgentDefinition): string | undefined {
   const entry = definition.models?.[0]
   if (entry === undefined) return undefined
   return typeof entry === "string" ? entry : entry.model
+}
+
+// Devin catalog ids are flat ("adaptive", "swe-2-high"); the resolved model string keeps the
+// provider-qualified "devin/<id>" convention every other agent row uses. DevinAcpRunner strips the
+// prefix again for `devin acp --model`.
+export function qualifiedDevinModel(model: string): string {
+  const trimmed = model.trim()
+  return trimmed.startsWith("devin/") ? trimmed : `devin/${trimmed}`
 }
 
 function resolvedAgent(

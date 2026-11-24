@@ -12,7 +12,8 @@ import { BUILTIN_AGENT_NAMES } from "./names"
 
 const CURATED_AGENT_NAMES = ["explore", "librarian", "plan-consultant", "plan-reviewer"] as const
 const REVIEWER_AGENT_NAMES = ["omo-native-code-reviewer", "omo-native-gate-reviewer", "omo-native-qa-executor"] as const
-const ALL_BUILTIN_NAMES = [...CURATED_AGENT_NAMES, ...REVIEWER_AGENT_NAMES].sort()
+// "devin" is the odd builtin out: a devin-acp child, not an in-process curated persona.
+const ALL_BUILTIN_NAMES = ["devin", ...CURATED_AGENT_NAMES, ...REVIEWER_AGENT_NAMES].sort()
 
 const EXPECTED_TOOL_ALLOWLIST = [
   "read",
@@ -61,10 +62,10 @@ describe("builtin curated agents", () => {
     }
   })
 
-  test("#given every builtin definition #when inspecting shape #then mode is subagent and executionMode is pinned in-process", () => {
+  test("#given every builtin definition #when inspecting shape #then mode is subagent and executionMode matches its runner", () => {
     for (const definition of BUILTIN_AGENT_DEFAULTS) {
       expect(definition.mode).toBe("subagent")
-      expect(definition.executionMode).toBe("in-process")
+      expect(definition.executionMode).toBe(definition.name === "devin" ? "devin-acp" : "in-process")
     }
   })
 

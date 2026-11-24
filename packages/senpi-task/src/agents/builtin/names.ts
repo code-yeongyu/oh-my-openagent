@@ -6,4 +6,5 @@ export const BUILTIN_AGENT_NAMES: readonly string[] = [
   "omo-native-code-reviewer",
   "omo-native-qa-executor",
   "omo-native-gate-reviewer",
+  "devin",
 ]

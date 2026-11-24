@@ -24,7 +24,7 @@ export type {
 export { agentToolPolicy, type AgentToolPolicy } from "./agent-tool-policy"
 export { loadAgents } from "./loader"
 export { mapOmoConfigAgents } from "./omo-config-agents"
-export { resolveAgent } from "./resolve-agent"
+export { qualifiedDevinModel, resolveAgent } from "./resolve-agent"
 export { defineAgent } from "./schema"
 export { registerAgent } from "./registry"
 export { resolveToolRule } from "./tools"
