@@ -1,5 +1,6 @@
 import { dispatchCall, preparesMutation } from "../call-budget/call-deadline"
 import { createConnection, type Socket } from "node:net"
+import { holderVersion } from "./tools/thread-state"
 import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import {
@@ -328,8 +329,8 @@ export type LiveThreadSurface = ThreadHost &
 /** The engine version a host's get_protocol_info names: its engine's own, else its package's (an older host). */
 function engineVersionOf(protocol: unknown): string | undefined {
   if (!record(protocol)) return undefined
-  const named = typeof protocol.engineVersion === "string" ? protocol.engineVersion : protocol.serverVersion
-  return typeof named === "string" && named !== "" ? named : undefined
+  // omo-relay-spec #314: the engine's own version when the key is present, the legacy serverVersion only when it is absent.
+  return holderVersion("engineVersion" in protocol ? protocol.engineVersion : protocol.serverVersion).engine_version
 }
 
 function isConnectRefusal(error: unknown): boolean {

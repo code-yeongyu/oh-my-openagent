@@ -65,10 +65,10 @@ function dropMeasurements(node) {
  * measurements dropped, the plugin id namespaces token-mapped, and a ranked timestamp's zone offset dropped with it.
  * The run-scoped roots and host facts are the harness's, unchanged.
  */
-export function observeOmo(run, observables, harness) {
+export function observeOmo(run, observables, harness, settledStatus = []) {
   const raw = Object.fromEntries(observables.map((id) => [id, dropMeasurements(harness.collectors[id](run))]))
   if (raw.O5) raw.O5 = { ...raw.O5, plugin: dropMeasurements(collectPluginState(run)) }
-  if (raw.O6) raw.O6 = raw.O6.map(splitStatusChannels)
+  if (raw.O6) raw.O6 = raw.O6.map((client) => splitStatusChannels(client, settledStatus))
   const normalize = harness.createNormalizer({
     roots: [
       { prefix: run.box.dir, token: "<sandbox>" },

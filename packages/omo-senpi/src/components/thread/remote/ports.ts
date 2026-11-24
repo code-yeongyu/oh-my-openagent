@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {
@@ -274,6 +278,18 @@ export type RemoteThreadSurface = {
   readonly chain: ChainCountWire
   /** The approval mode a session this surface creates is opened in (#6189): the creator's own. Absent: none is named. */
   readonly permissionPreset?: () => string | undefined
+}
+
+// A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
+const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/**
+ * A listing row's creation time. The row carries none and its `updated_ms` is not one (#14474), so it is the time a
+ * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
+ */
+export function rowCreatedAt(row: RemoteSessionRow): string {
+  const match = UUID_V7.exec(row.durable_id ?? "")
+  return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
 }
 
 /**
