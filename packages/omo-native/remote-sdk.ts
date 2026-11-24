@@ -5,7 +5,13 @@ import type { OpenRemote } from "./remote-sdk-api.ts"
 import packageJson from "./package.json" with { type: "json" }
 
 export type * from "./remote-sdk-api.ts"
-export { canonicalizeThreadHandle, describeThread, handleOf, REMOTE_CODES } from "../omo-senpi/src/components/remote/index.ts"
+export {
+  canonicalizeThreadHandle,
+  describeThread,
+  handleOf,
+  REMOTE_CODES,
+} from "../omo-senpi/src/components/remote/index.ts"
 
 /** @public */
-export const openRemote: OpenRemote = (options = {}) => remoteClientForPerson({ version: packageJson.version, ...options })
+export const openRemote: OpenRemote = (options = {}) =>
+  remoteClientForPerson({ version: packageJson.version, ...options })

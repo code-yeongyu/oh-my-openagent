@@ -16,7 +16,10 @@ const REMOTE = "packages/omo-senpi/src/components/remote/"
 // surface (the barrel only). remote-sdk-api.ts is its published declaration surface: it names components/remote's leaf
 // types directly, type-only, so the shipped declarations stay that small closure (#13782); S3 allows that and nothing else.
 const REMOTE_SDK_DECLARATIONS = "packages/omo-native/remote-sdk-api.ts"
-export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set(["packages/omo-native/remote-sdk.ts", REMOTE_SDK_DECLARATIONS])
+export const REMOTE_SDK_ENTRY: ReadonlySet<string> = new Set([
+  "packages/omo-native/remote-sdk.ts",
+  REMOTE_SDK_DECLARATIONS,
+])
 
 const isRemoteSurface = (file: string): boolean =>
   file.startsWith("packages/omo-senpi/src/components/thread/") ||

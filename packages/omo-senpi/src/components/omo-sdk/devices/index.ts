@@ -55,7 +55,12 @@ function listingFailure(failure: RemoteFailure): OmoResult<never> {
       details,
     )
   if (failure.code === "scope_denied" || failure.code === "relay_requires_paid_plan")
-    return refused("service_refused", "the device service refused to list the account's devices", SERVICE_CHECK, details)
+    return refused(
+      "service_refused",
+      "the device service refused to list the account's devices",
+      SERVICE_CHECK,
+      details,
+    )
   return refused("internal_error", "the device listing failed unexpectedly", "retry; report it if it repeats", details)
 }
 

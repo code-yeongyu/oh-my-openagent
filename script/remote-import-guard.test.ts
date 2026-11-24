@@ -168,7 +168,10 @@ describe("remote import guard G1 matcher", () => {
     "packages/omo-native/remote-sdk-api.ts",
     'import type { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\nimport type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
   )
-  write("packages/omo-native/remote-sdk.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  write(
+    "packages/omo-native/remote-sdk.ts",
+    'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
+  )
   write(
     `${senpi}/src/components/remote/tui/command.ts`,
     'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
