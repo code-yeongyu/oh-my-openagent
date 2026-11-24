@@ -41,6 +41,57 @@ fetch() { # fetch <url> <output file|->
   fi
 }
 
+# >>> omo release signature (#14916) >>>
+# Compiled-in release key set and cut-over constant, generated from packages/release-signing/keys/release-keys.json
+# by script/installer/generate-installer-keys.ts. Empty values mean release signing is not active yet: nothing is
+# verified (no signed releases exist), and installs behave exactly as before. Each pinned line is
+# keyid-hex|SPKI-base64 (the single-line base64 of the key's 44-byte SubjectPublicKeyInfo DER).
+OMO_RELEASE_KEYS=''
+OMO_RELEASE_V_SIGN=''
+
+version_lt() { # version_lt <a> <b>: prints lt when release a sorts before release b
+  awk -v a="$1" -v b="$2" 'BEGIN {
+    split(a, va, /[.-]/); split(b, vb, /[.-]/)
+    for (i = 1; i <= 3; i++) { if (va[i] + 0 < vb[i] + 0) { print "lt"; exit } if (va[i] + 0 > vb[i] + 0) { print "ge"; exit } }
+    print (split(a, ta, "-") > 1 && split(b, tb, "-") < 2) ? "lt" : "ge"
+  }'
+}
+
+verify_release_signature() { # verify_release_signature <workdir> <version> <explicit-pin 0|1>
+  local work="$1" version="$2" explicit="$3"
+  local sig="$work/SHA256SUMS.sig"
+  [ -n "$OMO_RELEASE_KEYS" ] || return 0
+  if [ ! -f "$sig" ]; then
+    if [ "$explicit" = 1 ] && [ "$(version_lt "$version" "$OMO_RELEASE_V_SIGN")" = lt ]; then
+      say "  release ${version} predates signed releases; continuing without a signature"
+      return 0
+    fi
+    fail "release signature missing (SHA256SUMS.sig); refusing to install. Only an explicitly pinned version older than V_sign may be unsigned"
+  fi
+  command -v openssl >/dev/null 2>&1 || fail "openssl is required to verify the release signature"
+  [ "$(grep -c '' "$sig")" = 4 ] || fail "release signature malformed (line count)"
+  sed -n '2p' "$sig" | tr -d '\r\n' | openssl base64 -d -A >"$work/sigblock.bin" 2>/dev/null || fail "release signature malformed (base64)"
+  [ "$(wc -c <"$work/sigblock.bin" | tr -d ' ')" = 74 ] || fail "release signature malformed (length)"
+  [ "$(head -c 2 "$work/sigblock.bin")" = ED ] || fail "release signature algorithm refused (only ED is accepted)"
+  local sigkeyid; sigkeyid="$(tail -c 72 "$work/sigblock.bin" | head -c 8 | od -An -tx1 | tr -d ' \n')"
+  tail -c 64 "$work/sigblock.bin" >"$work/sig.bin"
+  openssl dgst -blake2b512 -binary "$work/SHA256SUMS" >"$work/digest.bin" 2>/dev/null || fail "this openssl lacks BLAKE2b-512; install openssl >= 1.1.1 to verify omo releases"
+  local keyid pem ok=1
+  while IFS='|' read -r keyid pem; do
+    [ "$keyid" = "$sigkeyid" ] || continue
+    printf -- '-----BEGIN PUBLIC KEY-----\n%s\n-----END PUBLIC KEY-----\n' "$pem" >"$work/key.pem"
+    if openssl pkeyutl -verify -pubin -inkey "$work/key.pem" -rawin -in "$work/digest.bin" -sigfile "$work/sig.bin" >/dev/null 2>&1; then
+      ok=0
+      say "  release signature verified (key ${keyid})"
+      break
+    fi
+  done <<EOF
+$OMO_RELEASE_KEYS
+EOF
+  [ "$ok" = 0 ] || fail "release signature invalid; refusing to install (possible tampering)"
+}
+# <<< omo release signature (#14916) <<<
+
 sha256_of() {
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1" | awk '{print $1}'
   elif command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1" | awk '{print $1}'
@@ -292,7 +343,26 @@ main() {
   # shellcheck disable=SC2064 # expand now: the local is gone when the EXIT trap fires after main returns
   trap "rm -rf '${work}'" EXIT
   download "$version" SHA256SUMS "$work/SHA256SUMS" "$base"
-  expected="$(awk -v a="$asset" '$2==a || $2=="*"a {print $1}' "$work/SHA256SUMS" | head -n1)"
+  if [ -n "$OMO_RELEASE_KEYS" ]; then
+    fetch "${base}/v/${version}/SHA256SUMS.sig" "$work/SHA256SUMS.sig" 2>/dev/null \
+      || fetch "${GITHUB_DOWNLOAD}/v${version}/SHA256SUMS.sig" "$work/SHA256SUMS.sig" 2>/dev/null \
+      || rm -f "$work/SHA256SUMS.sig"
+  fi
+  verify_release_signature "$work" "$version" "$([[ "$want" =~ $VERSION_RE ]] && echo 1 || echo 0)"
+  if [ -f "$work/SHA256SUMS.sig" ]; then
+    header="$(sed -n '1p' "$work/SHA256SUMS")"
+    [[ "$header" == "# omo-release-v1 version="* ]] || fail "SHA256SUMS malformed (missing omo-release-v1 header); refusing to install"
+    hversion="${header#* version=}"; hversion="${hversion%% *}"
+    [ "$hversion" = "$version" ] || fail "signed release version mismatch (asked ${version}, signature says ${hversion}); refusing to install"
+    if [[ "$want" != pinned ]]; then
+      hchannel="${header##*channel=}"
+      wanted_channel="$([[ "$want" = beta ]] && echo beta || echo stable)"
+      [ "$hchannel" = "$wanted_channel" ] || fail "signed release channel mismatch (asked ${wanted_channel}, signature says ${hchannel}); refusing to install"
+    fi
+    expected="$(awk -v a="$asset" 'NR>1 && $2==a {print $1}' "$work/SHA256SUMS" | head -n1)"
+  else
+    expected="$(awk -v a="$asset" '$2==a || $2=="*"a {print $1}' "$work/SHA256SUMS" | head -n1)"
+  fi
   [ -n "$expected" ] || fail "SHA256SUMS for ${version} has no entry for ${asset}"
 
   if [ -x "$launcher" ] && [ "$(sha256_of "$launcher")" = "$expected" ]; then
@@ -303,6 +373,10 @@ main() {
     [ "$actual" = "$expected" ] || fail "checksum mismatch for ${asset}: expected ${expected}, got ${actual}"
     say "  checksum verified (sha256 ${expected})"
     chmod +x "$work/omo"
+    if [ "$(uname -s)" = Darwin ] && [ -n "$OMO_RELEASE_KEYS" ]; then
+      codesign --verify --strict -R='=anchor apple generic and certificate leaf[subject.OU] = "523JNR86LZ"' "$work/omo" 2>/dev/null \
+        || fail "the macOS release is not signed by the expected Developer ID; refusing to install"
+    fi
     mkdir -p "$dir"
     cp "$work/omo" "${launcher}.new.$$"
     mv -f "${launcher}.new.$$" "$launcher"

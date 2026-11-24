@@ -41,6 +41,7 @@
         "@oh-my-opencode/omo-senpi": "workspace:*",
         "@oh-my-opencode/openclaw-core": "workspace:*",
         "@oh-my-opencode/prompts-core": "workspace:*",
+        "@oh-my-opencode/release-signing": "workspace:*",
         "@oh-my-opencode/rules-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-engine": "workspace:*",
         "@oh-my-opencode/senpi-desktop-prelude": "workspace:*",
@@ -327,6 +328,7 @@
       },
       "dependencies": {
         "@code-yeongyu/senpi": "2026.11.23",
+        "@oh-my-opencode/release-signing": "workspace:*",
       },
     },
     "packages/omo-opencode": {
@@ -426,6 +428,10 @@
         "@oh-my-opencode/model-core": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
       },
+    },
+    "packages/release-signing": {
+      "name": "@oh-my-opencode/release-signing",
+      "version": "0.1.0",
     },
     "packages/rules-engine": {
       "name": "@oh-my-opencode/rules-engine",
@@ -975,6 +981,8 @@
     "@oh-my-opencode/openclaw-core": ["@oh-my-opencode/openclaw-core@workspace:packages/openclaw-core"],
 
     "@oh-my-opencode/prompts-core": ["@oh-my-opencode/prompts-core@workspace:packages/prompts-core"],
+
+    "@oh-my-opencode/release-signing": ["@oh-my-opencode/release-signing@workspace:packages/release-signing"],
 
     "@oh-my-opencode/rules-engine": ["@oh-my-opencode/rules-engine@workspace:packages/rules-engine"],
 

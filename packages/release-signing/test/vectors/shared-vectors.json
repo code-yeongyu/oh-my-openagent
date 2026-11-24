@@ -1,0 +1,71 @@
+{
+  "message_utf8": "# omo-release-v1 version=9.9.9 channel=stable\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  omo-linux-x64\n",
+  "primary_seed_hex": "0101010101010101010101010101010101010101010101010101010101010101",
+  "backup_seed_hex": "0202020202020202020202020202020202020202020202020202020202020202",
+  "pinned_public_keys_hex": [
+    "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+    "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+  ],
+  "cases": [
+    {
+      "name": "valid_primary_ed",
+      "expect": "ok",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8oc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5gQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n"
+    },
+    {
+      "name": "valid_backup_ed",
+      "expect": "ok",
+      "sig_file": "untrusted comment: minisign signature\nRUSQEgX8JIdmE7+ANbi6KLNgm9j7b8+RLQoXLDFzCL8jrpsNLROOrC6kEQOz9uqKEAPA/D68XBoq+JhW0FwF6hOHPweejysHWAw=\ntrusted comment: omo release 9.9.9 stable vectors\ndQt1/HUo5+nHg9RZBlQEHyLuC6/KPRJI4mp71dDFagosW3quWHwMNVNPjaB8+aF/EdCsfGlC3BZYFi23FqK9AQ==\n"
+    },
+    {
+      "name": "wrong_key_signature",
+      "expect": "refuse:signature",
+      "sig_file": "untrusted comment: minisign signature\nRUS8mL38xrL7atQjEzf3yMRsHDaRFrimK4fsjXy6ibJQV2RCgzs2NWKo5P4t0s86NGbX6Cf6U3BMI0lFw/awpzZtqpUOIjmk/wI=\ntrusted comment: omo release 9.9.9 stable vectors\nkXFr3+jDlmhenPXDqp0u83/6U7ulrmWGNCRlg9W2IbHN8Jl/P7X8WHAHfXj8Up0NdFWKy2zdZv/JNFjnkd2KDA==\n"
+    },
+    {
+      "name": "raw_ed_algorithm_refused",
+      "expect": "refuse:algorithm",
+      "sig_file": "untrusted comment: minisign signature\nRWTM93yUcw4JiDgUAuYRZ/D0XebTsZG/NNZcZoYB5Ap8yl3ITG4lzaxOILp2GcQFkeZDxOxeTmy/CF9gnWhlxtBHeP1tlSXFXwk=\ntrusted comment: omo release 9.9.9 stable vectors\ne6+2Mu6rsBVYV6JM655nVUyuRmRVQ6SYwuoUJie//qskRfxdujvW45YcCrAs7ehIpG8sjBSU+puGBmhrecjgDA==\n"
+    },
+    {
+      "name": "tampered_message_bit",
+      "expect": "refuse:signature",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8oc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5gQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n",
+      "message_override_utf8": "# omo-release-v1 version=9.9.9 channel=stable\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  omo-linux-x65\n"
+    },
+    {
+      "name": "tampered_signature_byte",
+      "expect": "refuse:signature",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8sc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5gQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n"
+    },
+    {
+      "name": "noncanonical_s_refused",
+      "expect": "refuse:malformed",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBjJ4SNrizRl+L3QMQRWFUVK/ZNN558+SRUeP5HPgY5hQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n"
+    },
+    {
+      "name": "extra_line_refused",
+      "expect": "refuse:malformed",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8oc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5gQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\nextra\n"
+    },
+    {
+      "name": "short_block_refused",
+      "expect": "refuse:wrong_length",
+      "sig_file": "untrusted comment: minisign signature\nRUTM93yUcw4JiHSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8oc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5g==\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n"
+    },
+    {
+      "name": "stranger_keyid_only_refused",
+      "expect": "refuse:signature",
+      "sig_file": "untrusted comment: minisign signature\nRUS8mL38xrL7anSZoak539Od6i7Rq68dDVCaCBj/lBLhkZsBFS4xEFGBn8oc2Z1QNAe1QAxtZmd1P6/ZNN558+SRUeP5HPgY5gQ=\ntrusted comment: omo release 9.9.9 stable vectors\nL3vdRaE8efMbXyyqNdj7NMB55PeZDHCDpcCU8PZgHZoDtkX/CRj52ejEAAISrJXcyPkJ4OjDz5vhSIYM9GxZAw==\n"
+    }
+  ],
+  "verifier_key_sets": {
+    "normal": [
+      "8a88e3dd7409f195fd52db2d3cba5d72ca6709bf1d94121bf3748801b40f6f5c",
+      "8139770ea87d175f56a35466c34c7ecccb8d8a91b4ee37a25df60f5b8fc9b394"
+    ],
+    "small_order_a": [
+      "0100000000000000000000000000000000000000000000000000000000000000"
+    ]
+  }
+}

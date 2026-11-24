@@ -1,0 +1,25 @@
+{
+  "name": "@oh-my-opencode/release-signing",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Signed omo CLI releases: minisign ED (Ed25519 over BLAKE2b-512) signature over the SHA256SUMS checksum list with a versioned header. Shared by the compiled self-update, the installer scripts' generator and the release/mirror tooling (#14916).",
+  "exports": {
+    "./minisign": {
+      "types": "./src/minisign.ts",
+      "import": "./src/minisign.ts"
+    },
+    "./checksums-release": {
+      "types": "./src/checksums-release.ts",
+      "import": "./src/checksums-release.ts"
+    },
+    "./keys": {
+      "types": "./src/keys.ts",
+      "import": "./src/keys.ts"
+    },
+    "./sign": {
+      "types": "./src/sign.ts",
+      "import": "./src/sign.ts"
+    }
+  }
+}
