@@ -393,7 +393,7 @@ describe("maskUrlUserinfo", () => {
       expect(redactUrl(value)).toBe(value)
       return reads
     }
-    String.prototype.charAt = function (this: string, position?: number) {
+    String.prototype.charAt = function (this: string, position = 0) {
       reads++
       return charAt.call(this, position)
     }
