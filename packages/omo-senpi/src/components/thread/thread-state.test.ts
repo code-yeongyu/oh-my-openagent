@@ -430,6 +430,42 @@ describe("thread state on another device's rows", () => {
     for (const row of rows(result)) expect(row).toMatchObject({ as_of: new Date(asOf).toISOString() })
   })
 
+  test("#given one device whose rows come from two holders (rows 6 wait, rows 7 version) #when listed #then each row keeps its own holder's version, only a running row carries the wait, and a field the row lacks stays absent (#14278)", async () => {
+    const until = "2026-11-20T09:00:45.000Z"
+    const wait = { kind: "rate_limit", attempt: 2, maxAttempts: 5, delayMs: 45_000, until }
+    const holders: RemoteSessionRow[] = [
+      remoteRow("h1-waiting", { state: "running", engine_version: "2026.11.19-3", waiting: wait }),
+      remoteRow("h1-idle", { state: "idle", engine_version: "2026.11.19-3" }),
+      remoteRow("h2-running", { state: "running", engine_version: "5.1.70" }),
+      // An older holder, or a host below rows 6/7: nothing is inferred from the device or a sibling row.
+      remoteRow("unknown-holder", { state: "running" }),
+      // A cached snapshot names no live holder: neither field is shown.
+      remoteRow("cached", { state: "running", source: "cache", as_of: 1, engine_version: "5.1.70", waiting: wait }),
+      // A malformed version is no version.
+      remoteRow("bad-version", { state: "idle", engine_version: "x".repeat(129) }),
+    ]
+    const { remote } = remoteFixture.account({ rows: holders })
+    const { run } = remoteFixture.surface(remote, { sessions: [] })
+    const listed = rows(await run("thread_list", { state: ["running", "idle", "inactive"] }))
+    const seen = Object.fromEntries(
+      listed.map((row) => {
+        const fields = row as { engine_version?: string; waiting_on?: unknown }
+        return [row.thread, { engine_version: fields.engine_version ?? null, waiting_on: fields.waiting_on ?? null }]
+      }),
+    )
+    expect(seen).toEqual({
+      "h1-waiting": {
+        engine_version: "2026.11.19-3",
+        waiting_on: { kind: "retry", reason: "rate_limit", until, attempt: 2, max_attempts: 5 },
+      },
+      "h1-idle": { engine_version: "2026.11.19-3", waiting_on: null },
+      "h2-running": { engine_version: "5.1.70", waiting_on: null },
+      "unknown-holder": { engine_version: null, waiting_on: null },
+      cached: { engine_version: null, waiting_on: null },
+      "bad-version": { engine_version: null, waiting_on: null },
+    })
+  })
+
   test("#given a state that is not one of the four #when listed #then invalid_arguments", async () => {
     const { remote } = remoteFixture.account({ rows: REMOTE_ROWS })
     const { run } = remoteFixture.surface(remote, { sessions: [] })
