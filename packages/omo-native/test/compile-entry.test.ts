@@ -275,6 +275,22 @@ describe("compiled omo entry launcher parity", () => {
       expect(isProvisionedExecutable("C:\\\u0282omo.exe", "C:\\\uA7C5omo.exe", "win32", missing)).toBe(false) // Latin s with hook, Unicode 12
     })
 
+    test("#when two names differ by a one-way Unicode uppercase #then they stay different executables", () => {
+      // Each of these uppercases in JS to a letter whose own lowercase is a different unit. dev's toLowerCase()
+      // keeps every pair apart, and a looser match here would accept a different file as the provisioned one.
+      const oneWay: [string, string][] = [
+        ["\u0131", "I"], // dotless i
+        ["\u017f", "S"], // long s
+        ["\u00b5", "\u039c"], // micro sign / capital mu
+        ["\u03c2", "\u03c3"], // final sigma / sigma
+        ["\u0345", "\u0399"], // combining ypogegrammeni / capital iota
+        ["\u1fbe", "\u0399"], // prosgegrammeni / capital iota
+      ]
+      for (const [unit, other] of oneWay) {
+        expect(isProvisionedExecutable(`C:\\${unit}omo.exe`, `C:\\${other}omo.exe`, "win32", missing)).toBe(false)
+      }
+    })
+
     test("#when two names differ by a long-standing BMP case pair #then they are the same executable", () => {
       // Latin-1, Latin Extended-A, Greek and Cyrillic pairs every NTFS upcase table holds.
       expect(

@@ -18,6 +18,21 @@ describe("frozen NTFS upcase table (#12809)", () => {
     expect(disagreements).toEqual([])
   })
 
+  test("#given every BMP unit the table folds #when its uppercase is lowercased #then it is the unit again", () => {
+    // given
+    const oneWay: string[] = []
+
+    // when
+    for (let unit = 0; unit < 0x10000; unit += 1) {
+      const text = String.fromCharCode(unit)
+      const folded = foldNtfsCase(text)
+      if (folded !== text && folded.toLowerCase() !== text) oneWay.push(unit.toString(16))
+    }
+
+    // then
+    expect(oneWay).toEqual([])
+  })
+
   test("#given ASCII #when folded #then only a-z change", () => {
     // given
     const ascii = Array.from({ length: 128 }, (_, unit) => String.fromCharCode(unit)).join("")
