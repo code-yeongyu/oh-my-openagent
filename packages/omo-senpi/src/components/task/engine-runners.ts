@@ -1,6 +1,7 @@
 import type { ToolDefinition } from "@code-yeongyu/senpi"
 import type { OmoTaskSettings } from "@oh-my-opencode/omo-config-core"
 import {
+  DevinAcpRunner,
   InProcessRunner,
   RpcHostRunner,
   RpcProcessRunner,
@@ -64,11 +65,15 @@ export interface RunnerBuildContext {
 export interface TaskRunnerFactories {
   readonly inProcess: (context: RunnerBuildContext) => ManagedRunner
   readonly process: (context: RunnerBuildContext) => ManagedRunner
+  // Optional so test factories and non-Devin wirings keep compiling; when absent the engine omits
+  // the "devin-acp" runner key and the manager fails such spawns closed.
+  readonly devinAcp?: (context: RunnerBuildContext) => ManagedRunner
 }
 
 export const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
   inProcess: buildInProcessRunner,
   process: buildProcessRunner,
+  devinAcp: buildDevinAcpRunner,
 }
 
 export { resolveTaskAgents } from "@oh-my-opencode/senpi-task"
@@ -154,6 +159,13 @@ export function createInheritedExtensionsResolver(build: RunnerBuildContext): ()
     }
     return [...argvEntries, ...selectPackageExtensionPaths(argvEntries, loadedExtensionPaths, installedPackageRoots)]
   }
+}
+
+// A devin-acp child is a spawned `devin acp` process, not a senpi session: no inherited extensions,
+// no model registry, no host runner. The runner resolves the binary from DEVIN_ACP_COMMAND /
+// DEVIN_BIN / PATH at spawn time.
+function buildDevinAcpRunner(_build: RunnerBuildContext): ManagedRunner {
+  return new DevinAcpRunner()
 }
 
 function buildProcessRunner(build: RunnerBuildContext): ManagedRunner {

@@ -421,6 +421,7 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
     expect(result.error.availableAgents).toEqual([
+      "devin",
       "explore",
       "librarian",
       "omo-native-code-reviewer",
@@ -446,6 +447,7 @@ describe("createTaskChildPlanner", () => {
     if (result.kind !== "error") throw new Error(`Expected error resolution, got ${result.kind}`)
     expect(result.error.code).toBe("unknown_target")
     expect(result.error.availableAgents).toEqual([
+      "devin",
       "explore",
       "librarian",
       "omo-native-code-reviewer",
@@ -478,6 +480,7 @@ describe("createTaskChildPlanner", () => {
     expect(result.error.message).toContain('Agent "explore"')
     expect(result.error.message).toContain("agents.explore.model")
     expect(result.error.availableAgents).toEqual([
+      "devin",
       "explore",
       "librarian",
       "omo-native-code-reviewer",

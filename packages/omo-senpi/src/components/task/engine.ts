@@ -285,7 +285,11 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
       }),
     store: storeChain.store,
     isolation,
-    runners: { "in-process": factories.inProcess(runnerContext), process: factories.process(runnerContext) },
+    runners: {
+      "in-process": factories.inProcess(runnerContext),
+      process: factories.process(runnerContext),
+      ...(factories.devinAcp === undefined ? {} : { "devin-acp": factories.devinAcp(runnerContext) }),
+    },
     kernelToolBindings,
     resolveChildToolNames: kernelTools.childToolNames,
     planner,

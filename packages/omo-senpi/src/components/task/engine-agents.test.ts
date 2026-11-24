@@ -65,6 +65,7 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(Object.keys(engine.agents).sort()).toEqual([
+      "devin",
       "explore",
       "librarian",
       "omo-native-code-reviewer",
@@ -103,6 +104,7 @@ describe("task engine builtin agent overlay", () => {
 
     // then
     expect(Object.keys(engine.agents).sort()).toEqual([
+      "devin",
       "explore",
       "librarian",
       "omo-native-code-reviewer",
@@ -175,7 +177,7 @@ describe("task engine builtin agent overlay", () => {
 
     // when / then
     expect(advertisedAgentNames(engine)).toBe(
-      "explore, librarian, omo-native-code-reviewer, omo-native-gate-reviewer, omo-native-qa-executor",
+      "devin, explore, librarian, omo-native-code-reviewer, omo-native-gate-reviewer, omo-native-qa-executor",
     )
     expect(advertisedPlanGatedAgentNames(engine)).toBe("plan-consultant, plan-reviewer")
   })
@@ -191,7 +193,7 @@ describe("task engine builtin agent overlay", () => {
     // then
     expect(engine.agents["plan-reviewer"]?.disable).toBe(true)
     expect(advertisedAgentNames(engine)).toBe(
-      "explore, librarian, omo-native-code-reviewer, omo-native-gate-reviewer, omo-native-qa-executor",
+      "devin, explore, librarian, omo-native-code-reviewer, omo-native-gate-reviewer, omo-native-qa-executor",
     )
     expect(advertisedPlanGatedAgentNames(engine)).toBe("plan-consultant")
   })

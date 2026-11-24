@@ -9,6 +9,7 @@ import { inheritParentFastMode, type ResolveParentServiceTier } from "./fast-mod
 import { NO_REGISTRY_MESSAGE, resolveExplicitPin, type ResolveDefaultRoute } from "./planner-explicit-pin"
 import { agentModelFailureText, categoryModelFailureText } from "./model-error-text"
 import {
+  qualifiedDevinModel,
   resolveAgent,
   resolveCategory,
   type AgentDefinition,
@@ -145,6 +146,15 @@ function resolveAgentTarget(
   if (explicitModel !== undefined && explicitModel.length > 0) {
     const resolution = resolveAgent(agentName, agents, undefined, { modelOverride: explicitModel })
     if (resolution.kind !== "resolved") return undefined
+    // A devin-acp agent's model is a Devin catalog id, not a senpi registry model: qualify it with
+    // the devin/ provider prefix (the runner strips it for --model) instead of parsing it as a
+    // provider/model pin, which would fail closed.
+    if (resolution.agentExecutionMode === "devin-acp") {
+      return {
+        kind: "resolved",
+        plan: toAgentPlan(resolution, undefined, qualifiedDevinModel(explicitModel)),
+      }
+    }
     const pin = resolveExplicitPin(explicitModel, resolveRegistry, resolveDefaultRoute, omoConfig.exclude_models)
     if (pin.kind !== "resolved") return { kind: "error", error: pin.error }
     return { kind: "resolved", plan: toAgentPlan(resolution, pin.metadata, pin.canonical) }

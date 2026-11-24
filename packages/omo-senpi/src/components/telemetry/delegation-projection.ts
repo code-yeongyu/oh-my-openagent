@@ -49,7 +49,7 @@ export function projectDelegationCompleted(input: DelegationProjectionInput): De
     agent_type: closedName(record.agent_type, CURATED_READONLY_AGENT_NAMES),
     owner_kind: ownerKindOf(record),
     background_mode: record.background_mode ?? "unknown",
-    execution_mode: record.execution_mode === "process" ? "process" : "in-process",
+    execution_mode: record.execution_mode === "in-process" ? "in-process" : "process",
     provider: masked.provider,
     model_id: masked.model_id,
     reasoning_effort: reasoningEffortOf(record.resolved_model),

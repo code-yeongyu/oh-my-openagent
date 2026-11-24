@@ -166,8 +166,20 @@ describe("omo.modelRouting.resolve rows match resolveAgent for every task agent"
       (candidate) => candidate.kind === "agent",
     )
     expect(rows.map((candidate) => candidate.name).sort()).toEqual(Object.keys(agents).sort())
-    for (const candidate of rows)
+    for (const candidate of rows) {
+      // devin-acp resolves against Devin's own catalog, never the senpi registry: its row stays
+      // resolved even when every senpi model is gone.
+      if (candidate.name === "devin") {
+        expect(candidate).toEqual({
+          kind: "agent",
+          name: "devin",
+          effective: "devin/adaptive",
+          source: "provider-fallback",
+        })
+        continue
+      }
       expect(candidate).toEqual({ kind: "agent", name: candidate.name, effective: null, source: "unresolved" })
+    }
   })
 })
 
