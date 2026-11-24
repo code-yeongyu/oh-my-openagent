@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import type { Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
 import { closeClients, type FakeClock, fakeClock, startModeOwner, startOwner } from "../remote/testing/fake-service"
 import { createOmoSdk, type OmoResult, type OmoSdk } from "."
 
@@ -17,12 +18,22 @@ afterEach(async () => {
   await closeClients()
 })
 
-const sdkOn = (stateDir: string, clock: FakeClock = fakeClock()): OmoSdk => {
+const SIGNED_IN: Credentials = {
+  accessToken: "access-token-fixture",
+  accessTokenExpiresAt: "2026-11-19T15:00:00.000Z",
+  refreshToken: "refresh-token-fixture",
+  device: { id: "dev-self", name: "This Mac" },
+  signingPrivateKey: "signing-key-fixture",
+  sealingPrivateKey: "sealing-key-fixture",
+}
+
+// By default a credential store that would answer signed_out: a listing the device service answers never reads the
+// account sign-in. Only a listing with no device service asks it, to tell a signed-out device from a missing service.
+const sdkOn = (stateDir: string, clock: FakeClock = fakeClock(), stored: Credentials | null = null): OmoSdk => {
   const sdk = createOmoSdk({
     env: { OMO_DEVICE_SERVICE_STATE_DIR: stateDir },
     cwd: tmpdir(),
-    // A credential store that would answer signed_out: the listing must not read the account sign-in at all.
-    ports: { desktopLaunch: () => false, credentialStore: { read: async () => null }, remoteTimers: clock },
+    ports: { desktopLaunch: () => false, credentialStore: { read: async () => stored }, remoteTimers: clock },
   })
   sdks.push(sdk)
   return sdk
@@ -71,20 +82,27 @@ describe("omo SDK devices.list through the remote module", () => {
     expect([...owner.state.conns].map((conn) => conn.client()?.name)).toEqual(["omo"])
   })
 
-  test("#given no device service on this machine #when devices.list runs #then it answers device_service_unavailable, never a made-up local device", async () => {
+  test("#given no device service on a signed-in device #when devices.list runs #then it answers device_service_unavailable, never a made-up local device", async () => {
     const empty = mkdtempSync(join(tmpdir(), "omo-sdk-no-service-"))
     dirs.push(empty)
 
-    expect(errorOf(await sdkOn(empty).devices.list())).toMatchObject({
+    expect(errorOf(await sdkOn(empty, fakeClock(), SIGNED_IN).devices.list())).toMatchObject({
       code: "device_service_unavailable",
       details: { code: "not_installed" },
     })
   })
 
+  test("#given no device service on a device that is not signed in #when devices.list runs #then it answers signed_out, the reason no service runs", async () => {
+    const empty = mkdtempSync(join(tmpdir(), "omo-sdk-no-service-"))
+    dirs.push(empty)
+
+    expect(errorOf(await sdkOn(empty).devices.list()).code).toBe("signed_out")
+  })
+
   test("#given a device service that never completes its handshake #when the deadline passes #then the module's failure maps to device_service_unavailable with its code", async () => {
     const { owner, withheld } = await startModeOwner("silent-handshake")
     const clock = fakeClock()
-    const listing = sdkOn(owner.stateDir, clock).devices.list()
+    const listing = sdkOn(owner.stateDir, clock, SIGNED_IN).devices.list()
     await withheld("welcome")
 
     clock.advance(60_000)

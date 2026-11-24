@@ -75,9 +75,16 @@ export function createDevicesApi(access: AccountAccess, listing: DeviceListing):
       })
       try {
         const listed = await client.devices.list({ signal: access.signal })
-        if (listed.kind === "error") return listingFailure(listed)
         // With no device service the module answers this machine as a local-only row, which is no account device.
-        if (listed.value.some((row) => row.kind === "local"))
+        const noService =
+          listed.kind === "error" ? UNAVAILABLE.has(listed.code) : listed.value.some((row) => row.kind === "local")
+        // A device that is not signed in has no service to ask: that is the reason to report, not the missing service.
+        if (noService) {
+          const account = await access.signedIn(async () => undefined)
+          if (account.kind === "error" && account.error.code === "signed_out") return account
+        }
+        if (listed.kind === "error") return listingFailure(listed)
+        if (noService)
           return refused("device_service_unavailable", "no device service runs on this machine", SERVICE_CHECK, {
             code: "not_installed",
           })
