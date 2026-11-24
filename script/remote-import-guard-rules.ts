@@ -49,7 +49,11 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
     "packages/omo-native/device-service-handoff.ts",
     "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
-  s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
+  s3: {
+    surface: isRemoteSurface,
+    layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY],
+    entries: [`${REMOTE}index.ts`, `${REMOTE}lazy.ts`],
+  },
 }
 
 type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
@@ -110,11 +114,6 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
   },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
     uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
-  "packages/omo-senpi/src/components/thread/live-surface.ts": {
-    uses: [REMOTE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
   "packages/omo-senpi/src/components/thread/remote/ports.ts": {

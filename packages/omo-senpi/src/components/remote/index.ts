@@ -23,5 +23,5 @@ export type * from "./types"
 // The device-service wire types a surface names in its own signatures (a command's result, an attach, the connection), so
 // a surface takes them from here, not from device-service-core (guard S3).
 export type { CommandResult, DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
-// The thread tools' lazy remote surface (#13414 U5): built on the module's port and the client its sender names.
-export { createLazyRemoteSurface } from "./port/lazy-remote"
+// The thread client sidecar's port and client (#omo-thread-client-runtime, live-surface.ts).
+export { remoteClient, remoteSessionsPort } from "./port/thread-runtime"
