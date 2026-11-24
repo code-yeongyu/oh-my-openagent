@@ -55,12 +55,7 @@ on:
         type: string
         default: ""
       operator_darwin_artifacts:
-        description: "Maintainer-only: draft release operator-darwin-<12 hex> holding operator-built, signed and notarized darwin artifacts. Replaces the hosted macOS legs of publish-platform. Requires prepared_release_sha and operator_darwin_manifest_sha256. Leave empty for the hosted legs."
-        required: false
-        type: string
-        default: ""
-      operator_darwin_manifest_sha256:
-        description: "Maintainer-only: sha256 of that release's operator-darwin-manifest.json, as the operator printed it. The run refuses any other manifest, so a later edit of the draft cannot swap artifacts. Leave empty for the hosted legs."
+        description: "Maintainer-only: draft release operator-darwin-<12 hex> holding operator-built, signed and notarized darwin artifacts. Replaces the hosted macOS legs of publish-platform. Requires prepared_release_sha. Leave empty for the hosted legs."
         required: false
         type: string
         default: ""
@@ -173,13 +168,15 @@ jobs:
           fetch-depth: ${{ inputs.source_sha && '0' || '1' }}
 
       # Operator-built darwin artifacts (#13921) replace the hosted macOS legs only for a maintainer on the
-      # prepared-source run. An empty input never enters the block.
+      # prepared-source run. An empty input never enters the block. The operator_darwin_manifest_sha256
+      # dispatch input was removed to keep publish.yml within GitHub's 10-input workflow_dispatch limit, so
+      # the manifest is always empty here and the gate refuses any operator_darwin_artifacts run below.
       - name: Refuse inadmissible operator darwin artifacts
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPERATOR_DARWIN_ARTIFACTS: ${{ inputs.operator_darwin_artifacts }}
-          OPERATOR_DARWIN_MANIFEST_SHA256: ${{ inputs.operator_darwin_manifest_sha256 }}
+          OPERATOR_DARWIN_MANIFEST_SHA256: ""
           PREPARED_RELEASE_SHA: ${{ inputs.prepared_release_sha }}
           ACTOR: ${{ github.actor }}
           TRIGGERING_ACTOR: ${{ github.triggering_actor }}
@@ -1351,7 +1348,6 @@ jobs:
       github.repository == 'code-yeongyu/oh-my-openagent' &&
       inputs.prepared_release_sha == '' &&
       inputs.operator_darwin_artifacts == '' &&
-      inputs.operator_darwin_manifest_sha256 == '' &&
       (needs.verify-exact-pinned-stamp.result == 'success' || (inputs.source_sha == '' && needs.verify-exact-pinned-stamp.result == 'skipped')) &&
       needs.release-metadata.result == 'success' &&
       needs.prepare-release-state.result == 'success'
@@ -1994,7 +1990,6 @@ jobs:
       dist_tag: ${{ needs.release-metadata.outputs.dist_tag }}
       omo_ai_version: ${{ needs.release-metadata.outputs.omo_ai_version }}
       operator_darwin_artifacts: ${{ inputs.operator_darwin_artifacts }}
-      operator_darwin_manifest_sha256: ${{ inputs.operator_darwin_manifest_sha256 }}
       prepared_release_sha: ${{ inputs.prepared_release_sha }}
     secrets: inherit
 

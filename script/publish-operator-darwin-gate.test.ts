@@ -182,17 +182,19 @@ describe("operator darwin gate (publish.yml gate-reuse)", () => {
 describe("operator darwin wiring", () => {
   test("the parent preparation run never dispatches the child when the input is set", () => {
     expect(job(publish, "dispatch-provenance-safe-publish").if).toContain("inputs.operator_darwin_artifacts == ''")
-    expect(job(publish, "dispatch-provenance-safe-publish").if).toContain(
-      "inputs.operator_darwin_manifest_sha256 == ''",
-    )
+    // The operator_darwin_manifest_sha256 dispatch input was removed from publish.yml to keep the
+    // workflow within GitHub's 10-input workflow_dispatch limit, so the condition no longer names it.
+    expect(job(publish, "dispatch-provenance-safe-publish").if).not.toContain("operator_darwin_manifest_sha256")
   })
 
   test("publish-platform receives the input and the prepared sha from the provenance run only", () => {
     expect(job(publish, "publish-platform").with).toMatchObject({
       operator_darwin_artifacts: "${{ inputs.operator_darwin_artifacts }}",
-      operator_darwin_manifest_sha256: "${{ inputs.operator_darwin_manifest_sha256 }}",
       prepared_release_sha: "${{ inputs.prepared_release_sha }}",
     })
+    // The operator_darwin_manifest_sha256 dispatch input was removed from publish.yml to keep the
+    // workflow within GitHub's 10-input workflow_dispatch limit, so it is no longer passed down.
+    expect(job(publish, "publish-platform").with).not.toHaveProperty("operator_darwin_manifest_sha256")
     expect(Object.keys(platform.on.workflow_call?.inputs ?? {})).toEqual(
       expect.arrayContaining(["operator_darwin_artifacts", "operator_darwin_manifest_sha256", "prepared_release_sha"]),
     )
