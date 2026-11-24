@@ -16,4 +16,7 @@ export { canonicalizeThreadHandle, type CanonicalThread, describeThread, handleO
 export { resolveTypedDevice } from "../thread/address"
 // Seam 4 (the only resolver for a typed thread address, #14305): every `omo remote` verb resolves what a person typed here.
 export { resolveTypedAddress } from "./device-address"
+// Seam 5 (#13414 4c-2): the person client's thread surface that resolver reads, and the relay check every verb answers first.
+export { personSurface } from "./person-surface"
+export { relayUnavailable } from "./relay-availability"
 export type * from "./types"

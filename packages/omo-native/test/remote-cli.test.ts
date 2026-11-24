@@ -137,7 +137,7 @@ describe("omo remote", () => {
 
   test("sessions --device names the candidates of an ambiguous device one per line, on the one call it makes (#14305)", async () => {
     const calls: string[] = []
-    const { code, err } = await run(["sessions", "--device", "studio"], privateDir(), undefined, undefined, undefined, {
+    const { code, err } = await run(["sessions", "--device", "studio"], privateDir(), undefined, undefined, {
       client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient,
     })
     expect(code).toBe(REMOTE_EXIT.failed)
@@ -150,7 +150,6 @@ describe("omo remote", () => {
     const { code, out } = await run(
       ["sessions", "--device", "studio", "--json"],
       privateDir(),
-      undefined,
       undefined,
       undefined,
       { client: () => ambiguousDeviceClient(calls) as unknown as RemoteClient },

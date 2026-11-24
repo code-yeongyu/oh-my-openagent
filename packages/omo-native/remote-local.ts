@@ -18,11 +18,11 @@ import {
 import {
   exitCodeOf,
   type LocalSessions,
+  personSurface,
   type RemoteClient,
   type RemoteFailure,
   remoteClientForPerson,
 } from "../omo-senpi/src/components/remote/index"
-import type { RemoteThreadSurface } from "../omo-senpi/src/components/thread/remote/ports"
 import { readAccountInProcess } from "./account-show"
 import type { LocalStatus } from "./remote-cold-wake"
 import packageJson from "./package.json" with { type: "json" }
@@ -37,12 +37,15 @@ import {
   wakeLines,
 } from "./remote-render"
 import { isSessionVerb, parseSession, type SessionArgs } from "./remote-session-args"
-import { runSession } from "./remote-session-verbs"
+import { type PersonRemote, runSession } from "./remote-session-verbs"
 import { AFTER_LOGIN_FLAG } from "./remote-verbs"
 
 // The `omo remote` verbs whose whole call path is the account read plus this device's local API (omo#13440): argument
 // parsing, the account notice, the connection, and each verb's body. `remote-cli.ts` keeps usage, `bootstrap` (a
 // download) and `attach` (the engine) and delegates the rest here; nothing in this module reaches the network.
+
+/** What the person client is built from (its factory's deps: the device service SDK's connection and attach). */
+type PersonDeps = Parameters<typeof remoteClientForPerson>[0]
 
 export interface RemoteCommandDependencies {
   /** `omo account show`: the first bootstrap step; nothing else runs unless it reports signed in. */
@@ -57,12 +60,12 @@ export interface RemoteCommandDependencies {
   /** This device's operator endpoint for the person client (its own sessions in `sessions`); remote-cli loads it. */
   readonly localSessions?: () => Promise<LocalSessions>
   readonly now: () => number
+  /** The clock the person client's deadlines run on (a waiting send's --timeout among them); real timers by default. */
+  readonly timers?: PersonDeps["timers"]
   readonly output: (line: string) => void
   /** Text as it arrives, with no line ending added: `send` streams the answer through it. */
   readonly write: (text: string) => void
   readonly error: (line: string) => void
-  /** The thread tools' remote surface over a connected service; the device service's own by default. Test seam. */
-  readonly remote?: (service: DeviceService) => RemoteThreadSurface
   /** The mode `open` names when no --permission-preset is given; this device's engine settings by default. Test seam. */
   readonly localPermissionPreset?: () => string
   /**
@@ -91,14 +94,56 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
   }
 }
 
-/** The person at this terminal, over this device's service: the one client every read verb uses. */
-const personClient = (dependencies: RemoteCommandDependencies): RemoteClient =>
+/** The person at this terminal, over this device's service: the one client every verb uses. */
+const personClient = (
+  dependencies: RemoteCommandDependencies,
+  extra: Partial<Pick<PersonDeps, "connect" | "serveAttach">> = {},
+): RemoteClient =>
   remoteClientForPerson({
     version: packageJson.version,
     stateDir: dependencies.stateDir,
     connect: () => dependencies.connect(),
     localSessions: dependencies.localSessions,
+    ...(dependencies.timers === undefined ? {} : { timers: dependencies.timers }),
+    ...extra,
   })
+
+/**
+ * The command's one device-service connection, lent to its remote client: the client's members ride it, and the client's
+ * close() leaves it open for the command, which closes it itself.
+ */
+const borrowedService = (service: DeviceService): DeviceService =>
+  new Proxy(service, {
+    get: (target, key) => {
+      if (key === "close") return () => undefined
+      const value: unknown = Reflect.get(target, key, target)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
+
+/**
+ * The person's remote over the verb's connection (#13414 4c-2): the person client on it, and that client's thread surface
+ * for the one address resolver. `close` releases both and leaves the connection to the command.
+ */
+export function personRemoteOn(
+  dependencies: RemoteCommandDependencies,
+  service: DeviceService,
+  extra: Partial<Pick<PersonDeps, "serveAttach">> = {},
+): PersonRemote & { readonly close: () => Promise<void> } {
+  const client = (
+    dependencies.client ?? (() => personClient(dependencies, { connect: async () => borrowedService(service), ...extra }))
+  )()
+  const surface = personSurface(client, packageJson.version)
+  return {
+    client,
+    surface,
+    close: async () => {
+      // The port owns its attach pool (#14074): closing it clears the pool's timers and closes only what it dialed.
+      await surface.sessions.close?.()
+      client.close()
+    },
+  }
+}
 
 const CONTROL_VALUES = ["on", "off"] as const
 type ControlValue = (typeof CONTROL_VALUES)[number]
@@ -179,9 +224,15 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
     case "send":
     case "model":
     case "interrupt":
-    case "close":
-      if (parsed.session !== undefined) return runSession(service, parsed.session, parsed.json, dependencies)
-      throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
+    case "close": {
+      if (parsed.session === undefined) throw new UsageError(`omo remote ${parsed.command}: arguments were not parsed`)
+      const remote = personRemoteOn(dependencies, service)
+      try {
+        return await runSession(remote, parsed.session, parsed.json, dependencies)
+      } finally {
+        await remote.close()
+      }
+    }
     default:
       throw new UsageError(
         parsed.command === "" ? "omo remote: a command is required" : `omo remote: unknown command ${parsed.command}`,
@@ -319,30 +370,36 @@ export async function runLocalRemoteVerb(dependencies: RemoteCommandDependencies
       client.close()
     }
   }
-  if (!existsSync(dependencies.stateDir)) {
-    dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
-    return REMOTE_EXIT.unavailable
-  }
-  if (!existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
-    dependencies.error("The OmO device service is not running on this device.")
-    return REMOTE_EXIT.unavailable
-  }
-  let service: DeviceService
-  try {
-    service = await dependencies.connect()
-  } catch (error) {
-    if (isServiceStopped(error)) {
-      dependencies.error("The OmO device service is not running on this device.")
-      return REMOTE_EXIT.unavailable
-    }
-    return reportFailure(dependencies, error)
-  }
+  const service = await connectVerb(dependencies)
+  if (typeof service === "number") return service
   try {
     return await runOn(service, parsed, dependencies)
   } catch (error) {
     return reportFailure(dependencies, error)
   } finally {
     service.close()
+  }
+}
+
+/**
+ * The verb's own device-service connection, or the exit code that says why there is none: not set up, not running (no
+ * endpoint, or a connection the stopped service refuses), or the connect's own failure.
+ */
+export async function connectVerb(dependencies: RemoteCommandDependencies): Promise<DeviceService | number> {
+  if (!existsSync(dependencies.stateDir)) {
+    dependencies.error("The OmO device service is not set up on this device. Install the OmO desktop app to set it up.")
+    return REMOTE_EXIT.unavailable
+  }
+  if (!existsSync(deviceServiceEndpointPath(dependencies.stateDir))) {
+    dependencies.error(NOT_RUNNING)
+    return REMOTE_EXIT.unavailable
+  }
+  try {
+    return await dependencies.connect()
+  } catch (error) {
+    if (!isServiceStopped(error)) return reportFailure(dependencies, error)
+    dependencies.error(NOT_RUNNING)
+    return REMOTE_EXIT.unavailable
   }
 }
 
