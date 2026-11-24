@@ -1443,6 +1443,7 @@
     "packages/omo-senpi/src/components/remote/follow.ts",
     "packages/omo-senpi/src/components/remote/index.ts",
     "packages/omo-senpi/src/components/remote/lazy.ts",
+    "packages/omo-senpi/src/components/remote/local-service.ts",
     "packages/omo-senpi/src/components/remote/person-surface.ts",
     "packages/omo-senpi/src/components/remote/port/device-service.ts",
     "packages/omo-senpi/src/components/remote/port/lazy-remote.ts",
