@@ -186,6 +186,7 @@ export type {
 } from "./category"
 export {
   DEFAULT_MAX_CHILD_DEPTH,
+  DevinAcpRunner,
   InProcessRunner,
   RunnerError,
   buildSubagentPrompt,
@@ -199,6 +200,7 @@ export {
 } from "./runners"
 export type {
   ChildCompletionPolicy,
+  DevinAcpRunnerOptions,
   ChildHandle,
   ChildSession,
   ChildSessionEvent,
@@ -390,6 +392,7 @@ export {
   loadAgents,
   mapOmoConfigAgents,
   registerAgent,
+  qualifiedDevinModel,
   resolveAgent,
   resolveToolRule,
 } from "./agents"
