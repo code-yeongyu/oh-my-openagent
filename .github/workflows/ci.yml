@@ -22,12 +22,14 @@ permissions:
   contents: read
 
 jobs:
+  # Job timeouts are about twice each job's measured p95 (25 green PR runs + 12 green dev pushes, 2026-11-22),
+  # with a 3-minute floor for setup noise, so a regression fails loudly instead of creeping (#14573).
   # A stable, unconditional context that dev's required checks can enforce even
   # when the rest of CI takes a docs/web/release fast path.
   lint-ratchet:
     name: Lint ratchet
     runs-on: ubuntu-26.04
-    timeout-minutes: 10
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -59,6 +61,7 @@ jobs:
 
   ci-mode:
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -429,7 +432,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
@@ -453,7 +456,15 @@ jobs:
       # The full install runs the root `prepare` (`bun run build`), whose `build:lsp-daemon` step already runs
       # `npm ci && npm run build` in packages/lsp-daemon, so its node_modules and dist exist before the tests.
       - name: Install dependencies
+        if: matrix.part != 'memory-core'
         run: bun install --frozen-lockfile
+
+      # memory-core needs only the vendored LSP daemon built by the shared test preload.
+      - name: Install memory-core test dependencies
+        if: matrix.part == 'memory-core'
+        run: |
+          bun install --frozen-lockfile --ignore-scripts
+          bun run build:lsp-daemon
 
       - name: Remove stale self-package test copies
         run: bun run script/remove-stale-self-package-tests.ts
@@ -604,7 +615,8 @@ jobs:
     timeout-minutes: 110
     outputs:
       lsp: ${{ steps.lsp-daemon-tests.outcome }}
-      shard1: ${{ steps.root-tests-posix-1.outcome }}
+      shard1a: ${{ steps.root-tests-posix-1a.outcome }}
+      shard1b: ${{ steps.root-tests-posix-1b.outcome }}
       shard2a: ${{ steps.root-tests-posix-2a.outcome }}
       shard2b: ${{ steps.root-tests-posix-2b.outcome }}
       codex: ${{ steps.codex-platform-tests.outcome }}
@@ -632,15 +644,29 @@ jobs:
         timeout-minutes: 5
         working-directory: packages/lsp-daemon
         run: npm test
-      - name: Run root test shard 1
-        id: root-tests-posix-1
+      # Shard 1 is split by measured time (#14849): one 20-minute step did not fit a runner 2.4-2.7x slower than the
+      # fast one (571 s fast, ~1350-1545 s projected on the slow runners). memory-core's sync and memfs trees (249 s fast,
+      # ~672 s at 2.7x) run in 1a; the rest of memory-core and omo-opencode (322 s fast, ~870 s at 2.7x) run in 1b, which
+      # ignores those two trees.
+      - name: Run root test shard 1 memory-core sync
+        id: root-tests-posix-1a
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        # 14, not 20: the part budgets must stay inside the job's 110 minutes (ci-macos-combined.test.ts); ~11 min at 2.7x.
+        timeout-minutes: 14
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: |
+          mkdir -p "$CI_JUNIT_DIR"
+          bun test --timeout 20000 packages/memory-core/src/sync/ packages/memory-core/src/memfs/ --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1a.xml"
+      - name: Run root test shard 1 rest
+        id: root-tests-posix-1b
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         timeout-minutes: 20
         env:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: |
           mkdir -p "$CI_JUNIT_DIR"
-          bun test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1.xml"
+          bun --config=bunfig.macos-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"
       - name: Run root test shard 2 heavy
         id: root-tests-posix-2a
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -689,7 +715,8 @@ jobs:
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
             - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
-            - Root shard 1: `${{ steps.root-tests-posix-1.outcome }}`.
+            - Root shard 1 memory-core sync: `${{ steps.root-tests-posix-1a.outcome }}`.
+            - Root shard 1 rest: `${{ steps.root-tests-posix-1b.outcome }}`.
             - Root shard 2 heavy: `${{ steps.root-tests-posix-2a.outcome }}`.
             - Root shard 2 light: `${{ steps.root-tests-posix-2b.outcome }}`.
             - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
@@ -718,7 +745,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard1 }}
+          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard1a }} ${{ needs.macos-combined.outputs.shard1b }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -800,6 +827,7 @@ jobs:
   typecheck:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v7
 
@@ -1091,7 +1119,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 20
+    timeout-minutes: 4
     steps:
       - uses: actions/checkout@v7
 
@@ -1143,7 +1171,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 60
+    timeout-minutes: 11
     steps:
       - uses: actions/checkout@v7
 
@@ -1170,7 +1198,7 @@ jobs:
       # linux-x64 B0 goldens. The collectors, normalizer and fake model server are the senpi EQ harness at a pinned commit.
       - name: Run omo fused-path equivalence (EQ.omo E21-E24)
         shell: bash
-        timeout-minutes: 45
+        timeout-minutes: 10
         env:
           SENPI_EQ_HARNESS_SHA: 5ab795e3392325c961596d7944a1740f4d0a9e20
         run: |
@@ -1203,7 +1231,7 @@ jobs:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true'
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 18
     strategy:
       fail-fast: false
       matrix:
@@ -1347,6 +1375,7 @@ jobs:
   lazycodex-published-smoke:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 3
     continue-on-error: true
     steps:
       - uses: actions/setup-node@v7
@@ -1436,6 +1465,7 @@ jobs:
   build:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 4
     permissions:
       contents: read
     steps:
@@ -1501,6 +1531,7 @@ jobs:
   omo-ai-payload-check:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v7
 
@@ -1522,7 +1553,13 @@ jobs:
 
       - name: Install dependencies
         if: needs.ci-mode.outputs.run_heavy == 'true'
-        run: bun install --frozen-lockfile
+        run: bun install --frozen-lockfile --ignore-scripts
+
+      - name: Build native payload inputs
+        if: needs.ci-mode.outputs.run_heavy == 'true'
+        env:
+          OMO_BUILD_PROFILE: omo-native
+        run: bun run build
 
       - name: Build omo-native
         if: needs.ci-mode.outputs.run_heavy == 'true'

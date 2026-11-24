@@ -12,6 +12,13 @@ import { createThreadSdk } from "./sdk"
 import type { ThreadHost, ThreadHostSession } from "./tools"
 import { remainingTestTime } from "../../../../../test-support/test-deadline"
 
+/** A local bound send answers with its row's delivery id; anything else is a failed precondition of the test. */
+function deliveryIdOf(sent: { readonly kind: string; readonly delivery_id?: string }): string {
+  if (sent.kind !== "ok" || sent.delivery_id === undefined)
+    throw new Error(`expected a delivered local send: ${JSON.stringify(sent)}`)
+  return sent.delivery_id
+}
+
 /**
  * A session bound to two chat threads reports (or arms its completion) without naming a binding. The
  * default is the thread whose message the CURRENT run consumed: the runtime below emits the extension
@@ -465,8 +472,8 @@ describe("a send from a run continues the causal chain of the message that run c
     const fromB = await s.send(b, "and what about me")
     expect(fromB).toMatchObject({ kind: "ok", delivery: { kind: "queued" } })
     if (fromA.kind !== "ok" || fromB.kind !== "ok") throw new Error("the bound messages were not delivered")
-    const rootA = await s.rootOf(fromA.delivery_id)
-    const rootB = await s.rootOf(fromB.delivery_id)
+    const rootA = await s.rootOf(deliveryIdOf(fromA))
+    const rootB = await s.rootOf(deliveryIdOf(fromB))
     expect(rootA).not.toBe(rootB)
 
     expect(await s.sendFromRun("asking the peer for A")).toBe(rootA)
@@ -481,7 +488,7 @@ describe("a send from a run continues the causal chain of the message that run c
     if (fromA.kind !== "ok") throw new Error(`the bound message was not delivered: ${JSON.stringify(fromA)}`)
     await s.runStartedDelivery()
 
-    expect(await s.sendFromRun("asking the peer")).toBe(await s.rootOf(fromA.delivery_id))
+    expect(await s.sendFromRun("asking the peer")).toBe(await s.rootOf(deliveryIdOf(fromA)))
   })
 })
 
@@ -522,7 +529,7 @@ describe("input sent over the session's RPC socket (#12317)", () => {
     s.rpcInput("steer")
     await s.enterSteer()
 
-    expect(await s.sendFromRun("asking the peer for A")).toBe(await s.rootOf(fromA.delivery_id))
+    expect(await s.sendFromRun("asking the peer for A")).toBe(await s.rootOf(deliveryIdOf(fromA)))
     const refused = await s.callReport("report", "whose step?")
     expect(refused).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
     expect([...(refused.error?.details?.binding_ids ?? [])].sort()).toEqual([a, b].sort())

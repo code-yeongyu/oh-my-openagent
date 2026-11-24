@@ -206,6 +206,7 @@
     }
   },
   "docs": {
+    "englishFallback": "이 문서는 영어로 제공됩니다.",
     "mobileHeader": "OmO 문서",
     "searchPlaceholder": "문서 검색...",
     "searchLabel": "문서 섹션 필터",

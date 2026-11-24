@@ -2,10 +2,11 @@
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
-import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import { dirname, join } from "node:path"
+import { CI_YML_PATH, ciJobs, VALIDATIONS, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
+import { createGitOrigin, type GitOrigin, runReleaseBash } from "./fixtures/publish-gate-reuse-origin"
 
 /**
  * Release contract: publish.yml gate-reuse waits for a successful hosted ci.yml run on the prepared
@@ -32,22 +33,49 @@ function stepRun(): string {
   return run.replaceAll("${{ github.repository }}", REPOSITORY)
 }
 
+// RUN_LEGS / BASE_LEGS: the Windows leg of hosted run 42 and of the base's dev push run 7 (success, failure, or
+// skipped = passed with its test step skipped). The jobs and dev-run answers go through the caller's --jq filter, so the
+// shipped platform-jobs.jq is what classifies them; the stub is exported so base-platform-green.sh sees it too.
 const GH_STUB = [
+  "leg_jobs() {",
+  '  local test_step="$1" conclusion="$1"',
+  '  [ "$1" = skipped ] && conclusion=success',
+  '  printf \'{"jobs":[{"name":"test (windows-latest, 1/2)","conclusion":"%s","html_url":"u","labels":["windows-latest"],"steps":[{"name":"Set up job","conclusion":"success"},{"name":"Run tests","conclusion":"%s"}]}]}\' "$conclusion" "$test_step"',
+  "}",
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
+  '  local filter="" previous="" argument',
+  '  for argument in "$@"; do [ "$previous" = --jq ] && filter="$argument"; previous="$argument"; done',
   '  case "$*" in',
+  '    *"/actions/runs/42/jobs"*) leg_jobs "$RUN_LEGS" | jq -r "$filter" ;;',
+  '    *"/actions/runs/7/jobs"*) leg_jobs "$BASE_LEGS" | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs?branch=dev"*) printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z"}]}\' | jq -r "$filter" ;;',
   '    *"/collaborators/"*"/permission"*)',
   '      local login="${2#*/collaborators/}"; login="${login%/permission}"',
   '      [ -n "$PERMISSION_API_DOWN" ] && return 1',
   '      local entry; for entry in $ROLES; do [ "${entry%%=*}" = "$login" ] && { printf "%s\\n" "${entry#*=}"; return 0; }; done',
   '      printf "none\\n" ;;',
   '    *"actions/workflows/ci.yml/runs"*)',
-  '      printf \'{"workflow_runs":[{"id":42,"head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$PREPARED_RELEASE_SHA" "$CI_CONCLUSION" ;;',
+  '      local sha id=42 event=pull_request conclusion="$CI_CONCLUSION"; for arg in "$@"; do case "$arg" in head_sha=*) sha="${arg#head_sha=}" ;; event=push) event=push; conclusion="$PUSH_CONCLUSION"; if [ "$sha" = "$PREPARED_RELEASE_SHA" ]; then conclusion="$STAMP_PUSH_CONCLUSION"; else id=41; fi ;; esac; done',
+  '      printf \'{"workflow_runs":[{"id":%s,"run_attempt":2,"event":"%s","head_sha":"%s","status":"completed","conclusion":"%s","created_at":"2026-01-01T00:00:00Z","html_url":"u"}]}\' "$id" "$event" "$sha" "$conclusion" ;;',
+  '    *"/actions/runs/41/attempts/2/jobs?"*) cat "$PIN_JOBS" ;;',
+  '    *"/actions/runs/42/attempts/2/jobs?"*) cat "$STAMP_JOBS" ;;',
+  '    *"/contents/.github/workflows/ci.yml?ref="*) cat "$CI_YML" ;;',
+  "    *) return 1 ;;",
   "  esac",
   "}",
+  "export -f gh leg_jobs",
   "sleep() { :; }",
+  `yq() { [ "$1" = -o=json ] || return 1; ${YQ_TO_JSON}; }`,
   "",
 ].join("\n")
+
+// The step reads these from its checkout (the dispatch ref); the test checkout is empty, so they are copied in.
+const STEP_FILES = [
+  ".github/scripts/platform-jobs.jq",
+  ".github/scripts/base-platform-green.sh",
+  "script/release-state-paths.mjs",
+]
 
 const fixtureRoot = mkdtempSync(join(tmpdir(), "publish-gate-reuse-origin-"))
 let fixture: GitOrigin
@@ -58,6 +86,14 @@ beforeAll(() => {
 afterAll(() => rmSync(fixtureRoot, { recursive: true, force: true }))
 
 interface Dispatch {
+  readonly mirrorTip?: string
+  readonly pin?: string
+  readonly pushConclusion?: string
+  readonly stampPushConclusion?: string
+  readonly pinValidation?: Validation
+  readonly stampValidation?: Validation
+  /** ci.yml served for the exact push SHA; the repository's own by default. */
+  readonly ciYml?: string
   readonly prepared?: string
   readonly receipt?: string
   readonly head?: string
@@ -65,6 +101,8 @@ interface Dispatch {
   readonly triggeringActor?: string
   readonly permissionApiDown?: boolean
   readonly ciConclusion?: string
+  readonly runLegs?: "success" | "failure" | "skipped"
+  readonly baseLegs?: "success" | "failure" | "skipped"
   // Replaces the step's own LC_ALL=C. Git Bash on windows-latest keeps classifying UTF-8 characters under LC_ALL=C, so
   // its [[:print:]] matches "\u00e9" (#13955); a UTF-8 locale reproduces that on any host.
   readonly classLocale?: string
@@ -87,6 +125,20 @@ function dispatch(input: Dispatch): Outcome {
   scratch.push(root)
   const checkout = join(root, "checkout")
   fixture.initCheckout(checkout)
+  const prepared = input.prepared ?? fixture.sha.B
+  if (input.pin) {
+    const git = (args: string[]) => {
+      const result = spawnSync("git", args, { cwd: checkout, env: fixture.gitEnv, encoding: "utf8" })
+      if (result.status !== 0) throw new Error(result.stderr)
+    }
+    git(["fetch", "origin"])
+    git(["update-ref", "refs/remotes/origin/master", input.mirrorTip ?? fixture.sha.A])
+    git(["checkout", "--detach", prepared || "origin/dev"])
+  }
+  for (const path of STEP_FILES) {
+    mkdirSync(join(checkout, dirname(path)), { recursive: true })
+    copyFileSync(new URL(`../${path}`, import.meta.url), join(checkout, path))
+  }
   const script = join(root, "step.sh")
   const summary = join(root, "summary.md")
   const ghCalls = join(root, "gh-calls")
@@ -98,7 +150,13 @@ function dispatch(input: Dispatch): Outcome {
   writeFileSync(script, GH_STUB + localized)
   writeFileSync(summary, "")
   writeFileSync(ghCalls, "")
-  const result = spawnSync("bash", ["-eo", "pipefail", script], {
+  const ciYml = join(root, "ci.yml")
+  writeFileSync(ciYml, input.ciYml ?? readFileSync(CI_YML_PATH, "utf8"))
+  const pinJobs = join(root, "pin-jobs.json")
+  writeFileSync(pinJobs, ciJobs(input.pinValidation))
+  const stampJobs = join(root, "stamp-jobs.json")
+  writeFileSync(stampJobs, ciJobs(input.stampValidation))
+  const result = runReleaseBash(root, script, {
     cwd: checkout,
     encoding: "utf8",
     timeout: TEST_TIMEOUT_MS - 1_000,
@@ -106,7 +164,17 @@ function dispatch(input: Dispatch): Outcome {
       ...fixture.gitEnv,
       GH_CALLS: ghCalls,
       GITHUB_STEP_SUMMARY: summary,
-      PREPARED_RELEASE_SHA: input.prepared ?? fixture.sha.B,
+      GITHUB_OUTPUT: join(root, "output"),
+      SOURCE_SHA: input.pin ?? "",
+      GITHUB_SHA: prepared || fixture.sha.T,
+      LAZYCODEX_ONLY: "false",
+      PUSH_CONCLUSION: input.pushConclusion ?? "success",
+      STAMP_PUSH_CONCLUSION: input.stampPushConclusion ?? "success",
+      PIN_JOBS: pinJobs,
+      STAMP_JOBS: stampJobs,
+      CI_YML: ciYml,
+      BUN_EXE: process.execPath,
+      PREPARED_RELEASE_SHA: prepared,
       CI_BASIS_RECEIPT: input.receipt ?? "",
       CI_BASIS_HEAD: input.head ?? "",
       ACTOR: input.actor ?? "maint",
@@ -115,6 +183,8 @@ function dispatch(input: Dispatch): Outcome {
       ROLES: "maint=maintain owner=admin dev=write",
       PERMISSION_API_DOWN: input.permissionApiDown ? "1" : "",
       CI_CONCLUSION: input.ciConclusion ?? "success",
+      RUN_LEGS: input.runLegs ?? "success",
+      BASE_LEGS: input.baseLegs ?? "success",
     },
   })
   if (result.error) throw result.error
@@ -127,6 +197,79 @@ function dispatch(input: Dispatch): Outcome {
 }
 
 const RECEIPT = "ci-basis-20261116-01"
+
+describe("#given a pinned release", () => {
+  test.each(VALIDATIONS)(
+    "the parent requires closed-world validation evidence (%s) even if the pin push is green",
+    (validation) => {
+      const result = dispatch({ pin: fixture.sha.B, prepared: "", pinValidation: validation })
+      expect(result.status === 0, result.output).toBe(validation === "passed" || validation === "allowed-skip")
+      if (result.status !== 0 && validation !== "empty-response")
+        expect(result.output).toContain("update the release proof contract")
+      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+    },
+  )
+
+  test.each(["skipped-job", "skipped-step", "passed"] as const)(
+    "the child requires independent validation evidence (%s) for an exact non-stamp push",
+    (validation) => {
+      const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.B, stampValidation: validation })
+      expect(result.status === 0, result.output).toBe(validation === "passed")
+      expect(result.ghCalls).toContain("/actions/runs/41/attempts/2/jobs?")
+      expect(result.ghCalls).toContain("/actions/runs/42/attempts/2/jobs?")
+    },
+  )
+
+  test("#when the source is malformed or outside dev #then it cannot start preparation", () => {
+    for (const pin of ["dev", fixture.sha.B.slice(0, 12), fixture.sha.D]) {
+      const result = dispatch({ pin, prepared: "" })
+      expect(result.status).not.toBe(0)
+      expect(result.ghCalls).toBe("")
+    }
+  })
+
+  test("a pin on dev that cannot fast-forward master is refused before CI lookup or stamping", () => {
+    const result = dispatch({ pin: fixture.sha.B, prepared: "", mirrorTip: fixture.sha.D })
+    expect(result.status).not.toBe(0)
+    expect(result.output).toContain("does not contain origin/master")
+    expect(result.ghCalls).toBe("")
+  })
+
+  test("#when only non-push CI is green #then neither dispatch can proceed", () => {
+    for (const prepared of ["", fixture.sha.T]) {
+      const result = dispatch({ pin: fixture.sha.B, prepared, pushConclusion: "failure" })
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+      expect(result.status).not.toBe(0)
+    }
+  })
+
+  test("#when the merged stamp is version-only #then only the pinned push run is needed", () => {
+    const result = dispatch({ pin: fixture.sha.B.toUpperCase(), prepared: fixture.sha.T, ciConclusion: "failure" })
+    expect(result.status, result.output).toBe(0)
+    expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+    expect(result.ghCalls).not.toContain(`head_sha=${fixture.sha.T}`)
+  })
+
+  test("#when the delta changes workflow code #then green PR CI cannot substitute for push CI on the stamp", () => {
+    for (const stampPushConclusion of ["success", "failure"]) {
+      const result = dispatch({
+        pin: fixture.sha.A,
+        prepared: fixture.sha.B,
+        ciConclusion: "success",
+        stampPushConclusion,
+      })
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.A} -f event=push`)
+      expect(result.status === 0).toBe(stampPushConclusion === "success")
+      expect(result.ghCalls).toContain(`head_sha=${fixture.sha.B} -f event=push`)
+    }
+  })
+
+  test("#when the published SHA is a grandchild of the pin #then green CI cannot authorize it", () => {
+    const result = dispatch({ pin: fixture.sha.A, prepared: fixture.sha.T })
+    expect(result.status).not.toBe(0)
+    expect(result.ghCalls).toBe("")
+  })
+})
 
 describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
   test.each([
@@ -259,6 +402,51 @@ describe("publish.yml gate-reuse ci_basis_receipt waiver", () => {
       expect(outcome.summary).toBe("")
     },
     TEST_TIMEOUT_MS,
+  )
+
+  // #14438: a release-state run kept on Linux, or a release merge push that skipped macOS/Windows, proves them only
+  // through its base; the same rule ci-fast-path.mjs used to keep it on Linux.
+  test.each([
+    ["its legs ran green", { runLegs: "success" }, 0, "Its macOS/Windows legs ran and passed."],
+    [
+      "its legs were skipped on a stamp over a base whose legs ran green",
+      { runLegs: "skipped", prepared: "P", baseLegs: "success" },
+      0,
+      "the delta is the release stamp only",
+    ],
+    [
+      "its legs were skipped and the base's legs were red",
+      { runLegs: "skipped", prepared: "P", baseLegs: "failure" },
+      1,
+      "has no dev push run whose macOS/Windows legs ran green",
+    ],
+    [
+      "its legs were skipped and the base's legs were skipped too",
+      { runLegs: "skipped", prepared: "P", baseLegs: "skipped" },
+      1,
+      "has no dev push run whose macOS/Windows legs ran green",
+    ],
+    [
+      "its legs were skipped on a stamp that also changes source",
+      { runLegs: "skipped", prepared: "Q", baseLegs: "success" },
+      1,
+      "changes more than the release stamp",
+    ],
+    [
+      "its legs were skipped on a stamp that renames a source file into the changelog fragments",
+      { runLegs: "skipped", prepared: "S", baseLegs: "success" },
+      1,
+      "changes more than the release stamp",
+    ],
+  ] as const)(
+    "#given an empty receipt and a successful hosted run #when %s #then gate-reuse decides on the platform proof",
+    (_label, input, status, line) => {
+      const prepared = "prepared" in input ? fixture.sha[input.prepared] : undefined
+      const legs = { runLegs: input.runLegs, ...("baseLegs" in input ? { baseLegs: input.baseLegs } : {}) }
+      const outcome = dispatch({ ...legs, ...(prepared === undefined ? {} : { prepared }) })
+      expect(outcome.status === 0 ? 0 : 1).toBe(status)
+      expect(outcome.output).toContain(line)
+    },
   )
 
   test(

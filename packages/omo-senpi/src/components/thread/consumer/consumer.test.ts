@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
 import { gatewayDatabasePath } from "../gateway/paths"
-import { GATEWAY_MIGRATIONS } from "../gateway/schema"
+import { GATEWAY_MIGRATIONS, GATEWAY_READER_FLOOR_KEY } from "../gateway/schema"
 import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/harness"
 import { writeSessionFile } from "../wake/testing/fake-wake-host"
 import { createDeliveryConsumer, type DeliveryConsumer } from "./consumer"
@@ -82,12 +82,17 @@ describe("declaring", () => {
     expect(service.calls).toEqual([{ type: "deliveries.serve", agent_dir: expect.any(String), v: 1 }])
   })
 
-  test("#given a store written by a newer build #when an older consumer starts #then it declares nothing", async () => {
+  test("#given a store written by a newer build this one cannot read #when an older consumer starts #then it declares nothing", async () => {
     const { h, service, consumer } = setup()
     await h.store().identity()
     const db = new Database(gatewayDatabasePath(h.agentDir))
     try {
+      // A newer build records its reader floor in the migration transaction (#14382); a floor above this build is unreadable.
       db.exec(`PRAGMA user_version = ${GATEWAY_MIGRATIONS.length + 1}`)
+      db.run("UPDATE gateway_meta SET value = ? WHERE key = ?", [
+        String(GATEWAY_MIGRATIONS.length + 1),
+        GATEWAY_READER_FLOOR_KEY,
+      ])
     } finally {
       db.close()
     }
