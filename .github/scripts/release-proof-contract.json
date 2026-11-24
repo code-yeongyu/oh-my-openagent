@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "425899999d7b98fe9f360539d9db6c86742d1d8a04a1caf670b7080a226725c8",
+  "workflowSha256": "ec6910b9030f776fbd950bfa056184c02f5c4f99b57907fd766ce0f82a034576",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
