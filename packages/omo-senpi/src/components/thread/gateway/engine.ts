@@ -193,6 +193,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       body: request.text,
       mode,
       expected_turn_id: request.expected_turn_id ?? null,
+      binding: null,
       receipt: {
         idempotency_key: idempotencyKey,
         args_hash: deliveryArgsHash({

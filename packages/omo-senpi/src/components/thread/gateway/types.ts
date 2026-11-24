@@ -201,6 +201,11 @@ export type EnqueueRequest = {
   readonly body: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
+  /**
+   * Always null: no send carries a binding since #14312. Kept on the wire because a store worker of an older build reads it
+   * on every enqueue, and a session still running schema 14 keeps that worker across an upgrade (#14382).
+   */
+  readonly binding: null
   readonly receipt: { readonly idempotency_key: string; readonly args_hash: string }
   readonly endpoint_kind: "rpc_host" | "tui" | null
   /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */

@@ -43,9 +43,6 @@ const ENVELOPE = (id: string) =>
     delivery_id: id,
   })
 
-/** The binding-era objects the v17 step drops from an empty-bindings store, with their registry rows. */
-const V17_DROPPED = /^(sqlite_autoindex_)?(bindings|outbox|outbox_cursors|completion_arms)(_|$)/
-
 /** A v14 row with every column set, the later-added ones included, so a dropped or reordered column shows. */
 const DELIVERY_ROW = (id: string, seq: number, effective: string | null, extra: Partial<Record<string, string>> = {}) =>
   `INSERT INTO deliveries (delivery_id, target_durable_id, seq, sender, sender_turn, envelope, body, bytes, mode_requested,
@@ -125,10 +122,7 @@ test("#given a v14 store holding deliveries in every lane #when the current buil
   expect(after.objects).toEqual(
     [...(before.objects as { type: string; name: string }[]), SINCE_V15.object].toSorted(byTypeAndName),
   )
-  // v17 then drops the binding-era tables (this store holds no binding rows) and their registry rows; nothing else goes.
-  expect(after.registry).toEqual(
-    (before.registry as { readonly name: string }[]).filter((row) => !V17_DROPPED.test(row.name)),
-  )
+  expect(after.registry).toEqual(before.registry)
   expect(after.foreignKeyViolations).toBe(0)
   insertStart()
   const db = new Database(path)
@@ -200,7 +194,7 @@ test("#given a store one schema ahead of this build #when this build's worker op
   await openAndMigrate(h)
   const ahead = GATEWAY_MIGRATIONS.length + 1
   const db = new Database(path)
-  db.exec(`PRAGMA user_version = ${ahead}`)
+  db.exec(`PRAGMA user_version = ${ahead}; INSERT OR REPLACE INTO gateway_meta VALUES ('reader_floor', '${ahead}')`)
   db.close()
   const newer = snapshot(path)
 

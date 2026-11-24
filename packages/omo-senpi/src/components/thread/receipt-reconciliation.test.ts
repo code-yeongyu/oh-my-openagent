@@ -30,25 +30,32 @@ async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
   const service = createFakeDeliveryService(admission)
   const counts = { forward: 0, reverse: 0, wakes: 0, queries: 0 }
   const senderService = createFakeDeliveryService({ admitted: true })
+  // reportDrained reports its mark at once and sends each refusal notice in the background (#14623 review M3), so a test
+  // that reads what a notice did waits for every notice it started, then for the sender's consumer to apply them.
+  const notices: Promise<void>[] = []
   const consumer = createDeliveryConsumer({
     store,
     port: {
       ...service.port,
-      notice: async (n) => {
+      notice: (n) => {
         counts.reverse++ // Count before transport, including notices deliberately lost below.
-        if (noticeMode === "drop") return
-        for (let i = 0; i < (noticeMode === "duplicate" ? 2 : 1); i++)
-          await senderService.inbound({
-            command_id: `notice-${counts.reverse}-${i}`,
-            sender_device: "b",
-            durable_id: n.session,
-            record: {
-              type: "delivery_outcome_notice",
-              deliveryId: n.delivery_id,
-              targetSessionId: n.target_durable_id,
-              reason: n.reason,
-            },
-          })
+        const sent = (async () => {
+          if (noticeMode === "drop") return
+          for (let i = 0; i < (noticeMode === "duplicate" ? 2 : 1); i++)
+            await senderService.inbound({
+              command_id: `notice-${counts.reverse}-${i}`,
+              sender_device: "b",
+              durable_id: n.session,
+              record: {
+                type: "delivery_outcome_notice",
+                deliveryId: n.delivery_id,
+                targetSessionId: n.target_durable_id,
+                reason: n.reason,
+              },
+            })
+        })()
+        notices.push(sent)
+        return sent
       },
     },
     agentDir: h.agentDir,
@@ -116,6 +123,10 @@ async function setup(noticeMode: "deliver" | "drop" | "duplicate" = "deliver") {
     consumer,
     senderService,
     link,
+    noticesSettled: async () => {
+      await Promise.all(notices)
+      await senderConsumer.idle()
+    },
     cleanup: async () => {
       setSystemTime()
       consumer.stop()
@@ -338,6 +349,7 @@ test.each(["expired", "turn_conflict", "not_steerable", "target_closed"] as cons
       await x.store.refuseQueued({ now: x.h.clock.now, delivery_id: row.delivery_id, reason })
       await x.consumer.reportDrained()
       await x.consumer.reportDrained()
+      await x.noticesSettled()
       const held = await x.sender.store.remoteReceipt({
         now: x.sender.store.now(),
         principal: "session:dur-caller",

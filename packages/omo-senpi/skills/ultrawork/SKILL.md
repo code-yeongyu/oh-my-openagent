@@ -85,18 +85,18 @@ exercises the surface; capture the artifact.
      (`Network.clearBrowserCookies`, `Storage.clearCookies`,
      `chrome.browsingData.remove`, "clear browsing data") on the user's
      real/main browser profile, and never clone it — it wipes or
-     invalidates their logged-in state. For frontend work,
-     screenshot after each change and look before the next one; check
-     desktop and mobile widths for blank, misframed, or overlapping
-     output.
+     invalidates their logged-in state. For a UI deliverable, script a
+     play-through: walk the product to several places or states and
+     screenshot each; check desktop and mobile widths for blank,
+     misframed, or overlapping output.
   4. Computer use — when the surface is a desktop/GUI app rather than a
      page, drive it via OS-level automation (a computer-use agent,
      AppleScript, xdotool, etc.) against the running app; capture
      action log + screenshot. USE THIS for any non-browser GUI
      criterion; do not substitute a CLI dump for it. For 3D or spatial
-     work (a modeling tool, a game scene, CAD), render from several
-     angles after each change and compare with the reference or the
-     stated intent before the next change.
+     work (a modeling tool, a game scene, CAD), the play-through takes
+     several angles; compare each with the reference or the stated
+     intent.
 
 For EVERY scenario name the exact tool and the exact invocation
 upfront: the literal command / API call / page action with its concrete
@@ -315,8 +315,8 @@ failed or missing item verbatim - a `try`/`catch` that turns a failure
 into an absent row makes the aggregate lie - and re-read truncated output
 before deciding on it. When the result must be SEEN rather than read - a
 page, a component, an image, a 3D scene, a layout - make one change,
-render or screenshot it, look, then make the next; check a 3D scene from
-several angles and a page at desktop and mobile widths, compare with the
+render or screenshot it, look, then make the next; after each feature
+re-run the play-through and look at every shot, compare with the
 reference or the stated intent, and ask only where two readings of that
 intent diverge. Kernel busy with a detached cell? HOP to `py` - never
 bash + `python3 -c`. Spawn independent `task(...)` children in the same
