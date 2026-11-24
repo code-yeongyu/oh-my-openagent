@@ -1,4 +1,4 @@
-import type { DeviceService, RemoteAttach } from "@oh-my-opencode/device-service-core/device-service"
+import type { DeviceService, RemoteAttach } from "../../remote/index"
 import type { JsonObject } from "./ports"
 
 // The reads a session's attach holds: its model catalog (`get_available_models`) and its engine's protocol info

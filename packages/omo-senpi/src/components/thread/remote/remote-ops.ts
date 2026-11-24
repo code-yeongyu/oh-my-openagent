@@ -1,6 +1,6 @@
 import { failed as fail, type Failed as Failure } from "../address/refusals"
 import { resolveTypedDevice } from "../address/device"
-import type { CommandResult } from "@oh-my-opencode/device-service-core"
+import type { CommandResult } from "../../remote/index"
 import { accountState } from "../address/account"
 import { outcomeFailure, READ_UNCERTAIN } from "./outcome"
 import {

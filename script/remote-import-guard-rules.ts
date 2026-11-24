@@ -112,28 +112,12 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/attach-pool.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
   // Part 4a-1 moved the thread tools' device-service port into the remote module (remote/port/): these two reach it there.
   "packages/omo-senpi/src/components/thread/live-surface.ts": {
     uses: [REMOTE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
-  "packages/omo-senpi/src/components/thread/remote/default-remote.ts": {
-    uses: [REMOTE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/outcome.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
   "packages/omo-senpi/src/components/thread/remote/ports.ts": {
-    uses: [DEVICE_SERVICE_CORE],
-    removedBy: "omo#13414 U5 (thread tools onto the module)",
-  },
-  "packages/omo-senpi/src/components/thread/remote/remote-ops.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",
   },
