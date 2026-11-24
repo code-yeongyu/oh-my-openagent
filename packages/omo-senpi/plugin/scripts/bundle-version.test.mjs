@@ -12,7 +12,10 @@ const manifest = JSON.parse(readFileSync(join(pluginRoot, "package.json"), "utf8
 const scratch = mkdtempSync(join(tmpdir(), "omo-senpi-bundle-version-"))
 afterAll(() => rmSync(scratch, { recursive: true, force: true }))
 
-const committedBundles = execFileSync("git", ["ls-files", "extensions", "runtime"], { cwd: pluginRoot, encoding: "utf8" })
+const committedBundles = execFileSync("git", ["ls-files", "extensions", "runtime"], {
+  cwd: pluginRoot,
+  encoding: "utf8",
+})
   .split("\n")
   .filter((path) => /\.m?js$/.test(path))
 

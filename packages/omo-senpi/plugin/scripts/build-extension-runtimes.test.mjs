@@ -146,6 +146,7 @@ describe("thread SDK runtime", () => {
     await mkdir(join(plugin, "extensions"), { recursive: true })
     await cp(outputs.threadSdkOutputPath, join(plugin, "runtime", "thread-sdk", "sdk.js"))
     await cp(outputs.gatewayStoreWorkerOutputPath, join(plugin, "extensions", "gateway-store-worker.mjs"))
+    await cp(join(outputs.root, "package.json"), join(plugin, "package.json"))
     const agentDir = join(plugin, "agent")
     const probe = [
       `const { createThreadSdk } = await import(${JSON.stringify(pathToFileURL(join(plugin, "runtime", "thread-sdk", "sdk.js")).href)})`,

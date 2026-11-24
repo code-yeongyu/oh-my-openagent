@@ -422,12 +422,9 @@ export function resolveOutputs(options) {
 }
 
 export async function buildExtension(options = {}) {
-  const packageManifest = JSON.parse(await readFile(join(packageRoot, "package.json"), "utf8"))
-  if (typeof packageManifest.version !== "string" || packageManifest.version.length === 0) {
-    throw new Error("omo-senpi package manifest must contain a version")
-  }
+  // No package version is defined here: the bundles read it from the manifest beside them at runtime, so a release
+  // stamp, which only bumps manifests, leaves every committed bundle byte-identical (#14867).
   const buildDefines = {
-    OMO_SENPI_PACKAGE_VERSION: packageManifest.version,
     OMO_SENPI_BUNDLED: true,
   }
   const {

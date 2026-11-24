@@ -8,6 +8,7 @@ import {
   type TelemetryEnv,
   type TelemetryProductConfig,
 } from "@oh-my-opencode/telemetry-core/injected"
+import { omoSenpiPackageVersion } from "../../package-version"
 import { AGENT_DIR_ENV_NAMES, resolveAgentHome } from "../agent-home/resolve-agent-home"
 import { type BundledSkillsOverrideLogger, resolveBundledSkillsOverride } from "../bundled-skills/override"
 import { ALL_KNOWN_MODEL_IDS, KNOWN_MODELS, KNOWN_PROVIDERS, type KnownProvider } from "./model-vocabulary"
@@ -41,9 +42,7 @@ export {
   OMO_NATIVE_PROPERTY_ALLOWLISTS,
 } from "./event-schemas"
 
-declare const OMO_SENPI_PACKAGE_VERSION: string
-
-const PACKAGE_VERSION = typeof OMO_SENPI_PACKAGE_VERSION === "string" ? OMO_SENPI_PACKAGE_VERSION : readPackageVersion()
+const PACKAGE_VERSION = omoSenpiPackageVersion()
 const SALT_FILE_NAME = "session-id-salt"
 const SALT_LENGTH = 32
 const fallbackSalts = new Map<string, Buffer>()
@@ -283,17 +282,4 @@ function readSalt(path: string): Buffer | undefined {
     // Missing or unreadable salt is repaired by the caller. Telemetry identity must never block the host.
     return undefined
   }
-}
-
-function readPackageVersion(): string {
-  try {
-    const parsed: unknown = JSON.parse(readFileSync(new URL("../../../package.json", import.meta.url), "utf8"))
-    if (parsed !== null && typeof parsed === "object" && !Array.isArray(parsed)) {
-      const version = Reflect.get(parsed, "version")
-      if (typeof version === "string") return version
-    }
-  } catch {
-    return "0.0.0"
-  }
-  return "0.0.0"
 }

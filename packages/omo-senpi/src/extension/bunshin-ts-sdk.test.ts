@@ -11,6 +11,7 @@ import {
   RelayTransportError,
   SDK_VERSION,
 } from "./bunshin-ts-sdk"
+import adapterManifest from "../../package.json" with { type: "json" }
 
 // Public API contract: eval cells destructure these names from `${OMO_BUNSHIN_TS_SDK_ROOT}/sdk.js`.
 describe("bunshin-ts eval SDK entry", () => {
@@ -27,7 +28,7 @@ describe("bunshin-ts eval SDK entry", () => {
     }
     expect(RelayTransportError.prototype).toBeInstanceOf(Error)
     expect(FanoutRun.prototype).toBeDefined()
-    expect(SDK_VERSION).toBe("dev")
+    expect(SDK_VERSION).toBe(adapterManifest.version)
     expect(createRelayTransport({ stateDir: "/nonexistent" }).kind).toBe("relay")
     const refused = await pickTransport({ BUNSHIN_TS_TRANSPORT: "hub" }).then(
       () => undefined,
