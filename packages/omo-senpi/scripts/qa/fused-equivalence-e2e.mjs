@@ -279,6 +279,8 @@ const cases = [
     id: "E23",
     title: "memory",
     observables: WITHOUT_O8,
+    // #13046: the memory footer is compared at its settled value; its refresh ordering is pinned by status.test.ts.
+    settledStatus: ["setStatus:memory"],
     spec: () => ({
       settings: SETTINGS,
       turns: [
@@ -487,7 +489,7 @@ async function main() {
               if (error instanceof Error) error.message = `${error.message}\n${tails.join("\n")}`
               throw error
             }
-            const observations = observeOmo(run, testCase.observables, harness)
+            const observations = observeOmo(run, testCase.observables, harness, testCase.settledStatus)
             result.statusCounts.push(statusCounts(observations))
             runs.push({ observations, witness: readWitness(run.sessionFile) })
           } finally {

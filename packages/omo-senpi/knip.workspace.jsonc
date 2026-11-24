@@ -32,6 +32,7 @@
         "src/components/memory/index-engine.fixture.ts",
         "src/components/memory/index-observer.fixture.ts",
         "src/components/memory/index-selection.fixture.ts",
+        "src/components/thread/caller-stall-host.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
@@ -872,8 +873,8 @@
     "packages/omo-senpi/src/components/thread/gateway/schema.ts": ["GATEWAY_TABLES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
     "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
-    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) reconcile, claim, recordOutcome, refuseQueued, isReferenced, journalMode, stats, migrateLegacyMailboxes
+    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
@@ -916,8 +917,6 @@
     "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
     // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
     "packages/omo-senpi/src/index.ts": ["omoSenpiAdapterPackageName"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-    "packages/omo-senpi/src/install/local-launcher.ts": ["localLauncherCmdPath"],
     // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
     "packages/omo-senpi/src/omo-native-capture-path.audit.test.ts": ["findDirectNativeCaptureViolations"]
   }

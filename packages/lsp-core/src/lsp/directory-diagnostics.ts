@@ -1,13 +1,15 @@
 import { existsSync, lstatSync, readdirSync, type Stats } from "node:fs"
 import { join, resolve } from "node:path"
 import { contextCwd } from "../request-context.js"
-import { findWorkspaceRoot, formatServerLookupError } from "./client-wrapper.js"
+import { formatServerLookupError } from "./client-wrapper.js"
 import { DEFAULT_MAX_DIAGNOSTICS, DEFAULT_MAX_DIRECTORY_FILES } from "./constants.js"
+import { scanServedGroups } from "./directory-group-scan.js"
+import { groupFilesByClient } from "./directory-server-groups.js"
 import { effectiveExtension } from "./effective-extension.js"
 import { LspInvalidPathError, LspServerLookupError } from "./errors.js"
 import { filterDiagnosticsBySeverity, formatDiagnostic } from "./formatters.js"
 import { getLspManager, type LspManager } from "./manager.js"
-import { findServerForExtension } from "./server-resolution.js"
+import type { TimerProvider } from "./timer-provider.js"
 import type { Diagnostic, ResolvedServer, SeverityFilter } from "./types.js"
 
 const SKIP_DIRECTORIES = new Set(["node_modules", ".git", "dist", "build", ".next", "out"])
@@ -36,6 +38,7 @@ export interface DirectoryDiagnosticsOptions {
   readonly workspaceRoot?: string
   readonly server?: ResolvedServer
   readonly signal?: AbortSignal
+  readonly timers?: TimerProvider
 }
 
 export function collectFilesWithExtension(dir: string, extension: string, maxFiles: number): string[] {
@@ -97,15 +100,6 @@ export async function aggregateDiagnosticsForDirectory(
     throw new LspInvalidPathError(`Directory does not exist: ${absDir}`)
   }
 
-  const serverResult =
-    options.server === undefined
-      ? findServerForExtension(extension)
-      : { status: "found" as const, server: options.server }
-  if (serverResult.status !== "found") {
-    throw new LspServerLookupError(formatServerLookupError(serverResult))
-  }
-
-  const server = serverResult.server
   const allFiles = (options.listFiles ?? collectFilesWithExtension)(absDir, extension, maxFiles + 1)
   const wasCapped = allFiles.length > maxFiles
   const filesToProcess = allFiles.slice(0, maxFiles)
@@ -120,43 +114,46 @@ export async function aggregateDiagnosticsForDirectory(
     return { output, totalDiagnostics: 0, fileFailures: [] }
   }
 
-  const root = options.workspaceRoot ?? findWorkspaceRoot(absDir)
+  // Each file goes to the client a single-file request for it would use; one scan at a repository root
+  // can span packages served by different servers. File cap and concurrency stay per request.
+  const groups = groupFilesByClient(filesToProcess, extension, {
+    ...(options.server === undefined ? {} : { server: options.server }),
+    ...(options.workspaceRoot === undefined ? {} : { workspaceRoot: options.workspaceRoot }),
+  })
+  const firstUnserved = groups.unserved[0]
+  if (groups.served.length === 0 && firstUnserved !== undefined) {
+    throw new LspServerLookupError(formatServerLookupError(firstUnserved.lookup))
+  }
+
   const manager = options.manager ?? getLspManager()
   const allDiagnostics: FileDiagnostic[] = []
   const fileErrors: DirectoryDiagnosticsFileFailure[] = []
   const maxConcurrency = Math.max(1, options.maxConcurrency ?? DIRECTORY_DIAGNOSTICS_MAX_CONCURRENCY)
+  for (const group of groups.unserved) {
+    const error = formatServerLookupError(group.lookup).split("\n")[0] ?? "No LSP server"
+    fileErrors.push(...group.files.map((file) => ({ file, error })))
+  }
 
   options.signal?.throwIfAborted()
-  const client = await manager.getClient(root, server, options.signal)
-  try {
-    let nextIndex = 0
-    const workers = Array.from({ length: Math.min(maxConcurrency, filesToProcess.length) }, async () => {
-      for (;;) {
-        if (options.signal?.aborted) return
-        const file = filesToProcess[nextIndex]
-        nextIndex += 1
-        if (file === undefined) return
-        try {
-          const result = await client.diagnostics(file, options.signal)
-          const filtered = filterDiagnosticsBySeverity(result.items, severity)
-          allDiagnostics.push(
-            ...filtered.map((diagnostic) => ({
-              filePath: file,
-              diagnostic,
-            })),
-          )
-        } catch (e) {
-          fileErrors.push({
-            file,
-            error: e instanceof Error ? e.message : String(e),
-          })
-        }
+  await scanServedGroups({
+    manager,
+    groups: groups.served,
+    maxConcurrency,
+    ...(options.signal === undefined ? {} : { signal: options.signal }),
+    ...(options.timers === undefined ? {} : { timers: options.timers }),
+    onGroupUnavailable: (group, error) => {
+      fileErrors.push(...group.files.map((file) => ({ file, error })))
+    },
+    checkFile: async (client, file) => {
+      try {
+        const result = await client.diagnostics(file, options.signal)
+        const filtered = filterDiagnosticsBySeverity(result.items, severity)
+        allDiagnostics.push(...filtered.map((diagnostic) => ({ filePath: file, diagnostic })))
+      } catch (e) {
+        fileErrors.push({ file, error: e instanceof Error ? e.message : String(e) })
       }
-    })
-    await Promise.all(workers)
-  } finally {
-    manager.releaseClient(root, server.id)
-  }
+    },
+  })
 
   const displayDiagnostics = allDiagnostics.slice(0, DEFAULT_MAX_DIAGNOSTICS)
   const wasDiagCapped = allDiagnostics.length > DEFAULT_MAX_DIAGNOSTICS

@@ -14,6 +14,7 @@
 //   FAKE_RETRY_FALLBACK=refuse|hang|exit answer set_retry_fallback with an error, never answer it, or exit on it
 //   FAKE_PROTOCOL_INFO=after-prompt hold the get_protocol_info answer until a prompt arrives (a probe answered late)
 //   FAKE_PROTOCOL_INFO=no-data answer get_protocol_info with success and no data (an engine that names no capabilities)
+//   FAKE_BOOT_BUSY_MS=<ms> burn CPU for this long before reading any command (a slow cold engine start)
 //   FAKE_PROMPT_REFUSAL=<json> refuse every prompt with this payload merged into the failed response
 //                        (e.g. {"error":"...","errorCode":"provider_credentials_missing","errorData":{...}})
 import { appendFileSync } from "node:fs"
@@ -252,4 +253,6 @@ if (process.env.FAKE_EMIT_UI === "1") {
   }, 5)
 }
 
+const bootUntil = Date.now() + Number(process.env.FAKE_BOOT_BUSY_MS ?? 0)
+while (Date.now() < bootUntil) {}
 createInterface({ input: process.stdin }).on("line", handleLine)
