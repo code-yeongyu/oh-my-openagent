@@ -222,7 +222,7 @@ describe("taskResultLines", () => {
     expect(lines.join(" ")).toContain("completed")
   })
 
-  test("#given a nickname in single and batch spawn details #when rendered #then it is displayed without replacing names or ids", () => {
+  test("#given a nickname in single and batch spawn details #when rendered #then the displayed id uses the nickname", () => {
     // given
     const single = {
       task_id: "st_single",
@@ -230,6 +230,9 @@ describe("taskResultLines", () => {
       nickname: "Selene",
       status: "running",
       mode: "spawn" as const,
+      subagent_type: "explore",
+      model: "chatgpt-subscription/gpt-6-luna",
+      run_in_background: true,
     }
     const batch = {
       task_id: "st_batch",
@@ -240,14 +243,18 @@ describe("taskResultLines", () => {
 
     // when
     const singleLine = taskResultLines(single)[0] ?? ""
+    const [compact] = renderTaskResultComponent(single, ANSI_THEME).render(80)
     const batchLines = taskResultLines(batch)
 
     // then
-    expect(singleLine).toContain("nickname:Selene")
-    expect(singleLine).toContain("id:st_single")
+    expect(singleLine).toContain("id:Selene")
+    expect(singleLine).not.toContain("st_single")
+    expect(compact).toContain("id:Selene")
+    expect(compact).not.toContain("st_single")
+    expect(batchLines[0]).toContain("id:st_batch")
     expect(batchLines[1]).toContain("name:canonical-item")
-    expect(batchLines[1]).toContain("nickname:Helios")
-    expect(batchLines[1]).toContain("id:st_batch_item")
+    expect(batchLines[1]).toContain("id:Helios")
+    expect(batchLines[1]).not.toContain("st_batch_item")
   })
 
   test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {

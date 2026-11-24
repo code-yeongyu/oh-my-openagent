@@ -102,7 +102,7 @@ There is no `team_wait` tool. When the next step depends on a reply, send with `
 ### Worker nicknames
 
 `task.nicknames` is optional. Define each set once and reference it from any
-number of exact `provider/model` IDs, agent names, or category names:
+number of model IDs or wildcard patterns, exact agent names, or exact category names:
 
 ```jsonc
 {
@@ -114,7 +114,8 @@ number of exact `provider/model` IDs, agent names, or category names:
         "general": ["Atlas", "Kite", "Moss"]
       },
       "models": {
-        "chatgpt-subscription/gpt-6-luna": "moon",
+        "chatgpt-subscription/*": "general",
+        "chatgpt-subscription/gpt-*-luna*": "moon",
         "chatgpt-subscription/gpt-6.2-sol": "sun"
       },
       "agents": { "explore": "moon" },
@@ -125,12 +126,29 @@ number of exact `provider/model` IDs, agent names, or category names:
 }
 ```
 
-The resolved spawn model takes priority, then the requested agent or category,
-then `default`. No match means no nickname. Use nonempty sets with short,
-printable labels (1–32 characters after trimming). Each named set rotates in
-list order independently within the parent session. Models or roles mapped to
-the same set share its rotation; other spawns do not advance it. The rotation
-is in memory and starts over when the task manager is recreated. Assigned
+The resolved spawn model takes priority. An exact `provider/model` key wins
+before any wildcards. In a wildcard, `*` matches zero or more characters,
+including `/`, and matching ignores case. A pattern with `/` matches the full
+`provider/model` ID; a pattern without `/` can match model IDs across providers,
+including the part after a gateway's nested vendor prefix. Other characters
+are literal.
+
+Among matching wildcard rules, a narrower rule (one that matches a strict
+subset of another rule's IDs) wins over the broader rule, regardless of
+declaration order. If multiple rules remain because they match identical or
+overlapping sets and none is narrower than another, the lexicographically first
+key wins. Use an exact key to override that choice for a particular model.
+
+If no model rule matches, OmO tries the requested agent or category, then
+`default`. No match means no nickname. Use nonempty sets with short,
+printable labels (1–32 characters after trimming). Each set starts at a
+position derived from the parent session ID and the set's key, then rotates
+in list order. Two sessions can land on the same starting name, especially
+with short lists. Reordering set definitions does not change their starting
+positions. Models or roles mapped to the same set share its rotation; other
+spawns do not advance it. The rotation is in memory and restarts at the same
+seeded position when the task manager is recreated with the same session ID
+and set. Assigned
 nicknames stay fixed across model fallback and resume. They are not steering addresses:
 continue to use the task's `name` or `task_id`.
 
@@ -139,7 +157,8 @@ linked native task record or an `omo.task.updated` task snapshot. Older or
 unconfigured tasks omit it.
 
 Stock Senpi displays nicknames in task spawn, send, cancel, and output
-results. Tool clients can read the optional `nickname` alongside `name` and
+results. The spawn card uses the nickname in its `id:` label when one is
+available. Tool clients can read the optional `nickname` alongside `name` and
 `task_id` on a resolved result or batch item, or in `task_output`'s
 `details.snapshot`. The handle and task ID are still the only task addresses.
 Team mail from a known nicknamed worker can show a `Message from` notification;

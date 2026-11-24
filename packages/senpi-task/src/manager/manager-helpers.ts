@@ -8,6 +8,7 @@ import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
 import type { TaskSequence } from "./task-sequence"
+import { wildcardNicknameSet } from "./nickname-model-patterns"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
 // and the post-start pin check read (#9722 H1) - a stale resolvedModel from the failed rung would
@@ -66,6 +67,9 @@ export function selectTaskNickname(
   const modelId = model === undefined ? undefined : `${model.provider}/${model.model_id}`
   const set =
     ownValue(nicknames.models, modelId) ??
+    (modelId === undefined || nicknames.models === undefined
+      ? undefined
+      : wildcardNicknameSet(nicknames.models, modelId)) ??
     (spec.subagent_type !== undefined || (spec.category === undefined && agentType !== undefined)
       ? ownValue(nicknames.agents, agentType)
       : ownValue(nicknames.categories, category)) ??
@@ -73,7 +77,7 @@ export function selectTaskNickname(
   if (set === undefined) return undefined
   const pool = ownValue(nicknames.sets, set)
   if (pool === undefined) return undefined
-  return pool[sequence.nextNicknameOrdinal(spec.parent_session_id, set) % pool.length]
+  return pool[sequence.nextNicknameIndex(spec.parent_session_id, set, pool.length)]
 }
 
 export function buildRecordInput(input: {

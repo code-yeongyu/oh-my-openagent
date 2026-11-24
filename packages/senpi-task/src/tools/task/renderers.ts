@@ -2,7 +2,7 @@ import type { Theme, ThemeColor } from "@code-yeongyu/senpi"
 
 import { piTui } from "../../lazy/pi-tui"
 import type { TaskToolDetails, TaskToolItemDetail } from "./types"
-import { formatTaskMode, renderTaskCallLines, taskCallLines } from "./call-renderer"
+import { formatTaskMode } from "./call-renderer"
 import { formatTargetWithModel } from "../../status-line"
 import { priorityAliasBaseId } from "../../runners/pinned-model-equivalence"
 import { splitModelDecorators } from "../../senpi/explicit-pin"
@@ -126,8 +126,12 @@ function taskDowngradeToken(details: TaskToolDetails): string | undefined {
   return `tier:${tier}`
 }
 
+function taskDisplayId(details: Pick<TaskToolDetails, "task_id" | "nickname">): string | undefined {
+  return optionalRendererText(details.nickname) ?? optionalRendererText(details.task_id)
+}
+
 function taskResultLine(details: TaskToolDetails, mode: string | undefined): string {
-  const taskId = optionalRendererText(details.task_id)
+  const taskId = taskDisplayId(details)
   const reason = optionalRendererText(details.reason)
   const summary = runStatsCardSummary(details.run_stats)
   return (
@@ -138,7 +142,6 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
       fallbackCountToken(details),
       mode,
       formatTaskStatus(details.status),
-      details.nickname === undefined ? undefined : `nickname:${optionalRendererText(details.nickname)}`,
       taskId === undefined ? undefined : `id:${taskId}`,
       details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
       reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
@@ -147,7 +150,7 @@ function taskResultLine(details: TaskToolDetails, mode: string | undefined): str
 }
 
 function taskItemResultLine(item: TaskToolItemDetail): string {
-  const taskId = optionalRendererText(item.task_id)
+  const taskId = taskDisplayId(item)
   const name = optionalRendererText(item.name)
   const error = optionalRendererText(item.error_message)
   return joinRendererTokens([
@@ -155,7 +158,6 @@ function taskItemResultLine(item: TaskToolItemDetail): string {
     name === undefined ? undefined : `name:${name}`,
     taskTargetToken(item),
     formatTaskStatus(item.status),
-    item.nickname === undefined ? undefined : `nickname:${optionalRendererText(item.nickname)}`,
     taskId === undefined ? undefined : `id:${taskId}`,
     item.queue_position === undefined ? undefined : `queue:${item.queue_position}`,
     error === undefined ? undefined : `error:${excerptRendererText(error, TASK_REASON_EXCERPT_WIDTH)}`,
@@ -204,13 +206,12 @@ function compactTargetToken(details: TargetIdentity, maxWidth: number): string |
 }
 
 function taskResultOptionalTokens(details: TaskToolDetails): readonly string[] {
-  const taskId = optionalRendererText(details.task_id)
+  const taskId = taskDisplayId(details)
   const reason = optionalRendererText(details.reason)
   return [
     taskId === undefined ? undefined : `id:${taskId}`,
     details.queue_position === undefined ? undefined : `queue:${details.queue_position}`,
     reason === undefined ? undefined : `reason:${excerptRendererText(reason, TASK_REASON_EXCERPT_WIDTH)}`,
-    details.nickname === undefined ? undefined : `nickname:${optionalRendererText(details.nickname)}`,
   ].filter((token): token is string => token !== undefined)
 }
 
