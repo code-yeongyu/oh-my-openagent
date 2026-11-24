@@ -13,11 +13,19 @@ interface LocalBinRule {
   readonly binDirs: readonly string[]
 }
 
+/** The Node rule: a marked project's `node_modules/.bin`. */
+export const NODE_PROJECT_MARKERS: readonly string[] = [
+  "package.json",
+  "bun.lock",
+  "bun.lockb",
+  "package-lock.json",
+  "yarn.lock",
+  "pnpm-lock.yaml",
+]
+export const NODE_LOCAL_BIN_DIR = join("node_modules", ".bin")
+
 const LOCAL_BIN_RULES: readonly LocalBinRule[] = [
-  {
-    markers: ["package.json", "bun.lock", "bun.lockb", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"],
-    binDirs: [join("node_modules", ".bin")],
-  },
+  { markers: NODE_PROJECT_MARKERS, binDirs: [NODE_LOCAL_BIN_DIR] },
   {
     markers: [
       "pyproject.toml",
@@ -74,12 +82,12 @@ export function __serverBinaryProbeCountForTests(): number {
   return probeCount
 }
 
-function probe(path: string): boolean {
+export function probe(path: string): boolean {
   probeCount += 1
   return existsSync(path)
 }
 
-function executableSuffixes(platform: NodeJS.Platform, pathExt: string | undefined): readonly string[] {
+export function executableSuffixes(platform: NodeJS.Platform, pathExt: string | undefined): readonly string[] {
   if (platform !== "win32") return [""]
   const configured = pathExt ?? process.env["PATHEXT"] ?? ""
   // PATHEXT is conventionally uppercase, but the on-disk shims npm/bun write are lowercase.
@@ -92,7 +100,7 @@ function executableSuffixes(platform: NodeJS.Platform, pathExt: string | undefin
   return [...new Set(["", ...systemExts, ".exe", ".cmd", ".bat", ".ps1"])]
 }
 
-function probeWithSuffixes(directory: string, command: string, suffixes: readonly string[]): string | null {
+export function probeWithSuffixes(directory: string, command: string, suffixes: readonly string[]): string | null {
   for (const suffix of suffixes) {
     const candidate = join(directory, command + suffix)
     if (probe(candidate)) return candidate

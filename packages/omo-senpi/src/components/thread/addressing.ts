@@ -34,10 +34,9 @@
  * `all_scope: true` widens visibility to every entry the daemon knows.
  */
 
-import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
+import { matchThread, rowKey, rowName, type LadderView } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import {
-  ID_PREFIX_SHAPE,
   normalizeName,
   SESSION_ID_SHAPE,
   THREAD_ID_SHAPE as DURABLE_ID_SHAPE,
@@ -194,6 +193,13 @@ function addressError(
 /** What a candidate is passed back as: its thread id, or for a listed row that publishes none, its row key. */
 const candidateThread = (entry: ThreadAddressEntry): string =>
   entry.thread_id === "" && entry.transport !== undefined ? rowKey(entry.transport.row) : entry.thread_id
+
+const ladderView = (entry: ThreadAddressEntry): LadderView => ({
+  id: entry.thread_id,
+  ...(entry.session_ids === undefined ? {} : { keys: entry.session_ids }),
+  ...(entry.aliases === undefined ? {} : { aliases: entry.aliases }),
+  name: entry.name,
+})
 
 function toCandidate(entry: ThreadAddressEntry): ThreadCandidate {
   // #13304: a candidate from another device prints its title and project escaped; the entry itself stays as received.
@@ -383,101 +389,86 @@ export function resolveTarget(
   const hasCallerRoot = callerRoot.length > 0
   const rootResolver = makeRootResolver()
 
-  // Ladder step 1: the exact durable id wins immediately, across every entry.
-  const idHit = entries.find((entry) => entry.thread_id === target)
-  if (idHit !== undefined) return scopedIdHit(idHit, opts, callerRoot, hasCallerRoot, rootResolver)
+  // The steps are thread-address-core's ladder (matchThread), shared with the remote client's sessions.resolve; this
+  // function adds this device's workspace scope and words the outcome.
+  // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
+  const inScope = (entry: ThreadAddressEntry): boolean =>
+    opts.all_scope === true ||
+    entry.transport !== undefined ||
+    (hasCallerRoot && sameWorkspace(entry.cwd, callerRoot, rootResolver))
+  const hit = matchThread(entries, target, { view: ladderView, named: inScope, idPrefix: opts.id_prefix ?? true })
 
-  // Ladder step 1b: a sessionId (`rpc-N`, a short engine session id, another device's listing key) is an alias of
-  // the durable thread_id. One live match resolves to that id; two are ambiguous and name the durable ids.
-  const sessionHits = entries.filter((entry) => entry.session_ids?.includes(target) === true)
-  if (sessionHits.length === 1) {
-    const hit = scopedIdHit(sessionHits[0], opts, callerRoot, hasCallerRoot, rootResolver)
-    if (hit.kind === "error" && hit.code === "scope_denied") {
+  // Step 1: the exact durable id wins immediately, across every entry; this device's book is listed first, so its
+  // copy of an id another device also lists is the one answered.
+  if (hit.kind !== "none" && hit.step === "id") {
+    const first = hit.kind === "one" ? hit.entry : hit.entries[0]
+    if (first !== undefined) return scopedIdHit(first, opts, callerRoot, hasCallerRoot, rootResolver)
+  }
+
+  // Step 1b: a sessionId (`rpc-N`, a short engine session id, another device's listing key) is an alias of the
+  // durable thread_id. One live match resolves to that id; two are ambiguous and name the durable ids.
+  if (hit.kind === "one" && hit.step === "session_id") {
+    const scoped = scopedIdHit(hit.entry, opts, callerRoot, hasCallerRoot, rootResolver)
+    if (scoped.kind === "error" && scoped.code === "scope_denied") {
       return addressError(
         "scope_denied",
-        `Thread ${sessionHits[0].thread_id} (session id "${target}") exists outside this workspace.`,
-        `Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) and pass thread ${sessionHits[0].thread_id}, or target a thread in this workspace.`,
+        `Thread ${hit.entry.thread_id} (session id "${target}") exists outside this workspace.`,
+        `Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) and pass thread ${hit.entry.thread_id}, or target a thread in this workspace.`,
       )
     }
-    return hit
+    return scoped
   }
-  if (sessionHits.length >= 2) {
-    const ids = sessionHits.map(candidateThread).filter((id) => id.length > 0)
+  if (hit.kind === "many" && hit.step === "session_id") {
+    const ids = hit.entries.map(candidateThread).filter((id) => id.length > 0)
     return addressError(
       "ambiguous_target",
-      `${sessionHits.length} visible threads share the session id "${target}". Pass one thread: ${ids.join(", ")}.`,
+      `${hit.entries.length} visible threads share the session id "${target}". Pass one thread: ${ids.join(", ")}.`,
       "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
-      toCandidates(sessionHits),
+      toCandidates(hit.entries),
     )
   }
 
-  // Ladder step 1c (decision 0027): an account alias names one thread account-wide, on any device, never workspace-scoped.
-  const wantedAlias = normalizeThreadName(target)
-  const aliasHit =
-    wantedAlias === ""
-      ? undefined
-      : entries.find((entry) => entry.aliases?.some((alias) => normalizeThreadName(alias) === wantedAlias))
-  if (aliasHit !== undefined) return { kind: "ok", entry: aliasHit, resolution: "alias" }
+  // Step 1c (decision 0027): an account alias names one thread account-wide, on any device, never workspace-scoped.
+  if (hit.kind === "one" && hit.step === "alias") return { kind: "ok", entry: hit.entry, resolution: "alias" }
 
-  // Ladder step 2: normalized name match over the visible entries only.
-  let visible: readonly ThreadAddressEntry[]
-  if (opts.all_scope === true) {
-    visible = entries
-  } else {
-    if (!hasCallerRoot) {
-      return addressError(
-        "caller_context_missing",
-        "Scoped address resolution needs the caller's workspace root, which this call did not provide.",
-        "Set all_scope to address every workspace, or call thread_list (tool.thread_list() in an eval cell) from a session that knows its workspace.",
-      )
-    }
-    // A thread on another device belongs to the account, not to a workspace of this device: it stays visible (decision 0027).
-    visible = entries.filter(
-      (entry) => entry.transport !== undefined || sameWorkspace(entry.cwd, callerRoot, rootResolver),
+  // Steps 2 and 3 read names over the visible entries only, so a scoped call needs the caller's workspace root.
+  if (opts.all_scope !== true && !hasCallerRoot) {
+    return addressError(
+      "caller_context_missing",
+      "Scoped address resolution needs the caller's workspace root, which this call did not provide.",
+      "Set all_scope to address every workspace, or call thread_list (tool.thread_list() in an eval cell) from a session that knows its workspace.",
     )
   }
 
-  const matches = visible.filter((entry) => normalizeThreadName(entry.name) === guard.normalized)
-  if (matches.length === 1) return { kind: "ok", entry: matches[0], resolution: "name" }
-  if (matches.length >= 2) {
+  // Step 2: normalized name match over the visible entries.
+  if (hit.kind === "one" && hit.step === "name") return { kind: "ok", entry: hit.entry, resolution: "name" }
+  if (hit.kind === "many" && hit.step === "name") {
     return addressError(
       "ambiguous_target",
-      `${matches.length} visible threads share the name "${target}".`,
+      `${hit.entries.length} visible threads share the name "${target}".`,
       "Call thread_list (tool.thread_list() in an eval cell) and pass the exact thread value of the intended thread.",
-      toCandidates(matches),
+      toCandidates(hit.entries),
     )
   }
 
-  // Ladder step 3: a durable-id prefix, over every entry the id step sees, one entry per thread.
-  if (opts.id_prefix !== false && ID_PREFIX_SHAPE.test(target)) {
-    const prefix = target.toLowerCase()
-    const excluded = typeof opts.id_prefix === "object" ? opts.id_prefix.exclude : undefined
-    const byThread = new Map<string, ThreadAddressEntry>()
-    for (const entry of entries)
-      if (
-        entry.thread_id !== excluded &&
-        entry.thread_id.toLowerCase().startsWith(prefix) &&
-        !byThread.has(entry.thread_id)
-      )
-        byThread.set(entry.thread_id, entry)
-    const prefixed = [...byThread.values()]
-    if (prefixed.length === 1) {
-      const hit = scopedIdHit(prefixed[0], opts, callerRoot, hasCallerRoot, rootResolver)
-      return hit.kind === "ok" ? { ...hit, resolution: "id_prefix" } : hit
-    }
-    if (prefixed.length >= 2) {
-      return addressError(
-        "ambiguous_target",
-        `${prefixed.length} threads have an id starting with "${target}".`,
-        "Pass a longer prefix or the exact thread value from the candidates.",
-        toCandidates(prefixed),
-      )
-    }
+  // Step 3: a durable-id prefix, over every entry the id step sees, one entry per thread.
+  if (hit.kind === "one" && hit.step === "id_prefix") {
+    const scoped = scopedIdHit(hit.entry, opts, callerRoot, hasCallerRoot, rootResolver)
+    return scoped.kind === "ok" ? { ...scoped, resolution: "id_prefix" } : scoped
   }
-  // Ladder step 2b (after the prefix, which an 8-hex name can also satisfy): the name matched nothing visible,
-  // but same-device threads outside the caller's workspace carry it. The id ladder answers `scope_denied` for the
-  // same fact; a name must not read as absent while the thread sits on this device.
-  if (opts.all_scope !== true && hasCallerRoot && matches.length === 0) {
+  if (hit.kind === "many" && hit.step === "id_prefix") {
+    return addressError(
+      "ambiguous_target",
+      `${hit.entries.length} threads have an id starting with "${target}".`,
+      "Pass a longer prefix or the exact thread value from the candidates.",
+      toCandidates(hit.entries),
+    )
+  }
+  const visible = entries.filter(inScope)
+  // Step 2b (after the prefix, which an 8-hex name can also satisfy): the name matched nothing visible, but
+  // same-device threads outside the caller's workspace carry it. The id ladder answers `scope_denied` for the same
+  // fact; a name must not read as absent while the thread sits on this device.
+  if (opts.all_scope !== true && hasCallerRoot) {
     const outOfScope = entries.filter(
       (entry) =>
         entry.transport === undefined &&

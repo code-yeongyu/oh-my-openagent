@@ -165,7 +165,20 @@ function probeBase(name: string, legs: readonly Leg[] | null): string {
     writeFileSync(join(api, path.replace(/[^A-Za-z0-9]/g, "_")), JSON.stringify(body))
   const repo = "repos/owner/project"
   answer(`${repo}/actions/workflows/ci.yml/runs?branch=dev&event=push&status=completed&head_sha=abc&per_page=20`, {
-    workflow_runs: legs === null ? [] : [{ id: 5, created_at: "2026-11-21T08:00:00Z" }],
+    workflow_runs:
+      legs === null
+        ? []
+        : [
+            {
+              id: 5,
+              created_at: "2026-11-21T08:00:00Z",
+              conclusion: "success",
+              head_sha: "abc",
+              head_branch: "dev",
+              event: "push",
+              status: "completed",
+            },
+          ],
   })
   answer(`${repo}/actions/runs/5/jobs?filter=latest&per_page=100`, {
     jobs: [
@@ -197,7 +210,7 @@ function probeBase(name: string, legs: readonly Leg[] | null): string {
       BASE_SHA: "abc",
     },
   })
-  expect(run.stderr).toBe("")
+  expect(run.stderr).toMatch(/^base-platform-green: .*run (5|none)/)
   expect(run.status).toBe(0)
   return run.stdout.trim()
 }

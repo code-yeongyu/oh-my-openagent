@@ -116,7 +116,7 @@ const MUTATIONS: Record<Validation, (jobs: Job[]) => void> = {
   "empty-response": () => {},
   "missing-codex": (jobs) => void jobs.splice(jobs.indexOf(job(jobs, "codex-compatibility (ubuntu-latest, full)")), 1),
   "skipped-senpi": (jobs) => skipJob(jobs, "senpi-compatibility (windows-latest)"),
-  "skipped-macos-codex": (jobs) => setStep(jobs, "macos-combined", "Run Codex platform smoke", "skipped"),
+  "skipped-macos-codex": (jobs) => setStep(jobs, "macos-combined-1", "Run Codex platform smoke", "skipped"),
   "skipped-macos-parity": (jobs) =>
     setStep(jobs, "native-binary-parity (macos-15, darwin-arm64, aarch64-apple-darwin, omo-darwin-arm64, true)", "Compare the binary with the npm launcher", "skipped"),
   "skipped-windows-parity": (jobs) =>
