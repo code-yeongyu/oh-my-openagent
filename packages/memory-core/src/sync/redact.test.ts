@@ -190,14 +190,10 @@ describe("redactUrl", () => {
     // the slowest macOS runner measured), and one quadratic pattern ("A+X") makes it ~9.7 s. The bound is 2 s.
     it("#then the regex passes finish far below a catastrophic-backtracking bound", () => {
       const input = `-----BEGIN ${"A".repeat(200_000)}-----${"B".repeat(200_000)}`
-      let fastest = Number.POSITIVE_INFINITY
-      for (let run = 0; run < 2; run++) {
-        const started = performance.now()
-        expect(redactUrl(input)).toBe(input)
-        fastest = Math.min(fastest, performance.now() - started)
-      }
-      expect(fastest).toBeLessThan(2_000)
-    }, 60_000)
+      const started = performance.now()
+      expect(redactUrl(input)).toBe(input)
+      expect(performance.now() - started).toBeLessThan(2_000)
+    })
   })
 
   describe("#given an empty url", () => {
