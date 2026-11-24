@@ -139,6 +139,19 @@ const SPAWN_CALL_SITES = [
   "packages/utils/src/runtime/spawn.ts: bun.spawnSync(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawn(bin; args)",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawnSync(bin; args)",
+  // #14622 review M4: a source build about to migrate the gateway store reads the OS user record's home through the
+  // pinned account-home helper (/etc/passwd, `/usr/bin/id -P`, System32 whoami/reg), never a tool found on PATH.
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: accountHomes(process.env; options.facts ?? systemPlatformFacts)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: packages/omo-opencode/src/cli/service-auth/account-home.ts#userRecordHome(facts; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedAgentDir(ctx.config.agent_dir; {stores})",
+  // #14622 review M9: the guard also compares the database file the worker opened (links resolved) with each shared
+  // agent dir's database by identity; both checks list the shared agent dirs through sharedAgentDirs.
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedStoreFile(ctx.databasePath; gatewayDatabasePath)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: sourceBuildMigrationRefusal(ctx; opened)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchOp(ctx; op)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/store-ops.ts#migrate(context; -)",
 ]
 const CONNECT_CALLS = [
   'createConnection({ host: "127.0.0.1", port })',

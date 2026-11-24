@@ -10,6 +10,8 @@ on:
 
 permissions:
   contents: read
+  # Reads the release-state PR a landing merges (#14818).
+  pull-requests: read
 
 jobs:
   changelog-gate:
@@ -32,6 +34,27 @@ jobs:
         with:
           bun-version: "1.4.4"
 
+      # A release-state landing (#14818) merges an open release-state PR's head as its second parent. Pass that PR's
+      # facts; the gate re-derives every git fact itself and treats anything missing as "not a landing".
+      - name: Read the release-state PR a landing merges
+        id: landing
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          second="$(git rev-parse --verify -q "${HEAD_SHA}^2" || true)"
+          pr=""
+          if [ -n "$second" ]; then
+            pr="$(gh api "repos/${REPO}/commits/${second}/pulls" --jq "[.[] | select(.head.sha == \"${second}\" and .head.repo.full_name == \"${REPO}\" and .state == \"open\") | {number, state: (.state | ascii_upcase), headSha: .head.sha, headRepo: .head.repo.full_name, branch: .head.ref, title, body: (.body // \"\")}] | first // empty" || true)"
+          fi
+          {
+            echo "pr<<LANDING_PR_EOF"
+            echo "$pr"
+            echo "LANDING_PR_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Check this PR's changelog fragment
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -46,6 +69,9 @@ jobs:
           CHANGELOG_GATE_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
           CHANGELOG_GATE_TITLE: ${{ github.event.pull_request.title }}
           CHANGELOG_GATE_BODY: ${{ github.event.pull_request.body }}
+          CHANGELOG_GATE_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          CHANGELOG_GATE_REPO: ${{ github.repository }}
+          CHANGELOG_GATE_LANDING_PR: ${{ steps.landing.outputs.pr }}
         run: |
           if [ "$EVENT_NAME" = "merge_group" ]; then
             echo "changelog-gate: PASS - queued PRs have already passed their PR gate"
