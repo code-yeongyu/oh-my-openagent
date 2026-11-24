@@ -185,6 +185,20 @@ describe("macOS status jobs forwarding combined-job outcomes", () => {
     ["heavy work disabled", "skipped", "", "false", "true", "true", 0],
     ["unexpected skip", "skipped", "", "true", "true", "true", 1],
     ["classification missing", "skipped", "", "", "", "", 1],
+    ["both source jobs passed", "success success", "success success success", "true", "true", "true", 0],
+    ["the other source job failed elsewhere", "success failure", "success success success", "true", "true", "true", 0],
+    ["a part in the second source job failed", "success failure", "success failure success", "true", "true", "true", 1],
+    ["both source jobs skipped as intended", "skipped skipped", "missing missing missing", "true", "false", "false", 0],
+    ["one source job never ran", "success skipped", "success missing success", "true", "true", "true", 1],
+    [
+      "one source job cancelled before its parts",
+      "success cancelled",
+      "success missing success",
+      "true",
+      "true",
+      "true",
+      1,
+    ],
   ])(
     "#given %s #when the real status script runs #then it propagates the verdict",
     (_name, jobStatus, outcomes, runHeavy, fullMatrix, runtimeTouching, exitCode) => {

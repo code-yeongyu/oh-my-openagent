@@ -6,7 +6,7 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { CI_YML_PATH, ciJobs, VALIDATIONS, type Validation, YQ_TO_JSON } from "./fixtures/publish-ci-validation"
-import { createGitOrigin, type GitOrigin } from "./fixtures/publish-gate-reuse-origin"
+import { createGitOrigin, type GitOrigin, runReleaseBash } from "./fixtures/publish-gate-reuse-origin"
 
 /**
  * Release contract: publish.yml gate-reuse waits for a successful hosted ci.yml run on the prepared
@@ -49,7 +49,9 @@ const GH_STUB = [
   '  case "$*" in',
   '    *"/actions/runs/42/jobs"*) leg_jobs "$RUN_LEGS" | jq -r "$filter" ;;',
   '    *"/actions/runs/7/jobs"*) leg_jobs "$BASE_LEGS" | jq -r "$filter" ;;',
-  '    *"actions/workflows/ci.yml/runs?branch=dev"*) printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z"}]}\' | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs?branch=dev"*)',
+  '      local base="${2##*head_sha=}"; base="${base%%&*}"',
+  '      printf \'{"workflow_runs":[{"id":7,"created_at":"2026-01-01T00:00:00Z","conclusion":"success","head_sha":"%s","head_branch":"dev","event":"push","status":"completed"}]}\' "$base" | jq -r "$filter" ;;',
   '    *"/collaborators/"*"/permission"*)',
   '      local login="${2#*/collaborators/}"; login="${login%/permission}"',
   '      [ -n "$PERMISSION_API_DOWN" ] && return 1',
@@ -156,7 +158,7 @@ function dispatch(input: Dispatch): Outcome {
   writeFileSync(pinJobs, ciJobs(input.pinValidation))
   const stampJobs = join(root, "stamp-jobs.json")
   writeFileSync(stampJobs, ciJobs(input.stampValidation))
-  const result = spawnSync("bash", ["-eo", "pipefail", script], {
+  const result = runReleaseBash(root, script, {
     cwd: checkout,
     encoding: "utf8",
     timeout: TEST_TIMEOUT_MS - 1_000,
