@@ -50,7 +50,9 @@ export async function openOn(
   if (answer.json) dependencies.output(JSON.stringify({ ...partial, ...named, prompt: { error: failure } }))
   else {
     dependencies.output(partial.thread)
-    dependencies.error(`omo remote: opened ${partial.thread}, but its first prompt was not delivered: ${failure.message}`)
+    dependencies.error(
+      `omo remote: opened ${partial.thread}, but its first prompt was not delivered: ${failure.message}`,
+    )
     dependencies.error(`${failure.next_action} Send it again with omo remote send ${partial.thread} <text>.`)
   }
   return REMOTE_EXIT.failed

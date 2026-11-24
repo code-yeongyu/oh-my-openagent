@@ -131,7 +131,8 @@ export function personRemoteOn(
   extra: Partial<Pick<PersonDeps, "serveAttach">> = {},
 ): PersonRemote & { readonly close: () => Promise<void> } {
   const client = (
-    dependencies.client ?? (() => personClient(dependencies, { connect: async () => borrowedService(service), ...extra }))
+    dependencies.client ??
+    (() => personClient(dependencies, { connect: async () => borrowedService(service), ...extra }))
   )()
   const surface = personSurface(client, packageJson.version)
   return {
