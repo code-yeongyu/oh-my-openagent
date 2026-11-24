@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import type { JsonObject, RemoteCommandOutcome, RemoteThreadSurface } from "../remote/ports"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import { gitRepoKit } from "./git-repo.testkit"
@@ -62,6 +63,28 @@ describe("thread_create with worktree on this device", () => {
       { cwd: path, name: "thread-create-worktree-50", durableSessionId: expect.any(String) },
     ])
     expect(kit.git(path, "branch", "--show-current")).toBe("feat/thread")
+  })
+
+  test("#given a host that never registers the new session #when thread_create with a worktree and a prompt is refused #then the worktree and the branch this call made are removed (#14648 review)", async () => {
+    const repo = kit.repository()
+    const { run } = surface(account().remote, { firstPromptWaitMs: 50, createdNeverDrains: true, closeUnlists: true })
+    const result = await run("thread_create", {
+      name: "thread-create-worktree-rollback",
+      cwd: repo,
+      worktree: { branch: "feat/rolled-back" },
+      prompt: "build it",
+    })
+    expect(failure(result)).toMatchObject({
+      code: "host_unavailable",
+      details: {
+        reason: "control_endpoint_unregistered",
+        created: false,
+        worktree: { branch: "feat/rolled-back", removed: true },
+      },
+    })
+    const path = (failure(result)?.details as { worktree: { path: string } }).worktree.path
+    expect(existsSync(path)).toBe(false)
+    expect(kit.git(repo, "branch", "--list", "feat/rolled-back")).toBe("")
   })
 
   test("#given the branch already exists #when thread_create asks for it #then name_conflict branch_exists and no thread opens", async () => {

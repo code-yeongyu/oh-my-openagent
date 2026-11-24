@@ -24,9 +24,17 @@ import {
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
-import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
+import {
+  answered,
+  closeNotLive,
+  closeOptions,
+  closeThread,
+  interruptThread,
+  NOT_LIVE,
+  setModelOn,
+} from "./control/operations"
 import { renameThread } from "./control/rename"
-import { controlIdentity, controlRefusalOf } from "./control/port"
+import { controlRefusalOf } from "./control/port"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { isUiRequestKind, UI_REQUEST_KINDS } from "./gateway/answer-shape"
@@ -758,9 +766,8 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       control(threadToolParamSchemas.thread_close, request, async (value) => {
         const found = await located(value.thread ?? "self", value.all_scope)
         if (found.kind === "error") return found.result
-        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (found.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
+        // Nothing live holds it: it stays resumable from its session file; what the gateway holds for it is answered there.
+        if (found.kind === "not_live") return await closeNotLive(store, found, closeOptions(value))
         return await closeThread(found.control, closeOptions(value))
       }),
     rename: (request) =>

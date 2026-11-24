@@ -42,7 +42,14 @@ export type LocalExisting =
    * `name`: the name the thread had, so a reopen keeps it (#14274). `cwd`: the folder its session records, which the
    * reopen names so the engine does not probe the file's path on its loop (#14296).
    */
-  | { readonly kind: "file"; readonly sessionPath: string; readonly name?: string; readonly cwd?: string }
+  | {
+      readonly kind: "file"
+      readonly sessionPath: string
+      readonly name?: string
+      readonly cwd?: string
+      /** The thread the file holds, as the address resolved it. */
+      readonly thread?: string
+    }
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
 /** This device's side of placement: its name ladder, what it knows of an existing thread, and its SessionHost. */
@@ -140,6 +147,7 @@ export async function planCreate(
       request: { sessionPath: existing.sessionPath, ...(existing.cwd === undefined ? {} : { cwd: existing.cwd }) },
       creates: false,
       ...(existing.name === undefined ? {} : { previousName: existing.name }),
+      ...(existing.thread === undefined ? {} : { reopenedId: existing.thread }),
     }
   }
   if (value.thread !== undefined && value.device !== undefined)

@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
+import { existsSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import type { SameDeviceWake } from "../gateway/same-device-wake"
+import { createdThreadId } from "./session-host"
 import { createRemoteThreadFixture, ENGINE } from "../thread-remote-fixture"
 
 // omo#13409 / omo#13410: thread_create takes the new thread's model, reasoning level, approval mode and first prompt in
@@ -223,9 +227,199 @@ describe("thread_create with a first prompt (#13410)", () => {
 // The held-thread report: thread_create({ prompt }) answered ok while its first prompt never ran (no client attached, the
 // new session's control endpoint never drained the row). A create with a prompt either runs it or fails, typed.
 describe("thread_create whose first prompt does not start", () => {
-  test("#given a new session here whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+  // #14648: a thread host running another omo opens the session but its gateway refuses this machine's store, so it never
+  // registers the session: the send answers queued offline, and with this process's carrier, queued waiting on a wake
+  // that can never admit it (the session is live in that same host). Either way the prompt never runs.
+  const wakeThatNeverAdmits: SameDeviceWake = {
+    afterSend: async (result) =>
+      result.kind === "ok" && result.delivery.kind === "queued_offline"
+        ? {
+            ...result,
+            delivery: { kind: "queued", queue_position: result.delivery.queue_position, waiting_on: { kind: "wake" } },
+          }
+        : result,
+  }
+  test.each([
+    ["no carrier", undefined],
+    ["a carrier that answers waiting on the wake", wakeThatNeverAdmits],
+  ] as const)(
+    "#given a new session here its host never registers with the gateway, with %s #when created with a prompt #then host_unavailable, the prompt taken back and the session ended, nothing left (#14648)",
+    async (_, sameDeviceWake) => {
+      const a = account()
+      const { run, store, forcedCloses } = surface(a.remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        ...(sameDeviceWake === undefined ? {} : { sameDeviceWake }),
+      })
+      const result = await run("thread_create", { name: "never-registered", prompt: "build it" })
+      const rows = await store.list({ target_durable_id: "dur-created-here" })
+      expect(rows.map((row) => [row.state, row.reason])).toEqual([["refused", "target_closed"]])
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "host_unavailable",
+          details: {
+            reason: "control_endpoint_unregistered",
+            created: false,
+            thread: "dur-created-here",
+            delivery_id: rows[0]?.delivery_id,
+            dropped_deliveries: [rows[0]?.delivery_id],
+          },
+        },
+      })
+      expect(forcedCloses).toEqual(["route-created"])
+    },
+  )
+
+  // A session file on disk, so this device's engine resumes it under that id (as senpi does) and the book lists it.
+  const writeSession = (agentDir: string, id: string) => {
+    const path = join(agentDir, `${id}.jsonl`)
+    writeFileSync(path, `${JSON.stringify({ type: "session", version: 3, id, cwd: process.cwd() })}\n`)
+    return path
+  }
+
+  test("#given an earlier run under the same key left its thread's session file #when the create reopens it and its host never registers it #then the refusal keeps that file (#14648 review B1)", async () => {
+    const id = createdThreadId("dur-caller", "retry-14648")
+    const { run, agentDir } = surface(account().remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      closeUnlists: true,
+      diskSessions: [id],
+    })
+    const file = writeSession(agentDir, id)
+    const result = await run("thread_create", { name: "retried", prompt: "build it", idempotency_key: "retry-14648" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: id } },
+    })
+    expect(existsSync(file)).toBe(true)
+  })
+
+  test.each([
+    ["an endpoint its exit cleared", false],
+    ["a stale endpoint a crash left", true],
+  ] as const)(
+    "#given a thread with a message held for its wake and an earlier life's registration with %s #when it is reopened with a prompt and its host never registers it #then only the prompt is taken back, the session is ended with no close recorded, and the create is refused (#14648 review B2 B3)",
+    async (_, staleEndpoint) => {
+      const { run, store, agentDir, closeRequests } = surface(account().remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        diskSessions: ["dur-saved"],
+        sameDeviceWake: wakeThatNeverAdmits,
+      })
+      writeSession(agentDir, "dur-saved")
+      // An earlier life registered it: a clean exit cleared the endpoint and kept the incarnation; a crash left both.
+      await store.registerIncarnation({
+        durable_id: "dur-saved",
+        incarnation: "earlier-life",
+        ...(staleEndpoint ? { endpoint: { socket: join(agentDir, "gone.sock"), kind: "rpc_host" as const } } : {}),
+      })
+      expect(await run("thread_send", { thread: "dur-saved", message: "held for the wake" })).toMatchObject({
+        kind: "ok",
+      })
+      const [held] = await store.list({ target_durable_id: "dur-saved" })
+      const result = await run("thread_create", { thread: "dur-saved", prompt: "build it" })
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered", thread: "dur-saved" } },
+      })
+      const rows = await store.list({ target_durable_id: "dur-saved" })
+      const prompt = rows.find((row) => row.delivery_id !== held?.delivery_id)
+      expect(rows.find((row) => row.delivery_id === held?.delivery_id)?.state).toBe("queued")
+      expect([prompt?.state, prompt?.reason]).toEqual(["refused", "target_closed"])
+      expect(result).toMatchObject({ error: { details: { dropped_deliveries: [prompt?.delivery_id] } } })
+      // The wake sweep settles a thread's queued rows only after a close recorded on request; a rollback records none.
+      expect(closeRequests).toEqual([{ force: true, record: false }])
+    },
+  )
+
+  test.each([
+    ["a registry that answers", undefined],
+    ["a registry whose lookups fail after planning found the alias free", 1],
+  ] as const)(
+    "#given a thread that holds no alias and %s #when it is reopened with a new alias and a prompt and its host never registers it #then no alias is claimed, so none is left behind (#14648 review M2)",
+    async (_, resolveFailsAfter) => {
+      const a = account(resolveFailsAfter === undefined ? {} : { resolveFailsAfter })
+      const { run, agentDir } = surface(a.remote, {
+        firstPromptWaitMs: 50,
+        createdNeverDrains: true,
+        diskSessions: ["dur-saved"],
+      })
+      writeSession(agentDir, "dur-saved")
+      const result = await run("thread_create", { thread: "dur-saved", alias: "lane-new", prompt: "build it" })
+      expect(result).toMatchObject({ kind: "error", error: { code: "host_unavailable" } })
+      expect(a.aliases.has("lane-new")).toBe(false)
+      expect(a.registryCalls.includes("claim")).toBe(false)
+    },
+  )
+
+  test("#given a thread that already holds an alias #when it is reopened by that alias with a prompt and its host never registers it #then the refusal keeps the alias (#14648 review B4)", async () => {
     const a = account()
-    const { run, enqueuedRequests } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const { run, agentDir } = surface(a.remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      diskSessions: ["dur-saved"],
+    })
+    writeSession(agentDir, "dur-saved")
+    const holder = { session_id: "dur-saved", device: "here" }
+    a.aliases.set("lane-held", holder)
+    expect(await run("thread_create", { thread: "dur-saved", alias: "lane-held", prompt: "build it" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "control_endpoint_unregistered" } },
+    })
+    expect(a.aliases.get("lane-held")).toEqual(holder)
+  })
+
+  test("#given a create with an alias whose new session its host never registers #when it is refused #then no alias was claimed (#14648 review M2)", async () => {
+    const a = account()
+    const { run } = surface(a.remote, { firstPromptWaitMs: 50, createdNeverDrains: true })
+    const result = await run("thread_create", { alias: "lane-14648", prompt: "build it" })
+    expect(result).toMatchObject({ kind: "error", error: { code: "host_unavailable", details: { created: false } } })
+    expect(a.aliases.has("lane-14648")).toBe(false)
+    expect(a.registryCalls.includes("claim")).toBe(false)
+  })
+
+  test("#given a create with an alias whose first prompt starts but whose alias claim fails #when it is created and retried under its key #then the failure carries the started delivery and its receipt, and the prompt is delivered once (#14648 review M1)", async () => {
+    const a = account({ failClaim: true })
+    const { run, enqueuedRequests } = surface(a.remote)
+    const args = { alias: "lane-flaky", prompt: "build it", idempotency_key: "alias-after-prompt" }
+    const result = await run("thread_create", args)
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "host_unavailable",
+        details: {
+          reason: "claim_failed",
+          thread: "dur-created-here",
+          prompt: { delivery: { kind: "started" }, delivery_id: expect.any(String) },
+        },
+      },
+    })
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+    expect(await run("thread_create", args)).toEqual(result)
+    expect(enqueuedRequests("dur-created-here")).toHaveLength(1)
+  })
+
+  test("#given a create with an alias whose first prompt starts here #when it is created #then the alias is claimed after the prompt and names the new thread (#14648 review M2)", async () => {
+    const a = account()
+    const { run } = surface(a.remote)
+    const result = await run("thread_create", { alias: "lane-started", prompt: "build it" })
+    expect(result).toMatchObject({
+      kind: "ok",
+      thread: "dur-created-here",
+      alias: "lane-started",
+      prompt: { delivery: { kind: "started" } },
+    })
+    expect(a.aliases.get("lane-started")?.session_id).toBe("dur-created-here")
+  })
+
+  test("#given a new session here its host registered but whose control endpoint never drains #when created with a prompt #then the create fails prompt_not_started naming the thread, the delivery and its last state", async () => {
+    const a = account()
+    const { run, enqueuedRequests } = surface(a.remote, {
+      firstPromptWaitMs: 50,
+      createdNeverDrains: true,
+      createdRegisters: true,
+    })
     const result = await run("thread_create", { name: "never-drained", prompt: "build it" })
     expect(result).toMatchObject({
       kind: "error",
