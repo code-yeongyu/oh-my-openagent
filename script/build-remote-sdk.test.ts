@@ -72,10 +72,10 @@ const consumerTypecheck = (moduleResolution: "nodenext" | "bundler") => {
 describe("omo-ai/remote build", () => {
   test("the bundle and its declarations match their source", async () => {
     await buildRemoteSdk(true)
-  }, 120_000)
+  })
 
   for (const moduleResolution of ["nodenext", "bundler"] as const)
     test(`#given omo-ai installed in a bare project #when its ${moduleResolution} consumer type-checks with skipLibCheck off #then the shipped declarations resolve and type the API`, () => {
       expect(consumerTypecheck(moduleResolution)).toEqual({ code: 0, output: "" })
-    }, 120_000)
+    })
 })
