@@ -25,6 +25,25 @@ describe("the remote failure conversion", () => {
       expect(remoteFailureOf(onRoot)).toEqual(original)
     })
 
+  test("#given failures whose details legitimately carry their own code field #when they round-trip #then nothing is rewritten", () => {
+    const registered: RemoteFailure = {
+      kind: "error",
+      code: "timeout",
+      message: "late",
+      next_action: "retry",
+      details: { code: "ETIMEDOUT" },
+    }
+    const internal: RemoteFailure = {
+      kind: "error",
+      code: "internal_error",
+      message: "broke",
+      next_action: "retry",
+      details: { code: "orphaned" },
+    }
+    expect(remoteFailureOf(remoteFailure(registered))).toEqual(registered)
+    expect(remoteFailureOf(remoteFailure(internal))).toEqual(internal)
+  })
+
   test("#given a remote failure with only its required fields #when it round-trips #then no optional field appears", () => {
     const original: RemoteFailure = { kind: "error", code: "timeout", message: "late", next_action: "retry" }
     expect(remoteFailureOf(remoteFailure(original))).toEqual(original)

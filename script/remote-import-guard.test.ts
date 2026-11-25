@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { checkAdapterImports, offenderGrowth } from "./remote-import-guard-adapter"
+import { offenderBaseProblems, probeBase, repoGit } from "./sdk-parity/base-probe"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
@@ -224,4 +225,15 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })
   })
+})
+
+// Home two of the offender-record check (home one is gate-cli.ts in the SDK Parity job); see sdk-parity/base-probe.ts.
+const BASE = probeBase(repoGit)
+describe("adapter offender record against the merge base (runs whenever the merge base is readable)", () => {
+  test.skipIf(!BASE.readable)(
+    `#given the merge base's offender record #then this head's record only shrinks against it${BASE.readable ? "" : ` [skipped: ${BASE.reason}]`}`,
+    () => {
+      expect(offenderBaseProblems(repoGit, ADAPTER_OFFENDERS)).toEqual({ problems: [] })
+    },
+  )
 })

@@ -15,6 +15,13 @@ describe("the thread failure conversion", () => {
       expect(threadToolFailureOf(onRoot)).toEqual(original)
     })
 
+  test("#given failures whose details legitimately carry their own code field #when they round-trip #then nothing is rewritten", () => {
+    const registered = threadToolFailure("not_found", "gone", "list again", { code: "ENOENT" })
+    const internal = threadToolFailure("internal_error", "broke", "retry", { code: "not_found" })
+    expect(threadToolFailureOf(threadFailure(registered))).toEqual(registered)
+    expect(threadToolFailureOf(threadFailure(internal))).toEqual(internal)
+  })
+
   test("#given a thread failure with no details #when it round-trips #then no details field appears", () => {
     const original = threadToolFailure("not_found", "gone", "list again")
     expect(threadToolFailureOf(threadFailure(original))).toEqual(original)

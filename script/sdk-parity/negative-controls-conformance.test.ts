@@ -52,12 +52,18 @@ describe("conformance: the observed trace and the stated effect (H1)", () => {
       expect: [{ port: "host", op: "listSessions", result }],
     })
     const runs = [
-      custom(stimulus("by-id", false, 1), (calls) => (calls.push(host("listSessions")), { kind: "ok" })),
-      custom(stimulus("all-scope", true, 2), (calls) => (calls.push(host("listSessions")), { kind: "ok" })),
-      custom(
-        stimulus("other-device", true, 3, "other_device"),
-        (calls) => (calls.push(host("listSessions")), { kind: "ok" }),
-      ),
+      custom(stimulus("by-id", false, 1), (calls) => {
+        calls.push(host("listSessions"))
+        return { kind: "ok" }
+      }),
+      custom(stimulus("all-scope", true, 2), (calls) => {
+        calls.push(host("listSessions"))
+        return { kind: "ok" }
+      }),
+      custom(stimulus("other-device", true, 3, "other_device"), (calls) => {
+        calls.push(host("listSessions"))
+        return { kind: "ok" }
+      }),
     ]
     expect(await problems(runs)).toEqual([
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",

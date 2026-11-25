@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
-import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { mappingProblems } from "./cell-mappings"
 import { cliProgram } from "../../packages/omo-opencode/src/cli/cli-program"
 import {
@@ -14,9 +13,10 @@ import {
   loopArity,
   nativeTableArity,
 } from "./arity-check"
+import { probeBase, registryBaseProblems, repoGit } from "./base-probe"
+import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { cellProblems } from "./cells"
-import { conformanceProblems } from "./conformance"
-import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, runEffectScenarios } from "./conformance-run"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
@@ -102,4 +102,22 @@ describe("SDK parity registry (#14947)", () => {
     ])
     expect(toolProblems(tools, rows)).toEqual([])
   })
+})
+
+// Home two of the base-tree checks (home one is gate-cli.ts in the SDK Parity job); see base-probe.ts.
+const BASE = probeBase(repoGit)
+describe("the head against the merge base's tree (runs whenever the merge base is readable)", () => {
+  test.skipIf(!BASE.readable)(
+    `#given the merge base this pull request merges into and the head's run evidence #then the baseline and the built rows hold${BASE.readable ? "" : ` [skipped: ${BASE.reason}]`}`,
+    async () => {
+      const head = {
+        rows,
+        originalText: repoFile(ORIGINAL_PATH),
+        pinText: repoFile(PIN_PATH),
+        unresolved: JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline,
+        evidence: await runEffectScenarios(rows, await loadScenarioRuns()),
+      }
+      expect(registryBaseProblems(repoGit, head)).toEqual({ problems: [] })
+    },
+  )
 })

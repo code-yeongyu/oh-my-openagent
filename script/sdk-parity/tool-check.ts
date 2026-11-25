@@ -53,7 +53,7 @@ export function schemaDifferences(tool: unknown, sdk: unknown, path: string): st
   const [left, right] = [variants(a.anyOf), variants(b.anyOf)]
   if (left.length !== right.length)
     out.push(`${path}: ${left.length} variants in the tool and ${right.length} in the SDK`)
-  else left.forEach((variant, i) => out.push(...schemaDifferences(variant, right[i], `${path}|${i}`)))
+  else for (const [i, variant] of left.entries()) out.push(...schemaDifferences(variant, right[i], `${path}|${i}`))
   return out
 }
 
