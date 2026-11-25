@@ -38,25 +38,32 @@ describe("removeStaleSelfPackageTests", () => {
     // given
     const workflow = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")
 
+    const jobs = (Bun.YAML.parse(workflow) as { jobs: Record<string, { steps: { name?: string }[] }> }).jobs
+    const suites: Record<string, string> = {
+      test: "Run tests with Windows telemetry",
+      "test-linux": "Run omo-opencode tests",
+      "senpi-compatibility": "Run Senpi compatibility tests with Windows telemetry",
+      "senpi-tests-linux": "Run Senpi compatibility tests",
+    }
+
     // when
-    const installIndex = workflow.indexOf("      - name: Install dependencies")
-    const cleanupIndex = workflow.indexOf("      - name: Remove stale self-package test copies")
-    const testIndex = workflow.indexOf("      - name: Run tests")
-    const senpiJobIndex = workflow.indexOf("  senpi-compatibility:")
-    const senpiInstallIndex = workflow.indexOf("      - name: Install dependencies", senpiJobIndex)
-    const senpiCleanupIndex = workflow.indexOf("      - name: Remove stale self-package test copies", senpiJobIndex)
-    const senpiTestIndex = workflow.indexOf("      - name: Run Senpi compatibility tests", senpiJobIndex)
-    const cleanupCount = workflow.match(/      - name: Remove stale self-package test copies/g)?.length ?? 0
+    const order = Object.entries(suites).map(([id, testStep]) => {
+      const names = (jobs[id]?.steps ?? []).map((step) => step.name)
+      return {
+        id,
+        install: names.indexOf("Install dependencies"),
+        cleanup: names.indexOf("Remove stale self-package test copies"),
+        test: names.indexOf(testStep),
+      }
+    })
 
     // then
-    expect(installIndex).toBeGreaterThanOrEqual(0)
-    expect(cleanupIndex).toBeGreaterThan(installIndex)
-    expect(testIndex).toBeGreaterThan(cleanupIndex)
-    expect(senpiInstallIndex).toBeGreaterThan(senpiJobIndex)
-    expect(senpiCleanupIndex).toBeGreaterThan(senpiInstallIndex)
-    expect(senpiTestIndex).toBeGreaterThan(senpiCleanupIndex)
-    expect(cleanupCount).toBe(2)
-    expect(workflow.match(/run: bun run script\/remove-stale-self-package-tests\.ts/g)).toHaveLength(2)
+    for (const job of order) {
+      expect(job.install, job.id).toBeGreaterThanOrEqual(0)
+      expect(job.cleanup, job.id).toBeGreaterThan(job.install)
+      expect(job.test, job.id).toBeGreaterThan(job.cleanup)
+    }
+    expect(workflow.match(/run: bun run script\/remove-stale-self-package-tests\.ts/g)).toHaveLength(order.length)
   })
 })
 

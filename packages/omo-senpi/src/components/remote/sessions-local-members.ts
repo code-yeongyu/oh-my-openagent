@@ -1,6 +1,6 @@
 import { interruptOver } from "../thread/control/interrupt"
 import type { ThreadSocketConnect } from "../thread/live-surface"
-import type { ThreadHost, ThreadSessionPort } from "../thread/tools/ports"
+import type { ThreadCloseOptions, ThreadHost, ThreadSessionPort } from "../thread/tools/ports"
 import { ok, type Outcome } from "./client"
 import { nextActionFor, remoteFailure } from "./codes"
 import { probing, wireFailure, type WireProbe } from "./local-wire"
@@ -68,7 +68,7 @@ export function localSessionMembers(hostOn: HostOn) {
   }
 
   return {
-    close: (target: LocalTarget) =>
+    close: (target: LocalTarget, options: ThreadCloseOptions = {}) =>
       run(target, "closed the session", async ({ port, routing, durable }) => {
         if (port.closeSession === undefined)
           return remoteFailure(
@@ -79,7 +79,7 @@ export function localSessionMembers(hostOn: HostOn) {
               details: { feature: "close", device: target.device },
             },
           )
-        const outcome = await port.closeSession(routing, durable)
+        const { outcome, dropped_deliveries } = await port.closeSession(routing, durable, options)
         if (outcome === "held_elsewhere")
           return remoteFailure(
             "foreign_live_owner",
@@ -87,7 +87,7 @@ export function localSessionMembers(hostOn: HostOn) {
             "Close it from the client that holds it, or call sessions.send first so it can be closed for every holder.",
             { details: { device: target.device } },
           )
-        return ok({ closed: outcome === "closed" })
+        return ok({ closed: outcome === "closed", dropped_deliveries: [...dropped_deliveries] })
       }),
     interrupt: (target: LocalTarget, thread: ThreadHandle): Promise<Outcome<InterruptResult>> =>
       run(target, "interrupted the turn", async ({ port, routing, durable }) => {

@@ -9,6 +9,9 @@ import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
 import { parseSession } from "./remote-session-args"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
+import { useIsolatedAgentDir } from "./test/remote-cli-harness"
+
+useIsolatedAgentDir()
 
 // The command reaches its client through the state dir it is connected on; a connected device service has its endpoint file there.
 const connectedStateDir = (): string => {
@@ -124,7 +127,7 @@ describe("omo remote open connection", () => {
     } as RemoteCommandDependencies
     const code = await runSession(
       shared.conn,
-      { verb: "open", device: "b", permissionPreset: "full-access" },
+      { verb: "open", device: "b", permissionPreset: "full-access", delivery: "auto" },
       false,
       dependencies,
     )
@@ -264,5 +267,13 @@ describe("omo remote send bounded settle (#13425)", () => {
     } finally {
       await remoteFixture.cleanup()
     }
+  })
+})
+
+describe("#14333: omo remote send and open default to auto", () => {
+  test("#given no --steer or --follow-up #when send and open --prompt are parsed #then both carry the shared default; --follow-up is kept", () => {
+    expect(parseSession("send", ["b/rk-on-b", "ping"]).session).toMatchObject({ delivery: "auto" })
+    expect(parseSession("open", ["b", "--prompt", "go"]).session).toMatchObject({ delivery: "auto" })
+    expect(parseSession("send", ["--follow-up", "b/rk-on-b", "ping"]).session).toMatchObject({ delivery: "follow_up" })
   })
 })

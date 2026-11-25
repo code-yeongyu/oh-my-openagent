@@ -38,7 +38,7 @@ const RUNTIME_WRAPPERS = "packages/utils/src/runtime/"
 
 // Rule 1: every reachable file importing node:child_process or a spawn wrapper (the utils runtime, the Bun spawn shim).
 const SPAWN_IMPORTERS = [
-  "packages/device-service-core/src/local-api/dacl.ts",
+  "packages/device-service-core/src/local-api/powershell.ts",
   "packages/memory-core/src/locks/process-identity.ts",
   "packages/omo-native/bin/lib/process-list.js",
   "packages/omo-opencode/src/cli/service-auth/account-home.ts",
@@ -58,13 +58,14 @@ const SPAWN_IMPORTERS = [
 const BUN_PRIMITIVE_USES: Record<string, number> = {}
 // Rule 3: every call that can start a process, with its command and argv as written (spawn-call-sites.ts).
 const SPAWN_CALL_SITES = [
-  "packages/device-service-core/src/local-api/dacl.ts: applyExactDacl(path; userSid)",
   "packages/device-service-core/src/local-api/dacl.ts: describeDacl(path; run)",
-  'packages/device-service-core/src/local-api/dacl.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
   "packages/device-service-core/src/local-api/dacl.ts: run(APPLY_DACL_SCRIPT; {LA_PATH,LA_SID,LA_KIND})",
   "packages/device-service-core/src/local-api/dacl.ts: run(CURRENT_USER_SID_SCRIPT; {})",
   "packages/device-service-core/src/local-api/dacl.ts: run(DESCRIBE_DACL_SCRIPT; {LA_PATH})",
-  "packages/device-service-core/src/local-api/dacl.ts: verifyExactDacl(path; userSid)",
+  'packages/device-service-core/src/local-api/powershell.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#applyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#verifyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: run(sddlReaderWith(LEVEL_READ); {OMO_LEVEL_PATH})",
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "args=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "lstart=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("powershell.exe"; [ "-NoProfile", "-Command", `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString(\'o\')`, ])',
@@ -124,6 +125,7 @@ const SPAWN_CALL_SITES = [
   'packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts: node:child_process#execFile("git"; [...args])',
   "packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts: originRemote(cwd; env)",
   "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(row.admitted_by; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(row.admitted_by; -)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatch(request.op; request.args)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchWoken(ctx; op)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(claimant; -)",
@@ -132,11 +134,24 @@ const SPAWN_CALL_SITES = [
   'packages/omo-senpi/src/components/thread/gateway/store-worker.ts: takeOverWake(ctx; args as WokenRequest<"takeOver">)',
   "packages/omo-senpi/src/components/thread/gateway/store.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd}; -)",
   "packages/omo-senpi/src/components/thread/tools/internals.ts: packages/omo-senpi/src/components/thread/addressing.ts#workspaceDirectories(root; -)",
-  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; current)",
+  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; view)",
   "packages/utils/src/runtime/spawn.ts: bun.spawn(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: bun.spawnSync(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawn(bin; args)",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawnSync(bin; args)",
+  // #14622 review M4: a source build about to migrate the gateway store reads the OS user record's home through the
+  // pinned account-home helper (/etc/passwd, `/usr/bin/id -P`, System32 whoami/reg), never a tool found on PATH.
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: accountHomes(process.env; options.facts ?? systemPlatformFacts)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: packages/omo-opencode/src/cli/service-auth/account-home.ts#userRecordHome(facts; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedAgentDir(ctx.config.agent_dir; {stores})",
+  // #14622 review M9: the guard also compares the database file the worker opened (links resolved) with each shared
+  // agent dir's database by identity; both checks list the shared agent dirs through sharedAgentDirs.
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedStoreFile(ctx.databasePath; gatewayDatabasePath)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: sourceBuildMigrationRefusal(ctx; opened)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchOp(ctx; op)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/store-ops.ts#migrate(context; -)",
 ]
 const CONNECT_CALLS = [
   'createConnection({ host: "127.0.0.1", port })',

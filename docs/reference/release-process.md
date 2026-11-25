@@ -18,6 +18,18 @@ The `/publish` command accepts `patch`, `minor`, `major`, or an explicit semanti
 
 For the `omo-ai` package (OmO Native), see the [omo-ai publishing runbook](./omo-ai-publishing.md): the version-derived channel (stable on `latest`, prereleases on `beta`), the Trusted Publisher merge gate, and the release checklist.
 
+## Release a green commit while dev moves
+
+Use `source_sha` when commits after a green `dev` revision should stay out of the release:
+
+```bash
+gh workflow run publish.yml --ref dev -f source_sha=<full-40-hex-sha> -f bump=patch
+```
+
+The pin must be an ancestor of `origin/dev` with a successful `ci.yml` **push** run at that exact SHA. The workflow stamps the version directly on the pin and merges the release-state PR into `dev`. It tags and publishes the stamp, not the merge commit, and refuses to tag it if its first parent is not the pin.
+
+The publish gate reuses the pin's CI only if `release-state-paths.mjs --check-stamp` verifies the delta. Otherwise it requires successful CI at the stamp SHA. A tag whose workflow predates `source_sha` uses its existing exact-stamp CI gate. Leave `source_sha` empty for the ordinary release; it cannot be combined with `lazycodex_only` or the CI receipt waiver.
+
 ## Resuming a Failed Publish
 
 For a transient failure, retry only the failed jobs and their dependencies:

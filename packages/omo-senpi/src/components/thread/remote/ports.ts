@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {
@@ -155,8 +159,11 @@ export type RemoteSessionsPort = {
   readonly devices: () => Promise<readonly RemoteDevice[]>
   /** The account's session list; with `device`, that one device's rows only (no account-wide round). */
   readonly sessions: (filter?: { readonly device?: string }) => Promise<readonly RemoteSessionRow[]>
-  /** The account-wide list as `sessions` gives it, with the devices it could not include. Absent: every device counts as listed. */
-  readonly listing?: () => Promise<RemoteListing>
+  /**
+   * The account-wide list as `sessions` gives it, with the devices it could not include; with `device`, that one device's
+   * rows and whether it missed the round (no account-wide round). Absent: every device counts as listed.
+   */
+  readonly listing?: (filter?: { readonly device?: string }) => Promise<RemoteListing>
   /**
    * A session-less engine record (`open_session`, `list_sessions`) on `device`'s engine endpoint, with no
    * attach: the attach-less `session.command {device, endpoint, rpc}` shape (relay daemon #393). `locate` asks a
@@ -165,13 +172,20 @@ export type RemoteSessionsPort = {
    * record settles (#12777). Sent on the long-lived connection it would attach the host's delegated engine
    * connection to the session as well, and the engine would write each streamed delta twice; the attach that
    * follows rides the long-lived connection, which then carries one copy per delta. Every other record rides the
-   * long-lived connection.
+   * long-lived connection. `endpoint` sends to that listed engine key instead of the primary (omo#14271: a read-only
+   * lookup the primary cannot serve), and is never kept as the device's endpoint for later commands. `waitMs` bounds
+   * this one call (the fallback shares one budget across its engines).
    */
   readonly endpointCommand: (
     device: string,
     rpc: JsonObject,
-    options?: { readonly locate?: boolean },
+    options?: { readonly locate?: boolean; readonly endpoint?: string; readonly waitMs?: number },
   ) => Promise<RemoteCommandOutcome>
+  /**
+   * omo#14271: every engine endpoint key `device` lists, and the one it names as its own (0.1.11+). The primary is named
+   * by key, never by position. Absent: only the primary is ever asked.
+   */
+  readonly endpointKeys?: (device: string) => Promise<{ readonly keys: readonly string[]; readonly primary?: string }>
   /**
    * The id a session just created on `device` is addressed by (its listing row's `session_id`, the key an attach
    * takes), from the durable engine session id the create reply names; settles once that id attaches. A `knownKey` the
@@ -217,10 +231,12 @@ export type RemoteSessionsPort = {
     options?: RemoteWatchOptions,
   ) => Promise<RemoteWatchOutcome>
   /**
-   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `file`. Until the listing catches
-   * up it lists the row ended, carrying that file as `session_file`. Absent: the listing is read as it comes.
+   * #14170 (`closed-rows.ts`): this surface closed `row`'s session, whose unload named `file`, or its holder answered that
+   * nothing runs it (#14273). Until the listing catches up it lists the row ended, carrying that file as `session_file`.
+   * `at`: when the holder recorded the close, on the holder's clock (the unload's effect), so the close's own activity
+   * never reads as a reopen. Absent: the listing is read as it comes.
    */
-  readonly closed?: (row: RemoteSessionRow, file: string | undefined) => void
+  readonly closed?: (row: RemoteSessionRow, file: string | undefined, at?: number) => void
   /**
    * #14170: `row`'s session runs again under `key` (this surface reopened it, or its holder says an engine runs it), so a
    * closed mark no longer applies.
@@ -264,8 +280,17 @@ export type RemoteThreadSurface = {
   readonly permissionPreset?: () => string | undefined
 }
 
-/** The id a listing row has ABOVE the ports (decision 0027 D2): its durable id and nothing else; "" when the device publishes none. */
-export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? ""
+// A UUIDv7 carries its creation time in its first 48 bits (RFC 9562 section 5.7); engine durable ids are UUIDv7.
+const UUID_V7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/**
+ * A listing row's creation time. The row carries none and its `updated_ms` is not one (#14474), so it is the time a
+ * UUIDv7 durable id encodes; a row without such an id keeps `updated_ms`.
+ */
+export function rowCreatedAt(row: RemoteSessionRow): string {
+  const match = UUID_V7.exec(row.durable_id ?? "")
+  return new Date(match === null ? row.updated_ms : Number.parseInt(`${match[1]}${match[2]}`, 16)).toISOString()
+}
 
 /**
  * A listing row's thread status. Live only when its device answered this round with a non-ended state: a cached row of a
@@ -274,14 +299,15 @@ export const rowThreadId = (row: RemoteSessionRow): string => row.durable_id ?? 
 export const rowStatus = (row: RemoteSessionRow): ThreadStatus =>
   row.state === "ended" || row.source === "cache" ? "resumable" : "live"
 
-/** A listing row's display name: its title, else its folder's name, so no listed thread shows an empty name (#14043). */
-export const rowLabel = (row: RemoteSessionRow): string =>
-  row.title !== "" ? row.title : (row.project.split(/[\\/]/).findLast((part) => part !== "") ?? "")
+/** A row's working folder: its `path` (the folder the device lists), else the folder's name when that is unknown (#14429). */
+export const rowFolder = (row: RemoteSessionRow): string =>
+  row.path !== "" && row.path !== "unknown" ? row.path : row.project
 
 /**
  * The one rule for a probe-built `ended` row (#13238 review): a probe may build one only while this device's service
  * can carry the wake, since an ended row goes down the wake path; with the wake off it would go down the live path and
- * attach to a key no engine runs. Every probe site (holderTarget, replyOnDevice, lookupAcross) asks this first.
+ * attach to a key no engine runs. Every probe site (address/holder.ts holderTarget, address/probe.ts probeAcross and
+ * pinned) asks this first.
  */
 export async function probeMayBuildEndedRow(sessions: Pick<RemoteSessionsPort, "canWake">): Promise<boolean> {
   return (await sessions.canWake?.().catch(() => false)) === true

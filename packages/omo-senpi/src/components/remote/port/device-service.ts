@@ -11,7 +11,7 @@ import {
   type EndpointCommandResult,
   type RemoteAttach,
 } from "@oh-my-opencode/device-service-core/device-service"
-import { CATALOG_RECORD, createAttachPool, type HeldAttach } from "../../thread/remote/attach-pool"
+import { createAttachPool, HELD_RECORDS, type HeldAttach } from "../../thread/remote/attach-pool"
 import type {
   DeviceServiceDial,
   JsonObject,
@@ -38,7 +38,7 @@ export type DeviceServiceSessionsOptions = {
   readonly retryDelay?: (ms: number) => Promise<void>
   /** Test seam: how long an attach no op or watch holds is kept before it is detached. */
   readonly attachIdleMs?: number
-  /** Test seam: the clock that ages a finished account listing. */
+  /** Test seam: the clock that ages a finished account listing and the reads an attach holds (attach-pool.ts). */
   readonly now?: () => number
 }
 
@@ -74,7 +74,12 @@ const sessionReason = (code: string): string => (code === "session_not_found" ? 
 
 // The engine records the thread tools send that change nothing on the other device (thread_read and its paged form,
 // the pre-send probe). Like the port's read, every failure of one is a typed refusal: there is nothing that may have run.
-const READ_ONLY_RECORDS: ReadonlySet<string> = new Set(["get_state", "get_messages", "get_entries"])
+const READ_ONLY_RECORDS: ReadonlySet<string> = new Set([
+  "get_state",
+  "get_messages",
+  "get_entries",
+  "get_protocol_info",
+])
 
 // How long a read-only record waits for its final state before it is refused request_timeout (the local API's own request
 // bound). Every other record keeps the attach's default bound: a lost final state never holds a tool call forever.
@@ -180,7 +185,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         throw error
       },
     )).then((dialed) => dialed.conn)
-  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs)
+  const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
   const endpoints = new Map<string, string>()
   const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
@@ -234,9 +239,9 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     try {
       const { attached, catalog } = held.session
       const readOnly = READ_ONLY_RECORDS.has(String(rpc["type"]))
-      const isCatalog = rpc["type"] === CATALOG_RECORD
+      const isHeld = HELD_RECORDS.has(String(rpc["type"]))
       const key = recordKey(record)
-      if (isCatalog && commandOptions?.fresh !== true) {
+      if (isHeld && commandOptions?.fresh !== true) {
         const kept = catalog.get(key)
         if (kept !== undefined) return { kind: "ok", response: kept, local: true }
       }
@@ -250,7 +255,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
         const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
-        if (isCatalog && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
+        if (isHeld && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
         // It left this device and its final state did not come back: the device has it, its answer was lost.
@@ -285,8 +290,22 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         ...(row.source === "cache" ? { as_of: row.as_of } : {}),
         ...(row.model === undefined ? {} : { model: { provider: row.model.provider, id: row.model.id } }),
         ...(row.archived === true ? { archived: true as const } : {}),
+        // Rows 6/7 (omo-relay-spec #313, #314): copied as sent; a row without them carries none, and nothing is inferred.
+        ...("waiting" in row && row.waiting !== undefined ? { waiting: row.waiting } : {}),
+        ...("engine_version" in row && typeof row.engine_version === "string"
+          ? { engine_version: row.engine_version }
+          : {}),
       })),
-      incomplete: listed.incomplete,
+      // A device the round did not mark answered (page_cap, timed_out, undelivered, ...) listed only part of its rows, or
+      // none: it is incomplete like the devices the round names so, never read as that device's whole listing (#14295).
+      incomplete: [
+        ...new Set([
+          ...listed.incomplete,
+          ...Object.entries(listed.devices ?? {})
+            .filter(([, state]) => state !== "answered")
+            .map(([device]) => device),
+        ]),
+      ],
     }
   }
   // Only the unfiltered account listing waits on every device, so only it is shared; a one-device listing goes out as asked.
@@ -317,7 +336,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         last_seen_ms: row.last_seen_ms,
       })),
     sessions: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)).rows,
-    listing: round.listing,
+    listing: async (filter) => (filter?.device === undefined ? await round.listing() : await listing(filter)),
     // create / open / fork on another device: relay daemon #393's attach-less `session.command {device, endpoint, rpc}`.
     // The endpoint lookup and every refusal answered before sending ran nothing; anything after sending may have.
     // An open_session goes on the endpoint dialer (a fresh owned connection per call by default), closed once it
@@ -365,6 +384,17 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         return outcomeOf(sent)
       }
       try {
+        // omo#14271: a named engine is asked as is, and never becomes the device's endpoint for later commands. A
+        // caller's `waitMs` (the fallback's shared budget) bounds this one call.
+        const named = endpointOptions?.endpoint
+        if (named !== undefined)
+          return outcomeOf(
+            await connected.endpointCommand(device, record, {
+              ...endpointOptions,
+              endpoint: named,
+              waitMs: endpointOptions?.waitMs ?? commandWaitMs(SEND_WAIT_MS),
+            }),
+          )
         const outcome = await send(endpoints.get(device))
         if (outcome !== UNLISTED_ENDPOINT) return outcome
         endpoints.delete(device)
@@ -382,6 +412,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
         if (dialed.owned) connected.close()
       }
     },
+    endpointKeys: async (device) => await (await svc()).engineEndpoints(device),
     sessionCommand,
     read: async (device, sessionId, tail) => {
       // A read changes nothing on the other device, so every failure is a typed refusal, never uncertain.

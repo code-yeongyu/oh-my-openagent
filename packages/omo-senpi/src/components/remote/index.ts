@@ -13,5 +13,7 @@ export {
 // Seam 1 (the only thread-address parser) and seam 2 (the only thread-naming helper): surfaces parse and name threads here.
 export { canonicalizeThreadHandle, type CanonicalThread, describeThread, handleOf } from "./seams"
 // Seam 3 (the only device resolver for a typed device): thread_create's resolveDevice over the account's devices.
-export { resolveTypedDevice } from "./device-address"
+export { resolveTypedDevice } from "../thread/address"
+// Seam 4 (the only resolver for a typed thread address, #14305): every `omo remote` verb resolves what a person typed here.
+export { resolveTypedAddress } from "./device-address"
 export type * from "./types"

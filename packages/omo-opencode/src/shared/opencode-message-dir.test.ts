@@ -1,53 +1,31 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
+import { describe, it, expect, beforeEach, afterEach, spyOn } from "bun:test"
 import { mkdirSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { getMessageDir } from "./opencode-message-dir"
+import * as storageDetection from "./opencode-storage-detection"
 
 const TEST_STORAGE = join(tmpdir(), `omo-msgdir-test-${randomUUID()}`)
 const TEST_MESSAGE_STORAGE = join(TEST_STORAGE, "message")
-let sqliteBackend = false
 
-mock.module("./opencode-storage-paths", () => ({
-  OPENCODE_STORAGE: TEST_STORAGE,
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: join(TEST_STORAGE, "part"),
-  SESSION_STORAGE: join(TEST_STORAGE, "session"),
-}))
-
-mock.module("./opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
-  resetSqliteBackendCache: () => {},
-}))
-
-afterAll(() => {
-  mock.restore()
-})
-
-const { getMessageDir } = await import("./opencode-message-dir")
+function getFixtureMessageDir(sessionID: string): string | null {
+  return getMessageDir(sessionID, TEST_MESSAGE_STORAGE)
+}
 
 describe("getMessageDir", () => {
   beforeEach(() => {
-    sqliteBackend = false
     mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
   })
 
   afterEach(() => {
-    try {
-      rmSync(TEST_MESSAGE_STORAGE, { recursive: true, force: true })
-    } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
-  })
-
-  afterAll(() => {
-    try {
-      rmSync(TEST_STORAGE, { recursive: true, force: true })
-    } catch {} // no-excuse-ok: catch — best-effort temp-dir cleanup
+    rmSync(TEST_STORAGE, { recursive: true, force: true })
   })
 
   it("returns null when sessionID does not start with ses_", () => {
     //#given - sessionID without ses_ prefix
     //#when
-    const result = getMessageDir("invalid")
+    const result = getFixtureMessageDir("invalid")
     //#then
     expect(result).toBe(null)
   })
@@ -56,7 +34,7 @@ describe("getMessageDir", () => {
     //#given
     rmSync(TEST_MESSAGE_STORAGE, { recursive: true, force: true })
     //#when
-    const result = getMessageDir("ses_123")
+    const result = getFixtureMessageDir("ses_123")
     //#then
     expect(result).toBe(null)
   })
@@ -66,7 +44,7 @@ describe("getMessageDir", () => {
     const sessionDir = join(TEST_MESSAGE_STORAGE, "ses_123")
     mkdirSync(sessionDir, { recursive: true })
     //#when
-    const result = getMessageDir("ses_123")
+    const result = getFixtureMessageDir("ses_123")
     //#then
     expect(result).toBe(sessionDir)
   })
@@ -76,28 +54,32 @@ describe("getMessageDir", () => {
     const sessionDir = join(TEST_MESSAGE_STORAGE, "subdir", "ses_123")
     mkdirSync(sessionDir, { recursive: true })
     //#when
-    const result = getMessageDir("ses_123")
+    const result = getFixtureMessageDir("ses_123")
     //#then
     expect(result).toBe(sessionDir)
   })
 
   it("returns file fallback path even when SQLite backend is active", () => {
     //#given
-    sqliteBackend = true
     const sessionDir = join(TEST_MESSAGE_STORAGE, "subdir", "ses_123")
     mkdirSync(sessionDir, { recursive: true })
 
-    //#when
-    const result = getMessageDir("ses_123")
+    const sqlite = spyOn(storageDetection, "isSqliteBackend").mockReturnValue(true)
+    try {
+      //#when
+      const result = getFixtureMessageDir("ses_123")
 
-    //#then
-    expect(result).toBe(sessionDir)
+      //#then
+      expect(result).toBe(sessionDir)
+    } finally {
+      sqlite.mockRestore()
+    }
   })
 
   it("returns null for path traversal attempts with ..", () => {
     //#given - sessionID containing path traversal
     //#when
-    const result = getMessageDir("ses_../etc/passwd")
+    const result = getFixtureMessageDir("ses_../etc/passwd")
     //#then
     expect(result).toBe(null)
   })
@@ -105,7 +87,7 @@ describe("getMessageDir", () => {
   it("returns null for path traversal attempts with forward slash", () => {
     //#given - sessionID containing forward slash
     //#when
-    const result = getMessageDir("ses_foo/bar")
+    const result = getFixtureMessageDir("ses_foo/bar")
     //#then
     expect(result).toBe(null)
   })
@@ -113,7 +95,7 @@ describe("getMessageDir", () => {
   it("returns null for path traversal attempts with backslash", () => {
     //#given - sessionID containing backslash
     //#when
-    const result = getMessageDir("ses_foo\\bar")
+    const result = getFixtureMessageDir("ses_foo\\bar")
     //#then
     expect(result).toBe(null)
   })
@@ -123,7 +105,7 @@ describe("getMessageDir", () => {
     mkdirSync(join(TEST_MESSAGE_STORAGE, "subdir1"), { recursive: true })
     mkdirSync(join(TEST_MESSAGE_STORAGE, "subdir2"), { recursive: true })
     //#when
-    const result = getMessageDir("ses_nonexistent")
+    const result = getFixtureMessageDir("ses_nonexistent")
     //#then
     expect(result).toBe(null)
   })

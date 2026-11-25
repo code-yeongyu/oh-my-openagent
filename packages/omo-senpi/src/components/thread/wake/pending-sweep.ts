@@ -1,5 +1,6 @@
 import type { IntakeAdmission } from "../gateway/drain"
 import type { GatewayStore } from "../gateway/store"
+import { settleClosedIntake } from "./closed-intake"
 
 export type PendingSweepOptions = {
   readonly store: GatewayStore
@@ -10,12 +11,16 @@ export type PendingSweepOptions = {
    * their session only when it is on for that session.
    */
   readonly sameDevice: (durableId: string) => boolean
+  /** When the session was last closed on request (`session-target.ts` `closed_at`); undefined when never (#14273). */
+  readonly closedAt: (durableId: string) => number | undefined
 }
 
 /**
  * The pending sweep (#13037 design 5.4 step 6, 5.6 at wake): run when the consumer connects and when an engine endpoint
  * appears. A session holding open intake rows is woken once one of its senders is admitted now; the rows of a sender the
  * service refuses settle `sender_not_admitted`, and a sender with no answer leaves its rows queued for the next sweep.
+ * Rows queued before the session was closed on request settle `target_closed` first, so a close is never undone by a
+ * message that was waiting when it happened (#14273); a session left with nothing queued is not woken.
  */
 export async function runPendingSweep(options: PendingSweepOptions): Promise<void> {
   const { store } = options
@@ -29,6 +34,8 @@ export async function runPendingSweep(options: PendingSweepOptions): Promise<voi
     return answer
   }
   for (const session of await store.intakeMarks.openSessions()) {
+    const closedAt = options.closedAt(session.durable_id)
+    if (closedAt !== undefined && (await settleClosedIntake(store, session.durable_id, closedAt)).length === 0) continue
     // Local first: a session that is not local can never wake this way, so its project's setting is never read.
     let wake = session.local && options.sameDevice(session.durable_id)
     for (const device of session.devices) {

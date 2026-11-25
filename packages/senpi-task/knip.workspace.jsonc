@@ -89,8 +89,6 @@
     "packages/senpi-task/src/dag/recovery-lease-watch.ts": ["DAG_LEASE_WATCH_INTERVAL_MS"],
     // pre-existing at origin dev 4686e425b5: unused export(s) DAG_NODE_CONTROL_ERROR_CODES
     "packages/senpi-task/src/dag/scheduler.ts": ["DAG_NODE_CONTROL_ERROR_CODES"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) dagKeyHash
-    "packages/senpi-task/src/dag/store.ts": ["dagKeyHash"],
     // pre-existing at origin dev 4686e425b5: unused export(s) EvalHandleHostError
     "packages/senpi-task/src/eval-handles/index.ts": ["EvalHandleHostError"],
     // pre-existing at origin dev 4686e425b5: unused export(s) createWorkpoolWorkerTool, buildWorkpoolExecute, WorkpoolParams, WorkpoolYieldParams, WorkpoolCommandSchema, WorkpoolCreateSchema, createWorkpoolStore, WORKPOOL_ERROR_CODES, childInvokeScope, escalatingHostTools and 130 more

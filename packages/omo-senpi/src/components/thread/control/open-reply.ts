@@ -1,7 +1,7 @@
 import type { ThreadDataError } from "../contracts"
 import { threadToolFailure } from "../errors"
 import type { JsonObject, RemoteCommandOutcome } from "../remote/ports"
-import { outcomeFailure } from "../remote/outcome"
+import { endpointOutcomeFailure } from "../remote/outcome"
 import { folderFailure } from "../worktree/failures"
 
 const nonEmpty = (value: unknown): string | undefined =>
@@ -59,5 +59,5 @@ export function openRefusal(
       device,
       ...(cwd === undefined ? {} : { path: cwd }),
     })
-  return outcomeFailure(outcome, device)
+  return endpointOutcomeFailure(outcome, device)
 }

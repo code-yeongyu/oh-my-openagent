@@ -43,10 +43,11 @@ export const REMOTE_IMPORT_RULES: GuardRules = {
   s2AllowedImporters: [
     DEVICE_SERVICE_CORE,
     REMOTE,
-    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget.
+    // The three infrastructure callers of section 1: endpoint registration, sign-in hand-off, memory re-adopt/forget
+    // (the memory device session's CLI session file, cli-session.ts, moved out of account-runtime.ts in omo#14374).
     "packages/device-service-core/src/registrant.ts",
     "packages/omo-native/device-service-handoff.ts",
-    "packages/omo-senpi/src/components/memory/device-session/account-runtime.ts",
+    "packages/omo-senpi/src/components/memory/device-session/cli-session.ts",
   ],
   s3: { surface: isRemoteSurface, layers: [DEVICE_SERVICE_CORE, REMOTE, BUNSHIN_TS_RELAY], entry: `${REMOTE}index.ts` },
 }
@@ -156,8 +157,6 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/lsp-daemon/scripts/qa/cancellation-smoke.mjs": 6,
   "packages/lsp-daemon/scripts/qa/commit-barrier-smoke.mjs": 1,
   "packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs": 2,
-  "packages/omo-codex/plugin/skills/browser/scripts/omowright.mjs": 1,
-  "packages/omo-codex/plugin/skills/lsp-setup/scripts/verify-lsp.ts": 1,
   "packages/omo-codex/scripts/install-generated-bundle.test.mjs": 1,
   "packages/omo-codex/scripts/install-local.mjs": 1,
   "packages/omo-native/bin/lib/category-coverage.js": 2,
@@ -176,8 +175,6 @@ export const NON_LITERAL_IMPORT_OFFENDERS: Readonly<Record<string, number>> = {
   "packages/omo-senpi/plugin/scripts/build-extension-runtimes.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/build-extension.test.mjs": 1,
   "packages/omo-senpi/plugin/scripts/bundle-inputs.test.mjs": 1,
-  "packages/omo-senpi/plugin/skills/browser/scripts/omowright.mjs": 1,
-  "packages/omo-senpi/plugin/skills/lsp-setup/scripts/verify-lsp.ts": 1,
   "packages/omo-senpi/scripts/qa/agent-toolkit-catalog-qa.mjs": 1,
   "packages/omo-senpi/scripts/qa/fused-equivalence-e2e.mjs": 2,
   "packages/omo-senpi/scripts/qa/gateway-acceptance-trace.mjs": 1,

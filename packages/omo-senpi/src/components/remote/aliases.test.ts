@@ -253,8 +253,16 @@ describe("aliases", () => {
 })
 
 describe("aliases when the holder's device missed the listing round", () => {
-  // Review M1 at 15dcf94: a device that did not answer the round is an outage, not a missing session (thread tools:
-  // remote-ops.ts holderTarget answers device_offline there).
+  // A device that did not answer the round is an outage, not a missing session (design section 5): an online one is
+  // host_unavailable listing_incomplete naming it; device_offline is only for a device the roster says is offline.
+  const peer = (device: string, online: boolean) => ({
+    device,
+    label: device,
+    kind: "desktop",
+    platform: "linux",
+    online,
+    last_seen_ms: 1_790_000_000_000,
+  })
   const silentDevice = {
     serviceVersion: "0.1.37",
     capabilities: ["sessions", "devices"],
@@ -262,34 +270,41 @@ describe("aliases when the holder's device missed the listing round", () => {
     close: () => {},
     status: async () => ({ state: "connected" }),
     thisDevice: async () => ({ id: "dev-self", name: "self" }),
-    devices: async () => [],
-    sessions: async () => ({ revision: 1, rows: [], devices: { "dev-b": "timeout" }, incomplete: [] }),
+    devices: async () => [peer("dev-b", true), peer("dev-c", false)],
+    sessions: async () => ({
+      revision: 1,
+      rows: [],
+      devices: { "dev-b": "timeout", "dev-c": "offline" },
+      incomplete: [],
+    }),
   } as unknown as DeviceService
-  const registry: AliasRegistry = {
-    resolve: async () => ({ kind: "ok", value: { device: "dev-b", session_id: "dur-b" } }),
+  const registryOn = (device: string): AliasRegistry => ({
+    resolve: async () => ({ kind: "ok", value: { device, session_id: "dur-b" } }),
     aliasesOf: async () => ({ kind: "ok", value: new Map() }),
     claim: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
     rename: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
     release: async () => ({ kind: "error", error: { code: "alias_registry_unavailable", message: "unreached" } }),
-  }
-  test("#given the holder's device timed out on the round #when resolve or set runs #then device_offline naming it, never not_found", async () => {
-    const owner = await startOwner()
-    const client = clientOn(owner.stateDir, fakeClock(), undefined, {
-      connect: async () => silentDevice,
-      aliasRegistry: async () => registry,
-    })
-    const thread = handleOf("dev-b", "key-b")
-    expect(failureOf(await client.aliases.resolve("lane-b"))).toMatchObject({
-      code: "device_offline",
-      details: { device: "dev-b" },
-    })
-    expect(failureOf(await client.aliases.set(thread, "lane-b"))).toMatchObject({
-      code: "device_offline",
-      details: { device: "dev-b" },
-    })
-    expect(failureOf(await client.aliases.clear(thread))).toMatchObject({
-      code: "device_offline",
-      details: { device: "dev-b" },
-    })
   })
+  for (const [label, device, expected] of [
+    [
+      "an online device that timed out",
+      "dev-b",
+      { code: "host_unavailable", details: { reason: "listing_incomplete", devices: ["dev-b"] } },
+    ],
+    ["a device the roster says is offline", "dev-c", { code: "device_offline", details: { device: "dev-c" } }],
+  ] as const)
+    test(`#given the holder is ${label} #when resolve, set or clear runs #then ${expected.code} naming it, never not_found`, async () => {
+      const owner = await startOwner()
+      const client = clientOn(owner.stateDir, fakeClock(), undefined, {
+        connect: async () => silentDevice,
+        aliasRegistry: async () => registryOn(device),
+      })
+      const thread = handleOf(device, "key-b")
+      for (const settled of [
+        await client.aliases.resolve("lane-b"),
+        await client.aliases.set(thread, "lane-b"),
+        await client.aliases.clear(thread),
+      ])
+        expect(failureOf(settled)).toMatchObject(expected)
+    })
 })

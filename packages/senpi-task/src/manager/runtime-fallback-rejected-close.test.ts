@@ -10,6 +10,7 @@ import { baseSpec, cleanupProjects, launchSettled, settings, tempProject } from 
 import { createTaskManager } from "./manager"
 import type { ManagedRunner } from "./types"
 import { NO_HOST_ENDPOINT } from "../lifecycle/host-session"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 // Invariant: every committed state of a record whose failed rung was never confirmed closed still names
 // that rung's session, so a parent that dies after any single write leaves recovery something to close.
@@ -45,7 +46,7 @@ describe("runtime fallback whose failed-rung close is never acknowledged", () =>
     // given
     const project = tempProject()
     const committed: Array<TaskRecord | null> = []
-    const store = recordingStore(createTaskRecordStore({ project_dir: project }), committed)
+    const store = recordingStore(createTaskRecordStore(ownedTaskState(project)), committed)
     const host = await harness.fakeHost()
     const rpc = harness.runnerOver(host, { closeGraceMs: 50 })
     const runner: ManagedRunner = {

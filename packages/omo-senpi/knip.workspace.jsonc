@@ -32,6 +32,7 @@
         "src/components/memory/index-engine.fixture.ts",
         "src/components/memory/index-observer.fixture.ts",
         "src/components/memory/index-selection.fixture.ts",
+        "src/components/thread/caller-stall-host.fixture.ts",
         "src/components/memory/kibitzer/tools/test-support.ts",
         "src/components/memory/palace/runtime.ts",
         "src/components/memory/recall-store-runtime.ts",
@@ -355,6 +356,10 @@
         "scripts/qa/thread-tools/desktop-to-cli.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/draft-preservation.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#14333: no mode starts an idle TUI and steers a busy one)
+        "scripts/qa/thread-tools/default-delivery.mjs",
+        // run by path from scripts/qa/thread-tools/run-all.mjs (#14313: a graceful close of a busy daemon session and terminal)
+        "scripts/qa/thread-tools/graceful-close.mjs",
         // run by path as the free-plan cross-workspace thread-tools QA driver (#14201)
         "scripts/qa/thread-tools/free-plan-cross-workspace.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -369,6 +374,8 @@
         "scripts/qa/thread-tools/lib/gateway.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/lib/harness.mjs",
+        // run by name from run-all.mjs, which knip does not trace
+        "scripts/qa/thread-tools/default-delivery.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/loop-guard.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
@@ -381,6 +388,8 @@
         "scripts/qa/thread-tools/receiver-crash.mjs",
         // pre-existing at origin dev 4686e425b5: a file nothing imports or runs
         "scripts/qa/thread-tools/repeated-wake.mjs",
+        // a QA scenario that run-all.mjs runs by name (#14428), like its siblings
+        "scripts/qa/thread-tools/busy-backlog.mjs",
         // a QA scenario that run-all.mjs runs by name (#13396), like its siblings
         "scripts/qa/thread-tools/report-origin-auto-steer.mjs",
         // a QA scenario that run-all.mjs runs by name (#14058), like its siblings
@@ -574,8 +583,8 @@
     "packages/omo-senpi/scripts/qa/task-resume-e2e-scenarios.mjs": ["FINISHED_CHILD_TOKEN", "RESUME_OMO_CONFIG"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runTaskResumeScenarios
     "packages/omo-senpi/scripts/qa/task-resume-e2e.mjs": ["runTaskResumeScenarios"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids, liveRecordRpcChildPids
-    "packages/omo-senpi/scripts/qa/task-rpc-e2e-helpers.mjs": ["CREDENTIAL_FILES", "digestCredentialFiles", "childSessionJsonlExists", "analyzeRpcRouting", "analyzeSpawn", "eventsMentionSteerAck", "statusSnapshots", "recordRpcChildPids", "liveRecordRpcChildPids"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) CREDENTIAL_FILES, digestCredentialFiles, childSessionJsonlExists, analyzeRpcRouting, analyzeSpawn, eventsMentionSteerAck, statusSnapshots, recordRpcChildPids
+    "packages/omo-senpi/scripts/qa/task-rpc-e2e-helpers.mjs": ["CREDENTIAL_FILES", "digestCredentialFiles", "childSessionJsonlExists", "analyzeRpcRouting", "analyzeSpawn", "eventsMentionSteerAck", "statusSnapshots", "recordRpcChildPids"],
     // pre-existing at origin dev 4686e425b5: unused export(s) runOne
     "packages/omo-senpi/scripts/qa/task-rpc-reconcile-batch.mjs": ["runOne"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolResults, runtimeRootDir, taskEventText, buildMessage
@@ -844,10 +853,10 @@
     "packages/omo-senpi/src/components/thread/gateway/answer-shape.ts": ["isBlankAnswer"],
     // pre-existing at origin dev 4686e425b5: unused export(s) AUTHOR_ID_MAX_LENGTH, AUTHOR_DISPLAY_MAX_LENGTH
     "packages/omo-senpi/src/components/thread/gateway/author.ts": ["AUTHOR_ID_MAX_LENGTH", "AUTHOR_DISPLAY_MAX_LENGTH"],
+    // #14428: readTargetBacklogs is called only by store-worker.ts, a worker thread knip does not reach (as toolReceiptRelease, #12925)
+    "packages/omo-senpi/src/components/thread/gateway/backlog.ts": ["readTargetBacklogs"],
     // pre-existing at origin dev 4686e425b5: unused export(s) BINDING_SCHEMA_VERSION, BINDING_PLATFORMS, BINDING_STATUSES, COMPLETION_OUTCOMES, BINDING_MAX_TTL_SECONDS, BINDING_DEFAULT_POLICY_ID
     "packages/omo-senpi/src/components/thread/gateway/bindings.ts": ["BINDING_SCHEMA_VERSION", "BINDING_PLATFORMS", "BINDING_STATUSES", "COMPLETION_OUTCOMES", "BINDING_MAX_TTL_SECONDS", "BINDING_DEFAULT_POLICY_ID"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) completionOutcome
-    "packages/omo-senpi/src/components/thread/gateway/completion.ts": ["completionOutcome"],
     // pre-existing at origin dev 4686e425b5: unused export(s) GATEWAY_SCHEMA_VERSION
     "packages/omo-senpi/src/components/thread/gateway/constants.ts": ["GATEWAY_SCHEMA_VERSION"],
     // pre-existing at origin dev 4686e425b5: unused export(s) queuedNotice
@@ -864,8 +873,8 @@
     "packages/omo-senpi/src/components/thread/gateway/schema.ts": ["GATEWAY_TABLES"],
     // pre-existing at origin dev 4686e425b5: unused export(s) recordThreadCreation, sessionCall
     "packages/omo-senpi/src/components/thread/gateway/store-extension-session-ops.ts": ["recordThreadCreation", "sessionCall"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) migrate, reconcile, claim, recordOutcome, refuseQueued, listDeliveries, isReferenced, journalMode, stats, migrateLegacyMailboxes
-    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["migrate", "reconcile", "claim", "recordOutcome", "refuseQueued", "listDeliveries", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
+    // pre-existing at origin dev 4686e425b5: unused export(s) reconcile, claim, recordOutcome, refuseQueued, isReferenced, journalMode, stats, migrateLegacyMailboxes
+    "packages/omo-senpi/src/components/thread/gateway/store-ops.ts": ["reconcile", "claim", "recordOutcome", "refuseQueued", "refuseReturned", "isReferenced", "journalMode", "stats", "migrateLegacyMailboxes"],
     // pre-existing at origin dev 4686e425b5: unused export(s) registerIncarnation, clearEndpoint, sessionOwner
     "packages/omo-senpi/src/components/thread/gateway/store-ownership.ts": ["registerIncarnation", "clearEndpoint", "sessionOwner"],
     // pre-existing at origin dev 4686e425b5: unused export(s) toolReceiptBegin, toolReceiptSettle, registerIncarnation, pendingCompletionArms, latestCompletionArm, closeQuestion
@@ -908,8 +917,6 @@
     "packages/omo-senpi/src/extension/wake-queue-source.ts": ["WAKE_QUEUE_STATE_EVENT"],
     // pre-existing at origin dev 4686e425b5: unused export(s) omoSenpiAdapterPackageName
     "packages/omo-senpi/src/index.ts": ["omoSenpiAdapterPackageName"],
-    // pre-existing at origin dev 4686e425b5: unused export(s) localLauncherCmdPath
-    "packages/omo-senpi/src/install/local-launcher.ts": ["localLauncherCmdPath"],
     // pre-existing at origin dev 4686e425b5: unused export(s) findDirectNativeCaptureViolations
     "packages/omo-senpi/src/omo-native-capture-path.audit.test.ts": ["findDirectNativeCaptureViolations"]
   }

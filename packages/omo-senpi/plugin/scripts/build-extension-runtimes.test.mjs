@@ -1,4 +1,4 @@
-import { afterAll, afterEach, describe, expect, setDefaultTimeout, test } from "bun:test"
+import { afterAll, afterEach, beforeAll, describe, expect, setDefaultTimeout, test } from "bun:test"
 import { cp, mkdir, mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { spawn } from "node:child_process"
@@ -8,7 +8,7 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { createGatewayStore, gatewayStoreWorkerUrl } from "../../src/components/thread/gateway/store.ts"
 
 import { checkExtensionCurrent } from "./build-extension.mjs"
-import { createBuildFixture } from "./build-extension.test-support.mjs"
+import { createBuildFixture, BUILD_HOOK_OUTER_BOUND_MS } from "./build-extension.test-support.mjs"
 
 // The runtimes the built extension ships beside omo.js: the gateway store worker sidecar and the
 // thread SDK that runs on it. One build is shared by the whole file.
@@ -36,6 +36,8 @@ function unexpectedStderr(stderr) {
   return kept.join("\n")
 }
 
+// #13965: the cold builds run once as setup, bounded by their progress and CPU use, not this hook's outer bound.
+beforeAll(() => fixture.warmBuilds({ reproduction: false }), BUILD_HOOK_OUTER_BOUND_MS)
 afterEach(fixture.cleanupTest)
 afterAll(fixture.cleanupFile)
 
@@ -183,6 +185,53 @@ describe("thread SDK runtime", () => {
       ok: false,
       reason: "missing-output",
       output: outputs.threadSdkOutputPath,
+    })
+  })
+})
+
+describe("omo SDK runtime", () => {
+  test("#given the built omo SDK #when plain node imports it #then it exports createOmoSdk and answers typed reads with no engine", async () => {
+    // given: a signed-out store port and a state dir no device service listens on
+    const outputs = await sharedOutputs()
+    expect(outputs.omoSdkInputs.some((input) => input.endsWith("src/extension/omo-sdk.ts"))).toBe(true)
+    const home = await mkdtemp(join(tmpdir(), "omo-sdk-built-"))
+    perTestRoots.push(home)
+    const probe = [
+      `const sdk = await import(${JSON.stringify(pathToFileURL(outputs.omoSdkOutputPath).href)})`,
+      `const omo = sdk.createOmoSdk({ env: { HOME: ${JSON.stringify(home)}, OMO_DEVICE_SERVICE_STATE_DIR: ${JSON.stringify(join(home, "state"))} }, cwd: ${JSON.stringify(home)}, home: ${JSON.stringify(home)}, ports: { desktopLaunch: () => false, credentialStore: { read: async () => null } } })`,
+      "const [devices, status, config] = [await omo.devices.list(), await omo.deviceService.status(), await omo.config.status()]",
+      "console.log(JSON.stringify({ exports: Object.keys(sdk).sort(), devices: devices.kind === 'error' ? devices.error.code : devices.kind, status: status.kind === 'ok' ? status.value.state : status.error.code, config: config.kind }))",
+    ].join("\n")
+
+    // when
+    const child = spawn("node", ["--input-type=module", "-e", probe], { stdio: ["ignore", "pipe", "pipe"] })
+    let stdout = ""
+    let stderr = ""
+    child.stdout.on("data", (chunk) => {
+      stdout += chunk
+    })
+    child.stderr.on("data", (chunk) => {
+      stderr += chunk
+    })
+    const exitCode = await new Promise((resolve) => child.once("close", resolve))
+
+    // then
+    expect({ exitCode, stderr: unexpectedStderr(stderr) }).toEqual({ exitCode: 0, stderr: "" })
+    expect(JSON.parse(stdout.trim())).toEqual({
+      exports: ["SDK_VERSION", "createOmoSdk"],
+      devices: "signed_out",
+      status: "not_running",
+      config: "ok",
+    })
+  })
+
+  test("#given the built extension without the omo SDK #when freshness is checked #then it reports that output missing", async () => {
+    const outputs = await mutableOutputs()
+    await rm(outputs.omoSdkOutputPath)
+    expect(await checkExtensionCurrent(outputs)).toMatchObject({
+      ok: false,
+      reason: "missing-output",
+      output: outputs.omoSdkOutputPath,
     })
   })
 })

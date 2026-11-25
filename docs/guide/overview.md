@@ -40,7 +40,7 @@ Want more control? Run `/ulw-plan` for interview-based planning, then `/ulw-exec
 You don't have to know model names to get a good main agent. Pick a profile by intent and omo picks the model:
 
 - **Capable**: the strongest generalist you have. Claude Fable 5.2, then Claude Fable 5.1, then Claude Opus 5.5, then Kimi K3, then GLM 5.3.
-- **Deep work**: maximum reasoning for hard problems. GPT-6 Astra, then GPT-6 Sol.
+- **Deep work**: maximum reasoning for hard problems. GPT-6.2 Astra for the hardest calls, GPT-6.2 Sol for the default deep lane.
 
 Set one key in `omo.json`:
 
@@ -60,7 +60,7 @@ We used to call this "Claude Code on steroids." That was wrong.
 
 This isn't about making Claude Code better. It's about breaking free from the idea that one model, one provider, one way of working is enough. Anthropic wants you locked in. OpenAI wants you locked in. Everyone wants you locked in.
 
-Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-2` max, then `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6 Astra for deep reasoning, with GPT-5.6 Sol behind it. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
+Oh My OpenAgent doesn't play that game. It orchestrates across models, picking the right brain for the right job. Your session model for orchestration. Visual work uses `claude-fable-5-2` max, then `claude-fable-5-1` max, then `claude-opus-5-5` max, then `kimi-k3` max. GPT-6.2 Astra for deep reasoning. GPT-6 Luna Fast for quick tasks, Kimi high-speed for codebase search. All working together, automatically.
 
 ---
 
@@ -102,13 +102,13 @@ The main agent is your session. It runs on your session model (a profile, a pin,
 Recommended models, named plainly:
 
 - **Claude Opus 5.5** (or Claude Fable 5.1). The reference configuration. The orchestration prompt was built against Claude's habit of following long, mechanics-driven instructions.
-- **GPT-6 Astra, GPT-6.1 Sol or GPT-6 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
+- **GPT-6.2 Astra, GPT-6.1 Sol or GPT-6 Sol**. The GPT-recommended configuration. It gets the GPT-native `gpt-6-astra` prompt preset built for autonomous, principle-driven work: give it a goal, not a recipe. Over-orchestration on small bounded tasks is a known risk.
 
-Kimi K3 and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.1, Kimi K3, GPT-6 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Obsessive · Normal runs GPT-6 Astra at medium (then GPT-6.1 Sol Fast, plain GPT-6.1 Sol, and GPT-5.6 Sol where Astra isn't served) and Obsessive · Heavy GPT-6 Astra at high. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
+Kimi K3 and GLM 5.3 are on the Recommended list too, lower down and with lighter validation. Models outside it aren't supported as the main agent. You don't have to choose: with no `model_profile`, a fresh session runs **Recommended** (Opus 5.5, Fable 5.1, Kimi K3, GPT-6.2 Astra, GPT-6.1 Sol, GPT-6 Sol, GLM 5.3) and takes the first one you have connected. The Daily lanes lead with Claude; Obsessive · Normal runs GPT-6.2 Astra at medium (then the GPT-6.2 and GPT-6.1 Sol tiers and GPT-5.6 Sol where Astra isn't served) and Obsessive · Heavy GPT-6.2 Astra at high, with no fallback. Details in the [Agent-Model Matching Guide](./agent-model-matching.md).
 
 ### The category worker
 
-Every `task(category: ...)` call spawns the category worker: a fresh worker session configured by the category's model and skills. It gets one prompt, does the work, and reports back. Nothing else leaks in. That's what makes a `deep-high` call on GPT-6 Astra and a `quick` call on GPT-6 Luna Fast behave predictably side by side.
+Every `task(category: ...)` call spawns the category worker: a fresh worker session configured by the category's model and skills. It gets one prompt, does the work, and reports back. Nothing else leaks in. That's what makes a `deep-high` call on GPT-6.2 Astra and a `quick` call on GPT-6 Luna Fast behave predictably side by side.
 
 ### Curated agents
 
@@ -176,10 +176,10 @@ Override specific categories or curated agents in `omo.json`:
     // Frontend/UI work: Fable 5 max, then Opus 5 max, then Kimi K3.1 Pro max
     "visual-engineering": { "model": "anthropic/claude-fable-5-2", "reasoning": "max" },
 
-    // Hard logic: GPT-6 Astra max, then GPT-5.6 Sol max
+    // Hard logic: GPT-6.2 Astra max, no fallback model
     "ultrabrain": { "model": "openai/gpt-6.2-astra", "reasoning": "max" },
 
-    // Autonomous research and execution: GPT-6 Astra high, then GPT-5.6 Sol medium
+    // Autonomous research and execution: GPT-6.2 Astra high, no fallback model
     "deep-high": { "model": "openai/gpt-6.2-astra", "reasoning": "high" },
 
     // Creative and design work
@@ -210,9 +210,9 @@ Override specific categories or curated agents in `omo.json`:
 
 **GPT models** (explicit reasoning, principle-driven):
 
-- GPT-6.2 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh), `ultrabrain` (max), `deep-high` (high) and both Obsessive profiles, with `gpt-6.2-astra-fast` as the Fast-mode variant. GPT-6 Astra stays right behind it (it is what GitHub Copilot serves)
-- GPT-6.2 Sol: `deep-low` runs it at medium on the OpenAI lanes, then its Fast (priority) tier `gpt-6.2-sol-fast`, then GPT-6.1 Sol and its Fast tier, then GPT-5.6 Sol and `gpt-5.6-sol-fast`; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.2 Sol right behind it
-- GPT-5.6 Sol: the GPT-recommended main-agent configuration; the fallback rung under Astra for `ultrabrain` (max)
+- GPT-6.2 Astra: OpenAI's most capable model; default for `plan-reviewer` (xhigh), `ultrabrain` (max), `deep-high` (high) and both Obsessive profiles, with `gpt-6.2-astra-fast` as the Fast-mode variant. No builtin chain keeps GPT-6 Astra behind it anymore
+- GPT-6.2 Sol: `deep-low` runs it at medium on the OpenAI lanes and nothing else, Fast tier included; it is also the fifth `unspecified-low` rung (medium, OpenAI lanes); its Fast tier is also the first Sol rung on Obsessive · Normal, with plain GPT-6.2 Sol right behind it
+- GPT-5.6 Sol: the GPT-recommended main-agent configuration
 - GPT-5.6 Terra: balanced mid-tier; an optional override, not part of any default chain
 - GPT 5.6 Luna Fast: fast and cheap; default for `explore` and `librarian`
 

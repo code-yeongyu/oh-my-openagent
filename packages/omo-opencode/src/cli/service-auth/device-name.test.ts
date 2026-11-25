@@ -38,7 +38,7 @@ describe("default device name", () => {
   })
 
   test("is the machine name, without macOS's .local suffix", () => {
-    expect(deviceName("Qs-MacBook-Air.local")).toBe("Qs-MacBook-Air")
+    expect(deviceName("Studio-MacBook-Air.local")).toBe("Studio-MacBook-Air")
     expect(deviceName("build-box")).toBe("build-box")
   })
 

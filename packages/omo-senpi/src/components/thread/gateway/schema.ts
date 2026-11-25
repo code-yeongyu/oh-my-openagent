@@ -16,6 +16,40 @@ export class GatewaySchemaVersionError extends Error {
   }
 }
 
+/** Every `deliveries` column as of v14, in table order: the v15 rebuild copies exactly these. */
+const DELIVERY_COLUMNS = [
+  "delivery_id",
+  "target_durable_id",
+  "seq",
+  "sender",
+  "sender_turn",
+  "envelope",
+  "body",
+  "bytes",
+  "mode_requested",
+  "mode_effective",
+  "expected_turn_id",
+  "state",
+  "reason",
+  "admitted_by",
+  "claimed_at",
+  "attempt",
+  "admission_kind",
+  "turn_epoch",
+  "root_id",
+  "hop",
+  "created_at",
+  "updated_at",
+  "expires_at",
+  "binding_id",
+  "binding_revision",
+  "actor_user_id",
+  "wait_kind",
+  "ledger_id",
+  "verbatim_text",
+  "verbatim_display_text",
+].join(", ")
+
 export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
   [
     `CREATE TABLE deliveries (
@@ -358,7 +392,97 @@ export const GATEWAY_MIGRATIONS: readonly (readonly string[])[] = [
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_marks', NULL)",
     "INSERT OR IGNORE INTO extension_objects (type, name, owner) VALUES ('table', 'intake_commands', NULL)",
   ],
+
+  // v15 (#14333): `start` is a lane: a delivery that began a turn on an idle session records it, so its result and the
+  // header its receiver reads say what happened instead of `follow_up`. SQLite cannot widen a CHECK in place, so
+  // `deliveries` is rebuilt the way v7 rebuilt `bindings`: every column (the later ALTERs' included, in their order) and
+  // every rowid carried over, the four indexes and the v8 provenance trigger recreated before the step commits. It runs
+  // with foreign_keys OFF and a foreign_key_check on `deliveries` before the bump (migrate()).
+  [
+    `CREATE TABLE deliveries_v15 (
+      delivery_id TEXT PRIMARY KEY,
+      target_durable_id TEXT NOT NULL,
+      seq INTEGER NOT NULL,
+      sender TEXT NOT NULL,
+      sender_turn TEXT,
+      envelope TEXT NOT NULL,
+      body TEXT NOT NULL,
+      bytes INTEGER NOT NULL,
+      mode_requested TEXT NOT NULL CHECK (mode_requested IN ('auto', 'steer', 'follow_up')),
+      mode_effective TEXT CHECK (mode_effective IS NULL OR mode_effective IN ('start', 'steer', 'follow_up')),
+      expected_turn_id INTEGER,
+      state TEXT NOT NULL CHECK (state IN ('queued', 'admitting', 'admitted', 'applied', 'refused', 'uncertain')),
+      reason TEXT,
+      admitted_by TEXT,
+      claimed_at INTEGER,
+      attempt INTEGER NOT NULL DEFAULT 0,
+      admission_kind TEXT,
+      turn_epoch INTEGER,
+      root_id TEXT NOT NULL,
+      hop INTEGER NOT NULL,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      expires_at INTEGER NOT NULL,
+      binding_id TEXT,
+      binding_revision INTEGER,
+      actor_user_id TEXT,
+      wait_kind TEXT CHECK (wait_kind IS NULL OR wait_kind = 'approval'),
+      ledger_id TEXT,
+      verbatim_text TEXT,
+      verbatim_display_text TEXT,
+      UNIQUE (target_durable_id, seq)
+    )`,
+    `INSERT INTO deliveries_v15 (rowid, ${DELIVERY_COLUMNS}) SELECT rowid, ${DELIVERY_COLUMNS} FROM deliveries`,
+    "DROP TABLE deliveries",
+    "ALTER TABLE deliveries_v15 RENAME TO deliveries",
+    "CREATE INDEX deliveries_target_state_seq ON deliveries (target_durable_id, state, seq)",
+    "CREATE INDEX deliveries_root ON deliveries (root_id)",
+    "CREATE INDEX deliveries_sender_turn ON deliveries (sender, sender_turn)",
+    "CREATE UNIQUE INDEX deliveries_ledger ON deliveries (ledger_id) WHERE ledger_id IS NOT NULL",
+    ...PROVENANCE_MIGRATION,
+  ],
+
+  // v16 (#14428): a sender's collapse key, so a repeat replaces its earlier undelivered delivery to the same target.
+  [
+    "ALTER TABLE deliveries ADD COLUMN collapse_key TEXT",
+    "CREATE INDEX deliveries_collapse ON deliveries (target_durable_id, sender, collapse_key) WHERE collapse_key IS NOT NULL",
+  ],
 ]
+
+/**
+ * Migration indexes (0-based) that rebuild a table to widen a CHECK, by the table they rebuild: migrate() runs them with
+ * foreign_keys OFF and refuses the bump when the step left a foreign-key violation referencing that table.
+ */
+export const GATEWAY_TABLE_REBUILDS: ReadonlyMap<number, string> = new Map([
+  [6, "bindings"],
+  [14, "deliveries"],
+])
+
+/**
+ * Per migration (same index as GATEWAY_MIGRATIONS): the oldest gateway schema whose code may keep reading and writing a
+ * store this step has reached (#14382). A step that only adds what older code never reads (a nullable column, an index)
+ * or widens a CHECK to a value older code passes through as data keeps the floor; a step that changes what a column older
+ * code uses means sets it to its own version. Steps up to v14 predate the floor and claim nothing.
+ * v15 widens `deliveries.mode_effective` with `start`, which a v14 reader reports as the lane name it is; v16 adds the
+ * nullable `collapse_key`, which v14 writers leave NULL (no collapse).
+ * Only a binary that reads the floor relies on it (#14622 review M6): binaries released before it, schema 14 included,
+ * refuse every store newer than their own schema whatever floor it carries.
+ */
+const GATEWAY_READER_FLOORS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 14, 14]
+
+export const GATEWAY_READER_FLOOR_KEY = "reader_floor"
+
+/** The oldest schema a binary must know to use a store at `version`: the highest floor of the steps that reached it. */
+export function gatewayReaderFloor(version: number): number {
+  // Checked here, not at module load: a top-level statement would keep this module (and every migration's SQL) in
+  // bundles that import only its error class. Every store open computes a floor, so a missing entry still fails loudly.
+  if (GATEWAY_READER_FLOORS.length !== GATEWAY_MIGRATIONS.length) {
+    throw new Error(
+      `GATEWAY_READER_FLOORS has ${GATEWAY_READER_FLOORS.length} entries for ${GATEWAY_MIGRATIONS.length} migrations: declare the new step's floor`,
+    )
+  }
+  return GATEWAY_READER_FLOORS.slice(0, version).reduce((floor, step) => Math.max(floor, step), 0)
+}
 
 export const GATEWAY_TABLES = [
   "deliveries",

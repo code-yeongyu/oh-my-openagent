@@ -44,6 +44,8 @@ const TEST_AVAILABLE_MODELS = new Set([
   "anthropic/claude-haiku-4-5",
   "google/gemini-3.1-pro",
   "google/gemini-3-flash",
+  "openai/gpt-6.2-astra",
+  "openai/gpt-6.2-sol",
   "openai/gpt-6-luna-fast",
   "openai/gpt-5.6-sol",
   "kimi-for-coding/kimi-for-coding-highspeed",
@@ -157,7 +159,7 @@ describe("sisyphus-task", () => {
         anthropic: ["claude-opus-4-7", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"],
         google: ["gemini-3.1-pro", "gemini-3-flash"],
         "kimi-for-coding": ["k3.1-pro", "kimi-for-coding-highspeed"],
-        openai: ["gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
+        openai: ["gpt-6.2-astra", "gpt-6.2-sol", "gpt-5.6-sol", "gpt-5.5", "gpt-6-luna-fast", "gpt-5.5"],
       },
       connected: ["anthropic", "google", "openai", "kimi-for-coding"],
       updatedAt: "2026-01-01T00:00:00.000Z",
@@ -921,7 +923,7 @@ describe("sisyphus-task", () => {
       expect(result?.model).toBe("anthropic/claude-fable-5-2")
     })
 
-    test("returns null for deep-high when neither gpt-6-astra nor gpt-5.6-sol is available and no user config overrides it", () => {
+    test("returns null for deep-high when gpt-6.2-astra is not available and no user config overrides it", () => {
       // #given
       const categoryName = "deep-high"
       const availableModels = new Set<string>(["anthropic/claude-opus-4-7"])
@@ -937,13 +939,13 @@ describe("sisyphus-task", () => {
     })
 
     test.each([
+      ["openai/gpt-6.2-sol-fast"],
       ["openai/gpt-6.1-sol"],
       ["openai/gpt-6.1-sol-fast"],
       ["openai/gpt-5.6-sol-fast"],
       ["openai/gpt-5.6-sol"],
-    ])("keeps deep-low open on any GPT-6.1 Sol or GPT-5.6 Sol tier (%s) while deep-high stays Astra-only", (solId) => {
-      // #given: deep-low gates on any GPT-6.2, GPT-6.1 or GPT-5.6 Sol tier; the builtin default
-      // config is plain GPT-6.2 Sol and the runtime chain walk (category-resolver) picks the rung the registry carries
+    ])("gates deep-low closed on a Sol tier other than exact gpt-6.2-sol (%s)", (solId) => {
+      // #given: deep-low runs exactly gpt-6.2-sol (#14155); a Fast or older Sol tier never opens it
       const availableModels = new Set<string>([solId])
 
       // #when
@@ -951,6 +953,17 @@ describe("sisyphus-task", () => {
         systemDefaultModel: SYSTEM_DEFAULT_MODEL,
         availableModels,
       })
+
+      // #then
+      expect(result).toBeNull()
+    })
+
+    test("opens deep-low on exact gpt-6.2-sol while deep-high stays Astra-only", () => {
+      // #given
+      const availableModels = new Set<string>(["openai/gpt-6.2-sol"])
+
+      // #when
+      const result = resolveCategoryConfig("deep-low", { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels })
 
       // #then
       const resolved = expectResolvedCategoryConfig(result)
@@ -975,10 +988,11 @@ describe("sisyphus-task", () => {
       expect(result).toBeNull()
     })
 
-    test("keeps deep-high available when only gpt-6-astra is present", () => {
+    test("gates deep-high closed when only gpt-6-astra is present and opens it on gpt-6.2-astra", () => {
       // #given
       const categoryName = "deep-high"
-      const availableModels = new Set<string>(["openai/gpt-6-astra"])
+      const olderOnly = new Set<string>(["openai/gpt-6-astra"])
+      const availableModels = new Set<string>(["openai/gpt-6.2-astra"])
 
       // #when
       const result = resolveCategoryConfig(categoryName, {
@@ -987,6 +1001,9 @@ describe("sisyphus-task", () => {
       })
 
       // #then
+      expect(
+        resolveCategoryConfig(categoryName, { systemDefaultModel: SYSTEM_DEFAULT_MODEL, availableModels: olderOnly }),
+      ).toBeNull()
       const resolved = expectResolvedCategoryConfig(result)
       expect(resolved.config.model).toBe("openai/gpt-6.2-astra")
       expect(resolved.config.variant).toBe("high")
@@ -3672,7 +3689,7 @@ describe("sisyphus-task", () => {
         // then - dev-browser skill should be resolved
         expect(promptBody).toBeDefined()
         expect(promptBody.system).toBeDefined()
-        expect(promptBody.system).toContain("<Category_Context>")
+        expect(promptBody.system).toContain("<Category_Context")
         expect(String(promptBody.system).startsWith("<Category_Context>")).toBe(false)
       },
       { timeout: 20000 },

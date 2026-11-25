@@ -1,4 +1,11 @@
-import { THREAD_ACTIVITIES, THREAD_STATES, type ThreadActivity, type ThreadModel, type ThreadState } from "../contracts"
+import {
+  THREAD_ACTIVITIES,
+  THREAD_STATES,
+  type ThreadActivity,
+  type ThreadModel,
+  type ThreadRetryWait,
+  type ThreadState,
+} from "../contracts"
 import type { RemoteSessionRow } from "../remote/ports"
 
 /**
@@ -35,6 +42,49 @@ export function activityDetail(
     ...(activity === "errored" && typeof errorCode === "string" && errorCode !== "" ? { error_code: errorCode } : {}),
     ...(typeof turnId === "string" && turnId !== "" ? { turn_id: turnId } : {}),
   }
+}
+
+const RETRY_WAIT_KINDS: ReadonlySet<unknown> = new Set(["rate_limit", "retry"])
+
+/**
+ * A running thread asleep between provider retries, from senpi#7025's `waiting` on its list_sessions row
+ * (`{kind: "rate_limit" | "retry", attempt, maxAttempts, delayMs, until, error?}`): it is still `running`, and
+ * `waiting_on` says it waits on a retry until `until`. Nothing for an older engine, a thread that is not running, or a
+ * wait of a shape this build does not know.
+ */
+export function retryWait(running: boolean, waiting: unknown): { readonly waiting_on?: ThreadRetryWait } {
+  if (!running || typeof waiting !== "object" || waiting === null) return {}
+  const kind: unknown = Reflect.get(waiting, "kind")
+  const until: unknown = Reflect.get(waiting, "until")
+  const attempt: unknown = Reflect.get(waiting, "attempt")
+  const maxAttempts: unknown = Reflect.get(waiting, "maxAttempts")
+  if (
+    !RETRY_WAIT_KINDS.has(kind) ||
+    typeof until !== "string" ||
+    Number.isNaN(Date.parse(until)) ||
+    !Number.isInteger(attempt) ||
+    !Number.isInteger(maxAttempts)
+  )
+    return {}
+  return {
+    waiting_on: {
+      kind: "retry",
+      reason: kind as ThreadRetryWait["reason"],
+      until,
+      attempt: attempt as number,
+      max_attempts: maxAttempts as number,
+    },
+  }
+}
+
+/** omo-relay-spec #314: a holder version is an opaque, nonempty, well-formed string of at most 128 UTF-16 code units. */
+const ENGINE_VERSION_MAX_CHARS = 128
+
+/** The holder's engine version when it is one (see above); anything else is unknown and shown as nothing. */
+export function holderVersion(value: unknown): { readonly engine_version?: string } {
+  return typeof value === "string" && value !== "" && value.length <= ENGINE_VERSION_MAX_CHARS && value.isWellFormed()
+    ? { engine_version: value }
+    : {}
 }
 
 /** A reported model, when it is exactly a non-empty provider and id. */

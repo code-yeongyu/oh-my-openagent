@@ -4,17 +4,18 @@
  * the session loop that owns the store facade. Requests run strictly one at a time.
  */
 import { createHash, randomUUID } from "node:crypto"
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync, renameSync, writeFileSync } from "node:fs"
+import { chmodSync, closeSync, existsSync, mkdirSync, openSync, realpathSync, renameSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 import { setTimeout as delay } from "node:timers/promises"
 import { parentPort } from "node:worker_threads"
 
-import { WAKE_LEASE_MS, WOKEN_SESSION_CAP } from "./constants"
+import { OPEN_STATES, WAKE_LEASE_MS } from "./constants"
 import { lockWaitExceeded } from "./lock-wait"
 import { gatewayDatabasePath, gatewayRootDirectory, gatewayWakeMarkerPath } from "./paths"
 import { isClaimantDead, processStartTime } from "./process-identity"
 import { GatewaySchemaVersionError } from "./schema"
 import { isBusyError, Sql, type SqliteConnection, type SqlRow } from "./sql"
+import { readTargetBacklogs } from "./backlog"
 import * as ops from "./store-ops"
 import * as relay from "./store-relay-ops"
 import * as ownership from "./store-ownership"
@@ -42,6 +43,7 @@ import type {
   SessionWaitState,
   SessionWork,
 } from "./session-wait-types"
+import { waitBlocksDelivery } from "./session-wait-types"
 import type {
   LostLease,
   WakeRequestOutcome,
@@ -225,14 +227,14 @@ async function intake(ctx: ops.StoreContext, request: IntakeRequest): Promise<In
     if (view === null) throw error
     return answerFromLedgerRow(view.row, view.queue_position, ledgerId, record)
   }
-  if (outcome.kind === "inserted") {
+  if (outcome.kind === "inserted" || outcome.kind === "collapsed") {
     return {
       kind: "queued",
       delivery_id: record.deliveryId,
       row_id: outcome.row.delivery_id,
       ledger_id: ledgerId,
       queue_position: outcome.queue_position,
-      deduplicated: false,
+      deduplicated: outcome.kind === "collapsed",
     }
   }
   if (outcome.kind === "replay") {
@@ -355,8 +357,9 @@ function requireContext(): ops.StoreContext {
 }
 
 // The record of woken sessions (#13037 A3.1). Every write is one `BEGIN IMMEDIATE` transaction: a row leaves `requested`
-// in the transaction that counts the cap, so two processes cannot both pass at the cap, and every later write is a
-// compare-and-set on the generation a takeover raises, so a carrier that lost its lease writes nothing.
+// in one transaction, with no count on how many rows may be past it (the carrier defers a start only on measured host
+// memory, `wake/memory-headroom.ts`), and every later write is a compare-and-set on the generation a takeover raises, so
+// a carrier that lost its lease writes nothing.
 const WOKEN_COLUMNS = [
   "durable_id",
   "session_file",
@@ -463,10 +466,6 @@ async function startWake(ctx: ops.StoreContext, request: Timed<WokenSessionKey>)
     if (row.state !== "requested") return { kind: "in_progress", row }
     if (row.next_attempt_at !== null && row.next_attempt_at > request.now)
       return { kind: "not_yet", next_attempt_at: row.next_attempt_at }
-    const taken = Number(
-      ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM woken_sessions WHERE state <> 'requested'")?.n ?? 0,
-    )
-    if (taken >= WOKEN_SESSION_CAP) return { kind: "overloaded" }
     ops.write(
       ctx,
       "UPDATE woken_sessions SET state = 'opening', lease_owner = ?, lease_expires_at = ?, generation = generation + 1, next_attempt_at = NULL WHERE durable_id = ?",
@@ -649,7 +648,7 @@ async function clearWait(ctx: ops.StoreContext, request: WaitKey): Promise<void>
 /** A hold is reported before the wake, and a person's wait reads as approval (A2.6). */
 function waitingOn(ctx: ops.StoreContext, request: WaitKey): QueuedWaitingOn | null {
   const wait = readWait(ctx, request)
-  if (wait !== null) return { kind: wait.wait === "held" ? "hold" : "approval" }
+  if (wait !== null && waitBlocksDelivery(wait)) return { kind: wait.wait === "held" ? "hold" : "approval" }
   const woken = ctx.sql.one(["n"], "SELECT COUNT(*) AS n FROM woken_sessions WHERE durable_id = ?", [
     request.durable_id,
   ])
@@ -735,7 +734,7 @@ async function recordIntakeCommand(
 
 function openMarkRows(ctx: ops.StoreContext, pair: IntakePair): number {
   return Number(
-    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE ${MARK_PAIR_ROWS} AND state IN ${ops.OPEN_STATES}`, [
+    ctx.sql.one(["n"], `SELECT COUNT(*) AS n FROM deliveries WHERE ${MARK_PAIR_ROWS} AND state IN ${OPEN_STATES}`, [
       ...markPairParams(pair),
     ])?.n ?? 0,
   )
@@ -796,7 +795,7 @@ async function openIntakeSessions(ctx: ops.StoreContext): Promise<OpenIntakeSess
   const rows = ctx.sql.all(
     ["target_durable_id", "device", "state", "admitted_by"],
     `SELECT target_durable_id, ${MARK_DEVICE} AS device, state, admitted_by FROM deliveries
-     WHERE ledger_id IS NOT NULL AND state IN ${ops.OPEN_STATES}`,
+     WHERE ledger_id IS NOT NULL AND state IN ${OPEN_STATES}`,
     [],
     "target_durable_id",
   )
@@ -841,7 +840,7 @@ function openForMarkCommand(
       ctx.sql.one(
         ["n"],
         `SELECT COUNT(*) AS n FROM intake_commands c JOIN deliveries d ON d.ledger_id = c.ledger_id
-         WHERE c.command_id = ? AND substr(c.ledger_id, 1, length(?)) = ? AND d.state IN ${ops.OPEN_STATES}`,
+         WHERE c.command_id = ? AND substr(c.ledger_id, 1, length(?)) = ? AND d.state IN ${OPEN_STATES}`,
         [request.command_id, prefix, prefix],
       )?.n ?? 0,
     ) > 0
@@ -920,6 +919,12 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
     return null
   }
   const ctx = requireContext()
+  // Another process may have migrated the store since this worker opened it (#14622 review M5, M7): every op re-reads
+  // the schema and reads its data in one snapshot, and every write re-reads it under its write lock.
+  return await ops.inCheckedSnapshot(ctx, () => dispatchOp(ctx, op, args))
+}
+
+async function dispatchOp(ctx: ops.StoreContext, op: string, args: unknown): Promise<unknown> {
   if (op.startsWith("woken_")) return await dispatchWoken(ctx, op, args)
   switch (op) {
     case "extension_register": {
@@ -970,6 +975,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return await ops.recordOutcome(ctx, args as Parameters<typeof ops.recordOutcome>[1])
     case "refuse_queued":
       return await ops.refuseQueued(ctx, args as Parameters<typeof ops.refuseQueued>[1])
+    case "refuse_returned":
+      return await ops.refuseReturned(ctx, args as Parameters<typeof ops.refuseReturned>[1])
     case "complete_receipt":
       return await ops.completeReceipt(ctx, args as Parameters<typeof ops.completeReceipt>[1])
     case "abandon_receipt":
@@ -984,6 +991,8 @@ async function dispatch(op: string, args: unknown): Promise<unknown> {
       return ops.listDeliveries(ctx, args as Parameters<typeof ops.listDeliveries>[1])
     case "is_referenced":
       return ops.isReferenced(ctx, args as string)
+    case "backlogs":
+      return readTargetBacklogs(ctx, args as Parameters<typeof readTargetBacklogs>[1])
     case "journal_mode":
       return ops.journalMode(ctx)
     case "stats":
@@ -1047,8 +1056,11 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   const path = gatewayDatabasePath(config.agent_dir)
   closeSync(openSync(path, "a", 0o600))
   chmodSync(path, 0o600)
+  // The file actually opened, links resolved: the source-build guard checks this path, so a link moved after it was
+  // resolved cannot point the guard at another store than the one migrated (#14622 review M9).
+  const databasePath = realpathSync(path)
   const sqlite = await import("node:sqlite")
-  connection = new sqlite.DatabaseSync(path, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
+  connection = new sqlite.DatabaseSync(databasePath, { timeout: config.busy_timeout_ms }) as unknown as SqliteConnection
   const sql = new Sql(connection)
   sql.exec(`PRAGMA busy_timeout = ${Math.trunc(config.busy_timeout_ms)}`)
   // Two processes opening a brand-new store race for the WAL switch, which does not wait on
@@ -1080,6 +1092,7 @@ async function open(request: { readonly config: GatewayStoreConfig; readonly now
   context = {
     sql,
     config,
+    databasePath,
     self,
     stats: { writes: 0, marker_unlinks: 0, transactions: 0 },
     emit,

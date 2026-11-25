@@ -30,6 +30,13 @@ describe("the wake's engine minimum", () => {
     ["5.2.0", true],
     // An omob dev build: 0.0.0-omob.<omo>.<senpi>+<build>.
     ["0.0.0-omob.c072ae7.43bff8d+1794717661.43bff8d", true],
+    // A dev engine built on a senpi release stamps that CalVer first (measured on a swapped host: every same-device send
+    // to a parked session answered queued_offline/wake_unavailable because this stamp started no carrier).
+    ["2026.11.19-2-1-omob.6d05a3b.1975499+1795063675.1975499", true],
+    ["2026.11.19-2-1-omob.6d05a3b.1975499", true],
+    ["2026.11.15-2-dev.3", true],
+    ["2026.11.15-1-1-omob.6d05a3b.1975499", false],
+    ["2026.11.15-omob.6d05a3b", false],
   ] as const)(
     "#given an engine reporting %s #when the shipped minimum is read #then the wake runs: %s",
     (version, runs) => {

@@ -44,6 +44,7 @@ const gateway = [
   ["stopped-target", "stopped-target.mjs"],
   ["sender-death", "sender-death.mjs"],
   ["held-then-exit", "held-then-exit.mjs"],
+  ["graceful-close", "graceful-close.mjs"],
   ["receiver-crash", "receiver-crash.mjs"],
   ["loop-guard", "loop-guard.mjs"],
   ["lost-ack", "lost-ack.mjs"],
@@ -53,6 +54,8 @@ const gateway = [
   ["report-origin", "report-origin.mjs"],
   ["report-origin-steer", "report-origin-steer.mjs"],
   ["report-origin-auto-steer", "report-origin-auto-steer.mjs"],
+  ["default-delivery", "default-delivery.mjs"],
+  ["busy-backlog", "busy-backlog.mjs"],
 ]
 
 const legacy = [

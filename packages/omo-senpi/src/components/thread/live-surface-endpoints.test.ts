@@ -25,7 +25,7 @@ function tempDir(prefix: string): string {
   return directory
 }
 
-async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly frames: Frame[] }> {
+async function endpoint(socketPath: string, answer: Answer, protocol: Frame = {}): Promise<{ readonly frames: Frame[] }> {
   const frames: Frame[] = []
   const sockets = new Set<Socket>()
   const transport = fakeHostTransport(socketPath)
@@ -40,7 +40,7 @@ async function endpoint(socketPath: string, answer: Answer): Promise<{ readonly 
       if (newline < 0) return
       const frame = JSON.parse(buffer.slice(0, newline)) as Frame
       buffer = buffer.slice(newline + 1)
-      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: {} })}\n`); return }
+      if (frame.type === "get_protocol_info") { socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, data: protocol })}\n`); return }
       frames.push(frame)
       socket.write(`${JSON.stringify({ id: frame.id, type: "response", command: frame.type, success: true, ...answer(frame) })}\n`)
     })
@@ -129,8 +129,9 @@ describe("thread tools across host endpoints", () => {
     const dir = tempDir("thr-ep-")
     const legacy = join(dir, "rpc.sock")
     const shard = join(dir, "i-0123456789abcdef.sock")
-    await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")))
-    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")))
+    // Each endpoint names the engine it runs; an older host names only its package version (#14278).
+    await endpoint(legacy, hostWith("dur-terminal", "terminal", join(dir, "terminal.jsonl")), { serverVersion: "5.1.79", engineVersion: "2026.11.19-3" })
+    await endpoint(shard, hostWith("dur-desktop", "desktop", join(dir, "desktop.jsonl")), { serverVersion: "5.1.70" })
     const w = world({ legacy, shard, reports: () => [report(legacy, true), report(shard, true)] })
 
     // when
@@ -140,6 +141,9 @@ describe("thread tools across host endpoints", () => {
     expect(listed.kind).toBe("ok")
     const threads = (listed as Extract<ThreadToolResult, { kind: "ok"; threads: unknown }>).threads as ReadonlyArray<{ thread: string; surface?: string; status: string }>
     expect(threads.map((thread) => [thread.thread, thread.surface, thread.status]).sort()).toEqual([["dur-desktop", "desktop", "live"], ["dur-terminal", "daemon", "live"]])
+    // Every row names the engine version of the host that holds it.
+    const engines = Object.fromEntries((threads as ReadonlyArray<{ thread: string; engine_version?: string }>).map((thread) => [thread.thread, thread.engine_version]))
+    expect(engines).toEqual({ "dur-terminal": "2026.11.19-3", "dur-desktop": "5.1.70" })
   })
 
   test("#given both endpoints hold a session routed as rpc-1 #when thread_send and thread_read target the i-* thread #then every per-session request dials the i-* socket and none reaches the legacy one", async () => {

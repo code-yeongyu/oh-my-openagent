@@ -3,8 +3,23 @@ import type { EntryPageRead } from "../paged-reader"
 import type { ThreadTranscriptEntry } from "../reader"
 import type { InterruptOutcome } from "./interrupt"
 import type { ModelChoice } from "../tools/model-match"
-import type { ThreadCloseOutcome } from "../tools/ports"
-import type { ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
+import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
+import { threadModel } from "../tools/thread-state"
+import type { ThreadModel, ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
+
+export type SessionModelState = {
+  readonly model: ThreadModel
+  readonly thinkingLevel: string
+}
+
+export function sessionModelState(state: {
+  readonly model?: unknown
+  readonly thinkingLevel?: unknown
+}): SessionModelState | undefined {
+  const { thinkingLevel } = state
+  const { model } = threadModel(state.model)
+  return model !== undefined && typeof thinkingLevel === "string" ? { model, thinkingLevel } : undefined
+}
 
 /**
  * One live thread's controls, wherever it is held: the session on this device's endpoint, or the session on another
@@ -23,7 +38,7 @@ export type SessionControl = {
   /** `interruptOver` on this leg's transport: an idle session answers `interrupted: false`. */
   readonly interrupt: (turnId?: string) => Promise<InterruptOutcome>
   /** The one close ladder (`close-ladder.ts`) on the thread's engine. */
-  readonly close: () => Promise<ThreadCloseOutcome>
+  readonly close: (options?: ThreadCloseOptions) => Promise<ThreadCloseAnswer>
   readonly setName: (name: string) => Promise<void>
   /**
    * The session's model catalog. `held`: answered from a copy the leg keeps (bounded in age), on which only an exact
@@ -32,6 +47,8 @@ export type SessionControl = {
   readonly getAvailableModels: (options?: {
     readonly fresh?: boolean
   }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
+  /** A fresh `get_state` snapshot of the model and level, for restoring a refused compound switch. */
+  readonly getModelState: () => Promise<SessionModelState | undefined>
   readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**

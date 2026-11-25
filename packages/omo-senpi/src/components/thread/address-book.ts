@@ -224,6 +224,9 @@ export function assembleAddressBook(
 
   for (const session of diskSessions) {
     if (session.durable_id.length === 0) continue
+    // The workspace scan reads a file an endpoint already claimed with no endpoint: the endpoint's record, which carries its
+    // failure (a timed-out engine's `live_unresponsive`), wins, so the thread never reads as a plain closed one (#14308).
+    if (session.source_host === null && byDurableId.get(session.durable_id)?.source_host != null) continue
     const failure = session.source_host === null ? undefined : failures.get(session.source_host)
     byDurableId.set(
       session.durable_id,

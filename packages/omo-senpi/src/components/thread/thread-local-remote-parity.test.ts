@@ -97,8 +97,8 @@ describe("B1: a thread no engine runs answers every tool the same way, and never
         { seq: 2, role: "assistant", content: JSON.stringify("noted") },
       ],
     })
-    for (const tool of ["thread_interrupt", "thread_rename"] as const)
-      expect(errorOf(await run(tool, { thread: id, name: "renamed" }))?.code).toBe("not_resumable")
+    expect(errorOf(await run("thread_interrupt", { thread: id }))?.code).toBe("not_resumable")
+    expect(errorOf(await run("thread_rename", { thread: id, name: "renamed" }))?.code).toBe("not_resumable")
   })
 })
 
@@ -115,9 +115,10 @@ describe("#13215: a session another device holds but lists nowhere answers read 
     return { run: surface(b.remote).run, lookups: b.lookups }
   }
 
-  test("#given a closed session on b that b lists nowhere #when thread_read names it by session id on device a #then the id probe finds it on b and it answers not_resumable, never not_found", async () => {
+  // omo#14799: a read of it answers its transcript on both legs; the remote leg reopens it on b to read it.
+  test("#given a closed session on b that b lists nowhere #when thread_read names it by session id on device a #then the id probe finds it on b, b reopens it and the read answers its transcript, never not_resumable or not_found", async () => {
     const remote = unlisted("remote")
-    expect(errorOf(await remote.run("thread_read", { thread: CLOSED }))).toMatchObject({ code: "not_resumable" })
+    expect(await remote.run("thread_read", { thread: CLOSED })).toMatchObject({ kind: "ok", device: "b" })
     expect(remote.lookups).toEqual([{ device: "b", durable_id: CLOSED }])
   })
 
@@ -153,7 +154,8 @@ const ENGINE_STATE = {
   endpoint_kind: "rpc_host",
   controls: ["send", "read"],
 }
-const SUMMARY_KEYS = ["created_at", "cwd", "link", "name", "state", "status", "thread", "updated_at"]
+// A create given no prompt says `prompt: null` on both legs, beside the thread's summary.
+const SUMMARY_KEYS = ["created_at", "cwd", "link", "name", "prompt", "state", "status", "thread", "updated_at"]
 const threadKeys = (result: ThreadToolResult) => {
   if (result.kind !== "ok" || !("thread" in result)) throw new Error(`expected a thread, got ${JSON.stringify(result)}`)
   return Object.keys(result)

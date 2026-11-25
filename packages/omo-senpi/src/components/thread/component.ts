@@ -2,8 +2,12 @@ import { AsyncResource } from "node:async_hooks"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 
+import { resolveErrorStreakSettings, resolveHomeDir } from "@oh-my-opencode/omo-config-core"
+
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"
+import { loadSenpiOmoConfig } from "../config-resolution"
+import { returnedAtClose, settleGracefulClose } from "./gateway/graceful-close-returns"
 import { createCompletionTracker, type AgentEndFacts } from "./gateway/completion"
 import { SESSION_CONTROL_DELIVERY_TYPE } from "./gateway/constants"
 import { gatewayDatabasePath } from "./gateway/paths"
@@ -24,13 +28,16 @@ import { createGatewayStore, type GatewayStore } from "./gateway/store"
 import { registerThreadTools, UNKNOWN_CALLER, type ThreadToolSurfaceOptions } from "./tools"
 import { createLazyLiveThreadSurface } from "./lazy-live-surface"
 import { createDefaultRemoteSurface } from "./remote/default-remote"
+import { loadSenpiProjector } from "./remote/senpi-projector"
 import { registerRemoteMonitorTargets } from "./remote/lazy-ops"
 import { createOmoNativeProductConfig } from "../telemetry/product-identity"
 import { defaultThreadStateDirectory, isThreadSocket } from "./live-surface-paths"
-import { stampThisDevice } from "./remote/this-device"
+import { stampThisDevice, thisDeviceId } from "./remote/this-device"
+import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
 import type { SameDeviceWake } from "./gateway/same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
+import { ledgerDevice } from "./delivery-ledger"
 
 /**
  * The longest the `agent_settled` handler waits for an armed completion's store write. senpi waits
@@ -76,6 +83,8 @@ export type ThreadComponentOptions = Partial<
   readonly controlEndpointTest?: ControlEndpointRegistrantOptions["_test"]
   /** Test seams of the session wake (#13037): the carrier, the consumer and their switches. */
   readonly wake?: ThreadWakeOptions
+  /** Test seams of the error-streak alerts (#14430): the clock, this device's id, the webhook client and the retry pause. */
+  readonly operatorAlerts?: Pick<RunAlertsOptions, "now" | "device" | "fetch" | "delay">
 }
 
 /**
@@ -162,29 +171,10 @@ function deliveryOf(message: EngineMessage):
       typeof details?.sender?.name === "string" && details.sender.name.trim() !== ""
         ? details.sender.name.trim()
         : undefined,
-    device: deliveryDevice(id),
+    device: ledgerDevice(id),
     // senpi admits a `prompt`/`steer`/`follow_up` sent over the session's RPC socket as this same message, under the
     // client's `clientMessageId` and with this sender it stamps itself (`session-control-input-commands.js`).
     rpcInput: details?.sender?.kind === "external" && details.sender.platform === "rpc",
-  }
-}
-
-/**
- * The device a delivery came from, as the receiving side attested it in the delivery's id: `device:<device>/<id>` names
- * it (URI-encoded); `rpc:local/<id>` and a bare row id name no device (amendment A4.3.1 of #13037). Those are this
- * device's deliveries, or another device's admitted on a connection that declared no remote origin (#14048), so a reply
- * that finds no such session here resolves account-wide (`tools.ts` `locate`).
- */
-function deliveryDevice(id: string): string | undefined {
-  if (!id.startsWith("device:")) return undefined
-  const rest = id.slice("device:".length)
-  const slash = rest.indexOf("/")
-  const part = slash === -1 ? rest : rest.slice(0, slash)
-  // A device part that is not valid URI encoding is kept as written: it names no listed device, so a reply to it is not_found.
-  try {
-    return decodeURIComponent(part)
-  } catch {
-    return part
   }
 }
 
@@ -305,6 +295,10 @@ function relayedQuestionOf(event: unknown): { readonly call: string; readonly re
     : undefined
 }
 
+/** senpi's `session_shutdown { closed: true }`: a graceful close ended the session on request (omo#14313). */
+const closedOnRequest = (event: unknown): boolean =>
+  typeof event === "object" && event !== null && (event as { readonly closed?: unknown }).closed === true
+
 function durableIdOf(eventCtx: unknown): string | undefined {
   const manager = (eventCtx as { readonly sessionManager?: { readonly getSessionId?: () => unknown } } | undefined)
     ?.sessionManager
@@ -399,6 +393,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           sender: { kind: "session", id: runtimeInstance ?? UNKNOWN_CALLER },
           log: (line) => ctx.logger.warn(line),
           permissionPreset: () => pi.getPermissionPreset?.(),
+          loadProjector: loadSenpiProjector,
         })
       registerRemoteMonitorTargets(pi, remote)
       const store =
@@ -528,6 +523,23 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         },
         (line) => ctx.logger.warn(line),
       )
+      const alertEnv = options.env ?? process.env
+      const alerts = createRunAlerts({
+        // User layer only: loading from $HOME walks no project layer, so a cloned repo's .omo/omo.json cannot pick the
+        // env var a webhook URL is read from, or add threads that receive messages sent as this session.
+        settings: () =>
+          resolveErrorStreakSettings(loadSenpiOmoConfig({ cwd: resolveHomeDir(alertEnv), env: alertEnv }).config),
+        env: alertEnv,
+        now: Date.now,
+        sendAs: tools.sendAs,
+        sessionName: () => pi.getSessionName?.(),
+        device: async () => {
+          const here = await thisDeviceId(remote)
+          return "device" in here ? here.device : undefined
+        },
+        log: { info: (line) => ctx.logger.info(line), warn: (line) => ctx.logger.warn(line) },
+        ...options.operatorAlerts,
+      })
       // A durable arm this runtime did not make itself - left by an earlier runtime (a restart, or a
       // crash before its write), or made by another process (`omo thread report ... completion`) - is
       // picked up at session_start and on a `wake` command, and written at this session's next settle.
@@ -661,7 +673,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       })
       pi.on("agent_end", (event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
-        if (durableId !== undefined) completions.agentEnd(durableId, event as AgentEndFacts)
+        if (durableId === undefined) return
+        completions.agentEnd(durableId, event as AgentEndFacts)
+        alerts.agentEnd(durableId, event as AgentEndFacts)
       })
       pi.on("agent_settled", async (_event, eventCtx) => {
         const durableId = durableIdOf(eventCtx)
@@ -672,6 +686,7 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
         run.local = false
         run.answered = true
         if (durableId === undefined) return
+        alerts.settled(durableId)
         // A failed write is reported (and retried) by the tracker's onWriteFailed.
         await waitAtMost(
           completions.settled(durableId).then(
@@ -681,7 +696,9 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           COMPLETION_SETTLE_WAIT_MS,
         )
       })
-      pi.on("session_shutdown", async () => {
+      pi.on("session_shutdown", async (event, eventCtx) => {
+        const endedId = durableIdOf(eventCtx)
+        if (endedId !== undefined) alerts.ended(endedId)
         completions.dispose()
         tools.dispose()
         await registrant
@@ -689,6 +706,13 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           .catch((error: unknown) =>
             ctx.logger.warn(
               `thread gateway: control endpoint teardown failed: ${error instanceof Error ? error.message : String(error)}`,
+            ),
+          )
+        const durableId = durableIdOf(eventCtx)
+        if (closedOnRequest(event) && durableId !== undefined)
+          await settleGracefulClose(store, durableId, returnedAtClose(eventCtx)).catch((error: unknown) =>
+            ctx.logger.warn(
+              `thread gateway: the graceful close's unread messages were not answered: ${error instanceof Error ? error.message : String(error)}`,
             ),
           )
         if (options.store === undefined) await store.dispose().catch(() => undefined)

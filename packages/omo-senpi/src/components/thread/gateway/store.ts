@@ -133,6 +133,8 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
   let idleTimer: ReturnType<typeof setTimeout> | undefined
   /** The close-and-terminate of a retired worker, until it settles: `dispose` waits for it. */
   let retiring: Promise<void> | undefined
+  /** Set by `dispose` while calls are in flight: the last one to settle releases it. */
+  let callsSettled: (() => void) | undefined
   const idleRetireMs = options._test?.idleRetireMs ?? GATEWAY_STORE_IDLE_RETIRE_MS
   const resolveTarget = options.resolveTarget
   /** The registrations the current worker holds, restored on the next worker after one exits. */
@@ -321,7 +323,10 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     options._test?.onWorkerRetiring?.(idle)
   }
 
-  /** Holds the worker from retiring for the whole call, its open included, then re-arms the idle timer. */
+  /**
+   * Holds the worker from retiring, and `dispose` from closing it, for the whole call, its open included, then
+   * re-arms the idle timer.
+   */
   async function track<T>(run: () => Promise<T>): Promise<T> {
     callsInFlight += 1
     cancelIdleRetire()
@@ -329,6 +334,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       return await run()
     } finally {
       callsInFlight -= 1
+      if (callsInFlight === 0) callsSettled?.()
       armIdleRetire()
     }
   }
@@ -362,6 +368,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     claim: (request) => call("claim", request),
     recordOutcome: (request) => call("record_outcome", request),
     refuseQueued: (request) => call("refuse_queued", request),
+    refuseReturned: (request) => call("refuse_returned", request),
     completeReceipt: (request) => call("complete_receipt", request),
     abandonReceipt: (request) => call("abandon_receipt", request),
     deliveryView: (deliveryId) => call("delivery_view", deliveryId),
@@ -369,6 +376,7 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
     recoverDelivery: (request) => call("recover_delivery", request),
     list: (filter = {}) => call("list", filter),
     isReferenced: (durableId) => call("is_referenced", durableId),
+    backlogs: (durableIds) => call("backlogs", { targets: durableIds, now: now() }),
     journalMode: () => call("journal_mode"),
     stats: () => call("stats"),
     legacyMigrated: () => track(async () => (await start()).legacy_migrated),
@@ -404,6 +412,13 @@ export function createGatewayStore(options: GatewayStoreOptions): GatewayStore {
       if (disposed) return
       disposed = true
       cancelIdleRetire()
+      // A call already admitted finishes before the close: a close posted under it would reach the worker between the
+      // call's open and its own request, and the call would fail with "the gateway store is not open". Calls made from
+      // here on are refused as disposed by `start`.
+      if (callsInFlight > 0)
+        await new Promise<void>((resolve) => {
+          callsSettled = resolve
+        })
       // A worker retired just before still holds its database until its close settles; a caller that
       // removes the agent directory after `dispose` must find it closed.
       await retiring

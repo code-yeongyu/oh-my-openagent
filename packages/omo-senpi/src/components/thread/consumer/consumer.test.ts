@@ -3,7 +3,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { join } from "node:path"
 
 import { gatewayDatabasePath } from "../gateway/paths"
-import { GATEWAY_MIGRATIONS } from "../gateway/schema"
+import { GATEWAY_MIGRATIONS, GATEWAY_READER_FLOOR_KEY } from "../gateway/schema"
 import { createGatewayHarness, type GatewayHarness } from "../gateway/testing/harness"
 import { writeSessionFile } from "../wake/testing/fake-wake-host"
 import { createDeliveryConsumer, type DeliveryConsumer } from "./consumer"
@@ -82,12 +82,17 @@ describe("declaring", () => {
     expect(service.calls).toEqual([{ type: "deliveries.serve", agent_dir: expect.any(String), v: 1 }])
   })
 
-  test("#given a store written by a newer build #when an older consumer starts #then it declares nothing", async () => {
+  test("#given a store written by a newer build this one cannot read #when an older consumer starts #then it declares nothing", async () => {
     const { h, service, consumer } = setup()
     await h.store().identity()
     const db = new Database(gatewayDatabasePath(h.agentDir))
     try {
+      // A newer build records its reader floor in the migration transaction (#14382); a floor above this build is unreadable.
       db.exec(`PRAGMA user_version = ${GATEWAY_MIGRATIONS.length + 1}`)
+      db.run("UPDATE gateway_meta SET value = ? WHERE key = ?", [
+        String(GATEWAY_MIGRATIONS.length + 1),
+        GATEWAY_READER_FLOOR_KEY,
+      ])
     } finally {
       db.close()
     }
@@ -288,6 +293,35 @@ describe("a handed delivery", () => {
       } else expect(woken).toEqual(["t"])
     },
   )
+
+  test("#given one device already handed this session 8 records #when a 9th follows at once #then the answer is pair_loop_guard with the burst, the window and the wait the sender maps", async () => {
+    const { sessions, service, consumer } = setup()
+    writeSessionFile(sessions, "t")
+    await consumer.start()
+    for (let index = 0; index < 8; index++) {
+      const reply = await service.inbound({
+        command_id: `c-${index}`,
+        sender_device: "dev-a",
+        durable_id: "t",
+        record: record(`d-${index}`),
+      })
+      expect(reply.data).toMatchObject({ kind: "queued" })
+    }
+    const ninth = await service.inbound({
+      command_id: "c-8",
+      sender_device: "dev-a",
+      durable_id: "t",
+      record: record("d-8"),
+    })
+    expect(ninth.data).toEqual({
+      kind: "refused",
+      reason: "pair_loop_guard",
+      burst: 8,
+      window_ms: 40_000,
+      retry_after_ms: 5_000,
+    })
+    await consumer.idle()
+  })
 
   // #12766 review L2: a limit that cannot be read fails open, so the delivery is queued as before and the failure is reported.
   test("#given the chain count limit cannot be read #when a record is handed in #then it is queued, the session woken and the failure reported", async () => {
