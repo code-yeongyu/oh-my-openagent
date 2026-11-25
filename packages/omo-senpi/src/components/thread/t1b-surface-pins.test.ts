@@ -1755,8 +1755,8 @@ describe("T1b pins: reads", () => {
   })
 
   test("receipt: the outcome of the caller's own delivery, on the tool only; the SDK has no receipt read", async () => {
-    const { sdk, tool } = fresh()
-    const sent = (await tool("thread_send", { thread: LEGS.here, message: "receipt me" })) as { delivery_id?: string }
+    const { s, sdk, tool } = fresh()
+    const sent = (await s.run("thread_send", { thread: LEGS.here, message: "receipt me" })) as { delivery_id?: string }
     const deliveryId = String(sent.delivery_id)
     const pins = {
       own: await tool("thread_read", { thread: LEGS.here, delivery_id: deliveryId }),
@@ -1770,7 +1770,7 @@ describe("T1b pins: reads", () => {
           "delivery_id": "<uuid>",
           "kind": "ok",
           "outcome": {
-            "kind": "outcome_unavailable",
+            "kind": "pending",
           },
           "thread": "dur-local",
         },
