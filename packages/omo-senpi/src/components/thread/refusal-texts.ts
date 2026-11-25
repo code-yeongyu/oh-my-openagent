@@ -54,17 +54,21 @@ const PROVENANCE = new WeakMap<
 
 /** Where `failure` came from, when refusal() produced it; a failure built any other way has none. */
 export function provenanceOf(
-  failure: ThreadToolFailure,
+  failure: object,
 ): { readonly id: RefusalId; readonly slots: Readonly<Record<string, string>> } | undefined {
   return PROVENANCE.get(failure)
 }
 
+/** `to`, carrying `from`'s provenance: for a path that rebuilds a failure as a new object (a spread drops the entry). */
+export function carryProvenance<T extends object>(from: object, to: T): T {
+  const known = PROVENANCE.get(from)
+  if (known !== undefined) PROVENANCE.set(to, known)
+  return to
+}
+
 /** `failure` with `details` merged in, keeping its provenance (a spread alone would drop it). */
 export function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
-  const merged: ThreadToolFailure = { ...failure, details: { ...failure.details, ...details } }
-  const known = PROVENANCE.get(failure)
-  if (known !== undefined) PROVENANCE.set(merged, known)
-  return merged
+  return carryProvenance(failure, { ...failure, details: { ...failure.details, ...details } })
 }
 
 /** A repeat of a refusal: its template filled again; a code with no template answers its fixed text. */
