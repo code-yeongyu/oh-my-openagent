@@ -29,7 +29,7 @@ const dirs: string[] = []
  * A run from source refuses to migrate a store under an account home (#14892), so every test that reaches the send
  * path gets its own agent dir outside HOME, as the guard asks (#14909).
  */
-export function useIsolatedAgentDir(): void {
+function useIsolatedAgentDir(): void {
   let saved: string | undefined
   let dir = ""
   beforeEach(() => {
