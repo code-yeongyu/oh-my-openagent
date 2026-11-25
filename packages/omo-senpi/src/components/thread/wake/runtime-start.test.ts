@@ -94,6 +94,38 @@ describe("the ensured host's idle-exit setting", () => {
   })
 })
 
+describe("a wake that throws", () => {
+  test("#given a carrier whose wake throws #when a send asks the running wake for it #then the failure is warned with the session id instead of vanishing with the caller's catch", async () => {
+    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    writeSessionFile(join(agentDir, "sessions"), "t")
+    const real = createGatewayStore({ agentDir })
+    const warnings: string[] = []
+    const running = start(
+      agentDir,
+      {
+        store: {
+          ...real,
+          sessionWait: {
+            ...real.sessionWait,
+            read: async () => {
+              throw new Error("the wait read failed")
+            },
+          },
+        },
+        deliveries: async () => undefined,
+        schedule: () => () => undefined,
+      },
+      (line) => warnings.push(line),
+    )
+
+    await expect(running?.wake("t") ?? Promise.resolve()).rejects.toThrow("the wait read failed")
+
+    expect(warnings).toEqual(["thread wake: t was not woken and is retried by the sweep: the wait read failed"])
+    await running?.stop()
+    await real.dispose()
+  })
+})
+
 describe("the consumer retry loop's warnings", () => {
   test("#given a failure whose kind changes without a recovery #when each retry fails #then each new failure is warned once and a repeating one stays silent", async () => {
     const agentDir = shortTempDir("omo-wake-runtime-")
