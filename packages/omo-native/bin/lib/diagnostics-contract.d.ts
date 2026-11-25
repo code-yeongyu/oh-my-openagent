@@ -133,9 +133,19 @@ export type DiagnosticsInstall =
       readonly sources: CompiledSources
     }
 
+/** The low-level process port (a conformance run's fake): one spawn of `ps`, one signal per reaped pid. */
+export type ProcessPort = {
+  readonly spawn: (
+    command: string,
+    argv: readonly string[],
+  ) => Promise<{ readonly exitCode: number; readonly stdout: string }>
+  readonly signal: (pid: number, signal: string) => Promise<void>
+}
+
 export type ProcessPorts = {
   readonly list?: () => readonly ProcessEntry[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
+  readonly process?: ProcessPort
 }
 
 export type RunPorts = ProcessPorts & {

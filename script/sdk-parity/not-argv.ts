@@ -14,6 +14,10 @@ export const NOT_ARGV: Readonly<Record<string, NotArgv>> = {
     tokens: ["--internal-", "upgrade"],
     reason: "matches the command line of running engine processes, not omo's argv",
   },
+  "packages/omo-native/bin/lib/process-list.js": {
+    tokens: ["-ww", "-axo"],
+    reason: "arguments of the ps child process the diagnostics core reads the process table with",
+  },
   "packages/omo-native/bin/lib/reflection-lock.generated.js": {
     tokens: ["--batch", "-c"],
     reason: "arguments of the git child process the memory core runs",

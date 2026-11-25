@@ -2,7 +2,7 @@
 import { finding } from "./diagnostics-findings.js"
 import { reflectionLockSweep } from "./reflection-lock-sweep.js"
 import { isEngine, isInteractive } from "./engine-processes.js"
-import { listProcesses } from "./process-list.js"
+import { processAccess } from "./process-list.js"
 
 /** @typedef {import("./diagnostics-contract").DiagnosticsCalls} DiagnosticsCalls */
 /** @typedef {import("./diagnostics-contract").ReapedEngine} ReapedEngine */
@@ -60,8 +60,8 @@ export async function reapStaleEngines(input, ports = {}) {
       },
     }
   }
-  const entries = (ports.list ?? listProcesses)()
-  const kill = ports.kill ?? ((pid, signal) => process.kill(pid, signal))
+  const access = processAccess(ports)
+  const entries = await access.list()
   /** @type {ReapedEngine[]} */
   const engines = []
   for (const pid of input.pids) {
@@ -73,7 +73,7 @@ export async function reapStaleEngines(input, ports = {}) {
       engines.push({ pid, outcome: "refused", reason: "live_session", details: { launcher_pid: entry.ppid } })
     else {
       try {
-        kill(pid, "SIGTERM")
+        await access.kill(pid, "SIGTERM")
         engines.push({ pid, outcome: "reaped", age: entry.elapsed, tty: entry.tty })
       } catch (error) {
         engines.push({

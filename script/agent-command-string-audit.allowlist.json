@@ -134,7 +134,6 @@
     "packages/memory-core/src/retention/cap.ts: omo doctor",
     "packages/memory-core/src/retention/pass.ts: omo doctor",
     "packages/memory-core/src/retention/size.ts: omo doctor",
-    "packages/omo-native/bin/lib/diagnostics-contract.d.ts: omo doctor x2",
     "packages/omo-native/bin/lib/diagnostics-findings.js: omo doctor",
     "packages/omo-native/bin/lib/diagnostics-run.js: omo doctor x2",
     "packages/omo-native/bin/lib/doctor.js: omo doctor x4",
@@ -161,10 +160,16 @@
     "packages/omo-native/test/engine-trust-doctor.test.ts: omo doctor",
     "packages/omo-native/test/keychain-helper-doctor.test.ts: omo doctor x2",
     "packages/omo-native/test/launch-spec-mode.test.ts: omo doctor x3",
-    "packages/omo-senpi/src/components/omo-sdk/contract/results/host.ts: omo doctor",
     "docs/reference/omo-sdk-first-party-design.md: omo doctor x3",
     "docs/reference/omo-sdk-first-party-design.md: omo install",
-    "docs/reference/omo-sdk-first-party-design.md: omo ulw-loop"
+    "docs/reference/omo-sdk-first-party-design.md: omo ulw-loop",
+    "packages/omo-native/bin/lib/diagnostics-contract.d.ts: omo doctor x3",
+    "packages/omo-native/bin/lib/reap-exit.js: omo doctor x2",
+    "packages/omo-native/test/diagnostics-root-report.test.ts: omo doctor x2",
+    "packages/omo-native/test/reap-exit.test.ts: omo doctor x2",
+    "packages/omo-native/test/sdk-exit-doctor.test.ts: omo doctor x3",
+    "packages/omo-senpi/src/components/omo-sdk/contract/results/host.ts: omo doctor x3",
+    "packages/omo-senpi/src/components/omo-sdk/exit/diagnostics.ts: omo doctor"
   ],
   "literal-label": [
     "packages/omo-opencode/src/cli/account-keys/keystore.ts: =omo",

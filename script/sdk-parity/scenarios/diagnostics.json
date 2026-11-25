@@ -17,7 +17,10 @@
           "args": {
             "command": "ps"
           },
-          "result": []
+          "result": {
+            "exitCode": 0,
+            "stdout": ""
+          }
         },
         {
           "port": "host",
@@ -196,15 +199,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 1,
-              "elapsed": "05:00",
-              "tty": "pts/1",
-              "command": "node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin"
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin\n"
+          }
         },
         {
           "port": "process",
@@ -233,7 +231,10 @@
           "args": {
             "command": "ps"
           },
-          "result": []
+          "result": {
+            "exitCode": 0,
+            "stdout": ""
+          }
         },
         {
           "port": "process",
@@ -259,15 +260,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 1,
-              "elapsed": "05:00",
-              "tty": "pts/1",
-              "command": "node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc"
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc\n"
+          }
         },
         {
           "port": "process",
@@ -293,15 +289,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4242,
-              "ppid": 777,
-              "elapsed": "05:00",
-              "tty": "pts/1",
-              "command": "node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin"
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4242    777       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin\n"
+          }
         },
         {
           "port": "process",
@@ -328,15 +319,10 @@
           "args": {
             "command": "ps"
           },
-          "result": [
-            {
-              "pid": 4343,
-              "ppid": 1,
-              "elapsed": "05:00",
-              "tty": "pts/1",
-              "command": "node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc"
-            }
-          ]
+          "result": {
+            "exitCode": 0,
+            "stdout": "  4343      1       05:00 pts/1    node /opt/omo/node_modules/@code-yeongyu/senpi/dist/bundle/cli.js --extension /opt/omo/plugin --mode rpc\n"
+          }
         },
         {
           "port": "process",
