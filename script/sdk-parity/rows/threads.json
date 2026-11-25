@@ -2094,6 +2094,7 @@
       "kind": "capability",
       "sdk": "threads.send",
       "today": "partial",
+      "note": "A steer's expected_turn_id is decided by principal in the core send operation, before any transport (#15007): a session principal (thread_send, thread_handoff, a delivery) must name the turn and is refused invalid_arguments without it; a person or script principal may omit it and the running turn is steered, on every leg. The id is a concurrency guard, not a permission. A keyed send is at most once at the holder: the prompt's client message id and a delivery's id are derived from the principal and the idempotency key (#15011).",
       "slices": [
         "T1a",
         "T1b"
