@@ -56,11 +56,12 @@ export type Finding = {
 /** `failed` is the exit rule `omo doctor` applies: only an artifact, engine, launch-spec or computer-use failure. */
 export type Diagnostics = { readonly findings: readonly Finding[]; readonly failed: boolean }
 /** `omo doctor --models --json`'s view: the spawn resolvers' chains and the main session's lane, in their own types. */
-export type ModelChains = ModelChainsReport & { readonly configProfile?: string; readonly modelProfile: ModelProfileView }
+export type ModelChains = ModelChainsReport & {
+  readonly configProfile?: string
+  readonly modelProfile: ModelProfileView
+}
 /** One line of the sweep in print order: memory-core's own text verbatim, or a finding about the sweep. */
-export type FixEntry =
-  | { readonly kind: "sweep_text"; readonly text: string }
-  | ({ readonly kind: "finding" } & Finding)
+export type FixEntry = { readonly kind: "sweep_text"; readonly text: string } | ({ readonly kind: "finding" } & Finding)
 export type FixReflectionLock = {
   readonly dry_run: boolean
   readonly entries: readonly FixEntry[]

@@ -1,4 +1,5 @@
 import type { SurfaceExits } from "."
+import { DOCTOR } from "./diagnostics"
 
 /** `omo thread` (omo-native bin/lib/thread.js threadExitCode, THREAD_EXIT): 3 unavailable, 5 internal_error. */
 const THREAD: SurfaceExits = {
@@ -142,6 +143,7 @@ const REMOTE: SurfaceExits = {
 
 /** Each surface under the CLI entry strings of the rows whose verbs print through it (rows' cli route, space-joined). */
 export const SURFACE_EXITS: Readonly<Record<string, SurfaceExits>> = {
+  doctor: DOCTOR,
   "thread list": THREAD,
   "thread read": THREAD,
   "thread send": THREAD,
