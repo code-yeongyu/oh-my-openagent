@@ -4,7 +4,8 @@ import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { commandWaitMs } from "../../call-budget/call-deadline"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
-import { endpointOutcomeFailure } from "./outcome"
+import { endpointOutcomeFailure, unreached } from "./outcome"
+import { ACCESS_ENDED, ACCESS_REFUSED } from "./session-state"
 import {
   rowStatus,
   type JsonObject,
@@ -43,6 +44,20 @@ const isFound = (outcome: RemoteCommandOutcome): boolean => {
 
 const diskOnly = (outcome: RemoteCommandOutcome): boolean =>
   outcome.kind === "ok" && recordOf(replyData(outcome.response)["found"])?.["open"] === false
+
+// Only topology, unsupported lookup and transient transport failures allow another engine to be asked.
+// An unrecognised refusal, like an explicit access refusal, is authoritative.
+function terminalRefusal(outcome: RemoteCommandOutcome): boolean {
+  return (
+    outcome.kind === "refused" &&
+    (ACCESS_ENDED.has(outcome.reason) ||
+      ACCESS_REFUSED.has(outcome.reason) ||
+      (!lacksFindSession(outcome) &&
+        outcome.reason !== "route_unlisted" &&
+        outcome.reason !== "no_primary_endpoint" &&
+        !unreached(outcome)))
+  )
+}
 
 /** The whole fallback (every listed engine) shares this budget, so a non-live send never waits minutes (omo#14271 review L1). */
 const FALLBACK_TOTAL_MS = 15_000
@@ -103,6 +118,7 @@ async function findSession(
     const remaining = commandWaitMs(deadline - Date.now())
     if (remaining <= 0) break
     const outcome = await remote.sessions.endpointCommand(device, rpc, { endpoint, waitMs: remaining })
+    if (terminalRefusal(outcome)) return { outcome, listed: true, uncertain: false }
     if (isFound(outcome)) {
       // Engines sharing an agent dir see the same file. Only its owner sees it open.
       if (seekOwner && diskOnly(outcome)) disk ??= outcome
@@ -132,12 +148,15 @@ export type HolderView = "running" | "on_disk" | "absent" | "unknown"
  * `unknown`, which the send treats as on disk: an ended row is woken when this device can, anything else is
  * `not_resumable`.
  */
-export async function holderView(remote: RemoteThreadSurface, row: RemoteSessionRow): Promise<HolderView> {
+export async function holderView(
+  remote: RemoteThreadSurface,
+  row: RemoteSessionRow,
+): Promise<HolderView | ReturnType<typeof endpointOutcomeFailure>> {
   // find_session looks a session up by its durable id; a row without one cannot be looked up.
   const thread = row.durable_id ?? ""
   if (thread === "") return "unknown"
   const { outcome } = await findSession(remote, row.device, thread, rowStatus(row) === "live")
-  if (outcome.kind !== "ok") return "unknown"
+  if (outcome.kind !== "ok") return terminalRefusal(outcome) ? endpointOutcomeFailure(outcome, row.device) : "unknown"
   const data = replyData(outcome.response)
   const found = recordOf(data["found"])
   if (found !== undefined) return found["open"] === true ? "running" : "on_disk"
