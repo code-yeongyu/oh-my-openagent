@@ -92,3 +92,45 @@ test("#given a real home full of canaries and a root built for an empty scratch 
   expect(answer.value.findings.filter((finding) => finding.check === "settings.packages")).toEqual([])
   expect({ real: tree(realHome), scratch: tree(scratch) }).toEqual(before)
 })
+
+test("#given a relative memory home and a project layer under the process's own cwd and a root built for a scratch cwd #when diagnostics.run answers #then the memory sections and the daemon's config loader read the root's cwd only", async () => {
+  const processCwd = mkdtempSync(join(tmpdir(), "c1b-process-cwd-"))
+  const scratch = mkdtempSync(join(tmpdir(), "c1b-scratch-cwd-"))
+  roots.push(processCwd, scratch)
+  mkdirSync(join(processCwd, "rel-memory", "agents", `${CANARY}-identity`, "repo"), { recursive: true })
+  const home = join(scratch, "home")
+  const agentDir = join(home, ".omo", "agent")
+  mkdirSync(agentDir, { recursive: true })
+  const seenCwd: string[] = []
+  const loader = createDiagnosticsLoader({
+    process: { spawn: async () => ({ exitCode: 0, stdout: "" }), signal: async () => {} },
+    host: { status: async () => ({ endpoints: [] }) },
+    fetchDistTags: () => undefined,
+    loadTaskConfig: () => ({
+      resolveDaemonTaskSettings: ({ cwd }: { readonly cwd: string }) => {
+        seenCwd.push(cwd)
+        return {}
+      },
+    }),
+  })
+  const root = assembleOmoSdk(
+    {
+      env: { HOME: home, OMO_CODING_AGENT_DIR: agentDir, OMO_MEMORY_HOME: "rel-memory", PATH: "" },
+      cwd: scratch,
+      home,
+    },
+    { cores: { diagnostics: loader } },
+  )
+  const previous = process.cwd()
+  process.chdir(processCwd)
+  let answer
+  try {
+    answer = await root.diagnostics.run({})
+  } finally {
+    process.chdir(previous)
+  }
+  expect(JSON.stringify(answer)).not.toContain(CANARY)
+  expect(JSON.stringify(answer)).not.toContain(processCwd)
+  expect(seenCwd.length).toBeGreaterThan(0)
+  expect([...new Set(seenCwd)]).toEqual([scratch])
+})

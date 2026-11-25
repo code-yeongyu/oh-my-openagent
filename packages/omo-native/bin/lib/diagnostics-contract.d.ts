@@ -162,6 +162,8 @@ export type RunPorts = ProcessPorts & {
   readonly env?: Env
   readonly homeDir?: string
   readonly cwd?: string
+  /** The staged task-config runtime the daemon section resolves its project and user layers with. */
+  readonly loadTaskConfig?: () => unknown
   readonly platform?: NodeJS.Platform
   readonly fetchDistTags?: () => unknown
   readonly now?: () => number
