@@ -76,10 +76,16 @@ export type SignInFailure = SignInRefusal | { readonly code: "accounts_closed" }
 
 const ABORTED = Symbol("aborted")
 
-/** Settles with the work, or with ABORTED the moment the signal aborts; the work is not waited on after that. */
+/**
+ * Settles with the work, or with ABORTED the moment the signal aborts; the work is not waited on after that, but it is
+ * still observed: a cooperative callback that rejects as the cancellation reaches it leaves no unhandled rejection.
+ */
 function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T | typeof ABORTED> {
   if (signal === undefined) return work
-  if (signal.aborted) return Promise.resolve(ABORTED)
+  if (signal.aborted) {
+    work.catch(() => undefined)
+    return Promise.resolve(ABORTED)
+  }
   return new Promise((resolve, reject) => {
     const stop = () => resolve(ABORTED)
     signal.addEventListener("abort", stop, { once: true })

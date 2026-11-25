@@ -134,6 +134,47 @@ describe("account.signIn cancelled before the commit point: nothing stored", () 
   })
 })
 
+describe("a cooperative callback that rejects as the caller aborts", () => {
+  const unhandled: unknown[] = []
+  const seen = (reason: unknown) => unhandled.push(reason)
+  const quiet = () => new Promise<void>((resolve) => setImmediate(resolve))
+
+  test("#given an onUserCode that aborts and rejects at once #then the call ends cancelled and no rejection escapes", async () => {
+    process.on("unhandledRejection", seen)
+    try {
+      const w = await world()
+      const answer = await run(w, {
+        onUserCode: () => {
+          w.controller.abort()
+          return Promise.reject(new Error("the caller stopped waiting"))
+        },
+      })
+      await quiet()
+      expect({ answer, unhandled }).toEqual({ answer: { kind: "refused", code: "cancelled" }, unhandled: [] })
+    } finally {
+      process.off("unhandledRejection", seen)
+    }
+  })
+
+  test("#given a setup that rejects when the signal it was given aborts #then the call ends signed in and no rejection escapes", async () => {
+    process.on("unhandledRejection", seen)
+    try {
+      const w = await world()
+      const answer = await run(w, {
+        setUp: (signal) =>
+          new Promise<"on">((_, reject) => {
+            signal?.addEventListener("abort", () => reject(new Error("setup stopped")), { once: true })
+            queueMicrotask(() => w.controller.abort())
+          }),
+      })
+      await quiet()
+      expect({ answer, unhandled }).toMatchObject({ answer: signedInNotOn, unhandled: [] })
+    } finally {
+      process.off("unhandledRejection", seen)
+    }
+  })
+})
+
 describe("account.signIn cancelled at or after the commit point: signed in, setup not on", () => {
   test("#given an abort while the grant is exchanged #then the grant is stored and the setup never runs", async () => {
     const w = await world({ onToken: () => w.controller.abort() })
