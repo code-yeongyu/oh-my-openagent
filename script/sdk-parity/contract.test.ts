@@ -37,7 +37,7 @@ import { join } from "node:path"
 import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { portProblems } from "./expectation"
-import { loadScenarioTable } from "./scenario-table"
+import { loadScenarioTable, type TableScenario } from "./scenario-table"
 import { syncRow } from "./sync-inputs"
 import { tableProblems } from "./scenario-rules"
 
@@ -313,6 +313,9 @@ const OPEN_ON_PURPOSE: Readonly<Record<string, string>> = {
   "engine.launch.headless.api_key": "security input owned by slice P1a-s",
   "toolkit.addGoal.successCriteria[]": "security input owned by slice P1a-s",
   "toolkit.steer.childGoals[]": "security input owned by slice P1a-s",
+  "daemon.warm.context": "a caller-defined map of warm context, keyed by the caller (Record<string, unknown>)",
+  "threads.extensions.register.sessionCallable[].parameters":
+    "a JSON Schema the extension supplies for its own callable; any keyword is the extension's, not the SDK's",
 }
 
 type SchemaNode = {
@@ -325,9 +328,8 @@ type SchemaNode = {
 }
 const openObjects = (node: SchemaNode, path: string): string[] => [
   ...(node.anyOf ?? []).flatMap((variant) => openObjects(variant, path)),
-  ...(node.type === "object" && node.additionalProperties === undefined && node.patternProperties === undefined
-    ? [path]
-    : []),
+  // Open is anything but additionalProperties: false: absent, true, or a schema that admits further keys.
+  ...(node.type === "object" && node.additionalProperties !== false ? [path] : []),
   ...Object.entries(node.type === "object" ? (node.properties ?? {}) : {}).flatMap(([key, child]) =>
     openObjects(child, `${path}.${key}`),
   ),
@@ -339,16 +341,32 @@ describe("unknown keys (finding relayed from C1c, design 4.4)", () => {
     const open = Object.entries(ROOT_CALLS).flatMap(([key, call]) =>
       openObjects(JSON.parse(JSON.stringify(call.input)) as SchemaNode, key),
     )
-    expect(open.toSorted()).toEqual(Object.keys(OPEN_ON_PURPOSE).toSorted())
+    expect([...new Set(open)].toSorted()).toEqual(Object.keys(OPEN_ON_PURPOSE).toSorted())
   })
 
-  test("#given any root call #then an input carrying a key its schema does not name is refused", () => {
-    const opened = Object.keys(ROOT_CALLS).filter((key) => {
-      const sample = scenarios
+  test("#given any root call #then its sample input is accepted and the same input with an unknown key is refused", () => {
+    const sampleOf = (key: string): TableScenario | undefined =>
+      scenarios
         .flatMap((file) => file.scenarios)
-        .find((scenario) => scenario.invalid !== true && rows.find((row) => row.id === scenario.row)?.sdk === key)
-      return sample !== undefined && inputAccepts(key, { ...sample.input, unknown_key_probe: 1 })
+        .find(
+          (scenario) =>
+            scenario.invalid !== true &&
+            scenario.kind === "effect" &&
+            rows.find((row) => row.id === scenario.row)?.sdk === key &&
+            inputAccepts(key, scenario.input),
+        )
+    const keys = Object.keys(ROOT_CALLS)
+    // Coverage invariant: every call has an admitted effect scenario to mutate, so the check can never skip a call.
+    expect(keys.filter((key) => sampleOf(key) === undefined)).toEqual([])
+    const outcomes = keys.map((key) => {
+      const input = sampleOf(key)?.input ?? {}
+      return {
+        key,
+        accepted: inputAccepts(key, input),
+        withUnknown: inputAccepts(key, { ...input, unknown_key_probe: 1 }),
+      }
     })
-    expect(opened).toEqual([])
+    expect(outcomes.filter((outcome) => !outcome.accepted).map((outcome) => outcome.key)).toEqual([])
+    expect(outcomes.filter((outcome) => outcome.withUnknown).map((outcome) => outcome.key)).toEqual([])
   })
 })
