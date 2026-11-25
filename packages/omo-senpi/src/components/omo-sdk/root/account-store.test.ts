@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { type StoreDependencies, storePort } from "@oh-my-opencode/account-core/calls/store"
+import { type StoreDependencies, storeSwitchPort } from "@oh-my-opencode/account-core/calls/store"
 import { dedicatedFake } from "@oh-my-opencode/account-core/keychain-helper/dedicated-fake.test-support"
 import { A, API } from "@oh-my-opencode/account-core/keychain-helper/fake-keychain.test-support"
 import { assembleOmoSdk } from "../assembly"
@@ -30,7 +30,7 @@ function rootWith(store: Partial<StoreDependencies>, desktopLaunch = false) {
       cwd: home,
       ports: {
         desktopLaunch: () => desktopLaunch,
-        accountStore: storePort({
+        accountStore: storeSwitchPort({
           api: API,
           platform: "darwin",
           state: fake.state,

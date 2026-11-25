@@ -5,7 +5,7 @@ import type * as result from "../results/account"
 // The devices, account, deviceService and sync namespaces (first-party design 6.3 to 6.6).
 export const ACCOUNT_CALLS = {
   "account.whoami": valueCall<result.WhoAmI>()(input.AccountWhoami),
-  "account.show": valueCall<result.AccountShowResult>()(input.AccountShow),
+  "account.show": valueCall<result.AccountShown>()(input.AccountShow),
   "account.signInCheck": instantCall<result.SignInCheck>()(input.AccountSignInCheck),
   "account.signOut": valueCall<result.SignedOut>()(input.AccountSignOut),
   "account.forget": valueCall<result.Forgotten>()(input.AccountForget),

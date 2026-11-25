@@ -49,6 +49,8 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
   })
   const account = accountNamespace({
     access,
+    env,
+    cwd,
     ...(ports.accountStore === undefined ? {} : { store: ports.accountStore }),
   })
   const root = assembleRoot(

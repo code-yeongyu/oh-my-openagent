@@ -50,6 +50,8 @@ function untouchedRoot(principal: OmoPrincipal, root: Readonly<Record<string, un
     deviceServiceStatus: touch("deviceService"),
     signInProcess: touch("process"),
     accountStore: {
+      platform: "darwin",
+      available: touch("accountStore"),
       status: () => {
         touched.push("accountStore")
         throw new Error("accountStore was touched")

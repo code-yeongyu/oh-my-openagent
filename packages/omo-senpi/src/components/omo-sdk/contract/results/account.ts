@@ -38,6 +38,9 @@ export type Forgotten = { readonly forgotten: true }
  */
 export type { StoreDisabled, StoreEnabled, StoreStatus } from "@oh-my-opencode/account-core/calls/store"
 
+/** `omo account show`: the record it prints (design lane ruling of 2026-11-26 on typed results); never a token or a key. */
+export type { AccountShown } from "@oh-my-opencode/account-core/calls/show"
+
 export type Revoked = { readonly revoked: true; readonly device: { readonly id: string; readonly name: string } }
 
 export type Enabled = { readonly enabled: boolean }

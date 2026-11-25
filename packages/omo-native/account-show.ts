@@ -1,4 +1,3 @@
-import { homedir } from "node:os"
 import type { AccountShowResult } from "../device-service-core/src/account-state.ts"
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { loadTrustAnchor } from "../memory-core/src/sync/crypto/trust-pin.ts"
@@ -7,15 +6,13 @@ import {
   type CredentialStore,
   CredentialStoreError,
   createCredentialStore,
-  credentialId,
   KeychainLockedError,
   SESSION_READ_WAIT,
   SecretServiceUnavailableError,
 } from "../account-core/src/keystore"
-import { type Credentials, SignInError, serviceOrigin } from "../account-core/src/protocol"
-import { readRecoveryClock, type RecoveryClock } from "../account-core/src/recovery-clock"
-import { eligibleAttempt } from "../account-core/src/refresh-attempt"
-import { readSignedOutMarker, signedOutMarkerPath } from "../account-core/src/signed-out-marker"
+import { accountShow, type SyncState } from "../account-core/src/calls/show"
+import { SignInError, serviceOrigin } from "../account-core/src/protocol"
+import type { RecoveryClock } from "../account-core/src/recovery-clock"
 
 // `omo account show`, apart from the verbs that sign in, refresh or hand keys over: it reads the stored credential, the
 // signed-out marker and the sync pin, and nothing here reaches the account service (omo#13440).
@@ -46,68 +43,41 @@ export interface AccountShowDependencies {
   readonly error: (line: string) => void
 }
 
-const deviceOf = (credentials: Credentials) => ({ id: credentials.device.id, name: credentials.device.name })
-
-const isAttemptRecord = (value: unknown): value is { readonly state?: unknown } =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-
-// `uncertain` is in progress only while a protocol-2 attempt is still eligible on this boot. No attempt, an
-// exhausted attempt, or one the recovery clock rejects (deadline, reboot, clock loss) is terminal: `omo token`
-// already ends that session, and the desktop must not treat it as a renewal still running.
-async function reportedRefreshState(current: Credentials, origin: string, clock: RecoveryClock): Promise<string> {
-  if (current.refreshState !== "uncertain") return current.refreshState ?? "ok"
-  const attempt = current.refreshAttempt
-  if (attempt === undefined || attempt === null) return "expired"
-  if (isAttemptRecord(attempt) && attempt.state === "exhausted") return "expired"
-  if (current.owner === undefined) return "expired"
-  const eligible = eligibleAttempt(attempt, serviceOrigin(origin), current.owner, current.refreshToken, await clock())
-  return eligible === null ? "expired" : "uncertain"
-}
-
 const reply = (dependencies: AccountShowDependencies, value: unknown, code: number = ACCOUNT_EXIT.ok): number => {
   dependencies.output(JSON.stringify(value))
   return code
 }
 
-// A trust pin is written only after the device verified its membership, so a pin means this device
-// joined memory sync for that account.
-async function syncStateOf(pinDir: string, account: string): Promise<"joined" | "not_joined" | "corrupt_pin"> {
+// A trust pin is written only after the device verified its membership, so a pin means this device joined memory sync
+// for that account.
+async function syncStateOf(pinDir: string, account: string): Promise<SyncState> {
   const pin = await loadTrustAnchor(pinDir, account)
   if (pin.ok) return "joined"
   return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
 }
 
-const accountSignedOutMarker = (dependencies: Pick<AccountShowDependencies, "api" | "home">) =>
-  readSignedOutMarker(signedOutMarkerPath(dependencies.home ?? homedir(), credentialId(dependencies.api)))
-
 export async function showAccount(dependencies: AccountShowDependencies, flags: readonly string[]): Promise<number> {
-  const current = await dependencies.store.read()
   const accountAt = flags.indexOf("--account")
   const account = accountAt === -1 ? undefined : flags[accountAt + 1]
   if (accountAt !== -1 && (account === undefined || account === "")) {
     dependencies.error("omo account show: --account needs an account id")
     return ACCOUNT_EXIT.invalid
   }
-  const sync = account === undefined ? {} : { sync: await syncStateOf(dependencies.pinDir(), account) }
-  const marker = current === null ? await accountSignedOutMarker(dependencies) : null
-  // Where the shared sign-in lives, or would be kept (#7185b): the OS store, or Linux's private state file.
-  const storage = dependencies.store.storage === undefined ? {} : { storage: dependencies.store.storage() }
-  return reply(
-    dependencies,
-    current === null
-      ? { signedIn: false, ...(marker === null ? {} : { signedOut: marker }), ...sync, ...storage }
-      : {
-          signedIn: true,
-          device: deviceOf(current),
-          refreshState: await reportedRefreshState(
-            current,
-            dependencies.api,
-            dependencies.recoveryClock ?? readRecoveryClock,
-          ),
-          ...sync,
-          ...storage,
-        },
+  const shown = await accountShow(
+    {
+      api: dependencies.api,
+      store: dependencies.store,
+      ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
+      ...(dependencies.recoveryClock === undefined ? {} : { recoveryClock: dependencies.recoveryClock }),
+      syncState: (id) => syncStateOf(dependencies.pinDir(), id),
+    },
+    account === undefined ? {} : { account },
   )
+  if (shown.kind === "refused") {
+    dependencies.error("omo account show: --account needs an account id")
+    return ACCOUNT_EXIT.invalid
+  }
+  return reply(dependencies, shown.value)
 }
 
 export function accountStoreFailure(dependencies: AccountShowDependencies, error: unknown): number {

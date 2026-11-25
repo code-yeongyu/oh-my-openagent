@@ -6,6 +6,7 @@ import {
   storeDisable,
   storeEnable,
   storeStatus,
+  storeSwitchPort,
 } from "../account-core/src/calls/store"
 import { desktopRuntimeCandidates } from "../account-core/src/keychain-helper/creator-handoff"
 import { helperAccess } from "../account-core/src/keychain-helper/darwin-backend"
@@ -45,12 +46,13 @@ export async function runAccountStore(deps: AccountStoreDependencies, flags: rea
     deps.error("usage: omo account store status|enable|disable [--discard]")
     return ACCOUNT_EXIT.invalid
   }
+  const port = storeSwitchPort(deps)
   if (verb === "status") {
-    deps.output(JSON.stringify(storeStatus(deps)))
+    deps.output(JSON.stringify(storeStatus(port)))
     return ACCOUNT_EXIT.ok
   }
   if (verb === "disable") {
-    const disabled = await storeDisable(deps, { discard })
+    const disabled = await storeDisable(port, { discard })
     if (disabled.kind === "refused") return refusal(deps, disabled)
     if (disabled.value.damagedLeftInPlace === true)
       deps.error(
@@ -59,7 +61,7 @@ export async function runAccountStore(deps: AccountStoreDependencies, flags: rea
     deps.output(JSON.stringify(disabled.value))
     return ACCOUNT_EXIT.ok
   }
-  const enabled = await storeEnable(deps)
+  const enabled = await storeEnable(port)
   if (enabled.kind === "refused") return refusal(deps, enabled)
   deps.error(TRADE_OFF)
   if (deps.desktopInstalled()) deps.error(DESKTOP_NOTE)

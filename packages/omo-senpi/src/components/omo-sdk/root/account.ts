@@ -1,6 +1,15 @@
-import { type StorePort, type StoreRefusal, storePort } from "@oh-my-opencode/account-core/calls/store"
+import {
+  type StorePort,
+  type StoreRefusal,
+  storeDisable,
+  storeEnable,
+  storeStatus,
+  storeSwitchPort,
+} from "@oh-my-opencode/account-core/calls/store"
 import { helperAccess } from "@oh-my-opencode/account-core/keychain-helper/darwin-backend"
 import { dedicatedStoreState } from "@oh-my-opencode/account-core/keychain-helper/dedicated-store"
+import { accountShow, type SyncState } from "@oh-my-opencode/account-core/calls/show"
+import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 import { type AccountAccess, failure } from "../access"
 import { OMO_CODE_REGISTRY, type OmoFailure, type OmoValue } from "../contract"
 import type { NamespaceServing } from "./members"
@@ -41,14 +50,25 @@ async function answer<Value>(access: AccountAccess, run: () => Promise<OmoValue<
   }
 }
 
+type Env = Readonly<Record<string, string | undefined>>
+
+async function trustPinState(env: Env, cwd: string, account: string): Promise<SyncState> {
+  const { loadTrustAnchor } = await import("#omo-memory-sync-runtime")
+  const pin = await loadTrustAnchor(syncPinDir(resolveMemoryRoot(env, cwd)), account)
+  if (pin.ok) return "joined"
+  return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
+}
+
 export function accountNamespace(options: {
   readonly access: AccountAccess
+  readonly env: Env
+  readonly cwd: string
   readonly store?: StorePort
 }): NamespaceServing {
   const { access } = options
   const store =
     options.store ??
-    storePort({
+    storeSwitchPort({
       api: access.origin,
       platform: process.platform,
       state: () => dedicatedStoreState(),
@@ -56,15 +76,29 @@ export function accountNamespace(options: {
     })
   return {
     members: {
-      "account.store.status": () => answer(access, async () => ({ kind: "ok", value: store.status() })),
+      "account.show": (input) =>
+        answer(access, async () => {
+          const shown = await accountShow(
+            {
+              api: access.origin,
+              store: access.store(),
+              syncState: (account) => trustPinState(options.env, options.cwd, account),
+            },
+            input?.account === undefined ? {} : { account: input.account },
+          )
+          return shown.kind === "ok"
+            ? shown
+            : failed("invalid_arguments", "account must name an account id.", { field: "account" })
+        }),
+      "account.store.status": () => answer(access, async () => ({ kind: "ok", value: storeStatus(store) })),
       "account.store.enable": () =>
         answer(access, async () => {
-          const enabled = await store.enable()
+          const enabled = await storeEnable(store)
           return enabled.kind === "ok" ? enabled : storeRefusal(enabled)
         }),
       "account.store.disable": (input) =>
         answer(access, async () => {
-          const disabled = await store.disable({ discard: input?.discard === true })
+          const disabled = await storeDisable(store, { discard: input?.discard === true })
           return disabled.kind === "ok" ? disabled : storeRefusal(disabled)
         }),
     },

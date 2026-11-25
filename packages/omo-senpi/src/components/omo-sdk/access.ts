@@ -18,7 +18,7 @@ import { cliCredentialStore, openCliSession } from "../memory/device-session/cli
 import { ok, type OmoResult, refused } from "./result"
 
 export type SessionPort = Pick<Session, "accessToken" | "request">
-export type CredentialStorePort = Pick<CredentialStore, "read">
+export type CredentialStorePort = Pick<CredentialStore, "read"> & Partial<Pick<CredentialStore, "storage">>
 type Env = Readonly<Record<string, string | undefined>>
 
 export type AccessPorts = {
@@ -38,6 +38,8 @@ export type AccountAccess = {
   /** Why no account call may run here at all (a closed SDK, a desktop launch); undefined when one may. */
   readonly blockedReason: () => OmoResult<never> | undefined
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
+  /** This device's credential store, the one every account call of this root reads. */
+  readonly store: () => CredentialStorePort
   readonly close: () => void
 }
 
@@ -139,6 +141,7 @@ export function createAccountAccess(options: {
         return failure(error)
       }
     },
+    store: openStore,
     close: () => lifetime.abort(),
   }
 }
