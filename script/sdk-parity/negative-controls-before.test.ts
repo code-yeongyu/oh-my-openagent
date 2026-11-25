@@ -34,7 +34,7 @@ const contract: Contract = {
   registry: OMO_CODE_REGISTRY,
   heldCodes: HELD_CODES,
   sourceCodes: SOURCE_CODES,
-  accepts: (call, input) => inputAccepts(call, input),
+  accepts: (call, input, exempt) => inputAccepts(call, input, exempt),
 }
 const rows = allRows(loadDomainFiles())
 const files = loadScenarioTable()
@@ -114,6 +114,32 @@ describe("before: setup calls, their answers and their effects", () => {
     expect(
       tableProblems({ ...chained(), id: "threads.locate/before-short", input: { ...base.input, prior: "$answer:2" } }),
     ).toContain("prior names $answer:2, but the scenario has 1 before-call(s)")
+  })
+
+  // install.setup.apply: plan is the marked field; consent, its companion, is still checked against the schema.
+  const marked = (input: Record<string, unknown>): TableScenario => ({
+    id: "install.setup.apply/control-marked-companion",
+    row: "install.setup.apply",
+    kind: "effect",
+    before: [{ row: "install.setup.plan", input: {} }],
+    input,
+    expect: [{ port: "fs", op: "write", args: { path: "<agent-dir>/auth.json" } }],
+  })
+
+  test("#given a marked input whose companion field has the wrong type #then the schema check still refuses it", () => {
+    expect(tableProblems(marked({ plan: "$answer:1", consent: "some" }))).toContain(
+      "install.setup.apply's schema refuses its input",
+    )
+  })
+
+  test("#given a marked input missing a required companion field #then the schema check still refuses it", () => {
+    expect(tableProblems(marked({ plan: "$answer:1" }))).toContain("install.setup.apply's schema refuses its input")
+  })
+
+  test("#given a marked input whose companions are valid #then the schema check accepts it", () => {
+    expect(tableProblems(marked({ plan: "$answer:1", consent: "all" }))).not.toContain(
+      "control-marked-companion: install.setup.apply's schema refuses its input",
+    )
   })
 
   test("#given a before-call input its row's schema refuses #then the table check names it", () => {

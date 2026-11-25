@@ -53,7 +53,7 @@ const contract: Contract = {
   registry: OMO_CODE_REGISTRY,
   heldCodes: HELD_CODES,
   sourceCodes: SOURCE_CODES,
-  accepts: (call, input) => inputAccepts(call, input),
+  accepts: (call, input, exempt) => inputAccepts(call, input, exempt),
   ahead: TYPED_AHEAD_INPUTS,
 }
 

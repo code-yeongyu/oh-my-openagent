@@ -41,10 +41,11 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
   const marked = answerMarkers(scenario.input)
+  // A marked field's value is an earlier call's answer, supplied at run time: only that value is exempt; every other
+  // field is checked against the call's schema as usual.
   const accepted =
-    marked.length === 0
-      ? contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
-      : marked.every((field) => Object.hasOwn(row.input.properties, field))
+    contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at), marked) &&
+    marked.every((field) => Object.hasOwn(row.input.properties, field))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)

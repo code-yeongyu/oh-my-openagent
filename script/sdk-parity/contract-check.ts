@@ -41,7 +41,7 @@ export type Contract = {
   >
   readonly heldCodes: Readonly<Record<string, HeldReason>>
   readonly sourceCodes: readonly string[]
-  readonly accepts: (call: string, input: unknown) => boolean
+  readonly accepts: (call: string, input: unknown, exempt?: readonly string[]) => boolean
   /** Inputs the root types ahead of a row's descriptor until the slice that serves the call adds them. */
   readonly ahead?: readonly { readonly row: string; readonly field: string }[]
 }
