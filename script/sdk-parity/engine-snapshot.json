@@ -1,0 +1,392 @@
+{
+  "source": "hand-written from design sections 6.8 and 6.9 at 05525374 until the engine exports its command metadata (slice E1a)",
+  "commands": [
+    {
+      "route": [],
+      "flags": [
+        "--api-key",
+        "--append-system-prompt",
+        "--approve",
+        "--attach",
+        "--auto-title-sessions",
+        "--continue",
+        "--exclude-tools",
+        "--export",
+        "--extension",
+        "--fork",
+        "--grok-neo",
+        "--hand",
+        "--headless",
+        "--internal-rpc-host-supervisor",
+        "--list-models",
+        "--list-tips",
+        "--listen",
+        "--mcp-presenter-enforcement",
+        "--mcp-presenter-fd",
+        "--mode",
+        "--model",
+        "--models",
+        "--multi-session",
+        "--name",
+        "--no-approve",
+        "--no-builtin-tools",
+        "--no-context-files",
+        "--no-extensions",
+        "--no-prompt-templates",
+        "--no-session",
+        "--no-skills",
+        "--no-themes",
+        "--no-tools",
+        "--offline",
+        "--print",
+        "--print-prompt-sizes",
+        "--prompt-template",
+        "--provider",
+        "--rebind",
+        "--session",
+        "--session-dir",
+        "--session-id",
+        "--session-runtime",
+        "--skill",
+        "--spawned-by",
+        "--system-prompt",
+        "--theme",
+        "--thinking",
+        "--tool-runtime",
+        "--tools",
+        "--tui-mode",
+        "--use-theme",
+        "--verbose",
+        "-p"
+      ]
+    },
+    {
+      "route": [
+        "auth",
+        "check"
+      ],
+      "flags": [
+        "--credentials",
+        "--json",
+        "--model",
+        "--no-refresh",
+        "--provider"
+      ]
+    },
+    {
+      "route": [
+        "auth",
+        "print-api-key"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "auth",
+        "print-bearer-token"
+      ],
+      "flags": [
+        "--min-expiry"
+      ]
+    },
+    {
+      "route": [
+        "config"
+      ],
+      "flags": [
+        "--approve",
+        "--local",
+        "--no-approve",
+        "-l"
+      ]
+    },
+    {
+      "route": [
+        "config",
+        "agent-dir"
+      ],
+      "flags": [
+        "--json"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "ensure"
+      ],
+      "flags": [
+        "--launch-spec",
+        "--mcp-presenter-enforcement",
+        "--policy",
+        "--rpc-key-root",
+        "--socket"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "gc"
+      ],
+      "flags": [
+        "--agent-dir"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "handoff"
+      ],
+      "flags": [
+        "--allow-downgrade",
+        "--if-generation",
+        "--if-instance",
+        "--launch-spec",
+        "--operation",
+        "--policy",
+        "--socket",
+        "--target-build",
+        "--when"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "abort"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "close"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "list"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "model"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "open"
+      ],
+      "flags": [
+        "--cwd",
+        "--launch-spec",
+        "--model",
+        "--name",
+        "--prompt"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "prompt"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "read"
+      ],
+      "flags": [
+        "--messages",
+        "--since",
+        "--tail"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "state"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "steer"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "unload"
+      ],
+      "flags": [
+        "--children",
+        "--clear-queue",
+        "--force",
+        "--interrupt"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "session",
+        "wait"
+      ],
+      "flags": [
+        "--timeout",
+        "--until"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "shard-path"
+      ],
+      "flags": [
+        "--kind",
+        "--owner",
+        "--root"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "status"
+      ],
+      "flags": [
+        "--all",
+        "--include-workers",
+        "--socket"
+      ]
+    },
+    {
+      "route": [
+        "host",
+        "stop"
+      ],
+      "flags": [
+        "--drain",
+        "--expected-generation",
+        "--force",
+        "--instance",
+        "--socket",
+        "--wait-ms"
+      ]
+    },
+    {
+      "route": [
+        "install"
+      ],
+      "flags": [
+        "--approve",
+        "--local",
+        "--no-approve",
+        "-l"
+      ]
+    },
+    {
+      "route": [
+        "list"
+      ],
+      "flags": [
+        "--approve",
+        "--no-approve"
+      ]
+    },
+    {
+      "route": [
+        "models",
+        "discover"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "remove"
+      ],
+      "flags": [
+        "--approve",
+        "--local",
+        "--no-approve",
+        "-l"
+      ]
+    },
+    {
+      "route": [
+        "schedule",
+        "cancel"
+      ],
+      "flags": []
+    },
+    {
+      "route": [
+        "schedule",
+        "list"
+      ],
+      "flags": [
+        "--json"
+      ]
+    },
+    {
+      "route": [
+        "schedule",
+        "run"
+      ],
+      "flags": [
+        "--concurrency",
+        "--exec",
+        "--poll-seconds",
+        "--timeout-seconds",
+        "--watch"
+      ]
+    },
+    {
+      "route": [
+        "session-of-pid"
+      ],
+      "flags": [
+        "--json"
+      ]
+    },
+    {
+      "route": [
+        "uninstall"
+      ],
+      "flags": [
+        "--approve",
+        "--local",
+        "--no-approve",
+        "-l"
+      ]
+    },
+    {
+      "route": [
+        "update"
+      ],
+      "flags": [
+        "--approve",
+        "--extension",
+        "--extensions",
+        "--models",
+        "--no-approve"
+      ]
+    }
+  ]
+}
