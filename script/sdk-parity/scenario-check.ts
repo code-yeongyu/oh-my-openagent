@@ -49,7 +49,37 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
     problems.push(`${at}: an effect scenario names no refusal`)
   if (scenario.kind === "refusal" && scenario.refusal === undefined)
     problems.push(`${at}: a refusal scenario names its code`)
+  problems.push(...refusalDetailsProblems(at, scenario, contract))
+  problems.push(...callbackProblems(at, scenario))
   return problems
+}
+
+// refusal_details is a subset of a refusal's failure details; where the code's registry entry lists closed reasons,
+// the reason it names is one of them.
+function refusalDetailsProblems(at: string, scenario: TableScenario, contract: Contract): string[] {
+  const details = scenario.refusal_details
+  if (details === undefined) return []
+  if (scenario.kind !== "refusal") return [`${at}: refusal_details belongs to a refusal`]
+  const reasons = contract.registry[scenario.refusal ?? ""]?.reasons
+  if (reasons === undefined) return []
+  const reason = details["reason"]
+  return typeof reason === "string" && reasons.includes(reason)
+    ? []
+    : [`${at}: refusal_details.reason must be one of ${scenario.refusal}'s reasons (${reasons.join(", ")})`]
+}
+
+// A callback's calls are not port operations: each entry names a callback input the scenario passes as "$callback",
+// matches its argument by a subset, and states how many effects the trace holds when it is called.
+function callbackProblems(at: string, scenario: TableScenario): string[] {
+  return Object.entries(scenario.callbacks ?? {}).flatMap(([name, entries]) => [
+    ...(scenario.input[name] === "$callback" ? [] : [`${at}: callbacks.${name} names no "$callback" input`]),
+    ...(entries.length === 0 ? [`${at}: callbacks.${name} lists no call`] : []),
+    ...entries.flatMap((entry, index) =>
+      Number.isInteger(entry.effects_before) && entry.effects_before >= 0
+        ? []
+        : [`${at}: callbacks.${name}[${index}].effects_before is a whole number of effects`],
+    ),
+  ])
 }
 
 const without = (input: Readonly<Record<string, unknown>>, field: string): Record<string, unknown> =>

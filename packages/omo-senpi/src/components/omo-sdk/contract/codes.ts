@@ -8,6 +8,8 @@ type CodeEntry = {
   readonly namespaces: readonly Namespace[]
   readonly next_action: string
   readonly retires_with?: string
+  /** A code whose failures carry `details.reason` from a closed set lists it; a scenario's refusal_details names one. */
+  readonly reasons?: readonly string[]
 }
 
 export const OMO_CODE_REGISTRY = {
@@ -123,6 +125,15 @@ export const OMO_CODE_REGISTRY = {
   },
   install_failed: {
     namespaces: ["install"],
+    reasons: [
+      "engine_missing",
+      "manager_not_started",
+      "manager_failed",
+      "not_moved",
+      "file_held",
+      "versioned",
+      "binary_install",
+    ],
     next_action: "Read details.reason, fix what it names, then call install.update again.",
   },
   internal_error: {

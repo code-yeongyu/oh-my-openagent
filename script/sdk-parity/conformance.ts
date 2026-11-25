@@ -1,4 +1,5 @@
 import {
+  type CallbackEntry,
   type Expectation,
   expectationProblems,
   isSubsetOf,
@@ -32,6 +33,19 @@ export type EffectEvidence = {
   readonly threw?: string
   /** The `then` calls, run in order on the state the call before each left; each must pass for the scenario to pass. */
   readonly steps?: readonly EffectEvidence[]
+  /** The subset of the failure's details the refusal states, and the details it answered. */
+  readonly refusalDetails?: Readonly<Record<string, unknown>>
+  /** The scenario's callbacks: their stated entries and each call the call under test made, in order. */
+  readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
+  readonly callbackCalls?: readonly CallbackCall[]
+}
+
+/** One call of a callback: its argument, the entry it consumed (-1: none matched) and how far the trace had got. */
+export type CallbackCall = {
+  readonly name: string
+  readonly argument: unknown
+  readonly entry: number
+  readonly observedBefore: number
 }
 
 /** What the checks need beyond the rows: the effect operations per port (slice P1a's PORT_EFFECTS, every port named, an
@@ -99,6 +113,14 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
       problems.push(
         `${where}: effect ${call.port}.${call.op} ${JSON.stringify(call.args)} happened but the scenario does not state it`,
       )
+  if (record.refusalDetails !== undefined) {
+    const details = Reflect.get(Object(Reflect.get(Object(record.answered), "error")), "details")
+    if (!isSubsetOf(record.refusalDetails, details))
+      problems.push(
+        `${where}: refused with details ${JSON.stringify(details)}, not the stated ${JSON.stringify(record.refusalDetails)}`,
+      )
+  }
+  problems.push(...callbackCallProblems(where, record, context))
   if (record.answer !== undefined && !isSubsetOf(record.answer, record.answered))
     problems.push(
       `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer)}`,
@@ -210,4 +232,32 @@ export function conformanceProblems(
   return rows
     .filter((row) => row.kind === "capability" && !unresolved.has(row.id))
     .flatMap((row) => evidenceProblems(row, evidence, context))
+}
+
+// Completeness both ways (design lane ruling, slice C1c): every callback call consumed an entry, in order, with the trace
+// holding exactly the stated number of EFFECT operations at that moment, and every stated entry was consumed.
+function callbackCallProblems(where: string, record: EffectEvidence, context: ConformanceContext): string[] {
+  const problems: string[] = []
+  const calls = record.callbackCalls ?? []
+  for (const call of calls) {
+    if (call.entry < 0) {
+      problems.push(
+        `${where}: callback ${call.name} was called with ${JSON.stringify(call.argument)}, which no remaining entry matches`,
+      )
+      continue
+    }
+    const stated = record.callbacks?.[call.name]?.[call.entry]
+    const effects = record.observed
+      .slice(0, call.observedBefore)
+      .filter((observed) => (context.effects[observed.port] ?? []).includes(observed.op)).length
+    if (stated !== undefined && effects !== stated.effects_before)
+      problems.push(
+        `${where}: callback ${call.name} entry ${call.entry} was called after ${effects} effect(s), not ${stated.effects_before}`,
+      )
+  }
+  for (const [name, entries] of Object.entries(record.callbacks ?? {}))
+    for (const index of entries.keys())
+      if (!calls.some((call) => call.name === name && call.entry === index))
+        problems.push(`${where}: callback ${name} entry ${index} was never called`)
+  return problems
 }

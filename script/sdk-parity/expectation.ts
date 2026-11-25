@@ -32,7 +32,21 @@ export type Fault = {
   readonly occurrence?: number
 }
 
-export type ScenarioStep = {
+/**
+ * One call of a caller-supplied callback, in order (design lane ruling, slice C1c): \`when\` is a subset of the
+ * callback's argument, \`answer\` what it returns (absent for a callback that only receives), and \`effects_before\`
+ * the number of EFFECT operations the trace holds when it is called, which pins "asked before that write".
+ */
+export type CallbackEntry = {
+  readonly when: Readonly<Record<string, unknown>>
+  readonly answer?: unknown
+  readonly effects_before: number
+}
+
+/** Shared by a scenario and each of its steps: the subset of the failure's details a refusal states. */
+type RefusalDetails = { readonly refusal_details?: Readonly<Record<string, unknown>> }
+
+export type ScenarioStep = RefusalDetails & {
   readonly input: Readonly<Record<string, unknown>>
   readonly kind: "effect" | "refusal"
   readonly refusal?: string
@@ -44,7 +58,9 @@ export type ScenarioStep = {
   readonly fault?: Fault
 }
 
-export type TableScenario = {
+export type TableScenario = RefusalDetails & {
+  /** Each callback input the scenario passes as "$callback", built by the runner from its ordered calls. */
+  readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   /** `<row id>/<slug>`: stable, never reused for another behaviour. */
   readonly id: string
   readonly row: string

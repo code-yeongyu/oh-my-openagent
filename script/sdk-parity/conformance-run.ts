@@ -1,8 +1,8 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-import type { ConformanceContext, EffectEvidence } from "./conformance"
-import type { ObservedCall, TableScenario } from "./expectation"
+import type { CallbackCall, ConformanceContext, EffectEvidence } from "./conformance"
+import { type CallbackEntry, isSubsetOf, type ObservedCall, type TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
 // The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
@@ -103,6 +103,29 @@ function refusalOf(answer: unknown): { readonly code?: string; readonly source?:
   return typeof code === "string" ? { code, source: "value" } : {}
 }
 
+// A "$callback" input the scenario lists under callbacks becomes a function that answers its entries in order: a call
+// consumes the first remaining entry its argument matches, and records which (or none) and how far the trace had got.
+function withCallbacks(
+  input: Readonly<Record<string, unknown>>,
+  callbacks: Readonly<Record<string, readonly CallbackEntry[]>> | undefined,
+  record: CallbackCall[],
+  observed: () => number,
+): Readonly<Record<string, unknown>> {
+  if (callbacks === undefined) return input
+  const built = { ...input }
+  for (const [name, entries] of Object.entries(callbacks)) {
+    const used = new Set<number>()
+    built[name] = (argument: unknown) => {
+      const entry = entries.findIndex((candidate, index) => !used.has(index) && isSubsetOf(candidate.when, argument))
+      record.push({ name, argument, entry, observedBefore: observed() })
+      if (entry < 0) return undefined
+      used.add(entry)
+      return entries[entry]?.answer
+    }
+  }
+  return built
+}
+
 type Call = {
   readonly input: Readonly<Record<string, unknown>>
   readonly refusal_from?: "root" | "value"
@@ -158,7 +181,10 @@ export async function runEffectScenarios(
     for (const [index, step] of sequence.entries()) {
       const seen = calls().length
       const before = invoked.length
-      const result = await invoke(memberOf(), step, controller.signal)
+      const callbackCalls: CallbackCall[] = []
+      const callbacks = index === 0 ? scenario.callbacks : undefined
+      const input = withCallbacks(step.input, callbacks, callbackCalls, () => calls().length - seen)
+      const result = await invoke(memberOf(), { ...step, input }, controller.signal)
       records.push({
         scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
         row: scenario.row,
@@ -171,6 +197,8 @@ export async function runEffectScenarios(
         ...(step.refusal === undefined ? {} : { refusal: step.refusal }),
         ...(step.refusal_from === undefined ? {} : { refusalFrom: step.refusal_from }),
         ...(step.answer === undefined ? {} : { answer: step.answer }),
+        ...(step.refusal_details === undefined ? {} : { refusalDetails: step.refusal_details }),
+        ...(callbacks === undefined ? {} : { callbacks, callbackCalls }),
         ...result,
       })
     }
