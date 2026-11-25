@@ -57,7 +57,7 @@ export async function runKeyedPairs(
         second: null,
         deliveries: 0,
         cell: "not reached",
-        why: "no thread was opened on B for the pairs",
+        why: openFailure,
       })
       continue
     }

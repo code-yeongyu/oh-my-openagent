@@ -59,3 +59,21 @@ describe("opening the keyed pairs' thread", () => {
     expect(signals.map((signal) => signal.aborted)).toEqual([true])
   })
 })
+
+describe("the keyed pairs with no thread", () => {
+  test("#given the thread's open stalled #when the pairs run #then each pair names that reason", async () => {
+    const signals: AbortSignal[] = []
+    const drivers = { sdk: stalling(signals), tools: stalling(signals), cli: stalling(signals) } satisfies Record<
+      Surface,
+      Driver
+    >
+    const observer = {
+      judge: async () => ({ ok: true, why: "", state: { listed: true, streaming: false, messages: [], held: [] } }),
+    }
+    const records = await runKeyedPairs(drivers, undefined, undefined, observer, 20, "the open stalled")
+    expect(records.map((record) => [record.cell, record.why])).toEqual(
+      records.map(() => ["not reached", "the open stalled"]),
+    )
+    expect(signals).toEqual([])
+  })
+})

@@ -1,7 +1,7 @@
 // The X1a proof's evidence: one transcript per surface (each step's input, the surface's raw answer, and what device B
 // showed afterwards) and one summary table, step by surface. Every id, device id and scratch path is redacted, so the
 // table can be committed and the transcripts quoted. Transcripts stay local under .omo/evidence (#8703).
-import { ISSUES, type Op, OWNERS, type Surface, SURFACES } from "./scenario.ts"
+import { ISSUES, NOTES, type Op, OWNERS, type Surface, SURFACES } from "./scenario.ts"
 
 export { type Surface, SURFACES }
 
@@ -78,10 +78,12 @@ export function summary(
   const cell = (surface: Surface, step: string): string => {
     const record = runs[surface].find((entry) => entry.step === step)
     if (record === undefined) return "surface not run (--only)"
-    if (record.cell === "pass") return "pass"
+    const note = NOTES[`${surface}:${step}`]
+    const noted = note === undefined ? "" : ` [note: ${note}]`
+    if (record.cell === "pass") return `pass${noted}`
     const issue = ISSUES[`${surface}:${step}`]
     const owner = record.cell === "fail" ? (OWNERS[`${surface}:${step}`] ?? record.slice) : record.slice
-    return `${record.cell}: ${record.why} (${owner}${issue === undefined ? "" : `, ${issue}`})`
+    return `${record.cell}: ${record.why} (${owner}${issue === undefined ? "" : `, ${issue}`})${noted}`
   }
   const rows = steps.map((step) => `| ${step.id} (${step.op}) | ${SURFACES.map((s) => cell(s, step.id)).join(" | ")} |`)
   return [
