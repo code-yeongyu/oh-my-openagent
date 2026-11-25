@@ -10,7 +10,9 @@ import type * as held from "../results/custody"
 
 // The rows slice P1a held for P1a-s (security design #14945): the credential-bearing calls, the launch operations, attach,
 // the extension session operations, the OpenCode edition's run and the loop's operations. A call here is a type, never
-// authority: the principal matrix says who may make it, and P1b enforces it in the core.
+// authority: the principal matrix says who may make it. The root answers every cell it can decide from its fixed
+// principal and options at its boundary, before any core loads (omo-sdk/root/authority.ts); a core answers the cells
+// that depend on a call's input or its resolved leg, before its own side effect.
 type Answer<Schema extends keyof typeof held.CUSTODY_RESULTS> = Static<(typeof held.CUSTODY_RESULTS)[Schema]>
 
 export const AUTHORITY_CALLS = {

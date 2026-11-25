@@ -10,7 +10,7 @@ import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
-import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
@@ -127,7 +127,7 @@ try {
     originalText: readFileSync(join(REPO_ROOT, ORIGINAL_PATH), "utf8"),
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
-    evidence: await runEffectScenarios(rows),
+    evidence: await runEffectScenarios(rows, await loadScenarioRuns()),
     context: P0_CONTEXT,
     atBase: {
       originalText: show(mergeBase, ORIGINAL_PATH),
