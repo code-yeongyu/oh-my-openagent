@@ -48,9 +48,6 @@ const resolveOrigin = (api: string | undefined, env: Env): string =>
 
 const SIGN_IN = "sign this device in to OmO, then retry"
 
-export const closedRefusal = <T>(): OmoResult<T> =>
-  refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
-
 // Every message here is the SDK's own text: a service or store message can carry a credential, so none is passed on.
 export function failure<T>(error: unknown): OmoResult<T> {
   if (error instanceof KeychainLockedError)
@@ -119,7 +116,8 @@ export function createAccountAccess(options: {
       log: () => undefined,
     }))
   const blockedReason = (): OmoResult<never> | undefined => {
-    if (lifetime.signal.aborted) return closedRefusal()
+    if (lifetime.signal.aborted)
+      return refused("internal_error", "this SDK instance is closed", "create a new one with createOmoSdk")
     if (desktopLaunch())
       return refused(
         "desktop_sign_in",
