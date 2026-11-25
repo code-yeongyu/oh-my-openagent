@@ -435,6 +435,8 @@ Both editions register `login`, `logout` and `whoami` over the same core (`C/cli
 
 The launcher forwards these to the pinned engine unchanged. Their core is the engine's. Under the rule each still needs an SDK call. The engine exports a typed function per leaf operation, with no process exit and no printing, and its own CLI calls the same function; the omo SDK re-exports it. The SDK does not start the engine CLI as a child for them. Forwarding an argv today proves nothing about an importable equivalent, so these functions and their ownership of lifecycle and output are settled in the engine first (slice E1a). `trust` below is the project-trust choice of `--approve` and `--no-approve`. Each row has two phases: the Slice column names the engine slice that exports the function, and the row becomes a call on the omo root, with its descriptor migrated and its unresolved entry cleared, only in E1c.
 
+Where an operation has inputs that the security design gates (the endpoint selector, a key root, a presenter channel, the launch `setup`), there is still one implementation: one internal core function that takes every input, which the engine's CLI command calls. Slice E1a exports that function with the gated inputs left at their defaults, and slice E1a-s adds them to the exported signature. The exported function is never a second body. The exported command metadata lists the gated flags from the start, each marked as an input that E1a-s adds, so the registry sees them as recorded gaps and not as unmapped flags.
+
 | Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
 |---|---|---|---|---|---|
 | `engine.packages.install({ source, local?, trust? })` | `omo install <source> [-l\|--local] [--approve\|--no-approve]` | none | **no** | Tool omitted: installs code into the engine | E1a |
@@ -442,9 +444,10 @@ The launcher forwards these to the pinned engine unchanged. Their core is the en
 | `engine.packages.list({ trust? })` | `omo list [--approve\|--no-approve]` | none | **no** | Same reason | E1a |
 | `engine.packages.update({ source?, trust? })`: every installed package, or one | `omo update --extensions`; `omo update --extension <source>`; `omo update <source>`; each with `[--approve\|--no-approve]` | none | **no** | Same reason. These are the engine targets the launcher forwards today. `omo update --all` is not one of them: the launcher takes it as a product update with an unknown flag and refuses it, and that refusal is kept | E1a |
 | `engine.models.update()` | `omo update --models` | none | **no** | Tool omitted: `thread_set_model` resolves against the catalog the target already has | E1a |
-| `engine.models.discover()`, `engine.models.list({ pattern? })` | `omo models discover`; `omo --list-models [pattern]` | none | **no** | Same reason | E1a |
+| `engine.models.discover({ provider })`: fetches one provider's model list and adds it to that provider's entry; a call without a provider is refused, as the command refuses it (`E/cli/models-command.ts:13, 84-88`) | `omo models discover <provider>` | none | **no** | Same reason | E1a |
+| `engine.models.list({ pattern?, setup? })`. `setup` is the launch setup of 6.9, because the command builds its model runtime from the launch flags given with it (`E/main.ts:1431-1456`) | `omo --list-models [pattern]` with any launch setup flags | none | **no** | Same reason | E1a for the call over the default runtime; E1a-s for `setup` |
 | `engine.config.agentDir()` answering the versioned record the command prints | `omo config agent-dir --json` | none | **no** | Tool omitted: a host integration's lookup | E1a |
-| `engine.config.resources({ local?, trust? })` answering the resolved package resources with whether each is enabled; `engine.config.setResource({ local?, trust?, source, resource: { type, path }, enabled })` answering the changed entry. The resource type is the engine's own (`E/core/package-manager.ts:82-97`) | `omo config [-l\|--local] [--approve\|--no-approve]` (a TUI) | none | **no** | Tool omitted: #14366 decides what a session may edit. The TUI is a renderer over the two calls | E1a |
+| `engine.config.resources({ local?, trust? })` answering the resolved package resources with whether each is enabled; `engine.config.setResource(...)` answering the changed entry, with two typed forms, because the two settings files do not hold the same thing. Global: `{ source, resource: { type, path }, enabled: boolean }`. Project-local: `{ local: true, trust?, source, resource: { type, path }, state: "inherit" \| "load" \| "unload" }`, the three states the project override has (`E/modes/interactive/components/config-selector.ts:30, 671-740`); a boolean cannot express `inherit`. The resource type is the engine's own (`E/core/package-manager.ts:82-97`) | `omo config [-l\|--local] [--approve\|--no-approve]` (a TUI) | none | **no** | Tool omitted: #14366 decides what a session may edit. The TUI is a renderer over the two calls | E1a |
 | `engine.auth.check({ provider?, model?, refresh? })` answering status only | `omo auth check --provider <p> [--model] [--json] [--no-refresh]` | none | **no** | Tool omitted: provider credentials | E1a-s |
 | `engine.auth.credentials({ provider?, model?, refresh? })`, `engine.auth.apiKey({ provider?, model? })`, `engine.auth.bearerToken({ provider?, model?, min_expiry_ms? })`; where the credential goes is fixed by S0 | `omo auth check --credentials`; `omo auth print-api-key`; `omo auth print-bearer-token [--min-expiry]` | none | **no**; custody (S0) | Tool omitted: section 4.5 | E1a-s |
 | `engine.schedule.list()` | `omo schedule list [--json]` | none | **no** | Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one | E1a |
@@ -452,7 +455,7 @@ The launcher forwards these to the pinned engine unchanged. Their core is the en
 | `engine.schedule.run({ watch?, exec?, poll_seconds?, timeout_seconds?, concurrency?, signal? })`, a stream of deliveries when watching | `omo schedule run [--watch] [--exec] [--poll-seconds] [--timeout-seconds] [--concurrency]` | none | **no** | Tool omitted: it resumes sessions headlessly on this machine, an operator's runner | E1a |
 | `engine.sessionOfPid({ pid })` | `omo session-of-pid <pid> --json` | none | **no** | Tool omitted: a host integration's lookup | E1a |
 | `engine.sessions.exportHtml({ session, out? })` answering the written path; `out` omitted lets the engine choose it, as today | `omo --export <file> [<out>]` | none | **no** | Tool omitted: writes a file for a person | E1a |
-| `engine.promptSizes({ setup })`, taking the same `setup` object as a launch (6.9) and answering the size of each prompt part; `engine.tips()` | `omo --print-prompt-sizes` with any launch setup flags; `omo --list-tips` | none | **no** | Tool omitted: installation diagnostics | E1a |
+| `engine.promptSizes({ setup? })`, taking the same `setup` object as a launch (6.9) and answering the size of each prompt part; `engine.tips()` | `omo --print-prompt-sizes` with any launch setup flags; `omo --list-tips` | none | **no** | Tool omitted: installation diagnostics | E1a for the calls over the default runtime; E1a-s for `setup` |
 | Host sessions | `omo host session open\|close\|unload\|model\|prompt\|steer\|abort\|read\|state\|list\|wait [--socket] [--rpc-key-root]` | the thread tools | partial | The `threads.*` rows of 6.1 and 6.2; the endpoint is the root's `endpoint` | T1b |
 
 ### 6.9 Launching an engine process
@@ -632,8 +635,8 @@ Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`,
 | C1b | `diagnostics.*` | new | P1b |
 | C1c | `install.*` | new | P1b |
 | TEL | The per-caller telemetry consent contract, merged in the engine (its #7446) and pinned in omo | the engine's #7446 | none |
-| E1a | Engine: a typed function and exported metadata per leaf of 6.8 that carries no credential: packages, resources, schedules, models, queries, and the host lifecycle (ensure, status, stop, handoff, gc, shard path) without its credential options | new, on the engine | none |
-| E1a-s | Engine: `LaunchOptions` and the launch operations of 6.9, the endpoint options, the provider-credential functions | new, on the engine | S0 approved, TEL |
+| E1a | Engine: a typed function and exported metadata per leaf of 6.8 that carries no credential: packages, resources, schedules, models, queries, and the host lifecycle (ensure, status, stop, handoff, gc, shard path), each over the default endpoint and the default runtime. The endpoint selector, the key root, the presenter channel and the launch `setup` input are not in its exported signatures | new, on the engine | none |
+| E1a-s | Engine: `LaunchOptions` and the launch operations of 6.9, the endpoint options, the provider-credential functions, and the gated inputs of E1a's functions (the endpoint selector, key root and presenter channel on the host lifecycle; `setup` on `models.list` and `promptSizes`) | new, on the engine | S0 approved, TEL, E1a |
 | E1b | Engine release and the omo pin | release train | E1a, E1a-s |
 | E1c | `engine.*` on the root including `engine.launch.*`. The engine-forwarded dispatch descriptors migrate here, and the unresolved entry of every engine row is cleared here, not at the engine export. The engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
 | X1a | The native thread proof of section 9 | new | T2, T3 |
@@ -703,7 +706,13 @@ The runs use a sanctioned test account and a scripted or low-cost model. They ma
 | 5 | `omo remote` session verbs become aliases | Both historical projections (flags, wait default, JSON, exit codes) are pinned by goldens before the implementations converge; an alias is removed only after one release and only when its goldens show no caller-visible difference; sender admission is not widened |
 | 6 | The OpenCode-edition binary | Decided on #14943: both editions, every verb, zero gaps in both (6.11, OC1a to OC2, X1c) |
 
-## 11. Not in this program
+## 11. Amendments after the review's CLEAR
+
+The design was reviewed CLEAR at `3af8d30c50`. Each later change is numbered here and is reviewed as a delta before a slice treats it as binding.
+
+1. 2026-11-25, from slice E1a reading the engine: `engine.models.discover` takes a required `provider`; `engine.config.setResource` has a global form with `enabled` and a project-local form with the three override states; `engine.models.list` and `engine.promptSizes` take an optional `setup`, added to their exported signatures in E1a-s; the rule for an operation with gated inputs is one internal core function, exported in E1a without them (6.8, 8).
+
+## 12. Not in this program
 
 - Step 2 of the 2026-11-10 ruling on #13016: both transports accepting both sender kinds.
 - Remote approval-mode enforcement, device enrollment (#14365), configuration editing (#14366) and the session address format of #14044 beyond what section 5 needs. Each has its own issue; this design reserves their SDK names and does not design them.
