@@ -386,7 +386,8 @@ async function heldInstall({ result, before, install, resolveUpdate, readInstall
  * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupApplied} InstallSetupApplied
  * @typedef {{ home?: string, env?: NodeJS.ProcessEnv, loadCoverageRuntime?: () => Promise<any>,
  *   loadCoverageEngine?: () => Promise<any>, loadModelCatalog?: () => Promise<any>, pluginRoot?: string,
- *   onProgress?: (event: { kind: "notice", text: string }) => void }} SetupPorts
+ *   onProgress?: (event: { kind: "notice", text: string }) => void,
+ *   fs?: typeof import("./setup-fs.js").REAL_SETUP_FS }} SetupPorts
  */
 
 const FIX_INPUT = "Fix the named input and call it again."
@@ -551,6 +552,7 @@ export function createSetup() {
                   description: stage.question(stage.plan),
                 })) === "apply",
           (text) => progress({ kind: "notice", text }),
+          ports.fs === undefined ? {} : { fs: ports.fs },
         )
       } catch (error) {
         return setupFailure(error)

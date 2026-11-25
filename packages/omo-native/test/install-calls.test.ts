@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { exitOf, INSTALL_UPDATE_EXITS, setup, update } from "../bin/lib/install-calls.js"
 import { runSelfUpdate } from "../bin/lib/self-update.js"
+import { REAL_SETUP_FS } from "../bin/lib/setup-fs.js"
 import { setupEntryText } from "../bin/lib/setup-stream.js"
 import { summaryPhrase } from "../bin/lib/setup-summary.js"
 
@@ -137,6 +138,23 @@ describe("install.setup.apply after a stage's write throws", () => {
     })
     expect(existsSync(fixture.authFile)).toBe(true)
     expect(JSON.stringify(answer)).not.toContain(CANARY)
+  })
+})
+
+describe("install.setup.apply writes through the file port it is given", () => {
+  test("#given a file port #then the credentials stage's write goes through it", async () => {
+    const { plan, ports, authFile } = await plannedSetup()
+    const writes: string[] = []
+    const fs = {
+      ...REAL_SETUP_FS,
+      rename: (from: string, to: string) => {
+        writes.push(to)
+        REAL_SETUP_FS.rename(from, to)
+      },
+    }
+    const answer = await setup.apply({ plan, consent: "all" }, { ...ports, fs })
+    expect(answer).toMatchObject({ kind: "ok", value: { applied: ["credentials"] } })
+    expect(writes).toEqual([authFile])
   })
 })
 

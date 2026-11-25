@@ -132,6 +132,8 @@ export type SetupApplyOptions = {
   readonly writeAuth?: (target: string, additions: readonly SetupAuthEntry[]) => Promise<void> | void
   /** Receives the apply's notice lines (the CLI prints them; an RPC caller collects them into its reply). */
   readonly report?: (line: string) => void
+  /** The file effects the stages make (setup-fs.js); the real file system when absent. */
+  readonly fs?: typeof import("./setup-fs.js").REAL_SETUP_FS
 }
 
 /** Refused by `applySetupStages` when `staleGuard` finds a target that changed since planning. */
