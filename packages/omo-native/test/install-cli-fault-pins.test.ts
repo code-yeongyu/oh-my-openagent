@@ -52,6 +52,15 @@ function faultFixture() {
   return { root, agentDir, env, launcher: join(app, "bin", "omo.js") }
 }
 
+// On macOS the compiled entry's trust stage re-runs it with a generated CA bundle that an empty fixture home cannot
+// load, and the runtime warns once before omo writes anything. That one line, in exactly this shape, is the platform's;
+// everything after it is omo's and stays pinned byte for byte.
+const DARWIN_TRUST_WARNING = /^Warning: Ignoring extra certs from .*, load failed: .*PEM routines.*\n/
+
+function compiledStderr(stderr: string): string {
+  return process.platform === "darwin" ? stderr.replace(DARWIN_TRUST_WARNING, "") : stderr
+}
+
 function outcome(result: ReturnType<typeof spawnSync>, fixture: ReturnType<typeof faultFixture>) {
   if (result.error) throw result.error
   const clean = (text: unknown) =>
@@ -76,7 +85,7 @@ describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage who
       env: fixture.env,
     })
     const seen = outcome(result, fixture)
-    expect({ status: seen.status, imported: seen.imported, stderr: seen.stderr }).toEqual({
+    expect({ status: seen.status, imported: seen.imported, stderr: compiledStderr(seen.stderr) }).toEqual({
       status: 1,
       imported: ["google"],
       stderr: "omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n",
@@ -91,9 +100,11 @@ describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage who
     })
     const seen = outcome(result, fixture)
     expect(seen.status).toBe(1)
-    expect(seen.stderr.startsWith("omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n")).toBe(
-      true,
-    )
+    expect(
+      compiledStderr(seen.stderr).startsWith(
+        "omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n",
+      ),
+    ).toBe(true)
     expect(seen.stderr).toContain("at applyAssets (")
   })
 
