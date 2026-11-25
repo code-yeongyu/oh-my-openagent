@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 
 import { assembleOmoSdk } from "../omo-sdk/assembly"
+import { createThreadCore } from "./sdk-core"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 
 // #14951: the reads the SDK lacked (threads.receipt, threads.readAfterWait, threads.messages) on the root, each the
@@ -175,19 +176,38 @@ describe("threads.receipt", () => {
 
 describe("threads.readAfterWait", () => {
   test.each(["dur-local", "dur-on-b"])(
-    "#given an idle thread %s #when the root reads after a wait #then it answers the transcript with the wait block, as thread_read's wait branch does",
+    "#given an idle thread %s #when the root reads after a wait #then the core answers the transcript with the wait block, as thread_read's wait branch does",
     async (thread) => {
-      const { root, s } = rootOn()
+      // The core's call; the root reaches it once the matrix has a script or person cell (security design 4).
+      const a = account()
+      const s = surface(a.remote)
+      const core = createThreadCore({
+        agentDir: s.agentDir,
+        cwd: process.cwd(),
+        uid: 501,
+        user: "qa",
+        host: s.host,
+        store: s.store,
+        remote: a.remote,
+      } as never)
       const unmeasured = (answer: unknown) => {
         const { wait, ...rest } = answer as { readonly wait?: Record<string, unknown> }
         return { ...rest, wait: wait === undefined ? undefined : { ...wait, waited_ms: 0 } }
       }
-      const viaRoot = unmeasured(await root.threads.readAfterWait({ thread, wait_ms: 1 }))
+      const viaRoot = unmeasured(await core.readAfterWait({ thread, wait_ms: 1 } as never))
       const viaTool = unmeasured(await s.run("thread_read", { thread, wait_ms: 1 }))
       expect(viaRoot.wait).toBeDefined()
       expect(viaRoot).toEqual(viaTool)
     },
   )
+
+  test("#given a script principal #when it reads after a wait #then the matrix refuses it: no cell answers for a script yet", async () => {
+    const { root } = rootOn()
+    expect(await root.threads.readAfterWait({ thread: "dur-local", wait_ms: 1 })).toMatchObject({
+      kind: "error",
+      error: { code: "sender_not_allowed", details: { principal: "script", reason: "no_matrix_cell" } },
+    })
+  })
 })
 
 describe("threads.messages", () => {

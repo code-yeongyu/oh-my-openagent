@@ -70,6 +70,14 @@ const IDENTIFIERS = [
   "collapsed",
 ] as const
 
+/**
+ * The delivery kind a repeated send reports: the recorded kind (the current kind from slice D1, #14941, which changes
+ * this one function to ask the holder).
+ */
+function repeatedDeliveryKind(recorded: Record<string, unknown>): unknown {
+  return recorded["delivery"]
+}
+
 /** A replayed send: its outcome and identifiers, marked deduplicated; a refusal replays as recorded. */
 function replayed(result: ThreadToolResult): DeliveryOutcome {
   if (result.kind !== "ok") return result as DeliveryOutcome
@@ -79,8 +87,10 @@ function replayed(result: ThreadToolResult): DeliveryOutcome {
   )
   // The book's reader names the thread `thread` (thread-row.ts `currentResult`); a delivery outcome names it `thread_id`.
   const thread = recorded["thread_id"] ?? recorded["thread"]
+  const delivery = repeatedDeliveryKind(recorded)
   return {
     ...kept,
+    ...(delivery === undefined ? {} : { delivery }),
     ...(thread === undefined ? {} : { thread_id: thread }),
     deduplicated: true,
   } as unknown as DeliveryOutcome
