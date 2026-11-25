@@ -26,7 +26,7 @@ const readable =
   (files: Readonly<Record<string, string>>, listed: readonly string[] = []): GitPort =>
   (args) => {
     if (args[0] === "merge-base") return "b".repeat(40) + "\n"
-    if (args[0] === "ls-tree") return listed.join("\n")
+    if (args[0] === "ls-tree") return args.includes("HEAD") ? listed.join("\n") : ""
     if (args[0] === "cat-file") return ""
     const path = String(args[1]).split(":")[1] ?? ""
     if (files[path] === undefined) throw new Error(`fatal: path '${path}' does not exist`)

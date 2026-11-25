@@ -10,7 +10,7 @@ import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
-import { ACCOUNT_CORE_MOVES, gitTrees, moveListProblems, offenderBaseGrowth } from "../remote-import-guard-moves"
+import { ACCOUNT_CORE_MOVES, moveListProblems, moveTrees, offenderBaseGrowth } from "../remote-import-guard-moves"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
 import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
@@ -146,7 +146,7 @@ try {
     ...offenderBaseGrowth(
       recorded === undefined ? undefined : JSON.parse(recorded),
       ADAPTER_OFFENDERS,
-      gitTrees(gitReader, mergeBase, REPO_ROOT),
+      moveTrees(gitReader, mergeBase, REPO_ROOT),
     ),
     // Required here, never skipped: this job has full history, so an absent move commit fails instead of passing silently.
     ...moveListProblems(ACCOUNT_CORE_MOVES, gitReader),
