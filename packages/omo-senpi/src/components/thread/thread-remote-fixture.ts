@@ -1273,6 +1273,7 @@ export function createRemoteThreadFixture() {
     return {
       run,
       sdk,
+      host,
       /** What a `monitor({type: "rpc", target})` call by the caller arms on this surface (#14294). */
       monitorTarget: async (target: string) => await resolveMonitorTarget(target, caller),
       permission,
