@@ -179,7 +179,7 @@ export async function planCredentials(runtime, target, customProviderIds) {
  */
 export function applyCredentials(plan, options = {}) {
   if (options.writeAuth !== undefined) return options.writeAuth(plan.target, plan.result.additions)
-  writeAuthStore(plan.target, plan.current, plan.result.additions)
+  writeAuthStore(plan.target, plan.current, plan.result.additions, options.fs)
 }
 
 export function credentialPlanEntries(plan) {

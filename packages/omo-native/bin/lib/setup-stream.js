@@ -159,7 +159,7 @@ export function setupStages(plans) {
       entries: assetPlanEntries,
       countEntries: assetCountEntries,
       question: assetQuestion,
-      apply: (plan) => applyAssets(plan),
+      apply: (plan, options) => applyAssets(plan, options),
     },
     {
       id: "providers",
