@@ -57,6 +57,25 @@ export const isAbsoluteFileUrl = (value: string): boolean => {
   }
 }
 
+// A store extension operation that throws (its store failed unexpectedly) answers internal_error with fixed text: the
+// exception's own message and stack can carry what the store held, so they never reach the caller.
+const EXTENSION_UNEXPECTED: OmoFailure = {
+  kind: "error",
+  error: {
+    code: "internal_error",
+    message: "The store extension operation failed unexpectedly.",
+    next_action: "Call it again; if it fails again, run omo doctor.",
+  },
+}
+
+async function settledExtension<T>(run: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await run()
+  } catch {
+    return undefined
+  }
+}
+
 const LIST = ["all_scope", "state"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope"]
 const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
@@ -172,11 +191,15 @@ export function threadsNamespace(options: {
             details: { field: "moduleUrl" },
           },
         }
-      const registered = await (await thread()).extensions.register(input)
+      const registered = await settledExtension(async () => (await thread()).extensions.register(input))
+      if (registered === undefined) return EXTENSION_UNEXPECTED
       return registered.kind === "ok" ? registered : extensionFailure(registered)
     },
     "threads.extensions.call": async (input) => {
-      const answered = await (await thread()).extensions.call(input.name, input.op, input.args)
+      const answered = await settledExtension(async () =>
+        (await thread()).extensions.call(input.name, input.op, input.args),
+      )
+      if (answered === undefined) return EXTENSION_UNEXPECTED
       return answered.kind === "ok" ? answered : extensionFailure(answered)
     },
     "daemon.warm": async (input = {}) => {
