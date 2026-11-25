@@ -43,6 +43,8 @@ export type GoldenCase = {
   readonly store: keyof typeof STORES
   readonly service: Service
   readonly helper?: "ready" | "missing"
+  /** The account service origin the entry is given; absent, the case's own fake service on the loopback address. */
+  readonly origin?: string
   readonly steps: readonly Step[]
 }
 export type Observed = {
@@ -178,7 +180,7 @@ async function runCase(golden: GoldenCase): Promise<CaseRun> {
   const observed: Observed[] = []
   for (const step of golden.steps) {
     const requests: string[] = []
-    const api = fakeService(golden.service, requests)
+    const api = golden.origin ?? fakeService(golden.service, requests)
     const child = Bun.spawn(
       [
         process.execPath,
