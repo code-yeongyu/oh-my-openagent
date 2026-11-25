@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { clientMessageIdOf } from "../../remote/client-message-id"
+import { clientMessageIdOf } from "./client-message-id"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"

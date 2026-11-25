@@ -27,7 +27,7 @@ import { createDeviceServiceSessions } from "./port/device-service"
 import { idShaped } from "@oh-my-opencode/thread-address-core"
 import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { clientMessageIdOf } from "./client-message-id"
+import { clientMessageIdOf } from "../thread/remote/client-message-id"
 import type { LocalSessions } from "./local-sessions"
 import { sessionDetail } from "./session-detail"
 import type {
