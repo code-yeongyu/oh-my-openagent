@@ -26,8 +26,8 @@
     "./sync-device-retire": {
       "import": "./src/sync/device-retire.ts"
     },
-    "./sync-trust-pin": {
-      "import": "./src/sync/crypto/trust-pin.ts"
+    "./sync-trust-pin-read": {
+      "import": "./src/sync/crypto/trust-pin-read.ts"
     },
     "./personas": {
       "import": "./src/personas/manifest.ts"
