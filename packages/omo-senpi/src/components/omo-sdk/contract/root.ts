@@ -4,7 +4,7 @@ import type { CallSpec, StreamResult } from "./call-spec"
 import type { ROOT_CALLS } from "./calls"
 import type { OmoStream, OmoThreadAnswer, OmoValue } from "./failure"
 
-/** What every call that can wait takes (design 4.4): a call whose input already names `deadline_ms` takes the signal only. */
+/** What a call that can wait takes (design 4.4); a call whose input already names `deadline_ms` takes the signal only. */
 export type CallOptions = { readonly signal?: AbortSignal; readonly deadline_ms?: number }
 type OptionsFor<Input> = "deadline_ms" extends keyof Input ? Omit<CallOptions, "deadline_ms"> : CallOptions
 
@@ -14,20 +14,22 @@ type Calls = typeof ROOT_CALLS
 export type RootCallKey = keyof Calls & string
 
 type Answer<Spec> =
-  Spec extends CallSpec<TSchema, infer Result, "value">
+  Spec extends CallSpec<TSchema, infer Result, "value", boolean>
     ? Promise<OmoValue<Result>>
-    : Spec extends CallSpec<TSchema, infer Result, "thread">
+    : Spec extends CallSpec<TSchema, infer Result, "thread", boolean>
       ? Promise<OmoThreadAnswer<Result>>
-      : Spec extends CallSpec<TSchema, StreamResult<infer Event, infer Outcome>, "stream">
+      : Spec extends CallSpec<TSchema, StreamResult<infer Event, infer Outcome>, "stream", boolean>
         ? OmoStream<Event, Outcome>
         : never
 
 type Member<Spec> =
-  Spec extends CallSpec<infer Input, unknown, infer _Shape>
-    ? {} extends Static<Input>
-      ? (input?: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
-      : (input: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
-    : never
+  Spec extends CallSpec<infer Input, unknown, infer _Shape, false>
+    ? (input?: Static<Input>) => Answer<Spec>
+    : Spec extends CallSpec<infer Input, unknown, infer _Shape, true>
+      ? {} extends Static<Input>
+        ? (input?: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
+        : (input: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
+      : never
 
 type Head<Key extends string> = Key extends `${infer First}.${string}` ? First : Key
 type Rest<Key extends string, First extends string> = Key extends `${First}.${infer Tail}` ? Tail : never
@@ -46,4 +48,4 @@ export type OmoSdkRoot = Tree<"", RootCallKey> & {
 }
 
 export type RootCallInput<Key extends RootCallKey> =
-  Calls[Key] extends CallSpec<infer Input, unknown, infer _Shape> ? Static<Input> : never
+  Calls[Key] extends CallSpec<infer Input, unknown, infer _Shape, boolean> ? Static<Input> : never

@@ -60,7 +60,7 @@ type FollowEventOf<Stream> =
   Stream extends OmoStream<unknown, unknown> ? (Stream extends AsyncIterable<infer E> ? E : never) : never
 type FollowStep = FollowEventOf<ReturnType<OmoSdkRoot["threads"]["follow"]>>
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
-export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true] = [
+export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true, true] = [
   // H1: the object form of create's prompt is typed, without the author P1a-s holds.
   true satisfies Equal<
     "author" extends keyof PromptObject ? false : "message" extends keyof PromptObject ? true : false,
@@ -84,6 +84,8 @@ export const rootTypeChecks: [true, true, true, true, true, true, true, true, tr
   // H4: every call takes the wait options of 4.4; a call whose input already names deadline_ms takes only the signal.
   true satisfies Equal<Parameters<OmoSdkRoot["threads"]["readAfterWait"]>[1], CallOptions | undefined>,
   true satisfies Equal<Parameters<OmoSdkRoot["threads"]["wait"]>[1], Omit<CallOptions, "deadline_ms"> | undefined>,
+  // A call that answers at once from this process takes no wait options.
+  true satisfies Equal<Parameters<OmoSdkRoot["install"]["version"]>["length"], 0 | 1>,
 ]
 
 const rows = allRows(loadDomainFiles())
