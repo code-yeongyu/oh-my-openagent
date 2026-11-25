@@ -52,7 +52,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Name the thread: self is an address only a session can use.",
   },
   cancelled: {
-    namespaces: ["threads"],
+    namespaces: ["install", "threads"],
     next_action: "Call it again if it is still wanted.",
   },
   chain_count_limit: {
@@ -262,7 +262,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Pick a level from details.supported.",
   },
   timeout: {
-    namespaces: ["daemon"],
+    namespaces: ["daemon", "install"],
     next_action: "Retry the call; if it changes something, read the current state first.",
   },
   transport_expired: {

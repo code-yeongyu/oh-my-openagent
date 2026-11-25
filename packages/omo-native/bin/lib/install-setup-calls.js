@@ -15,6 +15,7 @@ import {
   setupStages,
 } from "./setup-stream.js"
 import { displayPath, setupSummary } from "./setup-summary.js"
+import { abortedAnswer, stopIfAborted, untilAborted, waitOn } from "./install-abort.js"
 import { failure } from "./install-result.js"
 
 /**
@@ -35,7 +36,8 @@ import { failure } from "./install-result.js"
  * @typedef {{ home?: string, env?: NodeJS.ProcessEnv, loadCoverageRuntime?: () => Promise<any>,
  *   loadCoverageEngine?: () => Promise<any>, loadModelCatalog?: () => Promise<any>, pluginRoot?: string,
  *   onProgress?: (event: { kind: "notice", text: string }) => void,
- *   fs?: typeof import("./setup-fs.js").REAL_SETUP_FS }} SetupPorts
+ *   fs?: typeof import("./setup-fs.js").REAL_SETUP_FS, after?: import("./install-abort.js").After }} SetupPorts
+ * @typedef {import("./install-abort.js").WaitOptions} WaitOptions
  */
 
 const FIX_INPUT = "Fix the named input and call it again."
@@ -106,44 +108,57 @@ export function createSetup() {
   return {
     /**
      * install.setup.detect(): the harnesses found on this machine and what each holds, read only.
-     * @param {object} [_input] @param {SetupPorts} [ports]
+     * @param {object} [_input] @param {SetupPorts} [ports] @param {WaitOptions} [options]
      * @returns {Promise<Result<InstallSetupInventory>>}
      */
-    async detect(_input = {}, ports = {}) {
+    async detect(_input = {}, ports = {}, options = {}) {
       const runtime = setupRuntime(ports)
+      const wait = waitOn(options, ports.after)
       try {
-        for await (const result of scanSetup(runtime, runtime.agentDir, { includeCustomProviders: true })) {
+        stopIfAborted(wait.signal)
+        const scan = scanSetup(runtime, runtime.agentDir, { includeCustomProviders: true })
+        for (;;) {
+          const next = await untilAborted(scan.next(), wait.signal)
+          if (next.done === true) return { kind: "ok", value: { harnesses: [] } }
+          const result = next.value
           if (result.source !== "detect") continue
           if (result.error !== undefined) throw result.error
           return { kind: "ok", value: /** @type {InstallSetupInventory} */ (/** @type {unknown} */ (result.plan)) }
         }
-        return { kind: "ok", value: { harnesses: [] } }
       } catch (error) {
-        return setupFailure(error)
+        return abortedAnswer(error) ?? setupFailure(error)
+      } finally {
+        wait.done()
       }
     },
 
     /**
      * install.setup.plan(): what `omo setup --dry-run` prints, as data. Nothing is written.
-     * @param {object} [_input] @param {SetupPorts} [ports]
+     * @param {object} [_input] @param {SetupPorts} [ports] @param {WaitOptions} [options]
      * @returns {Promise<Result<InstallSetupPlan>>}
      */
-    async plan(_input = {}, ports = {}) {
+    async plan(_input = {}, ports = {}, options = {}) {
+      const wait = waitOn(options, ports.after)
       try {
+        stopIfAborted(wait.signal)
         const runtime = setupRuntime(ports)
         const { home, env, agentDir } = runtime
         // The CLI has always carried OpenCode's custom providers; the onboarding RPC leaves them opt-in.
-        const { inventory, plans } = await collectSetupPlans(
-          scanSetup(runtime, agentDir, { includeCustomProviders: true }),
+        const { inventory, plans } = await untilAborted(
+          collectSetupPlans(scanSetup(runtime, agentDir, { includeCustomProviders: true })),
+          wait.signal,
         )
-        const categories = await setupCoverage({
-          agentDir,
-          home,
-          env,
-          plans,
-          loadRuntime: ports.loadCoverageRuntime,
-          loadEngine: ports.loadCoverageEngine,
-        })
+        const categories = await untilAborted(
+          setupCoverage({
+            agentDir,
+            home,
+            env,
+            plans,
+            loadRuntime: ports.loadCoverageRuntime,
+            loadEngine: ports.loadCoverageEngine,
+          }),
+          wait.signal,
+        )
         const stages = setupStages(plans).map((stage) => {
           const pending = stage.plan?.pending ?? 0
           return {
@@ -165,7 +180,9 @@ export function createSetup() {
         held.set(value, plans)
         return { kind: "ok", value }
       } catch (error) {
-        return setupFailure(error)
+        return abortedAnswer(error) ?? setupFailure(error)
+      } finally {
+        wait.done()
       }
     },
 
@@ -173,10 +190,12 @@ export function createSetup() {
      * install.setup.apply({ plan, consent, decide? }): writes what the plan holds. consent "all" applies every pending
      * stage; "each" calls decide once per pending stage, in plan order, before that stage's write.
      * @param {import("../../../omo-senpi/src/components/omo-sdk/contract/root.ts").RootCallInput<"install.setup.apply">} input
-     * @param {SetupPorts} [ports]
+     * A stop (cancelled, timeout) is checked before each stage's write and while decide is pending: the stages already
+     * applied stay, each whole; no stage is left half-written, and the next apply plans from what is on disk.
+     * @param {SetupPorts} [ports] @param {WaitOptions} [options]
      * @returns {Promise<Result<InstallSetupApplied>>}
      */
-    async apply(input, ports = {}) {
+    async apply(input, ports = {}, options = {}) {
       const { plan, consent, decide } = input
       if (consent !== "all" && consent !== "each")
         return failure("invalid_arguments", "consent is all or each", FIX_INPUT, { field: "consent" })
@@ -188,22 +207,35 @@ export function createSetup() {
           field: "plan",
         })
       const progress = ports.onProgress ?? (() => {})
+      const wait = waitOn(options, ports.after)
+      /** @param {any} stage */
+      const consented = async (stage) => {
+        stopIfAborted(wait.signal)
+        if (consent === "all") return true
+        const answer = await untilAborted(
+          /** @type {NonNullable<typeof decide>} */ (decide)({ id: stage.id, description: stage.question(stage.plan) }),
+          wait.signal,
+        )
+        stopIfAborted(wait.signal)
+        return answer === "apply"
+      }
       let applied
       try {
         applied = await applySetupStages(
           plans,
-          consent === "all"
-            ? () => true
-            : async (stage) =>
-                (await /** @type {NonNullable<typeof decide>} */ (decide)({
-                  id: stage.id,
-                  description: stage.question(stage.plan),
-                })) === "apply",
+          consented,
           (text) => progress({ kind: "notice", text }),
           ports.fs === undefined ? {} : { fs: ports.fs },
         )
       } catch (error) {
-        return setupFailure(error)
+        const fault = setupApplyFault(error)
+        const stopped = abortedAnswer(
+          error,
+          fault === undefined ? {} : { applied_stages: fault.applied, stopped_before: fault.stage },
+        )
+        return stopped ?? setupFailure(error)
+      } finally {
+        wait.done()
       }
       const stages = setupStages(plans)
       return {

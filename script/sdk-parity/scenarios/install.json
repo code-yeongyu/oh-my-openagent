@@ -2171,6 +2171,300 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "install.setup.detect/sqlite-never-loads-caller-cancels",
+      "row": "install.setup.detect",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "sqlite": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.detect/sqlite-never-loads-deadline-passes",
+      "row": "install.setup.detect",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "sqlite": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      },
+      "refusal_details": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.setup.plan/coverage-never-loads-caller-cancels",
+      "row": "install.setup.plan",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "coverage": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.plan/coverage-never-loads-deadline-passes",
+      "row": "install.setup.plan",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "engine",
+          "state": {
+            "coverage": "never"
+          }
+        }
+      ],
+      "input": {},
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      },
+      "refusal_details": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.setup.apply/decide-never-answers-caller-cancels",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
+      "input": {
+        "plan": "$answer:1",
+        "consent": "each",
+        "decide": "$callback"
+      },
+      "callbacks": {
+        "decide": [
+          {
+            "when": {
+              "id": "credentials"
+            },
+            "pending": true,
+            "effects_before": 0
+          }
+        ]
+      },
+      "refusal_details": {
+        "applied_stages": [],
+        "stopped_before": "credentials"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.setup.apply/decide-never-answers-deadline-passes",
+      "row": "install.setup.apply",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "before": [
+        {
+          "row": "install.setup.plan",
+          "input": {}
+        }
+      ],
+      "input": {
+        "plan": "$answer:1",
+        "consent": "each",
+        "decide": "$callback"
+      },
+      "callbacks": {
+        "decide": [
+          {
+            "when": {
+              "id": "credentials"
+            },
+            "pending": true,
+            "effects_before": 0
+          }
+        ]
+      },
+      "refusal_details": {
+        "deadline_ms": 50,
+        "applied_stages": [],
+        "stopped_before": "credentials"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      }
+    },
+    {
+      "id": "install.update/manager-never-exits-caller-cancels",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm": "hang"
+          }
+        }
+      ],
+      "input": {},
+      "refusal_details": {
+        "stopped_in": "install"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "install.update/manager-never-exits-deadline-passes",
+      "row": "install.update",
+      "kind": "refusal",
+      "refusal": "timeout",
+      "given": [
+        {
+          "port": "process",
+          "state": {
+            "registry_latest": "1.0.1",
+            "npm": "hang"
+          }
+        }
+      ],
+      "input": {},
+      "refusal_details": {
+        "deadline_ms": 50,
+        "stopped_in": "install"
+      },
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<package>/package.json"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "node",
+            "script": "omo-ai/dist-tags"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "npm"
+          }
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "count": 0
+        }
+      ],
+      "call_options": {
+        "deadline_ms": 50
+      }
     }
   ]
 }

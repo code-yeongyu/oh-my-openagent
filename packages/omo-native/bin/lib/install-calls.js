@@ -19,6 +19,7 @@ import {
 import { heldTarget, isLockFailure, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
 import { heldInstall } from "./update-held.js"
 import { join } from "node:path"
+import { abortedAnswer, stopIfAborted, untilAborted, waitOn } from "./install-abort.js"
 import { failure } from "./install-result.js"
 
 /**
@@ -81,6 +82,7 @@ export function version(_input = {}, ports = {}) {
  *   selfPids?: number[],
  *   root?: string,
  *   onProgress?: (event: UpdateProgress) => void,
+ *   after?: import("./install-abort.js").After,
  * }} UpdatePorts
  */
 
@@ -142,7 +144,22 @@ const installFailed = (details, message) => failure("install_failed", message, I
  * @param {UpdatePorts} [ports]
  * @returns {Promise<Result<InstallUpdate>>}
  */
-export async function update(input = {}, ports = {}) {
+export async function update(input = {}, ports = {}, options = {}) {
+  const wait = waitOn(options, ports.after)
+  try {
+    return await updateUntil(input, ports, wait.signal)
+  } catch (error) {
+    // Stopped before the package manager was started: nothing was written.
+    const stopped = abortedAnswer(error, { stopped_in: "before_install" })
+    if (stopped !== undefined) return stopped
+    throw error
+  } finally {
+    wait.done()
+  }
+}
+
+/** @param {{ dry_run?: boolean }} input @param {UpdatePorts} ports @param {AbortSignal} signal */
+async function updateUntil(input, ports, signal) {
   const unknown = Object.keys(input).find((key) => key !== "dry_run")
   if (unknown !== undefined || (input.dry_run !== undefined && typeof input.dry_run !== "boolean")) {
     return failure(
@@ -158,7 +175,9 @@ export async function update(input = {}, ports = {}) {
     ports.resolveUpdate ??
     ((targetVersion) => updateTarget(undefined, undefined, undefined, undefined, undefined, targetVersion))
   const fetchDistTags = ports.fetchDistTags ?? fetchNpmDistTagsSync
-  const run = ports.run ?? runChild
+  const spawnChild = ports.run ?? runChild
+  /** @type {NonNullable<UpdatePorts["run"]>} A child the call started is sent SIGTERM when the call stops. */
+  const run = (command, args, spawnOptions) => spawnChild(command, args, { ...spawnOptions, signal })
   const readInstalled = ports.readInstalled ?? readInstalledVersion
   const env = ports.env ?? process.env
   const platform = ports.platform ?? process.platform
@@ -168,6 +187,7 @@ export async function update(input = {}, ports = {}) {
   // Loaded here, not at module load: its bun-runtime import claims the private-descriptor table, which an engine boot
   // that imports this module for version or setup must still find (memory-sync-boot-claim.test.ts).
   const { findVersionedInstall, versionedInstallUpdate, versionedUpdateTarget } = await import("./versioned-install.js")
+  stopIfAborted(signal)
   const before = readInstalled()
   const channel = releaseChannel(before.omo)
   const target = channelDistTagVersion(fetchDistTags(), before.omo)
@@ -210,9 +230,16 @@ export async function update(input = {}, ports = {}) {
     }
     return answer("up_to_date", false)
   }
+  stopIfAborted(signal)
   progress({ kind: "installing", manager: resolved.manager, command: resolved.command })
   if (versioned !== undefined && target !== undefined) {
     const outcome = await versionedInstallUpdate({ install: versioned, before: before.omo, target, run, env, platform })
+    // Stopped while bun installed into the staging directory: current still names the old version, and the next
+    // update sets the unfinished directory aside.
+    const stoppedVersioned = signal.aborted
+      ? abortedAnswer(signal.reason, { stopped_in: "versioned_install", current: versioned.current })
+      : undefined
+    if (stoppedVersioned !== undefined) return stoppedVersioned
     if (outcome.kind === "updated") {
       return answer("updated", true, {
         after: { omo: target, engine: before.engine },
@@ -264,14 +291,20 @@ export async function update(input = {}, ports = {}) {
       "the package manager could not be started",
     )
 
+  // Stopped while the package manager ran: it was sent SIGTERM, and a partial global install is what the next update
+  // installs over.
+  const stoppedInstall = () =>
+    signal.aborted ? abortedAnswer(signal.reason, { stopped_in: "install", command: resolved.command }) : undefined
   /** @type {ChildResult} */
   let result
   for (let attempt = 0; ; attempt += 1) {
     try {
       result = await install(resolved)
     } catch {
-      return spawnFailed()
+      return stoppedInstall() ?? spawnFailed()
     }
+    const stopped = stoppedInstall()
+    if (stopped !== undefined) return stopped
     if (!failed(result) || !heldOnWindows(result) || attempt >= LOCK_RETRY_DELAYS_MS.length) break
     const delay = LOCK_RETRY_DELAYS_MS[attempt]
     progress({
@@ -281,7 +314,7 @@ export async function update(input = {}, ports = {}) {
       attempt: attempt + 2,
       attempts: LOCK_RETRY_DELAYS_MS.length + 1,
     })
-    await sleep(delay)
+    await untilAborted(sleep(delay), signal)
   }
 
   if (failed(result) && heldOnWindows(result)) {

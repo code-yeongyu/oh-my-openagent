@@ -4,7 +4,7 @@ import { dirname, join } from "node:path"
 import { installCore } from "../../../packages/omo-native/bin/lib/sdk-install.js"
 import { REAL_SETUP_FS } from "../../../packages/omo-native/bin/lib/setup-fs.js"
 import type { ScenarioRun } from "../conformance-run"
-import { type ScenarioFakes, scenarioRuns, type SetupOptions } from "../fakes/setup"
+import { type ScenarioFakes, scenarioSetup } from "../fakes/setup"
 import { loadScenarioTable } from "../scenario-table"
 
 // Slice C1c's drivers (#14960): the install namespace's calls on the real omo SDK root, its launcher-side core loaded
@@ -97,10 +97,34 @@ function versionedLayout(fakes: ScenarioFakes, version: string): string {
   return packageDir
 }
 
+// The fakes' virtual clock: timers fire, in time order, only once the call waits on something that never answers (a
+// hanging port, a pending callback), so a stop never races a real wait the call makes on the way there.
+function blockedClock() {
+  let now = 0
+  const due: { at: number; fire: () => void }[] = []
+  return {
+    after: (ms: number, fire: () => void) => {
+      const timer = { at: now + ms, fire }
+      due.push(timer)
+      return () => {
+        if (due.includes(timer)) due.splice(due.indexOf(timer), 1)
+      }
+    },
+    blocked: () => {
+      for (const timer of due.splice(0).toSorted((left, right) => left.at - right.at)) {
+        now = timer.at
+        timer.fire()
+      }
+    },
+  }
+}
+type Clock = ReturnType<typeof blockedClock>
+const never = (): Promise<never> => new Promise<never>(() => {})
+
 const text = (value: unknown): string | undefined => (typeof value === "string" ? value : undefined)
 const number = (value: unknown): number | undefined => (typeof value === "number" ? value : undefined)
 
-function updatePorts(fakes: ScenarioFakes) {
+function updatePorts(fakes: ScenarioFakes, clock: Clock) {
   const process = fakes.recorder.given("process")
   const fs = fakes.recorder.given("fs")
   const latest = text(process["registry_latest"])
@@ -126,8 +150,18 @@ function updatePorts(fakes: ScenarioFakes) {
       const spec = version === undefined ? "omo-ai@latest" : `omo-ai@${version}`
       return { manager: "npm", command: `npm install -g ${spec}`, argv: ["npm", "install", "-g", spec] }
     },
-    run: async (command: string, argv: readonly string[]) => {
+    after: clock.after,
+    run: async (command: string, argv: readonly string[], options?: Readonly<Record<string, unknown>>) => {
       fakes.recorder.record("process", "spawn", { command, argv: [...argv] })
+      // A package manager that runs until the call stops it: like node's spawn, it rejects once its signal aborts.
+      if (process["npm"] === "hang") {
+        const signal = options?.["signal"] as AbortSignal
+        const ended = new Promise<never>((_resolve, reject) =>
+          signal.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
+        )
+        clock.blocked()
+        return ended
+      }
       if (process["npm"] === "missing") throw new Error(`spawn ${command} ENOENT`)
       if (text(process["npm_held"]) !== undefined)
         return {
@@ -153,28 +187,48 @@ function versionPorts(fakes: ScenarioFakes) {
 
 // The engine's model runtime the setup summary's coverage line reads: absent, unless the scenario gives a malformed one,
 // whose answer the summary cannot project (the setup plan's unexpected fault).
-function coverageRuntime(fakes: ScenarioFakes): unknown {
+function coverageRuntime(fakes: ScenarioFakes, clock: Clock): unknown {
+  if (fakes.recorder.given("engine")["coverage"] === "never") {
+    clock.blocked()
+    return never()
+  }
   if (fakes.recorder.given("engine")["coverage"] !== "malformed") throw new Error("no coverage runtime in a scenario")
   return { categoryCoverage: () => ({ usable: null, unusable: null }) }
 }
 
-const installCores: SetupOptions["cores"] = (fakes) => ({
-  install: async (context) => {
-    setupFixture(fakes)
-    return installCore(context, {
-      update: updatePorts(fakes),
-      version: versionPorts(fakes),
-      setup: { fs: recordedSetupFs(fakes), loadCoverageRuntime: async () => coverageRuntime(fakes) },
-    })
-  },
-})
+function installCores(clock: Clock) {
+  return (fakes: ScenarioFakes) => ({
+    install: async (context: Parameters<typeof installCore>[0]) => {
+      setupFixture(fakes)
+      return installCore(context, {
+        update: updatePorts(fakes, clock),
+        version: versionPorts(fakes),
+        setup: {
+          fs: recordedSetupFs(fakes),
+          after: clock.after,
+          loadCoverageRuntime: async () => coverageRuntime(fakes, clock),
+          ...(fakes.recorder.given("engine")["sqlite"] === "never"
+            ? {
+                loadSqlite: () => {
+                  clock.blocked()
+                  return never()
+                },
+              }
+            : {}),
+        },
+      })
+    },
+  })
+}
 
-const ids = loadScenarioTable()
+// One clock per run, shared by the install core's ports and the runner's abort.
+export const runs: ScenarioRun[] = loadScenarioTable()
   .flatMap((file) => file.scenarios)
   .filter((scenario) => (ROWS as readonly string[]).includes(scenario.row))
-  .map((scenario) => scenario.id)
-
-export const runs: ScenarioRun[] = scenarioRuns(
-  [...ROWS],
-  Object.fromEntries(ids.map((id) => [id, { cores: installCores }])),
-)
+  .map((scenario) => ({
+    scenario,
+    setup: () => {
+      const clock = blockedClock()
+      return { ...scenarioSetup(scenario, { cores: installCores(clock) }), after: clock.after, blocked: clock.blocked }
+    },
+  }))

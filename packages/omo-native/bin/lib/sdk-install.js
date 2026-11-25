@@ -58,9 +58,9 @@ export async function installCore(context, overrides = {}) {
   return {
     sdkRoot: (input) => sdkRoot(input),
     version: async (input) => calls.version(input, overrides.version),
-    update: (input) => calls.update(input, updatePorts),
-    "setup.detect": (input) => setup.detect(input, ports),
-    "setup.plan": (input) => setup.plan(input, ports),
-    "setup.apply": (input) => setup.apply(input, ports),
+    update: (input, options) => calls.update(input, updatePorts, options),
+    "setup.detect": (input, options) => setup.detect(input, ports, options),
+    "setup.plan": (input, options) => setup.plan(input, ports, options),
+    "setup.apply": (input, options) => setup.apply(input, ports, options),
   }
 }
