@@ -6994,6 +6994,11 @@
           "port": "remote",
           "op": "sessions.open",
           "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "count": 0
         }
       ],
       "then": [
@@ -7017,6 +7022,15 @@
               "args": {
                 "device": "studio"
               }
+            },
+            {
+              "port": "remote",
+              "op": "sessions.send",
+              "args": {
+                "thread": "t-k8",
+                "message": "build it"
+              },
+              "count": 1
             }
           ],
           "answer": {
