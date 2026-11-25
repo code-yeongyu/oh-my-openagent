@@ -1,0 +1,144 @@
+{
+  "domain": "devices",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "devices.list/account-read-refuses-connector",
+      "row": "devices.list",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.list/account-read-refuses-service",
+      "row": "devices.list",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/rename-refuses-connector",
+      "row": "devices.rename",
+      "input": {
+        "id": "x-id",
+        "name": "x-name"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.rename/rename-refuses-service",
+      "row": "devices.rename",
+      "input": {
+        "id": "x-id",
+        "name": "x-name"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.rename",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/revoke-refuses-connector",
+      "row": "devices.revoke",
+      "input": {
+        "device": "x-device",
+        "confirm_name": "x-confirm_name"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/revoke-refuses-session",
+      "row": "devices.revoke",
+      "input": {
+        "device": "x-device",
+        "confirm_name": "x-confirm_name"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "devices.revoke/revoke-refuses-service",
+      "row": "devices.revoke",
+      "input": {
+        "device": "x-device",
+        "confirm_name": "x-confirm_name"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.revoke",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

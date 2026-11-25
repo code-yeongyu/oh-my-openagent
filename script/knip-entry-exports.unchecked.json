@@ -88,6 +88,7 @@
     "packages/telemetry-core/src/posthog-immediate-send.ts",
     "packages/utils/src/logger.ts",
     "script/omo-native-trust-mutations.ts",
-    "script/qa/rpc-relay-parity-live.ts"
+    "script/qa/rpc-relay-parity-live.ts",
+    "script/sdk-parity/gate-cli.ts"
   ]
 }
