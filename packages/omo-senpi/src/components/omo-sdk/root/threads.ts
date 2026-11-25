@@ -50,7 +50,8 @@ function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): Om
   }
 }
 
-const isAbsoluteFileUrl = (value: string): boolean => {
+/** The root's module-URL check (design lane ruling): an absolute file URL. */
+export const isAbsoluteFileUrl = (value: string): boolean => {
   try {
     return new URL(value).protocol === "file:"
   } catch {
