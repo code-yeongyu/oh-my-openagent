@@ -11,9 +11,23 @@
       ],
       "input": {
         "properties": {
-          "platform": {},
-          "codex_home": {},
-          "project": {}
+          "platform": {
+            "enum": [
+              "opencode",
+              "codex",
+              "both",
+              "native",
+              "native-dev"
+            ]
+          },
+          "codex_home": {
+            "type": "string",
+            "minLength": 1
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -71,7 +85,10 @@
       ],
       "input": {
         "properties": {
-          "directory": {}
+          "directory": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -328,9 +345,15 @@
       "input": {
         "properties": {
           "consent": {
-            "enum": [
-              "all",
-              "each"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "all"
+              },
+              {
+                "type": "string",
+                "const": "each"
+              }
             ]
           }
         },
@@ -449,7 +472,9 @@
       ],
       "input": {
         "properties": {
-          "dry_run": {}
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },

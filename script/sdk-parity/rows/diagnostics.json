@@ -12,7 +12,9 @@
       ],
       "input": {
         "properties": {
-          "dry_run": {}
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -93,7 +95,14 @@
       ],
       "input": {
         "properties": {
-          "pids": {}
+          "pids": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "minItems": 1
+          }
         },
         "required": [
           "pids"
@@ -136,9 +145,24 @@
       ],
       "input": {
         "properties": {
-          "status": {},
-          "verbose": {},
-          "platform": {}
+          "status": {
+            "type": "boolean"
+          },
+          "verbose": {
+            "type": "boolean"
+          },
+          "platform": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "opencode"
+              },
+              {
+                "type": "string",
+                "const": "codex"
+              }
+            ]
+          }
         },
         "required": []
       },

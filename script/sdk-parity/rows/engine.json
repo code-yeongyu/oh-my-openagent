@@ -224,7 +224,9 @@
       ],
       "input": {
         "properties": {
-          "local": {},
+          "local": {
+            "type": "boolean"
+          },
           "trust": {
             "type": "boolean"
           }
@@ -270,16 +272,58 @@
       ],
       "input": {
         "properties": {
-          "local": {},
+          "local": {
+            "type": "boolean"
+          },
           "trust": {
             "type": "boolean"
           },
-          "source": {},
-          "resource": {},
-          "enabled": {},
-          "state": {}
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "resource": {
+            "type": "object",
+            "required": [
+              "type",
+              "path"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "inherit"
+              },
+              {
+                "type": "string",
+                "const": "load"
+              },
+              {
+                "type": "string",
+                "const": "unload"
+              }
+            ]
+          }
         },
-        "required": []
+        "required": [
+          "source",
+          "resource"
+        ]
       },
       "cli": [
         {
@@ -1146,7 +1190,10 @@
       ],
       "input": {
         "properties": {
-          "provider": {}
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "provider"
@@ -1190,7 +1237,10 @@
       ],
       "input": {
         "properties": {
-          "pattern": {},
+          "pattern": {
+            "type": "string",
+            "minLength": 1
+          },
           "setup": {}
         },
         "required": []
@@ -1267,8 +1317,13 @@
       ],
       "input": {
         "properties": {
-          "source": {},
-          "local": {},
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "local": {
+            "type": "boolean"
+          },
           "trust": {
             "type": "boolean"
           }
@@ -1361,8 +1416,13 @@
       ],
       "input": {
         "properties": {
-          "source": {},
-          "local": {},
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "local": {
+            "type": "boolean"
+          },
           "trust": {
             "type": "boolean"
           }
@@ -1429,8 +1489,13 @@
       ],
       "input": {
         "properties": {
-          "source": {},
-          "trust": {}
+          "source": {
+            "type": "string",
+            "minLength": 1
+          },
+          "trust": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -1541,7 +1606,10 @@
       ],
       "input": {
         "properties": {
-          "id": {}
+          "id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "id"
@@ -1623,11 +1691,25 @@
       ],
       "input": {
         "properties": {
-          "watch": {},
-          "exec": {},
-          "poll_seconds": {},
-          "timeout_seconds": {},
-          "concurrency": {},
+          "watch": {
+            "type": "boolean"
+          },
+          "exec": {
+            "type": "string",
+            "minLength": 1
+          },
+          "poll_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timeout_seconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "concurrency": {
+            "type": "integer",
+            "minimum": 1
+          },
           "signal": {}
         },
         "required": []
@@ -1673,7 +1755,10 @@
       ],
       "input": {
         "properties": {
-          "pid": {}
+          "pid": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": [
           "pid"
@@ -1717,8 +1802,14 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "out": {}
+          "session": {
+            "type": "string",
+            "minLength": 1
+          },
+          "out": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "session"

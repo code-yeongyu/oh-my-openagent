@@ -1,5 +1,6 @@
 import { Type } from "typebox"
 
+import { THREAD_MESSAGE_MAX_BYTES } from "../../../thread/contracts"
 import {
   ThreadCreateParams,
   ThreadHandoffParams,
@@ -19,7 +20,18 @@ export const ThreadsSend = Type.Object({ ...ThreadSendParams.properties, attachm
 
 export const ThreadsSendAndFollow = Type.Object({ ...ThreadsSend.properties, deadline_ms: DeadlineMs })
 
-export const ThreadsCreate = ThreadCreateParams
+/** The first message: the tool's string, or the object form of 6.2 (the remote module's `first`) without `author`. */
+const FirstPrompt = Type.Optional(
+  Type.Union([
+    Type.String({ minLength: 1, maxLength: THREAD_MESSAGE_MAX_BYTES }),
+    Type.Object({
+      ...Type.Pick(ThreadSendParams, ["message", "delivery", "expected_turn_id", "summary"]).properties,
+      attachments: Attachments,
+    }),
+  ]),
+)
+
+export const ThreadsCreate = Type.Object({ ...ThreadCreateParams.properties, prompt: FirstPrompt })
 
 export const ThreadsInterrupt = ThreadInterruptParams
 

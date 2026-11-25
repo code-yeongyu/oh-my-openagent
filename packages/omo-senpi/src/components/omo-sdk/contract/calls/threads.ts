@@ -24,7 +24,7 @@ export const THREAD_CALLS = {
   "threads.interrupt": threadCall<result.ThreadInterruptResult>()(input.ThreadsInterrupt),
   "threads.close": threadCall<result.ThreadCloseResult>()(input.ThreadsClose),
   "threads.unload": threadCall<result.ThreadUnloadResult>()(input.ThreadsUnload),
-  "threads.release": threadCall<result.ThreadReleaseResult>()(input.ThreadsRelease),
+  "threads.release": valueCall<result.ThreadReleaseResult>()(input.ThreadsRelease),
   "threads.adopt": threadCall<result.ThreadAdoptResult>()(input.ThreadsAdopt),
   "threads.setModel": threadCall<result.ThreadSetModelResult>()(input.ThreadsSetModel),
   "threads.setReasoning": threadCall<result.ThreadSetReasoningResult>()(input.ThreadsSetReasoning),

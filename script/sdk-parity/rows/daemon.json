@@ -12,8 +12,25 @@
       ],
       "input": {
         "properties": {
-          "policy": {},
-          "pinned": {},
+          "policy": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
+            ]
+          },
+          "pinned": {
+            "type": "boolean"
+          },
           "launch_spec": {},
           "mcp_presenter_enforcement": {}
         },
@@ -60,8 +77,13 @@
       ],
       "input": {
         "properties": {
-          "prune_store_index": {},
-          "agent_dir": {}
+          "prune_store_index": {
+            "type": "boolean"
+          },
+          "agent_dir": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -117,25 +139,61 @@
       "input": {
         "properties": {
           "policy": {
-            "enum": [
-              "upgrade",
-              "fallback",
-              "never"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
             ]
           },
           "launch_spec": {},
-          "allow_downgrade": {},
+          "allow_downgrade": {
+            "type": "boolean"
+          },
           "when": {
+            "type": "object",
+            "required": [
+              "idle"
+            ],
             "properties": {
               "idle": {
+                "type": "object",
+                "required": [
+                  "operation",
+                  "if_instance",
+                  "if_generation",
+                  "target_build"
+                ],
                 "properties": {
-                  "operation": {},
-                  "if_instance": {},
-                  "if_generation": {},
-                  "target_build": {}
-                }
+                  "operation": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "if_instance": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "if_generation": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "target_build": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               }
-            }
+            },
+            "additionalProperties": false
           }
         },
         "required": []
@@ -198,9 +256,20 @@
       ],
       "input": {
         "properties": {
-          "stores": {},
-          "allow_missing_index": {},
-          "dry_run": {}
+          "stores": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          },
+          "allow_missing_index": {
+            "type": "boolean"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -245,13 +314,24 @@
       "input": {
         "properties": {
           "policy": {
-            "enum": [
-              "upgrade",
-              "fallback",
-              "never"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "upgrade"
+              },
+              {
+                "type": "string",
+                "const": "fallback"
+              },
+              {
+                "type": "string",
+                "const": "never"
+              }
             ]
           },
-          "pinned": {}
+          "pinned": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -294,9 +374,26 @@
       ],
       "input": {
         "properties": {
-          "kind": {},
-          "owner": {},
-          "root": {}
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "p"
+              },
+              {
+                "type": "string",
+                "const": "i"
+              }
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1
+          },
+          "root": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "kind",
@@ -342,8 +439,12 @@
       ],
       "input": {
         "properties": {
-          "all": {},
-          "include_workers": {}
+          "all": {
+            "type": "boolean"
+          },
+          "include_workers": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -400,11 +501,48 @@
       ],
       "input": {
         "properties": {
-          "drain": {},
-          "instance": {},
-          "wait_ms": {},
-          "force": {},
-          "expected_generation": {}
+          "drain": {
+            "type": "boolean"
+          },
+          "instance": {
+            "type": "string",
+            "minLength": 1
+          },
+          "wait_ms": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "expected_generation": {
+            "type": "object",
+            "required": [
+              "instance_id",
+              "generation",
+              "pid",
+              "process_start_time"
+            ],
+            "properties": {
+              "instance_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pid": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "process_start_time": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": []
       },
@@ -463,9 +601,16 @@
       ],
       "input": {
         "properties": {
-          "drain": {},
-          "wait": {},
-          "deadline_ms": {}
+          "drain": {
+            "type": "boolean"
+          },
+          "wait": {
+            "type": "boolean"
+          },
+          "deadline_ms": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": []
       },
@@ -510,9 +655,20 @@
       ],
       "input": {
         "properties": {
-          "cwd": {},
-          "kind": {},
-          "context": {}
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "context": {
+            "type": "object",
+            "patternProperties": {
+              "^.*$": {}
+            }
+          }
         },
         "required": []
       },

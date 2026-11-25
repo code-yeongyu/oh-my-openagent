@@ -10,10 +10,13 @@ import { PARITY_DIR } from "./registry"
 
 export const SCENARIOS_DIR = join(PARITY_DIR, "scenarios")
 
+/** One operation a fake port observes: `args` is matched as a subset, `count` defaults to 1 (0: never called). */
 export type Expectation = {
   readonly port: string
-  /** What that fake port observes: the call it receives, or that it receives none. */
-  readonly observes: string
+  readonly op: string
+  readonly args?: Readonly<Record<string, unknown>>
+  readonly count?: number
+  readonly result?: unknown
 }
 
 export type TableScenario = {

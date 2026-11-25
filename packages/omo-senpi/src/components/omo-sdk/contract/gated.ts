@@ -5,11 +5,51 @@
 // not have yet; the check fails once it appears, so the entry is revisited.
 export type GatedEntry = {
   readonly row: string
+  /** A field of the row's input, or a dotted path into one (`prompt.author`); absent, the whole row. */
   readonly field?: string
   readonly s0: readonly string[]
   readonly reason: string
+  /** Set only when `s0` is empty: why the entry is held although the security design does not name it. */
+  readonly heldWithoutS0?: string
   readonly rowExists: boolean
 }
+
+/** The sections of the security design (#14945) an entry may cite. */
+export const SECURITY_SECTIONS = [
+  "2.4",
+  "3",
+  "4",
+  "4.1",
+  "4.2",
+  "4.3",
+  "4.4",
+  "4.5",
+  "5",
+  "5.0",
+  "5.1",
+  "5.2",
+  "5.3",
+  "5.4",
+  "5.5",
+  "5.6",
+  "5.7",
+  "8.2",
+] as const
+
+/** The root options of first-party design 4.1; a root entry here holds one of them. */
+export const ROOT_OPTION_NAMES = [
+  "api",
+  "accounts",
+  "env",
+  "cwd",
+  "home",
+  "agentDir",
+  "uid",
+  "user",
+  "endpoint",
+  "principal",
+  "ports",
+] as const
 
 const row = (id: string, s0: readonly string[], reason: string, rowExists = true): GatedEntry => ({
   row: id,
@@ -94,11 +134,20 @@ export const GATED: readonly GatedEntry[] = [
   row("toolkit.steer", ["4.4"], LOOP),
   field("threads.send", "author", ["4.1"], "a connector's identity; any other principal is refused"),
   field("threads.sendAndFollow", "author", ["4.1"], "a connector's identity; any other principal is refused"),
+  {
+    row: "threads.create",
+    field: "launch_spec",
+    s0: [],
+    reason: "selects which launch spec a host starts from",
+    heldWithoutS0:
+      "the security design does not name it; it is a launch option under the P1a scope line, held by the design lane on 2026-11-25",
+    rowExists: true,
+  },
   field(
     "threads.create",
-    "launch_spec",
-    [],
-    "not named by the security design; it selects which launch spec a host starts from, a launch option under the P1a scope line, and the design lane held it on 2026-11-25",
+    "prompt.author",
+    ["4.1"],
+    "a connector's identity on the first prompt; any other principal is refused",
   ),
   field(
     "threads.extensions.register",

@@ -26,15 +26,15 @@ export const SendAnchor = Type.Optional(
 
 const Mime = Type.Optional(Type.String({ minLength: 1 }))
 
-/** The remote module's attachment forms (R/types.ts Attachment): a file on the sending device, or bytes with a name. */
+/** Bytes travel as base64 text: the inputs are JSON schemas and the scenario table is JSON, so a byte array cannot be. */
+const Base64 = Type.String({ minLength: 1, contentEncoding: "base64", pattern: "^[A-Za-z0-9+/]+={0,2}$" })
+
+/** The remote module's attachment forms (R/types.ts Attachment): a file on the sending device, or named bytes. */
 export const Attachments = Type.Optional(
   Type.Array(
     Type.Union([
       Type.Object({ path: Type.String({ minLength: 1 }), mime: Mime }, { additionalProperties: false }),
-      Type.Object(
-        { bytes: Type.Unsafe<Uint8Array>({}), name: Type.String({ minLength: 1 }), mime: Mime },
-        { additionalProperties: false },
-      ),
+      Type.Object({ bytes: Base64, name: Type.String({ minLength: 1 }), mime: Mime }, { additionalProperties: false }),
     ]),
     { minItems: 1 },
   ),

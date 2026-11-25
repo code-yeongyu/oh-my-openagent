@@ -11,9 +11,15 @@
       ],
       "input": {
         "properties": {
-          "account": {},
-          "install": {},
-          "adopt": {}
+          "account": {
+            "type": "object"
+          },
+          "install": {
+            "type": "boolean"
+          },
+          "adopt": {
+            "type": "boolean"
+          }
         },
         "required": []
       },

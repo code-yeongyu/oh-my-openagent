@@ -11,9 +11,21 @@
       ],
       "input": {
         "properties": {
-          "apply": {},
-          "older_than_days": {},
-          "repos": {}
+          "apply": {
+            "type": "boolean"
+          },
+          "older_than_days": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "repos": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 1
+          }
         },
         "required": []
       },

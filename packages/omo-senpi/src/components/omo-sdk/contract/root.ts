@@ -4,6 +4,10 @@ import type { CallSpec, StreamResult } from "./call-spec"
 import type { ROOT_CALLS } from "./calls"
 import type { OmoStream, OmoThreadAnswer, OmoValue } from "./failure"
 
+/** What every call that can wait takes (design 4.4): a call whose input already names `deadline_ms` takes the signal only. */
+export type CallOptions = { readonly signal?: AbortSignal; readonly deadline_ms?: number }
+type OptionsFor<Input> = "deadline_ms" extends keyof Input ? Omit<CallOptions, "deadline_ms"> : CallOptions
+
 // The root's type (first-party design 4.1, 4.2), computed from ROOT_CALLS: each dotted key is one member, its input the
 // static type of its schema and its answer one of the three shapes of 4.4. Types only; slice P1b builds the object.
 type Calls = typeof ROOT_CALLS
@@ -21,8 +25,8 @@ type Answer<Spec> =
 type Member<Spec> =
   Spec extends CallSpec<infer Input, unknown, infer _Shape>
     ? {} extends Static<Input>
-      ? (input?: Static<Input>) => Answer<Spec>
-      : (input: Static<Input>) => Answer<Spec>
+      ? (input?: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
+      : (input: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
     : never
 
 type Head<Key extends string> = Key extends `${infer First}.${string}` ? First : Key

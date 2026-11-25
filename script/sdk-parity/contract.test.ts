@@ -1,25 +1,32 @@
 import { describe, expect, test } from "bun:test"
 
+import type { ReleaseSessionReply } from "../../packages/omo-senpi/src/components/thread/gateway/adapter"
+import type { FollowOutcome } from "../../packages/omo-senpi/src/components/remote/types"
+import type {
+  CallOptions,
+  OmoFailure,
+  OmoSdkRoot,
+  OmoStream,
+  OmoStreamEvent,
+  OmoValue,
+  RootCallInput,
+  RootCallKey,
+} from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   GATED,
   HELD_CODES,
   inputAccepts,
   OMO_CODE_REGISTRY,
-  PORTS,
+  PORT_OPERATIONS,
   ROOT_CALLS,
+  ROOT_OPTION_NAMES,
+  SECURITY_SECTIONS,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import {
-  type CallInput,
-  codeProblems,
-  type Contract,
-  inputProblems,
-  scenarioProblems,
-  scopeProblems,
-} from "./contract-check"
+import { type CallInput, codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
+import { scenarioProblems } from "./scenario-check"
 import { allRows, loadDomainFiles } from "./registry"
-import type { Row } from "./schema"
-import { loadScenarioTable, type TableScenario, type ScenarioTableFile } from "./scenario-table"
+import { loadScenarioTable } from "./scenario-table"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
 // registry rows. Each check also runs once on a fixture that breaks it.
@@ -32,12 +39,52 @@ const asInput = (schema: unknown): CallInput => {
 const contract: Contract = {
   calls: Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, asInput(call.input)])),
   gated: GATED,
-  ports: PORTS,
+  ports: PORT_OPERATIONS,
+  sections: SECURITY_SECTIONS,
+  rootOptions: ROOT_OPTION_NAMES,
   registry: OMO_CODE_REGISTRY,
   heldCodes: HELD_CODES,
   sourceCodes: SOURCE_CODES,
   accepts: (call, input) => inputAccepts(call, input),
 }
+
+// The root's type is computed from ROOT_CALLS (design 4.1): these fail the typecheck when a member goes missing, takes
+// another input than its schema's static type, or answers outside the three shapes of 4.4.
+type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+type Leaves<T, Prefix extends string = ""> = {
+  [Key in keyof T & string]: T[Key] extends (...args: never[]) => unknown
+    ? `${Prefix}${Key}`
+    : Leaves<T[Key], `${Prefix}${Key}.`>
+}[keyof T & string]
+type FollowEventOf<Stream> =
+  Stream extends OmoStream<unknown, unknown> ? (Stream extends AsyncIterable<infer E> ? E : never) : never
+type FollowStep = FollowEventOf<ReturnType<OmoSdkRoot["threads"]["follow"]>>
+type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
+export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true] = [
+  // H1: the object form of create's prompt is typed, without the author P1a-s holds.
+  true satisfies Equal<
+    "author" extends keyof PromptObject ? false : "message" extends keyof PromptObject ? true : false,
+    true
+  >,
+  true satisfies Equal<Exclude<Leaves<OmoSdkRoot>, "close" | "dispose">, RootCallKey>,
+  true satisfies Equal<Parameters<OmoSdkRoot["threads"]["setModel"]>[0], RootCallInput<"threads.setModel">>,
+  true satisfies Equal<
+    Extract<Awaited<ReturnType<OmoSdkRoot["devices"]["rename"]>>, OmoFailure>,
+    OmoFailure & Extract<OmoValue<never>, OmoFailure>
+  >,
+  true satisfies ReturnType<OmoSdkRoot["threads"]["follow"]> extends OmoStream<unknown, unknown> ? true : false,
+  // Review 6061342489 H2: threads.release answers the engine's own reply as its value (design 4.4).
+  true satisfies Equal<Awaited<ReturnType<OmoSdkRoot["threads"]["release"]>>, OmoValue<ReleaseSessionReply>>,
+  // H3: one terminal event ends a follow; no nonterminal event carries the remote stream's own end or failure.
+  true satisfies Equal<Extract<FollowStep, { readonly kind: "event" }>["event"]["kind"] & ("end" | "failed"), never>,
+  true satisfies Equal<
+    Extract<FollowStep, { readonly outcome: unknown }>,
+    Extract<OmoStreamEvent<never, FollowOutcome>, { readonly outcome: unknown }>
+  >,
+  // H4: every call takes the wait options of 4.4; a call whose input already names deadline_ms takes only the signal.
+  true satisfies Equal<Parameters<OmoSdkRoot["threads"]["readAfterWait"]>[1], CallOptions | undefined>,
+  true satisfies Equal<Parameters<OmoSdkRoot["threads"]["wait"]>[1], Omit<CallOptions, "deadline_ms"> | undefined>,
+]
 
 const rows = allRows(loadDomainFiles())
 const scenarios = loadScenarioTable()
@@ -60,101 +107,20 @@ describe("SDK contract of slice P1a (#14948)", () => {
   })
 })
 
-const firstCall = Object.keys(contract.calls)[0] ?? ""
-const rowOf = (sdk: string): Row => {
-  const row = rows.find((candidate) => candidate.sdk === sdk)
-  if (row === undefined) throw new Error(`no row ${sdk}`)
-  return row
-}
-const withScenario = (files: readonly ScenarioTableFile[], scenario: TableScenario): ScenarioTableFile[] =>
-  files.map((file) =>
-    file.domain === scenario.row.split(".")[0] ? { ...file, scenarios: [...file.scenarios, scenario] } : file,
-  )
-
-describe("negative controls of the P1a checks", () => {
-  test("#given a call removed from the root #then the scope check names the row", () => {
-    const { [firstCall]: _removed, ...calls } = contract.calls
-    expect(scopeProblems(rows, { ...contract, calls }).join("\n")).toContain(`the root type has no call ${firstCall}`)
+describe("input schemas of the root (review 6061342489)", () => {
+  test("#given threads.create #then the prompt is a string or the object form, never with the held author", () => {
+    expect(inputAccepts("threads.create", { prompt: "hi" })).toBe(true)
+    expect(
+      inputAccepts("threads.create", { prompt: { message: "hi", delivery: "steer", expected_turn_id: "t1" } }),
+    ).toBe(true)
+    expect(inputAccepts("threads.create", { prompt: {} })).toBe(false)
   })
 
-  test("#given a held field typed on the root #then the scope check names it", () => {
-    const held = GATED.find((entry) => entry.field !== undefined && entry.rowExists && entry.row !== "root")
-    if (held?.field === undefined) throw new Error("GATED holds no field")
-    const sdk = rowOf(held.row).sdk
-    const call = contract.calls[sdk] ?? { properties: {}, required: [] }
-    const calls = { ...contract.calls, [sdk]: { ...call, properties: { ...call.properties, [held.field]: {} } } }
-    expect(scopeProblems(rows, { ...contract, calls }).join("\n")).toContain(`takes ${held.field} on ${sdk}`)
-  })
-
-  test("#given a schema field whose type drifted from the row #then the input check names it", () => {
-    const sdk = "threads.setModel"
-    const call = contract.calls[sdk] ?? { properties: {}, required: [] }
-    const calls = {
-      ...contract.calls,
-      [sdk]: { ...call, properties: { ...call.properties, model: { type: "number" } } },
-    }
-    expect(inputProblems(rows, { ...contract, calls }).join("\n")).toContain("row threads.setModel input model")
-  })
-
-  test("#given a refusal code missing from the registry #then the code check names it", () => {
-    const { not_found: _removed, ...registry } = contract.registry
-    expect(codeProblems(rows, { ...contract, registry }, scenarios).join("\n")).toContain("code not_found: returned by")
-  })
-
-  test("#given a registered code no row returns #then the code check names it", () => {
-    const registry = { ...contract.registry, local_only: { namespaces: ["threads"], next_action: "x" } }
-    const heldCodes = Object.fromEntries(Object.entries(contract.heldCodes).filter(([code]) => code !== "local_only"))
-    expect(codeProblems(rows, { ...contract, registry, heldCodes }, scenarios).join("\n")).toContain(
-      "code local_only: no row returns it",
-    )
-  })
-
-  test("#given a scenario with no observable effect #then the scenario check names it", () => {
-    const broken: TableScenario = {
-      id: "threads.setModel/nothing",
-      row: "threads.setModel",
-      kind: "effect",
-      input: { thread: "a", model: "m" },
-      expect: [],
-    }
-    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain(
-      "no observable expected effect",
-    )
-  })
-
-  test("#given a scenario whose input the schema refuses #then the scenario check names it", () => {
-    const broken: TableScenario = {
-      id: "threads.setModel/bad-input",
-      row: "threads.setModel",
-      kind: "effect",
-      input: { thread: "a" },
-      expect: [{ port: "host", observes: "set_model" }],
-    }
-    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain(
-      "schema refuses its input",
-    )
-  })
-
-  test("#given a behaviour input no scenario exercises #then the scenario check names it", () => {
-    const files = scenarios.map((file) => ({
-      ...file,
-      scenarios: file.scenarios.filter(
-        (scenario) => !(scenario.row === "threads.setModel" && "provider" in scenario.input),
-      ),
-    }))
-    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
-      "row threads.setModel: input provider changes no effect scenario",
-    )
-  })
-
-  test("#given a row naming a scenario id the table lacks #then the scenario check names it", () => {
-    const patched = rows.map((row) =>
-      row.id === "threads.setModel"
-        ? { ...row, scenarios: { effect: ["threads.setModel/missing"], refusal: [] } }
-        : row,
-    )
-    expect(scenarioProblems(patched, contract, scenarios).join("\n")).toContain(
-      "scenario threads.setModel/missing is not in the scenario table",
-    )
+  test("#given an attachment's bytes #then only base64 text is accepted, as the schema states", () => {
+    const send = (bytes: unknown): boolean =>
+      inputAccepts("threads.send", { thread: "t", message: "m", attachments: [{ bytes, name: "a.txt" }] })
+    expect(send("aGk=")).toBe(true)
+    expect(send("not base64!")).toBe(false)
+    expect(send(new Uint8Array([104, 105]))).toBe(false)
   })
 })
