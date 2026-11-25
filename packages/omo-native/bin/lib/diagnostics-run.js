@@ -30,9 +30,10 @@ import { keychainHelperFindings } from "./keychain-helper-doctor.js"
 import { launchSpecFindings } from "./launch-spec-mode.js"
 import { memoryIdentityFindings } from "./memory-identities.js"
 import { packageRoot, updateTarget } from "./package-paths.js"
-import { listProcesses } from "./process-list.js"
+import { processAccess } from "./process-list.js"
 import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
 import { engineHostCall } from "./engine-host-call.js"
+import { decorateEndpoints } from "./daemon-status.js"
 
 /** @typedef {import("./diagnostics-contract").DiagnosticFinding} DiagnosticFinding */
 /** @typedef {import("./diagnostics-contract").DiagnosticCheck} DiagnosticCheck */
@@ -53,17 +54,25 @@ const BLOCKING = new Set([
 ])
 
 /** @returns {Promise<readonly DiagnosticFinding[]>} */
-function npmMemoryRuntime() {
+/** @param {RunPorts} ports @returns {Promise<readonly DiagnosticFinding[]>} */
+function npmMemoryRuntime(ports) {
   const pluginRoot = join(packageRoot, "plugin")
+  const scope = {
+    pluginRoot,
+    ...(ports.env === undefined ? {} : { env: ports.env }),
+    ...(ports.cwd === undefined ? {} : { cwd: ports.cwd }),
+  }
   return memoryRuntimeReport({
-    maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot }),
-    discardFor: memoryRuntimeDiscardResolver({ pluginRoot }),
+    ...(ports.env === undefined ? {} : { env: ports.env }),
+    ...(ports.homeDir === undefined ? {} : { home: ports.homeDir }),
+    maxBytesFor: memoryRuntimeMaxBytesResolver(scope),
+    discardFor: memoryRuntimeDiscardResolver(scope),
   }).then((report) => report.findings, memoryRuntimeUnavailable)
 }
 
 /** @param {RunPorts} ports */
-function processFindings(ports) {
-  const entries = (ports.list ?? listProcesses)()
+async function processFindings(ports) {
+  const entries = await processAccess(ports).list()
   const payloadMtimeMs =
     ports.payloadMtimeMs ??
     /** @param {string} payloadDir */ ((payloadDir) => {
@@ -84,17 +93,21 @@ function processFindings(ports) {
  * @param {RunPorts} ports
  * @param {string} pluginRoot
  */
-function daemonSection(ports, pluginRoot) {
+async function daemonSection(ports, pluginRoot) {
   if (ports.daemon !== undefined) return ports.daemon()
-  if (ports.daemonEngine === undefined) return []
   const env = ports.env ?? process.env
-  return daemonFindings({
-    engine: ports.daemonEngine,
-    pluginRoot,
-    agentDir: canonicalAgentDir(env),
-    env,
-    platform: process.platform,
-  })
+  const agentDir = canonicalAgentDir(env, ports.homeDir)
+  const common = { pluginRoot, agentDir, env, platform: process.platform }
+  if (ports.host !== undefined) {
+    const answer = await ports.host.status({ all: true, include_workers: true })
+    return daemonFindings({
+      ...common,
+      engine: ports.daemonEngine,
+      endpoints: decorateEndpoints(answer?.endpoints ?? [], agentDir),
+    })
+  }
+  if (ports.daemonEngine === undefined) return []
+  return daemonFindings({ ...common, engine: ports.daemonEngine })
 }
 
 /** The npm install reaches its engine's host CLI by default; the compiled entry passes itself as the engine. */
@@ -113,22 +126,35 @@ function setupFindings(inventory) {
  */
 async function npmFindings(ports) {
   const pluginRoot = join(packageRoot, "plugin")
+  // The call's own context reaches every section, so a root built for a scratch home reads only that home.
+  const scope = {
+    ...(ports.env === undefined ? {} : { env: ports.env }),
+    ...(ports.cwd === undefined ? {} : { cwd: ports.cwd }),
+  }
+  const home = ports.homeDir === undefined ? {} : { home: ports.homeDir }
   const [config, reflectionLock, memoryRuntime, computerUse, coverage, inventory] = await Promise.all([
-    (ports.configDiagnostics ?? doctorConfigFindings)(),
-    (ports.reflectionLock ?? reflectionLockReport)(),
-    (ports.memoryRuntime ?? npmMemoryRuntime)(),
-    (ports.computerUse ?? doctorComputerUseFindings)(),
-    (ports.categoryCoverage ?? (() => doctorCoverageFindings({ agentDir: canonicalAgentDir() })))(),
-    ports.inventory ?? detectHarnesses(),
+    (ports.configDiagnostics ?? (() => doctorConfigFindings(scope)))(),
+    (ports.reflectionLock ?? (() => reflectionLockReport({ ...scope, ...home })))(),
+    (ports.memoryRuntime ?? (() => npmMemoryRuntime(ports)))(),
+    (ports.computerUse ?? (() => doctorComputerUseFindings(scope)))(),
+    (
+      ports.categoryCoverage ??
+      (() => doctorCoverageFindings({ ...scope, agentDir: canonicalAgentDir(ports.env, ports.homeDir) }))
+    )(),
+    ports.inventory ??
+      detectHarnesses({
+        ...(ports.env === undefined ? {} : { env: ports.env }),
+        ...(ports.homeDir === undefined ? {} : { home: ports.homeDir }),
+      }),
   ])
   const engine = engineFindings()
-  const processes = processFindings(ports)
+  const processes = await processFindings(ports)
   return [
     ...artifactFindings(packageRoot),
     ...engine.findings,
     ...npmVersionFindings(engine.engine, ports),
     ...migrationReport(ports, updateTarget().command),
-    ...settingsFindings(),
+    ...settingsFindings(ports.env, ports.homeDir),
     ...config,
     ...piConfigReport({ env: ports.env, homeDir: ports.homeDir }),
     ...processes.stale,
@@ -138,7 +164,7 @@ async function npmFindings(ports) {
     ...memoryRuntime,
     ...launchSpecFindings(ports.pluginRoot ?? pluginRoot, ports.launchSpecIo),
     ...(ports.keychainHelper ?? (() => keychainHelperFindings({ packageRoot })))(),
-    ...daemonSection({ daemonEngine: NPM_DAEMON_ENGINE, ...ports }, pluginRoot),
+    ...(await daemonSection({ daemonEngine: NPM_DAEMON_ENGINE, ...ports }, pluginRoot)),
     ...computerUse,
     ...coverage,
     ...setupFindings(inventory),
@@ -166,12 +192,12 @@ async function compiledFindings(install, ports) {
     finding("install.update", "notice", `Update: ${install.updateCommand}`, { command: install.updateCommand }),
     ...launchSpecFindings(pluginRoot),
     ...sources.keychainHelper(),
-    ...daemonSection(ports, pluginRoot),
+    ...(await daemonSection(ports, pluginRoot)),
     ...migrationReport({ ...ports, standalone: true }, null),
     ...settingsFindings(),
     ...sources.config(),
     ...piConfigReport({ env: ports.env, homeDir: ports.homeDir }),
-    ...processFindings({ list: ports.list }).stale,
+    ...(await processFindings(ports)).stale,
     ...memoryIdentityFindings({ env: ports.env ?? process.env }),
     ...trust,
     ...computerUse,

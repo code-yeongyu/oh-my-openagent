@@ -142,6 +142,14 @@ export type ProcessPort = {
   readonly signal: (pid: number, signal: string) => Promise<void>
 }
 
+/** The engine host's status (`host status --all --include-workers`): the endpoint list, or undefined when no host answers. */
+export type HostStatusPort = {
+  readonly status: (request: {
+    readonly all: boolean
+    readonly include_workers: boolean
+  }) => Promise<{ readonly endpoints: readonly unknown[] } | undefined>
+}
+
 export type ProcessPorts = {
   readonly list?: () => readonly ProcessEntry[]
   readonly kill?: (pid: number, signal: NodeJS.Signals) => void
@@ -153,6 +161,7 @@ export type RunPorts = ProcessPorts & {
   readonly inventory?: Inventory
   readonly env?: Env
   readonly homeDir?: string
+  readonly cwd?: string
   readonly platform?: NodeJS.Platform
   readonly fetchDistTags?: () => unknown
   readonly now?: () => number
@@ -162,6 +171,8 @@ export type RunPorts = ProcessPorts & {
   readonly pluginRoot?: string
   readonly launchSpecIo?: Readonly<Record<string, unknown>>
   readonly daemonEngine?: DaemonEngine
+  /** Construction-time only, like `process`: a conformance run's fake; absent, the engine CLI as `daemonEngine` runs it. */
+  readonly host?: HostStatusPort
   readonly daemon?: () => Findings
   readonly keychainHelper?: () => Findings
   readonly configDiagnostics?: () => Promise<Findings>

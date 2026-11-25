@@ -19,9 +19,9 @@ const requireRuntime = createRequire(import.meta.url)
 const MEMORY_ROOT_ENV_VAR = "OMO_MEMORY_HOME"
 
 /** @param {Readonly<Record<string, string | undefined>>} env */
-export function memoryRoot(env) {
+export function memoryRoot(env, home = homedir()) {
   const override = env[MEMORY_ROOT_ENV_VAR]
-  if (override === undefined || override.trim() === "") return join(homedir(), ".omo", "memory")
+  if (override === undefined || override.trim() === "") return join(home, ".omo", "memory")
   return resolve(process.cwd(), override)
 }
 
@@ -60,7 +60,7 @@ export function readGlobalMemorySettings(home = homedir(), options = {}) {
 // derivation `omo doctor --fix`'s exit code has always used: a step that threw, or a retention line that failed.
 /** @returns {Promise<{ status: "busy" | "swept", lines: string[], failed: boolean }>} */
 export async function reflectionLockSweep(options = {}) {
-  const memory = memoryRoot(options.env ?? process.env)
+  const memory = memoryRoot(options.env ?? process.env, options.home)
   const dryRun = options.dryRun === true
   const probe = options.reflectionLockProbe ?? {}
   let failed = false

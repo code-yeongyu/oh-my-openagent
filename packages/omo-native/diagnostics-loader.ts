@@ -41,7 +41,7 @@ export function createDiagnosticsLoader(ports: DiagnosticsLoaderPorts = {}): Cor
     const home = context.home === undefined ? {} : { home: context.home }
     const homeDir = context.home === undefined ? {} : { homeDir: context.home }
     return {
-      run: () => resolving(() => core.run({}, { env: context.env, ...homeDir, ...ports })),
+      run: () => resolving(() => core.run({}, { env: context.env, cwd: context.cwd, ...homeDir, ...ports })),
       models: () => resolving(() => core.models({}, { env: context.env, cwd: context.cwd, ...ports })),
       fixReflectionLock: (input) =>
         resolving(() => core.fixReflectionLock(input, { env: context.env, ...home, ...ports })),

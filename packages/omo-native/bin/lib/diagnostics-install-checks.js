@@ -109,8 +109,9 @@ export function npmVersionFindings(engine, ports) {
   ]
 }
 
-export function settingsFindings() {
-  const agentDir = canonicalAgentDir()
+/** @param {Readonly<Record<string, string | undefined>>} [env] @param {string} [home] */
+export function settingsFindings(env = process.env, home = undefined) {
+  const agentDir = canonicalAgentDir(env, home)
   const settingsPath = join(agentDir, "settings.json")
   if (!existsSync(settingsPath)) return []
 

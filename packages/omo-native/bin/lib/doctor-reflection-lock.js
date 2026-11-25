@@ -73,7 +73,7 @@ function listDurableIdentities(agentsRoot) {
 }
 
 export async function reflectionLockReport(options = {}) {
-  const agentsRoot = join(memoryRoot(options.env ?? process.env), "agents")
+  const agentsRoot = join(memoryRoot(options.env ?? process.env, options.home), "agents")
   const lines = []
   for (const identityRoot of options.listIdentities?.(agentsRoot) ?? listDurableIdentities(agentsRoot)) {
     const reflectionDir = join(identityRoot, "runtime", "reflection")

@@ -22,12 +22,12 @@ export function daemonFindings(options) {
 const NOT_RUNNING = finding("daemon", "notice", "Daemon: not running", { state: "not_running" })
 const TOO_OLD = finding("daemon", "notice", "Hosts: engine too old to enumerate", { state: "engine_too_old" })
 
-function engineFindings({ engine, agentDir, env, platform }) {
+function engineFindings({ engine, agentDir, env, platform, endpoints }) {
   if (platform === "win32")
     return [
       finding("daemon", "notice", "Daemon: unavailable on win32 (no unix socket to share)", { state: "unsupported" }),
     ]
-  const all = readAllEndpoints(engine, agentDir, env)
+  const all = endpoints === undefined ? readAllEndpoints(engine, agentDir, env) : { kind: "all", endpoints }
   if (all.kind === "all") {
     if (all.endpoints.length === 0) return [NOT_RUNNING]
     return endpointFindings(all.endpoints)

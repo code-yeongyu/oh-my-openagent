@@ -25,9 +25,9 @@ const MEMORY_ROOT_ENV_VAR = "OMO_MEMORY_HOME"
 // cover all of them.
 const LISTED_IDENTITIES = 10
 
-function memoryRoot(env) {
+function memoryRoot(env, home = homedir()) {
   const override = env[MEMORY_ROOT_ENV_VAR]
-  if (override === undefined || override.trim() === "") return join(homedir(), ".omo", "memory")
+  if (override === undefined || override.trim() === "") return join(home, ".omo", "memory")
   return resolve(process.cwd(), override)
 }
 
@@ -210,7 +210,7 @@ function memoryRuntimeFindings(identities, totalBytes) {
  * @returns {Promise<{ identities: { identity: string, bytes: number, maxBytes: number, unreflectedBytes?: number, discardUnreflectedJournals: boolean, evictableBytes?: number, sizeUnknown?: { budgetMs: number, at: string }, lastCleanup?: { at: string, total: number } }[], totalBytes: number, findings: import("./diagnostics-contract").DiagnosticFinding[] }>}
  */
 export async function memoryRuntimeReport(options = {}) {
-  const root = memoryRoot(options.env ?? process.env)
+  const root = memoryRoot(options.env ?? process.env, options.home)
   const agentsRoot = join(root, "agents")
   const maxBytesFor = options.maxBytesFor ?? (() => DEFAULT_RUNTIME_MAX_BYTES)
   const discardFor = options.discardFor ?? (() => false)

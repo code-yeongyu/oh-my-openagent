@@ -96,7 +96,13 @@ export async function runDoctor(inventory, args = [], options = {}) {
   process.exitCode = await printDoctorReport({
     ...options,
     inventory,
-    daemon: options.daemonReport === undefined ? undefined : () => findingsFromLines("daemon", options.daemonReport()),
+    // As before the move: this seam reports the daemon only from the lines or the engine its caller passes.
+    daemon:
+      options.daemonReport !== undefined
+        ? () => findingsFromLines("daemon", options.daemonReport())
+        : options.daemonEngine === undefined
+          ? () => []
+          : undefined,
     keychainHelper:
       options.keychainHelper === undefined
         ? undefined

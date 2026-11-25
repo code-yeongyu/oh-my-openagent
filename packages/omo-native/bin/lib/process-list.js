@@ -5,10 +5,10 @@ import { spawnSync } from "node:child_process"
 /** @typedef {import("./diagnostics-contract").ProcessPort} ProcessPort */
 
 // -ww: an unlimited width, so `args` is never cut at the terminal width (BSD/macOS `ps` truncates).
-export const PS_ARGV = ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="]
+const PS_ARGV = ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="]
 
 /** @param {string} stdout `ps`'s own answer @returns {ProcessEntry[]} */
-export function parseProcessTable(stdout) {
+function parseProcessTable(stdout) {
   const entries = []
   for (const line of stdout.split("\n")) {
     const match = /^\s*(\d+)\s+(\d+)\s+(\S+)\s+(\S+)\s+(.*)$/.exec(line)
@@ -40,6 +40,14 @@ export function listProcesses() {
 /**
  * The process table and the signal a reap needs, over the low-level process port when one is given (a conformance run's
  * fake), else the host's own `ps` and `process.kill`. A function-level `list` / `kill` (a unit test's) wins over both.
+ *
+ * Trust boundary (design ruling on #14959): the port is part of the trusted base, like the code that runs `ps` today. The
+ * core decides ownership from what it reports and cannot verify that independently, so the guarantee is where a port can
+ * come from: (1) only the process that constructs a root supplies it, through createDiagnosticsLoader, never a call's
+ * input; (2) that process runs as the OS user and can already signal the user's processes, so a lying port gives it
+ * nothing new; (3) a session never constructs its own root: the SDK the engine plugin provisions to sessions has no
+ * launcher-side cores, so no process port (omo-sdk/session-process-port.test.ts); (4) the public entry's options do not
+ * expose it: the port is an internal and test seam of the loader.
  * @param {{ list?: () => readonly ProcessEntry[], kill?: (pid: number, signal: NodeJS.Signals) => void, process?: ProcessPort }} ports
  */
 export function processAccess(ports) {

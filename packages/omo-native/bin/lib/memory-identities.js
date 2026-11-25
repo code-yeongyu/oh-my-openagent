@@ -15,9 +15,9 @@ const MEMORY_TRANSIENT_DIRNAME = "transient-runs"
 const MEMORY_REPO_DIRNAME = "repo"
 
 /** @param {Env} env */
-function memoryRoot(env) {
+function memoryRoot(env, home = homedir()) {
   const override = env[MEMORY_ROOT_ENV_VAR]
-  if (override === undefined || override.trim() === "") return join(homedir(), ".omo", "memory")
+  if (override === undefined || override.trim() === "") return join(home, ".omo", "memory")
   return resolve(process.cwd(), override)
 }
 
@@ -75,12 +75,13 @@ export function transientMemoryFindings(counts) {
 /**
  * @param {{
  *   env?: Env,
+ *   homeDir?: string,
  *   listDirs?: (path: string) => string[] | undefined,
  *   hasRepo?: (identityRoot: string) => boolean,
  * }} ports
  */
 export function memoryIdentityFindings(ports) {
-  const root = memoryRoot(ports.env ?? process.env)
+  const root = memoryRoot(ports.env ?? process.env, ports.homeDir)
   return transientMemoryFindings(
     countTransientMemoryIdentities({
       agentsRoot: join(root, MEMORY_AGENTS_DIRNAME),

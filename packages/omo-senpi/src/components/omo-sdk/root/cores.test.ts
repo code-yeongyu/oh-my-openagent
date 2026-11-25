@@ -86,7 +86,9 @@ describe("the root's launcher-side cores", () => {
           diagnostics: (() => {
             loads += 1
             if (loads === 1) throw new Error("sync-loader-detail")
-            return Promise.resolve({ run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }) })
+            return Promise.resolve({
+              run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }),
+            })
           }) as never,
         },
       },
@@ -103,7 +105,9 @@ describe("the root's launcher-side cores", () => {
       { env, cwd: tmpdir() },
       {
         cores: {
-          diagnostics: (() => ({ run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }) })) as never,
+          diagnostics: (() => ({
+            run: async () => ({ kind: "ok" as const, value: { findings: [], failed: false } }),
+          })) as never,
         },
       },
     )
