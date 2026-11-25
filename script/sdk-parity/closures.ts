@@ -64,7 +64,7 @@ export type SurfaceFindings = {
   readonly commander: readonly ArgvFinding[]
 }
 
-export function adapterModules(row: Row, findings: SurfaceFindings): string[] {
+function adapterModules(row: Row, findings: SurfaceFindings): string[] {
   const files = new Set<string>()
   for (const entry of row.cli) {
     const tokens = new Set([
@@ -81,7 +81,7 @@ export function adapterModules(row: Row, findings: SurfaceFindings): string[] {
   return [...files].toSorted()
 }
 
-export function implementationEntries(row: Row): readonly string[] {
+function implementationEntries(row: Row): readonly string[] {
   if (row.today === "no") return []
   return SDK_ENTRIES[row.sdk.split(".")[0] ?? ""] ?? []
 }

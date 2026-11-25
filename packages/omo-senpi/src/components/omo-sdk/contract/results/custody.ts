@@ -12,7 +12,7 @@ const Pid = Type.Integer({ minimum: 1 })
 const Device = Type.Object({ id: Text, name: Text }, closed)
 
 /** The destination record of 8.2: where the secret went, by identity, never the value. */
-export const DeliveredTo = Type.Union([
+const DeliveredTo = Type.Union([
   Type.Object(
     {
       kind: Type.Literal("terminal"),
@@ -33,7 +33,7 @@ export const DeliveredTo = Type.Union([
   ),
 ])
 
-export const HandedOver = Type.Object(
+const HandedOver = Type.Object(
   {
     delivered: Type.Literal(true),
     device: Device,
@@ -44,14 +44,14 @@ export const HandedOver = Type.Object(
   closed,
 )
 
-export const ProviderCredentialDelivered = Type.Object(
+const ProviderCredentialDelivered = Type.Object(
   { delivered: Type.Literal(true), provider: Text, expires_at: Type.Optional(Text), destination: DeliveredTo },
   closed,
 )
 
-export const Adopted = Type.Object({ device: Device, storage: Type.Enum(["omo", "login"]) }, closed)
+const Adopted = Type.Object({ device: Device, storage: Type.Enum(["omo", "login"]) }, closed)
 
-export const SignedIn = Type.Object(
+const SignedIn = Type.Object(
   {
     api: Text,
     device: Device,
@@ -61,19 +61,16 @@ export const SignedIn = Type.Object(
   closed,
 )
 
-export const Keyring = Type.Object({ device_id: Text, signing_public_key: Text, sealing_public_key: Text }, closed)
+const Keyring = Type.Object({ device_id: Text, signing_public_key: Text, sealing_public_key: Text }, closed)
 
-export const SyncEnabled = Type.Object({ enabled: Type.Literal(true) }, closed)
-export const SyncRecovered = Type.Object({ recovered: Type.Literal(true) }, closed)
+const SyncEnabled = Type.Object({ enabled: Type.Literal(true) }, closed)
+const SyncRecovered = Type.Object({ recovered: Type.Literal(true) }, closed)
 
-export const TrustEnsured = Type.Object({ action: Type.Literal("ensure"), generation: Text }, closed)
+const TrustEnsured = Type.Object({ action: Type.Literal("ensure"), generation: Text }, closed)
 
-export const McpLoggedIn = Type.Object(
-  { server: Text, stored: Type.Literal(true), expires_at: Type.Optional(Text) },
-  closed,
-)
-export const McpLoggedOut = Type.Object({ server: Text, removed: Type.Boolean() }, closed)
-export const McpStatus = Type.Object(
+const McpLoggedIn = Type.Object({ server: Text, stored: Type.Literal(true), expires_at: Type.Optional(Text) }, closed)
+const McpLoggedOut = Type.Object({ server: Text, removed: Type.Boolean() }, closed)
+const McpStatus = Type.Object(
   {
     servers: Type.Array(
       Type.Object(

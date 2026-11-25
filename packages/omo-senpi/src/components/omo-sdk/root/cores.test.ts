@@ -69,6 +69,39 @@ describe("the root's launcher-side cores", () => {
     expect(loads).toBe(2)
   })
 
+  test("#given a loader that throws before it returns a promise #when the namespace is called twice #then the first call answers internal_error as data and the second loads again", async () => {
+    let loads = 0
+    const root = assembleOmoSdk(
+      { env, cwd: tmpdir() },
+      {
+        cores: {
+          diagnostics: (() => {
+            loads += 1
+            if (loads === 1) throw new Error("sync-loader-detail")
+            return Promise.resolve({ run: async () => ({ kind: "ok" as const, value: { findings: [] } }) })
+          }) as never,
+        },
+      },
+    )
+    const first = await root.diagnostics.run({})
+    expect(first).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(JSON.stringify(first)).not.toContain("sync-loader-detail")
+    expect(await root.diagnostics.run({})).toMatchObject({ kind: "ok" })
+    expect(loads).toBe(2)
+  })
+
+  test("#given a loader that returns its core as a plain value, not a promise #when the namespace is called #then the call answers from that core", async () => {
+    const root = assembleOmoSdk(
+      { env, cwd: tmpdir() },
+      {
+        cores: {
+          diagnostics: (() => ({ run: async () => ({ kind: "ok" as const, value: { findings: [] } }) })) as never,
+        },
+      },
+    )
+    expect(await root.diagnostics.run({})).toMatchObject({ kind: "ok" })
+  })
+
   test("#given a loader that leaves a call out, and no loader for install #when those calls run #then each answers not_implemented", async () => {
     const root = assembleOmoSdk({ env, cwd: tmpdir() }, { cores: { diagnostics: async () => ({}) } })
     expect(await root.diagnostics.run({})).toMatchObject({ kind: "error", error: { code: "not_implemented" } })

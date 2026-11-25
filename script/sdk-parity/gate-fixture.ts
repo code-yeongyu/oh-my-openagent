@@ -15,7 +15,7 @@ export const original = text(ORIGINAL_PATH)
 export const unresolved = JSON.parse(text(UNRESOLVED_PATH)) as Baseline
 export const HEAD = "a".repeat(40)
 export const EARLIER = "b".repeat(40)
-export const scenario: Scenario = {
+const scenario: Scenario = {
   id: "s1",
   capability: "threads.send",
   surface: "native",

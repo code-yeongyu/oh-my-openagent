@@ -32,6 +32,9 @@ import { discoverOmoTools } from "./tool-registry"
 // negative controls live in negative-controls.test.ts.
 
 const files = loadDomainFiles()
+// Scanned once when the file loads, outside every test's timing: the scan parses every reachable native module and
+// takes about a second at moderate load, several under heavy load, which a per-test default timeout must not depend on.
+const NATIVE_FINDINGS = nativeArgvInventory(REPO_ROOT)
 const rows = allRows(files)
 const repoFile = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8")
 const LOOP_CLI = "packages/omo-codex/plugin/components/ulw-loop/src/cli.ts"
@@ -61,11 +64,11 @@ describe("SDK parity registry (#14947)", () => {
   })
 
   test("#given every native dispatcher #then each flag is mapped on the route that accepts it, shared flags on every verb", () => {
-    expect(routeFlagProblems(nativeArgvInventory(REPO_ROOT), rows)).toEqual([])
+    expect(routeFlagProblems(NATIVE_FINDINGS, rows)).toEqual([])
   })
 
   test("#given both native entry points #then every argv comparison has a row and every launcher row token is compared", () => {
-    const findings = nativeArgvInventory(REPO_ROOT)
+    const findings = NATIVE_FINDINGS
     expect(argvProblems(findings, rows, { edition: "native", own: "launcher", also: ["engine"] }, NOT_ARGV)).toEqual([])
   })
 
