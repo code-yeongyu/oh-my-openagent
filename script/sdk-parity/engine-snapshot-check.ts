@@ -98,8 +98,8 @@ export function sessionShapeProblems(snapshot: EngineSnapshot, sessionSchema: un
   for (const path of omo.keys())
     if (!(path in snapshot.session_answer))
       problems.push(`omo session ${path}: the engine's session answer has no such field`)
-  const want = JSON.stringify(snapshot.session_required.filter((p) => p !== "accounts").toSorted())
-  const have = JSON.stringify(required.filter((p) => p !== "accounts").toSorted())
+  const want = JSON.stringify([...snapshot.session_required].toSorted())
+  const have = JSON.stringify(required.toSorted())
   if (want !== have) problems.push(`session required fields: omo ${have}, the engine ${want}`)
   return problems
 }
