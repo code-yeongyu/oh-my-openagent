@@ -162,9 +162,7 @@
         }
       ],
       "tool": [],
-      "planned": {
-        "cli": "OC1c"
-      },
+      "planned": {},
       "omitted": {
         "tool": "Tool omitted: creates key material"
       },
@@ -202,9 +200,7 @@
         }
       ],
       "tool": [],
-      "planned": {
-        "cli": "OC1c"
-      },
+      "planned": {},
       "omitted": {
         "tool": "Tool omitted: creates key material"
       },
@@ -603,6 +599,7 @@
   "tables": [
     {
       "table": "6.11",
+      "kind": "pointer",
       "position": 9,
       "ids": [
         "account.keys.init",

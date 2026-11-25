@@ -1,7 +1,9 @@
+import { parseArgument } from "./manifest-schema"
 import type { ArgvFinding } from "./native-inventory"
 import type { NOT_ARGV } from "./not-argv"
 import type { CommanderRoute, OpencodeInventory } from "./opencode-inventory"
 import type { CliEntry, Edition, Row, Via } from "./schema"
+import { schemaDifferences } from "./tool-check"
 
 // The comparisons of design section 7.1: each inventory read from the code must match the registry's CLI entries
 // exactly. Every message names the route or flag and what to add, so a failure says what to fix.
@@ -42,6 +44,54 @@ export function argvProblems(
     for (const token of entry.tokens)
       if (scope.edition === "native" && !excused.get(file)?.has(token))
         problems.push(`not-argv.ts lists "${token}" in ${file}, which the scan no longer finds there; remove the entry`)
+  return problems
+}
+
+// The route prefix each native dispatcher serves, so a flag found in it is matched against that prefix's routes.
+export const DISPATCH_PREFIX: Readonly<Record<string, readonly string[]>> = {
+  "packages/omo-native/bin/lib/thread.js": ["thread"],
+  "packages/omo-native/bin/lib/thread-args.js": ["thread"],
+  "packages/omo-native/bin/lib/daemon.js": ["daemon"],
+  "packages/omo-native/bin/lib/daemon-adopt.js": ["daemon"],
+  "packages/omo-native/bin/lib/daemon-args.js": ["daemon"],
+  "packages/omo-native/bin/lib/update-args.js": ["update"],
+  "packages/omo-native/remote-local.ts": ["remote"],
+  "packages/omo-native/remote-session-args.ts": ["remote"],
+  "packages/omo-native/remote-verbs.ts": ["remote"],
+  "packages/omo-native/remote-cli.ts": ["remote"],
+  "packages/omo-native/account-cli.ts": ["account"],
+  "packages/omo-native/account-devices.ts": ["account"],
+  "packages/omo-native/account-store.ts": ["account"],
+  "packages/omo-native/account-show.ts": ["account"],
+  "packages/omo-native/account-sign-in.ts": ["account"],
+  "packages/omo-native/sync-cli.ts": ["sync"],
+}
+
+// Route-level flags (review H1): a flag the code accepts for one verb must be mapped on that verb's own entry; a flag in
+// a table every verb shares must be mapped on every verb of that dispatcher; a flag with no verb context must be mapped
+// on some route of the prefix.
+export function routeFlagProblems(findings: readonly ArgvFinding[], rows: readonly Row[]): string[] {
+  const native = entries(rows, "native", ["launcher", "engine"])
+  const problems: string[] = []
+  const verbOf = (entry: CliEntry): string => entry.route[1] ?? ""
+  for (const finding of findings) {
+    const prefix = DISPATCH_PREFIX[finding.file]
+    if (prefix === undefined || finding.scope === undefined) continue
+    const under = native.filter((entry) => prefix.includes(entry.route[0] ?? ""))
+    const maps = (entry: CliEntry): boolean => Object.hasOwn(entry.flags, finding.token)
+    const where = `${finding.file}:${finding.line}`
+    const verbsHere = new Set(findings.filter((f) => f.file === finding.file && f.scope === undefined).map((f) => f.token))
+    const named = finding.scope.words.filter((word) => under.some((entry) => verbOf(entry) === word))
+    if (finding.scope.shared) {
+      for (const verb of new Set(under.map(verbOf).filter((verb) => verbsHere.has(verb))))
+        if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
+          problems.push(`${where} accepts ${finding.token} on every ${prefix.join("|")} verb; map it on "${prefix[0]} ${verb}" too`)
+    } else if (named.length > 0) {
+      for (const verb of new Set(named))
+        if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
+          problems.push(`${where} accepts ${finding.token} on "${prefix[0]} ${verb}"; map it on that route's row entry`)
+    } else if (!under.some(maps)) problems.push(`${where} accepts ${finding.token} under "${prefix[0]}"; map it on the route that reads it`)
+  }
   return problems
 }
 
@@ -120,9 +170,11 @@ export function manifestProblems(operations: readonly ManifestOperation[], rows:
     for (const [field, notation] of Object.entries(operation.args)) {
       const fieldSchema = row.input.properties[field]
       if (fieldSchema === undefined) problems.push(`toolkit.${operation.method} lacks the manifest argument "${field}"`)
-      const optional = notation.includes("?")
-      if (fieldSchema !== undefined && optional === row.input.required.includes(field))
-        problems.push(`toolkit.${operation.method}.${field} is ${optional ? "optional" : "required"} in the manifest; match it`)
+      if (fieldSchema === undefined) continue
+      const parsed = parseArgument(notation)
+      if (parsed.optional === row.input.required.includes(field))
+        problems.push(`toolkit.${operation.method}.${field} is ${parsed.optional ? "optional" : "required"} in the manifest; match it`)
+      problems.push(...schemaDifferences(parsed.schema, fieldSchema, `toolkit.${operation.method}.${field} (manifest vs row)`))
     }
   }
   const methods = new Set(operations.map((operation) => `toolkit.${operation.method}`))

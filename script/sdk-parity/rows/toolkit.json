@@ -11,9 +11,41 @@
       ],
       "input": {
         "properties": {
-          "title": {},
-          "objective": {},
-          "successCriteria": {},
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "successCriteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario": {
+                  "type": "string"
+                },
+                "expectedEvidence": {
+                  "type": "string"
+                },
+                "userModel": {
+                  "enum": [
+                    "happy",
+                    "edge",
+                    "regression",
+                    "adversarial"
+                  ]
+                },
+                "essential": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "expectedEvidence",
+                "scenario"
+              ]
+            }
+          },
           "session_id": {}
         },
         "required": [
@@ -65,12 +97,30 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "status": {},
-          "evidence": {},
-          "codexGoalJson": {},
-          "qualityGateJson": {},
-          "printTemplate": {},
+          "goalId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "failed",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
+          "qualityGateJson": {
+            "type": "string"
+          },
+          "printTemplate": {
+            "enum": [
+              true
+            ]
+          },
           "advance": {},
           "session_id": {}
         },
@@ -131,7 +181,9 @@
       ],
       "input": {
         "properties": {
-          "retryFailed": {},
+          "retryFailed": {
+            "type": "boolean"
+          },
           "session_id": {}
         },
         "required": []
@@ -179,10 +231,21 @@
       ],
       "input": {
         "properties": {
-          "brief": {},
-          "codexGoalMode": {},
-          "force": {},
-          "validationBatchesJson": {},
+          "brief": {
+            "type": "string"
+          },
+          "codexGoalMode": {
+            "enum": [
+              "aggregate",
+              "per_story"
+            ]
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "validationBatchesJson": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -249,7 +312,9 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
+          "goalId": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -385,12 +450,31 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "criterionId": {},
-          "status": {},
-          "evidence": {},
-          "notes": {},
-          "artifacts": {},
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "session_id": {}
         },
         "required": [
@@ -448,11 +532,21 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "title": {},
-          "objective": {},
-          "evidence": {},
-          "codexGoalJson": {},
+          "goalId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -556,23 +650,92 @@
       ],
       "input": {
         "properties": {
-          "kind": {},
-          "source": {},
-          "evidence": {},
-          "rationale": {},
-          "goalId": {},
-          "criterionId": {},
-          "scenario": {},
-          "expectedEvidence": {},
-          "userModel": {},
-          "title": {},
-          "objective": {},
-          "childGoals": {},
-          "revisedTitle": {},
-          "revisedObjective": {},
-          "pendingOrder": {},
-          "blockedReason": {},
-          "idempotencyKey": {},
+          "kind": {
+            "enum": [
+              "add_subgoal",
+              "split_subgoal",
+              "reorder_pending",
+              "revise_pending_wording",
+              "revise_criterion",
+              "annotate_ledger",
+              "mark_blocked_superseded"
+            ]
+          },
+          "source": {
+            "enum": [
+              "finding",
+              "user_prompt_submit",
+              "cli"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "expectedEvidence": {
+            "type": "string"
+          },
+          "userModel": {
+            "enum": [
+              "happy",
+              "edge",
+              "regression",
+              "adversarial"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "childGoals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objective",
+                "title"
+              ]
+            }
+          },
+          "revisedTitle": {
+            "type": "string"
+          },
+          "revisedObjective": {
+            "type": "string"
+          },
+          "pendingOrder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockedReason": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
           "proposals": {},
           "session_id": {}
         },
@@ -636,6 +799,7 @@
   "tables": [
     {
       "table": "6.11",
+      "kind": "pointer",
       "position": 10,
       "ids": [
         "toolkit.help",

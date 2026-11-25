@@ -85,7 +85,8 @@
             "enable"
           ],
           "flags": {
-            "--after-login": "when"
+            "--after-login": "when",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -171,6 +172,32 @@
           "edition": "opencode",
           "via": "commander",
           "route": [],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon"
+          ],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread"
+          ],
           "flags": {
             "--help": "render",
             "-h": "render"

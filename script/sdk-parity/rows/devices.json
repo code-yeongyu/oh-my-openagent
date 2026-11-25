@@ -21,7 +21,9 @@
             "remote",
             "devices"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         },
@@ -37,11 +39,19 @@
           "values": []
         }
       ],
-      "tool": [],
+      "tool": [
+        {
+          "name": "thread_list",
+          "branch": "devices",
+          "when": {
+            "present": [],
+            "absent": []
+          },
+          "reads": []
+        }
+      ],
       "planned": {},
-      "omitted": {
-        "tool": "None"
-      },
+      "omitted": {},
       "projection": {},
       "scenarios": {
         "effect": [],

@@ -35,9 +35,7 @@
         }
       ],
       "tool": [],
-      "planned": {
-        "cli": "OC2"
-      },
+      "planned": {},
       "omitted": {
         "tool": "Planned (OC2)"
       },

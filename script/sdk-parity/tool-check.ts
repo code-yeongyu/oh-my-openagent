@@ -65,10 +65,19 @@ export function toolProblems(discovered: readonly DiscoveredTool[], rows: readon
       if (!read.has(field)) problems.push(`tool ${tool.name} input field "${field}" is in no SDK call; add it to the call's input`)
     for (const { row, entry } of own)
       for (const field of entry.reads) {
-        const sdkField = row.projection[field] ?? field
+        const projected = row.projection[field]
+        const widens = projected?.startsWith("widens:") === true
+        const sdkField = projected === undefined || widens ? field : projected
         const path = `tool ${tool.name} (${entry.branch} -> ${row.sdk}) field ${field}`
-        problems.push(...schemaDifferences(tool.parameters.properties?.[field], row.input.properties[sdkField], path))
-        const toolRequired = tool.parameters.required?.includes(field) === true
+        const sdkSchema = row.input.properties[sdkField]
+        // A declared widening: the SDK takes more forms than the tool, and one of its variants is the tool's schema.
+        const candidates = widens ? (sdkSchema?.anyOf ?? []) : [sdkSchema]
+        const best = candidates
+          .map((candidate) => schemaDifferences(tool.parameters.properties?.[field], candidate, path))
+          .toSorted((a, b) => a.length - b.length)[0]
+        problems.push(...(best ?? [`${path}: the SDK declares a widening with no variant`]))
+        // A branch is chosen by its presence predicate, so a field it requires present is required on that branch.
+        const toolRequired = tool.parameters.required?.includes(field) === true || entry.when.present.includes(field)
         if (toolRequired !== row.input.required.includes(sdkField))
           problems.push(`${path}: ${toolRequired ? "required" : "optional"} in the tool, not in ${row.sdk}`)
       }

@@ -27,11 +27,21 @@ export const GENERATED_SOURCES: Readonly<Record<string, string>> = {
   "packages/omo-native/bin/lib/service-auth.generated.js": "packages/omo-native/launcher-commands.ts",
 }
 
-export type ArgvFinding = { readonly token: string; readonly file: string; readonly line: number }
+// Where a flag literal sits: the word keys on its object-table path (`COMMANDS.send.values` gives send and values), the
+// verbs an enclosing `if`/`case` compares an argv element with, and whether it is in a table every verb shares.
+export type ArgvScope = { readonly words: readonly string[]; readonly shared: boolean }
+
+export type ArgvFinding = {
+  readonly token: string
+  readonly file: string
+  readonly line: number
+  readonly scope?: ArgvScope
+}
 
 const FLAG = /^--?[A-Za-z][A-Za-z0-9-]*=?$/
 const WORD = /^[a-z_][a-z0-9_-]*$/
 const VERB_TABLE = /(VERB|COMMAND|SUBCOMMAND|TARGET|ROUTE)S?$/i
+const SHARED_TABLE = /^(COMMON|SHARED|GLOBAL)/i
 const ARGV_NAME = /^(?:args?|argv|rest|tail|params|flags)$/i
 
 /** The reachable source set: static, `require()` and literal `import()` edges, generated bundles swapped for their source. */
@@ -123,9 +133,41 @@ export function scanArgvComparisons(file: string, text: string): ArgvFinding[] {
   const bound = argvBindings(source)
   const found: ArgvFinding[] = []
   const lineOf = (node: ts.Node): number => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
+  const comparedWords = (condition: ts.Node): string[] => {
+    const words: string[] = []
+    const walk = (node: ts.Node): void => {
+      if (ts.isBinaryExpression(node) && COMPARE.has(node.operatorToken.kind))
+        for (const [literal, other] of [
+          [node.right, node.left],
+          [node.left, node.right],
+        ] as const) {
+          const value = literalOf(literal)
+          if (value !== undefined && WORD.test(value) && isArgvElement(other, bound)) words.push(value)
+        }
+      ts.forEachChild(node, walk)
+    }
+    walk(condition)
+    return words
+  }
+  const scopeOf = (node: ts.Node): ArgvScope => {
+    const words: string[] = []
+    let shared = false
+    for (let at: ts.Node | undefined = node; at !== undefined; at = at.parent) {
+      const parent: ts.Node | undefined = at.parent
+      if (ts.isPropertyAssignment(at) && ts.isIdentifier(at.name) && WORD.test(at.name.text)) words.push(at.name.text)
+      if (ts.isPropertyAssignment(at) && ts.isStringLiteral(at.name) && WORD.test(at.name.text)) words.push(at.name.text)
+      if (ts.isVariableDeclaration(at) && ts.isIdentifier(at.name) && SHARED_TABLE.test(at.name.text)) shared = true
+      if (parent !== undefined && ts.isIfStatement(parent) && parent.thenStatement === at) words.push(...comparedWords(parent.expression))
+      if (ts.isCaseClause(at) && ts.isSwitchStatement(at.parent.parent) && isArgvElement(at.parent.parent.expression, bound)) {
+        const value = literalOf(at.expression)
+        if (value !== undefined && WORD.test(value)) words.push(value)
+      }
+    }
+    return { words, shared }
+  }
   const add = (token: string, node: ts.Node): void => {
     const clean = token.endsWith("=") ? token.slice(0, -1) : token
-    found.push({ token: clean, file, line: lineOf(node) })
+    found.push({ token: clean, file, line: lineOf(node), ...(FLAG.test(clean) ? { scope: scopeOf(node) } : {}) })
   }
   const flagOrArgvWord = (literal: ts.Node, other: ts.Node | undefined): void => {
     const value = literalOf(literal)

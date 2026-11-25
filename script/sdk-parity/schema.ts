@@ -82,6 +82,8 @@ export type Row = {
 // One rendered row of a section 6 table: which capabilities it stands for and its cells exactly as published.
 export type TableEntry = {
   readonly table: string
+  // A pointer names rows described in another table (6.8's Host sessions, 6.11's account and loop rows).
+  readonly kind?: "pointer"
   readonly position: number
   readonly ids: readonly string[]
   readonly cells: readonly string[]
@@ -89,7 +91,31 @@ export type TableEntry = {
 
 export type DomainFile = { readonly domain: string; readonly rows: readonly Row[]; readonly tables: readonly TableEntry[] }
 
+// The slices of design section 8; a planned surface or a row's slice names one of them.
+export const SLICES = new Set([
+  "S0", "P0", "P1a", "P1a-s", "P1b", "T1a", "T1b", "T1c", "T1d", "T1e", "D1", "T2", "T3", "A1a", "A1b", "A1c",
+  "A1d", "A2a", "A2b", "A2c", "C1a", "C1b", "C1c", "TEL", "E1a", "E1a-s", "E1b", "E1c", "X1a", "NM", "OC1a", "OC1b",
+  "OC1c", "OC2", "X1c", "X1b", "X2", "shipped", "reserved",
+])
+
 const fieldOf = (target: Target): string => target.split(/[.=]/)[0] ?? target
+
+// The schema at a dotted path (`worktree.branch`), or undefined when any segment is missing.
+export function schemaAt(input: InputSchema, path: string): FieldSchema | undefined {
+  const [head, ...rest] = path.split(".")
+  let schema: FieldSchema | undefined = input.properties[head ?? ""]
+  for (const segment of rest)
+    schema =
+      schema?.properties?.[segment] ??
+      schema?.anyOf?.map((variant) => variant.properties?.[segment]).find((found) => found !== undefined)
+  return schema
+}
+
+const allowedValues = (schema: FieldSchema): readonly unknown[] | undefined => {
+  if (schema.enum !== undefined) return schema.enum
+  const consts = (schema.anyOf ?? []).map((variant) => Reflect.get(variant, "const"))
+  return consts.length > 0 && consts.every((value) => value !== undefined) ? consts : undefined
+}
 
 /** Every rule a row must satisfy on its own; each message names the row and the field or flag to fix. */
 export function rowProblems(row: Row): string[] {
@@ -100,8 +126,14 @@ export function rowProblems(row: Row): string[] {
     problems.push(`${at}: a reserved name has no CLI or tool surface`)
   for (const surface of ["cli", "tool"] as const) {
     const empty = row[surface].length === 0
-    const planned = row.planned[surface] !== undefined
-    const omitted = row.omitted[surface] !== undefined
+    const plannedSlice = row.planned[surface]
+    const reason = row.omitted[surface]
+    const planned = plannedSlice !== undefined
+    const omitted = reason !== undefined
+    if (plannedSlice !== undefined && !SLICES.has(plannedSlice))
+      problems.push(`${at}: planned ${surface} names "${plannedSlice}", which is not a slice of design section 8`)
+    if (reason !== undefined && reason.trim().length < 12)
+      problems.push(`${at}: omitted ${surface} needs a written reason, not "${reason}"`)
     if (planned && omitted) problems.push(`${at}: ${surface} is both planned and omitted; it is one or the other`)
     if (row.kind === "capability" && empty && !planned && !omitted)
       problems.push(`${at}: empty ${surface} needs planned (a slice) or omitted (a reason)`)
@@ -119,9 +151,22 @@ export function rowProblems(row: Row): string[] {
         problems.push(`${at}: ${where} fills root option "${option}", which the SDK root does not have`)
       return
     }
-    if (!inputs.has(fieldOf(target)))
+    if (!inputs.has(fieldOf(target))) {
       problems.push(`${at}: ${where} fills "${fieldOf(target)}", which ${row.sdk} does not take; add it to the SDK input`)
+      return
+    }
+    const [path = "", value] = target.split("=")
+    const schema = schemaAt(row.input, path)
+    if (schema === undefined) {
+      problems.push(`${at}: ${where} fills "${path}", a path ${row.sdk}'s input does not have; add the nested field`)
+      return
+    }
+    const allowed = allowedValues(schema)
+    if (value !== undefined && allowed !== undefined && !allowed.map(String).includes(value))
+      problems.push(`${at}: ${where} sets ${path} to "${value}", which its schema does not allow (${allowed.join(", ")})`)
   }
+  for (const slice of row.slices)
+    if (!SLICES.has(slice)) problems.push(`${at}: slice "${slice}" is not a slice of design section 8`)
   let parseReason: string | undefined
   for (const entry of row.cli) {
     const verb = `${entry.edition} "${entry.route.join(" ")}"`

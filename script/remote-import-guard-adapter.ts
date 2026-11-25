@@ -23,6 +23,12 @@ export function checkAdapterImports(
   rules: AdapterRules,
 ): ReadonlyMap<string, readonly string[]> {
   const byFile = new Map(facts.map((fact) => [fact.file, fact]))
+  const resolved = new Map<string, string | undefined>()
+  const resolveOnce = (from: string, specifier: string): string | undefined => {
+    const key = `${from}\0${specifier}`
+    if (!resolved.has(key)) resolved.set(key, resolve(from, specifier))
+    return resolved.get(key)
+  }
   const findings = new Map<string, readonly string[]>()
   for (const fact of facts) {
     if (!rules.adapter(fact.file) || rules.testFile(fact.file)) continue
@@ -36,7 +42,7 @@ export function checkAdapterImports(
         if (edge.typeOnly) continue
         const builtin = edge.specifier.replace(/^node:/, "")
         if (rules.forbiddenBuiltins.includes(builtin)) reached.add(`node:${builtin}`)
-        const target = resolve(current.file, edge.specifier)
+        const target = resolveOnce(current.file, edge.specifier)
         if (target === undefined || rules.sdkEntries.includes(target)) continue
         const layer = layerOf(target, rules.forbidden)
         if (layer !== undefined && layer !== fact.file && !target.startsWith(fact.file)) {

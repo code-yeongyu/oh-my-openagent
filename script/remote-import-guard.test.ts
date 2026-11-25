@@ -4,9 +4,12 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { checkAdapterImports } from "./remote-import-guard-adapter"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
+  ADAPTER_OFFENDERS,
+  ADAPTER_RULES,
   NON_LITERAL_IMPORT_OFFENDERS,
   REMOTE_IMPORT_RULES,
   S1_OFFENDERS,
@@ -28,8 +31,12 @@ const asRecord = (map: ReadonlyMap<string, readonly string[]>): Record<string, r
 const usesOf = (offenders: Readonly<Record<string, { readonly uses: readonly string[] }>>) =>
   Object.fromEntries(Object.entries(offenders).map(([file, offender]) => [file, offender.uses.toSorted()]))
 
+// One scan of the repository serves G1 and family A.
+const REPO_ROOT = join(import.meta.dir, "..")
+const repoFacts = scanRepository(REPO_ROOT)
+
 describe("remote import guard G1 over packages/**", () => {
-  const repo = findings(join(import.meta.dir, ".."))
+  const repo = checkImports(repoFacts, createResolver(REPO_ROOT), REMOTE_IMPORT_RULES)
 
   test("#given S1 #then the vendored local-API client and bunshin relay transport are imported only where allowed", () => {
     // A new importer fails here; a removed one must leave S1_OFFENDERS in the same PR (the list only shrinks).
@@ -49,6 +56,39 @@ describe("remote import guard G1 over packages/**", () => {
   test("#given non-literal import() outside tests #then no file gains one", () => {
     const outsideTests = [...repo.nonLiteralImports].filter(([file]) => !REMOTE_IMPORT_RULES.testFile(file))
     expect(Object.fromEntries(outsideTests)).toEqual(NON_LITERAL_IMPORT_OFFENDERS)
+  })
+})
+
+describe("adapter import family A (#14943 design 7.5)", () => {
+  test("#given every adapter of both editions #then the layers it reaches are exactly its offender row (the list only shrinks)", () => {
+    // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
+    const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ADAPTER_RULES)
+    expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
+  })
+
+  test("#given an adapter that imports the delivery pipeline, directly or through a helper #then the reach is named, and the walk stops at the SDK entry", () => {
+    const root = mkdtempSync(join(tmpdir(), "adapter-guard-"))
+    try {
+      const thread = "packages/omo-senpi/src/components/thread"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${thread}/gateway/pipeline.ts`, "export const deliver = () => 1\n")
+      put(`${thread}/sdk.ts`, 'import { deliver } from "./gateway/pipeline.ts"\nexport const sdk = { deliver }\n')
+      put(`${thread}/helper.ts`, 'export { deliver } from "./gateway/pipeline.ts"\n')
+      put(`${thread}/tools.ts`, 'import { deliver } from "./helper.ts"\nimport { sdk } from "./sdk.ts"\nimport "node:net"\n')
+      put(`${thread}/tools/extension-tools.ts`, 'import { sdk } from "../sdk.ts"\n')
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkAdapterImports(scanRepository(root), createResolver(root), ADAPTER_RULES)
+      expect(Object.fromEntries(found)).toEqual({
+        [`${thread}/tools.ts`]: ["node:net", "packages/omo-senpi/src/components/thread/gateway/"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 

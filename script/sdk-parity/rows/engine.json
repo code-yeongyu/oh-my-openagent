@@ -315,11 +315,80 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {},
+              "project_trust": {},
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
           "input": {},
-          "presenter": {},
-          "gated": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -399,12 +468,81 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {},
+              "project_trust": {},
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
           "listen": {},
           "input": {},
-          "presenter": {},
-          "gated": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -485,14 +623,93 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "input": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {},
+              "project_trust": {},
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "input": {
+            "properties": {
+              "messages": {},
+              "files": {},
+              "stdin": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "tui_mode": {},
           "verbose": {},
-          "attach": {},
-          "presenter": {},
+          "attach": {
+            "properties": {
+              "socket": {}
+            }
+          },
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -578,12 +795,87 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "input": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {},
+              "project_trust": {},
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "input": {
+            "properties": {
+              "messages": {},
+              "files": {},
+              "stdin": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "mode": {},
-          "presenter": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "api_key": {}
         },
         "required": [
@@ -672,12 +964,81 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {},
+              "project_trust": {},
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "listen": {},
           "multi_session": {},
-          "presenter": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "input": {},
           "api_key": {}
         },
@@ -783,7 +1144,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
       },
       "projection": {},
       "scenarios": {
@@ -823,7 +1184,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
       },
       "projection": {},
       "scenarios": {
@@ -951,7 +1312,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -1017,7 +1378,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -1082,7 +1443,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason. These are the engine targets the launcher forwards today. `omo update --all` is not one of them: the launcher takes it as a product update with an unknown flag and refuses it, and that refusal is kept"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -1172,7 +1533,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one (as for engine.schedule.list)"
       },
       "projection": {},
       "scenarios": {

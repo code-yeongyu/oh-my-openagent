@@ -80,6 +80,19 @@ export function gateReport(input: GateInput): GateReport {
   return { failures, closureOnly, unchangedLine: UNCHANGED_LINE.test(input.body), initialization }
 }
 
+// The committed goldens are the reviewer's view of the comparison (design 7.4); the gate never reads them as truth, and
+// they must equal the head's live outcomes, so an edited golden with unchanged behaviour fails here.
+export function goldenProblems(
+  committed: Readonly<Record<string, Outcome>>,
+  live: Readonly<Record<string, Outcome>>,
+): string[] {
+  const ids = new Set([...Object.keys(committed), ...Object.keys(live)])
+  return [...ids]
+    .toSorted()
+    .filter((id) => JSON.stringify(committed[id]) !== JSON.stringify(live[id]))
+    .map((id) => `goldens.json ${id} differs from the scenario's live outcome; regenerate with bun script/sdk-parity/scenario-run.ts --out script/sdk-parity/goldens.json`)
+}
+
 export function renderReport(report: GateReport): string {
   const lines = [`## SDK parity gate${report.initialization ? " (initialization: the merge base has no registry)" : ""}`, ""]
   if (report.failures.length === 0) lines.push("No failure.")
