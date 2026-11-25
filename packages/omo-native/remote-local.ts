@@ -238,7 +238,7 @@ async function runOn(service: DeviceService, parsed: Parsed, dependencies: Remot
 }
 
 // A stopped service: its socket is gone (POSIX) or its TCP endpoint refuses (Windows keeps endpoint.json).
-export const isServiceStopped = (error: unknown): boolean =>
+const isServiceStopped = (error: unknown): boolean =>
   (error instanceof Error &&
     "code" in error &&
     ["ENOENT", "ECONNREFUSED", "ECONNRESET"].includes(String(error.code))) ||
