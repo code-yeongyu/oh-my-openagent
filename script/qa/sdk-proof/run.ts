@@ -6,7 +6,7 @@
 //   THREAD_QA_SENPI_VERSION=<the engine omo pins> bun script/qa/sdk-proof/run.ts [--evidence-dir <dir>] [--only sdk,tools,cli]
 // A failing or unavailable cell is a finding: it names the slice that fixes it. Nothing here makes a cell pass.
 import { createHash } from "node:crypto"
-import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { createCliDriver } from "./drivers/cli.ts"
@@ -16,7 +16,8 @@ import { createToolsDriver } from "./drivers/tools.ts"
 import { type Cell, redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
 import { fill, SCENARIO } from "./scenario.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
-import { DEVICE_A, DEVICE_B, startWorld, type World } from "./world/world.ts"
+import { CANARY, DEVICE_A, DEVICE_B, type Isolation, startWorld, type World } from "./world/world.ts"
+import { outsideWriteRoots } from "./world/write-roots.ts"
 
 const REPO = resolve(import.meta.dir, "..", "..")
 const arg = (name: string): string | undefined => {
@@ -37,8 +38,8 @@ const driverFor = async (surface: Surface, world: World): Promise<Driver> => {
       return createToolsDriver(await world.toolSession())
     case "cli":
       return createCliDriver({
-        launcher: [process.env["THREAD_QA_NODE"] ?? "node", world.install.omoJs],
-        env,
+        launcher: [process.execPath, world.install.omoJs],
+        env: world.cliEnv,
         cwd: world.a.work,
       })
   }
@@ -64,11 +65,19 @@ const withinStep = (
 
 async function runSurface(surface: Surface, world: World): Promise<StepRecord[]> {
   const driver = await driverFor(surface, world)
+  try {
+    return await runSteps(surface, world, driver)
+  } finally {
+    await driver.close()
+  }
+}
+
+async function runSteps(surface: Surface, world: World, driver: Driver): Promise<StepRecord[]> {
   const values: Record<string, string> = { deviceB: DEVICE_B.id, run: surface }
   const records: StepRecord[] = []
   let key: string | undefined
-  // Set once a cell cannot run in this world (the CLI open needs the account the world does not carry yet): every later
-  // cell of this surface reads not run with the same reason, never fail and never pass.
+  // Set once this surface cannot go on (its open needs an account the world lacks, or a step stalled): every later cell
+  // of the surface reads not reached with the same reason, never fail and never pass.
   let notRun: { readonly cell: Cell; readonly why: string } | undefined
   const record = (entry: StepRecord): void => {
     records.push(entry)
@@ -80,13 +89,13 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
     const skipped = (why: string, cell: Cell, slice: string): void =>
       record({ step: step.id, op: step.op, input, call: "-", raw: null, observed: null, cell, why, slice })
     if (mapping.kind === "unavailable") {
-      skipped("no call on this surface today", "n/a", mapping.slice)
+      skipped("no call on this surface today", "not reached", mapping.slice)
       continue
     }
     if (mapping.kind === "needs_account" && !world.account)
       notRun = {
-        cell: "not run",
-        why: "the world has no account yet (follow-up after the account fixture of PR 14996 is on dev)",
+        cell: "not reached",
+        why: "the world carries no account",
       }
     if (notRun !== undefined) {
       skipped(notRun.why, notRun.cell, step.owner.slice)
@@ -94,11 +103,15 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
     }
     // A step that names the thread cannot run when this surface's open answered none: it is not reached.
     if (step.op !== "create" && values["thread"] === undefined) {
-      skipped("not reached: this surface's open answered no thread", "fail", `${SCENARIO[0]?.owner.slice} (open)`)
+      skipped("this surface's open answered no thread", "not reached", `${SCENARIO[0]?.owner.slice} (open)`)
       continue
     }
     const before = step.op === "create" ? await world.observer.keys() : new Set<string>()
-    if (step.before === "fill-context") await world.observer.fill(key)
+    const setup = step.before === "fill-context" ? await world.observer.fill(key) : undefined
+    if (setup !== undefined) {
+      skipped(`world setup failed, not a product result: ${setup}`, "not reached", step.owner.slice)
+      continue
+    }
     const answer = await withinStep(
       (signal) =>
         driver.run({ op: step.op, input }, signal).catch((error: unknown) => ({
@@ -136,7 +149,6 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
       slice: step.owner.slice,
     })
   }
-  await driver.close()
   return records
 }
 
@@ -154,19 +166,39 @@ async function main(): Promise<void> {
   const build = `senpi ${world.engine}; thread SDK entry sha256 ${createHash("sha256").update(readFileSync(sdkEntry)).digest("hex").slice(0, 16)}`
   const redaction = { roots: world.roots, devices: { [DEVICE_A.id]: "<device-a>", [DEVICE_B.id]: "<device-b>" } }
   const runs: Record<Surface, StepRecord[]> = { sdk: [], tools: [], cli: [] }
+  let isolation: Isolation = { refused: [], guarded: 0, sessionBus: false }
   try {
+    // Fail closed before any surface runs: every write root of every environment the world uses stays in its scratch.
+    const escaped = world.writeEnvs.flatMap(({ name, env, root }) =>
+      outsideWriteRoots(env, [root]).map((entry) => `${name}: ${entry}`),
+    )
+    if (escaped.length > 0)
+      throw new Error(`x1a world: a write root is outside the scratch directory: ${escaped.join("; ")}`)
     for (const surface of only) {
       runs[surface] = await runSurface(surface, world)
       writeFileSync(join(evidence, `${surface}.md`), redact(transcript(surface, build, runs[surface]), redaction))
     }
   } finally {
+    isolation = world.isolation()
     await world.close()
   }
+  const isolated = isolation.refused.length === 0 && !isolation.sessionBus
+  writeFileSync(join(evidence, "isolation.json"), JSON.stringify(isolation, null, 2))
   writeFileSync(join(evidence, "relay-requests.json"), JSON.stringify(world.relay.requests, null, 2))
-  const table = summary(build, SCENARIO, runs)
+  const table = summary(build, SCENARIO, runs, [
+    `Isolation: ${isolation.refused.length} request(s) to a non-loopback address refused; the loopback guard loaded in ${isolation.guarded} world processes; session bus in the world's environment: ${isolation.sessionBus ? "present" : "absent"}.`,
+    "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",
+  ])
   writeFileSync(join(evidence, "summary.md"), table)
   writeFileSync(join(import.meta.dir, "RESULTS.md"), table)
+  // The synthetic credential must leave no trace: every evidence file and RESULTS.md is scanned for its canary.
+  const leaked = [
+    ...readdirSync(evidence).map((name) => join(evidence, name)),
+    join(import.meta.dir, "RESULTS.md"),
+  ].filter((path) => readFileSync(path, "utf8").includes(CANARY))
+  if (leaked.length > 0) process.stderr.write(`x1a: the credential canary appears in ${leaked.join(", ")}\n`)
   process.stdout.write(`${table}\nevidence: ${evidence}\n`)
+  if (!isolated || leaked.length > 0) process.exitCode = 1
 }
 
 if (import.meta.main) await main()

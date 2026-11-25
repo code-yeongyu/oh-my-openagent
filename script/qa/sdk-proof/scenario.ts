@@ -111,6 +111,14 @@ export const SCENARIO: readonly Step[] = [
     owner: { row: "threads.send (delivery steer, no expected_turn_id)", slice: "T1a (core send rule)" },
   },
   {
+    id: "set-model-parked",
+    op: "setModel",
+    input: { thread: "{{thread}}", model: `${PARK_TO.provider}/${PARK_TO.id}:${PARK_TO.thinking}` },
+    before: "fill-context",
+    expect: { kind: "parked", provider: PARK_TO.provider, id: PARK_TO.id, thinking: PARK_TO.thinking },
+    owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
+  },
+  {
     id: "send-long-2",
     op: "send",
     input: { thread: "{{thread}}", message: "x1a long two QA:HOLD {{run}}-interrupt", delivery: "follow_up" },
@@ -130,14 +138,6 @@ export const SCENARIO: readonly Step[] = [
     input: { thread: "{{thread}}", model: `${SWITCH_TO.provider}/${SWITCH_TO.id}:${SWITCH_TO.thinking}` },
     expect: { kind: "model", ...SWITCH_TO },
     owner: { row: "threads.setModel (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
-  },
-  {
-    id: "set-model-parked",
-    op: "setModel",
-    input: { thread: "{{thread}}", model: `${PARK_TO.provider}/${PARK_TO.id}:${PARK_TO.thinking}` },
-    before: "fill-context",
-    expect: { kind: "parked", provider: PARK_TO.provider, id: PARK_TO.id, thinking: PARK_TO.thinking },
-    owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
   },
   {
     id: "close",
@@ -161,7 +161,7 @@ export const OPS: readonly Op[] = ["create", "send", "read", "interrupt", "setMo
 export type Mapping =
   | { readonly kind: "call"; readonly how: string }
   | { readonly kind: "unavailable"; readonly slice: string }
-  /** A call that needs the account sign-in, which the world does not carry yet: not run, nor the cells behind it. */
+  /** A call that needs the account sign-in: in a world without an account it is not reached, nor are the cells behind it. */
   | { readonly kind: "needs_account"; readonly how: string }
 
 /** A step's input with the run's values filled in. */

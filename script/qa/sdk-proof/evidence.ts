@@ -12,10 +12,11 @@ const SURFACE_TITLE: Readonly<Record<Surface, string>> = {
 }
 
 /**
- * pass: the surface answered as the contract says and B shows the expected state; fail: either did not; n/a: no call on
- * this surface today; not run: the world cannot run the cell yet (the account the CLI open needs).
+ * pass: the surface answered as the contract says and B shows the expected state; fail: an assertion on the real output
+ * failed; not reached: the step did not run (no call on this surface yet, the open answered no thread, an earlier step
+ * stalled, or the world could not be set up), with the reason and, for planned work, the slice.
  */
-export type Cell = "pass" | "fail" | "n/a" | "not run"
+export type Cell = "pass" | "fail" | "not reached"
 
 export type StepRecord = {
   readonly step: string
@@ -70,12 +71,13 @@ export function summary(
   build: string,
   steps: readonly { readonly id: string; readonly op: Op }[],
   runs: Readonly<Record<Surface, readonly StepRecord[]>>,
+  notes: readonly string[] = [],
 ): string {
   const header = `| Step | ${SURFACES.map((surface) => SURFACE_TITLE[surface]).join(" | ")} |`
   const rule = `|---|${SURFACES.map(() => "---").join("|")}|`
   const cell = (surface: Surface, step: string): string => {
     const record = runs[surface].find((entry) => entry.step === step)
-    if (record === undefined) return "not run"
+    if (record === undefined) return "surface not run (--only)"
     if (record.cell === "pass") return "pass"
     const issue = ISSUES[`${surface}:${step}`]
     return `${record.cell}: ${record.why} (${record.slice}${issue === undefined ? "" : `, ${issue}`})`
@@ -86,6 +88,7 @@ export function summary(
     "",
     `Build under test: ${build}. Regenerate with \`bun script/qa/sdk-proof/run.ts\`.`,
     "",
+    ...notes.flatMap((note) => [note, ""]),
     header,
     rule,
     ...rows,

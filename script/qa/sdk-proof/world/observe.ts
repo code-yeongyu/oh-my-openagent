@@ -7,9 +7,9 @@ import { connectEngine, listSessions } from "./engine-port.ts"
 import { type BState, isObject, verdictOf } from "./verdict.ts"
 
 const SETTLE_MS = 60_000
-// Twelve prompts of this filler put about 31k tokens in B's live context (measured on senpi 2026.11.23): a switch to an
-// 80k-window model then needs a compaction first, so the holder parks it.
-const FILL_PROMPTS = 12
+// Nine prompts of this filler put about 24k tokens in B's live context (about 2.6k each, measured on senpi 2026.11.23) on
+// top of the thread's earlier turns: a switch to an 80k-window model then needs a compaction first, so the holder parks it.
+const FILL_PROMPTS = 9
 const FILLER = "lorem ipsum ".repeat(1700)
 
 type Client = Awaited<ReturnType<typeof connectEngine>>
@@ -36,7 +36,7 @@ export type Observer = {
     answered: boolean,
   ) => Promise<{ ok: boolean; why: string; state: BState }>
   /** World setup, not a surface call: prompts B's thread directly until it fits a PARK_TO-sized window only after compaction. */
-  readonly fill: (key: string | undefined) => Promise<void>
+  readonly fill: (key: string | undefined) => Promise<string | undefined>
   readonly close: () => void
 }
 
@@ -94,17 +94,38 @@ export async function observeB(socket: string, heldTags: () => readonly string[]
     read,
     judge,
     fill: async (key) => {
-      if (key === undefined) return
+      if (key === undefined) return "no thread on B to fill"
       for (let i = 0; i < FILL_PROMPTS; i += 1) {
         const answers = async (): Promise<number> =>
           (await read(key)).messages.filter((message) => message.role === "assistant").length
         const before = await answers()
-        await client.request({ type: "prompt", sessionId: key, message: `x1a fill ${i} ${FILLER}` })
-        await waitFor(async () => ((await answers()) > before && !(await read(key)).streaming ? true : undefined), {
-          label: "B answered a fill",
-          timeoutMs: SETTLE_MS,
-        })
+        // B may be compacting after an earlier fill: that refusal is retried, any other ends the setup.
+        let reply: Record<string, unknown> = {}
+        try {
+          reply = await waitFor(
+            async () => {
+              const sent = await client.request({ type: "prompt", sessionId: key, message: `x1a fill ${i} ${FILLER}` })
+              return sent["success"] === false && String(sent["error"]).includes("compaction is in progress")
+                ? undefined
+                : sent
+            },
+            { label: "B took a fill", timeoutMs: SETTLE_MS },
+          )
+        } catch (error) {
+          return `B kept compacting through fill ${i} (${String(error).slice(0, 200)})`
+        }
+        if (reply["success"] === false)
+          return `B refused fill ${i}: ${JSON.stringify(reply["error"] ?? reply).slice(0, 300)}`
+        try {
+          await waitFor(async () => ((await answers()) > before && !(await read(key)).streaming ? true : undefined), {
+            label: "B answered a fill",
+            timeoutMs: SETTLE_MS,
+          })
+        } catch (error) {
+          return `B did not answer fill ${i} (${String(error).slice(0, 200)}); prompt reply ${JSON.stringify(reply).slice(0, 300)}`
+        }
       }
+      return undefined
     },
     close: () => client.close(),
   }
