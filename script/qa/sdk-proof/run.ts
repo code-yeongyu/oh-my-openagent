@@ -141,10 +141,13 @@ async function runSteps(surface: Surface, world: World, driver: Driver): Promise
     }
     const turn = turnOf(answer.raw)
     if (turn !== undefined) values["turn"] = turn
-    if (step.release !== undefined) world.fake.release(fill(step.release, values))
+    if (step.release !== undefined) world.release(fill(step.release, values))
     const expect = JSON.parse(fill(JSON.stringify(step.expect), values))
     const refusal = step.refusedTo?.surfaces.includes(surface) === true ? step.refusedTo.code : undefined
     const verdict = await world.observer.judge(key, expect, answer.raw, answer.answered && refusal === undefined)
+    // An interrupted held turn is over: its tag stays released, or a later request quoting it (B's compaction summary)
+    // would be held again with no step left to release it.
+    if (expect.kind === "interrupted") world.release(expect.tag)
     const { cell, why } = cellOf(answer, verdict.ok ? undefined : verdict.why, refusal)
     record({
       step: step.id,

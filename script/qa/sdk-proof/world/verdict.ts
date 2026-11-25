@@ -70,13 +70,18 @@ export const verdictOf = (expect: Expect, state: BState, raw: unknown): string |
     }
     case "applied": {
       // #14939: the next turn compacts first, then the held switch applies with the thinking level it was asked for.
-      const exchanged =
-        said(state, "user", expect.token) && said(state, "assistant", ackOf(expect.token)) && !state.streaming
-      if (!exchanged) return `B's transcript lacks the message or its answer ${ackOf(expect.token)}`
       const wanted = `${expect.provider}/${expect.id}`
-      return state.model === wanted && state.thinking === expect.thinking
-        ? undefined
-        : `after the compaction B runs ${state.model ?? "?"} at ${state.thinking ?? "?"}, not ${wanted} at ${expect.thinking}`
+      const reasons = [
+        ...(state.model === wanted && state.thinking === expect.thinking
+          ? []
+          : [
+              `after the compaction B runs ${state.model ?? "?"} at ${state.thinking ?? "?"}, not ${wanted} at ${expect.thinking}`,
+            ]),
+        ...(said(state, "user", expect.token) && said(state, "assistant", ackOf(expect.token)) && !state.streaming
+          ? []
+          : [`B's transcript lacks the message or its answer ${ackOf(expect.token)}`]),
+      ]
+      return reasons.length === 0 ? undefined : reasons.join("; ")
     }
     case "closed":
       return state.listed ? "B still lists the thread" : undefined

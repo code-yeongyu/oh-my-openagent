@@ -10,6 +10,7 @@ import { pathToFileURL } from "node:url"
 
 import {
   buildOmoInstall,
+  bus,
   cleanupAll,
   ENGINE_VERSION,
   installCleanupHooks,
@@ -122,6 +123,11 @@ export type World = {
   readonly relay: FakeRelay
   readonly observer: Observer
   readonly fake: FakeModel
+  /**
+   * Releases a held turn, and keeps it released: a later request quoting that hold (B's compaction summarizing the
+   * transcript) would otherwise be held again on the same tag, with no step left to release it.
+   */
+  readonly release: (tag: string) => void
   readonly toolSession: () => Promise<ToolSession>
   readonly roots: readonly string[]
   /** Read before close: the scratch directories holding the guard's records go with the world. */
@@ -149,6 +155,11 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
   // The model reports usage the way a real provider does (about four characters a token over the whole request), so B's
   // context estimate follows the thread and a switch can need a compaction (the parked step, #14939).
   const fake = await startFakeModel({ promptTokens: (body) => Math.ceil(JSON.stringify(body).length / 4) })
+  const released = new Set<string>()
+  const rerelease = (): void => {
+    for (const tag of fake.heldTags()) if (released.has(tag)) fake.release(tag)
+  }
+  bus.on("tick", rerelease)
   const a = makeScratch("x1a-a", fake)
   const b = makeScratch("x1a-b", fake)
   addThinkingModel(b.agentDir)
@@ -199,6 +210,10 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     relay,
     observer,
     fake,
+    release: (tag) => {
+      released.add(tag)
+      fake.release(tag)
+    },
     toolSession,
     roots: [a.dir, b.dir, relay.stateDir, install.root],
     isolation: () => ({
@@ -210,6 +225,7 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
       sessionBus: [a, b].some((scratch) => scratch.env["DBUS_SESSION_BUS_ADDRESS"] !== undefined),
     }),
     close: async () => {
+      bus.off("tick", rerelease)
       observer.close()
       await relay.stop()
       await cleanupAll()
