@@ -3,6 +3,7 @@ import { expect, test } from "bun:test"
 import {
   CredentialStoreError,
   DedicatedStoreError,
+  InvalidCredentialState,
   KeychainApprovalPendingError,
   KeychainItemNotOwnedError,
   KeychainLockedError,
@@ -65,6 +66,14 @@ for (const route of ["account show", "account forget", "account store enable", "
       expect(exitOf(at(route), accessFailure(error))).toBe(cli)
     },
   )
+
+test("#given account show and an unreadable stored sign-in #then the root's answer exits as the verb does", () => {
+  const cli = accountStoreFailure(
+    quiet as unknown as AccountShowDependencies,
+    new InvalidCredentialState("cannot parse"),
+  )
+  expect(exitOf(at("account show"), failure("credential_store_unavailable", "unreadable_credential"))).toBe(cli)
+})
 
 test("#given account store with a malformed verb #then the root's invalid_arguments exits as the verb's usage error", async () => {
   const cli = await runAccountStore(quiet as unknown as AccountStoreDependencies, ["enable", "--bogus"])

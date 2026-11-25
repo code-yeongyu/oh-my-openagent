@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { KeychainLockedError } from "@oh-my-opencode/account-core"
+import { InvalidCredentialState } from "@oh-my-opencode/account-core/keystore"
 import { assembleOmoSdk } from "../assembly"
 
 // account.show on the root (first-party design 6.4, slice A1b): the record `omo account show` prints, read from the
@@ -52,6 +53,31 @@ function rootWith(read: () => Promise<unknown>, desktopLaunch = false) {
   )
   return { sdk, reads }
 }
+
+describe("an unreadable stored sign-in (design lane note on review 6065710236)", () => {
+  const unreadable = async () => {
+    throw new InvalidCredentialState("cannot parse the stored sign-in")
+  }
+  test("#given whoami #then today's answer, pinned: service_refused, invalid_response", async () => {
+    const { sdk } = rootWith(unreadable)
+    expect(await sdk.account.whoami()).toEqual({
+      kind: "error",
+      error: {
+        code: "service_refused",
+        message: "the account service sent an answer this SDK cannot read",
+        next_action: "update omo, then retry",
+        details: { code: "invalid_response" },
+      },
+    })
+  })
+  test("#given show, which reads only this machine's store #then the store's failure, unreadable_credential, as forget answers", async () => {
+    const { sdk } = rootWith(unreadable)
+    expect(await sdk.account.show({})).toMatchObject({
+      kind: "error",
+      error: { code: "credential_store_unavailable", details: { reason: "unreadable_credential" } },
+    })
+  })
+})
 
 describe("account.show on the root", () => {
   test("#given a stored sign-in #when shown with an account #then it answers the printed record and no stored secret", async () => {

@@ -11,6 +11,7 @@ import { dedicatedStoreState } from "@oh-my-opencode/account-core/keychain-helpe
 import { type CustodyCapability, type CustodyLog, custodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import { accountForget } from "@oh-my-opencode/account-core/calls/forget"
 import { accountHome } from "@oh-my-opencode/account-core/credential-lock"
+import { InvalidCredentialState } from "@oh-my-opencode/account-core/keystore"
 import { accountShow, type SyncState } from "@oh-my-opencode/account-core/calls/show"
 import { accountSignInCheck, accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
@@ -185,6 +186,7 @@ export function accountNamespace(options: {
         ),
       "account.show": (input) =>
         answer(access, async () => {
+          // show reads only this machine's store: an item it cannot parse is that store's failure, as for forget.
           const shown = await accountShow(
             {
               api: access.origin,
@@ -192,7 +194,14 @@ export function accountNamespace(options: {
               syncState: (account) => trustPinState(options.env, options.cwd, account),
             },
             input?.account === undefined ? {} : { account: input.account },
-          )
+          ).catch((error: unknown) => {
+            if (error instanceof InvalidCredentialState) return "unreadable" as const
+            throw error
+          })
+          if (shown === "unreadable")
+            return failed("credential_store_unavailable", "The stored sign-in could not be read.", {
+              reason: "unreadable_credential",
+            })
           return shown.kind === "ok"
             ? shown
             : failed("invalid_arguments", "account must name an account id.", { field: "account" })

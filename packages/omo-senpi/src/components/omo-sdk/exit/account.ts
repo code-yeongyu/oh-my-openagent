@@ -69,6 +69,7 @@ const ACCOUNT_SHOW: SurfaceExits = {
   rules: [
     { code: "invalid_arguments", exit: 2 },
     { code: "credential_store_locked", exit: 7 },
+    { code: "credential_store_unavailable", details: { reason: "unreadable_credential" }, exit: 1 },
     { code: "credential_store_unavailable", details: { reason: "keychain_unavailable" }, exit: 8 },
     { code: "credential_store_unavailable", exit: 9 },
   ],
