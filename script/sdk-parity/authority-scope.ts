@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
+  DESCRIPTOR_AHEAD,
   GATED,
   inputAccepts,
   OMO_CODE_REGISTRY,
@@ -65,6 +66,7 @@ export const sliceContract: Contract = {
   heldCodes: {},
   sourceCodes: SOURCE_CODES,
   accepts: (call, input) => inputAccepts(call, input),
+  ahead: DESCRIPTOR_AHEAD,
 }
 export const sliceInputContract: Contract = { ...sliceContract, calls: fullCalls }
 

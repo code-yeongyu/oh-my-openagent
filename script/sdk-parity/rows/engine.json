@@ -18,51 +18,9 @@
           "model": {
             "type": "string",
             "minLength": 1
-          },
-          "destination": {
-            "anyOf": [
-              {
-                "type": "object",
-                "required": [
-                  "kind"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "terminal"
-                  }
-                },
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "required": [
-                  "kind",
-                  "pid",
-                  "started_at"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "peer"
-                  },
-                  "pid": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "started_at": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "additionalProperties": false
-              }
-            ]
           }
         },
-        "required": [
-          "destination"
-        ]
+        "required": []
       },
       "cli": [
         {
@@ -110,51 +68,9 @@
           "min_expiry_ms": {
             "type": "integer",
             "minimum": 0
-          },
-          "destination": {
-            "anyOf": [
-              {
-                "type": "object",
-                "required": [
-                  "kind"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "terminal"
-                  }
-                },
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "required": [
-                  "kind",
-                  "pid",
-                  "started_at"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "peer"
-                  },
-                  "pid": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "started_at": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "additionalProperties": false
-              }
-            ]
           }
         },
-        "required": [
-          "destination"
-        ]
+        "required": []
       },
       "cli": [
         {
@@ -257,51 +173,9 @@
           },
           "refresh": {
             "type": "boolean"
-          },
-          "destination": {
-            "anyOf": [
-              {
-                "type": "object",
-                "required": [
-                  "kind"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "terminal"
-                  }
-                },
-                "additionalProperties": false
-              },
-              {
-                "type": "object",
-                "required": [
-                  "kind",
-                  "pid",
-                  "started_at"
-                ],
-                "properties": {
-                  "kind": {
-                    "type": "string",
-                    "const": "peer"
-                  },
-                  "pid": {
-                    "type": "integer",
-                    "minimum": 1
-                  },
-                  "started_at": {
-                    "type": "string",
-                    "minLength": 1
-                  }
-                },
-                "additionalProperties": false
-              }
-            ]
           }
         },
-        "required": [
-          "destination"
-        ]
+        "required": []
       },
       "cli": [
         {

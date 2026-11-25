@@ -5,6 +5,7 @@ import {
   type BehaviourChange,
   AUTH_CHECK_FREE_FIELDS,
   CUSTODY_RESULTS,
+  DESCRIPTOR_AHEAD,
   SESSION_RESULTS,
   GATED,
   type MatrixLine,
@@ -20,7 +21,8 @@ import {
   inventoryProblems,
 } from "./authority-check"
 import { CALL_ALIASES, CUSTODY_FIELDS, HELD } from "./authority-expected"
-import { calls, files, isTyped, json, rows, securityDesign } from "./authority-scope"
+import { calls, files, isTyped, json, rows, securityDesign, sliceInputContract, sliceRows } from "./authority-scope"
+import { inputProblems } from "./contract-check"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
 import { freeFieldMappingProblems, loadSnapshot, sessionShapeProblems } from "./engine-snapshot-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
@@ -193,5 +195,20 @@ describe("negative controls of custody and the held table (#14949)", () => {
       session_required: snapshot.session_required.filter((field) => field !== "provider"),
     }
     expect(sessionShapeProblems(engineLooser, session).join("\n")).toContain("session required fields")
+  })
+
+  test("#given a descriptor-ahead entry missing, or one whose row already has the field #then the input check names it", () => {
+    const missing = { ...sliceInputContract, ahead: DESCRIPTOR_AHEAD.filter((entry) => entry.row !== "account.adopt") }
+    expect(inputProblems(sliceRows, missing).join("\n")).toContain(
+      "row account.adopt: the schema of account.adopt takes credential, which the row lacks",
+    )
+    const withField = sliceRows.map((row) =>
+      row.id === "engine.auth.apiKey"
+        ? { ...row, input: { ...row.input, properties: { ...row.input.properties, destination: {} } } }
+        : row,
+    )
+    expect(inputProblems(withField, sliceInputContract).join("\n")).toContain(
+      "row engine.auth.apiKey: its descriptor has destination now; delete the descriptor-ahead entry",
+    )
   })
 })
