@@ -21,6 +21,7 @@ import type {
   RemoteWatchHandlers,
 } from "./remote/ports"
 import type { ThreadTranscriptEntry } from "./reader"
+import { createThreadSdk } from "./sdk"
 import { answerGetEntries, senpiProjector, type FakeEntryLog } from "./thread-remote-entries-fixture"
 import { createThreadTools, type ThreadHost, type ThreadHostSession } from "./tools"
 import type { ThreadCloseOptions, ThreadCloseOutcome } from "./tools/ports"
@@ -1257,8 +1258,21 @@ export function createRemoteThreadFixture() {
       if (parse === undefined) throw new Error("thread_send declares no permission parser")
       return parse(args, process.cwd())
     }
+    // The thread SDK over this same holder, store and account, acting as a script (`cli:501`), as `omo thread` builds it.
+    const sdk = () =>
+      createThreadSdk({
+        agentDir,
+        cwd: extra.callerWorkspaceRoot ?? process.cwd(),
+        uid: 501,
+        user: "qa",
+        host,
+        store: countedStore,
+        ...(remote === undefined ? {} : { remote }),
+        firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
+      })
     return {
       run,
+      sdk,
       /** What a `monitor({type: "rpc", target})` call by the caller arms on this surface (#14294). */
       monitorTarget: async (target: string) => await resolveMonitorTarget(target, caller),
       permission,
