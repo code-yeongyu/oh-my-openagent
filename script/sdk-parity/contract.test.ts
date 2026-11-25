@@ -199,6 +199,20 @@ describe("wait options against their cores (design lane ruling on review 6061342
 })
 
 describe("producers and sequences (review 6062113819)", () => {
+  test("#given the recovery whose admission reply is lost #then the first prompt reaches b's session exactly once, on the retry", () => {
+    // thread-create-remote-lost-reply.test.ts:228: admit_external_message + prompt on b's session total exactly one.
+    const recovery = scenarios
+      .flatMap((file) => file.scenarios)
+      .find((scenario) => scenario.id === "threads.create/recovery-admission-lost")
+    const sends = (expect: readonly { port: string; op: string; count?: number }[] | undefined): number =>
+      (expect ?? [])
+        .filter((e) => e.port === "remote" && e.op === "sessions.send")
+        .reduce((sum, e) => sum + (e.count ?? 1), 0)
+    expect(sends(recovery?.expect)).toBe(0)
+    expect(recovery?.expect.some((e) => e.port === "remote" && e.op === "sessions.send" && e.count === 0)).toBe(true)
+    expect(sends(recovery?.then?.[0]?.expect)).toBe(1)
+  })
+
   test("#given internal_error #then the registry names threads, whose create answers it in a shipped test", () => {
     // thread/control/thread-create-remote-lost-reply.test.ts:218-229: a remote create whose recovery admission reply is
     // lost answers internal_error, so threads returns the code today.
