@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "rows": [
+    {
+      "row": "threads.resolve",
+      "slice": "T1a; T1c for the alias"
+    },
+    {
+      "row": "threads.readAfterWait",
+      "slice": "T1b"
+    },
+    {
+      "row": "threads.messages",
+      "slice": "T1b"
+    },
+    {
+      "row": "threads.aliases.set",
+      "slice": "T1c"
+    },
+    {
+      "row": "threads.aliases.clear",
+      "slice": "T1c"
+    },
+    {
+      "row": "threads.release",
+      "slice": "T1c"
+    },
+    {
+      "row": "daemon.run",
+      "slice": "C1a"
+    },
+    {
+      "row": "daemon.warm",
+      "slice": "C1a"
+    },
+    {
+      "row": "diagnostics.models",
+      "slice": "C1b"
+    },
+    {
+      "row": "install.sdkRoot",
+      "slice": "P1b; X1b for the session's root"
+    },
+    {
+      "row": "engine.config.agentDir",
+      "slice": "E1c"
+    },
+    {
+      "row": "engine.config.resources",
+      "slice": "A later slice, with a cell of its own"
+    },
+    {
+      "row": "engine.models.update",
+      "slice": "E1c"
+    },
+    {
+      "row": "toolkit.help",
+      "slice": "OC2"
+    }
+  ]
+}

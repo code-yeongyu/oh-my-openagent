@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import {
   BEHAVIOUR_CHANGES,
@@ -15,6 +17,7 @@ import {
 import {
   behaviourChangeProblems,
   documentRowProblems,
+  sectionFourRows,
   matrixProblems,
   refusalScenarioProblems,
   inventoryProblems,
@@ -238,5 +241,48 @@ describe("negative controls of custody and the held table (#14949)", () => {
     expect(check([...TYPED_AHEAD_INPUTS, noField])).toContain(
       "typed-ahead engine.auth.check.destination: the contract of engine.auth.check has no input destination",
     )
+  })
+
+  // Section 4.6 (design lane ruling): rows read from the document's own headings, an absent 4.6 is no rows, and a 4.6
+  // row without a line is allowed only while a closed, self-retiring awaiting entry names it with the document's slice.
+  test("#given the revision with section 4.6 #then an awaiting row needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
+    const revision = readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8")
+    const awaiting = (
+      JSON.parse(readFileSync(join(import.meta.dir, "awaiting-owner-rows.json"), "utf8")) as {
+        rows: { row: string; slice: string }[]
+      }
+    ).rows
+    expect(sectionFourRows(securityDesign).some((row) => row.section === "4.6")).toBe(false)
+    const ownedOnly = (problems: readonly string[]) =>
+      problems.filter((problem) => problem.startsWith("section 4.6 ") || problem.startsWith("awaiting row "))
+    expect(ownedOnly(documentRowProblems(PRINCIPAL_MATRIX, revision, awaiting))).toEqual([])
+    const sdkRoot = sectionFourRows(revision).find((row) => row.capability.startsWith("`install.sdkRoot`"))
+    if (sdkRoot === undefined) throw new Error("no install.sdkRoot row")
+    const lined = [
+      ...PRINCIPAL_MATRIX,
+      {
+        ...(PRINCIPAL_MATRIX[0] as MatrixLine),
+        section: "4.6" as const,
+        capability: sdkRoot.capability,
+        docRow: undefined,
+      },
+    ]
+    expect(documentRowProblems(lined, revision, awaiting).join("\n")).toContain(
+      "awaiting row install.sdkRoot: stale, a line now covers it; delete the entry",
+    )
+    expect(
+      documentRowProblems(
+        PRINCIPAL_MATRIX,
+        revision,
+        awaiting.filter((entry) => entry.row !== "daemon.run"),
+      ).join("\n"),
+    ).toContain('row "`daemon.run`, `daemon.shardPath`": no line of the matrix')
+    expect(
+      documentRowProblems(
+        PRINCIPAL_MATRIX,
+        revision,
+        awaiting.map((entry) => (entry.row === "daemon.run" ? { ...entry, slice: "T1a" } : entry)),
+      ).join("\n"),
+    ).toContain('awaiting row daemon.run: slice "T1a" is not the document\'s "C1a"')
   })
 })

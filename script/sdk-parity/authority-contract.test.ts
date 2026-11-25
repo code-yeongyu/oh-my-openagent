@@ -23,13 +23,18 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   behaviourChangeProblems,
+  awaitingPairProblems,
   documentRowProblems,
   inventoryProblems,
   matrixProblems,
   refusalScenarioProblems,
   sectionFourRows,
   withoutAwaited,
+  type AwaitingOwnerRow,
 } from "./authority-check"
+import awaitingOwnerRows from "./awaiting-owner-rows.json"
+
+const AWAITING_OWNER_ROWS: readonly AwaitingOwnerRow[] = awaitingOwnerRows.rows
 import {
   AWAITING_ENGINE_PIN,
   AWAITING_REVISION,
@@ -117,10 +122,12 @@ describe("principals of slice P1a-s (#14949)", () => {
   })
 
   test("#given section 4 #then every refused cell has its code and a scenario answering it before any side effect", () => {
+    const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
     expect(matrixProblems(PRINCIPAL_MATRIX, rows, securityDesign, SOURCE_CODES)).toEqual([])
     expect(sectionFourRows(securityDesign).length).toBeGreaterThanOrEqual(50)
-    expect(documentRowProblems(PRINCIPAL_MATRIX, securityDesign)).toEqual([])
-    const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
+    expect(documentRowProblems(PRINCIPAL_MATRIX, securityDesign, AWAITING_OWNER_ROWS)).toEqual([])
+    const lined = new Set(PRINCIPAL_MATRIX.flatMap((line) => line.rows as readonly string[]))
+    expect(awaitingPairProblems(AWAITING_OWNER_ROWS, securityDesign, ids, lined)).toEqual([])
     const inventory = inventoryProblems(PRINCIPAL_MATRIX, REFUSALS, securityDesign, ids, CALL_ALIASES)
     expect(withoutAwaited(inventory, AWAITING_REVISION)).toEqual([])
     expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
