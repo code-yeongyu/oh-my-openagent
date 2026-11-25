@@ -36,6 +36,9 @@ export type ScenarioStep = {
   readonly input: Readonly<Record<string, unknown>>
   readonly kind: "effect" | "refusal"
   readonly refusal?: string
+  readonly refusal_from?: "root" | "value"
+  /** The expected answer of this step, a subset of the whole ok answer (a retry answering the first call's identity). */
+  readonly answer?: Readonly<Record<string, unknown>>
   readonly expect: readonly Expectation[]
   /** One fault at a time (design 4.6). */
   readonly fault?: Fault
@@ -65,9 +68,9 @@ export type TableScenario = {
   /** The caller's signal fires this long after the call, on the virtual clock (design 4.4); the scenario must state with
    * `count: 0` the effect that must not have happened. */
   readonly abort?: { readonly after_ms: number }
-  /** The expected answered value, matched as a subset, for a call whose value is the engine's own reply. Checked in
-   * addition to `expect`, never instead of it. */
-  readonly answer?: { readonly value: unknown }
+  /** A subset of the WHOLE ok answer the call resolved to, in either of the design's shapes: a thread call's flat
+   * contract (`{ thread, ... }`) or `{ value }` for every other namespace. Checked beside `expect`, never instead of it. */
+  readonly answer?: Readonly<Record<string, unknown>>
   /** Today's answer, kept until the named slice makes the target contract pass (design 7.3). */
   readonly retires_with?: string
 }

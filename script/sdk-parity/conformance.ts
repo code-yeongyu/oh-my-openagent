@@ -27,9 +27,11 @@ export type EffectEvidence = {
   readonly code?: string
   /** Where a refusal code was read: the root failure, or the error field of the value the call answered. */
   readonly codeSource?: "root" | "value"
-  readonly answer?: { readonly value: unknown }
+  readonly answer?: Readonly<Record<string, unknown>>
   readonly answered?: unknown
   readonly threw?: string
+  /** The `then` calls, run in order on the state the call before each left; each must pass for the scenario to pass. */
+  readonly steps?: readonly EffectEvidence[]
 }
 
 /** What the checks need beyond the rows: the effect operations per port (slice P1a's PORT_EFFECTS, every port named, an
@@ -52,9 +54,16 @@ const stated = (record: EffectEvidence, call: ObservedCall): boolean =>
   )
 
 export function recordProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
-  const where = `row ${row.id}: scenario ${record.scenario}`
   const listed = row.scenarios.effect.includes(record.scenario) ? "effect" : "refusal"
-  if (record.kind !== listed) return [`${where} is a ${record.kind} scenario but the row lists it under ${listed}`]
+  if (record.kind !== listed)
+    return [
+      `row ${row.id}: scenario ${record.scenario} is a ${record.kind} scenario but the row lists it under ${listed}`,
+    ]
+  return [record, ...(record.steps ?? [])].flatMap((call) => callProblems(row, call, context))
+}
+
+function callProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
+  const where = `row ${row.id}: scenario ${record.scenario}`
   if (record.code === "not_implemented") return [`${where} answered not_implemented; ${row.sdk} is a stub, build it`]
   if (record.threw !== undefined) return [`${where} threw ${record.threw}`]
   if (record.row !== row.id || record.member !== row.sdk)
@@ -67,7 +76,15 @@ export function recordProblems(row: Row, record: EffectEvidence, context: Confor
     ]
   if (record.kind === "effect" && record.code !== undefined)
     return [`${where} answered ${record.code} where an effect was expected`]
-  if (record.kind === "effect" && record.expect.every((expectation) => (expectation.count ?? 1) === 0))
+  // A PURE row (closed list in the schema) touches nothing: its answer builds it only when the trace is EMPTY, reads
+  // included, and an answer is stated. Every other effect scenario must state a port effect.
+  if (record.kind === "effect" && row.pure === true) {
+    if (record.observed.length > 0)
+      return [
+        `${where}: a pure call touched ${record.observed.map((call) => `${call.port}.${call.op}`).join(", ")}; it must touch nothing`,
+      ]
+    if (record.answer === undefined) return [`${where}: a pure call is proven by its answer; state it`]
+  } else if (record.kind === "effect" && record.expect.every((expectation) => (expectation.count ?? 1) === 0))
     return [`${where} states no port effect; an answer alone does not build a row`]
   const problems = expectationProblems(record.expect, record.observed).map((problem) => `${where}: ${problem}`)
   for (const call of record.observed)
@@ -79,16 +96,35 @@ export function recordProblems(row: Row, record: EffectEvidence, context: Confor
       problems.push(
         `${where}: effect ${call.port}.${call.op} ${JSON.stringify(call.args)} happened but the scenario does not state it`,
       )
-  if (record.answer !== undefined && !isSubsetOf(record.answer.value, record.answered))
+  if (record.answer !== undefined && !isSubsetOf(record.answer, record.answered))
     problems.push(
-      `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer.value)}`,
+      `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer)}`,
     )
   return problems
 }
 
-// The effect a scenario states, without the fakes' stimulus (`result`), which is no part of it.
+// The effect a scenario states, compared with the matcher's own semantics (review 6062172318 M3): the fakes' stimulus
+// (`result`) is no part of it, order does not matter, an absent count is 1, and argument objects compare by content.
+const canonical = (value: unknown): unknown =>
+  Array.isArray(value)
+    ? value.map(canonical)
+    : typeof value === "object" && value !== null
+      ? Object.fromEntries(
+          Object.entries(value)
+            .toSorted(([a], [b]) => a.localeCompare(b))
+            .map(([key, inner]) => [key, canonical(inner)]),
+        )
+      : value
 const effectOf = (record: EffectEvidence): string =>
-  JSON.stringify(record.expect.map(({ port, op, args, count }) => ({ port, op, args, count })))
+  JSON.stringify(
+    [record, ...(record.steps ?? [])].map((call) =>
+      call.expect
+        .map(({ port, op, args, count }) =>
+          JSON.stringify(canonical({ port, op, args: args ?? {}, count: count ?? 1 })),
+        )
+        .toSorted(),
+    ),
+  )
 
 // Coverage is computed, never declared: an optional input is covered by two passing records of the row whose inputs
 // differ in that field alone and that differ in kind or stated effect. Required inputs and inert fields are exempt.

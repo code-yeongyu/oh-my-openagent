@@ -1,3 +1,5 @@
+import { scopeProblems } from "./row-scopes"
+
 // The parity registry's row schema (design section 7.2). A row is one leaf capability of section 6 in both editions;
 // `sdk` is required for every row, so an SDK omission cannot be written down.
 
@@ -91,6 +93,9 @@ export type Row = {
   /** Host-local (design 7.3): the call acts on the calling device's session host only. Closed list: HOST_LOCAL_ROWS. */
   readonly addressScope?: "this_device"
   readonly addressReason?: string
+  /** Pure (design 7.3): the call touches no port at all; its answer builds it. Closed list: PURE_ROWS. */
+  readonly pure?: true
+  readonly pureReason?: string
 }
 
 // One rendered row of a section 6 table: which capabilities it stands for and its cells exactly as published.
@@ -173,20 +178,11 @@ const allowedValues = (schema: FieldSchema): readonly unknown[] | undefined => {
 }
 
 /** Every rule a row must satisfy on its own; each message names the row and the field or flag to fix. */
-// The rows that may declare addressScope "this_device" (design 7.3 ruling): the design does not make them cross-device.
-export const HOST_LOCAL_ROWS = ["threads.adopt", "threads.release", "threads.unload"] as const
-
 export function rowProblems(row: Row): string[] {
   const problems: string[] = []
   const at = `row ${row.id}`
   if (row.sdk.trim() === "") problems.push(`${at}: sdk is required; name the SDK call this capability has`)
-  if (row.addressScope !== undefined) {
-    if (!(HOST_LOCAL_ROWS as readonly string[]).includes(row.id))
-      problems.push(
-        `${at}: only ${HOST_LOCAL_ROWS.join(", ")} may declare addressScope; this row addresses threads on every device`,
-      )
-    if ((row.addressReason ?? "").trim() === "") problems.push(`${at}: addressScope needs a written addressReason`)
-  }
+  problems.push(...scopeProblems(row))
   if (row.kind === "reserved" && (row.cli.length > 0 || row.tool.length > 0))
     problems.push(`${at}: a reserved name has no CLI or tool surface`)
   for (const surface of ["cli", "tool"] as const) {
