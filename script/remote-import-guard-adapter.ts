@@ -45,6 +45,14 @@ export function offenderGrowth(
   return problems
 }
 
+// The specifiers a file depends on that are not import statements: triple-slash path and types references, and the
+// type-position `import("x")` queries (`typeof import("x")`, `import("x").T`) the edge scan does not record.
+export function referenceSpecifiers(text: string): string[] {
+  const triple = [...text.matchAll(/^\s*\/\/\/\s*<reference\s+(?:path|types)\s*=\s*["']([^"']+)["']/gm)]
+  const queries = [...text.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)]
+  return [...triple, ...queries].map((match) => match[1] ?? "")
+}
+
 // Each file outside `owner` that holds one of the markers, with the kinds of logic it names. Sources are the caller's:
 // tracked, non-test files.
 export function logicOutside(
