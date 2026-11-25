@@ -813,9 +813,9 @@
           "args": {}
         },
         "required": [
+          "args",
           "name",
-          "op",
-          "args"
+          "op"
         ]
       },
       "cli": [],
@@ -867,9 +867,9 @@
           }
         },
         "required": [
-          "name",
           "migrations",
-          "moduleUrl"
+          "moduleUrl",
+          "name"
         ]
       },
       "cli": [],
@@ -1110,8 +1110,8 @@
           }
         },
         "required": [
-          "thread",
-          "message"
+          "message",
+          "thread"
         ]
       },
       "cli": [],
@@ -1628,8 +1628,8 @@
           }
         },
         "required": [
-          "thread",
-          "delivery_id"
+          "delivery_id",
+          "thread"
         ]
       },
       "cli": [],
@@ -2005,8 +2005,8 @@
           "author": {}
         },
         "required": [
-          "thread",
-          "message"
+          "message",
+          "thread"
         ]
       },
       "cli": [
@@ -2213,8 +2213,8 @@
           }
         },
         "required": [
-          "thread",
-          "message"
+          "message",
+          "thread"
         ]
       },
       "cli": [
@@ -2278,8 +2278,8 @@
           }
         },
         "required": [
-          "thread",
-          "model"
+          "model",
+          "thread"
         ]
       },
       "cli": [
@@ -2406,8 +2406,8 @@
           }
         },
         "required": [
-          "thread",
-          "level"
+          "level",
+          "thread"
         ]
       },
       "cli": [],

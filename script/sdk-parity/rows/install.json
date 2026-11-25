@@ -439,7 +439,8 @@
           }
         },
         "required": [
-          "consent"
+          "consent",
+          "plan"
         ]
       },
       "cli": [

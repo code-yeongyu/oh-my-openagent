@@ -3,19 +3,24 @@ import type { Row } from "./schema"
 // Design 3.2 and 7.2: a descriptor's call is its row's `sdk` key, and a test runs the descriptor against a recording
 // root to confirm the one member it invokes. The root is a proxy that records every member path called on it.
 
-export function recordCalls(invoke: (root: unknown) => unknown): string[] {
-  const calls: string[] = []
+export type Invocation = { readonly member: string; readonly args: readonly unknown[] }
+
+export function recordInvocations(invoke: (root: unknown) => unknown): Invocation[] {
+  const invocations: Invocation[] = []
   const node = (path: readonly string[]): unknown =>
     new Proxy(() => undefined, {
       get: (_target, key) => (typeof key === "string" ? node([...path, key]) : undefined),
-      apply: () => {
-        calls.push(path.join("."))
+      apply: (_target, _self, args: unknown[]) => {
+        invocations.push({ member: path.join("."), args })
         return { kind: "ok", value: null }
       },
     })
   invoke(node([]))
-  return calls
+  return invocations
 }
+
+export const recordCalls = (invoke: (root: unknown) => unknown): string[] =>
+  recordInvocations(invoke).map((invocation) => invocation.member)
 
 export function descriptorCallProblems(row: Row, invoke: (root: unknown) => unknown): string[] {
   const calls = recordCalls(invoke)

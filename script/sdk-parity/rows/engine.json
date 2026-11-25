@@ -322,8 +322,8 @@
           }
         },
         "required": [
-          "source",
-          "resource"
+          "resource",
+          "source"
         ]
       },
       "cli": [],
