@@ -655,6 +655,16 @@ describe("#13756 review", () => {
     })
   })
 
+  test("#15011 #given a keyed send #when a fresh client sends other text under the same key #then the holder refuses it client_message_id_conflict", async () => {
+    const { owner } = await onWorld()
+    await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }))
+    const other = await clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, {
+      text: "other",
+      idempotency_key: "k",
+    })
+    expect(JSON.stringify(other)).toContain("client_message_id_conflict")
+  })
+
   test("#given a keyed send then a long run of unkeyed sends #when the key is retried #then it replays within the last 256 receipts and reaches the device again past them (L37)", async () => {
     // Every unkeyed send keeps a receipt under a fresh key nobody can retry: the store keeps the newest 256 settled ones.
     const { owner, sent } = await onWorld()
