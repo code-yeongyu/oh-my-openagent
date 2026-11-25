@@ -50,56 +50,104 @@ export function argvProblems(
   return problems
 }
 
-// The route prefix each native dispatcher serves, so a flag found in it is matched against that prefix's routes.
-export const DISPATCH_PREFIX: Readonly<Record<string, readonly string[]>> = {
-  "packages/omo-native/bin/lib/thread.js": ["thread"],
-  "packages/omo-native/bin/lib/thread-args.js": ["thread"],
-  "packages/omo-native/bin/lib/daemon.js": ["daemon"],
-  "packages/omo-native/bin/lib/daemon-adopt.js": ["daemon"],
-  "packages/omo-native/bin/lib/daemon-args.js": ["daemon"],
-  "packages/omo-native/bin/lib/update-args.js": ["update"],
-  "packages/omo-native/remote-local.ts": ["remote"],
-  "packages/omo-native/remote-session-args.ts": ["remote"],
-  "packages/omo-native/remote-verbs.ts": ["remote"],
-  "packages/omo-native/remote-cli.ts": ["remote"],
-  "packages/omo-native/account-cli.ts": ["account"],
-  "packages/omo-native/account-devices.ts": ["account"],
-  "packages/omo-native/account-store.ts": ["account"],
-  "packages/omo-native/account-show.ts": ["account"],
-  "packages/omo-native/account-sign-in.ts": ["account"],
-  "packages/omo-native/sync-cli.ts": ["sync"],
+// What each native dispatcher module parses: a route prefix (`remote`: the verb comes from the scan), a full route
+// (`account show`: every flag found there belongs to it), or a route with the only flags that file parses for it (a
+// module that also builds an engine's argv, whose other literals are not omo's own flags).
+type Dispatch = string | { readonly route: string; readonly flags: readonly string[] }
+export const DISPATCH: Readonly<Record<string, Dispatch>> = {
+  "packages/omo-native/bin/lib/thread.js": "thread",
+  "packages/omo-native/bin/lib/thread-args.js": "thread",
+  "packages/omo-native/bin/lib/daemon.js": "daemon",
+  "packages/omo-native/bin/lib/daemon-adopt.js": "daemon adopt",
+  "packages/omo-native/bin/lib/daemon-args.js": "daemon stop",
+  "packages/omo-native/bin/lib/daemon-operations.js": { route: "daemon rollback-prepare", flags: ["--store"] },
+  "packages/omo-native/bin/lib/update-args.js": "update",
+  "packages/omo-native/remote-local.ts": "remote",
+  "packages/omo-native/remote-session-args.ts": "remote",
+  "packages/omo-native/remote-verbs.ts": "remote",
+  "packages/omo-native/remote-cli.ts": "remote",
+  "packages/omo-native/account-cli.ts": "account",
+  "packages/omo-native/account-devices.ts": "account devices",
+  "packages/omo-native/account-store.ts": "account store",
+  "packages/omo-native/account-show.ts": "account show",
+  "packages/omo-native/account-sign-in.ts": "account sign-in",
+  "packages/omo-native/sync-cli.ts": "sync",
 }
 
-// Route-level flags (review H1): a flag the code accepts for one verb must be mapped on that verb's own entry; a flag in
-// a table every verb shares must be mapped on every verb of that dispatcher; a flag with no verb context must be mapped
-// on some route of the prefix.
+type ModuleRoute = {
+  readonly prefix: string
+  readonly verb: string | undefined
+  readonly only: readonly string[] | undefined
+}
+const moduleRoute = (file: string): ModuleRoute | undefined => {
+  const dispatch = DISPATCH[file]
+  if (dispatch === undefined) return undefined
+  const [prefix = "", verb] = (typeof dispatch === "string" ? dispatch : dispatch.route).split(" ")
+  return { prefix, verb, only: typeof dispatch === "string" ? undefined : dispatch.flags }
+}
+
+// Route-level flags (review H1 and H6), both ways. A flag the code accepts for one verb must be mapped on that verb's own
+// entry; a flag in a table every verb shares, on every verb of the prefix; an unattributed flag, on some route of the
+// prefix. And a flag a launcher route maps must be one its dispatcher accepts for that verb.
 export function routeFlagProblems(findings: readonly ArgvFinding[], rows: readonly Row[]): string[] {
   const native = entries(rows, "native", ["launcher", "engine"])
-  const problems: string[] = []
   const verbOf = (entry: CliEntry): string => entry.route[1] ?? ""
+  const verbsUnder = new Map<string, Set<string>>()
   for (const finding of findings) {
-    const prefix = DISPATCH_PREFIX[finding.file]
-    if (prefix === undefined || finding.scope === undefined) continue
-    const under = native.filter((entry) => prefix.includes(entry.route[0] ?? ""))
+    const at = moduleRoute(finding.file)
+    if (at !== undefined && finding.scope === undefined)
+      verbsUnder.set(at.prefix, (verbsUnder.get(at.prefix) ?? new Set()).add(finding.token))
+  }
+  const counted = findings.filter((finding) => {
+    const at = moduleRoute(finding.file)
+    return at !== undefined && finding.scope !== undefined && (at.only === undefined || at.only.includes(finding.token))
+  })
+  const problems: string[] = []
+  for (const finding of counted) {
+    const at = moduleRoute(finding.file)
+    if (at === undefined || finding.scope === undefined) continue
+    const under = native.filter((entry) => entry.route[0] === at.prefix)
     const maps = (entry: CliEntry): boolean => Object.hasOwn(entry.flags, finding.token)
     const where = `${finding.file}:${finding.line}`
-    const verbsHere = new Set(
-      findings.filter((f) => f.file === finding.file && f.scope === undefined).map((f) => f.token),
-    )
-    const named = finding.scope.words.filter((word) => under.some((entry) => verbOf(entry) === word))
-    if (finding.scope.shared) {
-      for (const verb of new Set(under.map(verbOf).filter((verb) => verbsHere.has(verb))))
+    const named =
+      at.verb !== undefined
+        ? [at.verb]
+        : finding.scope.words.filter((word) => under.some((entry) => verbOf(entry) === word))
+    if (finding.scope.shared && at.verb === undefined) {
+      for (const verb of new Set(under.map(verbOf).filter((verb) => verbsUnder.get(at.prefix)?.has(verb))))
         if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
           problems.push(
-            `${where} accepts ${finding.token} on every ${prefix.join("|")} verb; map it on "${prefix[0]} ${verb}" too`,
+            `${where} accepts ${finding.token} on every ${at.prefix} verb; map it on "${at.prefix} ${verb}" too`,
           )
     } else if (named.length > 0) {
       for (const verb of new Set(named))
         if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
-          problems.push(`${where} accepts ${finding.token} on "${prefix[0]} ${verb}"; map it on that route's row entry`)
+          problems.push(`${where} accepts ${finding.token} on "${at.prefix} ${verb}"; map it on that route's row entry`)
     } else if (!under.some(maps))
-      problems.push(`${where} accepts ${finding.token} under "${prefix[0]}"; map it on the route that reads it`)
+      problems.push(`${where} accepts ${finding.token} under "${at.prefix}"; map it on the route that reads it`)
   }
+  for (const row of rows)
+    for (const entry of row.cli) {
+      if (entry.edition !== "native" || entry.via !== "launcher" || entry.route.length < 2) continue
+      const [prefix = "", verb = ""] = entry.route
+      if (!Object.keys(DISPATCH).some((file) => moduleRoute(file)?.prefix === prefix)) continue
+      for (const flag of Object.keys(entry.flags)) {
+        const accepted = counted.some((finding) => {
+          const at = moduleRoute(finding.file)
+          if (at === undefined || at.prefix !== prefix || finding.token !== flag || finding.scope === undefined)
+            return false
+          if (at.verb !== undefined) return at.verb === verb
+          if (finding.scope.words.includes(verb)) return true
+          const unattributed =
+            finding.scope.shared || !finding.scope.words.some((word) => verbsUnder.get(prefix)?.has(word))
+          return unattributed && verbsUnder.get(prefix)?.has(verb) === true
+        })
+        if (!accepted)
+          problems.push(
+            `row ${row.id} maps ${flag} on "${entry.route.join(" ")}", which its dispatcher does not accept for ${verb}; remove the mapping`,
+          )
+      }
+    }
   return problems
 }
 

@@ -2,12 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
-import { cellProblems } from "./cells"
+import { cellProblems, mappingProblems } from "./cells"
 import { argvProblems, commanderProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
-import { scanArgvComparisons } from "./native-inventory"
+import { nativeArgvInventory, scanArgvComparisons } from "./native-inventory"
 import { opencodeInventory } from "./opencode-inventory"
 import { descriptorCallProblems } from "./recording-root"
-import { allRows, loadDomainFiles, TEMPLATE_PATH } from "./registry"
+import { allRows, loadDomainFiles, REPO_ROOT, TEMPLATE_PATH } from "./registry"
 import { registryProblems, rowProblems, type Row } from "./schema"
 import { toolProblems } from "./tool-check"
 import { discoverOmoTools } from "./tool-registry"
@@ -100,9 +100,44 @@ describe("negative controls: routes and flags (7.6)", () => {
       "packages/omo-native/bin/lib/thread.js",
       'const COMMON = ["--json", "--all-scope"]\nconst COMMANDS = { list: {}, send: {}, read: {}, close: {} }\n',
     )
-    expect(routeFlagProblems(findings, replaced(send))).toEqual([
+    expect(routeFlagProblems(findings, replaced(send))).toContainEqual(
       'packages/omo-native/bin/lib/thread.js:1 accepts --all-scope on every thread verb; map it on "thread send" too',
+    )
+  })
+})
+
+describe("negative controls: exact route correspondence and the published mappings (review 6061267823 H6, M7)", () => {
+  test("#given a route that maps a flag its dispatcher does not accept for that verb #then the mapping is named", () => {
+    const attach = row("threads.attach")
+    const entry = attach.cli.find((cli) => cli.route.join(" ") === "remote attach")
+    if (entry === undefined) throw new Error("no remote attach entry")
+    Object.assign(entry.flags, { "--json": "render" })
+    expect(routeFlagProblems(nativeArgvInventory(REPO_ROOT), replaced(attach))).toEqual([
+      'row threads.attach maps --json on "remote attach", which its dispatcher does not accept for attach; remove the mapping',
     ])
+  })
+
+  test("#given a delegated route module that gains an option no row maps #then that route is named", () => {
+    const findings = scanArgvComparisons("packages/omo-native/account-show.ts", 'export const wide = (args) => args.includes("--wide")\n')
+    expect(routeFlagProblems(findings, rows)).toContainEqual(
+      'packages/omo-native/account-show.ts:1 accepts --wide on "account show"; map it on that route\'s row entry',
+    )
+  })
+
+  test("#given a mapped flag the cell shows that a row stops mapping, or a mapping the cell does not show #then each is named", () => {
+    const template = readFileSync(TEMPLATE_PATH, "utf8")
+    const edit = (change: (row: Row) => Row) =>
+      files.map((file) => ({ ...file, rows: file.rows.map((candidate) => (candidate.id === "threads.read" ? change(clone(candidate)) : candidate)) }))
+    const dropped = edit((read) => {
+      for (const cli of read.cli) delete (cli.flags as Record<string, string>)["--cursor"]
+      return read
+    })
+    expect(mappingProblems(template, dropped)).toContainEqual("6.1#3: the cell shows --cursor, which no entry of its rows maps")
+    const added = edit((read) => {
+      for (const cli of read.cli) if (cli.route.join(" ") === "thread read") Object.assign(cli.flags, { "--since": "cursor" })
+      return read
+    })
+    expect(mappingProblems(template, added)).toContainEqual("6.1#3: threads.read maps --since, which the published cell does not show")
   })
 })
 
