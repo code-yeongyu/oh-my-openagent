@@ -290,6 +290,9 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     resolveChildToolNames: kernelTools.childToolNames,
     planner,
     config: settings,
+    nicknameAgentHome: host.agentDir ?? resolveAgentHome({ env: deps.env ?? process.env }),
+    onNicknameAllocationError: (error) =>
+      log("omo-senpi task nickname reservation failed", { error: error instanceof Error ? error.message : String(error) }),
     resolveInheritedExtensions,
     rpcRespawnRunner: buildRespawnRunner(runnerContext),
     executionModeGate: host.executionModeGate,

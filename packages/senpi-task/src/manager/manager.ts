@@ -26,7 +26,6 @@ import { createTaskRecord, isSpawnSpecV1, nextRunEpoch, parseTaskId, syncTaskIdF
 import { TaskIdSpaceExhaustedError } from "../state/id"
 import type {
   AwaitingInputReason,
-  EffectiveModelRecord,
   LiveRunStats,
   ResolvedModelRecord,
   TaskRecord,
@@ -83,7 +82,7 @@ import {
   recordSpawnedPid,
   recordSpawnedRunner,
   nextRungManagedSpec,
-  selectTaskNickname,
+  reserveTaskNickname,
 } from "./manager-helpers"
 import { createIsolationWiring, type IsolationWiring } from "./isolation-wiring"
 import type { IsolationPreparation } from "../isolation"
@@ -116,6 +115,8 @@ import { NameRegistry } from "./names"
 import { newestSessionPath } from "../lifecycle/session-path"
 import { withDroppedSteeringNotice } from "../state/queued-steering"
 import { TaskSequence } from "./task-sequence"
+import { createNicknameAllocator } from "./nickname-allocation"
+import { resolveAgentHome } from "../agent-home"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeChildFacts } from "./child-facts"
 import { stampSpawnEffectiveModel } from "./observed-model"
@@ -230,6 +231,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #rpcRespawnRunner: RpcRespawnRunner
   readonly #names = new NameRegistry()
   readonly #taskSequence = new TaskSequence()
+  readonly #allocateNickname: ReturnType<typeof createNicknameAllocator>
   readonly #live = new Map<string, LiveTask>()
   // Children whose teardown rejected and that have no pid or daemon session for the orphan path. They
   // are resident for the lifecycle (eviction, idle reclaim, shutdown and TTL see them and retry their
@@ -270,6 +272,9 @@ class TaskManagerImpl implements TaskManager {
   constructor(inputOptions: TaskManagerImplOptions) {
     const options = { ...inputOptions, admissionBarrier: inputOptions.admissionBarrier ?? new AdmissionBarrier() }
     this.#options = options
+    this.#allocateNickname = createNicknameAllocator(
+      options.nicknameAgentHome ?? resolveAgentHome({ env: process.env }),
+    )
     this.#barrier = options.admissionBarrier
     this.#startAdmissions = createStartAdmissions(
       options.admissionBarrier,
@@ -572,6 +577,7 @@ class TaskManagerImpl implements TaskManager {
       task_id: record.task_id,
       status: record.status,
       name: record.name ?? record.task_id,
+      ...(record.nickname === undefined ? {} : { nickname: record.nickname }),
       ...(record.resolved_model !== undefined ? { resolved_model: record.resolved_model } : {}),
     }
   }
@@ -610,12 +616,20 @@ class TaskManagerImpl implements TaskManager {
 
     const requestedName = normalizeSpecName(spec.name)
     spec.admission?.assertOpen()
+    const reservation = reserveTaskNickname(spec, plan, this.#options.config.nicknames, this.#allocateNickname)
+    const nickname =
+      reservation === undefined
+        ? undefined
+        : await reservation.catch((error: unknown) => {
+            this.#options.onNicknameAllocationError?.(error)
+            return undefined
+          })
+    spec.admission?.assertOpen()
     const requestedRegistration =
       requestedName === undefined ? undefined : this.#names.register(spec.parent_session_id, requestedName)
 
     let claimed: TaskRecord
     try {
-      const nickname = selectTaskNickname(spec, plan, this.#options.config.nicknames, this.#taskSequence)
       const draft = createTaskRecord(
         {
           ...(spec.admission === undefined ? {} : { task_id: spec.admission.taskId }),

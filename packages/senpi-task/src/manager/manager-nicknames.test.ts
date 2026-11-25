@@ -1,4 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 
 import { baseSpec, cleanupProjects, makeManager, settings } from "./__fixtures__/manager-fakes"
 
@@ -76,13 +78,15 @@ test.each([
   expect(store.load(task.task_id)?.nickname).toBe(expected)
 })
 
-test("nicknames start at stable parent-and-set offsets and rotate independently without changing task ordinals", async () => {
-  const make = () => makeManager({
+test("a shared pool continues across conversations and manager recreation while counts stay conversation-local", async () => {
+  const make = (project?: string, style?: "full") => makeManager({
+    ...(project === undefined ? {} : { project }),
     config: settings({
       nicknames: {
         sets: { moon: ["Selene", "Io", "Callisto"], sun: ["Helios", "Flare", "Corona"] },
         models: { "mock/luna": "moon", "mock/sol": "sun" },
         categories: { sharing: "moon" },
+        ...(style === undefined ? {} : { occurrence_style: style }),
       },
     }),
     planner: (spec) => {
@@ -96,7 +100,7 @@ test("nicknames start at stable parent-and-set offsets and rotate independently 
       }
     },
   })
-  const { manager, store } = make()
+  const { manager, store, project } = make()
   const spawn = async (category: string, parentSessionId = "parent-1") => {
     const task = await manager.start(baseSpec({ category, parent_session_id: parentSessionId }))
     if (task.kind !== "started") throw new Error(`expected started task, got ${task.kind}`)
@@ -110,10 +114,27 @@ test("nicknames start at stable parent-and-set offsets and rotate independently 
   expect(await spawn("sharing")).toEqual(["Selene", "Selene", 3])
   expect(await spawn("solar")).toEqual(["Corona", "Corona", 4])
   expect(await spawn("lunar", "parent-2")).toEqual(["Io", "Io", 0])
-  expect(await spawn("lunar")).toEqual(["Io", "Io", 5])
-  expect(await spawn("sharing")).toEqual(["Callisto", "Callisto", 6])
+  expect(await spawn("lunar")).toEqual(["Callisto II", "Callisto II", 5])
+  expect(await spawn("sharing")).toEqual(["Selene II", "Selene II", 6])
 
-  const restarted = await make().manager.start(baseSpec({ category: "lunar", parent_session_id: "parent-1" }))
+  const restarted = await make(project, "full").manager.start(
+    baseSpec({ category: "lunar", parent_session_id: "nested-parent", root_session_id: "parent-2" }),
+  )
   if (restarted.kind !== "started") throw new Error(`expected started task, got ${restarted.kind}`)
-  expect(restarted.nickname).toBe("Callisto")
+  expect(restarted.nickname).toBe("Io the Second")
+})
+
+test("invalid nickname state leaves task start and record creation available", async () => {
+  const { manager, store, project } = makeManager({
+    config: settings({ nicknames: { sets: { moon: ["Phobos"] }, default: "moon" } }),
+  })
+  writeFileSync(join(project, "task-nicknames.json"), '{"version":2}')
+
+  const task = await manager.start(baseSpec())
+
+  if (task.kind !== "started") throw new Error(`expected started task, got ${task.kind}`)
+  expect(task.nickname).toBeUndefined()
+  const record = store.load(task.task_id)
+  expect(record?.task_id).toBe(task.task_id)
+  expect(record?.nickname).toBeUndefined()
 })

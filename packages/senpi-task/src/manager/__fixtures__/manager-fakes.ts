@@ -196,6 +196,7 @@ export function makeManager(
     runners: { "in-process": inProcess, process: processRunner },
     planner: options.planner ?? categoryPlanner(),
     config: options.config ?? settings({ default_concurrency: 5, max_depth: 1 }),
+    nicknameAgentHome: project,
     cwd: project,
     ...(options.admit !== undefined && { admit: options.admit }),
     ...(options.executionModeGate !== undefined && { executionModeGate: options.executionModeGate }),

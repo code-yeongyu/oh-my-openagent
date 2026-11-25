@@ -140,17 +140,27 @@ overlapping sets and none is narrower than another, the lexicographically first
 key wins. Use an exact key to override that choice for a particular model.
 
 If no model rule matches, OmO tries the requested agent or category, then
-`default`. No match means no nickname. Use nonempty sets with short,
-printable labels (1–32 characters after trimming). Each set starts at a
-position derived from the parent session ID and the set's key, then rotates
-in list order. Two sessions can land on the same starting name, especially
-with short lists. Reordering set definitions does not change their starting
-positions. Models or roles mapped to the same set share its rotation; other
-spawns do not advance it. The rotation is in memory and restarts at the same
-seeded position when the task manager is recreated with the same session ID
-and set. Assigned
-nicknames stay fixed across model fallback and resume. They are not steering addresses:
-continue to use the task's `name` or `task_id`.
+`default`. No match means no nickname. Use nonempty sets with printable labels
+of at most 32 UTF-16 code units after trimming. Nickname occurrences use
+`task.nicknames.occurrence_style`, one of `#`, `roman`, `full`, or `arabic`;
+the default is `roman`. The first occurrence has no suffix. For the twenty-second
+occurrence of `Phobos`, the styles render `Phobos #22`, `Phobos XXII`,
+`Phobos the Twenty-Second`, and `Phobos the 22nd`, respectively.
+
+Occurrence counts are per root conversation and base nickname, regardless of
+which set or style selected it. If the full label exceeds 32 UTF-16 code units,
+OmO tries `#` style first. If it still does not fit, OmO shortens the base at a
+grapheme boundary and keeps the whole suffix.
+
+The task engine stores a persistent cursor in the shared agent home. Its key
+uses the set name and the exact effective ordered list after duplicate names
+are removed. The first allocation is seeded; later allocations advance that
+cursor. Projects using the same agent home share it. A different ordered list
+has its own cursor. Upgrading starts counting from the first new reservation;
+OmO does not count past tasks or rename them. A crash can skip reserved
+occurrences. If storage fails, the task runs without a nickname. Assigned
+nicknames stay fixed across model fallback and resume. They are not steering
+addresses: continue to use the task's `name` or `task_id`.
 
 Passive consumers can read the optional top-level `nickname` string from the
 linked native task record or an `omo.task.updated` task snapshot. Older or

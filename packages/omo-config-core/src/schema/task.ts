@@ -19,6 +19,7 @@ const TaskNicknamesLayerSchema = z
     agents: NicknameSetMap.optional(),
     categories: NicknameSetMap.optional(),
     default: NicknameSetId.optional(),
+    occurrence_style: z.enum(["#", "roman", "full", "arabic"]).optional(),
   })
   .strict()
 

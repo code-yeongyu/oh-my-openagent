@@ -620,6 +620,7 @@ OpenGateway has a built-in unlimited provider concurrency default, so it does no
 | `state_dir` | string | unset (runtime uses `<agent dir>/projects/<folder>-<path hash>/senpi-task`) |
 | `reattach_on_reconcile` | boolean | unset |
 | `resume_children` | boolean | `true` |
+| `nicknames.occurrence_style` | `# \| roman \| full \| arabic` | `roman`; see [Worker nicknames](../guide/senpi-task.md#worker-nicknames) |
 | `warnings.unavailable_categories` | boolean | `true` |
 | `wait.min_ms` | positive int | `5000` |
 | `wait.default_ms` | positive int | `60000` |

@@ -293,6 +293,8 @@ export type TaskManagerOptions = {
   readonly runners: Readonly<Record<ExecutionMode, ManagedRunner>>
   readonly planner: ChildPlanner
   readonly config: OmoTaskSettings
+  readonly nicknameAgentHome?: string
+  readonly onNicknameAllocationError?: (error: unknown) => void
   readonly cwd: string
   readonly now?: () => number
   readonly scheduleExitConfirmation?: ExitConfirmationSchedule

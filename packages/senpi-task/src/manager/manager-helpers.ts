@@ -7,7 +7,7 @@ import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import type { ManagedChildHandle } from "./child-handle"
 import type { ManagedStartSpec, ManagerStartSpec, ResolvedChildPlan, StartResult } from "./types"
 import type { ExecutionMode } from "./execution-mode"
-import type { TaskSequence } from "./task-sequence"
+import type { createNicknameAllocator } from "./nickname-allocation"
 import { wildcardNicknameSet } from "./nickname-model-patterns"
 
 // The spec for one attempt of a fallback chain: the rung's OWN model in every field the runner
@@ -54,12 +54,12 @@ export function memberKernelToolRefusal(
   }
 }
 
-export function selectTaskNickname(
+export function reserveTaskNickname(
   spec: ManagerStartSpec,
   plan: ResolvedChildPlan,
   nicknames: OmoTaskSettings["nicknames"],
-  sequence: TaskSequence,
-): string | undefined {
+  allocate: ReturnType<typeof createNicknameAllocator>,
+): Promise<string | undefined> | undefined {
   if (nicknames === undefined) return undefined
   const agentType = spec.subagent_type ?? plan.agentType
   const category = spec.category ?? plan.category
@@ -77,7 +77,13 @@ export function selectTaskNickname(
   if (set === undefined) return undefined
   const pool = ownValue(nicknames.sets, set)
   if (pool === undefined) return undefined
-  return pool[sequence.nextNicknameIndex(spec.parent_session_id, set, pool.length)]
+  return allocate({
+    set,
+    pool,
+    parentSessionId: spec.parent_session_id,
+    conversationId: spec.root_session_id ?? spec.parent_session_id,
+    style: nicknames.occurrence_style,
+  })
 }
 
 export function buildRecordInput(input: {

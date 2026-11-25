@@ -222,12 +222,12 @@ describe("taskResultLines", () => {
     expect(lines.join(" ")).toContain("completed")
   })
 
-  test("#given a nickname in single and batch spawn details #when rendered #then the displayed id uses the nickname", () => {
+  test("#given nicknamed single and batch spawns #when rendered #then only the routing token is marked as an id", () => {
     // given
     const single = {
       task_id: "st_single",
       name: "canonical-single",
-      nickname: "Selene",
+      nickname: "Selene the Second",
       status: "running",
       mode: "spawn" as const,
       subagent_type: "explore",
@@ -243,18 +243,16 @@ describe("taskResultLines", () => {
 
     // when
     const singleLine = taskResultLines(single)[0] ?? ""
-    const [compact] = renderTaskResultComponent(single, ANSI_THEME).render(80)
+    const [compact] = renderTaskResultComponent(single, ANSI_THEME).render(90)
     const batchLines = taskResultLines(batch)
 
     // then
-    expect(singleLine).toContain("id:Selene")
-    expect(singleLine).not.toContain("st_single")
-    expect(compact).toContain("id:Selene")
+    expect(singleLine).toContain(" Selene the Second id:st_single")
+    expect(compact).toContain(" Selene the Second")
     expect(compact).not.toContain("st_single")
     expect(batchLines[0]).toContain("id:st_batch")
     expect(batchLines[1]).toContain("name:canonical-item")
-    expect(batchLines[1]).toContain("id:Helios")
-    expect(batchLines[1]).not.toContain("st_batch_item")
+    expect(batchLines[1]).toContain(" Helios id:st_batch_item")
   })
 
   test("#given resolved category metadata #when rendered #then target, provider, display, nonduplicate reasoning, mode, status, id, and queue context appear", () => {

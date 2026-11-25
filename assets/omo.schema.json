@@ -1127,6 +1127,72 @@
             "maximum": 9007199254740991
           }
         },
+        "nicknames": {
+          "type": "object",
+          "properties": {
+            "sets": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string",
+                "minLength": 1
+              },
+              "additionalProperties": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 32,
+                  "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                }
+              }
+            },
+            "models": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "agents": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "categories": {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "default": {
+              "type": "string",
+              "minLength": 1
+            },
+            "occurrence_style": {
+              "type": "string",
+              "enum": [
+                "#",
+                "roman",
+                "full",
+                "arabic"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
         "max_depth": {
           "default": 1,
           "type": "integer",
@@ -3885,6 +3951,72 @@
                 "maximum": 9007199254740991
               }
             },
+            "nicknames": {
+              "type": "object",
+              "properties": {
+                "sets": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "additionalProperties": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32,
+                      "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                    }
+                  }
+                },
+                "models": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "agents": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "categories": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "default": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "occurrence_style": {
+                  "type": "string",
+                  "enum": [
+                    "#",
+                    "roman",
+                    "full",
+                    "arabic"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
             "max_depth": {
               "type": "integer",
               "minimum": 0,
@@ -6434,6 +6566,72 @@
                 "maximum": 9007199254740991
               }
             },
+            "nicknames": {
+              "type": "object",
+              "properties": {
+                "sets": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "additionalProperties": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32,
+                      "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                    }
+                  }
+                },
+                "models": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "agents": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "categories": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "default": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "occurrence_style": {
+                  "type": "string",
+                  "enum": [
+                    "#",
+                    "roman",
+                    "full",
+                    "arabic"
+                  ]
+                }
+              },
+              "additionalProperties": false
+            },
             "max_depth": {
               "type": "integer",
               "minimum": 0,
@@ -8982,6 +9180,72 @@
                 "minimum": 0,
                 "maximum": 9007199254740991
               }
+            },
+            "nicknames": {
+              "type": "object",
+              "properties": {
+                "sets": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "additionalProperties": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 32,
+                      "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                    }
+                  }
+                },
+                "models": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "agents": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "categories": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "default": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "occurrence_style": {
+                  "type": "string",
+                  "enum": [
+                    "#",
+                    "roman",
+                    "full",
+                    "arabic"
+                  ]
+                }
+              },
+              "additionalProperties": false
             },
             "max_depth": {
               "type": "integer",
@@ -11538,6 +11802,72 @@
                   "maximum": 9007199254740991
                 }
               },
+              "nicknames": {
+                "type": "object",
+                "properties": {
+                  "sets": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "additionalProperties": {
+                      "minItems": 1,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 32,
+                        "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                      }
+                    }
+                  },
+                  "models": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "agents": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "categories": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "default": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "occurrence_style": {
+                    "type": "string",
+                    "enum": [
+                      "#",
+                      "roman",
+                      "full",
+                      "arabic"
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              },
               "max_depth": {
                 "type": "integer",
                 "minimum": 0,
@@ -14086,6 +14416,72 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "nicknames": {
+                    "type": "object",
+                    "properties": {
+                      "sets": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "additionalProperties": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                          }
+                        }
+                      },
+                      "models": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "agents": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "categories": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "default": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "occurrence_style": {
+                        "type": "string",
+                        "enum": [
+                          "#",
+                          "roman",
+                          "full",
+                          "arabic"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "max_depth": {
                     "type": "integer",
@@ -16636,6 +17032,72 @@
                       "maximum": 9007199254740991
                     }
                   },
+                  "nicknames": {
+                    "type": "object",
+                    "properties": {
+                      "sets": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "additionalProperties": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                          }
+                        }
+                      },
+                      "models": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "agents": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "categories": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "default": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "occurrence_style": {
+                        "type": "string",
+                        "enum": [
+                          "#",
+                          "roman",
+                          "full",
+                          "arabic"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
+                  },
                   "max_depth": {
                     "type": "integer",
                     "minimum": 0,
@@ -19184,6 +19646,72 @@
                       "minimum": 0,
                       "maximum": 9007199254740991
                     }
+                  },
+                  "nicknames": {
+                    "type": "object",
+                    "properties": {
+                      "sets": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "additionalProperties": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 32,
+                            "pattern": "^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]+$"
+                          }
+                        }
+                      },
+                      "models": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "agents": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "categories": {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "default": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "occurrence_style": {
+                        "type": "string",
+                        "enum": [
+                          "#",
+                          "roman",
+                          "full",
+                          "arabic"
+                        ]
+                      }
+                    },
+                    "additionalProperties": false
                   },
                   "max_depth": {
                     "type": "integer",
