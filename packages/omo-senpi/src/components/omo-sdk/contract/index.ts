@@ -10,17 +10,10 @@ export { PORT_EFFECTS, PORT_OPERATIONS, PORTS, type Port } from "./ports"
 export type { CallOptions, OmoSdkRoot, RootCallInput, RootCallKey } from "./root"
 export { inputAccepts, isPrincipal, sessionAnswerAccepts } from "./validate"
 export { assertedExpectation, BEHAVIOUR_CHANGES, type BehaviourChange, type ChangeId } from "./behaviour-changes"
-export { Destination, Handle, type ReadableHandle } from "./inputs/custody"
+export type { ReadableHandle } from "./inputs/custody"
 export type { LaunchKeyHandle } from "./inputs/launch"
-export { type OmoPrincipal, Principal, PRINCIPAL_ID, PRINCIPAL_KINDS, type PrincipalKind } from "./principal"
-export {
-  type Cell,
-  type MatrixLine,
-  PRINCIPAL_MATRIX,
-  REFUSALS,
-  type Refusal,
-  refusalScenarioId,
-} from "./principal-matrix"
+export { type OmoPrincipal, PRINCIPAL_ID, PRINCIPAL_KINDS, type PrincipalKind } from "./principal"
+export { type Cell, type MatrixLine, PRINCIPAL_MATRIX, REFUSALS, type Refusal } from "./principal-matrix"
 export { CUSTODY_RESULTS, SESSION_RESULTS, type UserCode } from "./results/custody"
 export {
   AUTH_ACCOUNT_CHECK_CODES,
@@ -29,4 +22,4 @@ export {
   type FreeField,
   type FreeFieldOrigin,
 } from "./results/auth-check"
-export { type Endpoint, EndpointSelector, type RootAuthorityOptions } from "./root-options"
+export type { Endpoint, RootAuthorityOptions } from "./root-options"

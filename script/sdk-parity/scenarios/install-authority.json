@@ -301,6 +301,112 @@
       ]
     },
     {
+      "id": "install.setup.detect/host-change-refuses-connector",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/host-change-refuses-session",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.detect/host-change-refuses-service",
+      "row": "install.setup.detect",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-connector",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-session",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "install.setup.plan/host-change-refuses-service",
+      "row": "install.setup.plan",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "install.plugin/codex-autonomous-refuses-connector",
       "row": "install.plugin",
       "input": {
