@@ -118,7 +118,10 @@ describe("negative controls: exact route correspondence and the published mappin
   })
 
   test("#given a delegated route module that gains an option no row maps #then that route is named", () => {
-    const findings = scanArgvComparisons("packages/omo-native/account-show.ts", 'export const wide = (args) => args.includes("--wide")\n')
+    const findings = scanArgvComparisons(
+      "packages/omo-native/account-show.ts",
+      'export const wide = (args) => args.includes("--wide")\n',
+    )
     expect(routeFlagProblems(findings, rows)).toContainEqual(
       'packages/omo-native/account-show.ts:1 accepts --wide on "account show"; map it on that route\'s row entry',
     )
@@ -127,17 +130,25 @@ describe("negative controls: exact route correspondence and the published mappin
   test("#given a mapped flag the cell shows that a row stops mapping, or a mapping the cell does not show #then each is named", () => {
     const template = readFileSync(TEMPLATE_PATH, "utf8")
     const edit = (change: (row: Row) => Row) =>
-      files.map((file) => ({ ...file, rows: file.rows.map((candidate) => (candidate.id === "threads.read" ? change(clone(candidate)) : candidate)) }))
+      files.map((file) => ({
+        ...file,
+        rows: file.rows.map((candidate) => (candidate.id === "threads.read" ? change(clone(candidate)) : candidate)),
+      }))
     const dropped = edit((read) => {
       for (const cli of read.cli) delete (cli.flags as Record<string, string>)["--cursor"]
       return read
     })
-    expect(mappingProblems(template, dropped)).toContainEqual("6.1#3: the cell shows --cursor, which no entry of its rows maps")
+    expect(mappingProblems(template, dropped)).toContainEqual(
+      "6.1#3: the cell shows --cursor, which no entry of its rows maps",
+    )
     const added = edit((read) => {
-      for (const cli of read.cli) if (cli.route.join(" ") === "thread read") Object.assign(cli.flags, { "--since": "cursor" })
+      for (const cli of read.cli)
+        if (cli.route.join(" ") === "thread read") Object.assign(cli.flags, { "--since": "cursor" })
       return read
     })
-    expect(mappingProblems(template, added)).toContainEqual("6.1#3: threads.read maps --since, which the published cell does not show")
+    expect(mappingProblems(template, added)).toContainEqual(
+      "6.1#3: threads.read maps --since, which the published cell does not show",
+    )
   })
 })
 

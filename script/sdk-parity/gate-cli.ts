@@ -9,6 +9,7 @@ import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
+import { runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
@@ -129,11 +130,7 @@ try {
     originalText: readFileSync(join(REPO_ROOT, ORIGINAL_PATH), "utf8"),
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
-    ranAtHead: new Set(
-      Object.entries(headSide.outcomes)
-        .filter(([, outcome]) => !JSON.stringify(outcome).includes('"code":"not_implemented"'))
-        .map(([id]) => id),
-    ),
+    evidence: await runEffectScenarios(rows),
     atBase: {
       originalText: show(mergeBase, ORIGINAL_PATH),
       pinText: show(mergeBase, PIN_PATH),

@@ -2625,7 +2625,7 @@
         "threads.aliases.clear"
       ],
       "cells": [
-        "`threads.aliases.resolve({ alias })`, `.set({ thread, alias })`, `.clear({ thread })`",
+        "`threads.aliases.resolve({ alias })`, `.set({ thread?, alias })` with `thread` optional as for close, because the tool lets a session omit it, `.clear({ thread })`",
         "none",
         "`thread_rename { alias }`, `thread_create { alias }`",
         "partial: remote module `aliases.*`",

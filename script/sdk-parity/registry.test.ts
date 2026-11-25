@@ -6,6 +6,8 @@ import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ul
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
+import { runEffectScenarios } from "./conformance-run"
+import { baseRecord, mergeBase } from "./git-base"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
@@ -39,11 +41,6 @@ describe("SDK parity registry (#14947)", () => {
 
   test("#given every native dispatcher #then each flag is mapped on the route that accepts it, shared flags on every verb", () => {
     expect(routeFlagProblems(nativeArgvInventory(REPO_ROOT), rows)).toEqual([])
-  })
-
-  test("#given the rows counted as built #then each has effect scenarios and no stub outcome", () => {
-    const open = new Set((JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline).entries.map((entry) => entry.id))
-    expect(conformanceProblems(rows, open, [])).toEqual([])
   })
 
   test("#given both native entry points #then every argv comparison has a row and every launcher row token is compared", () => {
@@ -83,15 +80,20 @@ describe("SDK parity registry (#14947)", () => {
     expect(toolProblems(tools, rows)).toEqual([])
   })
 
-  test("#given the initializing pull request #then the original, its pin and the manifest are admitted together", () => {
+  test("#given the merge base this pull request merges into and the head's run evidence #then the baseline and the built rows hold", async () => {
+    // A recurring check (review 6061267823 H1): read from git at every pull request, so the first correct gap closure
+    // passes here exactly as it passes the gate; the initialization admission applies only while the base has no record.
+    const unresolved = JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline
+    const evidence = await runEffectScenarios(rows)
     const state = {
       rows,
       originalText: repoFile(ORIGINAL_PATH),
       pinText: repoFile(PIN_PATH),
-      unresolved: JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline,
-      ranAtHead: new Set<string>(),
-      atBase: { originalText: undefined, pinText: undefined, unresolved: undefined },
+      unresolved,
+      evidence,
+      atBase: baseRecord(mergeBase()),
     }
     expect(baselineProblems(state)).toEqual([])
+    expect(conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence)).toEqual([])
   })
 })

@@ -618,7 +618,7 @@
         "install.setup.apply"
       ],
       "cells": [
-        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent })` (asked once, or per stage as `--ask-each` does)",
+        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: \"all\" \\| \"each\" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each`",
         "`omo setup [--yes] [--ask-each] [--dry-run]`",
         "none",
         "**no**",
