@@ -1,4 +1,9 @@
-import type { CredentialStore } from "../account-core/src/keystore"
+import { createCredentialStore, type CredentialStore, INTERACTIVE_READ_WAIT } from "../account-core/src/keystore"
+import { serviceAccountsOpen } from "../account-core/src/accounts-gate"
+import { accountSignIn, type SignInRequest } from "../account-core/src/calls/sign-in"
+import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
+import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
+import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 import { type Credentials, credentialSchema, serviceOrigin } from "../account-core/src/protocol"
 import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import {
@@ -14,7 +19,8 @@ import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { accountStoreDependencies, runAccountStore } from "./account-store"
-import { launcherAccountDependencies } from "./account-launcher"
+import { cliDeviceServiceHandoff } from "./device-service-handoff"
+import { setUpRemoteAfterSignIn } from "./remote-entry"
 
 export { ACCOUNT_EXIT }
 
@@ -231,5 +237,48 @@ export async function runAccountCommand(
       error: stderr,
     }),
     args.slice(1),
+  )
+}
+
+type Io = Pick<AccountCommandDependencies, "readStdin" | "output" | "error"> & { readonly log: (line: string) => void }
+
+/** This machine's account as the launcher reaches it: its credential store, sync pin, device service and setup. */
+function launcherAccountDependencies(api: string, io: Io) {
+  const pinDir = () => syncPinDir(resolveMemoryRoot(process.env, process.cwd()))
+  // One store per command: its keyring check and fallback notice are per store (#10658 review).
+  let store: CredentialStore | undefined
+  return {
+    api,
+    get store() {
+      store ??= createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
+      return store
+    },
+    pinDir,
+    beforeKeysDiscarded: retireSyncPinOnDiscard({ pinDir, log: io.log }),
+    deviceService: cliDeviceServiceHandoff({ api, log: io.log }),
+    setUpDeviceService: () => setUpRemoteAfterSignIn(io.log),
+    ...io,
+  }
+}
+
+const silent = (): void => undefined
+
+/**
+ * account.signIn for the omo-ai/sdk entry (security design 5.4): the launcher's own sign-in, run in the caller's process
+ * with exactly the dependencies `omo account sign-in` uses. Nothing is printed: the caller hears the codes through
+ * onUserCode and the outcome through the answer.
+ */
+export function signInInLauncher(api: string, request: SignInRequest) {
+  const deps = launcherAccountDependencies(api, {
+    log: silent,
+    output: silent,
+    error: silent,
+    readStdin: async () => "",
+  })
+  const { store, deviceService, setUpDeviceService } = deps
+  const session = sessionOf(deps)
+  return accountSignIn(
+    { api, session, store, deviceService, accountsOpen: serviceAccountsOpen(), setUpDeviceService },
+    request,
   )
 }
