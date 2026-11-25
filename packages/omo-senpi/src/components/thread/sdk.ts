@@ -1,14 +1,12 @@
-import { randomUUID } from "node:crypto"
-import { join } from "node:path"
+import type { WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
-import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
-import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
-
-import { resolveAddress } from "./address"
-import { toThreadAddressEntries, type AddressEntry } from "./address-book"
-import type { ThreadAddressEntry } from "./addressing"
+import { assembleForFacade } from "../omo-sdk/assembly"
+import type { OmoFailure } from "../omo-sdk/contract"
+import { storeRefusal } from "../omo-sdk/root/extension-codes"
+import { threadToolFailureOf } from "../omo-sdk/root/thread-failures"
 import {
   parseThreadParams,
+  unknownKeys,
   threadToolParamSchemas,
   type ThreadCloseInput,
   type ThreadCreateInput,
@@ -18,19 +16,13 @@ import {
   type ThreadState,
   type ThreadToolResult,
 } from "./contracts"
-import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
-import { createThread } from "./control/create"
-import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
-import { locateControl } from "./control/locate"
-import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
-import { renameThread } from "./control/rename"
-import { controlIdentity, controlRefusalOf } from "./control/port"
-import { createReceipts } from "./control/receipts"
-import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
-import { createGatewayStore, type GatewayStore } from "./gateway/store"
-import type { ProvenanceWorkspaces } from "./gateway/provenance-resolver"
-import type { StoreExtensionApi } from "./gateway/store-extensions"
+import type { StoreExtensionApi, StoreExtensionRegistration } from "./gateway/store-extensions"
+import type { RelayDeliverySuccess } from "./gateway/transport"
+import type { GatewayDeliveryMode, GatewayDeliveryResult, GatewayDeliverySuccess } from "./gateway/types"
+import type { ThreadCoreOptions } from "./sdk-core/context"
+import type { Failure } from "./sdk-core/failures"
+import type { LocatedThread } from "./sdk-core/reads"
 export type {
   StoreExtensionApi,
   StoreExtensionRegistration,
@@ -40,46 +32,9 @@ export type {
   StoreExtensionRefusal,
   StoreExtensionRefusalCode,
 } from "./gateway/store-extensions"
-import type { DeliveryOutcome, RelayDeliverySuccess } from "./gateway/transport"
-import type { GatewayDeliveryMode, GatewayDeliveryResult, GatewayDeliverySuccess } from "./gateway/types"
-import { createLiveThreadSurface, parseHostStatusAll } from "./live-surface"
-import { resolveThreadSocket } from "./live-surface-paths"
-import { createGatewayServices } from "./tools/gateway-services"
-import { addressBook, hostView } from "./tools/internals"
-import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "./tools/ports"
-import { listThreads, readThread, withBacklog } from "./tools/read-ops"
-import { listAcross } from "./remote/cross-device"
-import { TOOL_CALL_BUDGET_MS, waitWithinCallBudget, withCallDeadline } from "../call-budget/call-deadline"
-import type { RemoteThreadSurface } from "./remote/ports"
+export type { LocatedThread } from "./sdk-core/reads"
 
-export type ThreadSdkOptions = {
-  readonly agentDir: string
-  /** The caller's working directory: the workspace a call without `all_scope` is scoped to. */
-  readonly cwd: string
-  readonly uid: number
-  readonly user: string
-  readonly env?: Readonly<Record<string, string | undefined>>
-  /**
-   * The caller's `provenance.workspaces` table. The SDK is a standalone build that does not read omo.json itself;
-   * without a table, sends are classified by the caller's environment (`OMO_PROVENANCE_*`) and git owner only.
-   */
-  readonly provenanceWorkspaces?: ProvenanceWorkspaces
-  /** The engine's `host status --all --include-workers --json` stdout; the caller owns how the engine is run. */
-  readonly engineStatusAll?: () => Promise<string | undefined>
-  /** Where the store worker sidecar is resolved from when this SDK is not loaded from `omo.js`. */
-  readonly workerModuleUrl?: string | URL
-  readonly host?: ThreadHost
-  readonly store?: GatewayStore
-  /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
-  readonly firstPromptWaitMs?: number
-  readonly now?: () => number
-  /**
-   * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
-   * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
-   * shipped entry (`extension/thread-sdk.ts`) passes the account surface when its caller passes none (#14616).
-   */
-  readonly remote?: RemoteThreadSurface
-}
+export type ThreadSdkOptions = ThreadCoreOptions
 
 /**
  * The SDK's boundary check: a script that calls `createThreadSdk()` with no options, or without one of the four fields
@@ -97,7 +52,6 @@ export function assertThreadSdkOptions(options: unknown): asserts options is Thr
     throw new TypeError(`createThreadSdk needs { agentDir, cwd, uid, user }; missing or invalid: ${missing.join(", ")}`)
 }
 
-type Failure = { readonly kind: "error"; readonly error: ThreadToolFailure }
 type Scoped = { readonly all_scope?: boolean }
 type Keyed = { readonly idempotency_key?: string }
 /** A send's answer: the gateway's delivery facts, with the session named `thread`, the address `read` and `send` take back. */
@@ -106,16 +60,6 @@ export type ThreadSdkSendResult =
   /** A send to a session on another device (#14616): its device answered; there is no local row, so no `message_seq`. */
   | (Omit<RelayDeliverySuccess, "thread_id"> & { readonly thread: string })
   | Exclude<GatewayDeliveryResult, GatewayDeliverySuccess>
-
-/** Where a session lives right now, as `omo daemon adopt` needs it. */
-export type LocatedThread = Pick<
-  AddressEntry,
-  "thread_id" | "title" | "cwd" | "status" | "session_path" | "endpoint" | "surface" | "alive"
-> & {
-  /** A thread on another device: its device id and the address every tool accepts (absent on this device). */
-  readonly device?: string
-  readonly address?: string
-}
 
 export type ThreadSdk = StoreExtensionApi & {
   /** `cli:<uid>`: the principal every receipt, budget and send of this SDK is keyed by. */
@@ -163,62 +107,27 @@ export type ThreadSdk = StoreExtensionApi & {
   readonly dispose: () => Promise<void>
 }
 
-// The first load compiles the extension graph; a loaded host answers in well under a second (the task host's bound).
-const DAEMON_WARM_TIMEOUT_MS = 60_000
-
-function fail(
-  code: Parameters<typeof threadToolFailure>[0],
-  message: string,
-  next: string,
-  details?: Readonly<Record<string, unknown>>,
-): Failure {
-  return { kind: "error", error: threadToolFailure(code, message, next, details) }
-}
-
-/** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
-function thrown(error: unknown): Failure {
-  // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
-  const refusal = controlRefusalOf(error)
-  if (refusal !== undefined) return { kind: "error", error: refusal }
-  const schema = gatewaySchemaRefusal(error)
-  if (schema !== undefined) return { kind: "error", error: schema }
-  const message = error instanceof Error ? error.message : String(error)
-  if (message.startsWith("host_unavailable:"))
-    return fail(
-      "host_unavailable",
-      `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`,
-      "Retry when a host or terminal session is running.",
-    )
-  if (message.startsWith("unsupported:"))
-    return fail(
-      "unsupported",
-      `The target's endpoint does not accept ${message.slice("unsupported:".length)}.`,
-      "Use thread read to follow the session.",
-      { command: message.slice("unsupported:".length) },
-    )
-  return fail(
-    "internal_error",
-    `Thread operation failed: ${message}`,
-    "Run omo thread list and retry after checking the target.",
-  )
-}
-
 /**
- * A script names only the keys an operation reads: a misspelt one (`allScope` for `all_scope`) is refused by name
- * instead of silently ignored (#14316).
+ * Each field of the facade's send answer and the field of the root's threads.send answer it projects from (design 4.1,
+ * the send amendment). The root's `link` has no facade field, so the facade does not carry it.
  */
-function unknownKeys(request: unknown, known: readonly string[]): Failure | undefined {
-  if (typeof request !== "object" || request === null || Array.isArray(request))
-    return fail("invalid_arguments", "The options must be an object.", `Pass an object with ${known.join(", ")}.`)
-  const unknown = Object.keys(request).filter((key) => !known.includes(key))
-  if (unknown.length === 0) return undefined
-  return fail(
-    "invalid_arguments",
-    `Unknown option${unknown.length === 1 ? "" : "s"}: ${unknown.join(", ")}.`,
-    `Pass only ${known.join(", ")}.`,
-    { unknown },
-  )
-}
+export const SEND_PROJECTION = {
+  kind: "kind",
+  thread: "thread",
+  delivery_id: "delivery_id",
+  message_seq: "message_seq",
+  delivery: "delivery",
+  outcome: "outcome",
+  effective_mode: "effective_mode",
+  endpoint_kind: "endpoint_kind",
+  deduplicated: "deduplicated",
+  collapsed: "collapsed",
+  device: "device",
+} as const
+
+const FACADE_FIELD: ReadonlyMap<string, string> = new Map(
+  Object.entries(SEND_PROJECTION).map(([facade, root]) => [root, facade]),
+)
 
 const LIST_KEYS = ["all_scope", "state"] as const
 const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
@@ -231,299 +140,102 @@ const SEND_KEYS = [
   "idempotency_key",
   "collapse_key",
 ] as const
-const LOCATE_KEYS = ["thread", "all_scope"] as const
 
-// omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
-async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
-  try {
-    return await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, body)
-  } catch (error) {
-    return thrown(error)
-  }
+// The facade answers the thread contract's own shapes, which the root's thread calls answer too; a root failure is the
+// thread failure it was made from (omo-sdk/root/thread-failures.ts).
+function asThreadResult(answer: { readonly kind: string }): ThreadToolResult {
+  if (answer.kind !== "error") return answer as ThreadToolResult
+  return { kind: "error", error: threadToolFailureOf(answer as OmoFailure) }
 }
 
 /**
- * The script-callable thread surface: every operation the agent tools offer, over the same address
- * book and engine, without an agent session. It never starts a host; it reads the endpoints
- * the engine enumerates and the gateway store under `agentDir`.
+ * The script-callable thread surface, kept as it shipped (`runtime/thread-sdk/sdk.js`): a compatibility facade over the
+ * omo SDK root (first-party design 4.1). Each member maps its fields onto the root's call and its answer back; the root
+ * is built for the script principal of `uid`, with the host, store, remote and clock given here.
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   assertThreadSdkOptions(options)
-  const principal = `cli:${options.uid}`
-  const env = { ...(options.env ?? process.env), OMO_CODING_AGENT_DIR: options.agentDir }
-  const engineStatusAll = options.engineStatusAll
-  const host =
-    options.host ??
-    createLiveThreadSurface(undefined, {
-      env,
-      ...(engineStatusAll === undefined ? {} : { statusAll: async () => parseHostStatusAll(await engineStatusAll()) }),
-    })
-  const store =
-    options.store ??
-    createGatewayStore({
-      agentDir: options.agentDir,
-      ...(options.workerModuleUrl === undefined ? {} : { workerModuleUrl: options.workerModuleUrl }),
-    })
-  const now = options.now ?? store.now
-  const workspaces = options.provenanceWorkspaces
-  const surface: ThreadToolSurfaceOptions = {
-    host,
-    store,
-    env,
-    ...(workspaces === undefined ? {} : { loadProvenanceWorkspaces: () => workspaces }),
-    stateDirectory: options.agentDir,
-    sessionsDirectory: () => join(options.agentDir, "sessions"),
-    callerSessionId: () => UNKNOWN_CALLER,
-    callerWorkspaceRoot: () => options.cwd,
-    now,
-  }
-  const view = () => hostView(surface)
-  const { pipeline } = createGatewayServices(
-    { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-    () => hostView(surface, { offline: true }),
-  )
-  const controls: ThreadToolSurfaceOptions = {
-    ...surface,
-    ...(options.remote === undefined ? {} : { remote: options.remote }),
-  }
-  // One session control as its tool runs it: the tool's parameter schema, the receipt protocol its key is honoured by
-  // (control/receipts.ts, the one the tools run), then its body; a control's typed refusal is data.
-  const receipts = createReceipts(store, now)
-  type Retrying = { readonly error_note: string | null } | undefined
-  function control<
-    N extends "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model",
-    I,
-  >(
-    name: N,
-    request: I,
-    body: (value: I, key: string, retrying: Retrying) => Promise<ThreadToolResult>,
-  ): Promise<ThreadToolResult> {
-    return guarded(async () => {
-      const parsed = parseThreadParams(threadToolParamSchemas[name], request)
-      if (parsed.kind === "error") return parsed as ThreadToolResult
-      const value = parsed.value as I & Keyed
-      const key = value.idempotency_key?.trim()
-      const scope = {
-        principal,
-        operation: name,
-        idempotency_key: key !== undefined && key.length > 0 ? key : `call:${randomUUID()}`,
-      }
-      const admission = await receipts.admit(scope, value)
-      if (admission.kind === "answer") return admission.result
-      let result: ThreadToolResult
-      try {
-        result = await answered(() => body(value, scope.idempotency_key, admission.retrying))
-      } catch (error) {
-        await receipts.fail(scope, error instanceof Error ? error.message : String(error))
-        throw error
-      }
-      await receipts.settle(scope, result, admission.retrying)
-      return result
-    })
-  }
-  async function located(address: string, allScope: boolean | undefined) {
-    return await locateControl(controls, await view(), address, allScope, UNKNOWN_CALLER)
-  }
-
-  // The shared resolver's context, as far as it is fixed for this SDK instance (the local book each call builds
-  // is spread in per call). `self` never resolves for the CLI (UNKNOWN_CALLER), exactly as before.
-  const resolveContext = (local: readonly ThreadAddressEntry[]) => ({
-    remote: options.remote,
-    callerWorkspaceRoot: surface.callerWorkspaceRoot(),
-    local,
-    callerId: UNKNOWN_CALLER,
+  const { agentDir, cwd, uid, user, env, host, store, remote, now } = options
+  const { provenanceWorkspaces, engineStatusAll, workerModuleUrl, firstPromptWaitMs } = options
+  const { root, releaseLocated } = assembleForFacade({
+    agentDir,
+    cwd,
+    uid,
+    user,
+    ...(env === undefined ? {} : { env }),
+    principal: { kind: "script", uid },
+    threads: {
+      ...(provenanceWorkspaces === undefined ? {} : { provenanceWorkspaces }),
+      ...(engineStatusAll === undefined ? {} : { engineStatusAll }),
+      ...(workerModuleUrl === undefined ? {} : { workerModuleUrl }),
+      ...(firstPromptWaitMs === undefined ? {} : { firstPromptWaitMs }),
+    },
+    ports: {
+      ...(host === undefined ? {} : { host }),
+      ...(store === undefined ? {} : { store }),
+      ...(remote === undefined ? {} : { remote }),
+      ...(now === undefined ? {} : { now }),
+    },
   })
-
-  function named(sent: DeliveryOutcome): ThreadSdkSendResult {
-    if (sent.kind !== "ok") return sent
-    const { thread_id, ...facts } = sent
-    return { ...facts, thread: thread_id }
-  }
-
+  const threads = root.threads
   return {
-    registerStoreExtension: store.registerStoreExtension,
-    extensionCall: store.extensionCall,
-    principal,
-    list: (request = {}) =>
-      guarded(
-        async () =>
-          unknownKeys(request, LIST_KEYS) ??
-          listAcross(
-            options.remote,
-            await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
-            request.all_scope === true,
-            request.state,
-          ),
-      ),
-    read: (request) =>
-      guarded(
-        async () =>
-          unknownKeys(request, READ_KEYS) ??
-          readThread(
-            { ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) },
-            await view(),
-            {
-              thread: request.thread,
-              max_bytes: request.max_bytes,
-              cursor: request.cursor,
-              all_scope: request.all_scope,
-            },
-            UNKNOWN_CALLER,
-          ),
-      ),
-    send: (request) =>
-      guarded(async () => {
-        const refused = unknownKeys(request, SEND_KEYS)
-        if (refused !== undefined) return refused
-        const current = await viewForSend(controls, request.thread, () => hostView(surface, { offline: true }))
-        const routed = await sendThread(
-          controls,
-          pipeline,
-          resolveAddress,
-          current,
-          {
-            thread: request.thread,
-            message: request.text,
-            delivery: request.mode,
-            all_scope: request.all_scope,
-            expected_turn_id: request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id),
-            collapse_key: request.collapse_key,
-          },
-          request.idempotency_key ?? `auto:${randomUUID()}`,
-          { kind: "operator", uid: options.uid, user: options.user },
-          request,
-        )
-        return routed.kind === "error" ? routed : named(routed.sent)
-      }),
-    locate: (request) =>
-      guarded(async () => {
-        const refused = unknownKeys(request, LOCATE_KEYS)
-        if (refused !== undefined) return refused
-        const current = await view()
-        const resolved = await resolveAddress(
-          resolveContext(toThreadAddressEntries(addressBook(surface, current))),
-          request.thread,
-          { all_scope: request.all_scope, probe: true },
-        )
-        if (resolved.kind === "error") return { kind: "error", error: resolved } as const
-        // A thread on another device: the same located shape, carrying its device and the address every tool takes.
-        if (resolved.where.kind === "device") {
-          const { thread_id, name, cwd, status } = resolved.entry
-          return {
-            kind: "ok",
-            thread: {
-              thread_id,
-              title: name,
-              cwd,
-              status,
-              session_path: null,
-              endpoint: null,
-              surface: null,
-              alive: status === "live",
-              device: resolved.where.row.device,
-              address: resolved.address,
-            },
-          } as const
-        }
-        const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.thread)
-        const entry = entries.find((candidate) => candidate.alive) ?? entries[0]
-        if (entry === undefined)
-          return fail(
-            "not_found",
-            `Thread ${resolved.thread} is not in the address book.`,
-            "Run omo thread list --all-scope.",
-          )
-        const { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive } = entry
-        return {
-          kind: "ok",
-          thread: { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive },
-        } as const
-      }),
-    create: (request) =>
-      control("thread_create", request, async (value, key, retrying) =>
-        createThread(controls, await view(), value, {
-          operationId: key,
-          callerId: UNKNOWN_CALLER,
-          retrying,
-          view,
-          deliverPrompt: async (_current, target, send, key) => {
-            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does,
-            // and goes the way every send of this SDK goes: on another device as the person's own prompt (#15006).
-            const sent = await sendToTarget(
-              controls,
-              pipeline,
-              target,
-              send,
-              key,
-              { kind: "operator", uid: options.uid, user: options.user },
-              send,
-              "creator",
-            )
-            if (sent.kind === "error") return { kind: "error", error: sent.error }
-            const { thread_id, ...facts } = sent
-            return { ...facts, thread: thread_id } as ThreadToolResult
-          },
-          awaitPromptStart: (deliveryId) =>
-            awaitPromptStart(
-              store,
-              deliveryId,
-              waitWithinCallBudget(
-                options.firstPromptWaitMs ?? FIRST_PROMPT_START_WAIT_MS,
-                FIRST_PROMPT_START_RESERVE_MS,
-              ),
-            ),
-        }),
-      ),
-    interrupt: (request) =>
-      control("thread_interrupt", request, async (value) => {
-        const found = await located(value.thread, value.all_scope)
-        if (found.kind === "error") return found.result
-        if (found.kind === "not_live") return NOT_LIVE
-        return await interruptThread(found.control, value.turn_id)
-      }),
-    close: (request) =>
-      control("thread_close", request, async (value) => {
-        const found = await located(value.thread ?? "self", value.all_scope)
-        if (found.kind === "error") return found.result
-        // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
-        if (found.kind === "not_live")
-          return { kind: "ok", ...controlIdentity(found), closed: false, reason: "not_live", dropped_deliveries: [] }
-        return await closeThread(found.control, closeOptions(value))
-      }),
-    rename: (request) =>
-      control("thread_rename", request, async (value, key) =>
-        renameThread(controls, await view(), value, key, UNKNOWN_CALLER),
-      ),
-    set_model: (request) =>
-      control("thread_set_model", request, async (value) => {
-        const found = await located(value.thread, value.all_scope)
-        if (found.kind === "error") return found.result
-        if (found.kind === "not_live") return NOT_LIVE
-        return await setModelOn(found.control, value.model, value.provider)
-      }),
-    release: async (thread, request) => {
-      const releaseSession = host.gateway?.releaseSession
-      if (releaseSession === undefined || thread.endpoint === null)
-        return { success: false, error: "release_unsupported" }
-      try {
-        return await releaseSession(thread.endpoint, { reason: "takeover", ...request })
-      } catch (error) {
-        const failure = thrown(error)
-        return { success: false, error: failure.error.code, errorData: { hint: failure.error.message } }
-      }
+    registerStoreExtension: async (extension: StoreExtensionRegistration) => {
+      const registered = await threads.extensions.register(
+        extension as Parameters<typeof threads.extensions.register>[0],
+      )
+      return registered.kind === "ok" ? registered : storeRefusal(registered)
     },
-    warmDaemon: async () =>
-      classifyWarmReply(
-        await askHost(
-          resolveThreadSocket(env),
-          { id: `omo-daemon-warm-${randomUUID()}`, type: "warm" },
-          DAEMON_WARM_TIMEOUT_MS,
-          { agentDir: options.agentDir },
-        ),
-      ),
-    dispose: async () => {
-      await options.remote?.sessions.close?.().catch(() => undefined)
-      return store.dispose()
+    extensionCall: async (name, op, args) => {
+      const answered = await threads.extensions.call({ name, op, args })
+      return answered.kind === "ok" ? (answered as never) : storeRefusal(answered)
     },
+    principal: `cli:${uid}`,
+    list: async (request = {}) => {
+      const refused = unknownKeys(request, LIST_KEYS)
+      if (refused !== undefined) return refused
+      const { state, ...rest } = request
+      return asThreadResult(await threads.list({ ...rest, ...(state === undefined ? {} : { state: [...state] }) }))
+    },
+    read: async (request) => unknownKeys(request, READ_KEYS) ?? asThreadResult(await threads.read(request)),
+    send: async (request) => {
+      const refused = unknownKeys(request, SEND_KEYS)
+      if (refused !== undefined) return refused
+      const { text, mode, expected_turn_id, ...rest } = request
+      const sent = await threads.send({
+        ...rest,
+        message: text,
+        ...(mode === undefined ? {} : { delivery: mode }),
+        ...(expected_turn_id === undefined ? {} : { expected_turn_id: String(expected_turn_id) }),
+      })
+      if (sent.kind !== "ok") return { kind: "error", error: threadToolFailureOf(sent as OmoFailure) }
+      const projected = Object.entries(sent).flatMap(([field, value]) => {
+        const facade = FACADE_FIELD.get(field)
+        return facade === undefined ? [] : [[facade, value] as const]
+      })
+      return Object.fromEntries(projected) as ThreadSdkSendResult
+    },
+    locate: async (request) => {
+      const located = await threads.locate(request)
+      return located.kind === "ok"
+        ? { kind: "ok", thread: located.located }
+        : { kind: "error", error: threadToolFailureOf(located) }
+    },
+    create: async (request) => {
+      // The facade takes the tool's create schema, narrower than the root's: what it refused, it still refuses as it did.
+      const parsed = parseThreadParams(threadToolParamSchemas.thread_create, request)
+      if (parsed.kind === "error") return parsed as ThreadToolResult
+      return asThreadResult(await threads.create(request))
+    },
+    interrupt: async (request) => asThreadResult(await threads.interrupt(request)),
+    close: async (request) => asThreadResult(await threads.close(request)),
+    rename: async (request) => asThreadResult(await threads.rename(request)),
+    set_model: async (request) => asThreadResult(await threads.setModel(request)),
+    release: releaseLocated,
+    warmDaemon: async () => {
+      const warmed = await root.daemon.warm({})
+      if (warmed.kind === "ok") return warmed.value as WarmAnswer
+      throw new Error(warmed.error.message)
+    },
+    dispose: root.dispose,
   }
 }
