@@ -25,6 +25,7 @@ import { locateControl } from "./control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "./control/operations"
 import { renameThread } from "./control/rename"
 import { controlIdentity, controlRefusalOf } from "./control/port"
+import { createReceipts } from "./control/receipts"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { ReleaseSessionReply, ReleaseSessionRequest } from "./gateway/adapter"
 import { createGatewayStore, type GatewayStore } from "./gateway/store"
@@ -285,17 +286,39 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     ...surface,
     ...(options.remote === undefined ? {} : { remote: options.remote }),
   }
-  // One session control as its tool runs it: the tool's parameter schema, then its body, a control's typed refusal as data.
-  function control<I>(
-    schema: (typeof threadToolParamSchemas)[
-      "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"],
+  // One session control as its tool runs it: the tool's parameter schema, the receipt protocol its key is honoured by
+  // (control/receipts.ts, the one the tools run), then its body; a control's typed refusal is data.
+  const receipts = createReceipts(store, now)
+  type Retrying = { readonly error_note: string | null } | undefined
+  function control<
+    N extends "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model",
+    I,
+  >(
+    name: N,
     request: I,
-    body: (value: I) => Promise<ThreadToolResult>,
+    body: (value: I, key: string, retrying: Retrying) => Promise<ThreadToolResult>,
   ): Promise<ThreadToolResult> {
     return guarded(async () => {
-      const parsed = parseThreadParams(schema, request)
+      const parsed = parseThreadParams(threadToolParamSchemas[name], request)
       if (parsed.kind === "error") return parsed as ThreadToolResult
-      return await answered(() => body(parsed.value as I))
+      const value = parsed.value as I & Keyed
+      const key = value.idempotency_key?.trim()
+      const scope = {
+        principal,
+        operation: name,
+        idempotency_key: key !== undefined && key.length > 0 ? key : `call:${randomUUID()}`,
+      }
+      const admission = await receipts.admit(scope, value)
+      if (admission.kind === "answer") return admission.result
+      let result: ThreadToolResult
+      try {
+        result = await answered(() => body(value, scope.idempotency_key, admission.retrying))
+      } catch (error) {
+        await receipts.fail(scope, error instanceof Error ? error.message : String(error))
+        throw error
+      }
+      await receipts.settle(scope, result, admission.retrying)
+      return result
     })
   }
   async function located(address: string, allScope: boolean | undefined) {
@@ -446,10 +469,11 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         } as const
       }),
     create: (request) =>
-      control(threadToolParamSchemas.thread_create, request, async (value) =>
+      control("thread_create", request, async (value, key, retrying) =>
         createThread(controls, await view(), value, {
-          operationId: value.idempotency_key ?? `auto:${randomUUID()}`,
+          operationId: key,
           callerId: UNKNOWN_CALLER,
+          retrying,
           view,
           deliverPrompt: async (_current, target, send, key) => {
             // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does.
@@ -479,14 +503,14 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         }),
       ),
     interrupt: (request) =>
-      control(threadToolParamSchemas.thread_interrupt, request, async (value) => {
+      control("thread_interrupt", request, async (value) => {
         const found = await located(value.thread, value.all_scope)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE
         return await interruptThread(found.control, value.turn_id)
       }),
     close: (request) =>
-      control(threadToolParamSchemas.thread_close, request, async (value) => {
+      control("thread_close", request, async (value) => {
         const found = await located(value.thread ?? "self", value.all_scope)
         if (found.kind === "error") return found.result
         // Nothing live holds it: there is nothing to close, and the thread stays resumable from its session file.
@@ -495,11 +519,11 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         return await closeThread(found.control, closeOptions(value))
       }),
     rename: (request) =>
-      control(threadToolParamSchemas.thread_rename, request, async (value) =>
-        renameThread(controls, await view(), value, value.idempotency_key ?? `auto:${randomUUID()}`, UNKNOWN_CALLER),
+      control("thread_rename", request, async (value, key) =>
+        renameThread(controls, await view(), value, key, UNKNOWN_CALLER),
       ),
     set_model: (request) =>
-      control(threadToolParamSchemas.thread_set_model, request, async (value) => {
+      control("thread_set_model", request, async (value) => {
         const found = await located(value.thread, value.all_scope)
         if (found.kind === "error") return found.result
         if (found.kind === "not_live") return NOT_LIVE

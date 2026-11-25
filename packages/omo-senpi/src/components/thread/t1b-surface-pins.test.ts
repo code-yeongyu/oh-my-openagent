@@ -2030,7 +2030,7 @@ describe("T1b pins: controls", () => {
 })
 
 describe("T1b pins: the idempotency key on a control call", () => {
-  test("a repeat of close under one key: the tool replays its first answer and closes once; the SDK closes twice", async () => {
+  test("a repeat of close under one key: the tool and the SDK replay the first answer and close once", async () => {
     const toolSide = fresh()
     const first = await toolSide.tool("thread_close", { thread: LEGS.here, idempotency_key: "k-close" })
     const again = await toolSide.tool("thread_close", { thread: LEGS.here, idempotency_key: "k-close" })
@@ -2050,7 +2050,7 @@ describe("T1b pins: the idempotency key on a control call", () => {
             "reason": "closed",
             "thread": "dur-local",
           },
-          "closes": 2,
+          "closes": 1,
           "first": {
             "closed": true,
             "dropped_deliveries": [],
@@ -2091,7 +2091,7 @@ describe("T1b pins: the idempotency key on a control call", () => {
       sent.filter((entry) => entry.rpc?.["type"] === "interrupt").length
     expect({ tool: interruptsOn(toolSide.a.sent), sdk: interruptsOn(sdkSide.a.sent) }).toMatchInlineSnapshot(`
       {
-        "sdk": 2,
+        "sdk": 1,
         "tool": 1,
       }
     `)

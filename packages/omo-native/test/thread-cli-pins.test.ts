@@ -555,7 +555,7 @@ describe("omo thread pins", () => {
             "thread": "dur-local",
           },
         },
-        "closes": 2,
+        "closes": 1,
         "first": {
           "exit": 0,
           "json": {
