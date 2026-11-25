@@ -406,13 +406,20 @@ const sha256File = async (path) => {
   return `sha256:${createHash("sha256").update(readFileSync(path)).digest("hex")}`
 }
 
+// Two long strings that share a prefix used to print as the same 160 characters (#14969): show where they part.
+function diffExcerpt(golden, actual, width = 160) {
+  const left = JSON.stringify(golden) ?? "undefined"
+  const right = JSON.stringify(actual) ?? "undefined"
+  let at = 0
+  while (at < left.length && at < right.length && left[at] === right[at]) at++
+  const from = Math.max(0, at - 40)
+  const cut = (text) =>
+    `${from > 0 ? "…" : ""}${text.slice(from, from + width)}${text.length > from + width ? "…" : ""}`
+  return `golden=${cut(left)} actual=${cut(right)}${from > 0 ? ` (first difference at char ${at})` : ""}`
+}
+
 function summarizeDiffs(diffs) {
-  return diffs
-    .slice(0, 12)
-    .map(
-      (row) =>
-        `    ${row.path}: golden=${JSON.stringify(row.golden)?.slice(0, 160)} actual=${JSON.stringify(row.actual)?.slice(0, 160)}`,
-    )
+  return diffs.slice(0, 12).map((row) => `    ${row.path}: ${diffExcerpt(row.golden, row.actual)}`)
 }
 
 const SANDBOX_MCP_CONFIG = { mcpServers: { context7: { enabled: false }, grep_app: { enabled: false } } }
