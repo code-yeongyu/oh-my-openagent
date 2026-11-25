@@ -43,8 +43,8 @@ function namespaceLoads(loaders: CoreLoaders, context: CoreContext): ReadonlyMap
   )) {
     let core: Promise<Node> | undefined
     loads.set(namespace, async () => {
-      core ??= loader(context)
       try {
+        core ??= loader(context)
         return await core
       } catch {
         core = undefined
