@@ -33,6 +33,7 @@ import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
+import { reportFatal } from "./bin/lib/fatal.js"
 import { version } from "./bin/lib/install-calls.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
@@ -584,4 +585,10 @@ async function main(): Promise<void> {
   await import("../../node_modules/@code-yeongyu/senpi/dist/cli.js") // literal: see import note above
 }
 
-if (import.meta.main) await main()
+if (import.meta.main) {
+  try {
+    await main()
+  } catch (error) {
+    process.exitCode = reportFatal(error)
+  }
+}
