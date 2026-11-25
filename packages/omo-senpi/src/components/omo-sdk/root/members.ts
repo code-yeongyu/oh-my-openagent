@@ -17,6 +17,8 @@ export type Members = { readonly [Key in RootCallKey]?: MemberOf<Key> }
 /** One namespace module of the root: the calls it serves and how its core is released. */
 export type NamespaceServing = {
   readonly members: Members
+  /** Calls whose shipped convention predates the root input; their member checks its root-convention input itself. */
+  readonly legacy?: readonly RootCallKey[]
   /** Synchronous: aborts what is in flight, as `close()` does today. */
   readonly close?: () => void
   /** Releases what the core holds (the gateway store, the remote sessions). */
