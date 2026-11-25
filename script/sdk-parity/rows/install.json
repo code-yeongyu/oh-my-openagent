@@ -588,7 +588,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The dist-tag lookup is a registry READ carried by a process: the core spawns node with a fetch script for the omo-ai dist-tags URL; no install happens there. The compiled edition's omo update runs compiledInstallUpdate, not the core the root binds (edition-gaps.json, #15010)."
     },
     {
       "id": "install.version",
