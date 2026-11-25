@@ -31,7 +31,6 @@ import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
-import { printSetupReport } from "./setup-report.js"
 import { refuseRetiredCommand } from "./retired-command.js"
 
 function engineVersion() {
@@ -263,11 +262,6 @@ export async function runLauncher(args = process.argv.slice(2)) {
       reflectionLock,
       memoryRuntime,
     })
-    return
-  }
-  if (command === "setup") {
-    printSetupReport(await detectHarnesses())
-    process.exitCode = 0
     return
   }
   if ((command === "--version" || command === "-v") && args.length === 1) {
