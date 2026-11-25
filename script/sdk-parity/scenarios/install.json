@@ -58,7 +58,7 @@
           },
           "stages": [
             {
-              "id": "import-credentials",
+              "id": "credentials",
               "description": "import API credentials"
             }
           ]
@@ -88,9 +88,10 @@
       ]
     },
     {
-      "id": "install.setup.apply/given-plan-applies-its-stages",
+      "id": "install.setup.apply/foreign-plan-refused",
       "row": "install.setup.apply",
-      "kind": "effect",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
       "input": {
         "consent": "all",
         "plan": {
@@ -99,8 +100,8 @@
           },
           "stages": [
             {
-              "id": "import-credentials",
-              "description": "import"
+              "id": "credentials",
+              "description": "import API credentials"
             }
           ]
         }
@@ -109,29 +110,16 @@
         {
           "port": "fs",
           "op": "read",
-          "args": {
-            "path": "~/.config/opencode/opencode.json"
-          },
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
           "count": 0
         },
         {
           "port": "terminal",
           "op": "read",
-          "count": 0
-        },
-        {
-          "port": "fs",
-          "op": "write",
-          "args": {
-            "path": "<agent-dir>/auth.json"
-          }
-        },
-        {
-          "port": "fs",
-          "op": "write",
-          "args": {
-            "path": "<agent-dir>/models.json"
-          },
           "count": 0
         }
       ]
@@ -167,7 +155,7 @@
           },
           "stages": [
             {
-              "id": "import-credentials",
+              "id": "credentials",
               "description": "import API credentials"
             }
           ]

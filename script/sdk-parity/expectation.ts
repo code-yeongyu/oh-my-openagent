@@ -43,6 +43,17 @@ export type CallbackEntry = {
   readonly effects_before: number
 }
 
+/**
+ * A call made before the scenario's own, on the same fixture (design lane ruling, slice C1c): a row of the scenario's
+ * namespace and an input its schema accepts. Its answer is \`$answer:<n>\` (1-based) in the scenario's inputs; its port
+ * calls are the run's setup, outside the expected trace, and it may make an effect only with \`allow_effects\`.
+ */
+export type BeforeCall = {
+  readonly row: string
+  readonly input: Readonly<Record<string, unknown>>
+  readonly allow_effects?: true
+}
+
 /** Shared by a scenario and each of its steps: the subset of the failure's details a refusal states. */
 type RefusalDetails = { readonly refusal_details?: Readonly<Record<string, unknown>> }
 
@@ -59,6 +70,7 @@ export type ScenarioStep = RefusalDetails & {
 }
 
 export type TableScenario = RefusalDetails & {
+  readonly before?: readonly BeforeCall[]
   /** Each callback input the scenario passes as "$callback", built by the runner from its ordered calls. */
   readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   /** `<row id>/<slug>`: stable, never reused for another behaviour. */

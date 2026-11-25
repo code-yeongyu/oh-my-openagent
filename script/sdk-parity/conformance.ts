@@ -38,6 +38,18 @@ export type EffectEvidence = {
   /** The scenario's callbacks: their stated entries and each call the call under test made, in order. */
   readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   readonly callbackCalls?: readonly CallbackCall[]
+  /** The before-calls: the run's setup, kept and visible, outside the expected trace. */
+  readonly setup?: readonly SetupCall[]
+  /** A \`$answer:<n>\` the call used whose before-call did not answer a success. */
+  readonly failedMarkers?: readonly string[]
+}
+
+export type SetupCall = {
+  readonly row: string
+  readonly input: Readonly<Record<string, unknown>>
+  readonly observed: readonly ObservedCall[]
+  readonly answered?: unknown
+  readonly allowEffects: boolean
 }
 
 /** One call of a callback: its argument, the entry it consumed (-1: none matched) and how far the trace had got. */
@@ -121,6 +133,14 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
       )
   }
   problems.push(...callbackCallProblems(where, record, context))
+  for (const marker of record.failedMarkers ?? [])
+    problems.push(`${where}: ${marker} names a before-call that did not answer a success`)
+  for (const [index, call] of (record.setup ?? []).entries())
+    for (const observed of call.observed)
+      if ((context.effects[observed.port] ?? []).includes(observed.op) && !call.allowEffects)
+        problems.push(
+          `${where}: before[${index}] (${call.row}) made the effect ${observed.port}.${observed.op}; a before-call is a read unless it states allow_effects`,
+        )
   if (record.answer !== undefined && !isSubsetOf(record.answer, record.answered))
     problems.push(
       `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer)}`,

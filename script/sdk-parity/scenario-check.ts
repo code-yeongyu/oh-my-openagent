@@ -40,7 +40,11 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-  const accepted = contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
+  const marked = answerMarkers(scenario.input)
+  const accepted =
+    marked.length === 0
+      ? contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
+      : marked.every((field) => field in (contract.calls[row.sdk]?.properties ?? {}))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
@@ -203,6 +207,7 @@ export function scenarioProblems(
         continue
       }
       problems.push(...scenarioShapeProblems(scenario, row, file.domain, contract))
+      problems.push(...beforeProblems(scenario, inScope, contract))
       if (scenario.invalid !== true) byRow.set(row.id, [...(byRow.get(row.id) ?? []), scenario])
     }
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
@@ -221,5 +226,34 @@ export function scenarioProblems(
     if (row === undefined || contract.calls[row.sdk]?.properties[key.slice(cut + 1)] === undefined)
       problems.push(`inert ${key}: names no input of a P1a row`)
   }
+  return problems
+}
+
+// `$answer:<n>` names the answer of the scenario's n-th before-call; the runner substitutes it before the call, so the
+// table check only requires each marked field to be one the call takes. It is a general form, not an install case.
+const MARKER = /^\$answer:([1-9][0-9]*)$/
+const answerMarkers = (input: Readonly<Record<string, unknown>>): string[] =>
+  Object.entries(input)
+    .filter(([, value]) => typeof value === "string" && MARKER.test(value))
+    .map(([field]) => field)
+
+function beforeProblems(scenario: TableScenario, rows: ReadonlyMap<string, Row>, contract: Contract): string[] {
+  const at = `scenario ${scenario.id}`
+  const before = scenario.before ?? []
+  const problems: string[] = []
+  for (const [index, call] of before.entries()) {
+    const row = rows.get(call.row)
+    if (row === undefined) problems.push(`${at}: before[${index}] names ${call.row}, which is not a P1a row`)
+    else if (namespaceOf(row.sdk) !== namespaceOf(scenario.row))
+      problems.push(`${at}: before[${index}] calls ${call.row}, outside the scenario's namespace`)
+    else if (answerMarkers(call.input).length > 0 || !contract.accepts(row.sdk, call.input))
+      problems.push(`${at}: before[${index}]'s input is not one ${row.sdk}'s schema accepts`)
+  }
+  for (const input of [scenario.input, ...(scenario.then ?? []).map((step) => step.input)])
+    for (const field of answerMarkers(input)) {
+      const n = Number(MARKER.exec(String(input[field]))?.[1])
+      if (n > before.length)
+        problems.push(`${at}: ${field} names $answer:${n}, but the scenario has ${before.length} before-call(s)`)
+    }
   return problems
 }

@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-import type { CallbackCall, ConformanceContext, EffectEvidence } from "./conformance"
+import type { CallbackCall, ConformanceContext, EffectEvidence, SetupCall } from "./conformance"
 import { type CallbackEntry, isSubsetOf, type ObservedCall, type TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
@@ -126,6 +126,24 @@ function withCallbacks(
   return built
 }
 
+// Each `$answer:<n>` becomes the value the n-th before-call answered; one whose before-call failed is named instead.
+function withAnswers(
+  input: Readonly<Record<string, unknown>>,
+  answers: readonly unknown[],
+  failed: string[],
+): Readonly<Record<string, unknown>> {
+  return Object.fromEntries(
+    Object.entries(input).map(([field, value]) => {
+      const n = typeof value === "string" ? /^\$answer:([1-9][0-9]*)$/.exec(value)?.[1] : undefined
+      if (n === undefined) return [field, value]
+      const answer = answers[Number(n) - 1]
+      if (field_(answer, "kind") !== "ok") failed.push(String(value))
+      return [field, field_(answer, "value")]
+    }),
+  )
+}
+const field_ = (value: unknown, key: string): unknown => Reflect.get(Object(value), key)
+
 type Call = {
   readonly input: Readonly<Record<string, unknown>>
   readonly refusal_from?: "root" | "value"
@@ -176,6 +194,23 @@ export async function runEffectScenarios(
     }
     const controller = new AbortController()
     if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
+    const setupCalls: SetupCall[] = []
+    const answers: unknown[] = []
+    for (const call of scenario.before ?? []) {
+      const seen = calls().length
+      let member: unknown = forwarding(root, [], [])
+      for (const key of (rows.find((candidate) => candidate.id === call.row)?.sdk ?? "").split("."))
+        member = Reflect.get(Object(member), key)
+      const result = await invoke(member, { input: call.input, kind: "effect" }, controller.signal)
+      answers.push(result.answered)
+      setupCalls.push({
+        row: call.row,
+        input: call.input,
+        observed: calls().slice(seen),
+        ...(result.answered === undefined ? {} : { answered: result.answered }),
+        allowEffects: call.allow_effects === true,
+      })
+    }
     const sequence = [scenario, ...(scenario.then ?? [])]
     const records: EffectEvidence[] = []
     for (const [index, step] of sequence.entries()) {
@@ -183,7 +218,13 @@ export async function runEffectScenarios(
       const before = invoked.length
       const callbackCalls: CallbackCall[] = []
       const callbacks = index === 0 ? scenario.callbacks : undefined
-      const input = withCallbacks(step.input, callbacks, callbackCalls, () => calls().length - seen)
+      const failedMarkers: string[] = []
+      const input = withCallbacks(
+        withAnswers(step.input, answers, failedMarkers),
+        callbacks,
+        callbackCalls,
+        () => calls().length - seen,
+      )
       const result = await invoke(memberOf(), { ...step, input }, controller.signal)
       records.push({
         scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
@@ -199,6 +240,8 @@ export async function runEffectScenarios(
         ...(step.answer === undefined ? {} : { answer: step.answer }),
         ...(step.refusal_details === undefined ? {} : { refusalDetails: step.refusal_details }),
         ...(callbacks === undefined ? {} : { callbacks, callbackCalls }),
+        ...(index === 0 && setupCalls.length > 0 ? { setup: setupCalls } : {}),
+        ...(failedMarkers.length > 0 ? { failedMarkers } : {}),
         ...result,
       })
     }
