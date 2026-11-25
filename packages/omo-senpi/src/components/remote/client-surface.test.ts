@@ -39,30 +39,31 @@ const memberTree = (client: RemoteClient): Record<string, unknown> =>
 const fns = (...names: string[]) => Object.fromEntries(names.map((name) => [name, "function"]))
 
 describe("remote client factories: the member tree", () => {
-  for (const [kind, build] of FACTORIES) test(`#given the ${kind} factory #when its client is built #then its members are exactly the shipped tree`, () => {
-    const client = build()
-    clients.push(client)
-    expect(memberTree(client)).toEqual({
-      service: fns("info", "status", "setEnabled", "control", "setControl", "bootstrap", "wake", "setWake"),
-      devices: fns("list", "resolve"),
-      sessions: fns(
-        "list",
-        "resolve",
-        "get",
-        "open",
-        "send",
-        "read",
-        "follow",
-        "wait",
-        "interrupt",
-        "setModel",
-        "setReasoning",
-        "close",
-        "archive",
-      ),
-      attach: "function",
-      aliases: fns("resolve", "set", "clear"),
-      close: "function",
+  for (const [kind, build] of FACTORIES)
+    test(`#given the ${kind} factory #when its client is built #then its members are exactly the shipped tree`, () => {
+      const client = build()
+      clients.push(client)
+      expect(memberTree(client)).toEqual({
+        service: fns("info", "status", "setEnabled", "control", "setControl", "bootstrap", "wake", "setWake"),
+        devices: fns("list", "resolve"),
+        sessions: fns(
+          "list",
+          "resolve",
+          "get",
+          "open",
+          "send",
+          "read",
+          "follow",
+          "wait",
+          "interrupt",
+          "setModel",
+          "setReasoning",
+          "close",
+          "archive",
+        ),
+        attach: "function",
+        aliases: fns("resolve", "set", "clear"),
+        close: "function",
+      })
     })
-  })
 })

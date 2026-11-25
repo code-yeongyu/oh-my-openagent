@@ -20,7 +20,20 @@ import {
   inventoryProblems,
 } from "./authority-check"
 import { CALL_ALIASES, CUSTODY_FIELDS, HELD } from "./authority-expected"
-import { calls, files, isTyped, json, rows, securityDesign } from "./authority-scope"
+import {
+  calls,
+  files,
+  isTyped,
+  json,
+  rows,
+  securityDesign,
+  sliceInputContract,
+  sliceRows,
+  contractCalls,
+  UNRESOLVED_IDS,
+} from "./authority-scope"
+import { inputProblems } from "./contract-check"
+import { TYPED_AHEAD_INPUTS, typedAheadProblems } from "./typed-ahead"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
 import { freeFieldMappingProblems, loadSnapshot, sessionShapeProblems } from "./engine-snapshot-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
@@ -193,5 +206,37 @@ describe("negative controls of custody and the held table (#14949)", () => {
       session_required: snapshot.session_required.filter((field) => field !== "provider"),
     }
     expect(sessionShapeProblems(engineLooser, session).join("\n")).toContain("session required fields")
+  })
+
+  test("#given a typed-ahead input with no entry, or an entry that is stale or names nothing #then each is named", () => {
+    const missing = {
+      ...sliceInputContract,
+      ahead: TYPED_AHEAD_INPUTS.filter((entry) => entry.row !== "account.adopt"),
+    }
+    expect(inputProblems(sliceRows, missing).join("\n")).toContain(
+      "row account.adopt: the schema of account.adopt takes credential, which the row lacks",
+    )
+    const check = (entries: typeof TYPED_AHEAD_INPUTS, table = rows, open = UNRESOLVED_IDS): string =>
+      typedAheadProblems(entries, table, contractCalls, open).join("\n")
+    const carried = rows.map((row) =>
+      row.id === "engine.auth.apiKey"
+        ? { ...row, input: { ...row.input, properties: { ...row.input.properties, destination: {} } } }
+        : row,
+    )
+    expect(check(TYPED_AHEAD_INPUTS, carried)).toContain(
+      "typed-ahead engine.auth.apiKey.destination: stale, the row's descriptor carries destination now",
+    )
+    const resolved = new Set([...UNRESOLVED_IDS].filter((id) => id !== "account.adopt"))
+    expect(check(TYPED_AHEAD_INPUTS, rows, resolved)).toContain(
+      "typed-ahead account.adopt.credential: stale, account.adopt has left unresolved.json",
+    )
+    const extra = { row: "engine.nope", field: "destination", reason: "control", retires_with: "none" }
+    expect(check([...TYPED_AHEAD_INPUTS, extra])).toContain(
+      "typed-ahead engine.nope.destination: no registry row engine.nope",
+    )
+    const noField = { row: "engine.auth.check", field: "destination", reason: "control", retires_with: "none" }
+    expect(check([...TYPED_AHEAD_INPUTS, noField])).toContain(
+      "typed-ahead engine.auth.check.destination: the contract of engine.auth.check has no input destination",
+    )
   })
 })

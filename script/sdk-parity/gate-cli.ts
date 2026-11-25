@@ -10,6 +10,9 @@ import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
+import { offenderGrowth } from "../remote-import-guard-adapter"
+import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
+import { conformanceProblems } from "./conformance"
 import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
@@ -122,12 +125,20 @@ try {
     body,
     headSha: git("rev-parse", "HEAD").trim(),
   })
+  // The checks that read the merge base's tree run here, in the dedicated job that fetches it, and nowhere else: the
+  // ordinary test shards have a shallow checkout without the base ref (design 7.4; train review of 6871a012b9).
+  const evidence = await runEffectScenarios(rows, await loadScenarioRuns())
+  const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
+  const baseFailures = [
+    ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
+    ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
+  ]
   const baselineFailures = baselineProblems({
     rows,
     originalText: readFileSync(join(REPO_ROOT, ORIGINAL_PATH), "utf8"),
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
-    evidence: await runEffectScenarios(rows, await loadScenarioRuns()),
+    evidence,
     context: P0_CONTEXT,
     atBase: {
       originalText: show(mergeBase, ORIGINAL_PATH),
@@ -139,7 +150,12 @@ try {
     string,
     Outcome
   >
-  const failures = [...report.failures, ...baselineFailures, ...goldenProblems(goldens, headSide.outcomes)]
+  const failures = [
+    ...report.failures,
+    ...baselineFailures,
+    ...baseFailures,
+    ...goldenProblems(goldens, headSide.outcomes),
+  ]
   const text = `${renderReport({ ...report, failures })}\nMerge base ${mergeBase.slice(0, 10)}; ${SCENARIOS.length} scenarios on both trees in ${(comparedMs / 1000).toFixed(1)} s; gate total ${((Date.now() - started) / 1000).toFixed(1)} s.\n`
   process.stdout.write(text)
   const summary = arg("--summary") ?? process.env.GITHUB_STEP_SUMMARY

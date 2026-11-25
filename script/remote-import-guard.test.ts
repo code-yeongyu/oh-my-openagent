@@ -8,7 +8,6 @@ import { checkAdapterImports, offenderGrowth } from "./remote-import-guard-adapt
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
-  ADAPTER_LAYER_RENAMES,
   ADAPTER_OFFENDERS,
   ADAPTER_RULES,
   NON_LITERAL_IMPORT_OFFENDERS,
@@ -65,25 +64,6 @@ describe("adapter import family A (#14943 design 7.5)", () => {
     // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
     const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ADAPTER_RULES)
     expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
-  })
-
-  test("#given the merge base's offender record #then this head's record only shrinks against it", () => {
-    const base = execFileSync("git", ["merge-base", process.env.SDK_PARITY_BASE ?? "origin/dev", "HEAD"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    }).trim()
-    let recorded: string | undefined
-    try {
-      recorded = execFileSync("git", ["show", `${base}:script/remote-import-guard-adapter-offenders.json`], {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      })
-    } catch {
-      recorded = undefined
-    }
-    const baseRecord = recorded === undefined ? undefined : JSON.parse(recorded)
-    expect(offenderGrowth(baseRecord, ADAPTER_OFFENDERS, ADAPTER_LAYER_RENAMES)).toEqual([])
   })
 
   test("#given a layer whose code moved #then a base row naming it also admits the new layer, and nothing else does", () => {
