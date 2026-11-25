@@ -20,7 +20,7 @@ export type OmoModelReferenceDiagnostic = {
 }
 
 type OmoModelChainOwner = {
-  readonly models?: readonly (string | OmoFallbackModelObject)[]
+  readonly models?: readonly (string | OmoFallbackModelObject)[] | undefined
 }
 
 export type ResolveModelReferencesResult = {
