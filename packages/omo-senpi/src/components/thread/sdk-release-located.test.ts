@@ -123,13 +123,13 @@ describe("the located-row release stays internal", () => {
     expect(() => createOmoSdk({ env: {}, releaseLocated: () => undefined })).not.toThrow()
   })
 
-  // Architecture contract (design 7.5 and the ruling): the facade's runtime imports reach the root's internal assembly,
+  // Architecture contract (design 7.5 and the ruling): the facade's runtime imports reach the root's thread-only assembly,
   // the root's failure conversions and the thread contract only, never a thread-core module; type-only imports are erased.
   test("#given the thread facade's source #when its value imports are listed #then none reaches a thread-core module", () => {
     const source = readFileSync(join(import.meta.dir, "sdk.ts"), "utf8")
     const valueImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+"([^"]+)"/gms)].map((match) => match[1])
     expect(valueImports.toSorted()).toEqual([
-      "../omo-sdk/assembly",
+      "../omo-sdk/thread-assembly",
       "../omo-sdk/root/extension-codes",
       "../omo-sdk/root/thread-failures",
       "./contracts",
