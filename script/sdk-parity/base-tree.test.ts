@@ -58,6 +58,21 @@ describe("merge-base dependency isolation (review H2)", () => {
     expect(isolationProblems(base)).toEqual([])
   })
 
+  test("#given a workspace package the head reaches through a copy in bun's store #then the base links it to its own package", () => {
+    const { head, base } = trees()
+    const store = join(head, "node_modules", ".bun", "core-copy", "node_modules", "@ws", "core")
+    mkdirSync(store, { recursive: true })
+    writeFileSync(join(store, "package.json"), '{"name":"@ws/core"}')
+    mkdirSync(join(head, "packages", "app", "node_modules", "@ws"), { recursive: true })
+    symlinkSync(store, join(head, "packages", "app", "node_modules", "@ws", "core"))
+    mkdirSync(join(base, "packages", "app"), { recursive: true })
+    prepareBaseTree(head, base)
+    expect(realpathSync(join(base, "packages", "app", "node_modules", "@ws", "core"))).toBe(
+      join(base, "packages", "core"),
+    )
+    expect(isolationProblems(base)).toEqual([])
+  })
+
   test("#given a base whose node_modules is the head's (the old link) #then its workspace package is named as resolving outside it", () => {
     const { head, base } = trees()
     symlinkSync(join(head, "node_modules"), join(base, "node_modules"))

@@ -11,31 +11,52 @@ const isInside = (path: string, root: string): boolean => {
   return rel === "" || (!rel.startsWith("..") && !rel.startsWith("/"))
 }
 
-function linkEntries(headDir: string, baseDir: string, headRoot: string, baseRoot: string): void {
+// A workspace package is linked by NAME to the base tree's own package directory, however the head reaches it: a
+// workspace link into packages/, or a copy in bun's store (a `file:` dependency), which holds the head's source too.
+function linkEntries(
+  headDir: string,
+  baseDir: string,
+  headRoot: string,
+  workspaces: ReadonlyMap<string, string>,
+  scope = "",
+): void {
   mkdirSync(baseDir, { recursive: true })
   for (const entry of readdirSync(headDir, { withFileTypes: true })) {
     const from = join(headDir, entry.name)
     const to = join(baseDir, entry.name)
     if (existsSync(to) || lstatSync(to, { throwIfNoEntry: false }) !== undefined) continue
     if (entry.isDirectory() && entry.name.startsWith("@")) {
-      linkEntries(from, to, headRoot, baseRoot)
+      linkEntries(from, to, headRoot, workspaces, entry.name)
       continue
     }
+    const own = workspaces.get(scope === "" ? entry.name : `${scope}/${entry.name}`)
     const real = realpathSync(from)
-    const workspace = isInside(real, headRoot) && !real.split("/").includes("node_modules")
-    symlinkSync(workspace ? join(baseRoot, relative(headRoot, real)) : real, to)
+    if (own !== undefined) symlinkSync(own, to)
+    else if (!isInside(real, headRoot) || real.split("/").includes("node_modules")) symlinkSync(real, to)
   }
+}
+
+function workspaceDirs(root: string): Map<string, string> {
+  const dirs = new Map<string, string>()
+  for (const entry of readdirSync(join(root, "packages"), { withFileTypes: true })) {
+    const manifest = join(root, "packages", entry.name, "package.json")
+    if (!entry.isDirectory() || !existsSync(manifest)) continue
+    const name = (JSON.parse(readFileSync(manifest, "utf8")) as { name?: unknown }).name
+    if (typeof name === "string") dirs.set(name, join(root, "packages", entry.name))
+  }
+  return dirs
 }
 
 // Every node_modules directory of the head (root and per package, five levels deep) gets a twin in the base tree.
 export function prepareBaseTree(headRoot: string, baseRoot: string): void {
+  const workspaces = workspaceDirs(baseRoot)
   const walk = (rel: string, depth: number): void => {
     for (const entry of readdirSync(join(headRoot, rel), { withFileTypes: true })) {
       if (!entry.isDirectory() || entry.name === ".git") continue
       const child = rel === "" ? entry.name : `${rel}/${entry.name}`
       if (entry.name === "node_modules") {
         if (existsSync(join(baseRoot, rel)))
-          linkEntries(join(headRoot, child), join(baseRoot, child), headRoot, baseRoot)
+          linkEntries(join(headRoot, child), join(baseRoot, child), headRoot, workspaces)
       } else if (depth < 5) walk(child, depth + 1)
     }
   }
