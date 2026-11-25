@@ -62,35 +62,26 @@ function classify(plan, models, auth) {
 }
 
 /** Where the key of an added provider comes from, in the words the setup summary prints. */
+/** Where a carried provider's key comes from, typed; the setup summary phrases it. Never the key itself. */
 export function providerKeySource(provider, result) {
-  if (result.keysExisting.includes(provider.id)) return "kept the existing auth.json key"
-  if (result.keysBlocked.includes(provider.id)) return "key not imported (malformed auth.json)"
-  if (provider.key !== undefined) return `key from ${provider.key.source}`
-  return `no key found - /login ${provider.id} inside omo`
+  if (result.keysExisting.includes(provider.id)) return { key_source: "kept_existing" }
+  if (result.keysBlocked.includes(provider.id)) return { key_source: "store_malformed" }
+  if (provider.key !== undefined) return { key_source: "found", key_from: provider.key.source }
+  return { key_source: "none" }
 }
 
-function list(label, ids) {
-  return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
-}
-
-export function providerPlanLines({ result }) {
+export function providerPlanEntries({ result }) {
   return [
-    list(
-      "planned-providers",
-      result.added.map((provider) => provider.id),
-    ),
-    list("providers-skipped-existing", result.skippedExisting),
+    { key: "planned-providers", value: result.added.map((provider) => provider.id) },
+    { key: "providers-skipped-existing", value: result.skippedExisting },
   ]
 }
 
-export function providerCounts({ result }) {
+export function providerCountEntries({ result }) {
   return [
-    list(
-      "providers-imported",
-      result.added.map((provider) => provider.id),
-    ),
-    `provider-keys-imported: ${result.keys.length}`,
-    `providers-skipped-existing: ${result.skippedExisting.length}`,
+    { key: "providers-imported", value: result.added.map((provider) => provider.id) },
+    { key: "provider-keys-imported", value: result.keys.length },
+    { key: "providers-skipped-existing", value: result.skippedExisting.length },
   ]
 }
 

@@ -93,33 +93,23 @@ export function applyAssets(plan) {
   }
 }
 
-function list(label, ids) {
-  return `${label}: ${ids.length > 0 ? ids.join(", ") : "none"}`
-}
-
-export function assetPlanLines({ result }) {
+export function assetPlanEntries({ result }) {
   return [
-    list(
-      "planned-mcp",
-      result.servers.added.map((server) => server.name),
-    ),
-    list("mcp-skipped-existing", result.servers.skippedExisting),
-    list(
-      "planned-skills",
-      result.skills.added.map((skill) => skill.name),
-    ),
-    list("skills-skipped-existing", result.skills.skippedExisting),
-    list("skills-skipped-bundled", result.skills.skippedBundled),
+    { key: "planned-mcp", value: result.servers.added.map((server) => server.name) },
+    { key: "mcp-skipped-existing", value: result.servers.skippedExisting },
+    { key: "planned-skills", value: result.skills.added.map((skill) => skill.name) },
+    { key: "skills-skipped-existing", value: result.skills.skippedExisting },
+    { key: "skills-skipped-bundled", value: result.skills.skippedBundled },
   ]
 }
 
-export function assetCounts({ result }) {
+export function assetCountEntries({ result }) {
   return [
-    `mcp-imported: ${result.servers.added.length}`,
-    `mcp-skipped-existing: ${result.servers.skippedExisting.length}`,
-    `skills-imported: ${result.skills.added.length}`,
-    `skills-skipped-existing: ${result.skills.skippedExisting.length}`,
-    `skills-skipped-bundled: ${result.skills.skippedBundled.length}`,
+    { key: "mcp-imported", value: result.servers.added.length },
+    { key: "mcp-skipped-existing", value: result.servers.skippedExisting.length },
+    { key: "skills-imported", value: result.skills.added.length },
+    { key: "skills-skipped-existing", value: result.skills.skippedExisting.length },
+    { key: "skills-skipped-bundled", value: result.skills.skippedBundled.length },
   ]
 }
 

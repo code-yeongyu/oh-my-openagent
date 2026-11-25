@@ -50,7 +50,24 @@ export type SetupPlans = { readonly [stage: string]: unknown }
 export type SetupApplyStage = {
   readonly id: SetupStageId
   readonly plan: SetupStagePlan
+  /** The consent question `omo setup --ask-each` shows for this stage's current plan. */
+  readonly question: (plan: SetupStagePlan) => string
 }
+
+/** One line of `omo setup --dry-run` or of the counts after an apply, typed: a list of ids or a number. */
+export type SetupEntry = { readonly key: string; readonly value: number | readonly string[] }
+
+export function setupEntryText(entry: SetupEntry): string
+
+export type SetupStage = SetupApplyStage & {
+  readonly plan: SetupStagePlan | undefined
+  readonly present: boolean
+  readonly entries: (plan: SetupStagePlan) => SetupEntry[]
+  readonly countEntries: (plan: SetupStagePlan) => SetupEntry[]
+}
+
+/** In apply order; a stage whose source failed has no plan and is never applied. */
+export function setupStages(plans: SetupPlans): SetupStage[]
 
 export function canonicalAgentDir(env?: Readonly<Record<string, string | undefined>>, home?: string): string
 

@@ -18,7 +18,12 @@ import {
 } from "./package-paths.js"
 import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
 import { findVersionedInstall, versionedInstallUpdate, versionedUpdateTarget } from "./versioned-install.js"
-import { dirname, join } from "node:path"
+import { homedir } from "node:os"
+import { dirname, join, relative } from "node:path"
+import { canonicalAgentDir } from "./agent-dir.js"
+import { setupCoverage } from "./category-coverage.js"
+import { applySetupStages, collectSetupPlans, scanSetup, setupEntryText, setupStages } from "./setup-stream.js"
+import { displayPath, setupSummary } from "./setup-summary.js"
 
 /**
  * @typedef {{ code: string, message: string, next_action: string, details?: Record<string, unknown> }} FailureBody
@@ -322,4 +327,177 @@ async function heldInstall({ result, before, install, resolveUpdate, readInstall
     restored: (restored.status ?? 1) === 0 && !restored.signal && after?.omo === before.omo,
     previous_command: previous.command,
   }
+}
+
+/**
+ * @typedef {import("./setup-stream.js").SetupEntry & { readonly text: string }} InstallSetupEntry
+ * @typedef {import("./setup-stream.js").SetupInventory} InstallSetupInventory
+ * @typedef {{ id: string, description: string, present: boolean, pending: number, entries: InstallSetupEntry[] }} InstallSetupStage
+ * @typedef {{ inventory: InstallSetupInventory, stages: InstallSetupStage[], summary: ReturnType<typeof setupSummary>,
+ *   pending: number, target_roots: string[] }} InstallSetupPlan
+ * @typedef {{ id: string, outcome: "applied" | "skipped" | "nothing_pending", entries: InstallSetupEntry[] }} InstallSetupStageApplied
+ * @typedef {{ applied: string[], skipped: string[], stages: InstallSetupStageApplied[] }} InstallSetupApplied
+ * @typedef {{ home?: string, env?: NodeJS.ProcessEnv, loadCoverageRuntime?: () => Promise<any>,
+ *   loadCoverageEngine?: () => Promise<any>, loadModelCatalog?: () => Promise<any>, pluginRoot?: string,
+ *   onProgress?: (event: { kind: "notice", text: string }) => void }} SetupPorts
+ */
+
+/** The plans each answered SetupPlan stands for; they hold target file bytes, so they never leave this module. */
+const HELD_PLANS = new WeakMap()
+const FIX_INPUT = "Fix the named input and call it again."
+
+/** @param {SetupPorts} ports */
+function setupRuntime(ports) {
+  const home = ports.home ?? homedir()
+  const env = ports.env ?? process.env
+  return { ...ports, home, env, agentDir: canonicalAgentDir(env, home) }
+}
+
+/** @param {unknown} error */
+function setupFailure(error) {
+  return failure("internal_error", "omo setup could not finish", "Read details.cause, fix it, then call it again.", {
+    cause: error instanceof Error ? error.message : String(error),
+  })
+}
+
+/** @param {import("./setup-stream.js").SetupEntry} entry @returns {InstallSetupEntry} */
+const withText = (entry) => ({ ...entry, text: setupEntryText(entry) })
+
+/**
+ * The directories the whole plan writes into, a directory inside another one folded into it.
+ * @param {any} plans @param {string} agentDir @param {string} home @returns {string[]}
+ */
+function targetRoots(plans, agentDir, home) {
+  const choiceDirs = plans.modelChoices.items
+    .filter((/** @type {any} */ item) => item.state === "pending")
+    .map((/** @type {any} */ item) => dirname(item.target.path))
+  const roots = [...new Set([agentDir, ...choiceDirs])]
+  const inside = (/** @type {string} */ path, /** @type {string} */ root) =>
+    path !== root && !relative(root, path).startsWith("..")
+  return roots.filter((path) => !roots.some((root) => inside(path, root))).map((path) => displayPath(path, home))
+}
+
+export const setup = {
+  /**
+   * install.setup.detect(): the harnesses found on this machine and what each holds, read only.
+   * @param {Record<string, never>} [_input] @param {SetupPorts} [ports]
+   * @returns {Promise<Result<InstallSetupInventory>>}
+   */
+  async detect(_input = {}, ports = {}) {
+    const runtime = setupRuntime(ports)
+    try {
+      for await (const result of scanSetup(runtime, runtime.agentDir, { includeCustomProviders: true })) {
+        if (result.source !== "detect") continue
+        if (result.error !== undefined) throw result.error
+        return { kind: "ok", value: /** @type {InstallSetupInventory} */ (/** @type {unknown} */ (result.plan)) }
+      }
+      return { kind: "ok", value: { harnesses: [] } }
+    } catch (error) {
+      return setupFailure(error)
+    }
+  },
+
+  /**
+   * install.setup.plan(): what `omo setup --dry-run` prints, as data. Nothing is written.
+   * @param {Record<string, never>} [_input] @param {SetupPorts} [ports]
+   * @returns {Promise<Result<InstallSetupPlan>>}
+   */
+  async plan(_input = {}, ports = {}) {
+    const runtime = setupRuntime(ports)
+    const { home, env, agentDir } = runtime
+    let collected
+    try {
+      // The CLI has always carried OpenCode's custom providers; the onboarding RPC leaves them opt-in.
+      collected = await collectSetupPlans(scanSetup(runtime, agentDir, { includeCustomProviders: true }))
+    } catch (error) {
+      return setupFailure(error)
+    }
+    const { inventory, plans } = collected
+    const categories = await setupCoverage({
+      agentDir,
+      home,
+      env,
+      plans,
+      loadRuntime: ports.loadCoverageRuntime,
+      loadEngine: ports.loadCoverageEngine,
+    })
+    const stages = setupStages(plans).map((stage) => {
+      const pending = stage.plan?.pending ?? 0
+      return {
+        id: stage.id,
+        description: pending > 0 ? stage.question(stage.plan) : "",
+        present: stage.present,
+        pending,
+        entries: stage.present ? stage.entries(stage.plan).map(withText) : [],
+      }
+    })
+    /** @type {InstallSetupPlan} */
+    const value = {
+      inventory,
+      stages,
+      summary: setupSummary({ home, agentDir, inventory, ...plans, categories }),
+      pending: stages.reduce((total, stage) => total + stage.pending, 0),
+      target_roots: targetRoots(plans, agentDir, home),
+    }
+    HELD_PLANS.set(value, plans)
+    return { kind: "ok", value }
+  },
+
+  /**
+   * install.setup.apply({ plan, consent, decide? }): writes what the plan holds. consent "all" applies every pending
+   * stage; "each" calls decide once per pending stage, in plan order, before that stage's write.
+   * @param {{ plan: InstallSetupPlan, consent: "all" | "each",
+   *   decide?: (stage: { id: string, description: string }) => "apply" | "skip" | Promise<"apply" | "skip"> }} input
+   * @param {SetupPorts} [ports]
+   * @returns {Promise<Result<InstallSetupApplied>>}
+   */
+  async apply(input, ports = {}) {
+    const { plan, consent, decide } = input
+    if (consent !== "all" && consent !== "each")
+      return failure("invalid_arguments", "consent is all or each", FIX_INPUT, { field: "consent" })
+    if (consent === "each" && typeof decide !== "function")
+      return failure("invalid_arguments", "consent each needs decide", FIX_INPUT, { field: "decide" })
+    const plans = HELD_PLANS.get(plan)
+    if (plans === undefined)
+      return failure("invalid_arguments", "plan is not one install.setup.plan answered here", FIX_INPUT, {
+        field: "plan",
+      })
+    const progress = ports.onProgress ?? (() => {})
+    let applied
+    try {
+      applied = await applySetupStages(
+        plans,
+        consent === "all"
+          ? () => true
+          : async (stage) =>
+              (await /** @type {NonNullable<typeof decide>} */ (decide)({
+                id: stage.id,
+                description: stage.question(stage.plan),
+              })) === "apply",
+        (text) => progress({ kind: "notice", text }),
+      )
+    } catch (error) {
+      return setupFailure(error)
+    }
+    const stages = setupStages(plans)
+    return {
+      kind: "ok",
+      value: {
+        applied: [...applied],
+        skipped: stages
+          .filter((stage) => (stage.plan?.pending ?? 0) > 0 && !applied.has(stage.id))
+          .map((stage) => stage.id),
+        stages: stages
+          .filter((stage) => stage.present)
+          .map((stage) => {
+            const reported = applied.has(stage.id) || stage.plan.pending === 0
+            return {
+              id: stage.id,
+              outcome: applied.has(stage.id) ? "applied" : stage.plan.pending === 0 ? "nothing_pending" : "skipped",
+              entries: reported ? stage.countEntries(stage.plan).map(withText) : [],
+            }
+          }),
+      },
+    }
+  },
 }

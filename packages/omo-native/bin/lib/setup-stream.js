@@ -13,26 +13,26 @@ import { join, resolve } from "node:path"
 import { detectHarnesses } from "./setup-detect.js"
 import {
   applyCredentials,
-  credentialCounts,
-  credentialPlanLines,
+  credentialCountEntries,
+  credentialPlanEntries,
   credentialQuestion,
   opencodeOauthProviders,
   planCredentials,
 } from "./setup-credentials.js"
-import { applyAssets, assetCounts, assetPlanLines, assetQuestion, planAssets } from "./setup-assets-import.js"
+import { applyAssets, assetCountEntries, assetPlanEntries, assetQuestion, planAssets } from "./setup-assets-import.js"
 import { planOpencodeProviders } from "./setup-opencode-providers.js"
 import { withCommandCodeProvider } from "./setup-commandcode.js"
 import {
   applyProviders,
   planProviders,
-  providerCounts,
-  providerPlanLines,
+  providerCountEntries,
+  providerPlanEntries,
   providerQuestion,
 } from "./setup-providers-import.js"
 import {
   applyModelChoices,
-  modelChoiceCounts,
-  modelChoicePlanLines,
+  modelChoiceCountEntries,
+  modelChoicePlanEntries,
   modelChoiceQuestion,
   planModelChoices,
 } from "./setup-model-choices-import.js"
@@ -127,6 +127,16 @@ export async function collectSetupPlans(stream) {
 }
 
 /**
+ * One line of \`omo setup --dry-run\` or of the counts after an apply, from its typed entry: a list of ids (\`none\` when
+ * empty) or a number.
+ * @param {{ key: string, value: number | readonly string[] }} entry
+ */
+export function setupEntryText(entry) {
+  if (typeof entry.value === "number") return `${entry.key}: ${entry.value}`
+  return `${entry.key}: ${entry.value.length > 0 ? entry.value.join(", ") : "none"}`
+}
+
+/**
  * In apply order: the model-choice stage runs last because a default model or category may name a
  * custom provider the stage before it carries. `present` stages report counts after the run. A
  * stage whose source failed has no plan and is never applied.
@@ -137,8 +147,8 @@ export function setupStages(plans) {
       id: "credentials",
       plan: plans.credentials,
       present: plans.credentials !== undefined && !plans.credentials.malformed,
-      lines: credentialPlanLines,
-      counts: credentialCounts,
+      entries: credentialPlanEntries,
+      countEntries: credentialCountEntries,
       question: credentialQuestion,
       apply: (plan, options) => applyCredentials(plan, options),
     },
@@ -146,8 +156,8 @@ export function setupStages(plans) {
       id: "assets",
       plan: plans.assets,
       present: plans.assets?.present === true,
-      lines: assetPlanLines,
-      counts: assetCounts,
+      entries: assetPlanEntries,
+      countEntries: assetCountEntries,
       question: assetQuestion,
       apply: (plan) => applyAssets(plan),
     },
@@ -155,8 +165,8 @@ export function setupStages(plans) {
       id: "providers",
       plan: plans.providers,
       present: plans.providers?.present === true,
-      lines: providerPlanLines,
-      counts: providerCounts,
+      entries: providerPlanEntries,
+      countEntries: providerCountEntries,
       question: providerQuestion,
       apply: (plan, options) => applyProviders(plan, options),
     },
@@ -164,8 +174,8 @@ export function setupStages(plans) {
       id: "model-choices",
       plan: plans.modelChoices,
       present: plans.modelChoices?.present === true,
-      lines: modelChoicePlanLines,
-      counts: modelChoiceCounts,
+      entries: modelChoicePlanEntries,
+      countEntries: modelChoiceCountEntries,
       question: modelChoiceQuestion,
       apply: (plan, options) => applyModelChoices(plan, options),
     },

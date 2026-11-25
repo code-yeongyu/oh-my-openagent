@@ -125,10 +125,6 @@ function classify(item) {
   return item.members.every(([, value], index) => isDeepStrictEqual(existing[index], value)) ? "carried" : "kept"
 }
 
-function list(label, values) {
-  return `${label}: ${values.length > 0 ? values.join(", ") : "none"}`
-}
-
 function labels(plan, state) {
   return plan.items.filter((item) => item.state === state).map((item) => item.label)
 }
@@ -148,20 +144,20 @@ function planNotices(items, dropped) {
   return lines
 }
 
-export function modelChoicePlanLines(plan) {
+export function modelChoicePlanEntries(plan) {
   return [
-    list("planned-model-choices", labels(plan, "pending")),
-    list("model-choices-skipped-existing", labels(plan, "kept")),
-    list("model-choices-already-carried", labels(plan, "carried")),
-    `model-choices-not-carried: ${plan.dropped.length}`,
+    { key: "planned-model-choices", value: labels(plan, "pending") },
+    { key: "model-choices-skipped-existing", value: labels(plan, "kept") },
+    { key: "model-choices-already-carried", value: labels(plan, "carried") },
+    { key: "model-choices-not-carried", value: plan.dropped.length },
   ]
 }
 
-export function modelChoiceCounts(plan) {
+export function modelChoiceCountEntries(plan) {
   return [
-    list("model-choices-carried", plan.carried ?? []),
-    list("model-choices-skipped-existing", labels(plan, "kept")),
-    `model-choices-not-carried: ${plan.dropped.length}`,
+    { key: "model-choices-carried", value: plan.carried ?? [] },
+    { key: "model-choices-skipped-existing", value: labels(plan, "kept") },
+    { key: "model-choices-not-carried", value: plan.dropped.length },
   ]
 }
 
