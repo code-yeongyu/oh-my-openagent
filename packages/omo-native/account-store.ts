@@ -1,28 +1,22 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { credentialId } from "../account-core/src/keystore"
-import { withCredentialLock } from "../account-core/src/credential-lock"
-import type { HelperAccess } from "../account-core/src/keychain-helper/access"
+import {
+  type StoreDependencies,
+  type StoreRefusal,
+  storeDisable,
+  storeEnable,
+  storeStatus,
+} from "../account-core/src/calls/store"
 import { desktopRuntimeCandidates } from "../account-core/src/keychain-helper/creator-handoff"
 import { helperAccess } from "../account-core/src/keychain-helper/darwin-backend"
-import {
-  type DedicatedStoreState,
-  dedicatedStoreRoot,
-  dedicatedStoreState,
-} from "../account-core/src/keychain-helper/dedicated-store"
-import { StoreSwitchError, storeSwitch } from "../account-core/src/keychain-helper/dedicated-switch"
+import { dedicatedStoreRoot, dedicatedStoreState } from "../account-core/src/keychain-helper/dedicated-store"
 import { ACCOUNT_EXIT } from "./account-show"
 
 // `omo account store status|enable|disable [--discard]` (#13116): the opt-in OmO keychain for a Mac whose login
 // keychain stays locked. One JSON line on stdout like every `omo account` verb; the notes a person reads go to stderr.
 
-export interface AccountStoreDependencies {
-  readonly api: string
-  readonly platform: NodeJS.Platform
-  readonly state: () => DedicatedStoreState
-  readonly access: () => Promise<HelperAccess>
+export interface AccountStoreDependencies extends StoreDependencies {
   readonly desktopInstalled: () => boolean
-  readonly home?: string
   readonly output: (line: string) => void
   readonly error: (line: string) => void
 }
@@ -51,48 +45,42 @@ export async function runAccountStore(deps: AccountStoreDependencies, flags: rea
     deps.error("usage: omo account store status|enable|disable [--discard]")
     return ACCOUNT_EXIT.invalid
   }
-  const state = deps.platform === "darwin" ? deps.state() : "absent"
   if (verb === "status") {
-    deps.output(JSON.stringify({ store: state === "active" ? "omo" : "login", state, path: dedicatedStoreRoot() }))
+    deps.output(JSON.stringify(storeStatus(deps)))
     return ACCOUNT_EXIT.ok
   }
-  if (deps.platform !== "darwin") {
-    deps.error("omo account store: OmO's own keychain exists on macOS only.")
-    return ACCOUNT_EXIT.invalid
-  }
-  const access = await deps.access()
-  if (access.kind !== "ready") {
-    deps.error("omo account store: OmO's keychain helper is missing or failed its signature check. Reinstall omo.")
-    return ACCOUNT_EXIT.storeUnavailable
-  }
-  const locked = <T>(run: (switcher: ReturnType<typeof storeSwitch>) => Promise<T>): Promise<T> =>
-    withCredentialLock(
-      deps.api,
-      (lease) => run(storeSwitch({ access, account: credentialId(deps.api), lease, state: deps.state })),
-      deps.home,
-    )
-  try {
-    if (verb === "disable") {
-      const disabled = await locked((switcher) => switcher.disable(discard))
-      if (disabled.damagedLeftInPlace === true)
-        deps.error(
-          `omo: OmO's own keychain was damaged, so it was turned off without being erased. Delete ${dedicatedStoreRoot()} yourself.`,
-        )
-      deps.output(JSON.stringify({ store: "login", ...disabled }))
-      return ACCOUNT_EXIT.ok
-    }
-    const enabled = await locked((switcher) => switcher.enable())
-    deps.error(TRADE_OFF)
-    if (deps.desktopInstalled()) deps.error(DESKTOP_NOTE)
-    const note = MOVE_NOTES[enabled.moved]
-    if (note !== undefined) deps.error(note)
-    deps.output(JSON.stringify({ store: "omo", ...enabled }))
+  if (verb === "disable") {
+    const disabled = await storeDisable(deps, { discard })
+    if (disabled.kind === "refused") return refusal(deps, disabled)
+    if (disabled.value.damagedLeftInPlace === true)
+      deps.error(
+        `omo: OmO's own keychain was damaged, so it was turned off without being erased. Delete ${dedicatedStoreRoot()} yourself.`,
+      )
+    deps.output(JSON.stringify(disabled.value))
     return ACCOUNT_EXIT.ok
-  } catch (error) {
-    if (!(error instanceof StoreSwitchError)) throw error
-    deps.error(`omo account store: ${error.message}`)
-    deps.output(JSON.stringify({ error: "store-switch", store: deps.state() === "active" ? "omo" : "login" }))
-    return ACCOUNT_EXIT.failed
+  }
+  const enabled = await storeEnable(deps)
+  if (enabled.kind === "refused") return refusal(deps, enabled)
+  deps.error(TRADE_OFF)
+  if (deps.desktopInstalled()) deps.error(DESKTOP_NOTE)
+  const note = MOVE_NOTES[enabled.value.moved]
+  if (note !== undefined) deps.error(note)
+  deps.output(JSON.stringify(enabled.value))
+  return ACCOUNT_EXIT.ok
+}
+
+function refusal(deps: AccountStoreDependencies, refused: StoreRefusal): number {
+  switch (refused.code) {
+    case "macos_only":
+      deps.error("omo account store: OmO's own keychain exists on macOS only.")
+      return ACCOUNT_EXIT.invalid
+    case "helper_unavailable":
+      deps.error("omo account store: OmO's keychain helper is missing or failed its signature check. Reinstall omo.")
+      return ACCOUNT_EXIT.storeUnavailable
+    case "switch_failed":
+      deps.error(`omo account store: ${refused.message}`)
+      deps.output(JSON.stringify({ error: "store-switch", store: refused.store }))
+      return ACCOUNT_EXIT.failed
   }
 }
 

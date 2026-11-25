@@ -2,6 +2,7 @@ import { userInfo } from "node:os"
 
 import { createAccountAccess } from "./access"
 import type { OmoSdk, OmoSdkOptions } from "./options"
+import { accountNamespace } from "./root/account"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
@@ -46,8 +47,12 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
     ...(ports.signInProcess === undefined ? {} : { signInProcess: ports.signInProcess }),
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
   })
+  const account = accountNamespace({
+    access,
+    ...(ports.accountStore === undefined ? {} : { store: ports.accountStore }),
+  })
   const root = assembleRoot(
-    [shipped],
+    [shipped, account],
     cores,
     {
       env,
