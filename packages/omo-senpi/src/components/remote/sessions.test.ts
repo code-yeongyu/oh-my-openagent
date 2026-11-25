@@ -611,6 +611,50 @@ describe("#13756 review", () => {
     expect(sent("open_session")).toHaveLength(258)
   })
 
+  // #15011, measured before any fix: the client's receipt map is a cache. These pin what reaches the holder when the
+  // cache no longer holds the key: the prompt goes again, under the SAME client message id, which the holder's engine
+  // admits once (senpi ClientAdmissions: a repeated id with the same message answers replayed).
+  test("#15011 (a) #given one client and 257 keyed sends #when the first key is sent again #then the repeat reaches the holder under the first send's client message id", async () => {
+    const { owner, sent } = await onWorld()
+    const client = clientOn(owner.stateDir, fakeClock())
+    const first = await valueOf(client.sessions.send(LIVE, { text: "m-0", idempotency_key: "k-0" }))
+    for (let index = 1; index <= 256; index++)
+      await valueOf(client.sessions.send(LIVE, { text: `m-${index}`, idempotency_key: `k-${index}` }))
+    const again = await valueOf(client.sessions.send(LIVE, { text: "m-0", idempotency_key: "k-0" }))
+    const ids = sent("prompt")
+      .filter((record) => record["message"] === "m-0")
+      .map((record) => record["clientMessageId"])
+    expect({
+      prompts: ids.length,
+      sameId: ids[0] === ids[1],
+      delivery: again.delivery_id === first.delivery_id,
+    }).toEqual({
+      prompts: 2,
+      sameId: true,
+      delivery: true,
+    })
+  })
+
+  test("#15011 (b) #given a keyed send #when a fresh client sends the same key #then the repeat reaches the holder under the same client message id", async () => {
+    const { owner, sent } = await onWorld()
+    const first = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }),
+    )
+    const again = await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }),
+    )
+    const ids = sent("prompt").map((record) => record["clientMessageId"])
+    expect({
+      prompts: ids.length,
+      sameId: ids[0] === ids[1],
+      delivery: again.delivery_id === first.delivery_id,
+    }).toEqual({
+      prompts: 2,
+      sameId: true,
+      delivery: true,
+    })
+  })
+
   test("#given a keyed send then a long run of unkeyed sends #when the key is retried #then it replays within the last 256 receipts and reaches the device again past them (L37)", async () => {
     // Every unkeyed send keeps a receipt under a fresh key nobody can retry: the store keeps the newest 256 settled ones.
     const { owner, sent } = await onWorld()

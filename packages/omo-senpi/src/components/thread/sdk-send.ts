@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import { toThreadAddressEntries } from "./address-book"
 import type { resolve as Resolve } from "./address/contract"
 import type { ResolvePrincipal } from "./address/principal"
@@ -10,6 +9,7 @@ import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget, DeliveryOutcome } from "./gateway/transport"
 import { REFUSAL_CODES } from "./gateway/result"
 import type { DeliveryAuthority, GatewaySender } from "./gateway/types"
+import { clientMessageIdOf } from "../remote/client-message-id"
 import { addressBook, hostView, sendBookFor } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { consumedSendersOf } from "./tools/reply-permission"
@@ -140,8 +140,12 @@ export async function sendToTarget(
     args,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
-    // A person's prompt to another device is named by a client message id, the delivery_id its answer carries.
-    ...(sender.kind === "person" ? { client_message_id: randomUUID() } : {}),
+    // A person's prompt to another device is named by a client message id, the delivery_id its answer carries. It is
+    // derived from the caller and the key (#15011), as the remote module's own sends derive it, so a repeat under the key
+    // from any process carries the id the holder admitted once (senpi admits one prompt per client message id).
+    ...(sender.kind === "person" && principal.kind === "operator"
+      ? { client_message_id: clientMessageIdOf(`person:${principal.uid}`, key) }
+      : {}),
   })
 }
 
