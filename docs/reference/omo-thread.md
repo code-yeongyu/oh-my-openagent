@@ -75,7 +75,7 @@ with other arguments is `idempotency_conflict`.
 A `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
-starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads). The result's
+starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads); `started` with a turn id means the turn the run is expected to take, and a start cancelled before it begins is delivered in a later turn. The result's
 `effective_mode` is the lane the receiver's answer proves (`started` is `start`, `steered` is `steer`, a queued answer is
 `follow_up`, except a delivery waiting only for a wake, which starts the woken session). The header is written before
 the receiver answers, so when a turn begins or ends in between, the header keeps the lane that was asked for; a
