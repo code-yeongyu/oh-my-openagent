@@ -20,8 +20,16 @@ const LEVELS = ["off", "low", "high"]
 
 function scriptedHolder(
   mode: "apply" | "park" | "ignore",
-  options: { readonly restoreFails?: boolean; readonly stateLostAfterSwitch?: boolean } = {},
+  options: {
+    readonly restoreFails?: boolean
+    readonly stateLostAfterSwitch?: boolean
+    readonly loseFirstSwitchReply?: boolean
+  } = {},
 ) {
+  // The engine's effect ledger (senpi `runSetModel`): a repeated effect id replays its first answer and switches nothing.
+  const effects = new Set<string>()
+  let parks = 0
+  let repliesToLose = options.loseFirstSwitchReply === true ? 1 : 0
   const state: { model: Model; thinkingLevel: string; pending: Model | undefined } = {
     model: PREVIOUS,
     thinkingLevel: "low",
@@ -41,14 +49,28 @@ function scriptedHolder(
         pendingModelSwitch: state.pending === undefined ? null : { ...state.pending },
       }
     },
-    setModel: (provider: string, id: string): Model => {
+    parks: () => parks,
+    loseReply: () => {
+      if (repliesToLose === 0) return false
+      repliesToLose -= 1
+      return true
+    },
+    setModel: (provider: string, id: string, effectId?: string): Model => {
+      if (effectId !== undefined && effects.has(effectId)) {
+        calls.push(`set_model replay ${effectId}`)
+        return { provider, id }
+      }
+      if (effectId !== undefined) effects.add(effectId)
       calls.push(`set_model ${provider}/${id}`)
       if (options.restoreFails === true && provider === PREVIOUS.provider && id === PREVIOUS.id)
         throw new Error("Previous model is no longer available")
       if (mode === "apply") {
         state.model = { provider, id }
         state.pending = undefined
-      } else if (mode === "park") state.pending = { provider, id }
+      } else if (mode === "park") {
+        state.pending = { provider, id }
+        parks += 1
+      }
       return { provider, id }
     },
     setThinkingLevel: (level: string) => {
@@ -74,7 +96,11 @@ function localControl(holder: Holder): SessionControl {
         throw new Error(`host_unavailable: ${(error as Error).message}`)
       }
     },
-    setModel: async (_routing: string, provider: string, id: string) => holder.setModel(provider, id),
+    setModel: async (_routing: string, provider: string, id: string, _durable?: string, effectId?: string) => {
+      const switched = holder.setModel(provider, id, effectId)
+      if (holder.loseReply()) throw new Error("transport_closed: the reply to set_model was lost")
+      return switched
+    },
     getAvailableModels: async () => holder.models,
     setThinkingLevel: async (_routing: string, level: string) => {
       try {
@@ -118,8 +144,12 @@ function relayControl(holder: Holder): SessionControl {
         } catch {
           return { kind: "uncertain", reason: "request_gone" }
         }
-      case "set_model":
-        return ok(rpc, { ...holder.setModel(String(rpc["provider"]), String(rpc["modelId"])) })
+      case "set_model": {
+        const effectId = typeof rpc["effectId"] === "string" ? rpc["effectId"] : undefined
+        const switched = holder.setModel(String(rpc["provider"]), String(rpc["modelId"]), effectId)
+        if (holder.loseReply()) return { kind: "uncertain", reason: "reply_lost" }
+        return ok(rpc, { ...switched })
+      }
       case "set_thinking_level":
         try {
           holder.setThinkingLevel(String(rpc["level"]))
@@ -136,8 +166,10 @@ function relayControl(holder: Holder): SessionControl {
 
 const LEGS = { here: localControl, other_device: relayControl } as const
 
-async function switchOn(leg: keyof typeof LEGS, holder: Holder, model: string) {
-  const result = await answered(() => setModelOn(LEGS[leg](holder), model, undefined))
+async function switchOn(leg: keyof typeof LEGS, holder: Holder, model: string, effectId?: string) {
+  const result = await answered(() =>
+    setModelOn(LEGS[leg](holder), model, undefined, effectId === undefined ? undefined : { effectId }),
+  )
   return { result, holder: { ...holder.state }, calls: [...holder.calls] }
 }
 
@@ -264,5 +296,31 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
       })
       expect(holder).toEqual({ model: SELECTED, thinkingLevel: "low", pending: undefined })
     })
+
+    test(`#given a ${leg} holder that parked a switch under an effect id #when the same switch repeats under it #then the repeat answers the same pending outcome and parks nothing more`, async () => {
+      const holder = scriptedHolder("park")
+      const first = await switchOn(leg, holder, "anthropic/claude-small:high", "effect-1")
+      const repeat = await switchOn(leg, holder, "anthropic/claude-small:high", "effect-1")
+      expect(repeat.result).toEqual(first.result)
+      expect(first.result).toMatchObject({ kind: "ok", model_switch: "after_compaction" })
+      expect(holder.parks()).toBe(1)
+      expect(repeat.calls).toEqual(["set_model anthropic/claude-small", "set_model replay effect-1"])
+    })
   }
+
+  test("#given the reply to a parked switch on another device is lost #when the switch repeats under the same effect id #then the repeat answers the pending outcome and parks nothing more", async () => {
+    const holder = scriptedHolder("park", { loseFirstSwitchReply: true })
+    const first = await switchOn("other_device", holder, "anthropic/claude-small:high", "effect-lost")
+    expect(first.result).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
+    const repeat = await switchOn("other_device", holder, "anthropic/claude-small:high", "effect-lost")
+    expect(repeat.result).toEqual({
+      kind: "ok",
+      ...identity.other_device,
+      model: SELECTED,
+      model_switch: "after_compaction",
+      in_effect: { model: PREVIOUS, thinking_level: "low" },
+      pending: { model: SELECTED, thinking_level: "high", thinking_level_sent: false },
+    })
+    expect(holder.parks()).toBe(1)
+  })
 })

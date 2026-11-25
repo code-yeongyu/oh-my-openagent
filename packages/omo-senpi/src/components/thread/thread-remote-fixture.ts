@@ -346,6 +346,8 @@ export function createRemoteThreadFixture() {
       stateRefusedAfterAdmit?: string
       /** b's engine holds every model switch until its next compaction (senpi `pendingModelSwitch`, #14939). */
       parksModelSwitch?: boolean
+      /** The replies to b's first N set_model records are lost after b's engine took them (uncertain reply_lost). */
+      setModelLosesReply?: number
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -375,6 +377,10 @@ export function createRemoteThreadFixture() {
       thinkingLevel: "off",
       pending: null,
     }
+    // b's engine's effect ledger for set_model (senpi `runSetModel`): a repeated effect id switches nothing again.
+    const modelEffects = new Set<string>()
+    let modelSwitches = 0
+    let lostSetModelReplies = options.setModelLosesReply ?? 0
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -654,9 +660,18 @@ export function createRemoteThreadFixture() {
           ],
         })
       if (rpc["type"] === "set_model") {
-        const switched = { provider: String(rpc["provider"]), id: String(rpc["modelId"]) }
-        if (options.parksModelSwitch === true) modelState.pending = switched
-        else modelState.model = switched
+        const effectId = typeof rpc["effectId"] === "string" ? rpc["effectId"] : undefined
+        if (effectId === undefined || !modelEffects.has(effectId)) {
+          if (effectId !== undefined) modelEffects.add(effectId)
+          modelSwitches += 1
+          const switched = { provider: String(rpc["provider"]), id: String(rpc["modelId"]) }
+          if (options.parksModelSwitch === true) modelState.pending = switched
+          else modelState.model = switched
+        }
+        if (lostSetModelReplies > 0) {
+          lostSetModelReplies -= 1
+          return { kind: "uncertain", reason: "reply_lost" }
+        }
         return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
       }
       if (rpc["type"] === "get_available_thinking_levels") return ok({ levels: [...THINKING_LEVELS] })
@@ -974,6 +989,8 @@ export function createRemoteThreadFixture() {
     return {
       remote,
       sent,
+      /** How many model switches b's engine took (a replayed effect id is not one). */
+      modelSwitches: () => modelSwitches,
       hops,
       aliases,
       live,
