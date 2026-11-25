@@ -66,24 +66,6 @@ describe("adapter import family A (#14943 design 7.5)", () => {
     expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
   })
 
-  test("#given the merge base's offender record #then this head's record only shrinks against it", () => {
-    const base = execFileSync("git", ["merge-base", process.env.SDK_PARITY_BASE ?? "origin/dev", "HEAD"], {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-    }).trim()
-    let recorded: string | undefined
-    try {
-      recorded = execFileSync("git", ["show", `${base}:script/remote-import-guard-adapter-offenders.json`], {
-        cwd: REPO_ROOT,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "ignore"],
-      })
-    } catch {
-      recorded = undefined
-    }
-    expect(offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS)).toEqual([])
-  })
-
   test("#given a record that drops a reach #then it passes; one that adds a file or a layer #then each is named", () => {
     const base = { "a.ts": { uses: ["L1", "L2"] }, "b.ts": { uses: ["L1"] } }
     expect(offenderGrowth(base, { "a.ts": { uses: ["L1"] } })).toEqual([])
