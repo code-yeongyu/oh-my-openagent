@@ -445,6 +445,7 @@ export function createRelayTransport(
    */
   async function addressOf(
     listed: RemoteSessionRow,
+    person: boolean,
     parked?: SendOutcome,
   ): Promise<{ readonly row: RemoteSessionRow; readonly ended: boolean } | SendOutcome> {
     if (parked === undefined && rowStatus(listed) === "live") return { row: listed, ended: false }
@@ -452,6 +453,7 @@ export function createRelayTransport(
     const thread = rowKey(listed)
     const details = { device: listed.device, thread }
     const view = await holderView(remote, listed)
+    if (typeof view !== "string") return view
     if (view === "absent")
       return fail(
         "not_found",
@@ -461,6 +463,17 @@ export function createRelayTransport(
       )
     if (parked !== undefined && view === "unknown") return parked
     if (view !== "running") {
+      // A person's prompt needs a live session; it cannot use the agent wake/admission contract.
+      if (person)
+        return (
+          parked ??
+          fail(
+            "not_resumable",
+            `No running owner for ${thread} on device ${listed.device}.`,
+            "Open the thread on that device before sending.",
+            details,
+          )
+        )
       // omo#13037 5.4 / A4.5: a session no engine runs takes the wake path when this device's service can carry it.
       const wakeable = parked !== undefined ? view === "on_disk" : listed.state === "ended"
       if (wakeable && (await remote.sessions.canWake?.()) === true) return { row: listed, ended: true }
@@ -499,21 +512,26 @@ export function createRelayTransport(
     sending: () => void,
     retry?: {
       readonly ids: Awaited<ReturnType<typeof chain>> | undefined
-      readonly announced: boolean
       readonly refusal: SendOutcome
     },
   ): Promise<SendOutcome> {
     const online = await resolveTypedDevice(remote.client, listed.device, { exactId: true })
     if (online.kind === "error") return online
-    const parkedHere = (outcome: RemoteCommandOutcome) =>
+    const retryUnlisted = (
+      outcome: Exclude<RemoteCommandOutcome, { kind: "ok" }>,
+      ids?: Awaited<ReturnType<typeof chain>>,
+    ) =>
       retry === undefined &&
       rowStatus(listed) === "live" &&
       outcome.kind === "refused" &&
       outcome.reason === "route_unlisted"
-    const addressed = await addressOf(listed, retry?.refusal)
+        ? send(delivery, listed, later, sending, { ids, refusal: outcomeFailure(outcome, listed.device) })
+        : undefined
+    const addressed = await addressOf(listed, delivery.sender.kind === "person", retry?.refusal)
     if (!("row" in addressed)) return addressed
     // `ended`: the wake path (no lane probe; its state is offline in the decision table, so a steer is turn_conflict).
     const { row, ended } = addressed
+    if (delivery.sender.kind === "person") return prompt(delivery, row, sending, retryUnlisted)
     if (ended && delivery.mode === "steer")
       return fail(
         REFUSAL_CODES.turn_conflict.code,
@@ -536,8 +554,8 @@ export function createRelayTransport(
       if (probed.kind !== "ok") {
         const refusal = probeFailure(probed, row.device)
         // A live-listed row its host parked is re-addressed through the holder whatever the mode (#14240).
-        if (parkedHere(probed))
-          return await send(delivery, listed, later, sending, { ids: undefined, announced: false, refusal })
+        const recovered = retryUnlisted(probed)
+        if (recovered !== undefined) return recovered
         // Only a steer or the default needs the probe to pick its lane. An explicit follow_up is delivered whatever the
         // target is doing, so a lost or refused probe leaves its lane unknown instead of failing the send.
         if (delivery.mode !== "follow_up") return refusal
@@ -623,8 +641,7 @@ export function createRelayTransport(
       delivery_id,
       effective_mode: resentLane ?? effectiveLaneOfAnswer(kind),
     })
-    // One delivery is announced once: a retry after the first attempt's admission was refused does not announce it again.
-    if (retry?.announced !== true) sending()
+    sending()
     if (ended) return wakeAnswer(await woken(row, record), row, delivery_id, ok)
     let sent = await remote.sessions.sessionCommand(row.device, row.session_id, record)
     if (delivery.mode === "auto" && lane === "steer" && steerConflict(sent) !== undefined) {
@@ -637,12 +654,10 @@ export function createRelayTransport(
     }
     // The retry re-stamps its own record (a wake addresses the durable id on the follow-up lane); `stamp` is a pure
     // function of (record, hop) and the ids are the first attempt's, so the receiver sees one delivery.
-    if (sent.kind !== "ok" && parkedHere(sent))
-      return await send(delivery, listed, later, sending, {
-        ids,
-        announced: true,
-        refusal: outcomeFailure(sent, row.device),
-      })
+    if (sent.kind !== "ok") {
+      const recovered = retryUnlisted(sent, ids)
+      if (recovered !== undefined) return recovered
+    }
     if (
       sent.kind === "refused" &&
       engineNotReady(sent) === undefined &&
@@ -788,9 +803,8 @@ export function createRelayTransport(
     delivery: OutboundDelivery,
     row: RemoteSessionRow,
     sending: () => void,
+    retryUnlisted: (outcome: Exclude<RemoteCommandOutcome, { kind: "ok" }>) => Promise<SendOutcome> | undefined,
   ): Promise<SendOutcome> => {
-    const online = await resolveTypedDevice(remote.client, row.device, { exactId: true })
-    if (online.kind === "error") return online
     const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
       kind: "ok",
       thread_id: rowKey(row),
@@ -804,7 +818,7 @@ export function createRelayTransport(
         type: "get_state",
         sessionId: row.session_id,
       })
-      if (state.kind !== "ok") return probeFailure(state, row.device)
+      if (state.kind !== "ok") return retryUnlisted(state) ?? probeFailure(state, row.device)
       const engine = engineStateOf(replyData(state.response))
       if (engine.phase !== "mid_turn")
         return fail(
@@ -847,7 +861,7 @@ export function createRelayTransport(
           REFUSAL_CODES[refusal].next,
           { device: row.device },
         )
-      if (steered.kind !== "ok") return outcomeFailure(steered, row.device)
+      if (steered.kind !== "ok") return retryUnlisted(steered) ?? outcomeFailure(steered, row.device)
       return ok({ kind: "steered", turn_id: String(engine.turnEpoch) })
     }
     // One round trip: the engine starts a followUp prompt on an idle session and queues it behind a running turn.
@@ -866,7 +880,7 @@ export function createRelayTransport(
         1,
       ),
     )
-    if (sent.kind !== "ok") return outcomeFailure(sent, row.device)
+    if (sent.kind !== "ok") return retryUnlisted(sent) ?? outcomeFailure(sent, row.device)
     const reply = replyData(sent.response)
     const turnId = reply["turnId"]
     if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0)
@@ -919,11 +933,7 @@ export function createRelayTransport(
           "Send without collapse_key, or send from the device that holds the thread.",
           { device: row.device, field: "collapse_key" },
         )
-      if (delivery.sender.kind === "person")
-        return await once(delivery.caller_id, delivery.idempotency_key, delivery.args, (_later, sending) =>
-          prompt(delivery, row, sending),
-        )
-      if (delivery.mode === "steer" && delivery.expected_turn_id === undefined)
+      if (delivery.sender.kind !== "person" && delivery.mode === "steer" && delivery.expected_turn_id === undefined)
         return fail(
           "invalid_arguments",
           "A steer needs expected_turn_id (the target's current turn_epoch).",
