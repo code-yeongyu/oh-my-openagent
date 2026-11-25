@@ -129,9 +129,9 @@ describe("the located-row release stays internal", () => {
     const source = readFileSync(join(import.meta.dir, "sdk.ts"), "utf8")
     const valueImports = [...source.matchAll(/^import\s+(?!type\b)[^;]*?from\s+"([^"]+)"/gms)].map((match) => match[1])
     expect(valueImports.toSorted()).toEqual([
-      "../omo-sdk/thread-assembly",
       "../omo-sdk/root/extension-codes",
       "../omo-sdk/root/thread-failures",
+      "../omo-sdk/thread-assembly",
       "./contracts",
     ])
   })
