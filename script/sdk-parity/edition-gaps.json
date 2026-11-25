@@ -10,6 +10,17 @@
         "module": "packages/omo-native/compiled-update.ts",
         "calls": "compiledInstallUpdate"
       }
+    },
+    {
+      "row": "install.version",
+      "edition": "opencode",
+      "reason": "the OpenCode edition's version command and its -v/--version flags print that edition's own package version; it has no projection of install.version yet",
+      "retires_with": "#14963",
+      "evidence": {
+        "entry": "packages/omo-opencode/src/cli/index.ts",
+        "module": "packages/omo-opencode/src/cli/cli-program.ts",
+        "calls": "version"
+      }
     }
   ]
 }

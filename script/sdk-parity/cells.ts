@@ -63,6 +63,7 @@ function entryProblems(
   headers: readonly string[],
   rows: readonly Row[],
   previousToday: string | undefined,
+  opencodeGaps: ReadonlySet<string>,
 ): string[] {
   if (entry.kind === "pointer") return pointerProblems(entry, headers, rows)
   const opencodeTable = entry.table.startsWith("6.11")
@@ -106,14 +107,17 @@ function entryProblems(
     for (const name of named)
       if (!fromRows.has(name)) problems.push(`${at}: the Tool cell names ${name}, which no row of it maps`)
   }
+  // An OpenCode-edition entry shows "no" while an opencode edition gap names the row, whatever its native today says; once
+  // the gap is deleted the cell must follow the row again (design lane ruling on install.version).
+  const expectedToday = (row: Row): string => (opencodeTable && opencodeGaps.has(row.id) ? "no" : row.today)
   const today = cell(/^SDK today$/)
   if (today !== undefined)
     for (const row of rows)
       if (
         row.kind === "capability" &&
-        (todayOf(today) ?? (/^same\b/.test(today) ? previousToday : undefined)) !== row.today
+        (todayOf(today) ?? (/^same\b/.test(today) ? previousToday : undefined)) !== expectedToday(row)
       )
-        problems.push(`${at}: ${row.id} is "${row.today}" today, the cell says "${todayOf(today) ?? today}"`)
+        problems.push(`${at}: ${row.id} is "${expectedToday(row)}" today, the cell says "${todayOf(today) ?? today}"`)
   const slice = cell(/^Slice$/)
   if (slice !== undefined) {
     const shown = slicesIn(slice)
@@ -129,6 +133,12 @@ function entryProblems(
       if (!allSlices.has(name)) problems.push(`${at}: the Slice cell names ${name}, which no row of it carries`)
   }
   const adapter = cell(/^Adapter$/)
+  if (opencodeTable)
+    for (const row of rows.filter((candidate) => opencodeGaps.has(candidate.id)))
+      if (!row.slices.some((name) => name.startsWith("OC") && plain(`${adapter ?? ""} ${slice ?? ""}`).includes(name)))
+        problems.push(
+          `${at}: ${row.id} has an opencode edition gap, and neither the Adapter nor the Slice cell names its OC slice`,
+        )
   if (adapter !== undefined)
     for (const row of rows)
       for (const planned of [row.planned.cli, row.planned.tool])
@@ -137,7 +147,12 @@ function entryProblems(
   return problems
 }
 
-export function cellProblems(template: string, files: readonly DomainFile[]): string[] {
+/** `opencodeGaps`: the rows an opencode edition gap names (edition-gaps.json); their 6.11 cell shows "no". */
+export function cellProblems(
+  template: string,
+  files: readonly DomainFile[],
+  opencodeGaps: ReadonlySet<string> = new Set(),
+): string[] {
   const headers = tableHeaders(template)
   const byId = new Map(files.flatMap((file) => file.rows).map((row) => [row.id, row]))
   const entries = files
@@ -149,7 +164,7 @@ export function cellProblems(template: string, files: readonly DomainFile[]): st
     const header = headers.get(entry.table) ?? []
     const rows = entry.ids.map((id) => byId.get(id)).filter((row): row is Row => row !== undefined)
     const inherited = previous?.table === entry.table ? previous.today : undefined
-    problems.push(...entryProblems(entry, header, rows, inherited))
+    problems.push(...entryProblems(entry, header, rows, inherited, opencodeGaps))
     const todayCell = entry.cells[header.indexOf("SDK today")] ?? ""
     previous = { table: entry.table, today: todayOf(todayCell) ?? inherited }
   }

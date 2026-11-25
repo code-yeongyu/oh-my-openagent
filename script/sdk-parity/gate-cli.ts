@@ -13,6 +13,7 @@ import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
+import { EDITION_GAPS, EDITION_GAPS_PATH, type EditionGap, editionGapAdditionProblems } from "./edition-gaps"
 import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
@@ -132,6 +133,13 @@ try {
   const baseFailures = [
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
     ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
+    ...editionGapAdditionProblems(
+      EDITION_GAPS,
+      ((text) => (text === undefined ? [] : (JSON.parse(text) as { entries: EditionGap[] }).entries))(
+        show(mergeBase, EDITION_GAPS_PATH),
+      ),
+      new Set((base.unresolved ?? []).map((entry) => entry.id)),
+    ),
   ]
   const baselineFailures = baselineProblems({
     rows,

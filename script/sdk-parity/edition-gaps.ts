@@ -9,7 +9,10 @@ import type { Row } from "./schema"
 // another still runs its own function. So an entry names its evidence as data (the edition's entry module, the module
 // holding the function it runs instead, and that function), and goes stale when that entry no longer reaches it.
 
-const EDITIONS = ["npm", "compiled"] as const
+// npm and compiled are the native package's two editions; opencode is the other product edition's command line.
+const EDITIONS = ["npm", "compiled", "opencode"] as const
+
+export const EDITION_GAPS_PATH = "script/sdk-parity/edition-gaps.json"
 
 export type EditionGap = {
   readonly row: string
@@ -33,6 +36,13 @@ export function editionGapProblems(entries: readonly EditionGap[], rows: readonl
     if (!rows.some((row) => row.id === entry.row)) problems.push(`${at}: no registry row ${entry.row}`)
     if (!(EDITIONS as readonly string[]).includes(entry.edition))
       problems.push(`${at}: ${entry.edition} is not an edition (${EDITIONS.join(", ")})`)
+    const row = rows.find((candidate) => candidate.id === entry.row)
+    if (entry.edition === "opencode" && row !== undefined) {
+      if (!row.cli.some((cli) => cli.edition === "opencode"))
+        problems.push(`${at}: ${entry.row} has no opencode command line, so that edition has nothing missing`)
+      if (!row.slices.some((slice) => slice.startsWith("OC")))
+        problems.push(`${at}: ${entry.row} carries no OC slice to build the opencode edition`)
+    }
     const { entry: entryModule, module, calls } = entry.evidence
     const missing = [entryModule, module].filter((path) => !existsSync(join(repoRoot, path)))
     if (missing.length > 0) {
@@ -45,4 +55,22 @@ export function editionGapProblems(entries: readonly EditionGap[], rows: readonl
       problems.push(`${at}: stale, ${module} no longer calls ${calls}; delete the entry`)
   }
   return problems
+}
+
+/**
+ * An edition gap is added only by the pull request that clears its row's unresolved entry (design lane ruling): a gap
+ * the merge base did not have, on a row the merge base did not hold unresolved, could hide a regression in a built row.
+ */
+export function editionGapAdditionProblems(
+  head: readonly EditionGap[],
+  baseGaps: readonly EditionGap[],
+  baseUnresolved: ReadonlySet<string>,
+): string[] {
+  const had = new Set(baseGaps.map((gap) => `${gap.row} ${gap.edition}`))
+  return head
+    .filter((gap) => !had.has(`${gap.row} ${gap.edition}`) && !baseUnresolved.has(gap.row))
+    .map(
+      (gap) =>
+        `edition gap ${gap.row} (${gap.edition}): ${gap.row} was not unresolved at the merge base; an edition gap is added only by the pull request that clears its row`,
+    )
 }
