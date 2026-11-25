@@ -12,5 +12,6 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
     cores: {
       install: async () => installCore(),
     },
+    signIn: async (api, request) => (await import("./account-launcher.ts")).signInInLauncher(api, request),
   })
 }

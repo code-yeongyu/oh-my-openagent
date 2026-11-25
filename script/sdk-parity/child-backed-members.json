@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "member": "account.signIn",
+      "principal": "session",
+      "reason": "the device-service setup after a fresh sign-in lives in launcher-only code (runLoginSetup in packages/omo-native/remote-bootstrap.ts), which the engine's root cannot import; a session's root keeps the shipped launcher child so its caller keeps the device-service outcome it gets today",
+      "retires_with": "A2a"
+    }
+  ]
+}

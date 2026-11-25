@@ -5,7 +5,8 @@ import { createConfigApi } from "../config"
 import type { CallOptions } from "../contract"
 import { createDeviceServiceApi, type DeviceServiceApi, type DeviceServiceStatusPort } from "../device-service"
 import { createDevicesApi } from "../devices"
-import { accountSignIn } from "./account-sign-in"
+import type { OmoPrincipal } from "../contract"
+import { accountSignIn, type InProcessSignIn } from "./account-sign-in"
 import type { NamespaceServing } from "./members"
 
 type Env = Readonly<Record<string, string | undefined>>
@@ -37,6 +38,8 @@ export function shippedNamespaces(options: {
   readonly home?: string
   readonly signInProcess?: SignInProcess
   readonly deviceServiceStatus?: DeviceServiceStatusPort
+  readonly principal: OmoPrincipal
+  readonly signIn?: InProcessSignIn
 }): NamespaceServing {
   const account = createAccountApi(options.access, {
     process: options.signInProcess ?? launcherSignInProcess(options.env["OMO_BIN"]),
@@ -52,7 +55,11 @@ export function shippedNamespaces(options: {
   return {
     members: {
       "account.whoami": account.whoami,
-      "account.signIn": accountSignIn(account, options.access.origin),
+      "account.signIn": accountSignIn(account, {
+        access: options.access,
+        principal: options.principal,
+        ...(options.signIn === undefined ? {} : { inProcess: options.signIn }),
+      }),
       "devices.list": devices.list,
       "devices.rename": devices.rename,
       "deviceService.status": serviceStatus(deviceService),

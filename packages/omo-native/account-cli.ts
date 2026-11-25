@@ -1,6 +1,4 @@
-import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
-import { syncPinDir } from "../memory-core/src/sync/pin-dir"
-import { createCredentialStore, type CredentialStore, INTERACTIVE_READ_WAIT } from "../account-core/src/keystore"
+import type { CredentialStore } from "../account-core/src/keystore"
 import { type Credentials, credentialSchema, serviceOrigin } from "../account-core/src/protocol"
 import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import {
@@ -9,7 +7,6 @@ import {
   type DeviceServiceHandoff,
   type Session,
 } from "../account-core/src/session"
-import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
@@ -17,8 +14,7 @@ import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { accountStoreDependencies, runAccountStore } from "./account-store"
-import { cliDeviceServiceHandoff } from "./device-service-handoff"
-import { setUpRemoteAfterSignIn } from "./remote-entry"
+import { launcherAccountDependencies } from "./account-launcher"
 
 export { ACCOUNT_EXIT }
 
@@ -224,26 +220,16 @@ export async function runAccountCommand(
 ): Promise<void> {
   registerHelperCandidates(options.helperCandidates ?? [])
   const api = serviceOrigin(process.env.OMO_SERVICE_API_URL ?? "https://api.omo.dev")
-  // One store per command: its keyring check and fallback notice are per store (#10658 review).
-  let store: CredentialStore | undefined
+  const stderr = (line: string): void => {
+    process.stderr.write(`${line}\n`)
+  }
   process.exitCode = await runAccountVerb(
-    {
-      api,
-      get store() {
-        store ??= createCredentialStore(api, { wait: INTERACTIVE_READ_WAIT })
-        return store
-      },
-      pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-      beforeKeysDiscarded: retireSyncPinOnDiscard({
-        pinDir: () => syncPinDir(resolveMemoryRoot(process.env, process.cwd())),
-        log: (line) => process.stderr.write(`${line}\n`),
-      }),
-      deviceService: cliDeviceServiceHandoff({ api, log: (line) => process.stderr.write(`${line}\n`) }),
-      setUpDeviceService: setUpRemoteAfterSignIn,
+    launcherAccountDependencies(api, {
+      log: stderr,
       readStdin: () => new Response(Bun.stdin.stream()).text(),
       output: (line) => process.stdout.write(`${line}\n`),
-      error: (line) => process.stderr.write(`${line}\n`),
-    },
+      error: stderr,
+    }),
     args.slice(1),
   )
 }

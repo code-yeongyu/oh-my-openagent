@@ -56,7 +56,7 @@ const SignedIn = Type.Object(
     api: Text,
     device: Device,
     replaced_device: Type.Optional(Text),
-    device_service: Type.Enum(["on", "kept_off", "not_on", "background"]),
+    device_service: Type.Enum(["on", "kept_off", "not_on", "background", "not_run"]),
   },
   closed,
 )
