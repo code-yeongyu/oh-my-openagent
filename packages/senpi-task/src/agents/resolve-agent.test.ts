@@ -320,6 +320,7 @@ describe("resolveAgent curated explore/librarian chain", () => {
     model("chatgpt-subscription", "gpt-6-luna-fast"),
     model("deepseek", "deepseek-v4-flash"),
     model("deepseek", "deepseek-flash"),
+    model("vertex-garden", "deepseek-ai/deepseek-v4.1-flash-maas"),
     model("opencode-go", "qwen3.7-plus"),
     model("opencode-go", "minimax-m3"),
     model("minimax-coding-plan", "MiniMax-M3"),
@@ -329,7 +330,7 @@ describe("resolveAgent curated explore/librarian chain", () => {
   ])
 
   for (const agent of ["explore", "librarian"] as const) {
-    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, Qwen 3.7 Plus, then M2.7`, () => {
+    test(`#given every rung model is available #when ${agent} resolves #then it runs Kimi HighSpeed, Luna Fast, Haiku 5.5 medium, DeepSeek V4.1 Flash, the Vertex Garden Flash lane, Qwen 3.7 Plus, then M2.7`, () => {
       // when
       const result = expectResolved(resolveAgent(agent, BUILTIN_AGENTS, everyRungModel))
 
@@ -339,10 +340,12 @@ describe("resolveAgent curated explore/librarian chain", () => {
         "chatgpt-subscription/gpt-6-luna-fast",
         "anthropic-subscription/claude-haiku-5-5",
         "deepseek/deepseek-flash",
+        "vertex-garden/deepseek-ai/deepseek-v4.1-flash-maas",
         "opencode-go/qwen3.7-plus",
         "opencode-go/minimax-m2.7",
       ])
       expect(result.fallback_models?.[1]?.variant).toBe("medium")
+      expect(result.fallback_models?.[3]?.variant).toBe("medium")
     })
   }
 })

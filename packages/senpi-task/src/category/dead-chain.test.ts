@@ -41,6 +41,7 @@ describe("dead-chain category disabling", () => {
         "anthropic-api",
         "github-copilot",
         "deepseek",
+        "vertex-garden",
         "qwen-token-plan",
         "alibaba-token-plan",
         "bailian-coding-plan",
