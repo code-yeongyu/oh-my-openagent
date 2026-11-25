@@ -25,7 +25,7 @@ export const UNRESOLVED_PATH = "script/sdk-parity/unresolved.json"
 
 export const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex")
 
-export const countsTowardClosure = (row: Row): boolean => row.kind === "capability"
+const countsTowardClosure = (row: Row): boolean => row.kind === "capability"
 
 export type BaselineState = {
   readonly rows: readonly Row[]

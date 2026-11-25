@@ -20,7 +20,7 @@ export type ScenarioSetup = {
 
 export type ScenarioRun = { readonly scenario: TableScenario; readonly setup: () => ScenarioSetup }
 
-export const SCENARIO_RUNS: readonly ScenarioRun[] = []
+const SCENARIO_RUNS: readonly ScenarioRun[] = []
 
 // P0 has no run and no port list of its own: slice P1a's PORT_EFFECTS replaces this, and until then any observed call is
 // on an unclassified port and fails (conformance.ts), so an empty table can never pass a run silently.

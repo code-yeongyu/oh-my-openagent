@@ -7,7 +7,7 @@ import { SLICES } from "./schema"
 
 const PLACEHOLDER = /^\{\{rows ([0-9a-z.-]+)\}\}$/
 
-export function tableHeaders(template: string): Map<string, readonly string[]> {
+function tableHeaders(template: string): Map<string, readonly string[]> {
   const lines = template.split("\n")
   const out = new Map<string, readonly string[]>()
   lines.forEach((line, index) => {
