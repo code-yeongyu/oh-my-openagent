@@ -399,6 +399,11 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
           env: options.env,
           loadProvenanceWorkspaces,
           onProvenanceWarning,
+          // B8: an unexpected exception's text goes to this engine's local log only, never into a tool answer.
+          onUnexpected: (error: unknown) =>
+            ctx.logger.warn(
+              `thread: unexpected failure: ${error instanceof Error ? (error.stack ?? error.message) : String(error)}`,
+            ),
           diskSessions: options.diskSessions,
           sessionsDirectory,
           ensureHost: options.ensureHost,
