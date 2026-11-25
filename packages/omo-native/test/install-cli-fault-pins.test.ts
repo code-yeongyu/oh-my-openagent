@@ -31,7 +31,10 @@ function faultFixture() {
   const agentDir = join(root, "agent")
   mkdirSync(home, { recursive: true })
   writeFile(join(root, "xdg", "opencode", "auth.json"), JSON.stringify({ google: { type: "api", key: CANARY } }))
-  writeFile(join(root, "xdg-config", "opencode", "skills", "fixture-skill", "SKILL.md"), "---\nname: fixture-skill\ndescription: d\n---\nbody\n")
+  writeFile(
+    join(root, "xdg-config", "opencode", "skills", "fixture-skill", "SKILL.md"),
+    "---\nname: fixture-skill\ndescription: d\n---\nbody\n",
+  )
   writeFile(join(agentDir, "skills"), "not a directory\n")
   const app = join(root, "app")
   cpSync(join(SOURCE_ROOT, "bin"), join(app, "bin"), { recursive: true })
@@ -52,10 +55,7 @@ function faultFixture() {
 function outcome(result: ReturnType<typeof spawnSync>, fixture: ReturnType<typeof faultFixture>) {
   if (result.error) throw result.error
   const clean = (text: unknown) =>
-    String(text)
-      .replaceAll("\r\n", "\n")
-      .replaceAll(fixture.root, "<ROOT>")
-      .replaceAll(SOURCE_ROOT, "<SOURCE>")
+    String(text).replaceAll("\r\n", "\n").replaceAll(fixture.root, "<ROOT>").replaceAll(SOURCE_ROOT, "<SOURCE>")
   expect(`${result.stdout}${result.stderr}`).not.toContain(CANARY)
   const authFile = join(fixture.agentDir, "auth.json")
   return {
@@ -85,7 +85,10 @@ describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage who
 
   test("#given the npm launcher #then the credentials stage's write stays, the error is printed and the exit is 1", () => {
     const fixture = faultFixture()
-    const result = spawnSync(process.execPath, [fixture.launcher, "setup", "--yes"], { encoding: "utf8", env: fixture.env })
+    const result = spawnSync(process.execPath, [fixture.launcher, "setup", "--yes"], {
+      encoding: "utf8",
+      env: fixture.env,
+    })
     expect(outcome(result, fixture)).toMatchInlineSnapshot(`
       {
         "imported": [

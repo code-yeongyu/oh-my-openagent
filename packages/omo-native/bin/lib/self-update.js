@@ -1,4 +1,4 @@
-import { INSTALL_EXIT_BY_CODE, INSTALL_FAILED_EXIT, readInstalledVersion, update } from "./install-calls.js"
+import { exitOf, INSTALL_UPDATE_EXITS, readInstalledVersion, update } from "./install-calls.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 import { versionedUpdateLines } from "./versioned-install.js"
 
@@ -80,7 +80,7 @@ export async function runSelfUpdate(args, options = {}) {
     return 0
   }
   for (const line of failureLines(answer.error)) error(line)
-  return exitCodeOf(answer.error)
+  return exitOf(INSTALL_UPDATE_EXITS, answer.error)
 }
 
 function renderProgress(event, log, error) {
@@ -107,12 +107,6 @@ function renderProgress(event, log, error) {
       )
     }
   }
-}
-
-function exitCodeOf(failure) {
-  if (failure.code !== "install_failed") return INSTALL_EXIT_BY_CODE[failure.code] ?? 1
-  const exit = INSTALL_FAILED_EXIT[failure.details.reason]
-  return exit === "exit_status" ? failure.details.exit_status : exit
 }
 
 const VERSIONED_KIND = {

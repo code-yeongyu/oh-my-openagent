@@ -439,8 +439,7 @@
                 "const": "each"
               }
             ]
-          },
-          "decide": {}
+          }
         },
         "required": [
           "consent",

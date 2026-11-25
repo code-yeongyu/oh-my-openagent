@@ -110,26 +110,36 @@ const INSTALL_NEXT = "Read details.reason, fix what it names, then call install.
  */
 
 /**
- * The exit code \`omo update\` ends with for each install_failed reason: a number, or "exit_status" to pass the failed
- * command's own status through. Data, not code: it moves unchanged to the descriptor's exit slot once slice P1b's exit
- * projection defines one.
- * @satisfies {{ readonly [Reason in InstallFailedReason]: number | "exit_status" }}
+ * The exits \`omo update\` ends with, as data in the shape of the omo SDK's exit surfaces ({ ok, refused, rules }, rules
+ * tried in order, first match wins; exitFrom passes a details field through when it is an integer 1 to 255). It moves
+ * unchanged to omo-sdk/exit/install.ts once slice P1b's exit projection lands. The usage refusal (exit 2) is the
+ * parser's, before any call.
  */
-export const INSTALL_FAILED_EXIT = /** @type {const} */ ({
-  engine_missing: 1,
-  manager_not_started: 1,
-  manager_failed: "exit_status",
-  not_moved: 1,
-  file_held: 1,
-  versioned: "exit_status",
-  binary_install: 1,
+export const INSTALL_UPDATE_EXITS = /** @type {const} */ ({
+  ok: 0,
+  refused: 1,
+  rules: [
+    { code: "install_failed", details: { reason: "manager_failed" }, exitFrom: "exit_status" },
+    { code: "install_failed", details: { reason: "versioned" }, exitFrom: "exit_status" },
+  ],
 })
 
 /**
- * The exit code of every other failure an install call answers; the usage refusal is the command's own (2).
- * @type {{ readonly internal_error: number, readonly service_unreachable: number, readonly unsupported: number }}
+ * The exit for a failure under \`surface\`: the first rule whose code and details match, else \`refused\`.
+ * @param {typeof INSTALL_UPDATE_EXITS} surface @param {{ code: string, details?: Record<string, unknown> }} [failure]
+ * @returns {number}
  */
-export const INSTALL_EXIT_BY_CODE = { internal_error: 1, service_unreachable: 1, unsupported: 1 }
+export function exitOf(surface, failure) {
+  if (failure === undefined) return surface.ok
+  for (const rule of surface.rules) {
+    if (rule.code !== failure.code) continue
+    const details = failure.details ?? {}
+    if (!Object.entries(rule.details ?? {}).every(([key, value]) => details[key] === value)) continue
+    const value = details[rule.exitFrom]
+    if (Number.isInteger(value) && Number(value) >= 1 && Number(value) <= 255) return Number(value)
+  }
+  return surface.refused
+}
 
 /** @type {{ readonly [Kind in Exclude<import("./versioned-install.js").VersionedOutcome["kind"], "updated">]: Extract<InstallFailedDetails, { reason: "versioned" }>["cause"] }} */
 const VERSIONED_CAUSE = {

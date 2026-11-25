@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
-import { INSTALL_FAILED_EXIT, setup, update } from "../bin/lib/install-calls.js"
+import { exitOf, INSTALL_UPDATE_EXITS, setup, update } from "../bin/lib/install-calls.js"
 import { runSelfUpdate } from "../bin/lib/self-update.js"
 import { setupEntryText } from "../bin/lib/setup-stream.js"
 import { summaryPhrase } from "../bin/lib/setup-summary.js"
@@ -82,10 +82,11 @@ describe("install_failed: one closed reason per failure, and omo update exits wi
       },
     },
     { reason: "manager_failed", exit: 3, ports: { run: async () => ({ status: 3, signal: null }) } },
+    { reason: "manager_failed", exit: 1, ports: { run: async () => ({ status: null, signal: "SIGKILL" }) } },
     { reason: "not_moved", exit: 1, ports: { run: async () => ({ status: 0, signal: null }) } },
   ] as const
   for (const item of cases) {
-    test(`#given a ${item.reason} update #then details.reason is ${item.reason} and the command exits ${item.exit}`, async () => {
+    test(`#given a ${item.reason} update exiting ${item.exit} #then details.reason is ${item.reason} and the command exits ${item.exit}`, async () => {
       const ports = {
         resolveUpdate: () => target,
         fetchDistTags: () => ({ latest: "1.0.1" }),
@@ -96,10 +97,8 @@ describe("install_failed: one closed reason per failure, and omo update exits wi
       }
       const answer = await update({}, ports)
       if (answer.kind !== "error" || answer.error.code !== "install_failed") throw new Error("expected install_failed")
-      const details = answer.error.details as { reason: keyof typeof INSTALL_FAILED_EXIT; exit_status?: number }
-      expect(details.reason).toBe(item.reason)
-      const fromTable = INSTALL_FAILED_EXIT[details.reason]
-      expect(fromTable === "exit_status" ? details.exit_status : fromTable).toBe(item.exit)
+      expect(answer.error.details).toMatchObject({ reason: item.reason })
+      expect(exitOf(INSTALL_UPDATE_EXITS, answer.error)).toBe(item.exit)
       expect(await runSelfUpdate(["update"], { ...ports, log: () => {}, error: () => {} })).toBe(item.exit)
     })
   }
