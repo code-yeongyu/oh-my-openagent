@@ -1,0 +1,127 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`C1c fault pins: a file setup cannot read #given OpenCode's config unreadable #when the npm edition runs setup --dry-run #then the output is as today 1`] = `
+{
+  "imported": null,
+  "status": 0,
+  "stderr": "",
+  "stdout": 
+"DRY RUN: no files will be written
+Found your OpenCode setup
+  logins        1 API key (google) - will be imported
+  MCP servers   1 will be imported (docs)
+Notes:
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its mcp servers were not imported
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its custom providers were not imported
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its model choices were not imported
+Model-to-agent guidance: docs/guide/agent-model-matching.md
+OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.
+The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
+Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
+Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
+planned-add: google
+skipped-existing: none
+skipped-oauth: none
+skipped-unmapped: none
+planned-mcp: docs
+mcp-skipped-existing: none
+planned-skills: none
+skills-skipped-existing: none
+skills-skipped-bundled: none
+"
+,
+}
+`;
+
+exports[`C1c fault pins: a file setup cannot read #given OpenCode's config unreadable #when the compiled edition runs setup --dry-run #then the output is as today 1`] = `
+{
+  "imported": null,
+  "status": 0,
+  "stderr": "",
+  "stdout": 
+"DRY RUN: no files will be written
+Found your OpenCode setup
+  logins        1 API key (google) - will be imported
+  MCP servers   1 will be imported (docs)
+Notes:
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its mcp servers were not imported
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its custom providers were not imported
+  WARN opencode: could not parse <ROOT>/xdg-config/opencode/opencode.json: EACCES: permission denied, open '<ROOT>/xdg-config/opencode/opencode.json'; its model choices were not imported
+Model-to-agent guidance: docs/guide/agent-model-matching.md
+OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.
+The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
+Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
+Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
+planned-add: google
+skipped-existing: none
+skipped-oauth: none
+skipped-unmapped: none
+planned-mcp: docs
+mcp-skipped-existing: none
+planned-skills: none
+skills-skipped-existing: none
+skills-skipped-bundled: none
+"
+,
+}
+`;
+
+exports[`C1c fault pins: a file setup cannot read #given OpenCode's auth unreadable #when the npm edition runs setup --dry-run #then the output is as today 1`] = `
+{
+  "imported": null,
+  "status": 0,
+  "stderr": "",
+  "stdout": 
+"DRY RUN: no files will be written
+Found your OpenCode setup
+  MCP servers   1 will be imported (docs)
+Notes:
+  WARN opencode: could not parse auth.json: EACCES: permission denied, open '<ROOT>/xdg/opencode/auth.json'
+Model-to-agent guidance: docs/guide/agent-model-matching.md
+OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.
+The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
+Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
+Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
+planned-add: none
+skipped-existing: none
+skipped-oauth: none
+skipped-unmapped: none
+planned-mcp: docs
+mcp-skipped-existing: none
+planned-skills: none
+skills-skipped-existing: none
+skills-skipped-bundled: none
+"
+,
+}
+`;
+
+exports[`C1c fault pins: a file setup cannot read #given OpenCode's auth unreadable #when the compiled edition runs setup --dry-run #then the output is as today 1`] = `
+{
+  "imported": null,
+  "status": 0,
+  "stderr": "",
+  "stdout": 
+"DRY RUN: no files will be written
+Found your OpenCode setup
+  MCP servers   1 will be imported (docs)
+Notes:
+  WARN opencode: could not parse auth.json: EACCES: permission denied, open '<ROOT>/xdg/opencode/auth.json'
+Model-to-agent guidance: docs/guide/agent-model-matching.md
+OmO sends anonymous usage telemetry (no prompts, code, file paths, or account data) to improve the product.
+The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
+Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
+Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
+planned-add: none
+skipped-existing: none
+skipped-oauth: none
+skipped-unmapped: none
+planned-mcp: docs
+mcp-skipped-existing: none
+planned-skills: none
+skills-skipped-existing: none
+skills-skipped-bundled: none
+"
+,
+}
+`;

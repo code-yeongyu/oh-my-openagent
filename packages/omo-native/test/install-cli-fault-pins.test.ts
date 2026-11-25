@@ -1,6 +1,16 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -153,4 +163,41 @@ describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage who
       }
     `)
   })
+})
+
+// A file setup cannot read (mode 000) among readable ones: each read failure is that file's warning, the readable
+// files still count, and the dry run ends as it does today, in both editions.
+function unreadableFixture(which: "config" | "auth") {
+  const fixture = faultFixture()
+  rmSync(join(fixture.agentDir, "skills"), { force: true })
+  rmSync(join(fixture.root, "xdg-config", "opencode", "skills"), { recursive: true, force: true })
+  const configDir = join(fixture.root, "xdg-config", "opencode")
+  writeFile(join(configDir, "opencode.json"), "{}")
+  writeFile(
+    join(configDir, "opencode.jsonc"),
+    JSON.stringify({ mcp: { docs: { type: "remote", url: "https://mcp.example.test" } } }),
+  )
+  chmodSync(
+    which === "config" ? join(configDir, "opencode.json") : join(fixture.root, "xdg", "opencode", "auth.json"),
+    0,
+  )
+  return fixture
+}
+
+describe.skipIf(process.platform === "win32")("C1c fault pins: a file setup cannot read", () => {
+  for (const which of ["config", "auth"] as const)
+    for (const edition of ["npm", "compiled"] as const)
+      test(`#given OpenCode's ${which} unreadable #when the ${edition} edition runs setup --dry-run #then the output is as today`, () => {
+        const fixture = unreadableFixture(which)
+        const entry = edition === "npm" ? fixture.launcher : join(SOURCE_ROOT, "compile-entry.ts")
+        const result = spawnSync(process.execPath, [entry, "setup", "--dry-run"], {
+          encoding: "utf8",
+          env: fixture.env,
+        })
+        const seen = outcome(result, fixture)
+        expect({
+          ...seen,
+          stderr: edition === "compiled" ? compiledStderr(seen.stderr) : seen.stderr,
+        }).toMatchSnapshot()
+      })
 })

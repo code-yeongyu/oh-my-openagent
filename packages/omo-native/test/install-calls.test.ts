@@ -207,6 +207,33 @@ describe("a read that fails through the setup file port stays that file's notice
   })
 })
 
+describe("one OpenCode config file that fails to read among readable ones", () => {
+  test("#given opencode.json unreadable and opencode.jsonc readable #then plan warns about the first and keeps the second's server", async () => {
+    const { ports } = setupHome()
+    const dir = join(ports.env.XDG_CONFIG_HOME as string, "opencode")
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, "opencode.json"), "{}")
+    writeFileSync(
+      join(dir, "opencode.jsonc"),
+      JSON.stringify({ mcp: { docs: { type: "remote", url: "https://mcp.example.test" } } }),
+    )
+    const unreadable = join(dir, "opencode.json")
+    const fs = {
+      ...REAL_SETUP_FS,
+      read: (path: string) => {
+        if (path === unreadable) throw new Error(`EACCES: permission denied, open '${path}'`)
+        return REAL_SETUP_FS.read(path)
+      },
+    }
+    const planned = await setup.plan({}, { ...ports, fs })
+    if (planned.kind !== "ok") throw new Error(`plan failed: ${planned.error.code}`)
+    expect(JSON.stringify(planned.value.summary.notes)).toContain(`could not parse ${unreadable}: EACCES`)
+    expect(planned.value.stages.find((stage) => stage.id === "assets")?.entries).toContainEqual(
+      expect.objectContaining({ key: "planned-mcp", value: ["docs"] }),
+    )
+  })
+})
+
 describe("install.setup.apply writes through the file port it is given", () => {
   test("#given a file port #then the credentials stage's write goes through it", async () => {
     const { plan, ports, authFile } = await plannedSetup()
