@@ -1,6 +1,6 @@
 # The omo SDK as the first-party surface: design
 
-Tracking issue: #14943. Status: design, revision 3, after two reviews of #14944. Nothing in this document is implemented by the pull request that adds it, and nothing in it is a security approval: authority and custody are settled by the separate security design (slice S0, #14945).
+Tracking issue: #14943. Status: design, revision 4, after three reviews of #14944. Nothing in this document is implemented by the pull request that adds it, and nothing in it is a security approval: authority and custody are settled by the separate security design (slice S0, #14945).
 
 Source was read at `dev` `2e2a815ac8` and at the engine's `main` `48983b7bf8` on 2026-11-25. No product command was run for this document; every "today" statement is a source reading with its file and line. Path abbreviations: `N/` = `packages/omo-native/`, `T/` = `packages/omo-senpi/src/components/thread/`, `R/` = `packages/omo-senpi/src/components/remote/`, `S/` = `packages/omo-senpi/src/components/omo-sdk/`, `C/` = `packages/omo-opencode/src/cli/`, `E/` = the engine's `packages/coding-agent/src/`.
 
@@ -205,14 +205,14 @@ type OmoFailure = {
     readonly message: string
     readonly next_action: string
     readonly details?: Readonly<Record<string, unknown>>
-    readonly uncertain?: true        // it may have run: read, never resend blindly
+    readonly uncertain?: boolean     // carried exactly as the remote module gives it: true, false or absent
     readonly command_id?: string     // the relay's id for a command that left this device
     readonly partial?: unknown       // what was done before the failure
   }
 }
 ```
 
-- On the root, the error branch has one shape in every namespace. It is the shape the thread tools and the omo SDK already share, with the remote module's three extra fields carried as optional first-class fields, not folded into `details`. The conversion to and from the remote module's flat failure is therefore lossless and cannot collide with a key an existing `details` object uses.
+- On the root, the error branch has one shape in every namespace. It is the shape the thread tools and the omo SDK already share, with the remote module's three extra fields carried as optional first-class fields with their types and values unchanged (`R/types.ts:55-64`), not folded into `details`. The conversion to and from the remote module's flat failure is therefore lossless and cannot collide with a key an existing `details` object uses.
 - `OmoCode` is one registry: the union of `THREAD_ERROR_CODES`, the omo SDK's codes and `REMOTE_CODES`, one meaning per name. `not_implemented` is reserved for a call whose slice has not landed; it is never a valid outcome of a row counted as built (7.2).
 - The ok branch on the root has two shapes, both already shipped: `threads.*` answers the thread contract (`{ kind: "ok", thread, delivery, ... }`, `T/contracts/results.ts`), and every other namespace answers `{ kind: "ok", value }`. The thread contract is persisted in receipts, replayed and printed by `omo thread --json`, so it does not move. **The delivery result type does not move**: #14941 and the replay fix for a repeated idempotency key build on the present shape. This is a real cost to a generic caller, and the document does not claim one universal result. Calls that answer an engine reply today (`threads.release`, `daemon.warm`) keep that reply as their `value`.
 - Exit codes are a projection keyed by surface, not one table. Today `internal_error` exits 5 from `omo thread` (`N/bin/lib/thread.js:126-132`) and 1 from `omo remote` (`R/codes.ts:195-213`), and `omo account` and `omo daemon` have their own maps (`N/account-show.ts:24-36`, `N/bin/lib/daemon-args.js:7-13`). Each descriptor's `render.exit` names its surface's map; tests pin both the JSON and the exit outcome of every existing verb before any alias is removed or any wait default changes.
@@ -279,7 +279,9 @@ The policy that today lives in the tools' delivery locator (`T/tools.ts:583-678`
 | A sender this device does not hold | Looked up account-wide by exact id or name with `unique_holder`; a copy of the id on a second device makes it ambiguous |
 | A renamed sender | A stated name nobody carries any more is answered through the sender's recorded id |
 | The caller | A send never targets its own caller by an id prefix; `self` resolves only for a session principal and is `caller_context_missing` for every other |
-| Scope | `all_scope` widens this device's workspace scope only. A holder-qualified address is exact; a bare address two holders answer is `ambiguous_target` with both candidates, never a pick |
+| Scope | `all_scope` widens this device's workspace scope only |
+| Text with a slash | Two readings, as the resolver has them today (`T/address/resolve.ts:181-244`). The device reading is taken only when the first part names a device on the roster. When it names no device, or the device does not hold the thread part, the whole text is resolved as a bare address, because a thread name may contain a slash, and the device's refusal answers only when that also misses. An id-shaped thread part is the named device's to answer, with no whole-text reading. When the device holds the thread part and this device's book also holds a different thread literally named by the whole text, the answer is `ambiguous_target` with both |
+| One holder | `unique_holder` is an input a few operations set, not a property of every call: with it, a bare address that resolves is also checked for a second holder on the account, and a second holder is `ambiguous_target` (`T/address/resolve.ts:198-204`). Without it the ladder's order decides, as today. The operations that set it are the ones that set it today: the reply to a sender this device does not hold, and the typed address of the `omo remote` aliases |
 
 Caller-specific defaults are inputs each caller's SDK operation sets, not branches inside adapters: `threads.send` from a session sets `id_prefix: { exclude: caller }` and passes `reply` when the engine's reply allowance approved the send; from a script it sets neither. These defaults are rows of the security design's matrix and scenarios of the conformance test.
 
@@ -308,7 +310,7 @@ Direction: **SDK ⊇ CLI and SDK ⊇ tools.** Every row is a leaf capability wit
 
 - **SDK today**: **yes** (the root or a facade answers it, with these inputs honoured, at the pinned commit), **partial** (one of the entries answers part of it; the gap is named), **no** (a defect under the rule).
 - **Adapter**: for a CLI or tool cell that is empty, either **planned** with the slice that adds it, or **omitted** with the reason it is intentionally narrower. "Not built yet" is never a reason.
-- **Slice**: the slice of section 8 that builds the row's SDK call. Every row has one.
+- **Slice**: the slice of section 8 that builds the row's SDK call. Every row that counts toward closure has one. A `reserved` name (6.7) is not such a row.
 
 ### 6.1 Threads: reading
 
@@ -414,7 +416,7 @@ Both editions register `login`, `logout` and `whoami` over the same core (`C/cli
 | Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
 |---|---|---|---|---|---|
 | `config.status()` | `omo doctor` (its `WARN config:` lines) | none | yes | CLI planned only if #14366 asks for a verb | shipped |
-| `config.explain`, `.check`, `.edit`, `.revert`, `.modelSwaps` (#14366) | none | none | no | Owned by #14366; the names are reserved here | #14366 |
+| `config.explain`, `.check`, `.edit`, `.revert`, `.modelSwaps`: **reserved names, not a parity row**. No CLI verb and no tool has them today, so nothing here is a gap and the zero-gap gate does not count them. The registry lists them as `reserved`; when #14366 adds a surface for any of them, rule 5 applies to that pull request | none | none | no | Not applicable | reserved (#14366, outside this program) |
 | `daemon.run({ policy?, pinned? })`: one operation that ensures the operator daemon and then warms it; a refused or failed warm is reported in the value and the run still succeeds, as today | `omo daemon run [--no-upgrade] [--pinned] [--json]` | none | partial: `warmDaemon` only | Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call | C1a |
 | `daemon.ensure({ policy?, pinned?, launch_spec?, mcp_presenter_enforcement? })`, the endpoint from the root's `endpoint`; `daemon.warm({ cwd?, kind?, context? })` | `omo host ensure [--launch-spec] [--policy upgrade\|fallback\|never] [--socket] [--rpc-key-root] [--mcp-presenter-enforcement]` | none | partial: `warmDaemon` | Same reason | C1a, after S0 |
 | `daemon.status({ all?, include_workers? })`, each terminal row with its last activity | `omo daemon status [--include-workers]`; `omo host status [--all] [--include-workers] [--socket]` | none | **no** | Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) | C1a |
@@ -431,7 +433,7 @@ Both editions register `login`, `logout` and `whoami` over the same core (`C/cli
 
 ### 6.8 Engine commands forwarded by the launcher
 
-The launcher forwards these to the pinned engine unchanged. Their core is the engine's. Under the rule each still needs an SDK call. The engine exports a typed function per leaf operation, with no process exit and no printing, and its own CLI calls the same function; the omo SDK re-exports it. The SDK does not start the engine CLI as a child for them. Forwarding an argv today proves nothing about an importable equivalent, so these functions and their ownership of lifecycle and output are settled in the engine first (slice E1a). `trust` below is the project-trust choice of `--approve` and `--no-approve`.
+The launcher forwards these to the pinned engine unchanged. Their core is the engine's. Under the rule each still needs an SDK call. The engine exports a typed function per leaf operation, with no process exit and no printing, and its own CLI calls the same function; the omo SDK re-exports it. The SDK does not start the engine CLI as a child for them. Forwarding an argv today proves nothing about an importable equivalent, so these functions and their ownership of lifecycle and output are settled in the engine first (slice E1a). `trust` below is the project-trust choice of `--approve` and `--no-approve`. Each row has two phases: the Slice column names the engine slice that exports the function, and the row becomes a call on the omo root, with its descriptor migrated and its unresolved entry cleared, only in E1c.
 
 | Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
 |---|---|---|---|---|---|
@@ -455,7 +457,7 @@ The launcher forwards these to the pinned engine unchanged. Their core is the en
 
 ### 6.9 Launching an engine process
 
-`omo [flags] [prompt]` starts an engine process. That is a different capability from opening a thread on a host (`threads.create`), and it is where a fork is supported today: the terminal process forks a session (`E/main.ts:438-445`), while a host open refuses `fork_from`. The launch is its own set of SDK operations, all taking one `LaunchOptions` type, which the engine exports as its `Args` schema (slice E1a-s). The classification below is from the engine's parser and help text (`E/cli/args.ts`).
+`omo [flags] [prompt]` starts an engine process. That is a different capability from opening a thread on a host (`threads.create`), and it is where a fork is supported today: the terminal process forks a session (`E/main.ts:438-445`), while a host open refuses `fork_from`. The launch is its own set of SDK operations, one per mode. Each takes the parts of one `LaunchOptions` type that its mode admits and refuses the rest with the parser's own refusals; the engine exports the type as its `Args` schema (slice E1a-s). The classification below is from the engine's parser and help text (`E/cli/args.ts`).
 
 `LaunchOptions`:
 
@@ -463,19 +465,22 @@ The launcher forwards these to the pinned engine unchanged. Their core is the en
 |---|---|---|
 | `session` | One of `{ continue: true }`, `{ path }`, `{ id }` (created if missing), `{ fork }` (never with the others), `{ rebind }`, `{ ephemeral: true }`; plus `dir?`, `spawned_by?: { parentSessionId, rootSessionId, taskId }`, `name?` | `--continue`, `--session <path>`, `--session-id <id>`, `--fork <path\|id>`, `--rebind <path\|id>`, `--no-session`, `--session-dir <dir>`, `--spawned-by <json>`, `--name`. `--resume` is a picker: a renderer over `threads.list` that fills `session.path` |
 | `setup` | `model?`, `provider?`, `model_patterns?`, `reasoning?`, `system_prompt?`, `append_system_prompt?`, `tools?: { allow?, deny?, none?, no_builtin? }`, `extensions?: { paths?, none? }`, `skills?: { names?, none? }`, `prompt_templates?: { paths?, none? }`, `themes?: { paths?, none?, use? }`, `context_files?: boolean`, `project_trust?: boolean`, `offline?`, `session_runtime?: "in-process" \| "worker"`, `tool_runtime?: "in-process" \| "child"`, `auto_title?`, `extension_flags?` | `--model`, `--provider`, `--models`, `--thinking`, `--system-prompt`, `--append-system-prompt`, `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools`, `--extension`, `--no-extensions`, `--skill`, `--no-skills`, `--prompt-template`, `--no-prompt-templates`, `--theme`, `--no-themes`, `--use-theme`, `--no-context-files`, `--approve`, `--no-approve`, `--offline`, `--session-runtime`, `--tool-runtime`, `--auto-title-sessions`; a flag an extension registers (the engine's help names `--plan`) fills `extension_flags` and is discovered from a test engine session |
+| `input` | `messages?: string[]` in the order given, `files?: string[]`, `stdin?: boolean`. Several messages and files are kept as given; the parser's selection among them and its refusals are the contract | Positional arguments, each `@<file>` argument, `-` to read stdin, everything after `--` (`E/cli/args.ts:155-160, 374-400`); `--print [message]` adds its message to the list (`:268-273`) |
+| `presenter` | `{ bootstrap_fd: 4, enforcement?: boolean }`. Its contract is the security design's; until that approval these two inputs are a recorded gap, not a flag classified away | `--mcp-presenter-fd 4`, `--mcp-presenter-enforcement` (`E/cli/args.ts:347-351`) |
+| `gated` | `{ grok_neo?: boolean }`: an input the engine's parser accepts only while its feature gate is on. With the gate off the same text is not this input and falls to the unknown-flag path, as today (`E/cli/args.ts:339-340`). The row exists now, with that availability rule; each later gated input needs its own | `--grok-neo` |
 | A credential | A provider API key for the run; its carrier is fixed by S0 | `--api-key` |
 
 Operations:
 
 | Capability | CLI today | Outcome | Tool | SDK today | Slice |
 |---|---|---|---|---|---|
-| `engine.launch.interactive({ ...LaunchOptions, prompt?, tui_mode?, verbose?, attach?: { socket, session } })`: starts the terminal UI on the caller's terminal | `omo [flags] [prompt]`, `--tui-mode regular\|fullscreen`, `--verbose`, `--attach <socket>` (what `omo remote attach` launches over `threads.attach().serveEndpoint`) | Resolves when the process exits: `{ exit_code, session }` | none; omitted: a session has no terminal to give it | **no** | E1a-s, E1c |
-| `engine.launch.print({ ...LaunchOptions, prompt, mode: "text" \| "json" })`: runs the prompt to the end in a new process | `omo --print [flags] <prompt>`, `--mode text\|json` | A stream of the run's events, then `{ exit_code, session }` | none; omitted: a session delegates through its task tools | **no** | E1a-s, E1c |
-| `engine.launch.rpc({ ...LaunchOptions, listen?, multi_session? })`: starts an engine that serves its RPC on stdio or on an address | `omo --mode rpc`, `--listen <address>`, `--multi-session`, `--mcp-presenter-fd`, `--mcp-presenter-enforcement` | `{ address, pid }` and a handle whose `stop()` ends it; on stdio the handle is the duplex stream | none; omitted: the host a session runs on is not the session's to start | **no** | E1a-s, E1c |
-| `engine.launch.hand()`: starts a hand that runs tool calls for a remote loop | `omo --hand` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
-| `engine.launch.headless()`: starts the machine-owned session host | `omo --headless` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
+| `engine.launch.interactive({ session?, setup?, input?, gated?, tui_mode?, verbose?, attach?: { socket, session } })`: starts the terminal UI on the caller's terminal | `omo [flags] [messages] [@files] [-]`, `--tui-mode regular\|fullscreen`, `--verbose`, `--attach <socket>` (what `omo remote attach` launches over `threads.attach().serveEndpoint`) | Resolves when the process exits: `{ exit_code, session }` | none; omitted: a session has no terminal to give it | **no** | E1a-s, E1c |
+| `engine.launch.print({ session?, setup?, input, gated?, mode: "text" \| "json" })`: runs the input to the end in a new process | `omo --print [flags] [messages] [@files] [-]`, `--mode text\|json` | A stream of the run's events, then `{ exit_code, session }` | none; omitted: a session delegates through its task tools | **no** | E1a-s, E1c |
+| `engine.launch.rpc({ session?, setup?, gated?, listen?, multi_session?, presenter? })`: starts an engine that serves its RPC on stdio or on an address | `omo --mode rpc`, `--listen <address>`, `--multi-session`, `--mcp-presenter-fd`, `--mcp-presenter-enforcement` | `{ address, pid }` and a handle whose `stop()` ends it; on stdio the handle is the duplex stream | none; omitted: the host a session runs on is not the session's to start | **no** | E1a-s, E1c |
+| `engine.launch.hand({ session?, setup? })`: starts a hand that runs tool calls for a remote loop, on its own endpoint, in RPC mode. It refuses `input`, print, a mode other than `rpc`, `listen` and `multi_session`, and is never combined with headless (`E/cli/engine-mode-args.ts:8-24`) | `omo --hand [setup flags]` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
+| `engine.launch.headless({ session?, setup?, listen? })`: starts the machine-owned session host, in RPC mode and always multi-session. It refuses `input`, print and a mode other than `rpc`, and is never combined with hand (`E/cli/engine-mode-args.ts:8-24`) | `omo --headless [setup flags] [--listen]` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
 
-Feature-gated launch modes (the engine's `--grok-neo` is one) are registered the same way: each needs its own row with an operation and an outcome to pass the check.
+Which `setup` fields each mode admits, beyond the refusals named in its row, is read from the engine's exported schema in slice E1a-s. A field a mode's parser accepts and its operation lacks fails the flag check of section 7.1.
 
 ### 6.10 Rows that are not capabilities
 
@@ -495,7 +500,7 @@ Its routes are Commander registrations; the registry reads them from the program
 
 | Capability and SDK inputs | CLI (OpenCode edition) | SDK today | Adapter | Slice |
 |---|---|---|---|---|
-| `install.plugin({ interactive, platform?, claude?, openai?, copilot?, opencodeZen?, zaiCodingPlan?, kimiForCoding?, opencodeGo?, bailianCodingPlan?, vercelAiGateway?, and the three further provider inputs of `InstallArgs`, codex_autonomous?, skip_auth })`. `claude` is `no`, `yes` or `max20`; every other provider input is `no` or `yes`; each is its own typed field, one per key of `InstallArgs` (`C/types.ts:3-21`), and the registry row lists all twelve from that type. `platform` is `opencode`, `codex`, `both`, `native` or `native-dev`; it defaults to `codex` when the binary is invoked as that edition, and `native-dev` is refused unless the release enables it (`C/install-command-options.ts:23-36`). `codex_autonomous` is three-valued: set, cleared, or absent to leave the existing permission settings unchanged. The call answers what it installed and wrote per platform | `install` (alias `setup`) `[--no-tui] [one flag per provider input] [--codex-autonomous \| --no-codex-autonomous] [--skip-auth]`, with the root option `--platform` | **no** | Planned (OC1a). The interactive prompts are a renderer over the same call | OC1a |
+| `install.plugin({ interactive, platform?, claude?, openai?, copilot?, opencodeZen?, zaiCodingPlan?, kimiForCoding?, opencodeGo?, bailianCodingPlan?, vercelAiGateway?, and the three further provider inputs of `InstallArgs`, codex_autonomous?, skip_auth })`. `claude` is `no`, `yes` or `max20`; every other provider input is `no` or `yes`; each is its own typed field. The registry holds no placeholder for them: it enumerates the twelve provider keys of `InstallArgs` (`C/types.ts:3-21`) mechanically, checks each against its Commander option (`C/cli-program.ts:57-76`) and its mapping (`C/install-command-options.ts:38-55`), freezes all twelve as rows in P0's baseline, and requires a scenario per key and value. This document's prose abbreviates three of the twelve names; the registry does not. `platform` is `opencode`, `codex`, `both`, `native` or `native-dev`; it defaults to `codex` when the binary is invoked as that edition, and `native-dev` is refused unless the release enables it (`C/install-command-options.ts:23-36`). `codex_autonomous` has three input cases, kept as they are today: `true` configures that platform's autonomous permissions; `false` leaves the existing permission settings unchanged (`C/cli-program.ts:74-76`); absent takes the mode's default, which in a non-interactive install for that platform is to configure them (`C/install-validators.ts:244`) and in an interactive one is the prompt's answer. Each case is a scenario, and the contract is one the security design reviews. The call answers what it installed and wrote per platform | `install` (alias `setup`) `[--no-tui] [one flag per provider input] [--codex-autonomous \| --no-codex-autonomous] [--skip-auth]`, with the root option `--platform` | **no** | Planned (OC1a). The interactive prompts are a renderer over the same call | OC1a |
 | `threads.runToCompletion({ message, agent?, model?, directory?, session_id?, endpoint?: { port } \| { attach_url }, on_complete?: { command }, signal? })`: one operation that opens or reuses a session on that edition's server, sends the message, and waits until the run is complete by that edition's rule (the todos and child sessions are done and the run did meaningful work), then runs `on_complete`. It streams the run's events and answers `{ session_id, success, duration_ms, message_count, summary }` (`C/run/types.ts:4-29`, `C/run/runner.ts:145-177`). `port` and `attach_url` exclude each other. `on_complete` runs a command as the caller's OS user after completion; it is an effect of the operation, so who may pass it is a row of the security design | `run <message> [-a\|--agent] [-m\|--model] [-d\|--directory] [-p\|--port] [--attach <url>] [--session-id] [--on-complete <command>] [--json] [--no-timestamp] [--verbose]` | **no** | Planned (OC1b). The existing exit mapping and cancellation are the descriptor's projection | OC1b, after S0 |
 | `diagnostics.run({ status?, verbose?, platform? })` | `doctor [--status] [--verbose] [--json] [--platform]` | **no** | Planned (OC1a), on the findings shape of C1b | OC1a |
 | `install.version()` | `version`; the root option `--version`, `-v` | **no** | Planned (OC1a), with the edition's own version projection | OC1a |
@@ -504,10 +509,28 @@ Its routes are Commander registrations; the registry reads them from the program
 | `config.modelCapabilities.refresh({ directory?, source_url? })`, over `packages/model-core` | `refresh-model-capabilities [-d\|--directory] [--source-url] [--json]` | **no** | Planned (OC1a) | OC1a |
 | `mcp.oauth.login({ server, server_url?, client_id?, scopes? })`, `.logout({ server, server_url? })`, `.status({ server? })`, over `packages/mcp-client-core` | `mcp oauth login <server-name> [--server-url] [--client-id] [--scopes ...]`; `mcp oauth logout <server-name> [--server-url]`; `mcp oauth status [server-name]` | **no**; custody (S0) | Planned (OC1c) | OC1c |
 | `account.keys.*`, and `account.signIn`, `signOut`, `whoami` | `account keys init\|status`; `login`, `logout`, `whoami` | 6.4 | 6.4 | OC1c |
-| The toolkit operations of the loop | `ulw-loop [args...]`, which today starts a separately installed component's CLI as a child with the arguments unchanged (`C/codex-ulw-loop.ts:31-73`) | partial: the native edition has the agent toolkit SDK with a manifest of loop operations; that each argument form of the delegated CLI has a manifest operation is not shown | Planned (OC2): the delegated CLI's sub-commands are enumerated from that component's own dispatch and each is mapped to a `toolkit` operation; an unmapped one is a recorded gap | OC2 |
+| The loop's ten operations and five hook entries, enumerated in the table below | `ulw-loop [args...]`, which starts a separately installed component's CLI as a child with the arguments unchanged (`C/runtime-commands.ts:99-107`, `C/codex-ulw-loop.ts:31-73`) | partial: see below | Planned (OC2) | OC2 |
 | `boulder.status({ directory?, work_id? })`, over `packages/boulder-state` | `boulder [-d\|--directory] [-w\|--work-id] [--json]` | **no** | Planned (OC2) | OC2 |
 | `worktrees.sweep({ apply?, older_than_days?, repos? })`: a plan unless `apply` is set, with today's refusals and deletion guard | `worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]` | **no** | Planned (OC2) | OC2 |
 | `install.cleanup({ platform?, codex_home?, project? })`, answering what it removed; `platform` is `codex`, the sub-command's value before the root option's | `cleanup` (alias `uninstall`) `[--platform] [--codex-home] [--project] [--json]` | **no** | Planned (OC2) | OC2 |
+
+`ulw-loop [args...]` reaches the component's own dispatch (`packages/omo-codex/plugin/components/ulw-loop/src/cli.ts:8-44`, `cli-commands.ts:39-101`). That component already runs every sub-command through its own SDK (`cli-subcommands.ts:204`), whose manifest names one method per operation (`src/sdk/manifest.ts`). What is missing is the root: the OpenCode binary starts a child process, and `toolkit` on the root does not reach this component. Each leaf, with its flags as the component's usage gives them (`cli-output.ts:4-20`); every state sub-command also takes `--session-id` or the session environment, and `--json`:
+
+| Sub-command and flags | Root call | SDK today |
+|---|---|---|
+| `help` | `toolkit.help()` | partial: in the component's SDK, not on the root |
+| `create-goals --brief \| --brief-file \| --from-stdin [--codex-goal-mode aggregate\|per_story] [--validation-batch-json] [--force]` | `toolkit.createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`; the three sources of the brief are the adapter's parse | same |
+| `status` | `toolkit.status()` | same |
+| `complete-goals [--retry-failed]` | `toolkit.completeGoals({ retryFailed? })` | same |
+| `criteria --goal-id` | `toolkit.criteria(...)` | same |
+| `record-evidence --goal-id --criterion-id --status pass\|fail\|blocked --evidence [--notes]` | `toolkit.recordEvidence(...)` | same |
+| `checkpoint --print-template [--goal-id]`; `checkpoint --goal-id --status complete\|failed\|blocked --evidence --codex-goal-json [--quality-gate-json] [--no-advance]` | `toolkit.checkpoint(...)`, two branches | same |
+| `steer --kind <kind> --evidence --rationale [--proposals-json]`, with the flags each of the seven kinds requires (`cli-steering.ts:84-90`) | `toolkit.steer(...)`, one branch per kind | same |
+| `add-goal --title --objective` | `toolkit.addGoal(...)` | same |
+| `record-review-blockers --goal-id --title --objective --evidence --codex-goal-json` | `toolkit.recordReviewBlockers(...)` | same |
+| `hook user-prompt-submit [--with-ultrawork]`, `hook pre-tool-use`, `hook stop`, `hook post-tool-use-spawn`, `hook pre-tool-use-spawn` | Internal: hook entries that read a hook payload on stdin for that edition's plugin. Registered `internal`, each with the loop capability it serves | n/a |
+
+The argument object of each method is the manifest's `args` for that operation, and the registry takes it from the manifest, not from this table. Each of the ten operations is an entry of P0's baseline until OC2 wires the root to this component, and the command keeps its present behaviour until then.
 
 The OpenCode-edition binary has no thread tools of its own in this table: its agent-facing tools are that edition's plugin tools, outside the three surfaces this issue names.
 
@@ -556,9 +579,10 @@ This check sees a behaviour difference only on a sampled scenario. It does not p
 
 Rule 5 of section 1 is enforced per capability, by behaviour.
 
-- **Two files.** `script/sdk-parity/baseline.original.json` is the record of the defects that existed when the gate was introduced, for both editions: capability id, the missing SDK input or call, and the issue that fixes it. It is written once and pinned by hash, and never changes. `script/sdk-parity/unresolved.json` is the working manifest: it must be a subset of the original, entries are only ever removed, and an entry not in the original is rejected.
+- **Two files.** `script/sdk-parity/baseline.original.json` is the record of the defects that existed when the gate was introduced, for both editions: capability id, the missing SDK input or call, and the issue that fixes it. It is written once and never changes. Its hash pin is not a value the pull request supplies: the gate reads the pin from the base branch, as the initializing commit left it, so a pull request that edits the original and a pin together still fails. `script/sdk-parity/unresolved.json` is the working manifest. At every pull request it must be a subset of the original **and** of the manifest at the merge base: an entry the original lacks is rejected, and so is an entry the merge base no longer has, so a gap that was cleared cannot come back.
 - **Initialization.** Slice P0 adds every descriptor under gaps that already exist. The gate admits exactly one pull request in that state: the one whose merge base has no `baseline.original.json` and which creates it, its hash pin and the goldens below together, and changes no behaviour (its goldens are generated from the pre-change binaries and must still match after the change).
-- **Behaviour goldens.** For every capability, the CLI and tool drivers' outcomes over its scenarios are stored as goldens. A capability is *changed* by a pull request when any of these moved: its descriptor, its tool schema, a module in the import closure of its `parse` or `render`, or one of its goldens. A golden moves when the behaviour moves, wherever the edit was made, so a change inside a parser, a renderer or the core is caught even when the descriptor and schema text are untouched.
+- **What counts as changed.** A capability is *changed* by a pull request when any of these moved: its descriptor; its tool schema; a module in the import closure of its `parse` or `render`; a module in its **implementation closure**, the modules its SDK member reaches in the core, which the registry computes from the member; or one of its scenario outcomes. The outcomes are not read from a stored file a pull request could edit: the gate runs each capability's scenarios through the CLI and tool drivers on a build of the merge base and on the head, and compares the two results. A stored golden is only the reviewer's view of that comparison.
+- **The limit.** The scenarios are a sample (7.3). A change that keeps every sampled outcome is caught only by the closures, and a closure is wide: an edit to a shared core module marks every capability that reaches it as changed. That is the intended direction of error. A pull request that touches a shared module under another capability's unresolved gap is stopped until it shows that capability's outcomes equal on both builds and its reviewer confirms that none of its behaviour changed. The gate does not prove semantic equivalence of arbitrary code, and this document does not claim it does.
 - **Changed-capability gate.** A changed capability must have no entry in `unresolved.json` at the head, and its scenarios must have run and passed at that head. A pull request therefore cannot add an alias, a flag or a tool field, or alter what one does, under an existing gap. It adds the SDK call and its scenarios in the same pull request, or it fails.
 - **Zero-gap gate.** #14943 closes only when `unresolved.json` is empty for both editions, engine rows included.
 
@@ -570,7 +594,7 @@ Rule 5 of section 1 is enforced per capability, by behaviour.
 
 ### 7.6 Negative controls
 
-The checks are themselves tested. Fixtures add, one at a time, in each edition where the case exists: a verb with no row; a Commander command, alias or option with no descriptor; a flag with no mapping; a tool input field the SDK lacks; a nested field that became required; a branch that dispatches outside the dispatch function, in an entry file and in a delegated module; an adapter importing the delivery pipeline; a descriptor whose call invokes a different member than its row; a behaviour change in a parser with the descriptor untouched; a changed capability with an unresolved entry; an entry added to `unresolved.json` that the original lacks; a stub answering `not_implemented` on a row counted as built; a row whose only scenario is a refusal. Each must fail with a message that names the SDK call, the field or the import to fix.
+The checks are themselves tested. Fixtures add, one at a time, in each edition where the case exists: a verb with no row; a Commander command, alias or option with no descriptor; a flag with no mapping; a tool input field the SDK lacks; a nested field that became required; a branch that dispatches outside the dispatch function, in an entry file and in a delegated module; an adapter importing the delivery pipeline; a descriptor whose call invokes a different member than its row; a behaviour change in a parser with the descriptor untouched; a changed capability with an unresolved entry; an entry added to `unresolved.json` that the original lacks; an entry restored to `unresolved.json` that the merge base had removed; the original and a pin edited together; a core-only change under an unresolved entry with every descriptor, schema and adapter untouched; a stored golden edited with the behaviour unchanged; a stub answering `not_implemented` on a row counted as built; a row whose only scenario is a refusal. Each must fail with a message that names the SDK call, the field or the import to fix.
 
 ### 7.7 The real-surface proof
 
@@ -583,7 +607,7 @@ Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`,
 | Slice | What it does | Issue | Merges after |
 |---|---|---|---|
 | S0 | Security design, no code (#14945): threat model; the principal-by-capability matrix for every present caller and surface in both editions; custody of the eight credential groups; the `endpoint` selector, launch options, extension session operations, attach and answering; caller provenance; revocation; audit; rollout and rollback. Its approval is recorded on its issue | #14945 | none |
-| P0 | Descriptors for today's routes in both editions, the registry rows, the two baseline files, the goldens, the import rule with its offender list, the negative controls. No behaviour change | new | none |
+| P0 | Descriptors for today's routes in both editions, the registry rows, the two baseline files, the goldens, the import rule with its offender list, the negative controls. The baseline holds every enumerated leaf, the twelve install provider inputs and the ten loop operations among them. No behaviour change | new | none |
 | P1a | Typed contracts that carry no principal, credential, endpoint or launch option: the root's type, the code registry, the scenario ids, and the input schemas of the rows not marked S0 | new | P0 |
 | P1a-s | The security-sensitive contracts: `principal`, `endpoint`, the credential-bearing calls, `LaunchOptions`, the extension session operations, attach and answer | new | P1a, S0 approved |
 | P1b | The root and the facades over it, the failure conversion, the surface-keyed exit projection, `omo-ai/sdk`, `omo sdk root`, principals wired per the matrix, the non-disclosure scan, `threads.extensions.register` and `.call` on the root | new | P1a-s, #14881, #14890 |
@@ -594,7 +618,7 @@ Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`,
 | T1d | Every verb on the caller's own device | #14931 | D1, #14890 |
 | T1e | `threads.extensions.sessionOps` and `sessionCall` | new | T1d, S0 approved |
 | T2 | The thread tools and the extension tools become adapters; `*-ops.ts` bodies move under the core | new | T1e |
-| T3 | One CLI verb table (step 1 of the 2026-11-10 ruling); the `omo thread` verbs planned in section 6; `omo remote` session verbs as aliases. Owns `N/remote-cli.ts` and its dispatch until it merges | #14202, #13016 | T1e |
+| T3 | One CLI verb table for the session verbs whose root operations T1a to T1e supply (step 1 of the 2026-11-10 ruling): the `omo thread` verbs planned in section 6, and the `omo remote` session verbs as aliases. It migrates no other descriptor: the engine-forwarded ones are E1c's and the host lifecycle ones are C1a's. Owns `N/remote-cli.ts` and its dispatch until it merges | #14202, #13016 | T1e |
 | A1a | The account core moves out of `cli/`; no behaviour change | #14364 | P1b |
 | A1b | `account.signOut`, `show`, `forget`, `store.*`, `signIn` without a child process, `signInCheck`, the origin options. Owns `N/account-cli.ts` until it merges | #14364 | A1a |
 | A1c | `devices.revoke`, `devices.rename` bounds, the other findings of #14523 | #14523 | A1b |
@@ -602,19 +626,20 @@ Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`,
 | A2a | `deviceService.*` and the `omo remote` switch verbs as adapters | new | T3 |
 | A2b | `sync.status`, `enable`, `disable`, `approve`, `retirePin` | new | A1d |
 | A2c | `sync.recover` | #14464, #14891 (the memory-sync lane's own pull requests carry it) | P1a-s |
-| C1a | `daemon.*` | new | P1b |
+| C1a | `daemon.*` over the engine's exported host lifecycle functions, and the `omo daemon` and `omo host` lifecycle descriptors as adapters | new | P1b, E1b |
 | C1b | `diagnostics.*` | new | P1b |
 | C1c | `install.*` | new | P1b |
 | TEL | The per-caller telemetry consent contract, merged in the engine (its #7446) and pinned in omo | the engine's #7446 | none |
-| E1a | Engine: a typed function and exported metadata per leaf of 6.8 that carries no credential: packages, resources, schedules, models, queries | new, on the engine | none |
+| E1a | Engine: a typed function and exported metadata per leaf of 6.8 that carries no credential: packages, resources, schedules, models, queries, and the host lifecycle (ensure, status, stop, handoff, gc, shard path) without its credential options | new, on the engine | none |
 | E1a-s | Engine: `LaunchOptions` and the launch operations of 6.9, the endpoint options, the provider-credential functions | new, on the engine | S0 approved, TEL |
 | E1b | Engine release and the omo pin | release train | E1a, E1a-s |
-| E1c | `engine.*` on the root including `engine.launch.*`, generated descriptors, and the engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
+| E1c | `engine.*` on the root including `engine.launch.*`. The engine-forwarded dispatch descriptors migrate here, and the unresolved entry of every engine row is cleared here, not at the engine export. The engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
 | X1a | The native thread proof of section 9 | new | T2, T3 |
-| OC1a | OpenCode edition: `install.plugin`, `diagnostics.run`, `install.version`, `localVersion`, `config.migrate`, `config.modelCapabilities.refresh` | new | C1b, C1c |
-| OC1b | OpenCode edition: `threads.runToCompletion` over a session-host port for that edition's server | new | T3, X1a |
-| OC1c | OpenCode edition: `mcp.oauth.*`, `account.keys.*`, and that edition's `login`, `logout`, `whoami` descriptors | new | A1d |
-| OC2 | OpenCode edition: the loop's operations, `boulder.status`, `worktrees.sweep`, `install.cleanup` | new | OC1a |
+| NM | Native completion. A milestone, not a pull request: every native slice is merged and its rows are cleared: P1b, the thread chain through T2 and T3, A1a to A2c, C1a to C1c, E1c, X1a. It does not include X1b | none | those slices |
+| OC1a | OpenCode edition: `install.plugin`, `diagnostics.run`, `install.version`, `localVersion`, `config.migrate`, `config.modelCapabilities.refresh` | new | NM |
+| OC1b | OpenCode edition: `threads.runToCompletion` over a session-host port for that edition's server | new | NM |
+| OC1c | OpenCode edition: `mcp.oauth.*`, `account.keys.*`, and that edition's `login`, `logout`, `whoami` descriptors | new | NM |
+| OC2 | OpenCode edition: the loop's ten operations on the root, `boulder.status`, `worktrees.sweep`, `install.cleanup` | new | OC1a |
 | X1c | The OpenCode-edition proof of section 9 | new | OC1a, OC1b, OC1c, OC2 |
 | X1b | Closure: the zero-gap gate for both editions, the non-thread acceptance rows, `docs/reference/omo-sdk.md`, the skills re-pointed at the SDK (#13415, #14932) | new | every slice above |
 | X2 | The omo-harness skill: the steps omo-harness-skill#23 left on the CLI move to the SDK | new, on that repository | the release that carries the calls it needs |
@@ -623,20 +648,19 @@ Order:
 
 ```
 S0 ────────────────┐
-P0 ── P1a ── P1a-s ┴─ P1b ─┬─ T1a ── T1b ── T1c ── D1 ── T1d ── T1e ─┬─ T2 ─┐
-#14881, #14890 ────────────┘                                          └─ T3 ─┼─ X1a ── OC1b ─┐
-                           ├─ A1a ── A1b ── A1c ── A1d ─┬─ A2b               │               │
-                           │                            └─ OC1c ─────────────┼───────────────┤
-                           ├─ C1a                 T3 ── A2a                  │               │
-                           ├─ C1b ─┬─ OC1a ── OC2 ───────────────────────────┼───────────────┼─ X1c ── X1b
-                           └─ C1c ─┘                                         │               │
-TEL ── E1a-s ─┐                                                              │               │
-E1a ──────────┴─ E1b ── E1c ─────────────────────────────────────────────────┴───────────────┘
+P0 ── P1a ── P1a-s ┴─ P1b ─┬─ T1a ── T1b ── T1c ── D1 ── T1d ── T1e ─┬─ T2 ─┬─ X1a ─┐
+#14881, #14890 ────────────┘                                          └─ T3 ─┴─ A2a ─┤
+                           ├─ A1a ── A1b ── A1c ── A1d ── A2b ──────────────────────┤
+                           ├─ C1b ──────────────────────────────────────────────────┤
+                           ├─ C1c ──────────────────────────────────────────────────┼─ NM ─┬─ OC1a ── OC2 ─┐
+TEL ── E1a-s ─┐            │                                                        │      ├─ OC1b ────────┼─ X1c ── X1b
+E1a ──────────┴─ E1b ──────┴─ C1a, E1c ─────────────────────────────────────────────┘      └─ OC1c ────────┘
 ```
 
 - **The thread chain is serial.** T1a, T1b, T1c, D1, T1d and T1e all edit the thread facade, the control and delivery bodies or the address policy, so each merges after the one before it. T2 and T3 start only after T1e: neither turns a capability into an adapter, or dispatches an alias to it, before its own-device behaviour and its truthful-delivery behaviour exist. They touch different files and run in parallel with each other.
 - **The account chain is serial** (A1a to A1d): each step edits the account core and `N/account-cli.ts`.
-- **What runs in parallel**: the thread chain, the account chain, C1a, C1b, C1c, and on the engine E1a and TEL. They share no source file. E1a-s waits for S0.
+- **What runs in parallel**: the thread chain, the account chain, C1b, C1c, and on the engine E1a and TEL. They share no source file. E1a-s waits for S0; C1a and E1c wait for the engine release and pin (E1b). A2c lands with the memory-sync lane's own pull requests, any time after P1a-s.
+- **Native first.** No OpenCode-edition slice starts before the native completion milestone (NM), which is every native slice and not the final closure, so the order is native, then OpenCode, then X1b, with no cycle.
 - **Shared state, with owners.** The root's namespace registration is one array created by P1b; a slice adds its module and one line, and P1b's owner reviews every later edit to the root. The code registry and the exit projection are per-domain files that each slice appends to; a change to an existing code's meaning goes through P1b's owner. Parity rows are per-domain files, and two slices never own the same unresolved entry. The generated bundles (`service-auth.generated.js`, the thread client and SDK bundles, the bundle inputs) are regenerated by every slice and merge through the repository's bundle train. `N/remote-cli.ts` belongs to T3, then A2a. The sync state transitions in `N/account-cli.ts` (`retire-sync`, the sign-in's device-service setup) belong to A1b, then A2b.
 - **Work already in review is the base, not redone**: #14878, #14881 and #14890 (the remote module train) under P1b; #14937 under T1a; the engine fix for its #7138 under D1; #14464 and #14891 for recovery.
 
@@ -656,7 +680,7 @@ Native thread matrix (X1a), with B another signed-in device and A the caller, an
 8. Archive and unarchive it; hand a task off to it by exact name.
 9. Open a sibling thread; close the first; the listing shows it closed and the sibling still live.
 
-Attach, follow, entries, unload and adopt have no tool, so they are run through the SDK and the CLI only, as a tenth step: attach to the sibling, read its snapshot, detach, and confirm the served endpoint is gone.
+A tenth step, through the SDK and the CLI only, because attach has no tool: attach to the sibling, read its snapshot, detach, and confirm the served endpoint is gone. It exercises attach and its endpoint lifecycle and nothing else. Follow, entries, unload and adopt are not part of the real run; their per-input obligations are the conformance test's (7.3).
 
 Acceptance rows outside threads, run through the SDK and the CLI on the caller's device: `devices.list`, `account.whoami`, `deviceService.status`, `sync.status`, `daemon.status`, `diagnostics.run`, `install.version`, and one engine row from each group of 6.8 and 6.9.
 
@@ -666,7 +690,7 @@ Evidence on #14943 for each run: the script or commands, each call's typed resul
 
 The runs use a sanctioned test account and a scripted or low-cost model. They make no call on a personal subscription.
 
-## 10. Decisions, after two reviews
+## 10. Decisions, after three reviews
 
 | # | Decision | Where it stands |
 |---|---|---|
