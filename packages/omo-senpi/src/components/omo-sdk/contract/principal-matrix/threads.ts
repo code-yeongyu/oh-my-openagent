@@ -17,6 +17,21 @@ const UNSUPPORTED_CONNECTOR = refuse("unsupported", { note: "connector_send: a c
 
 export const THREAD_LINES: readonly MatrixLine[] = [
   {
+    section: "4.6",
+    capability:
+      "`threads.resolve`, `threads.locate`, `devices.resolve`, `threads.aliases.resolve`: turning an address, an alias or a device name into the row it names",
+    slug: "resolve",
+    rows: ["threads.resolve", "threads.locate", "devices.resolve", "threads.aliases.resolve"],
+    cells: columns({
+      people: allow(),
+      session: allow(
+        "under the same scope rules as the reads of 4.1: the workspace is the default scope and all_scope is an input the session supplies itself",
+      ),
+      connector: refuse("sender_not_allowed", { note: "new in revision 22, as for the reads of 4.1 and devices.list" }),
+      service: refuse("sender_not_allowed", { note: "new in revision 22" }),
+    }),
+  },
+  {
     section: "4.1",
     capability: "List, read, entries, get, wait, follow",
     slug: "read",

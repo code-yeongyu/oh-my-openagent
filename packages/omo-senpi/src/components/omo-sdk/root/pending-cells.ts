@@ -15,18 +15,6 @@ export type PendingCell = {
 
 export const PENDING_CELLS: readonly PendingCell[] = [
   {
-    call: "threads.resolve",
-    principal: "person",
-    served_by: "the same OS user (security design 3): remote module factories sessions.resolve (remote/client.ts:460)",
-    owner: "T1a",
-  },
-  {
-    call: "threads.resolve",
-    principal: "script",
-    served_by: "remote module factories sessions.resolve (remote/client.ts:460)",
-    owner: "T1a",
-  },
-  {
     call: "threads.readAfterWait",
     principal: "session",
     served_by: "thread_read tool with wait_ms (thread/tools.ts:447)",
@@ -39,18 +27,6 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     owner: "T1b",
   },
   { call: "threads.messages", principal: "script", served_by: "omo host session read --messages --json", owner: "T1b" },
-  {
-    call: "threads.locate",
-    principal: "person",
-    served_by: "the same OS user (security design 3): createThreadSdk.locate (thread/sdk.ts:404)",
-    owner: "T1a",
-  },
-  {
-    call: "threads.locate",
-    principal: "script",
-    served_by: "createThreadSdk.locate (thread/sdk.ts:404)",
-    owner: "T1a",
-  },
   {
     call: "threads.release",
     principal: "person",
@@ -73,18 +49,6 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "threads.adopt",
     principal: "script",
     served_by: "omo daemon adopt --json (bin/lib/daemon-adopt.js:86)",
-    owner: "T1c",
-  },
-  {
-    call: "threads.aliases.resolve",
-    principal: "person",
-    served_by: "the same OS user (security design 3): remote module factories aliases.resolve (remote/aliases.ts:148)",
-    owner: "T1c",
-  },
-  {
-    call: "threads.aliases.resolve",
-    principal: "script",
-    served_by: "remote module factories aliases.resolve (remote/aliases.ts:148)",
     owner: "T1c",
   },
   {
@@ -135,18 +99,6 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     principal: "script",
     served_by: "omo account sign-in --check, JSON output (account-sign-in.ts:176)",
     owner: "A1b",
-  },
-  {
-    call: "devices.resolve",
-    principal: "person",
-    served_by: "the same OS user (security design 3): remote module factories devices.resolve (remote/client.ts:436)",
-    owner: "T1a",
-  },
-  {
-    call: "devices.resolve",
-    principal: "script",
-    served_by: "remote module factories devices.resolve (remote/client.ts:436)",
-    owner: "T1a",
   },
   { call: "daemon.run", principal: "person", served_by: "omo daemon run (bin/lib/daemon.js:76)", owner: "C1a" },
   { call: "daemon.run", principal: "script", served_by: "omo daemon run --json (bin/lib/daemon.js:273)", owner: "C1a" },
