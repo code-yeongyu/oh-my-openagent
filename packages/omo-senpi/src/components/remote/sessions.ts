@@ -175,7 +175,13 @@ const selfDelivery = (device: string): RemoteFailure =>
     { details: { device } },
   )
 
-/** How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). */
+/**
+ * How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). These
+ * stores are a CACHE held by this process (#15011): a hit answers a repeat without a round trip, and a miss (an evicted
+ * key, a fresh process) must be safe. It is for a send: the prompt's client message id and a delivery's id are derived
+ * from the caller and the key, and the holder's engine admits each once. A keyed open has no such id at the holder yet
+ * (code-yeongyu/senpi#7475), so its at-most-once rests on this cache within the process.
+ */
 const KEYS_KEPT = 256
 
 /**
@@ -192,7 +198,8 @@ function keepNewest<V extends { readonly settled: boolean }>(held: Map<string, V
 
 /**
  * The receipts of this client's sends and opens: a repeat under one idempotency key replays the first answer. A send
- * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest).
+ * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest). A full
+ * store never refuses: it forgets the oldest settled receipt.
  */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
   type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }

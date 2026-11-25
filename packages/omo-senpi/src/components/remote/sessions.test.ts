@@ -614,7 +614,7 @@ describe("#13756 review", () => {
   // #15011, measured before any fix: the client's receipt map is a cache. These pin what reaches the holder when the
   // cache no longer holds the key: the prompt goes again, under the SAME client message id, which the holder's engine
   // admits once (senpi ClientAdmissions: a repeated id with the same message answers replayed).
-  test("#15011 (a) #given one client and 257 keyed sends #when the first key is sent again #then the repeat reaches the holder under the first send's client message id", async () => {
+  test("#15011 (a) #given one client and 257 keyed sends #when the first key is sent again #then the cache miss is safe: the repeat reaches the holder under the first send's client message id and answers its delivery", async () => {
     const { owner, sent } = await onWorld()
     const client = clientOn(owner.stateDir, fakeClock())
     const first = await valueOf(client.sessions.send(LIVE, { text: "m-0", idempotency_key: "k-0" }))
