@@ -17,7 +17,10 @@ export function tableProblems(rows: readonly Row[], scenarios: readonly TableSce
       problems.push(`${at}: a refusal scenario names its code`)
     if (scenario.kind !== "refusal" && scenario.refusal_from !== undefined)
       problems.push(`${at}: refusal_from belongs to a refusal`)
-    if (scenario.kind === "effect" && scenario.expect.every((expectation) => (expectation.count ?? 1) === 0))
+    const pure = rows.find((row) => row.id === scenario.row)?.pure === true
+    if (pure && scenario.kind === "effect" && scenario.answer === undefined)
+      problems.push(`${at}: a pure call's effect scenario states its answer`)
+    if (!pure && scenario.kind === "effect" && scenario.expect.every((expectation) => (expectation.count ?? 1) === 0))
       problems.push(`${at}: an effect scenario states a port effect; an answer alone builds nothing`)
     if (scenario.abort !== undefined && !scenario.expect.some((expectation) => expectation.count === 0))
       problems.push(`${at}: an aborting scenario states with count 0 the effect that must not have happened`)

@@ -441,7 +441,9 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "pure": true,
+      "pureReason": "answers its usage text from the build, with no child process and no port"
     },
     {
       "id": "toolkit.recordEvidence",
