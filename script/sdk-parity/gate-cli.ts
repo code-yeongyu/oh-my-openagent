@@ -131,7 +131,11 @@ try {
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
-    ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS, ADAPTER_LAYER_RENAMES),
+    ...offenderGrowth(
+      recorded === undefined ? undefined : JSON.parse(recorded),
+      ADAPTER_OFFENDERS,
+      ADAPTER_LAYER_RENAMES,
+    ),
   ]
   const baselineFailures = baselineProblems({
     rows,

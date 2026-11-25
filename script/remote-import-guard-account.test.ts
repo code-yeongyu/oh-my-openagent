@@ -54,12 +54,12 @@ describe("account core family A (#14364)", () => {
     expect(named.length).toBeGreaterThan(0)
     expect(named.filter((name) => (EDITION_PACKAGE_NAMES as readonly string[]).includes(name))).toEqual([])
     const tsconfig = JSON.parse(readFileSync(join(REPO_ROOT, "packages/account-core/tsconfig.json"), "utf8"))
-    expect([tsconfig.compilerOptions?.paths, tsconfig.compilerOptions?.baseUrl, tsconfig.references, tsconfig.extends]).toEqual([
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-    ])
+    expect([
+      tsconfig.compilerOptions?.paths,
+      tsconfig.compilerOptions?.baseUrl,
+      tsconfig.references,
+      tsconfig.extends,
+    ]).toEqual([undefined, undefined, undefined, undefined])
     expect(tsconfig.include).toEqual(["src/**/*"])
   })
 
