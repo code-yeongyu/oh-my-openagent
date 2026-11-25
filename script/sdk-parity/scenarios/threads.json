@@ -3827,6 +3827,45 @@
       "target": "this_device"
     },
     {
+      "id": "threads.rename/key-reused",
+      "row": "threads.rename",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "name": "review",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "name": "other",
+            "idempotency_key": "k1"
+          },
+          "kind": "refusal",
+          "refusal": "idempotency_conflict",
+          "expect": [
+            {
+              "port": "host",
+              "op": "rename_session",
+              "count": 0
+            }
+          ]
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.rename/self-from-script",
       "row": "threads.rename",
       "kind": "refusal",

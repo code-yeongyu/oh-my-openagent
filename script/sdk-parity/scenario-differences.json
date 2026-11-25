@@ -21,9 +21,9 @@
     },
     {
       "id": "threads.rename/idempotent-repeat",
-      "differs": "The idempotency key goes to the alias registry only, so no store.idempotency_get is made and the rename runs again (sdk-core/controls.ts:102).",
+      "differs": "A repeat under the key is answered from the receipt book (control/receipts.ts) with no port call: the fake store keeps the book and never records it, so the store.idempotency_get this scenario names is never made, and an effect step whose trace is empty cannot be stated (an answer alone builds nothing). threads.rename/key-reused proves the book through its conflict step.",
       "owner": "T1b",
-      "retires_with": "T1b"
+      "retires_with": "P1b"
     },
     {
       "id": "threads.rename/session-ended",
