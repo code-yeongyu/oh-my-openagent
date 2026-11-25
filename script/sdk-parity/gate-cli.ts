@@ -13,7 +13,7 @@ import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
 import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
-import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, PORT_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
 import type { DomainFile } from "./schema"
 import type { DiscoveredTool } from "./tool-check"
@@ -80,6 +80,30 @@ const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim(
 const scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
 const baseTree = join(scratch, "tree")
 git("worktree", "add", "--detach", baseTree, mergeBase)
+// A run stopped by a signal skips the finally below, which left the base worktree and its scratch directory behind; the
+// handler removes them and exits with the signal's code.
+// Idempotent: the signal handler and the finally may both run. prune clears a worktree record left half-created.
+let removed = false
+const removeBaseTree = (): void => {
+  if (removed) return
+  removed = true
+  try {
+    git("worktree", "remove", "--force", baseTree)
+  } catch {
+    // Not a worktree any more (already removed, or never fully added); prune below clears its record.
+  }
+  git("worktree", "prune")
+  rmSync(scratch, { recursive: true, force: true })
+}
+for (const [signal, code] of [
+  ["SIGINT", 130],
+  ["SIGTERM", 143],
+  ["SIGHUP", 129],
+] as const)
+  process.once(signal, () => {
+    removeBaseTree()
+    process.exit(code)
+  })
 try {
   const lockMoved = git("diff", "--name-only", mergeBase, "HEAD", "--", "bun.lock").trim() !== ""
   if (lockMoved)
@@ -130,7 +154,7 @@ try {
   const evidence = await runEffectScenarios(rows, await loadScenarioRuns())
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
-    ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
+    ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, PORT_CONTEXT),
     ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
   ]
   const baselineFailures = baselineProblems({
@@ -139,7 +163,7 @@ try {
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
     evidence,
-    context: P0_CONTEXT,
+    context: PORT_CONTEXT,
     atBase: {
       originalText: show(mergeBase, ORIGINAL_PATH),
       pinText: show(mergeBase, PIN_PATH),
@@ -162,6 +186,5 @@ try {
   if (summary !== undefined) appendFileSync(summary, text)
   process.exitCode = failures.length > 0 ? 1 : 0
 } finally {
-  git("worktree", "remove", "--force", baseTree)
-  rmSync(scratch, { recursive: true, force: true })
+  removeBaseTree()
 }

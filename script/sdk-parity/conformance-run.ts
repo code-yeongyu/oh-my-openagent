@@ -1,6 +1,7 @@
 import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
+import { PORT_EFFECTS } from "../../packages/omo-senpi/src/components/omo-sdk/contract/ports"
 import type { ConformanceContext, EffectEvidence } from "./conformance"
 import type { ObservedCall, TableScenario } from "./expectation"
 import { normalizer } from "./normalize"
@@ -52,7 +53,8 @@ export async function loadScenarioRuns(dir: string = RUNS_DIR): Promise<Scenario
 
 // P0 has no run and no port list of its own: slice P1a's PORT_EFFECTS replaces this, and until then any observed call is
 // on an unclassified port and fails (conformance.ts), so an empty table can never pass a run silently.
-export const P0_CONTEXT: ConformanceContext = { effects: {} }
+/** Slice P1a's classification of every port operation (an effect or a read), which the gate and the base probe judge by. */
+export const PORT_CONTEXT: ConformanceContext = { effects: PORT_EFFECTS }
 
 function forwarding(target: unknown, path: readonly string[], invoked: string[]): unknown {
   return new Proxy(() => undefined, {

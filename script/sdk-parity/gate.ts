@@ -30,6 +30,8 @@ export type GateReport = {
   readonly failures: readonly string[]
   readonly candidates: readonly string[]
   readonly liveSchema: readonly string[]
+  /** Rows the body declares changed on purpose (SDK-Parity-Changed): each has left unresolved.json with its evidence. */
+  readonly changed: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -38,6 +40,8 @@ export type GateReport = {
 
 const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
+// A deliberate change: `SDK-Parity-Changed: <row id> [<row id> ...]`, ids separated by spaces or commas.
+const CHANGED_LINE = /^SDK-Parity-Changed:\s*(.+?)\s*$/gim
 
 // Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
 // cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
@@ -146,12 +150,36 @@ export function gateReport(input: GateInput): GateReport {
     })
     .map((row) => row.id)
     .toSorted()
+  // Design lane ruling: a row the body declares changed on purpose is a demonstrated change, so it must have left
+  // unresolved.json (its evidence is the run record that cleared it), and the reviewer's digest covers it.
+  const rowIds = new Set(input.head.rows.map((row) => row.id))
+  const declared = [
+    ...new Set(
+      [...input.body.matchAll(CHANGED_LINE)].flatMap((match) => (match[1] ?? "").split(/[\s,]+/).filter(Boolean)),
+    ),
+  ].toSorted()
+  for (const id of declared)
+    if (!rowIds.has(id)) failures.push(`SDK-Parity-Changed names ${id}, which is not a registry row`)
+    else if (unresolved.has(id))
+      failures.push(
+        `SDK-Parity-Changed names ${id}, which is still in unresolved.json; a declared change leaves it with its run evidence`,
+      )
+  if (declared.length > 0 && UNCHANGED_LINE.test(input.body))
+    failures.push(
+      "the body carries both SDK-Parity-Unchanged: yes and SDK-Parity-Changed: they contradict each other; keep the one that is true",
+    )
+  const changedRows = declared.filter((id) => rowIds.has(id) && !unresolved.has(id))
   return {
     failures,
     candidates,
     liveSchema,
+    changed: changedRows,
     head: input.headSha,
-    digest: candidateDigest(input.headSha, [...candidates, ...liveSchema.map((id) => `${id}#live-schema`)]),
+    digest: candidateDigest(input.headSha, [
+      ...candidates,
+      ...liveSchema.map((id) => `${id}#live-schema`),
+      ...changedRows.map((id) => `${id}#changed`),
+    ]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
   }
@@ -177,6 +205,7 @@ export function goldenProblems(
 const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
+  ...report.changed.map((id) => `${id}#changed`),
 ]
 
 export function renderReport(report: GateReport): string {
