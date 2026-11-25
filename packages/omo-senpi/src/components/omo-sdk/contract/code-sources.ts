@@ -5,7 +5,7 @@ import type { OmoErrorCode } from "../result"
 // The three code lists design 4.4 unions into one registry: the thread taxonomy, the omo SDK's codes and the remote
 // module's. OMO_SDK_CODES restates the omo SDK's union as a value; the assertion below fails the typecheck when the two
 // drift apart.
-export const OMO_SDK_CODES = [
+const OMO_SDK_CODES = [
   "signed_out",
   "session_ended",
   "desktop_sign_in",

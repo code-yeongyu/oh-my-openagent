@@ -63,7 +63,7 @@ export function prepareBaseTree(headRoot: string, baseRoot: string): void {
   walk("", 0)
 }
 
-export function workspaceNames(root: string): string[] {
+function workspaceNames(root: string): string[] {
   return readdirSync(join(root, "packages"), { withFileTypes: true })
     .filter((entry) => entry.isDirectory() && existsSync(join(root, "packages", entry.name, "package.json")))
     .map(

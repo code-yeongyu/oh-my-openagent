@@ -105,7 +105,7 @@ export const DiagnosticsReapStaleEngines = Type.Object({ pids: Type.Array(Count,
 export const InstallSetupDetect = None
 export const InstallSetupPlan = None
 /** `omo setup`'s inventory (N/bin/lib/setup-report.js): one row per harness found on this machine. */
-export const SetupInventorySchema = Type.Object({
+const SetupInventorySchema = Type.Object({
   harnesses: Type.Array(
     Type.Object({
       id: Type.String(),
@@ -120,7 +120,7 @@ export const SetupInventorySchema = Type.Object({
 })
 
 /** What `omo setup --dry-run` prints and install.setup.apply takes back: the stages a person consents to. */
-export const SetupPlanSchema = Type.Object({
+const SetupPlanSchema = Type.Object({
   inventory: SetupInventorySchema,
   stages: Type.Array(Type.Object({ id: Type.String({ minLength: 1 }), description: Type.String() })),
 })

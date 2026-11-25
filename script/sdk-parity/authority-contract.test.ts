@@ -80,14 +80,14 @@ type Listed = (typeof AUTH_CHECK_FREE_FIELDS)[number]["field"]
 type LeakyAnswer = Omit<AuthStatusAnswer, "accounts"> & {
   readonly accounts: readonly (AuthStatusAnswer["accounts"][number] & { readonly leaked: string })[]
 }
-export const freeFieldTypeChecks: [true, true, true] = [
+const freeFieldTypeChecks: [true, true, true] = [
   // The planted list is every free path of the person's answer, and nothing else (review 6062824873 M1).
   true satisfies Equal<Exclude<FreePaths<AuthStatusAnswer>, Listed>, never>,
   true satisfies Equal<Exclude<Listed, FreePaths<AuthStatusAnswer>>, never>,
   // Control: an answer type with one added free field reports exactly that field as unplanted.
   true satisfies Equal<Exclude<FreePaths<LeakyAnswer>, Listed>, "accounts[].leaked">,
 ]
-export const authorityTypeChecks: [true, true, true] = [
+const authorityTypeChecks: [true, true, true] = [
   true satisfies Equal<keyof RootAuthorityOptions, (typeof AUTHORITY_ROOT_OPTIONS)[number]>,
   // A custody operation never picks where a secret goes because an argument was left out (security design 5.2).
   true satisfies Equal<"destination" & RequiredKeys<RootCallInput<"account.credentials.handOver">>, "destination">,
@@ -97,6 +97,10 @@ export const authorityTypeChecks: [true, true, true] = [
 const CANARY = "omo-canary-sk-0000"
 
 describe("principals of slice P1a-s (#14949)", () => {
+  test("#given the type-level checks of this file #then each one compiled to true", () => {
+    expect([...freeFieldTypeChecks, ...authorityTypeChecks].every((check) => check)).toBe(true)
+  })
+
   test("#given the root #then it has the five principals of section 3, each with its id, and no call takes one", () => {
     expect([...PRINCIPAL_KINDS]).toEqual(["person", "script", "connector", "session", "service"])
     expect(PRINCIPAL_ID).toEqual({

@@ -9,18 +9,18 @@ export type PrincipalKind = (typeof PRINCIPAL_KINDS)[number]
 
 const closed = { additionalProperties: false } as const
 
-export const PersonPrincipal = Type.Object({ kind: Type.Literal("person"), uid: Type.Integer({ minimum: 0 }) }, closed)
-export const ScriptPrincipal = Type.Object({ kind: Type.Literal("script"), uid: Type.Integer({ minimum: 0 }) }, closed)
-export const ConnectorPrincipal = Type.Object(
+const PersonPrincipal = Type.Object({ kind: Type.Literal("person"), uid: Type.Integer({ minimum: 0 }) }, closed)
+const ScriptPrincipal = Type.Object({ kind: Type.Literal("script"), uid: Type.Integer({ minimum: 0 }) }, closed)
+const ConnectorPrincipal = Type.Object(
   { kind: Type.Literal("connector"), binding: Type.String({ minLength: 1 }) },
   closed,
 )
 /** An agent session, by the durable id the engine hands a tool; never an id a model supplies. */
-export const SessionPrincipal = Type.Object(
+const SessionPrincipal = Type.Object(
   { kind: Type.Literal("session"), session_id: Type.String({ minLength: 1 }) },
   closed,
 )
-export const ServicePrincipal = Type.Object({ kind: Type.Literal("service") }, closed)
+const ServicePrincipal = Type.Object({ kind: Type.Literal("service") }, closed)
 
 export const Principal = Type.Union([
   PersonPrincipal,

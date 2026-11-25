@@ -54,7 +54,7 @@ export function argvProblems(
 // (`account show`: every flag found there belongs to it), or a route with the only flags that file parses for it (a
 // module that also builds an engine's argv, whose other literals are not omo's own flags).
 type Dispatch = string | { readonly route: string; readonly flags: readonly string[] }
-export const DISPATCH: Readonly<Record<string, Dispatch>> = {
+const DISPATCH: Readonly<Record<string, Dispatch>> = {
   "packages/omo-native/bin/lib/thread.js": "thread",
   "packages/omo-native/bin/lib/thread-args.js": "thread",
   "packages/omo-native/bin/lib/daemon.js": "daemon",
