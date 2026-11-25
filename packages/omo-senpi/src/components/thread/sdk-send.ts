@@ -7,6 +7,7 @@ import type { resolveAddress } from "./address/resolve"
 import type { Failed } from "./address/refusals"
 import { DEFAULT_THREAD_DELIVERY, type ThreadSendInput, type ThreadHandoffInput } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
+import { refusal } from "./refusal-texts"
 import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget, DeliveryOutcome } from "./gateway/transport"
 import type { DeliveryAuthority, GatewaySender } from "./gateway/types"
@@ -331,10 +332,9 @@ function replySender(
   }
   const found = [...distinct.values()]
   if (found.length <= 1) return found[0]
-  return threadToolFailure(
-    "ambiguous_target",
-    `"${address}" names more than one sender of this run's deliveries; none was picked.`,
-    "Send to the intended thread as a normal send, by its id.",
+  return refusal(
+    "control.reply_sender_ambiguous",
+    { address },
     {
       candidates: found.map((sender) => ({
         thread: sender.session_id,
