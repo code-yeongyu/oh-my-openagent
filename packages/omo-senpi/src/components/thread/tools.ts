@@ -73,9 +73,19 @@ import {
 } from "./tools/internals"
 import { threadRow } from "./tools/thread-row"
 import { createReceipts } from "./control/receipts"
-import { unexpectedFailure } from "./sdk-core/failures"
+import { thrown, type ThrownWording } from "./sdk-core/failures"
 
 export { RECEIPT_RECOVERY_MAX_KEYS } from "./control/receipts"
+
+/** The thread tools' wording of the one thrown-failure mapping (sdk-core/failures.ts `thrown`). */
+const TOOL_WORDING: ThrownWording = {
+  hostUnavailable: "Retry when the shared Senpi host is running.",
+  unsupported: (command) =>
+    `The target's endpoint does not accept ${command}: that terminal runs an engine from before terminal session controls.`,
+  unsupportedNext:
+    "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list() in an eval cell) shows each thread's controls.",
+  unexpectedNext: "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+}
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
   return buildThreadTools(options).tools
 }
@@ -144,36 +154,8 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
       retrying = admission.retrying
     }
     const failed = async (error: unknown): Promise<ToolOutput> => {
-      const message = error instanceof Error ? error.message : String(error)
       if (receipted) await receipts.fail(scope, error)
-      const schema = gatewaySchemaRefusal(error)
-      if (schema !== undefined) return output({ kind: "error", error: schema })
-      if (message.startsWith("host_unavailable:")) {
-        return output(
-          failure(
-            "host_unavailable",
-            `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`,
-            "Retry when the shared Senpi host is running.",
-          ),
-        )
-      }
-      if (message.startsWith("unsupported:")) {
-        return output(
-          failure(
-            "unsupported",
-            `The target's endpoint does not accept ${message.slice("unsupported:".length)}: that terminal runs an engine from before terminal session controls.`,
-            "Update omo where that terminal runs and restart it, or use thread_send and thread_read (tool.thread_send() and tool.thread_read() in an eval cell); thread_list (tool.thread_list() in an eval cell) shows each thread's controls.",
-            { command: message.slice("unsupported:".length) },
-          ),
-        )
-      }
-      return output(
-        unexpectedFailure(
-          error,
-          options.onUnexpected,
-          "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
-        ),
-      )
+      return output(thrown(error, options.onUnexpected, TOOL_WORDING))
     }
     let result: ThreadToolResult
     try {

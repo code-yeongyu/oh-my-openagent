@@ -13,28 +13,51 @@ export function fail(
   return { kind: "error", error: threadToolFailure(code, message, next, details) }
 }
 
-/** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
-export function thrown(error: unknown, onUnexpected?: (error: unknown) => void): Failure {
+/** How a surface words the refusals a thrown failure maps to; the codes, fields and fixed text are the mapping's own. */
+export type ThrownWording = {
+  readonly hostUnavailable: string
+  readonly unsupported: (command: string) => string
+  readonly unsupportedNext: string
+  readonly unexpectedNext: string
+}
+
+/** The thread SDK's and the root's wording. */
+export const SDK_WORDING: ThrownWording = {
+  hostUnavailable: "Retry when a host or terminal session is running.",
+  unsupported: (command) => `The target's endpoint does not accept ${command}.`,
+  unsupportedNext: "Use thread read to follow the session.",
+  unexpectedNext: "Run omo thread list and retry after checking the target.",
+}
+
+/**
+ * The ONE mapping of a thrown failure on every thread surface (B8): a known typed refusal (a control's own refusal, a
+ * gateway schema refusal, a host the surface names unavailable, a command an endpoint does not take) keeps its approved
+ * fields; anything else, whatever it is (an Error, its stack and causes, a string, an object), is the fixed failure and
+ * reaches only `onUnexpected`.
+ */
+export function thrown(
+  error: unknown,
+  onUnexpected?: (error: unknown) => void,
+  wording: ThrownWording = SDK_WORDING,
+): Failure {
   // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
   const refusal = controlRefusalOf(error)
   if (refusal !== undefined) return { kind: "error", error: refusal }
   const schema = gatewaySchemaRefusal(error)
   if (schema !== undefined) return { kind: "error", error: schema }
-  const message = error instanceof Error ? error.message : String(error)
-  if (message.startsWith("host_unavailable:"))
+  // Only an Error the surface raised itself carries one of these prefixes; anything else is unexpected.
+  const message = error instanceof Error ? error.message : undefined
+  if (message?.startsWith("host_unavailable:"))
     return fail(
       "host_unavailable",
       `The thread host is unavailable at ${message.slice("host_unavailable:".length)}.`,
-      "Retry when a host or terminal session is running.",
+      wording.hostUnavailable,
     )
-  if (message.startsWith("unsupported:"))
-    return fail(
-      "unsupported",
-      `The target's endpoint does not accept ${message.slice("unsupported:".length)}.`,
-      "Use thread read to follow the session.",
-      { command: message.slice("unsupported:".length) },
-    )
-  return unexpectedFailure(error, onUnexpected)
+  if (message?.startsWith("unsupported:")) {
+    const command = message.slice("unsupported:".length)
+    return fail("unsupported", wording.unsupported(command), wording.unsupportedNext, { command })
+  }
+  return unexpectedFailure(error, onUnexpected, wording.unexpectedNext)
 }
 
 /** The one fixed text every thread surface answers for an unexpected exception (security ruling B8). */
@@ -49,12 +72,19 @@ export function unexpectedFailure(
   onUnexpected?: (error: unknown) => void,
   next = "Run omo thread list and retry after checking the target.",
 ): Failure {
-  try {
-    onUnexpected?.(error)
-  } catch {
-    // A failing logger port must not turn a failure into a crash; the answer stays the fixed one.
-  }
+  reportUnexpected(onUnexpected, error)
   return fail("internal_error", UNEXPECTED_FAILURE_MESSAGE, next)
+}
+
+/** Hands an exception to the logger port, isolated from the outcome: a port that throws changes no answer and no receipt. */
+export function reportUnexpected(onUnexpected: ((error: unknown) => void) | undefined, error: unknown): void {
+  try {
+    // Never awaited: a port that hangs holds nothing; one that rejects is caught here, never an unhandled rejection.
+    const pending: unknown = onUnexpected?.(error)
+    if (pending instanceof Promise) pending.catch(() => undefined)
+  } catch {
+    // The port's own failure is dropped on purpose: reporting it would need the very sink that just failed.
+  }
 }
 
 // omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).

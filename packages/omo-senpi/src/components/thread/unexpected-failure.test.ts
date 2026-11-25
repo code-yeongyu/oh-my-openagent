@@ -1,62 +1,157 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { readdirSync, readFileSync, statSync } from "node:fs"
+import { join } from "node:path"
 
+import type { ThreadToolName } from "./contracts"
+import { threadToolParamSchemas } from "./contracts"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 
 // B8 (security ruling, carried by T1b #14951): an unexpected exception answers internal_error with fixed text on every
-// thread surface (thread_*, the thread SDK, omo thread); its text reaches only the onUnexpected port. Each case throws a
-// canary and scans the whole answer, the receipt it leaves and a retry under the same key for it.
+// thread surface; nothing of it reaches an answer or anything the call persists, and only `onUnexpected` sees it. Every
+// canary below shares the TAG, so one scan finds any of them; the root's every-call walk is non-disclosure.test.ts.
 
-const CANARY = "canary-b8-5e1f secret=sk-live-do-not-print"
+const TAG = "cnry-b8"
 const { account, surface, cleanup } = createRemoteThreadFixture()
 afterEach(cleanup)
 
-function world() {
-  const seen: unknown[] = []
-  const s = surface(account().remote, { onUnexpected: (error: unknown) => void seen.push(error) })
-  const sdk = s.sdk()
-  return { s, sdk, seen }
+function throwShapes(): Record<string, () => unknown> {
+  const inStack = new Error("boom")
+  inStack.stack = `Error: boom\n    at ${TAG}-stack (/secret/${TAG}-path.ts:1:1)`
+  const chained = new Error(`${TAG}-msg`, {
+    cause: new Error(`${TAG}-cause-1`, { cause: new Error(`${TAG}-cause-2`) }),
+  })
+  const withProps = Object.assign(new Error("boom"), { token: `${TAG}-enumerable` })
+  Object.defineProperty(withProps, "hidden", { value: `${TAG}-hidden`, enumerable: false })
+  return {
+    stack: () => inStack,
+    "cause chain": () => chained,
+    properties: () => withProps,
+    string: () => `${TAG}-string`,
+    object: () => ({ message: `${TAG}-object`, code: "internal_error" }),
+  }
 }
 
-const fault = async () => {
-  throw new Error(CANARY)
+function filesUnder(root: string): string[] {
+  return readdirSync(root).flatMap((name) => {
+    const path = join(root, name)
+    return statSync(path).isDirectory() ? filesUnder(path) : [path]
+  })
+}
+
+function leaks(agentDir: string, answers: readonly unknown[]): string[] {
+  const written = filesUnder(agentDir).filter((path) => readFileSync(path, "latin1").includes(TAG))
+  const said = answers.map((answer) => JSON.stringify(answer)).filter((text) => text?.includes(TAG))
+  return [...written, ...said]
+}
+
+function world(onUnexpected?: (error: unknown) => unknown) {
+  const seen: unknown[] = []
+  const s = surface(account().remote, {
+    onUnexpected: (error: unknown) => {
+      seen.push(error)
+      return onUnexpected?.(error)
+    },
+  })
+  return { s, sdk: s.sdk(), seen }
+}
+
+function faultEverything(s: ReturnType<typeof world>["s"], raise: () => unknown) {
+  for (const [name, value] of Object.entries(s.host))
+    if (typeof value === "function")
+      Object.assign(s.host, {
+        [name]: async () => {
+          throw raise()
+        },
+      })
 }
 
 describe("B8: an unexpected exception on every thread surface", () => {
-  test("#given a host whose listing throws #when the tool, the SDK and omo thread list and close #then each answers internal_error with no exception text, and the exception reaches onUnexpected (omo thread: omo-native thread-unexpected.test.ts)", async () => {
-    const { s, sdk, seen } = world()
-    Object.assign(s.host, { listView: fault, listSessions: fault })
-    const answers = [
-      await s.run("thread_list", {}),
-      await s.run("thread_close", { thread: "dur-local" }),
-      await sdk.list({}),
-      await sdk.close({ thread: "dur-local" }),
-    ]
-    for (const answer of answers) {
-      expect(answer).toMatchObject({ kind: "error", error: { code: "internal_error" } })
-      expect(JSON.stringify(answer)).not.toContain("canary-b8")
+  for (const [shape, raise] of Object.entries(throwShapes()))
+    test(`#given a host that throws ${shape} #when the tool and the SDK list, close and run a keyed create and its retry #then internal_error with fixed text, nothing in any answer or persisted file, and the value reaches onUnexpected`, async () => {
+      const { s, sdk, seen } = world()
+      faultEverything(s, raise)
+      const create = { name: "b8-create", idempotency_key: `k-${shape}` }
+      const answers = [
+        await s.run("thread_list", {}),
+        await s.run("thread_close", { thread: "dur-local" }),
+        await s.run("thread_create", create),
+        await s.run("thread_create", create),
+        await sdk.list({}),
+        await sdk.close({ thread: "dur-local" }),
+        await sdk.create(create),
+        await sdk.create(create),
+      ]
+      expect(leaks(s.agentDir, answers)).toEqual([])
+      for (const answer of answers.filter((each) => (each as { kind: string }).kind === "error"))
+        expect((answer as { error: { code: string } }).error.code).toMatch(/^(internal_error|idempotency_uncertain)$/)
+      expect(seen.length).toBeGreaterThan(0)
+    })
+
+  test("#given a host that rejects with a rejected promise's object #when the SDK lists #then the fixed failure", async () => {
+    const { s, sdk } = world()
+    Object.assign(s.host, { listView: () => Promise.reject({ secret: `${TAG}-rejected` }) })
+    const answer = await sdk.list({})
+    expect(answer).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(leaks(s.agentDir, [answer])).toEqual([])
+  })
+
+  test("#given a host whose every method throws #when every thread tool runs #then each answers a code, never the thrown text, and nothing persisted carries it", async () => {
+    const { s } = world()
+    faultEverything(s, () => new Error(`${TAG}-every`))
+    const minimal: Record<ThreadToolName, Record<string, unknown>> = {
+      thread_list: {},
+      thread_read: { thread: "dur-local" },
+      thread_send: { thread: "dur-local", message: "hi" },
+      thread_interrupt: { thread: "dur-local" },
+      thread_close: { thread: "dur-local" },
+      thread_rename: { thread: "dur-local", name: "renamed" },
+      thread_set_model: { thread: "dur-local", model: "m" },
+      thread_set_reasoning: { thread: "dur-local", level: "high" },
+      thread_archive: { thread: "dur-local" },
+      thread_handoff: { thread: "dur-local", message: "hi" },
+      thread_create: { name: "every" },
     }
-    expect(seen.length).toBeGreaterThan(0)
-    expect(seen.every((error) => error instanceof Error && error.message === CANARY)).toBe(true)
+    expect(Object.keys(minimal).sort()).toEqual(Object.keys(threadToolParamSchemas).sort())
+    const answers = []
+    for (const [name, args] of Object.entries(minimal)) answers.push(await s.run(name as ThreadToolName, args))
+    expect(leaks(s.agentDir, answers)).toEqual([])
   })
 
   test("#given a store whose receipt admission throws #when a keyed close runs through the tool and the SDK #then internal_error with no exception text", async () => {
     const { s, sdk, seen } = world()
-    Object.assign(s.store, { toolReceiptBegin: fault })
+    Object.assign(s.store, {
+      toolReceiptBegin: async () => {
+        throw new Error(`${TAG}-store`)
+      },
+    })
     const args = { thread: "dur-local", idempotency_key: "k-b8-store" }
-    for (const answer of [await s.run("thread_close", args), await sdk.close(args)]) {
-      expect(answer).toMatchObject({ kind: "error", error: { code: "internal_error" } })
-      expect(JSON.stringify(answer)).not.toContain("canary-b8")
-    }
+    const answers = [await s.run("thread_close", args), await sdk.close(args)]
+    for (const answer of answers) expect(answer).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(leaks(s.agentDir, answers)).toEqual([])
     expect(seen.length).toBe(2)
   })
+})
 
-  test("#given a keyed create whose body throws #when it is retried under the same key #then neither the answer nor the replayed uncertain note carries the exception text", async () => {
-    const { s, seen } = world()
-    Object.assign(s.host, { openSession: fault })
-    const args = { name: "b8-create", idempotency_key: "k-b8-create" }
-    const first = await s.run("thread_create", args)
-    const retry = await s.run("thread_create", args)
-    for (const answer of [first, retry]) expect(JSON.stringify(answer)).not.toContain("canary-b8")
-    expect(seen.length).toBeGreaterThan(0)
-  })
+describe("B8: the logger port is isolated from the outcome", () => {
+  const ports: Record<string, () => unknown> = {
+    throws: () => {
+      throw new Error("logger down")
+    },
+    hangs: () => new Promise(() => undefined),
+    rejects: () => Promise.reject(new Error("logger down")),
+  }
+  for (const [how, port] of Object.entries(ports))
+    test(`#given a logger that ${how} #when a keyed create fails and is retried #then the answers and the persisted receipt are the same as with a quiet logger`, async () => {
+      const outcome = async (logger: (() => unknown) | undefined) => {
+        const { s, sdk } = world(logger)
+        faultEverything(s, () => new Error(`${TAG}-logged`))
+        const create = { name: "logged", idempotency_key: "k-logger" }
+        const answers = [await s.run("thread_create", create), await sdk.create(create), await sdk.create(create)]
+        return { answers: JSON.parse(JSON.stringify(answers)) as unknown, leaks: leaks(s.agentDir, answers) }
+      }
+      const quiet = await outcome(undefined)
+      const loud = await outcome(port)
+      expect(loud).toEqual(quiet)
+      expect(loud.leaks).toEqual([])
+    })
 })

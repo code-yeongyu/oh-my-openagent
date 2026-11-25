@@ -4,7 +4,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "../gateway/constants"
 import { hashArgs } from "../gateway/hash-args"
 import { isLockWaitExceeded } from "../gateway/lock-wait"
 import type { GatewayStore } from "../gateway/store"
-import { thrown, UNEXPECTED_FAILURE_MESSAGE } from "../sdk-core/failures"
+import { reportUnexpected, thrown, UNEXPECTED_FAILURE_MESSAGE } from "../sdk-core/failures"
 import { failure, uncertainFailure, uncertainNote } from "../tools/internals"
 import { currentResult } from "../tools/thread-row"
 
@@ -99,7 +99,7 @@ export function createReceipts(
   }
   const keyOf = (scope: ReceiptScope) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
   const unrecorded = (scope: ReceiptScope, what: string) => (settleError: unknown) => {
-    onUnexpected?.(settleError)
+    reportUnexpected(onUnexpected, settleError)
     unsettled.set(keyOf(scope), `${what}, and its receipt could not be recorded.`)
   }
 
@@ -136,14 +136,14 @@ export function createReceipts(
           kind: "answer",
           result: failure(
             "overloaded",
-            `The gateway store is locked by another process; nothing ran: ${message}`,
+            "The gateway store is locked by another process; nothing ran.",
             "Wait a few seconds, then retry the call.",
           ),
         }
       const schema = gatewaySchemaRefusal(error)
       if (schema !== undefined) return { kind: "answer", result: { kind: "error", error: schema } }
       unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
-      onUnexpected?.(error)
+      reportUnexpected(onUnexpected, error)
       return {
         kind: "answer",
         result: failure(
