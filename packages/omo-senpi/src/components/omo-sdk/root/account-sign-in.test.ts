@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { SignInRequest } from "@oh-my-opencode/account-core/calls/sign-in"
 import { assembleOmoSdk } from "../assembly"
 import type { OmoPrincipal } from "../contract"
+import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
 import type { InProcessSignIn } from "./account-sign-in"
 
 // account.signIn on the root (first-party design 6.4, security design 4.2, 5.4, slice A1b). With an in-process sign-in
@@ -58,22 +59,32 @@ const signedIn =
   }
 
 describe("account.signIn on the root", () => {
-  test("#given a session principal #when it asks to replace #then it runs as today until B4's evidence exists", async () => {
-    const requests: SignInRequest[] = []
-    const { sdk } = rootWith({
-      principal: { kind: "session", session_id: "01-session" },
-      inProcess: async (api, request) => {
-        requests.push(request)
-        return signedIn("on")(api, request)
+  test("#given B4 with no evidence #when a session's root asks to replace #then today's answer: the shipped child signs in with replace", async () => {
+    // The pin of today's behaviour (design lane, 2026-11-26): B4 in contract/behaviour-changes.ts still asserts its
+    // today expectation. When B4's evidence lands, this table entry flips and this test turns into the refusal.
+    const b4 = BEHAVIOUR_CHANGES.find((change) => change.id === "B4")
+    expect(b4 === undefined ? undefined : assertedExpectation(b4).outcome).toBe("allow")
+    const stdins: string[] = []
+    const sdk = assembleOmoSdk(
+      {
+        principal: { kind: "session", session_id: "01-session" },
+        env: { OMO_SERVICE_API_URL: "https://api.example.test" },
+        cwd: "/work",
+        ports: {
+          desktopLaunch: () => false,
+          signInProcess: async ({ stdin, onLine }) => {
+            stdins.push(stdin)
+            onLine(JSON.stringify({ event: "signed_in", device: { id: "dev-1", name: "laptop" }, deviceService: "on" }))
+            return { code: 0 }
+          },
+        },
       },
-    })
-    const answer = (await sdk.account.signIn({
-      method: "device_code",
-      replace: true,
-      onUserCode: () => undefined,
-    })) as unknown
-    expect(answer).toMatchObject({ kind: "ok" })
-    expect(await requests[0]?.replaceDevice?.({ deviceId: "earlier" } as never)).toBe(true)
+      {},
+    )
+    expect(
+      (await sdk.account.signIn({ method: "device_code", replace: true, onUserCode: () => undefined })) as unknown,
+    ).toMatchObject({ kind: "ok", value: { device_service: "on" } })
+    expect(stdins.map((line) => JSON.parse(line))).toEqual([{ replace: true }])
   })
 
   test("#given an in-process sign-in #when the device code is approved #then the code reaches onUserCode and the answer names the device", async () => {
