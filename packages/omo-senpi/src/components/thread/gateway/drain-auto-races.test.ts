@@ -1,8 +1,9 @@
 import { afterEach, expect, test } from "bun:test"
 import { join } from "node:path"
 
-import type { AdmitExternalMessageInput } from "./adapter"
+import type { AdmitExternalMessageInput, GatewayAdmissionKind } from "./adapter"
 import { createInboxDrain } from "./drain"
+import { createClaimedAdmitter } from "./drain-admit"
 import { FakeSessionRuntime } from "./testing/fake-runtime"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
 import type { DeliveryRow, GatewayDeliveryResult } from "./types"
@@ -182,4 +183,45 @@ test("#given an explicit-mode delivery the engine answers turn_conflict #when th
   // then
   expect(result.admitted).toEqual([{ delivery_id: id, kind: "turn_conflict" }])
   expect((await row(id))?.state).toBe("refused")
+})
+
+test("#given a turn-pinned explicit steer whose turn ended #when it is admitted with join intent while the session is idle #then it is refused not_steerable and never joins a new turn", async () => {
+  // given
+  const h = (harness = createGatewayHarness())
+  h.session("A")
+  const b = h.session("B")
+  b.runtime.beginUserTurn()
+  b.runtime.typeDraft()
+  const sent = await h.get("A").engine.deliver({
+    sender: { kind: "session", durable_id: "A" },
+    target: "B",
+    text: "now",
+    mode: "steer",
+    expected_turn_id: b.runtime.epoch,
+  })
+  const id = okId(sent)
+  b.runtime.endTurn()
+  await h.quiesce()
+  const self = await b.store.identity()
+  const claimed = await b.store.claim({ now: h.clock.now, delivery_id: id, self, lane: "steer" })
+  if (claimed.kind !== "claimed") throw new Error(`expected the steer claimed, got ${JSON.stringify(claimed)}`)
+  const admitted: { delivery_id: string; kind: GatewayAdmissionKind }[] = []
+  const admit = createClaimedAdmitter({
+    store: b.store,
+    runtime: b.runtime,
+    durableId: "B",
+    self,
+    now: () => h.clock.now,
+    admitted,
+    held: new Map(),
+    noticeQueued: () => undefined,
+  })
+
+  // when
+  await admit(claimed.row, claimed.row, { joinsStart: true })
+
+  // then
+  expect(admitted).toEqual([{ delivery_id: id, kind: "not_steerable" }])
+  expect(b.runtime.enqueueCount(id)).toBe(0)
+  expect((await b.store.deliveryView(id))?.row.state).toBe("refused")
 })
