@@ -14,6 +14,7 @@ import { accountHome } from "@oh-my-opencode/account-core/credential-lock"
 import { accountShow, type SyncState } from "@oh-my-opencode/account-core/calls/show"
 import { accountSignInCheck, accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
+import { loadTrustAnchor } from "@oh-my-opencode/memory-core/sync-trust-pin"
 import { type AccountAccess, failure } from "../access"
 import { OMO_CODE_REGISTRY, type OmoFailure, type OmoPrincipal, type OmoValue } from "../contract"
 import type { NamespaceServing } from "./members"
@@ -57,7 +58,6 @@ async function answer<Value>(access: AccountAccess, run: () => Promise<OmoValue<
 type Env = Readonly<Record<string, string | undefined>>
 
 async function trustPinState(env: Env, cwd: string, account: string): Promise<SyncState> {
-  const { loadTrustAnchor } = await import("#omo-memory-sync-runtime")
   const pin = await loadTrustAnchor(syncPinDir(resolveMemoryRoot(env, cwd)), account)
   if (pin.ok) return "joined"
   return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
