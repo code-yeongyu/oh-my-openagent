@@ -56,6 +56,7 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
     problems.push(`${at}: a refusal scenario names its code`)
   problems.push(...refusalDetailsProblems(at, scenario, contract))
   problems.push(...callbackProblems(at, scenario))
+  problems.push(...callOptionProblems(at, scenario))
   return problems
 }
 
@@ -79,12 +80,23 @@ function callbackProblems(at: string, scenario: TableScenario): string[] {
   return Object.entries(scenario.callbacks ?? {}).flatMap(([name, entries]) => [
     ...(scenario.input[name] === "$callback" ? [] : [`${at}: callbacks.${name} names no "$callback" input`]),
     ...(entries.length === 0 ? [`${at}: callbacks.${name} lists no call`] : []),
-    ...entries.flatMap((entry, index) =>
-      Number.isInteger(entry.effects_before) && entry.effects_before >= 0
+    ...entries.flatMap((entry, index) => [
+      ...(Number.isInteger(entry.effects_before) && entry.effects_before >= 0
         ? []
-        : [`${at}: callbacks.${name}[${index}].effects_before is a whole number of effects`],
-    ),
+        : [`${at}: callbacks.${name}[${index}].effects_before is a whole number of effects`]),
+      ...(entry.pending === true && entry.answer !== undefined
+        ? [`${at}: callbacks.${name}[${index}] never answers, so it states no answer`]
+        : []),
+    ]),
   ])
+}
+
+// call_options.deadline_ms is a whole number of virtual milliseconds the call is allowed.
+function callOptionProblems(at: string, scenario: TableScenario): string[] {
+  const deadline = scenario.call_options?.deadline_ms
+  return deadline === undefined || (Number.isInteger(deadline) && deadline >= 0)
+    ? []
+    : [`${at}: call_options.deadline_ms is a whole number of milliseconds`]
 }
 
 const without = (input: Readonly<Record<string, unknown>>, field: string): Record<string, unknown> =>

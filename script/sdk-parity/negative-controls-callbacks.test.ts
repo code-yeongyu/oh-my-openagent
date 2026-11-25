@@ -181,3 +181,48 @@ describe("refusal_details: a subset of the failure's details, its reason from th
     expect(shape(table)).toContain("refusal_details.reason must be one of install_failed's reasons (engine_missing")
   })
 })
+
+describe("pending callbacks and call_options: the call waits, and its deadline reaches it", () => {
+  test("#given a pending entry that also states an answer #then the table check names it", () => {
+    expect(shape(asking({ decide: [{ when: {}, answer: "apply", effects_before: 0, pending: true }] }))).toContain(
+      "callbacks.decide[0] never answers, so it states no answer",
+    )
+  })
+
+  test("#given a fractional deadline_ms #then the table check names it", () => {
+    expect(shape({ ...scenario("by-id", undefined), call_options: { deadline_ms: 1.5 } })).toContain(
+      "call_options.deadline_ms is a whole number of milliseconds",
+    )
+  })
+
+  test("#given call_options and a pending callback #then the member gets deadline_ms beside its signal, and the clock hears it is blocked", async () => {
+    const seen: unknown[] = []
+    let blocked = 0
+    const table: TableScenario = {
+      ...asking({ decide: [{ when: { id: "credentials" }, pending: true, effects_before: 0 }] }),
+      call_options: { deadline_ms: 50 },
+    }
+    const waiting = async (calls: ObservedCall[], input: unknown, options?: unknown): Promise<unknown> => {
+      seen.push(options)
+      calls.push(host("listSessions"))
+      const decide = Reflect.get(Object(input), "decide") as (stage: { id: string }) => Promise<unknown>
+      void decide({ id: "credentials" })
+      return { kind: "ok" }
+    }
+    const calls: ObservedCall[] = []
+    await runEffectScenarios(builtRows, [
+      {
+        scenario: table,
+        setup: () => ({
+          root: { threads: { locate: (input: unknown, options: unknown) => waiting(calls, input, options) } },
+          calls: () => calls,
+          blocked: () => {
+            blocked += 1
+          },
+        }),
+      },
+    ])
+    expect(seen).toEqual([expect.objectContaining({ deadline_ms: 50 })])
+    expect(blocked).toBe(1)
+  })
+})

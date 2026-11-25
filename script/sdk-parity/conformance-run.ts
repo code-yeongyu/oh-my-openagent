@@ -20,6 +20,8 @@ export type ScenarioSetup = {
   readonly calls: () => readonly ObservedCall[]
   /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed. Needed only by an aborting scenario. */
   readonly after?: (ms: number, fire: () => void) => void
+  /** Tells the fakes' clock the call now waits on something that never answers, so what is due fires. */
+  readonly blocked?: () => void
 }
 
 export type ScenarioRun = { readonly scenario: TableScenario; readonly setup: () => ScenarioSetup }
@@ -110,6 +112,7 @@ function withCallbacks(
   callbacks: Readonly<Record<string, readonly CallbackEntry[]>> | undefined,
   record: CallbackCall[],
   observed: () => number,
+  blocked: (() => void) | undefined,
 ): Readonly<Record<string, unknown>> {
   if (callbacks === undefined) return input
   const built = { ...input }
@@ -120,7 +123,9 @@ function withCallbacks(
       record.push({ name, argument, entry, observedBefore: observed() })
       if (entry < 0) return undefined
       used.add(entry)
-      return entries[entry]?.answer
+      if (entries[entry]?.pending !== true) return entries[entry]?.answer
+      blocked?.()
+      return new Promise(() => {})
     }
   }
   return built
@@ -154,6 +159,7 @@ async function invoke(
   member: unknown,
   call: Call,
   signal: AbortSignal,
+  callOptions: TableScenario["call_options"] = undefined,
 ): Promise<{
   readonly code?: string
   readonly codeSource?: "root" | "value"
@@ -162,7 +168,10 @@ async function invoke(
 }> {
   try {
     const settled = await settle(
-      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [call.input, { signal }]),
+      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [
+        call.input,
+        { signal, ...callOptions },
+      ]),
     )
     if ("broken" in settled) return { threw: settled.broken }
     const { code, source } = refusalOf(settled.answer)
@@ -185,7 +194,7 @@ export async function runEffectScenarios(
   const evidence: EffectEvidence[] = []
   for (const { scenario, setup } of runs) {
     const row = rows.find((candidate) => candidate.id === scenario.row)
-    const { root, calls, after } = setup()
+    const { root, calls, after, blocked } = setup()
     const invoked: string[] = []
     const memberOf = (): unknown => {
       let member: unknown = forwarding(root, [], invoked)
@@ -224,8 +233,14 @@ export async function runEffectScenarios(
         callbacks,
         callbackCalls,
         () => calls().length - seen,
+        blocked,
       )
-      const result = await invoke(memberOf(), { ...step, input }, controller.signal)
+      const result = await invoke(
+        memberOf(),
+        { ...step, input },
+        controller.signal,
+        index === 0 ? scenario.call_options : undefined,
+      )
       records.push({
         scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
         row: scenario.row,

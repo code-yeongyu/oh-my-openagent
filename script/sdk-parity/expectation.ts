@@ -41,6 +41,8 @@ export type CallbackEntry = {
   readonly when: Readonly<Record<string, unknown>>
   readonly answer?: unknown
   readonly effects_before: number
+  /** The callback never answers: the call waits on it until its signal or deadline stops it. */
+  readonly pending?: true
 }
 
 /**
@@ -71,6 +73,8 @@ export type ScenarioStep = RefusalDetails & {
 
 export type TableScenario = RefusalDetails & {
   readonly before?: readonly BeforeCall[]
+  /** The call's wait options beside its signal (design 4.4): deadline_ms, measured on the fakes' virtual clock. */
+  readonly call_options?: { readonly deadline_ms: number }
   /** Each callback input the scenario passes as "$callback", built by the runner from its ordered calls. */
   readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   /** `<row id>/<slug>`: stable, never reused for another behaviour. */
