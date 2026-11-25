@@ -164,21 +164,30 @@ describe("resolve: the canonical thread string round-trips", () => {
     `here/${T.hereLive}`,
     T.bLive.slice(0, 8),
   ]
-  test.each(forms.map((form) => [form] as const))("#given %s resolves #when its thread value is resolved #then it names the same thread, device and holder", async (form) => {
-    const td = createTwoDevices()
-    cleanups.push(td.cleanup)
-    const sources = { remote: td.remote, workspace: process.cwd(), book: () => td.entries }
-    const first = await resolve(sources, form, { ...DELIVER, scope: { all_scope: true } })
-    if (first.kind === "error") throw new Error(`${form} did not resolve: ${first.code}`)
-    const again = await resolve(sources, first.thread, { ...DELIVER, scope: { all_scope: true } })
-    if (again.kind === "error") throw new Error(`${first.thread} did not resolve back: ${again.code}`)
-    expect({ id: again.id, device: again.device?.id ?? null, holder: again.holder.kind, thread: again.thread }).toEqual({
-      id: first.id,
-      device: first.device?.id ?? null,
-      holder: first.holder.kind,
-      thread: first.thread,
-    })
-  }, 60_000)
+  test.each(forms.map((form) => [form] as const))(
+    "#given %s resolves #when its thread value is resolved #then it names the same thread, device and holder",
+    async (form) => {
+      const td = createTwoDevices()
+      cleanups.push(td.cleanup)
+      const sources = { remote: td.remote, workspace: process.cwd(), book: () => td.entries }
+      const first = await resolve(sources, form, { ...DELIVER, scope: { all_scope: true } })
+      if (first.kind === "error") throw new Error(`${form} did not resolve: ${first.code}`)
+      const again = await resolve(sources, first.thread, { ...DELIVER, scope: { all_scope: true } })
+      if (again.kind === "error") throw new Error(`${first.thread} did not resolve back: ${again.code}`)
+      expect({
+        id: again.id,
+        device: again.device?.id ?? null,
+        holder: again.holder.kind,
+        thread: again.thread,
+      }).toEqual({
+        id: first.id,
+        device: first.device?.id ?? null,
+        holder: first.holder.kind,
+        thread: first.thread,
+      })
+    },
+    60_000,
+  )
 })
 
 describe("resolve: design section 5's policy table", () => {

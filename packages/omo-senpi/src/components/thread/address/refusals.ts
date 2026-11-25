@@ -1,6 +1,7 @@
 import { deviceLabel, formatAddress, type AddressRefusal } from "@oh-my-opencode/thread-address-core"
 import type { ThreadAddressError, ThreadCandidate } from "../addressing"
 import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
+import { carryProvenance, refusal as textRefusal } from "../refusal-texts"
 
 /** A refusal as the thread tools answer it: a taxonomy code, the message, the recovery step and the details. */
 export type ThreadRefusal = ThreadAddressError & { readonly details?: Readonly<Record<string, unknown>> }
@@ -29,59 +30,58 @@ export const failed = (
   details?: Readonly<Record<string, unknown>>,
 ): Failed => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
 
-export const asRefusal = (failure: ThreadToolFailure): ThreadRefusal => ({ kind: "error", ...failure })
+export const asRefusal = (failure: ThreadToolFailure): ThreadRefusal =>
+  carryProvenance(failure, { kind: "error", ...failure })
 
 /** A refusal as the failure a tool result carries (`{ kind: "error", error }`). */
 export function asFailure(refused: ThreadRefusal): ThreadToolFailure {
   const { kind: _kind, candidates: _candidates, ...failure } = refused
-  return failure
+  // The template the refusal came from travels with it, so a receipt records it by reference (#15021).
+  return carryProvenance(refused, failure)
 }
-
-const LIST_ALL = "call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell)"
-const RETRY_LIST =
-  "Retry the call; call thread_list (tool.thread_list() in an eval cell) to see which devices answered."
 
 const labels = (ids: readonly string[], names: readonly string[]): string =>
   ids.map((id, index) => deviceLabel({ id, name: names[index] ?? "" })).join(", ")
+
+/** A failure refusal() produced, as the thread tools answer it. */
+const asThreadRefusal = (failure: ThreadToolFailure): ThreadRefusal =>
+  carryProvenance(failure, { kind: "error", ...failure })
 
 /** The core's plain refusal, worded for the thread tools; `thread` is the address part that missed, when one did. */
 export function toolRefusal(core: AddressRefusal, thread?: string, answered?: readonly string[]): ThreadRefusal {
   const details = core.details
   switch (core.reason) {
     case "no_device":
-      return refusal(
-        "not_found",
-        `No device named ${core.typed} is signed in to this account.`,
-        `Pass a device name or id from candidates, or ${LIST_ALL}.`,
-        details,
-      )
+      return asThreadRefusal(textRefusal("address.no_device", { typed: core.typed }, details))
     case "devices_share_name":
-      return refusal(
-        "ambiguous_target",
-        `${core.details.candidates.length} ${core.details.candidates.every((row) => row.online) ? "online " : ""}devices are named ${core.typed}; none was picked.`,
-        "Pass the device id from candidates.",
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          "address.devices_share_name",
+          {
+            count: String(core.details.candidates.length),
+            online: core.details.candidates.every((row) => row.online) ? "online " : "",
+            typed: core.typed,
+          },
+          details,
+        ),
       )
     case "devices_share_prefix":
-      return refusal(
-        "ambiguous_target",
-        `${core.details.candidates.length} devices have an id starting ${core.typed}; none was picked.`,
-        "Pass more of the device id, or its name.",
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          "address.devices_share_prefix",
+          { count: String(core.details.candidates.length), typed: core.typed },
+          details,
+        ),
       )
     case "device_offline":
-      return refusal(
-        "device_offline",
-        `Device ${core.typed} is offline.`,
-        "Retry when that device is online; nothing was queued.",
-        details,
-      )
+      return asThreadRefusal(textRefusal("address.device_offline", { typed: core.typed }, details))
     case "listing_incomplete":
-      return refusal(
-        "host_unavailable",
-        `Nothing matched on the devices that answered; ${labels(core.details.devices, core.details.device_names)} did not answer this listing round.`,
-        RETRY_LIST,
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          "address.listing_incomplete",
+          { devices: labels(core.details.devices, core.details.device_names) },
+          details,
+        ),
       )
     case "device_unanswered": {
       const slow: string[] = []
@@ -106,34 +106,52 @@ export function toolRefusal(core: AddressRefusal, thread?: string, answered?: re
         answered === undefined || answered.length === 0
           ? retry
           : `${retry} If the session should be on a device that answered, its file is not where that device looks for sessions.`
-      return refusal(
-        "host_unavailable",
-        `No device that answered${answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`} holds ${thread === undefined ? "it" : `session ${thread}`}; ${outcomes.join(", and ")}.`,
-        next,
-        { ...details, ...(thread === undefined ? {} : { thread }), ...(answered === undefined ? {} : { answered }) },
+      return asThreadRefusal(
+        textRefusal(
+          "address.device_unanswered",
+          {
+            answered: answered === undefined || answered.length === 0 ? "" : ` (${answered.join(", ")})`,
+            target: thread === undefined ? "it" : `session ${thread}`,
+            outcomes: outcomes.join(", and "),
+            retry: next,
+          },
+          { ...details, ...(thread === undefined ? {} : { thread }), ...(answered === undefined ? {} : { answered }) },
+        ),
       )
     }
     case "remote_unavailable":
-      return refusal(
-        "host_unavailable",
-        `This device has no connection to the account's other devices, so ${deviceLabel({ id: core.details.device, name: core.details.device_name })} could not be asked for ${core.details.thread}.`,
-        "Retry from a session whose device service is set up, or send to another thread as a normal send.",
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          "address.remote_unavailable",
+          {
+            device: deviceLabel({ id: core.details.device, name: core.details.device_name }),
+            thread: core.details.thread,
+          },
+          details,
+        ),
       )
     case "wake_unavailable":
     case "lookup_unavailable":
-      return refusal(
-        "host_unavailable",
-        `${deviceLabel({ id: core.details.device, name: core.details.device_name })} does not list ${core.details.thread}, and ${core.reason === "wake_unavailable" ? "this device's service cannot carry a wake, so it does not probe" : "this device's service cannot make the single probe that would tell"}, so whether it still holds that session is unknown.`,
-        "Retry when the device service is reachable, or send to another thread as a normal send.",
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          core.reason === "wake_unavailable" ? "address.wake_unavailable" : "address.lookup_unavailable",
+          {
+            device: deviceLabel({ id: core.details.device, name: core.details.device_name }),
+            thread: core.details.thread,
+          },
+          details,
+        ),
       )
     case "no_thread_on_device":
-      return refusal(
-        "not_found",
-        `No thread ${core.details.thread} on ${deviceLabel({ id: core.details.device, name: core.details.device_name })}.`,
-        `Pass a thread that device holds, or ${LIST_ALL}.`,
-        details,
+      return asThreadRefusal(
+        textRefusal(
+          "address.no_thread_on_device",
+          {
+            device: deviceLabel({ id: core.details.device, name: core.details.device_name }),
+            thread: core.details.thread,
+          },
+          details,
+        ),
       )
   }
 }

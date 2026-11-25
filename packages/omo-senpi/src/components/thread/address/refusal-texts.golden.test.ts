@@ -1,10 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { toolRefusal } from "./refusals"
+import { provenanceOf } from "../refusal-texts"
+import { asFailure, toolRefusal } from "./refusals"
 
 // The address refusals' sentences as dev words them (captured from dev at 00b14e9845's refusals.ts, before they move onto
 // the one per-code renderer of #15021): a refactor, so every code and variant must stay byte-equal. A response protocol
 // contract the three surfaces print; a wording change is a recorded behaviour change, never an edit of this table.
-const GOLDEN: Record<string, { readonly args: readonly unknown[]; readonly want: Record<string, string> }> = {
+type Sentence = { readonly code: string; readonly message: string; readonly next_action: string }
+const GOLDEN: Record<string, { readonly args: readonly unknown[]; readonly want: Sentence }> = {
   no_device: {
     args: [{ reason: "no_device", code: "not_found", typed: "nowhere", details: { kind: "device", candidates: [] } }],
     want: {
@@ -214,12 +216,27 @@ const GOLDEN: Record<string, { readonly args: readonly unknown[]; readonly want:
   },
 }
 
+describe("an address refusal keeps its template through the tool result's conversions (#15021)", () => {
+  test("#given toolRefusal answers a device nobody holds #when the tool result carries it as a failure #then the receipt can read its template and slots", () => {
+    const refused = toolRefusal({
+      reason: "no_device",
+      code: "not_found",
+      typed: "nowhere",
+      details: { kind: "device", candidates: [] },
+    } as unknown as Parameters<typeof toolRefusal>[0])
+    expect(provenanceOf(asFailure(refused))).toEqual({ id: "address.no_device", slots: { typed: "nowhere" } })
+  })
+})
+
 describe("the address refusals' sentences, byte-equal to dev", () => {
   test.each(Object.keys(GOLDEN).map((id) => [id] as const))("%s", (id) => {
     const { args, want } = GOLDEN[id] as (typeof GOLDEN)[string]
-    const got = (toolRefusal as (...a: readonly unknown[]) => { code: string; message: string; next_action: string })(
-      ...args,
-    )
+    const call = toolRefusal as unknown as (...a: readonly unknown[]) => {
+      readonly code: string
+      readonly message: string
+      readonly next_action: string
+    }
+    const got = call(...args)
     expect({ code: got.code, message: got.message, next_action: got.next_action }).toEqual(want)
   })
 })
