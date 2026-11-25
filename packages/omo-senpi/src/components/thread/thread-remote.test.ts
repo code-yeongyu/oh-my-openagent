@@ -735,8 +735,9 @@ describe("SC-R8: from this device on another (create, list, open, status, prompt
 
     const [readB, readC] = await Promise.all([run("thread_read", { thread: onB }), run("thread_read", { thread: onC })])
 
-    expect(readB).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
-    expect(readC).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+    // A closed thread's transcript reads from its holder without reopening it (dev #14623): each read lands on its own device.
+    expect(readB).toMatchObject({ kind: "ok", device: "b" })
+    expect(readC).toMatchObject({ kind: "ok", device: "c" })
   })
 
   test("#given b lists a thread with an empty title #when it is listed and then addressed #then it is listed under its folder's name, yet resolves by its thread id only: the derived label is display-only, never an address (#14043)", async () => {
