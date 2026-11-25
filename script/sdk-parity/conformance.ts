@@ -5,6 +5,7 @@ import {
   type ObservedCall,
   type PortOperations,
 } from "./expectation"
+import { normalizer } from "./normalize"
 import type { Row } from "./schema"
 
 // Design 7.2, "a row's call is real" (reviews 6061267823 H3, 6061624223 H1, 6061874518 H1/H2; amendment 5): a row is built
@@ -19,8 +20,10 @@ export type EffectEvidence = {
   readonly kind: "effect" | "refusal"
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
-  /** The state the scenario's fakes start from. */
-  readonly given?: readonly unknown[]
+  /** The state the scenario's fakes start from; every producer states it, an empty list when the scenario gives none. */
+  readonly given: readonly unknown[]
+  /** Set when the call's answer differed between two runs of the same input after the goldens' normalisation. */
+  readonly unstableAnswer?: true
   readonly expect: readonly Expectation[]
   readonly target?: "this_device" | "other_device"
   readonly observed: readonly ObservedCall[]
@@ -101,6 +104,8 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
       problems.push(
         `${where}: effect ${call.port}.${call.op} ${JSON.stringify(call.args)} happened but the scenario does not state it`,
       )
+  if (record.unstableAnswer === true)
+    return [`${where}: its answer differs between two runs of the same input; an unstable answer proves no effect`]
   if (record.answer !== undefined && !isSubsetOf(record.answer, record.answered))
     problems.push(
       `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer)}`,
@@ -135,8 +140,9 @@ const effectOf = (record: EffectEvidence): string =>
 // the same given state, whose inputs differ in that field alone, and that differ in kind, in stated effect or in the
 // answer both state (design lane ruling: an effect is a different trace or a different answer). Required inputs and
 // inert fields are exempt.
+const normalizeAnswer = normalizer([])
 const answerOf = (record: EffectEvidence): string | undefined =>
-  record.answer === undefined ? undefined : JSON.stringify(canonical(record.answer))
+  record.answer === undefined ? undefined : normalizeAnswer(JSON.stringify(canonical(record.answer)))
 const answersDiffer = (a: EffectEvidence, b: EffectEvidence): boolean => {
   const [left, right] = [answerOf(a), answerOf(b)]
   return left !== undefined && right !== undefined && left !== right
@@ -156,7 +162,7 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              JSON.stringify(canonical(a.given ?? [])) === JSON.stringify(canonical(b.given ?? [])) &&
+              JSON.stringify(canonical(a.given)) === JSON.stringify(canonical(b.given)) &&
               (a.kind !== b.kind || effectOf(a) !== effectOf(b) || answersDiffer(a, b)),
           ),
         ),

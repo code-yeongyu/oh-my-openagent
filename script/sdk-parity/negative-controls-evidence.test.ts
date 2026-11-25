@@ -91,6 +91,88 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(
       problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }, [{ port: "host", state: { moved: true } }])),
     ).toContain(uncovered)
+    const [answeredA, silentB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (answeredA === undefined || silentB === undefined) throw new Error("no pair")
+    const { answer: _dropped, ...withoutAnswer } = silentB
+    expect(problems([answeredA, withoutAnswer])).toContain(uncovered)
+  })
+
+  // Slices C1c and A1b rely on this for consent-style inputs: a refusal and an ok answer from the same given, differing in
+  // one input, cover that input (the kinds differ); with a different given they do not.
+  test("#given an ok scenario and a refusal scenario that differ in one input #when their given is the same #then the input is covered, and not when the given differs", async () => {
+    const split = builtRows.map((row) =>
+      row.id === "threads.locate"
+        ? {
+            ...built,
+            scenarios: {
+              effect: ["threads.locate/by-id", "threads.locate/other-device"],
+              refusal: ["threads.locate/all-scope"],
+            },
+          }
+        : row,
+    )
+    const refused = (given: readonly { readonly port: string; readonly state: Record<string, unknown> }[]) =>
+      run(
+        {
+          ...scenario("all-scope", true),
+          kind: "refusal",
+          refusal: "scope_denied",
+          ...(given.length === 0 ? {} : { given }),
+        },
+        { kind: "error", error: { code: "scope_denied" } },
+      )
+    const uncovered =
+      "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one"
+    const problems = async (refusal: ScenarioRun) =>
+      conformanceProblems(
+        split,
+        open,
+        await runEffectScenarios(split, [pair[0], refusal, pair[2]] as ScenarioRun[]),
+        CONTEXT,
+      )
+    expect(await problems(refused([]))).not.toContain(uncovered)
+    expect(await problems(refused([{ port: "host", state: { moved: true } }]))).toContain(uncovered)
+  })
+
+  test("#given a scenario whose answer carries a value generated per run #when it is run twice #then it fails by name and covers nothing", async () => {
+    let generated = 0
+    const unstable = run(
+      { ...scenario("by-id", undefined), answer: { value: { thread: "t1" } } },
+      undefined,
+      (calls, input) => {
+        calls.push({
+          port: "host",
+          op: "listSessions",
+          args: { allScope: Reflect.get(Object(input), "all_scope") === true },
+        })
+        generated += 1
+        return { kind: "ok", value: { thread: "t1", request: `r-${generated}` } }
+      },
+    )
+    const steady = run(
+      { ...scenario("by-id", undefined), answer: { value: { thread: "t1" } } },
+      {
+        kind: "ok",
+        value: { thread: "t1", request: "r-1" },
+      },
+    )
+    const [shaky] = await runEffectScenarios(builtRows, [unstable])
+    const [stable] = await runEffectScenarios(builtRows, [steady])
+    expect(shaky?.unstableAnswer).toBe(true)
+    expect(stable?.unstableAnswer).toBeUndefined()
+    expect(conformanceProblems(builtRows, open, shaky === undefined ? [] : [shaky], CONTEXT)).toContainEqual(
+      "row threads.locate: scenario threads.locate/by-id: its answer differs between two runs of the same input; an unstable answer proves no effect",
+    )
+  })
+
+  test("#given an evidence record #then it must state its given state (a producer cannot leave it absent)", async () => {
+    const [record] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
+    if (record === undefined) throw new Error("no record")
+    expect(record.given).toEqual([])
+    const { given: _given, ...withoutGiven } = record
+    // @ts-expect-error given is required on every evidence record
+    const absent: EffectEvidence = withoutGiven
+    expect(absent.given).toBeUndefined()
   })
 
   test("#given the matching rules #then args are a subset, count 0 means never, result is never compared", () => {
