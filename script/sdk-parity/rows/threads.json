@@ -526,7 +526,23 @@
                 "type": "object",
                 "properties": {
                   "message": {},
-                  "delivery": {},
+                  "delivery": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "steer"
+                      },
+                      {
+                        "type": "string",
+                        "const": "follow_up"
+                      }
+                    ],
+                    "default": "auto"
+                  },
                   "expected_turn_id": {},
                   "summary": {},
                   "attachments": {},

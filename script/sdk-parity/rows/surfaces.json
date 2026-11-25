@@ -576,7 +576,7 @@
       ],
       "cells": [
         "`hook user-prompt-submit [--with-ultrawork]`, `hook pre-tool-use`, `hook stop`, `hook post-tool-use-spawn`, `hook pre-tool-use-spawn`",
-        "Internal: hook entries that read a hook payload on stdin for that edition's plugin. Registered `internal`, each with the loop capability it serves",
+        "Internal: hook entries that read a hook payload on stdin for that edition's plugin. Registered `internal`, each serving `toolkit.forSession`. Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root",
         "n/a"
       ]
     }

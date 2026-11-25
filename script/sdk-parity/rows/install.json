@@ -327,7 +327,12 @@
       ],
       "input": {
         "properties": {
-          "consent": {}
+          "consent": {
+            "enum": [
+              "all",
+              "each"
+            ]
+          }
         },
         "required": [
           "consent"
@@ -341,7 +346,7 @@
             "setup"
           ],
           "flags": {
-            "--yes": "consent",
+            "--yes": "consent=all",
             "--ask-each": "consent=each"
           },
           "positionals": {},
@@ -603,7 +608,7 @@
     },
     {
       "table": "6.7",
-      "position": 13,
+      "position": 14,
       "ids": [
         "install.setup.detect",
         "install.setup.plan",
@@ -620,7 +625,7 @@
     },
     {
       "table": "6.7",
-      "position": 14,
+      "position": 15,
       "ids": [
         "install.update"
       ],
@@ -635,7 +640,7 @@
     },
     {
       "table": "6.7",
-      "position": 15,
+      "position": 16,
       "ids": [
         "install.version",
         "install.sdkRoot"

@@ -263,8 +263,15 @@
       ],
       "input": {
         "properties": {
-          "method": {},
-          "open_browser": {},
+          "method": {
+            "enum": [
+              "device_code",
+              "browser"
+            ]
+          },
+          "open_browser": {
+            "type": "boolean"
+          },
           "onUserCode": {},
           "onOpenUrl": {},
           "deviceName": {},

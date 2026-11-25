@@ -199,7 +199,7 @@
     },
     {
       "table": "6.7",
-      "position": 12,
+      "position": 13,
       "ids": [
         "diagnostics.run",
         "diagnostics.models",

@@ -121,7 +121,9 @@
               true
             ]
           },
-          "advance": {},
+          "advance": {
+            "type": "boolean"
+          },
           "session_id": {}
         },
         "required": [
@@ -841,7 +843,7 @@
       ],
       "cells": [
         "`create-goals [--brief \\| --brief-file \\| --from-stdin \\| positional text] [--codex-goal-mode aggregate\\|per_story] [--validation-batch-json] [--force]`",
-        "`createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`. The brief has four sources that all fill the one `brief` field, taken in this order: `--brief`, then the file of `--brief-file`, then stdin with `--from-stdin`, then the positional words not consumed by a flag, joined by spaces. A brief that is empty after that is refused `ULW_LOOP_BRIEF_REQUIRED` (`cli-subcommands.ts:29-41`, `cli-arg-parser.ts:44-54`). The order and the refusal are the descriptor's parse, pinned by scenarios",
+        "`createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`. The brief has four sources that all fill the one `brief` field, taken in this order: `--brief`, then the file of `--brief-file`, then stdin with `--from-stdin`, then the positional words not consumed by a flag, joined by spaces. A brief that is empty after that is refused `ULW_LOOP_BRIEF_REQUIRED` (`cli-subcommands.ts:29-41`, `cli-arg-parser.ts:44-54`). The order and the refusal are the descriptor's parse, pinned by scenarios. The parser also accepts `--after-json`, `--directive-json`, `--directive-file` and `--target-goal-id` (`cli-arg-parser.ts:8`) only to keep their values out of the positional brief; nothing reads them. They are adapter parse flags with no SDK input and the written reason \"its value is removed from the positional brief; nothing reads it\", with one scenario that shows the brief excludes the value",
         "same"
       ]
     },
@@ -901,8 +903,8 @@
       ],
       "cells": [
         "`checkpoint --print-template [--goal-id]`; `checkpoint --goal-id --status complete\\|failed\\|blocked --evidence --codex-goal-json [--quality-gate-json] [--no-advance]`",
-        "`toolkit.checkpoint(...)`, two branches",
-        "same"
+        "`toolkit.checkpoint(...)`, two branches. The second branch takes `advance?`, which `--no-advance` sets to false (`checkpoint-continuation.ts:51`); the component's manifest does not carry it in the checkpoint arguments today, so it is an entry of the baseline",
+        "same, without `advance`"
       ]
     },
     {

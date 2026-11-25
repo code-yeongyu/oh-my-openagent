@@ -116,7 +116,13 @@
       ],
       "input": {
         "properties": {
-          "policy": {},
+          "policy": {
+            "enum": [
+              "upgrade",
+              "fallback",
+              "never"
+            ]
+          },
           "launch_spec": {},
           "allow_downgrade": {},
           "when": {
@@ -238,7 +244,13 @@
       ],
       "input": {
         "properties": {
-          "policy": {},
+          "policy": {
+            "enum": [
+              "upgrade",
+              "fallback",
+              "never"
+            ]
+          },
           "pinned": {}
         },
         "required": []
@@ -553,7 +565,7 @@
     },
     {
       "table": "6.7",
-      "position": 5,
+      "position": 6,
       "ids": [
         "daemon.status"
       ],
@@ -568,7 +580,7 @@
     },
     {
       "table": "6.7",
-      "position": 6,
+      "position": 7,
       "ids": [
         "daemon.stop"
       ],
@@ -583,7 +595,7 @@
     },
     {
       "table": "6.7",
-      "position": 7,
+      "position": 8,
       "ids": [
         "daemon.stopAll"
       ],
@@ -598,7 +610,7 @@
     },
     {
       "table": "6.7",
-      "position": 8,
+      "position": 9,
       "ids": [
         "daemon.handoff"
       ],
@@ -613,7 +625,7 @@
     },
     {
       "table": "6.7",
-      "position": 9,
+      "position": 10,
       "ids": [
         "daemon.gc"
       ],
@@ -628,7 +640,7 @@
     },
     {
       "table": "6.7",
-      "position": 10,
+      "position": 11,
       "ids": [
         "daemon.rollbackPrepare"
       ],
@@ -643,7 +655,7 @@
     },
     {
       "table": "6.7",
-      "position": 11,
+      "position": 12,
       "ids": [
         "daemon.shardPath"
       ],

@@ -113,6 +113,7 @@ export function schemaAt(input: InputSchema, path: string): FieldSchema | undefi
 
 const allowedValues = (schema: FieldSchema): readonly unknown[] | undefined => {
   if (schema.enum !== undefined) return schema.enum
+  if (schema.type === "boolean") return [true, false]
   const consts = (schema.anyOf ?? []).map((variant) => Reflect.get(variant, "const"))
   return consts.length > 0 && consts.every((value) => value !== undefined) ? consts : undefined
 }
@@ -162,6 +163,8 @@ export function rowProblems(row: Row): string[] {
       return
     }
     const allowed = allowedValues(schema)
+    if (value !== undefined && allowed === undefined)
+      problems.push(`${at}: ${where} sets ${path} to "${value}", but its schema lists no allowed values; declare them`)
     if (value !== undefined && allowed !== undefined && !allowed.map(String).includes(value))
       problems.push(`${at}: ${where} sets ${path} to "${value}", which its schema does not allow (${allowed.join(", ")})`)
   }

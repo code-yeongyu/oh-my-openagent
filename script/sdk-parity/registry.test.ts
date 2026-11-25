@@ -4,12 +4,16 @@ import { join } from "node:path"
 
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
-import { argvProblems, commanderProblems, engineProblems, manifestProblems } from "./inventory-check"
+import { cellProblems } from "./cells"
+import { conformanceProblems } from "./conformance"
+import { goldenProblems } from "./gate"
+import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
 import { opencodeInventory } from "./opencode-inventory"
 import { allRows, DESIGN_PATH, loadDomainFiles, REPO_ROOT, TEMPLATE_PATH } from "./registry"
 import { firstDifferences, renderSection6, section6Of } from "./render"
+import { runScenarios } from "./scenario-run"
 import { registryProblems } from "./schema"
 import { toolProblems } from "./tool-check"
 import { discoverOmoTools } from "./tool-registry"
@@ -32,7 +36,21 @@ describe("SDK parity registry (#14947)", () => {
     const committed = section6Of(readFileSync(DESIGN_PATH, "utf8"))
     expect(firstDifferences(rendered, committed)).toEqual([])
     expect(rendered).toBe(committed)
+    expect(cellProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
   })
+
+  test("#given every native dispatcher #then each flag is mapped on the route that accepts it, shared flags on every verb", () => {
+    expect(routeFlagProblems(nativeArgvInventory(REPO_ROOT), rows)).toEqual([])
+  })
+
+  test("#given the rows counted as built #then each has effect scenarios and no stub outcome", () => {
+    const open = new Set((JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline).entries.map((entry) => entry.id))
+    expect(conformanceProblems(rows, open, [])).toEqual([])
+  })
+
+  test("#given the committed goldens #then they are the head's live scenario outcomes", async () => {
+    expect(goldenProblems(JSON.parse(repoFile("script/sdk-parity/goldens.json")), await runScenarios(REPO_ROOT))).toEqual([])
+  }, 180_000)
 
   test("#given both native entry points #then every argv comparison has a row and every launcher row token is compared", () => {
     const findings = nativeArgvInventory(REPO_ROOT)
