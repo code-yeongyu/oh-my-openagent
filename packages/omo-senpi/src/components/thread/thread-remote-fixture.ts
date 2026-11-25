@@ -1085,7 +1085,8 @@ export function createRemoteThreadFixture() {
               ? `dur-created-${sessions.length}`
               : "dur-created-here"),
         cwd: process.cwd(),
-        name: null,
+        // The engine opens the session under the requested name, as senpi's open_session does.
+        name: request.name ?? null,
         status: "open",
       }
       sessions.push(created)
@@ -1102,7 +1103,10 @@ export function createRemoteThreadFixture() {
     const closeRequests: ThreadCloseOptions[] = []
     // The interrupt records this device's endpoint received, as b's engine's arrive in `sent`.
     const interrupts: JsonObject[] = []
-    const setSessionName = mock(async (_sessionId: string, _name: string) => {})
+    const setSessionName = mock(async (sessionId: string, name: string) => {
+      const session = sessions.find((candidate) => candidate.sessionId === sessionId)
+      if (session !== undefined) Object.assign(session, { name })
+    })
     const archived: Array<readonly [string, boolean, string | undefined]> = []
     const setSessionArchived = async (sessionId: string, value: boolean, durableId?: string) => {
       if (extra.archive === "refused") throw new Error("unsupported:set_session_archived")
