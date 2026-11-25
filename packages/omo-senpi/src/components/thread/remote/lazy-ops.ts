@@ -5,6 +5,7 @@ import type * as CrossDevice from "./cross-device"
 import type * as MonitorSource from "./monitor-source"
 import type * as RelayTransport from "./relay-transport"
 import type * as RelayControl from "../control/relay-control"
+import type * as Receipt from "./receipt"
 import type * as ReopenParked from "./reopen-parked"
 import type { SessionControl } from "../control/port"
 import type { DeliveryTransport } from "../gateway/transport"
@@ -16,6 +17,7 @@ type Runtime = Pick<
 > &
   Pick<typeof RelayTransport, "createRelayTransport"> &
   Pick<typeof RelayControl, "createRelayControl"> &
+  Pick<typeof Receipt, "readReceipt"> &
   Pick<typeof ReopenParked, "reopenParkedRow"> &
   Pick<typeof MonitorSource, "createRemoteMonitorSource" | "resolveMonitorTarget">
 
@@ -25,6 +27,8 @@ const runtime = (): Promise<Runtime> => import("#omo-thread-client-runtime")
 
 export const listAcross = async (...args: Parameters<Runtime["listAcross"]>) =>
   await (await runtime()).listAcross(...args)
+export const readReceipt = async (...args: Parameters<Runtime["readReceipt"]>) =>
+  await (await runtime()).readReceipt(...args)
 export const planCreate = async (...args: Parameters<Runtime["planCreate"]>) =>
   await (await runtime()).planCreate(...args)
 export const renameAlias = async (...args: Parameters<Runtime["renameAlias"]>) =>

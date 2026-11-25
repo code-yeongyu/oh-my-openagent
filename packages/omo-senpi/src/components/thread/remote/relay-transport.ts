@@ -3,7 +3,7 @@ import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
 import { pairLoopGuardMessage, pairLoopGuardNextAction, threadToolFailure, type ThreadToolFailure } from "../errors"
-import { hashArgs } from "../gateway/bindings"
+import { hashArgs } from "../gateway/hash-args"
 import { decideDelivery, effectiveLaneOf } from "../gateway/decision"
 import { senderFacts } from "../gateway/envelope"
 import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/provenance"
@@ -15,16 +15,23 @@ import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { replyData } from "./remote-ops"
 import { resolveTypedDevice } from "../address/device"
-import { chainCountLimitFailure, outcomeFailure } from "./outcome"
+import { chainCountLimitFailure, engineNotReady, outcomeFailure } from "./outcome"
 import { holderView } from "./find-session"
 import { reopenParkedRow } from "./reopen-parked"
 import { outsideCallDeadline } from "../../call-budget/call-deadline"
+import { reconcileRemoteReceipt } from "./receipt"
 
 export type RelayTransportOptions = {
   readonly remote: RemoteThreadSurface
   readonly store: Pick<
     GatewayStore,
-    "now" | "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRevise" | "toolReceiptRelease" | "deliveryView"
+    | "now"
+    | "toolReceiptBegin"
+    | "toolReceiptSettle"
+    | "toolReceiptRevise"
+    | "toolReceiptRelease"
+    | "deliveryView"
+    | "reconcileRemoteReceipt"
   >
   readonly now?: () => number
   readonly senderProvenance: () => Promise<Provenance>
@@ -337,7 +344,7 @@ export function createRelayTransport(
     const admission = await store.toolReceiptBegin({ ...scope, now: now(), args_hash: hashArgs(args) })
     if (admission.kind === "replay") {
       const first = admission.result as SendOutcome
-      return first.kind === "ok" ? { ...first, deduplicated: true } : first
+      return first.kind === "ok" ? await reconcileRemoteReceipt(store, remote, callerId, idempotencyKey, first) : first
     }
     if (admission.kind === "conflict")
       return fail(
@@ -585,8 +592,6 @@ export function createRelayTransport(
             body: delivery.text,
             mode_requested: delivery.mode,
             mode_effective: effective,
-            binding_id: null,
-            binding_revision: null,
           }),
           displayText: renderDeliveryDisplayText({
             envelope: {
@@ -638,7 +643,11 @@ export function createRelayTransport(
         announced: true,
         refusal: outcomeFailure(sent, row.device),
       })
-    if (sent.kind === "refused" && (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command")))
+    if (
+      sent.kind === "refused" &&
+      engineNotReady(sent) === undefined &&
+      (ADMIT_UNSUPPORTED.has(sent.reason) || sent.reason.startsWith("Unknown command"))
+    )
       return fail(
         "unsupported",
         `Device ${row.device} runs an engine without admit_external_message (${escapeForDisplay(sent.reason)}); a peer message cannot be delivered there as a delivery.`,

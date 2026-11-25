@@ -1,16 +1,14 @@
 # omo thread - the session gateway from scripts and connectors
 
-`omo thread` runs every thread operation the agent tools offer (`thread_list`, `thread_send`,
-`thread_read`, `thread_report` ... `thread_answer`) without an agent session, plus the binding
-operations (`bind`, `unbind`, `rebind`, `bindings`) that are not session tools: the always-on
-gateway binds chat threads, and a script can do the same here. It is how a script,
-a cron job or a chat connector talks to running OmO sessions: terminal sessions (`tui`),
+`omo thread` lists, reads and sends to sessions the way the agent tools `thread_list`, `thread_read` and
+`thread_send` do, without an agent session. It is how a script, a cron job or a chat connector talks to
+running OmO sessions, always addressed by session id, alias or name: terminal sessions (`tui`),
 Desktop threads and task children on their hosts (`rpc_host`).
 
 It never starts a host. Sessions are listed from the endpoints the engine's registry names
-(`<agent dir>/rpc-host-daemon/`, read in-process; each endpoint's `list_sessions` says whether it is live), and bindings, the outbox and delivery receipts live in the gateway store
+(`<agent dir>/rpc-host-daemon/`, read in-process; each endpoint's `list_sessions` says whether it is live), and delivery receipts live in the gateway store
 (`<agent dir>/gateway/`). Every call runs as the principal `cli:<uid>`: receipts, loop budgets
-and bindingless sends are keyed by it, and a delivered message carries the provenance header
+and sends are keyed by it, and a delivered message carries the provenance header
 `source=external`, `actor=<os user>`.
 
 Exact durable-id sends read the gateway's `session_meta` ownership record rather than running
@@ -28,26 +26,12 @@ uses the existing durable queued-offline path. A target no registration publishe
 keeps legacy discovery.
 Listing, name ambiguity and fuzzy matching still use broad discovery. No TTL or setting changes.
 
+During a local engine handoff, a thread can be listed as `opening` before its successor can attach it. It stays visible with no available controls. A close during this state returns `host_unavailable` with reason `session_opening`; retry once it lists as idle or running. An evicted thread remains inactive.
+
 ```bash
-omo thread list [--all-scope] [--state running|idle|inactive|archived[,...]] [--json]
+omo thread list [--all-scope] [--state opening|running|idle|inactive|archived[,...]] [--json]
 omo thread send <target> <text> [--mode auto|steer|follow_up] [--expected-turn <n>] [--idempotency-key <k>] [--collapse-key <k>] [--json]
-omo thread send --binding <id> [<target>] <text> [--idempotency-key <event-id>] [--mode auto|follow_up]
-                [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]] [--json]
 omo thread read <target> [--limit <items>] [--max-bytes <n>] [--cursor <c>] [--json]
-omo thread bind <session> --platform <p> --account <id> --chat <id> [--thread <id>] [--root-message <id>]
-                [--progress-message <id>] [--direction in|out|both] [--inbound-mode auto|follow_up]
-                [--events milestone,report,question,completion] [--policy <id>] [--ttl <seconds>|none]
-                [--idempotency-key <k>]
-omo thread unbind <binding-id> --revision <n> [--idempotency-key <k>]
-omo thread rebind <binding-id> <session> --revision <n> [--idempotency-key <k>]
-omo thread bindings [--session <s>] [--platform <p>] [--account <id>] [--chat <id>] [--thread <id>] [--status <s>]
-                    [--cursor <c>] [--limit <n>]
-omo thread report <session> <milestone|report|question|completion> <text> [--binding <id>] [--request-id <id>]
-                  [--request-kind question|select|confirm|input|editor] [--idempotency-key <k>]
-omo thread answer --binding <answering-binding-id> --token <reply-token> <text>
-                  [--author-id <platform-user-id> --author-name <display> [--author-user-id <id>]]
-omo thread outbox <binding-id> [--after <cursor>] [--limit <n>] [--ack]
-omo thread ack <binding-id> <cursor> [--provider-message-id <id>]
 ```
 
 `omo thread list` lists this device's threads (in this directory's workspace, or every workspace with `--all-scope`)
@@ -67,9 +51,9 @@ that the account's plan has no relay (a Free plan). Aliases are only read while 
 API, and a connector cannot start a session for a new chat thread through `omo thread` alone. To
 give a new chat thread its own session, a connector opens one on the operator endpoint
 (`omo daemon run` ensures it on `<agent dir>/rpc/rpc.sock`; its `open_session` command is what the
-agent tool `thread_create` calls) or launches `omo` itself, then binds that session's durable id with
-`omo thread bind`. A session that is not running is still bound, sent to (`queued_offline`) and
-reported for; it takes its messages when it next starts.
+agent tool `thread_create` calls) or launches `omo` itself, keeps the chat-thread-to-session map in its own
+state, and sends to that session's durable id with `omo thread send`. A session that is not running is still sent
+to (`queued_offline`); it takes its messages when it next starts.
 
 Addresses: a `<target>` or `<session>` is a thread id, a session id, an account alias,
 an exact name, a unique thread-id prefix, or `<device>/<thread>` (the device part a device id,
@@ -79,10 +63,7 @@ and an address may resolve to a thread on another of the account's devices: `rea
 reach it there. `send` resolves it too and delivers it the way `omo remote send` does: the other
 device's engine admits no command-line delivery from another machine, so the text goes as this
 user's own input (a prompt under principal `person:<uid>`, no delivery envelope) and the result
-names the `device` that answered, with no local `message_seq` or `endpoint_kind`. The binding operations (`bind`, `rebind`, `bindings --session`, `report`, and a
-bound send's target) resolve on this device first and bind and report only sessions this device
-holds: a session only another device holds answers `unsupported` with `details.reason:
-"session_on_other_device"` naming the device. `self` names the calling session, which `omo thread`
+names the `device` that answered, with no local `message_seq` or `endpoint_kind`. `self` names the calling session, which `omo thread`
 (principal `cli:<uid>`) never is, so it answers `caller_context_missing` here. Without
 `--all-scope` only sessions in the current directory's workspace resolve (the
 same rule the agent tools apply); an id outside it is `scope_denied`. `--idempotency-key` on a
@@ -91,7 +72,7 @@ with other arguments is `idempotency_conflict`.
 
 ## Sending
 
-A bindingless `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
+A `send` delivers as `cli:<uid>`. `--mode auto` (the default) steers a running turn:
 the message enters the turn in flight, as typing into its terminal does, with that running turn as
 its expected turn (`delivery.kind: "steered"`, `effective_mode: "steer"`). On an idle session it
 starts a turn (`effective_mode: "start"`, and `effective=start` in the delivery header the receiver reads). The result's
@@ -115,31 +96,9 @@ only one that saw it running. An unknown target is `not_found`; a name two sessi
 A terminal session is never prompted directly; the message lands in its inbox and its own
 extension admits it (a held draft in the editor is never overwritten).
 
-`send --binding <id>` is the connector inbound path: the message is delivered to the binding's
-session as `binding:<id>`, and `--idempotency-key` is the platform's event id, so one platform
-message is admitted once. A target, when given, must be the binding's session.
-
-- **Mode.** Without `--mode` the message takes the binding's `inbound_mode`. `--mode` sets it per
-  message, capped by the binding: `follow_up` is allowed on an `auto` binding, but `--mode auto` on
-  a `follow_up` binding is refused `invalid_arguments` (exit 1, `details: {binding_id, mode,
-  inbound_mode}`). It is never silently downgraded. So one binding per thread can deliver the
-  owner's messages as `auto` and everyone else's as `follow_up`. `--mode steer` and
-  `--expected-turn` are usage errors (exit 2): a binding message never names a turn to steer. An
-  `auto` message still steers a running turn, as an unbound `auto` send does; a `follow_up`
-  binding keeps every message queued behind it.
-- **Author.** `--author-id <platform-user-id> --author-name <display>` (plus an optional
-  `--author-user-id <id>`, the omo user the connector mapped them to) names the human who wrote the
-  message, as the connector authenticated them. Author flags are accepted only with `--binding`, and
-  `--author-id` and `--author-name` go together; anything else is a usage error (exit 2). Each field
-  must be non-empty, at most 256 characters, and a single line: a control character, newline or
-  Unicode line separator is `invalid_arguments` (exit 1). The author is stored on the delivery's
-  external origin and rendered in the provenance header, outside the body, as JSON-quoted fields:
-  `author="Jane Doe" author_id="U123"` (and `author_user_id="..."`). Brackets inside a value are
-  escaped as `\u005b`/`\u005d`, so the body or a display name can never add or close a header
-  field; a body that says `author=owner` is still just the body. `actor=` stays the binding's
-  account, the bot the connector speaks as.
-- The SDK takes the same: `send({ binding_id, text, mode, author: { platform_user_id, display, user_id? } })`.
-  An `author` without `binding_id` is `invalid_arguments`.
+The SDK's `send` takes exactly `{ thread, text, mode?, expected_turn_id?, all_scope?, idempotency_key?, collapse_key? }`; any other
+key (a misspelt `allScope`, say) is `invalid_arguments` naming it, and so is an unknown key on `list`, `read` and
+`locate`.
 
 What the receiving session does with a delivery depends on its state when its drain runs:
 
@@ -161,12 +120,12 @@ Every send is checked against fixed budgets, which no setting raises:
 
 | Guard | Limit | Answer |
 | --- | --- | --- |
-| Message size | 1 MiB for `send` (with or without `--binding`); 32 KiB for `report` and `answer` text | `message_too_large` |
+| Message size | 1 MiB for `send` | `message_too_large` |
 | Backlog of one target | 128 undelivered follow-up/auto messages or 1 MiB; steers have their own 16 / 256 KiB; an expired message no longer counts, also while the target is not running | `queue_full` (details: held count, how many the session holds vs the gateway, oldest age, reason, `target_running`, and `frees_at`: when the oldest queued message expires and frees a slot) |
-| One sender to one target (the loop guard) | bursts of 8, then one every 5 s; a binding sender is keyed by binding and author (`binding:<id>#author:<platform user id>`), or by the binding alone when the message names no author | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
+| One sender to one target (the loop guard) | bursts of 8, then one every 5 s | `pair_loop_guard` with `burst`, `window_ms` and `retry_after_ms` |
 | One causal chain (a message and the messages it caused) | no count limit; each delivery records its hop | - |
 | A send to itself | always refused | `loop_detected` |
-| An undelivered message | expires after 24 hours (or when its binding expires), whether or not the target is running | the row ends `refused` |
+| An undelivered message | expires after 24 hours, whether or not the target is running | the row ends `refused` |
 
 A sender that repeats one message (an alert re-sent every few minutes) passes `--collapse-key <k>`
 (`collapse_key` on `thread_send`): the send replaces the sender's earlier undelivered message under
@@ -174,15 +133,11 @@ the same key, which ends `refused` `superseded`, or, when the session already to
 queue, is answered deduplicated with its delivery id and `collapsed: true` (this text is not delivered;
 the earlier message stands). One key never holds more than one undelivered message. It reaches sessions on this device only; a send to another device with it answers `unsupported`.
 
-A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`, `report` and `answer`.
+A session may message the session that messaged it, so A to B to A is delivered; answers also flow back through `read`.
 
 A connector treats `pair_loop_guard` as back-pressure, not as a lost message: nothing was written, so
 it queues the message and retries the same `send` (same `--idempotency-key`) after
-`error.details.retry_after_ms`. The author id that keys a bucket is whatever the connector passes:
-the gateway trusts the local connector to authenticate its humans, and a connector that varied it
-per message would still be bounded by the target's 128-message backlog. It passes `--author-*` on every message it can attribute, so one
-busy human in a thread spends only their own budget; without an author every human in the thread
-shares the binding's one bucket.
+`error.details.retry_after_ms`.
 
 ## Store extensions
 
@@ -234,22 +189,6 @@ Operations run in one `BEGIN IMMEDIATE`. The transaction surface is:
   replaced; literal question marks in SQL strings, quoted identifiers and comments are preserved.
   `exec` can also create, alter and drop the extension's own objects during an operation, not
   just during migration. Identifiers and schema qualifiers follow SQLite's ASCII case folding.
-- `enqueue({ binding_id, event_id, text, author?, mode? })`: the relay's inbound validation,
-  including resolution through its shared live-and-disk address book, author-specific rate
-  limits, mode ceiling and idempotency. A missing target returns `not_found`, just as relay
-  inbound does. Like a core enqueue, it creates the target's wake marker inside the
-  transaction, so a committed delivery always has its marker and a rolled-back one never
-  keeps it; the wake is only ever early, and a marker that cannot be created refuses the
-  call. Enqueue requires a binding;
-  there is no `enqueueToSession` operation.
-  `deliveries.actor_user_id` records `author.user_id`, or NULL without it.
-- `bind({ principal, binding, idempotency_key? })`, `unbind({ principal, binding_id,
-  expected_revision, idempotency_key? })`, `rebind({ principal, binding_id, expected_revision,
-  session_durable_id, idempotency_key? })`, and `outboxAck({ binding_id, cursor,
-  provider_message_id? })`: the existing relay operations, joined to this transaction.
-- `bindingFor({ platform, account_id, chat_id, thread_id })`: the active, unexpired binding
-  or NULL. `outboxPending({ binding_id, after_cursor?, limit? })`: the relay page shape, pending
-  rows only, ordered by cursor; default 100 and maximum 500.
 
 SQL can access only objects recorded as owned by this extension in the persistent
 `extension_objects` registry. Core migration v6 snapshots every existing schema object as
@@ -269,24 +208,15 @@ Transaction-control SQL, PRAGMAs and attached/temporary databases are refused. T
 sources such as `json_each` and `pragma_table_info` are not owned objects and are refused.
 This is a store API contract, not a sandbox for untrusted JavaScript modules.
 A foreign key from an extension table to a core table makes every write to that table read the
-core table, so those writes are refused; keep core ids such as `binding_id` as plain values.
+core table, so those writes are refused; keep core ids such as a session's durable id as plain values.
 
-The [retention](#retention) sweep deletes only core rows, never rows of an extension's tables,
-and never a core row an extension can still act on through `tx`: an active binding, a closed
-binding that still has outbox rows, completion arms or undelivered messages, or an undelivered
-message. A core id an extension keeps by value can name a row that retention has since pruned.
+The [retention](#retention) sweep deletes only core rows, never rows of an extension's tables. A core id an
+extension keeps by value can name a row that retention has since pruned.
 
-A thrown operation rolls back extension rows and joined core writes together. Inbox wake
-markers are created inside the transaction, exactly as a core enqueue creates them: a
-committed delivery always has its marker, and a marker that cannot be created fails the
-operation. A rollback removes the markers the operation created (a failed removal is an
-`extension_error` with phase `after_rollback`), and a marker left by a crash before COMMIT
-names no row, so the next reconcile removes it. Marker removals still run only after COMMIT.
-Each post-commit effect runs independently: a failed effect emits an `extension_error` store
-event with phase `after_commit`, does not skip later effects, and does not turn committed
-data into a refused call. A returned relay refusal is data, so an operation that wants to
-undo its earlier work must throw. Catching an error from `all`, `one` or `exec` does not
-clear it: the whole call still rolls back, including for a caught constraint error.
+A thrown operation rolls back the extension's writes. Each post-commit effect runs independently: a failed effect
+emits an `extension_error` store event with phase `after_commit`, does not skip later effects, and does not turn
+committed data into a refused call. Catching an error from `all`, `one` or `exec` does not clear it: the whole call
+still rolls back, including for a caught constraint error.
 
 Refusal codes are `extension_import_failed`, `extension_unknown_op`, `extension_unknown_name`,
 `extension_schema_violation`, `gateway_lock_wait_exceeded`, and `gateway_schema_too_new`.
@@ -295,13 +225,13 @@ operation or expired operation deadline is `extension_operation_failed`. The wor
 serving core requests after operation refusals on a supported database. Reserved names, unowned object access, triggers,
 views, and forbidden DDL all use `extension_schema_violation`; rejecting a reserved name leaves
 that name unregistered. Lock acquisition uses the core busy timeout and
-30-second total bound, not an unbounded retry. An operation and its pending helpers have the
-same time budget after acquiring the transaction lock. That budget equals the bound other writers
+30-second total bound, not an unbounded retry. An operation has the same time budget after acquiring the
+transaction lock. That budget equals the bound other writers
 wait for the lock, so a writer queued behind an operation that runs out its budget can itself
 receive the retryable `gateway_lock_wait_exceeded`. On expiry, the transaction is revoked
 and rolled back before the next request runs. This bounds asynchronous waits, not synchronous
 JavaScript that blocks the worker's event loop. Using a retained `tx` after the operation
-returns throws a typed error (async helpers reject); an unhandled expired-transaction error
+returns throws a typed error; an unhandled expired-transaction error
 is reported as an `extension_error` event with phase `stale_transaction`, without killing
 the worker. Any other late asynchronous error from extension code - a timer or an unawaited
 promise that fails after the operation returned - is reported as an `extension_error` with
@@ -336,236 +266,10 @@ lazy migration checks compare versions under the migration lock. Refusal leaves 
 version, timestamps, ownership and data unchanged and does not replace an existing
 compatible registration. Core operations and compatible extensions remain usable.
 
-## Connector loop
-
-```bash
-id=$(omo thread bind my-session --platform custom --account bot --chat c1 --thread t1 --json | jq -r .binding.binding_id)
-omo thread send --binding "$id" --idempotency-key evt-1 --author-id U123 --author-name "Jane Doe" "hello from outside"
-# Post each outbox row, then ack exactly the row that was posted, with the platform's message id.
-omo thread outbox "$id" --json | jq -c '.rows[]' | while read -r row; do
-  cursor=$(jq -r .cursor <<<"$row")
-  posted=$(post_to_platform "$row")     # your connector: returns the platform message id
-  omo thread ack "$id" "$cursor" --provider-message-id "$posted"
-done
-token=$(omo thread outbox "$id" --after 0 --json | jq -r '[.rows[] | select(.event == "question" and .question_state == "pending")][0].reply_token')
-omo thread answer --binding "$id" --token "$token" --author-id U123 --author-name "Jane Doe" "yes"
-```
-
-A question row carries a `reply_token`. `answer --author-id <id> --author-name <display>
-[--author-user-id <id>]` names the human who answered (validated like a `send` author); it is recorded
-on the question's outbox row as `answered_by` and returned in the answer result, so the outbox keeps
-who answered. The answer must arrive through the binding that asked:
-another binding is `binding_mismatch` (the question stays pending), and a token minted before a
-rebind, expiry or session restart is `stale_token`. While another answer to the same question is
-still being handed to the session, a second answer is `answer_in_progress` (exit 1): retry after a
-moment, because the first attempt may still fail and leave the question pending. An answer
-abandoned mid-hand-off for more than 120 s is taken over by the next one. When the abandoned
-attempt finally ends, a failure changes nothing; if the session took its answer after all, the
-question is delivered with that answer and the later attempt is `already_answered`, because the
-session takes one answer per question. `already_answered` (exit 1) means the answer reached the
-session: stop retrying.
-
-A question answered through an omo from before the answer states existed cannot tell a delivered
-answer from one whose attempt died halfway, so it counts as an answer in flight since it was
-answered: after 120 s the next answer takes it over. If the session already has that answer, it
-refuses the new one (`question_already_resolved`): the question is marked delivered with the earlier
-answer, and the new one is `already_answered` (exit 1), as is every answer after it. When the
-session instead no longer knows the question at all (`unknown_extension_ui_request`,
-`unknown_request`), it was closed some other way: answered in the terminal or Desktop, timed out,
-or cancelled. The question is then marked delivered with no answer text, and the new answer and
-every later one are `already_answered` with "The session no longer waits for this question
-(answered or closed elsewhere)". Such a question costs at most one refused frame, and nothing
-reaches the session twice.
-
-Both outcomes in the paragraph above belong to a takeover only: an answer that took over an
-expired claim. A normal claim (nothing to take over) that the session refuses because it no longer
-waits on the question (`question_already_resolved`, `unknown_extension_ui_request`,
-`unknown_request`) is `stale_token` (exit 1), and the question stays `pending`. An answer given in
-the terminal or Desktop is not written back to the outbox, so a connector that lists pending
-questions keeps showing that one until the question-closure follow-up below lands.
-
-The answer text takes the form of the request the session reported (`--request-kind`):
-
-| request kind | accepted answer | reaches the session as |
-| --- | --- | --- |
-| `question` | any non-blank text | a comment (`answers: {}`, `comment: <text>`) |
-| `select` | the option label, non-blank | `value: <text>` |
-| `confirm` | `yes` or `no` (also `y`/`n`, `true`/`false`; any case, surrounding spaces trimmed) | `confirmed: true` / `false` |
-| `input`, `editor` | any text, empty included | `value: <text>` |
-| none reported | any non-blank text | `value`, `answers: {}` and `comment` together, plus `confirmed` for a yes/no word |
-
-Without `--request-kind` the answer goes out in every text form at once, so a question, select,
-input or editor each reads its own field. A yes/no word (the confirm words above) also goes out as
-`confirmed`, which only a confirm reads, so an undeclared confirm answered yes or no resolves that
-way; any other text leaves an undeclared confirm resolving as no. An input or editor that should
-take an empty answer must name its kind.
-
-Blank means only whitespace or invisible characters (a zero-width space counts as blank). An
-answer the request cannot take is `invalid_arguments` (exit 1) and claims nothing. Only a match
-marks the question answered and hands the answer to the session's own endpoint. If the session
-cannot be reached or no reply comes back, the answer is `host_unavailable` (exit 3). If the session
-refuses it (it no longer waits on that question, or cannot read the answer), the answer is
-`stale_token`, or `invalid_arguments` for an unreadable answer, with the session's code in
-`error.details.reason` (exit 1). The question then becomes (or stays) pending, so it can be answered
-again. The one exception is an answer that took over an expired claim (above) and is refused because
-the session no longer waits on the request: the question is then delivered with the earlier answer,
-and the answer is `already_answered`. A delivered answer is never released.
-
-### Question-closure follow-up
-
-Not included yet: a question that ends inside the session (answered in the terminal or Desktop,
-timed out, cancelled) is not reported to its binding. The reserved `question_closed` event and the
-reserved `expired` and `cancelled` question states ([Reports and the outbox](#reports-and-the-outbox))
-are its contract; their producer is not part of this release. Until it lands, a connector learns
-that such a question closed only from a refused answer: `already_answered` after a takeover,
-`stale_token` on a normal claim.
-
-## Bindings
-
-A binding attaches one session to one external thread, named by `(platform, account, chat,
-thread)`; `--thread` defaults to `@chat` (the chat itself). `--platform` is one of `discord`,
-`telegram`, `slack`, `notion`, `feishu`, `herdr`, `custom` or `whatsapp`. Nothing here talks to a chat platform:
-a connector drives the binding.
-
-- At most one `active` binding holds a thread. Binding a thread that is already held is
-  `binding_conflict`, with the holder's `binding_id`, `revision` and session in `details`; there is
-  no implicit takeover.
-- `unbind` and `rebind` name the revision they expect (`--revision`) and are `stale_revision`
-  when it moved. Each bumps the revision. An already closed binding unbinds again with
-  `already_closed: true`, and `in_flight` lists the deliveries that came through it and are not
-  taken yet.
-- `rebind` moves the binding to another session: `lease_started_at` resets, `expires_at` does not
-  move (a TTL is never extended), and deliveries still queued under the old revision are refused
-  `binding_closed` (listed in `closed`), never moved. A detached or expired binding is
-  `binding_inactive`.
-- `--ttl` is in seconds (default 604800, 7 days); `--ttl none` never expires. `--direction` and
-  `--events` (default all four) decide what may flow each way.
-- `unbind` and `rebind` follow the same local single-user trust model as `bind`: any session or
-  CLI caller on this agent dir may unbind or rebind any binding, not only the session it is
-  attached to. `--revision` protects against a stale write, not against another local caller.
-  Run the gateway only for one local user.
-
-Claimant liveness: a claim records the claiming process's pid and start time, so a pid that was
-reused after the claimant died is not mistaken for it. On win32 there is no start-time source, so
-liveness would rest on the pid alone; that is why `omo thread` and the gateway endpoints refuse
-win32 today, and Windows support requires a real start-time source first.
-
-## Reports and the outbox
-
-`report` writes a row to a binding's outbox for the connector to post. Only the session a binding
-is attached to reports through it (`scope_denied` otherwise), only while the binding is active
-(`binding_inactive`) and subscribed to that event (`unsupported`). From the session's own
-`thread_report` tool, a report without a binding goes to the ORIGINATING binding: the one whose
-message the session is answering now. A message from another thread that arrives while the run is
-going waits behind it and does not change that; once the session takes that queued message up (after
-its answer to the first, even before the session goes idle), reports answer the new message's thread.
-When one answer covers messages from two bound threads (a steer, or several queued messages taken up
-together), a report without a binding is refused and names both. So is one whose answer covers a
-bound thread's message and a user message (typed while the thread's message runs, or the reverse)
-while the session has another active outbound binding: the answer has two possible origins, so the
-report must name its binding. With the thread's binding as the session's only outbound binding,
-both inputs can only be answered there, and the report goes to it.
-
-The session cannot tell where a user message came from: senpi gives a prompt typed in the terminal
-and a message an extension sends with `sendUserMessage` the same shape. So these all count as typed
-input: a prompt, steer or follow-up typed in the terminal, a non-blocking ask_user answer (also when
-a thread's user gave it), a stop-hook follow-up, and `/remember`. And after the session's final
-answer (a reply without a tool call), any new message the run takes up starts a new answer: a user
-message, a bound thread's message, or another extension message that starts a turn, such as a
-delegated task's result. When the session has several active outbound bindings, a report without a
-binding is therefore refused (never misrouted) when its answer covers a bound thread's message and
-one of these user messages, and when it follows such an extension message that arrived after the
-final answer, since that answer covers no bound message. Name the binding in those cases.
-
-Otherwise, and always for `omo thread report`, which
-runs outside the session, a report without `--binding` goes to the session's only active outbound
-binding; a session with none or several must name `--binding` (`invalid_arguments`, with the
-`binding_ids` to choose from). Nothing is ever copied to the session's other bindings.
-
-- `milestone` and `report` rows are written at once. The first `--provider-message-id` acked for
-  a milestone becomes the binding's `progress_message_id`, and later milestone rows carry it as
-  `edit_message_id`, so a connector can edit one progress message in place.
-- `question` needs `--request-id`, the session's pending request id, and returns the
-  `reply_token` the answer must carry. `--request-kind` says which request that id is (`question`,
-  `select`, `confirm`, `input` or `editor`); it decides the answer forms above. Without it the answer
-  goes out in every text form, and as `confirmed` for a yes/no word (see above).
-  Another kind name is `invalid_arguments`, and so is `--request-kind` on a non-question report.
-  A question row's `question_state` is `pending` or `answered`. Two more values are reserved and
-  not written yet: `expired` (the question timed out in the session) and `cancelled` (it was
-  cancelled or closed without an answer). A connector should treat either as a closed question
-  that takes no answer.
-  An outbox row's `event` is `milestone`, `report`, `question` or `completion`. One more value is
-  reserved and not written yet: `question_closed` (a question ended in the session without an
-  answer through the thread). A connector should skip a row whose `event` it does not know.
-- `completion` is only armed (see below): it answers `armed: true` and `cursor: null`, and its
-  row appears when the session settles.
-
-`outbox <binding-id>` reads rows in cursor order. Cursors are numbered across all bindings of the
-store, so one binding's cursors increase but skip numbers; a gap is another binding's row, never a
-lost one. Without `--after` it continues after the
-acknowledged cursor; `--after <cursor>` re-reads from an older one. `ack` is idempotent: an older
-or equal cursor changes nothing (`changed: false`), and a newer cursor that names no row of this
-binding (past its newest row, or another binding's row) is `cursor_invalid` and acks nothing. Acked rows are kept 30 days after their ack; unacked rows live as long as their
-binding plus 30 days. A detached binding's outbox stays readable.
-
-Delivery between the outbox and the platform is **at-least-once**. A row stays unacked until the
-connector acks it, so a connector that dies after the platform accepted a post but before its
-`ack` reads the same row again and posts it again. `(binding_id, cursor)` is the row's stable
-identity: a connector that must not double-post records it with the platform message (or in its
-own store) and skips a row it already posted. The loop is: read, post, then
-`ack <binding-id> <cursor> --provider-message-id <id>` for the row just posted.
-
-`outbox --ack` reads a page and acks through its newest row **before anything was posted**. It is
-a convenience for scripts that only drain or inspect an outbox; a connector that uses it loses
-every row of the page if it crashes before posting them.
-
-### Waking on new rows
-
-`<agent dir>/gateway/outbox.marker` is the outbox wake signal. It is rewritten after every outbox
-row insert (a `report`, a `question`, a settled `completion`), in the same write transaction, as a
-temp file renamed over the marker, so it is never seen half written. Its content is
-`{"binding_id", "cursor", "written_at"}` of the newest insert, across all bindings. It is a wake
-hint only: on a change the connector re-reads its own bindings' outboxes with `outbox`, and it
-never treats the marker's content as the list of new rows (two inserts may land between two
-reads). Watch the `gateway/` directory for events on `outbox.marker`, not the file itself: the
-rename replaces the file, which ends a watch on the old one. The marker does not change on
-deliveries, acks or any other store write. A connector that cannot watch files polls `outbox`.
-
-The SQLite WAL file (`gateway.sqlite-wal`) is not a supported wake signal. It changes on every
-delivery to any session, on checkpoints, and when connections open or close, and it is removed
-when the last connection closes, which silently ends a watch on it.
-
-### Completion arms
-
-A completion is opt-in. Only a session with an arm (from `report ... completion`, here or through
-its `thread_report` tool) writes one; every other session settles without touching the gateway
-store. The arm is durable: the store row is the source of truth, and it is kept until its
-completion is written, with the outcome of the run that settled (`completed`, `failed` or
-`cancelled`), never at an intermediate turn end.
-
-A completion row's `text` is the text given when the completion was armed (`report ... completion
-<text>`), not the model's reply, and its `outcome` is how the run ended. A connector that needs the
-answer itself has the session post it with `report` (`thread_report` from inside the session), or
-reads the transcript with `omo thread read`.
-
-`report <session> completion` arms the completion (`armed: true`) and wakes the session's
-endpoint, so a running session writes it when it next settles, with that run's outcome. The arm is
-durable: when no endpoint answers the wake, the session writes it at the first settle after it
-next starts. An arm that lands while a run is settling is written at the next run, with that
-run's outcome.
-
-A session picks up arms it did not make itself (left by an earlier runtime after a restart or a
-crash, or made by `omo thread`) when it starts and on each wake, with a read that takes no write
-lock. Settling never waits on the store for long: the session gives the write 250 ms and lets it
-finish in the background. A write that cannot get the store's write lock gives up at about 25 s
-(never past 30 s) and is retried after the store's 5 s busy timeout, with the same outcome, until
-it lands.
-
 ## Retention
 
 The gateway store keeps a delivered message's body and bookkeeping only as long as something can
-still read it. Pruning runs inside the store's own write transactions (a send, a binding or report
-operation, an outbox read), at most once an hour unless the previous pass hit its bound of 256 rows
+still read it. Pruning runs inside the store's own write transactions (a send, a tool receipt), at most once an hour unless the previous pass hit its bound of 256 rows
 per table, so it never adds a write when nothing else writes.
 
 | Rows | Kept for |
@@ -575,10 +279,7 @@ per table, so it never adds a write when nothing else writes.
 | Idempotency receipts | 30 days |
 | A causal chain's root record | 7 days; a continuation after that is delivered under a fresh root and keeps its hop count |
 | A sender's rate bucket | until it is idle for a full refill (40 s), which is exactly a fresh bucket |
-| Acked outbox rows | 30 days after their ack |
-| Unacked outbox rows | as long as their binding, plus 30 days after it closes |
-| A detached or expired binding and its outbox cursor | 30 days after it closed, once no outbox row, completion arm or undelivered message of it remains; after that `outbox` answers `not_found` |
-| A session's sequence counter and incarnation | while any delivery, binding, outbox row or completion arm names the session; rebuilt on its next use |
+| A session's sequence counter and incarnation | while any delivery names the session; rebuilt on its next use |
 
 ## JSON
 
@@ -587,22 +288,9 @@ every other subcommand prints the full result.
 
 | Subcommand | `--json` on success |
 | --- | --- |
-| `list` | `[{thread, name, state: running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
+| `list` | `[{thread, name, state: opening\|running\|idle\|inactive\|archived, model?: {provider, id}, status: live\|resumable (deprecated: resumable exactly when no engine holds the thread), machine?, cwd, created_at, updated_at: <ISO 8601 string>\|null, link, surface?: tui\|desktop\|child\|daemon, as_of?, controls?, error_note?, device?, alias?}]`; `--state` (repeatable or comma-separated) picks the states listed, and the default lists every state except `archived`; a thread its engine closed stays listed `inactive` from its session file (the newest 200 files in scope); `thread` is the address `read` and `send` take back. Live and degraded rows use the same bounded final-record policy, so `updated_at` is null rather than an older timestamp when the final complete valid entry's timestamp cannot be proved. After live and degraded rows are combined, the public list sorts known `updated_at` newest first, then unknown activity last, with `thread` ascending for ties. Routing ids, socket and session-file paths are not shown (#14044) |
 | `send` | `{kind:"ok", thread, delivery_id, message_seq, delivery: {kind: queued\|queued_offline\|started\|steered, ...}, effective_mode: start\|steer\|follow_up (the requested mode while it waits for a receiver), endpoint_kind: rpc_host\|tui\|null, deduplicated}` |
 | `read` | `{kind:"ok", thread, link, items: [{seq, role: user\|assistant\|tool\|system, content}], truncated, next_cursor?, source, source_incomplete?, error_note?}` |
-| `bind` | `{kind:"ok", binding: <binding>, deduplicated}` |
-| `unbind` | `{kind:"ok", binding, already_closed, in_flight: [delivery ids], deduplicated}` |
-| `rebind` | `{kind:"ok", binding, closed: [delivery ids], deduplicated}` |
-| `bindings` | `{kind:"ok", bindings: [<binding>], next_cursor}` |
-| `report` | `{kind:"ok", binding_id, revision, event, cursor, reply_token, armed, deduplicated}` |
-| `answer` | `{kind:"ok", binding_id, cursor, session_durable_id, answered_by: {platform_user_id, display, user_id?} \| null}` |
-| `outbox` | `{kind:"ok", binding_id, revision, status, rows: [{cursor, binding_id, revision, event, text, state, created_at, edit_message_id, provider_message_id, reply_token, question_state, outcome, answered_by}], next_cursor, acked_cursor, acked?}`; `answered_by` is the author an answer named (`--author-*` on `answer`), `null` for an answer without one and for every row that is not an answered question |
-| `ack` | `{kind:"ok", binding_id, acked_cursor, changed}` |
-
-`<binding>` is `{schema_version, binding_id, revision, status, platform, account_id, chat_id,
-thread_id, root_message_id, progress_message_id, session_realm_id, session_durable_id,
-direction: {inbound, outbound}, inbound_mode, outbound_events, policy_id, created_at, updated_at,
-lease_started_at, ttl_seconds, expires_at}`.
 
 A failure is `{kind:"error", error: {code, message, next_action, details?}}`; the code is one of
 the thread error taxonomy (`packages/omo-senpi/src/components/thread/AGENTS.md`, "Error taxonomy").
@@ -614,9 +302,9 @@ The failures the CLI answers itself use the same shape: a usage error is `invali
 | Code | Meaning |
 | --- | --- |
 | 0 | done |
-| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `unsupported` with `details.reason` `sender_not_allowed` or `session_on_other_device`, `binding_mismatch`, `turn_conflict`, `loop_detected`, `answer_in_progress` (retry after a moment), `already_answered` (stop), `invalid_arguments` for a `--mode` above the binding's `inbound_mode` or an author field that is empty, too long or not one line, ...) |
-| 2 | usage: unknown subcommand or option, a missing required flag, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up` (or `steer`/`--expected-turn` with `--binding`), a `--direction` other than `in`/`out`/`both`, an empty or whitespace-only `send` text, `--author-*` without `--binding` or without both `--author-id` and `--author-name` (the SDK is not loaded) |
-| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session, `answer`; or, with the account's devices, an address this device does not hold that a device which did not answer may hold (`details.reason` `listing_incomplete` or `device_unanswered`). A `send` to a session this device holds, or knows from its session file, never answers it (it queues offline); nor do `bind`, `rebind`, `report` or `bindings --session` for such a session |
+| 1 | the gateway refused (read `error.code`: `not_found`, `scope_denied`, `unsupported` with `details.reason` `sender_not_allowed`, `turn_conflict`, `loop_detected`, ...) |
+| 2 | usage: unknown subcommand or option, a wrong number of arguments, a non-integer where a number goes, a `--mode` other than `auto`/`steer`/`follow_up`, an empty or whitespace-only `send` text (the SDK is not loaded) |
+| 3 | `host_unavailable`: no endpoint answered where one was needed: `list`, `read` of a live session; or, with the account's devices, an address this device does not hold that a device which did not answer may hold (`details.reason` `listing_incomplete` or `device_unanswered`). A `send` to a session this device holds, or knows from its session file, never answers it (it queues offline) |
 | 4 | the CLI cannot run here: win32 (no unix sockets), or a runtime without `node:sqlite`. A gateway answer with code `unsupported` exits 1 |
 | 5 | `internal_error`, also when the plugin's thread SDK cannot be loaded (a broken install; with `--json` still one JSON error) |
 

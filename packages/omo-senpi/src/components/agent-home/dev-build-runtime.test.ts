@@ -163,13 +163,17 @@ const facts = (passwd: () => string): PlatformFacts => ({
 
 test("#given HOME and USERPROFILE elsewhere #when the agent dir is the OS user record's store #then it is shared", () => {
   const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE }
+  // A real directory as the record's home: a literal /home/<user> is the macOS auto_home trigger, where Bun's realpath of
+  // the missing path's parent never returns and the test file never ends (#14866).
+  const recordHome = temp("agent-home-record-")
   try {
     process.env.HOME = join("/", "alternate-home")
     delete process.env.USERPROFILE
-    const record = facts(() => "me:x:1000:1000::/home/me:/bin/sh\n")
-    expect(isSharedAgentDir(join("/", "home", "me", ".omo", "agent"), { facts: record })).toBe(true)
+    const record = facts(() => `me:x:1000:1000::${recordHome}:/bin/sh\n`)
+    expect(isSharedAgentDir(join(recordHome, ".omo", "agent"), { facts: record })).toBe(true)
     expect(isSharedAgentDir(join("/", "tmp", "isolated-agent"), { facts: record })).toBe(false)
   } finally {
+    rmSync(recordHome, { recursive: true, force: true })
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value

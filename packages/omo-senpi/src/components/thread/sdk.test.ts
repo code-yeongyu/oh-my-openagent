@@ -232,7 +232,7 @@ describe("thread SDK: sessions", () => {
     })
   })
 
-  test("#given no binding #when the CLI sends to the terminal #then the row is written by the cli principal with a cli origin and only a wake reaches the terminal", async () => {
+  test("#given a terminal session #when the CLI sends to it #then the row is written by the cli principal with a cli origin and only a wake reaches the terminal", async () => {
     const { sdk, store, wakes } = fixture()
     const sent = await sdk.send({ thread: "my-tui", text: "ping" })
     expect(sent).toMatchObject({ kind: "ok", endpoint_kind: "tui", effective_mode: "auto", deduplicated: false })
@@ -258,19 +258,66 @@ describe("thread SDK: sessions", () => {
     expect(sdk.principal).toBe("cli:501")
   })
 
-  test("#given a send without target or binding #when called #then it is invalid_arguments and nothing is written", async () => {
+  // The send shape chat connectors call by session id (#14312): this is the SDK's only delivery entry point.
+  test("#given a session id #when a script sends with thread, text, mode, all_scope and an idempotency key, twice #then the first answers its delivery and the repeat replays it deduplicated", async () => {
     const { sdk, store } = fixture()
-    expect(await sdk.send({ text: "nowhere" })).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    expect(await store.list()).toEqual([])
+    const request = {
+      thread: "dur-tui",
+      text: "from the chat",
+      mode: "follow_up" as const,
+      all_scope: true,
+      idempotency_key: "event-1",
+    }
+    const first = await sdk.send(request)
+    if (first.kind !== "ok") throw new Error(JSON.stringify(first))
+    expect({
+      thread: first.thread,
+      deliveryId: typeof first.delivery_id,
+      deduplicated: first.deduplicated,
+      delivery: first.delivery.kind,
+    }).toEqual({
+      thread: "dur-tui",
+      deliveryId: "string",
+      deduplicated: false,
+      delivery: expect.stringMatching(/^(queued|queued_offline|started|steered)$/),
+    })
+    expect(await sdk.send(request)).toMatchObject({
+      kind: "ok",
+      thread: "dur-tui",
+      delivery_id: first.delivery_id,
+      deduplicated: true,
+    })
+    expect((await store.list({ target_durable_id: "dur-tui" })).map((row) => row.body)).toEqual(["from the chat"])
+  })
+})
+
+describe("thread SDK: unknown option keys (#14316)", () => {
+  test("#given a script that passes no options object, or a non-object #when it calls the SDK #then list() lists and the others answer invalid_arguments", async () => {
+    const { sdk } = fixture()
+    const loose = sdk as unknown as Record<"list" | "read" | "send" | "locate", (request?: unknown) => Promise<unknown>>
+    expect(await loose.list()).toMatchObject({ kind: "ok" })
+    for (const method of ["read", "send", "locate"] as const)
+      for (const request of [undefined, null, "dur-tui", ["dur-tui"]])
+        expect(await loose[method](request)).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
   })
 
-  test("#given an author on a send without a binding #when called #then it is invalid_arguments and nothing is written", async () => {
-    const { sdk, store } = fixture()
-    expect(
-      await sdk.send({ thread: "my-tui", text: "ping", author: { platform_user_id: "U1", display: "Jane" } }),
-    ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    expect(await store.list()).toEqual([])
-  })
+  test.each([
+    ["send", { thread: "dur-tui", text: "ping", allScope: true }, ["allScope"]],
+    ["read", { thread: "dur-tui", maxBytes: 10 }, ["maxBytes"]],
+    ["list", { all_scope: true, State: ["idle"] }, ["State"]],
+    ["locate", { thread: "dur-tui", binding_id: "bnd-1" }, ["binding_id"]],
+  ] as const)(
+    "#given %s with a key it does not read #when called #then it is invalid_arguments naming the key and nothing is written",
+    async (method, request, unknown) => {
+      const { sdk, store } = fixture()
+      const call = sdk[method] as (value: unknown) => Promise<unknown>
+      expect(await call(request)).toMatchObject({
+        kind: "error",
+        error: { code: "invalid_arguments", message: `Unknown option: ${unknown[0]}.`, details: { unknown } },
+      })
+      expect(await store.list()).toEqual([])
+    },
+  )
 })
 
 describe("thread SDK: a send with no remote surface resolves through the address module (#14322)", () => {
@@ -312,23 +359,6 @@ describe("thread SDK: a send with no remote surface resolves through the address
     await store.registerIncarnation({ durable_id: HEX, incarnation: "runtime-1" })
     expect(await sdk.send({ thread: HEX, text: "ping" })).toMatchObject({ kind: "ok" })
     expect(views).toEqual([])
-  })
-
-  test("#given one SDK object that sent to a session before it started #when the session starts and is then bound and reported to #then the completion wakes the session that is live now (#14322 delta review N1)", async () => {
-    const sessions: ThreadHostSession[] = []
-    const { sdk, wakes } = fixture({ sessions, diskOnly: [HEX] })
-    expect(await sdk.send({ thread: HEX, text: "before it runs" })).toMatchObject({
-      kind: "ok",
-      delivery: { kind: "queued_offline" },
-    })
-    sessions.push(hexSession)
-    const bound = await sdk.bind({ session: HEX, binding: { platform: "custom", account_id: "qa", chat_id: "late" } })
-    expect(bound).toMatchObject({ kind: "ok" })
-    expect(await sdk.report({ session: HEX, kind: "completion", text: "done" })).toMatchObject({
-      kind: "ok",
-      wake: { reached: true },
-    })
-    expect(wakes.map((wake) => wake.endpoint.kind)).toEqual(["rpc_host"])
   })
 })
 
@@ -580,366 +610,11 @@ describe("thread SDK: every address form through the shared resolver (#14305)", 
     expect(await sdk.read({ thread: `here/${T.hereLive}` })).toMatchObject({ kind: "ok", thread: T.hereLive })
   })
 
-  test("#given a session that lives only on device B #when bind, rebind, bindings --session, report and a bound send name it #then each is refused with the device named and nothing is written", async () => {
-    const { sdk, store } = sdkOn(twoDevices())
-    const refused = await sdk.bind({
-      session: NAMES.bLive,
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
-    })
-    expect(refused).toMatchObject({
-      kind: "error",
-      error: {
-        code: "unsupported",
-        details: {
-          thread: T.bLive,
-          device: B.id,
-          device_name: B.name,
-          address: `${B.id}/${T.bLive}`,
-          reason: "session_on_other_device",
-        },
-      },
-    })
-    expect(await sdk.report({ session: NAMES.bLive, kind: "milestone", text: "m" })).toMatchObject({
-      kind: "error",
-      error: { code: "unsupported", details: { device: B.id, reason: "session_on_other_device" } },
-    })
-    expect(await sdk.bindings({ session: NAMES.bLive })).toMatchObject({
-      kind: "error",
-      error: { code: "unsupported", details: { device: B.id } },
-    })
-    const bound = await sdk.bind({
-      session: NAMES.hereLive,
-      binding: { platform: "custom", account_id: "qa", chat_id: "c2" },
-    })
-    if (bound.kind !== "ok") throw new Error("bind of a local session failed")
-    expect(
-      await sdk.rebind({ binding_id: bound.binding.binding_id, expected_revision: 1, session: NAMES.bLive }),
-    ).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: B.id } } })
-    expect(
-      await sdk.send({ binding_id: bound.binding.binding_id, thread: NAMES.bLive, text: "wrong device" }),
-    ).toMatchObject({ kind: "error", error: { code: "unsupported", details: { device: B.id } } })
-    expect(await store.list()).toEqual([])
-  })
-
-  test("#given a name a local session and a thread on device B share #when bind and report name it #then they resolve to the local session, as before the module (#14322 review H1)", async () => {
-    const { sdk } = sdkOn(twoDevices())
-    const bound = await sdk.bind({
-      session: NAMES.shared,
-      binding: { platform: "custom", account_id: "qa", chat_id: "shared" },
-    })
-    expect(bound).toMatchObject({ kind: "ok", binding: { session_durable_id: T.hereShared } })
-    expect(await sdk.report({ session: NAMES.shared, kind: "milestone", text: "m" })).toMatchObject({ kind: "ok" })
-  })
-
   test("#given device B missed the listing round #when locate names a thread only B holds #then it answers host_unavailable naming B, never not_found", async () => {
     const { sdk } = sdkOn(twoDevices({ incomplete: true }))
     expect(await sdk.locate({ thread: NAMES.bLive })).toMatchObject({
       kind: "error",
       error: { code: "host_unavailable", details: { reason: "listing_incomplete", devices: [B.id] } },
-    })
-  })
-})
-
-describe("thread SDK: bindings and the connector surface", () => {
-  test("#given a binding #when the same inbound event is sent twice through it #then the binding principal writes it once in the binding's mode", async () => {
-    const { sdk, store } = fixture()
-    const bound = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "t1", inbound_mode: "follow_up" },
-    })
-    expect(bound).toMatchObject({ kind: "ok", binding: { session_durable_id: "dur-tui", revision: 1 } })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const first = await sdk.send({ binding_id: bindingId, text: "hello from outside", idempotency_key: "evt-1" })
-    const second = await sdk.send({ binding_id: bindingId, text: "hello from outside", idempotency_key: "evt-1" })
-    expect(first).toMatchObject({ kind: "ok", effective_mode: "follow_up", deduplicated: false })
-    expect(second).toMatchObject({ kind: "ok", deduplicated: true })
-    const rows = await store.list({ target_durable_id: "dur-tui" })
-    expect(rows.map((row) => row.sender)).toEqual([`binding:${bindingId}`])
-  })
-
-  test("#given a binding #when a send carries an author and a per-message mode #then the row keeps the author on its external origin and the requested mode; steer and expected_turn_id are refused", async () => {
-    const { sdk, store } = fixture()
-    const bound = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const author = { platform_user_id: "U123", display: "Jane Doe" }
-    expect(
-      await sdk.send({ binding_id: bindingId, text: "hi", author, mode: "follow_up", idempotency_key: "evt-1" }),
-    ).toMatchObject({ kind: "ok", effective_mode: "follow_up" })
-    expect(await sdk.send({ binding_id: bindingId, text: "hi", mode: "steer" })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    expect(await sdk.send({ binding_id: bindingId, text: "hi", expected_turn_id: 2 })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    const rows = await store.list({ target_durable_id: "dur-tui" })
-    expect(rows.map((row) => ({ mode: row.mode_requested, origin: row.envelope.origin }))).toEqual([
-      {
-        mode: "follow_up",
-        origin: {
-          external: {
-            platform: "custom",
-            account_id: "qa",
-            chat_id: "c1",
-            thread_id: "@chat",
-            message_id: "evt-1",
-            author,
-          },
-        },
-      },
-    ])
-  })
-
-  test("#given a binding of one session #when a send names another session as its target #then it is refused and nothing is written", async () => {
-    const { sdk, store } = fixture()
-    const bound = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(await sdk.send({ thread: "host lane", binding_id: bindingId, text: "wrong target" })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments", details: { session: "dur-tui" } },
-    })
-    expect(await store.list()).toEqual([])
-  })
-
-  test("#given a milestone in the outbox #when a connector reads, acks and re-reads #then the ack moves the cursor and an older cursor still re-reads the row", async () => {
-    const { sdk } = fixture()
-    const bound = await sdk.bind({
-      session: "dur-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const reported = await sdk.report({
-      session: "my-tui",
-      binding_id: bindingId,
-      kind: "milestone",
-      text: "done step 1",
-    })
-    expect(reported).toMatchObject({ kind: "ok", binding_id: bindingId, event: "milestone" })
-    const cursor = (reported as { cursor: number }).cursor
-    expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({
-      kind: "ok",
-      rows: [{ cursor, text: "done step 1" }],
-    })
-    expect(await sdk.ack({ binding_id: bindingId, cursor, provider_message_id: "m-1" })).toEqual({
-      kind: "ok",
-      binding_id: bindingId,
-      acked_cursor: cursor,
-      changed: true,
-    })
-    expect(await sdk.outbox({ binding_id: bindingId })).toMatchObject({ kind: "ok", rows: [] })
-    expect(await sdk.outbox({ binding_id: bindingId, after_cursor: cursor - 1 })).toMatchObject({
-      kind: "ok",
-      rows: [{ cursor }],
-    })
-  })
-
-  test("#given a running session #when the CLI arms a completion and reports a milestone #then only the arm wakes the session's endpoint, with no delivery ids", async () => {
-    const { sdk, wakes } = fixture()
-    const bound = await sdk.bind({
-      session: "host lane",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1", outbound_events: ["milestone", "completion"] },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(
-      await sdk.report({ session: "host lane", binding_id: bindingId, kind: "milestone", text: "step 1" }),
-    ).toMatchObject({ kind: "ok", armed: false })
-    expect(wakes).toEqual([])
-    expect(
-      await sdk.report({ session: "host lane", binding_id: bindingId, kind: "completion", text: "done" }),
-    ).toMatchObject({ kind: "ok", armed: true })
-    expect(wakes).toEqual([
-      {
-        endpoint: { kind: "rpc_host", socket: HOST_SOCKET, routing_id: "rpc-1", durable_session_id: "dur-host" },
-        ids: [],
-      },
-    ])
-  })
-
-  test("#given an answer release that gave up at the store's lock-wait bound #when the SDK is disposed #then the background release retry makes no further attempt", async () => {
-    let releases = 0
-    let real: GatewayStore | undefined
-    const { sdk } = fixture({
-      store: (agentDir) => {
-        real = createGatewayStore({ agentDir, _test: { busyTimeoutMs: 50 } })
-        const base = real
-        return {
-          ...base,
-          releaseAnswer: async (request) => {
-            releases++
-            if (releases === 1)
-              throw Object.assign(
-                new Error(
-                  "gateway store lock wait exceeded: release_answer waited 25000 ms for the write lock (limit 30000 ms); another process holds it",
-                ),
-                { code: "gateway_lock_wait_exceeded" },
-              )
-            return await base.releaseAnswer(request)
-          },
-        }
-      },
-    })
-    const bound = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1" },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    const asked = await sdk.report({
-      session: "my-tui",
-      binding_id: bindingId,
-      kind: "question",
-      text: "deploy?",
-      request_id: "ui-1",
-    })
-    // The fixture's host has no respondUi, so the claimed answer cannot be handed off and its release
-    // hits the bound. The retry it arms runs on the fake clock, so the test decides when it would be due.
-    jest.useFakeTimers()
-    try {
-      await sdk.answer({
-        binding_id: bindingId,
-        reply_token: (asked as { reply_token: string }).reply_token,
-        answer: "yes",
-      })
-      expect(releases).toBe(1)
-      await sdk.dispose()
-      // Well past the retry's due time: a retry that survived dispose would count itself here.
-      jest.advanceTimersByTime((real?.busyTimeoutMs ?? 50) * 4)
-      expect(releases).toBe(1)
-    } finally {
-      jest.useRealTimers()
-    }
-  })
-
-  test("#given a question asked through binding X #when the answer arrives through binding Y #then it is binding_mismatch and the question stays pending", async () => {
-    const { sdk } = fixture()
-    const x = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "x" },
-    })
-    const y = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c1", thread_id: "y" },
-    })
-    const xId = (x as { binding: { binding_id: string } }).binding.binding_id
-    const yId = (y as { binding: { binding_id: string } }).binding.binding_id
-    const asked = await sdk.report({
-      session: "my-tui",
-      binding_id: xId,
-      kind: "question",
-      text: "proceed?",
-      request_id: "ui-1",
-    })
-    const token = (asked as { reply_token: string }).reply_token
-    expect(await sdk.answer({ binding_id: yId, reply_token: token, answer: "yes" })).toMatchObject({
-      kind: "error",
-      error: { code: "binding_mismatch" },
-    })
-    expect(await sdk.outbox({ binding_id: xId })).toMatchObject({
-      rows: [{ event: "question", question_state: "pending" }],
-    })
-  })
-})
-
-describe("thread SDK: store extensions", () => {
-  const EXTENSION = {
-    name: "alpha",
-    moduleUrl: new URL("./gateway/testing/store-extension.mjs", import.meta.url).href,
-    migrations: [["CREATE TABLE alpha_items (id INTEGER PRIMARY KEY, value TEXT)"]],
-  }
-  const SETTLE_MS = 10_000
-  async function settled<T>(what: string, call: Promise<T>): Promise<T> {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const bound = new Promise<never>((_resolve, reject) => {
-      timer = setTimeout(() => reject(new Error(`${what} did not settle within the test budget`)), remainingTestTime())
-    })
-    try {
-      return await Promise.race([call, bound])
-    } finally {
-      clearTimeout(timer)
-    }
-  }
-
-  // The gateway connector opens the store through the SDK and admits every inbound chat message with
-  // one extension call that binds or enqueues inside the store worker's transaction. That target
-  // lookup runs while the worker is busy with the call, so it must not ask the same store anything.
-  test(
-    "#given the SDK's own store #when an extension operation binds a session and enqueues through that binding #then both settle and the delivery is written",
-    async () => {
-      useTestTimeout(SETTLE_MS * 3)
-      const { sdk } = fixture({ sdkOwnsStore: true })
-      expect((await sdk.registerStoreExtension(EXTENSION)).kind).toBe("ok")
-      const bound = await settled(
-        "tx.bind",
-        sdk.extensionCall<{ kind: string; binding?: { binding_id: string } }>("alpha", "core", {
-          op: "bind",
-          request: {
-            principal: "test",
-            binding: {
-              platform: "custom",
-              account_id: "qa",
-              chat_id: "c1",
-              session_durable_id: "dur-tui",
-              ttl_seconds: null,
-            },
-          },
-        }),
-      )
-      expect(bound).toMatchObject({ kind: "ok", value: { kind: "ok", binding: { session_durable_id: "dur-tui" } } })
-      const bindingId =
-        bound.kind === "ok" ? (bound.value as { binding: { binding_id: string } }).binding.binding_id : ""
-      const sent = await settled(
-        "tx.enqueue",
-        sdk.extensionCall("alpha", "core", {
-          op: "enqueue",
-          request: { binding_id: bindingId, event_id: "evt-1", text: "hello from the chat" },
-        }),
-      )
-      expect(sent).toMatchObject({ kind: "ok", value: { kind: "ok", deduplicated: false } })
-    },
-    SETTLE_MS * 3,
-  )
-})
-
-describe("thread SDK: request kinds", () => {
-  test("#given a confirm question reported with request_kind #when an unknown kind is named, and when the question is answered no #then the unknown kind is invalid_arguments and the answer is not refused as blank or unreadable", async () => {
-    const { sdk } = fixture()
-    const bound = await sdk.bind({
-      session: "my-tui",
-      binding: { platform: "custom", account_id: "qa", chat_id: "c-kind" },
-    })
-    const bindingId = (bound as { binding: { binding_id: string } }).binding.binding_id
-    expect(
-      await sdk.report({
-        session: "my-tui",
-        binding_id: bindingId,
-        kind: "question",
-        text: "ok?",
-        request_id: "ui-k",
-        request_kind: "radio",
-      }),
-    ).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
-    const asked = await sdk.report({
-      session: "my-tui",
-      binding_id: bindingId,
-      kind: "question",
-      text: "ok?",
-      request_id: "ui-k",
-      request_kind: "confirm",
-    })
-    const token = (asked as { reply_token: string }).reply_token
-    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "maybe" })).toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
-    })
-    expect(await sdk.answer({ binding_id: bindingId, reply_token: token, answer: "no" })).not.toMatchObject({
-      kind: "error",
-      error: { code: "invalid_arguments" },
     })
   })
 })

@@ -105,10 +105,6 @@ const LOCAL_CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ["thread_set_reasoning", { thread: LOCAL_ID, level: "high" }],
   ["thread_archive", { thread: LOCAL_ID }],
   ["thread_archive", { thread: "self", archived: false }],
-  ["thread_report", { kind: "progress", text: "x" }],
-  ["thread_outbox", {}],
-  ["thread_outbox_ack", { binding_id: "b", cursor: 1 }],
-  ["thread_answer", { binding_id: "b", reply_token: "t", answer: "yes" }],
 ]
 
 describe("i22: routine local thread tool calls ask for no approval", () => {
