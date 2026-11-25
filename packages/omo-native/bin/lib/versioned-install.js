@@ -101,21 +101,8 @@ async function installInto(input, finalDir, bun) {
 /**
  * Installs omo-ai@<target> beside the running version the way the layout was built, proves the new dir
  * runs, then swaps `current` with one rename. `current` never names a dir that failed either step, and
- * the previous version dir stays for rollback. Exit 0 only when the omo on PATH reports the target.
- * @param {{ install: VersionedInstall, before: string, target: string, run: Function, env: NodeJS.ProcessEnv,
- *   platform: NodeJS.Platform, log: (line: string) => void, error: (line: string) => void, now?: () => number }} input
- * @returns {Promise<number>}
- */
-export async function updateVersionedInstall(input) {
-  const outcome = await versionedInstallUpdate(input)
-  const lines = versionedUpdateLines(outcome, input)
-  for (const line of lines.log) input.log(line)
-  for (const line of lines.error) input.error(line)
-  return outcome.exitCode
-}
-
-/**
- * The same update as data: what happened and the facts its report names, with nothing printed.
+ * the previous version dir stays for rollback. Answers what happened and the facts its report names
+ * (`versionedUpdateLines` renders them); exitCode is 0 only when the omo on PATH reports the target.
  * @param {{ install: VersionedInstall, before: string, target: string, run: Function, env: NodeJS.ProcessEnv,
  *   platform: NodeJS.Platform, now?: () => number }} input
  * @returns {Promise<VersionedOutcome>}

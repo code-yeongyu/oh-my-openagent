@@ -146,7 +146,7 @@ function keySourcePhrase(item) {
 }
 
 /** A summary line: its typed items and the text they render to, items of one line joined by "; ". */
-export function summaryPart(items) {
+function summaryPart(items) {
   const phrased = items.map((item) => ({ ...item, text: summaryPhrase(item) }))
   return { items: phrased, text: phrased.map((item) => item.text).join("; ") }
 }

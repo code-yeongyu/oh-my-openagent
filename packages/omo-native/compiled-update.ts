@@ -196,7 +196,7 @@ const INSTALL_NEXT = "Read details.reason, fix what it names, then call install.
  * install.update({ dry_run? }) for the compiled binary: resolves the newest release on this build's channel that ships
  * this platform's asset and, unless dry_run, replaces the launched binary with it. Nothing is printed.
  */
-export async function compiledInstallUpdate(
+async function compiledInstallUpdate(
   input: { readonly dry_run?: boolean },
   ports: CompiledUpdatePorts,
 ): Promise<{ readonly kind: "ok"; readonly value: CompiledInstallUpdate } | CompiledUpdateFailure> {
