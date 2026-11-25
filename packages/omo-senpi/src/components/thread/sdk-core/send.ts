@@ -67,6 +67,7 @@ export function createSend(context: ThreadCoreContext) {
           all_scope: request.all_scope,
           expected_turn_id: request.expected_turn_id === undefined ? undefined : String(request.expected_turn_id),
           collapse_key: request.collapse_key,
+          idempotency_key: request.idempotency_key,
         },
         request.idempotency_key ?? `auto:${randomUUID()}`,
         { kind: "operator", uid: options.uid, user: options.user },

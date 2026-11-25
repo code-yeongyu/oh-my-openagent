@@ -1,3 +1,4 @@
+import { throughSendBook } from "./sdk-core/send-book"
 import { withinCallBudget } from "../call-budget/call-deadline"
 import { toThreadAddressEntries } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
@@ -99,7 +100,7 @@ export async function sendToTarget(
       ? sessionSender(options, principal.id)
       : { kind: target.kind === "remote" ? "person" : "cli", uid: principal.uid, user: principal.user }
   const inboundHop = principal.kind === "session" ? options.callerChainHop?.() : undefined
-  return pipeline.deliver({
+  const delivery = {
     sender,
     caller_id: principal.kind === "session" ? principal.id : `${sender.kind}:${principal.uid}`,
     target,
@@ -111,7 +112,17 @@ export async function sendToTarget(
     args,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
-  })
+  }
+  // A key the caller named admits through the one send book before any transport (#15021).
+  const named = value.idempotency_key?.trim()
+  if (named === undefined || named === "") return pipeline.deliver(delivery)
+  const hashed = {
+    message: value.message,
+    delivery: delivery.mode,
+    expected_turn_id: value.expected_turn_id,
+    ...("collapse_key" in value ? { collapse_key: value.collapse_key } : {}),
+  }
+  return throughSendBook(options.store, target, named, "local", hashed, () => pipeline.deliver(delivery))
 }
 
 function sessionSender(options: ThreadToolSurfaceOptions, id: string): GatewaySender {
