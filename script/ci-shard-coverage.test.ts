@@ -140,14 +140,19 @@ test("#given a Windows part that dropped or repeated a file #when coverage is ch
 
     // then
     expect(result.status).toBe(1)
-    expect(result.stderr).toContain("duplicate: packages/omo-senpi/a.test.ts\nmissing: packages/omo-senpi-extra/c_test.ts")
+    expect(result.stderr).toContain(
+      "duplicate: packages/omo-senpi/a.test.ts\nmissing: packages/omo-senpi-extra/c_test.ts",
+    )
   })
 })
 
 test("#given a Windows part whose record never uploaded #when coverage is checked #then the check fails", () => {
   withFixture((cwd) => {
     // given
-    windowsRecord(cwd, "windows-shard-record-senpi-two", "senpi-two", ["packages/omo-senpi/a.test.ts", "packages/omo-senpi-extra/c_test.ts"])
+    windowsRecord(cwd, "windows-shard-record-senpi-two", "senpi-two", [
+      "packages/omo-senpi/a.test.ts",
+      "packages/omo-senpi-extra/c_test.ts",
+    ])
 
     // when
     const result = run(cwd, "windows-senpi")

@@ -9,9 +9,16 @@ import { discoverTestFiles, WINDOWS_SPLITS, type WindowsSplit, windowsTimedInvoc
 // part that drops, repeats or adds a file fails here. The status jobs check the same partition again on the hosted run
 // from the Bun timing records the parts upload (script/ci-shard-coverage.ts).
 
-const stepSchema = z.object({ id: z.string().optional(), name: z.string().optional(), run: z.string().optional(), with: z.record(z.string(), z.unknown()).optional() })
+const stepSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().optional(),
+  run: z.string().optional(),
+  with: z.record(z.string(), z.unknown()).optional(),
+})
 const { jobs } = z
-  .object({ jobs: z.record(z.string(), z.object({ needs: z.array(z.string()).optional(), steps: z.array(stepSchema) })) })
+  .object({
+    jobs: z.record(z.string(), z.object({ needs: z.array(z.string()).optional(), steps: z.array(stepSchema) })),
+  })
   .parse(Bun.YAML.parse(readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8")))
 
 const splits = {
@@ -61,41 +68,56 @@ function recordsByFile(split: WindowsSplit): Map<string, string[]> {
 }
 
 describe("split Windows suites run every file of the unsplit suite exactly once (#14942)", () => {
-  test.each(splitNames)("#given %s #when its parts' files are counted #then none is missing, repeated or extra", (split) => {
-    const { suite } = WINDOWS_SPLITS[split]
-    const reference = discoverTestFiles(suite.config, suite.filters)
-    const ran = recordsByFile(split)
-    expect(reference.size).toBeGreaterThan(0)
-    expect({
-      repeated: [...ran].filter(([, records]) => records.length > 1).map(([file, records]) => `${file}: ${records.join(", ")}`),
-      missing: [...reference].filter((file) => !ran.has(file)).sort(),
-      extra: [...ran.keys()].filter((file) => !reference.has(file)).sort(),
-    }).toEqual({ repeated: [], missing: [], extra: [] })
-  })
+  test.each(splitNames)(
+    "#given %s #when its parts' files are counted #then none is missing, repeated or extra",
+    (split) => {
+      const { suite } = WINDOWS_SPLITS[split]
+      const reference = discoverTestFiles(suite.config, suite.filters)
+      const ran = recordsByFile(split)
+      expect(reference.size).toBeGreaterThan(0)
+      expect({
+        repeated: [...ran]
+          .filter(([, records]) => records.length > 1)
+          .map(([file, records]) => `${file}: ${records.join(", ")}`),
+        missing: [...reference].filter((file) => !ran.has(file)).sort(),
+        extra: [...ran.keys()].filter((file) => !reference.has(file)).sort(),
+      }).toEqual({ repeated: [], missing: [], extra: [] })
+    },
+  )
 
-  test.each(splitNames)("#given %s #when ci.yml wraps its bun commands #then every one writes a record the status job checks", (split) => {
-    const wrapped = runs(split).flatMap((run) => [...run.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)])
-    const timed = runs(split).flatMap(windowsTimedInvocations)
-    expect(timed).toHaveLength(wrapped.length)
-    expect(timed.map(({ record }) => record).sort()).toEqual([...WINDOWS_SPLITS[split].records].sort())
-  })
+  test.each(splitNames)(
+    "#given %s #when ci.yml wraps its bun commands #then every one writes a record the status job checks",
+    (split) => {
+      const wrapped = runs(split).flatMap((run) => [...run.matchAll(/& \.github\/scripts\/windows-ci-telemetry\.ps1/g)])
+      const timed = runs(split).flatMap(windowsTimedInvocations)
+      expect(timed).toHaveLength(wrapped.length)
+      expect(timed.map(({ record }) => record).sort()).toEqual([...WINDOWS_SPLITS[split].records].sort())
+    },
+  )
 
   test("#given global zauc mocks #when root shard 1 is split #then every omo-opencode file runs in one bun process", () => {
     const records = new Set(
-      [...recordsByFile("windows-root")].filter(([file]) => file.startsWith("packages/omo-opencode/")).flatMap(([, rs]) => rs),
+      [...recordsByFile("windows-root")]
+        .filter(([file]) => file.startsWith("packages/omo-opencode/"))
+        .flatMap(([, rs]) => rs),
     )
     expect([...records]).toEqual(["shard-1b"])
   })
 
-  test.each(splitNames)("#given %s #when its status job runs #then it verifies the records its parts upload", (split) => {
-    const { job: id, status, upload, download } = splits[split]
-    const uploadStep = job(id).steps.find((step) => step.name === "Upload Windows shard record")
-    expect(uploadStep?.with).toMatchObject({ name: upload, overwrite: true, "if-no-files-found": "error" })
-    const statusJob = job(status)
-    expect(statusJob.needs).toEqual(["ci-mode", id])
-    expect(statusJob.steps.find((step) => step.name?.startsWith("Download"))?.with).toMatchObject({ pattern: download })
-    expect(statusJob.steps.find((step) => step.id === "coverage")?.run).toBe(
-      `bun script/ci-shard-coverage.ts ${split} "$RUNNER_TEMP/windows-shard-records"`,
-    )
-  })
+  test.each(splitNames)(
+    "#given %s #when its status job runs #then it verifies the records its parts upload",
+    (split) => {
+      const { job: id, status, upload, download } = splits[split]
+      const uploadStep = job(id).steps.find((step) => step.name === "Upload Windows shard record")
+      expect(uploadStep?.with).toMatchObject({ name: upload, overwrite: true, "if-no-files-found": "error" })
+      const statusJob = job(status)
+      expect(statusJob.needs).toEqual(["ci-mode", id])
+      expect(statusJob.steps.find((step) => step.name?.startsWith("Download"))?.with).toMatchObject({
+        pattern: download,
+      })
+      expect(statusJob.steps.find((step) => step.id === "coverage")?.run).toBe(
+        `bun script/ci-shard-coverage.ts ${split} "$RUNNER_TEMP/windows-shard-records"`,
+      )
+    },
+  )
 })

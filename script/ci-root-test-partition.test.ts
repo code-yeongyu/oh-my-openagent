@@ -102,7 +102,7 @@ describe("root test CI partition", () => {
     expect(matrix).not.toContain('shard: "1/2"')
     expect(matrix).toContain('shard: "2/2"')
     expect(windowsShard1StatusJob()).toContain(
-      'name: test\n    needs: [ci-mode, test-windows-1]\n    if: ${{ always() && !cancelled() }}\n    runs-on: ubuntu-26.04',
+      "name: test\n    needs: [ci-mode, test-windows-1]\n    if: ${{ always() && !cancelled() }}\n    runs-on: ubuntu-26.04",
     )
     expect(windowsShard1StatusJob()).toContain('- os: windows-latest\n            shard: "1/2"')
     expect(matrix).not.toContain("config:")

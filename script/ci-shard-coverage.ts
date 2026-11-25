@@ -1,6 +1,12 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { discoverTestFiles, type Invocation, SENPI_SUITE, WINDOWS_SPLITS, type WindowsSplit } from "./ci-test-discovery.ts"
+import {
+  discoverTestFiles,
+  type Invocation,
+  SENPI_SUITE,
+  WINDOWS_SPLITS,
+  type WindowsSplit,
+} from "./ci-test-discovery.ts"
 
 // Linux groups: each part uploads one ci-shard-<group>-<part>/ci-shard-record.json artifact.
 const groups = {
@@ -72,7 +78,8 @@ function verifyWindows(group: WindowsSplit, dir: string): void {
   const records = new Map<string, Map<string, number>>()
   for (const name of WINDOWS_SPLITS[group].records) {
     const found = [...new Bun.Glob(`**/${name}.timings.json`).scanSync({ cwd: dir })]
-    if (found.length !== 1) throw new Error(`${group}: expected one ${name}.timings.json under ${dir}, found ${found.length}`)
+    if (found.length !== 1)
+      throw new Error(`${group}: expected one ${name}.timings.json under ${dir}, found ${found.length}`)
     records.set(name, readTimings(join(dir, found[0] ?? "")))
   }
   compare(group, WINDOWS_SPLITS[group].suite, records)
@@ -80,7 +87,9 @@ function verifyWindows(group: WindowsSplit, dir: string): void {
 
 const [mode, records, output, ...extra] = process.argv.slice(2)
 if (!records || extra.length > 0) {
-  throw new Error("Usage: bun script/ci-shard-coverage.ts <root|senpi|windows-root|windows-senpi|merge> <records-dir> [merged-file]")
+  throw new Error(
+    "Usage: bun script/ci-shard-coverage.ts <root|senpi|windows-root|windows-senpi|merge> <records-dir> [merged-file]",
+  )
 }
 if (mode === "merge" && output) {
   const root = verify("root", records)
@@ -94,5 +103,7 @@ if (mode === "merge" && output) {
 } else if ((mode === "windows-root" || mode === "windows-senpi") && output === undefined) {
   verifyWindows(mode, records)
 } else {
-  throw new Error("Expected root, senpi, windows-root or windows-senpi without an output path, or merge with an output path")
+  throw new Error(
+    "Expected root, senpi, windows-root or windows-senpi without an output path, or merge with an output path",
+  )
 }
