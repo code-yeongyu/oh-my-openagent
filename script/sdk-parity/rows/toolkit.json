@@ -21,6 +21,10 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "scenario",
+                "expectedEvidence"
+              ],
               "properties": {
                 "scenario": {
                   "type": "string"
@@ -39,18 +43,17 @@
                 "essential": {
                   "type": "boolean"
                 }
-              },
-              "required": [
-                "expectedEvidence",
-                "scenario"
-              ]
+              }
             }
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
-          "objective",
-          "title"
+          "title",
+          "objective"
         ]
       },
       "cli": [
@@ -124,12 +127,15 @@
           "advance": {
             "type": "boolean"
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
-          "evidence",
           "goalId",
-          "status"
+          "status",
+          "evidence"
         ]
       },
       "cli": [
@@ -186,7 +192,10 @@
           "retryFailed": {
             "type": "boolean"
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -248,7 +257,10 @@
           "validationBatchesJson": {
             "type": "string"
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "brief"
@@ -317,7 +329,10 @@
           "goalId": {
             "type": "string"
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "goalId"
@@ -367,8 +382,14 @@
       ],
       "input": {
         "properties": {
-          "cwd": {},
-          "session_id": {}
+          "cwd": {
+            "type": "string",
+            "minLength": 1
+          },
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
           "cwd"
@@ -477,13 +498,16 @@
               "type": "string"
             }
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
-          "criterionId",
-          "evidence",
           "goalId",
-          "status"
+          "criterionId",
+          "status",
+          "evidence"
         ]
       },
       "cli": [
@@ -549,13 +573,16 @@
           "codexGoalJson": {
             "type": "string"
           },
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
-          "evidence",
           "goalId",
+          "title",
           "objective",
-          "title"
+          "evidence"
         ]
       },
       "cli": [
@@ -606,7 +633,10 @@
       ],
       "input": {
         "properties": {
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": []
       },
@@ -706,6 +736,10 @@
             "type": "array",
             "items": {
               "type": "object",
+              "required": [
+                "title",
+                "objective"
+              ],
               "properties": {
                 "title": {
                   "type": "string"
@@ -713,11 +747,7 @@
                 "objective": {
                   "type": "string"
                 }
-              },
-              "required": [
-                "objective",
-                "title"
-              ]
+              }
             }
           },
           "revisedTitle": {
@@ -739,13 +769,16 @@
             "type": "string"
           },
           "proposals": {},
-          "session_id": {}
+          "session_id": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "required": [
-          "evidence",
           "kind",
-          "rationale",
-          "source"
+          "source",
+          "evidence",
+          "rationale"
         ]
       },
       "cli": [

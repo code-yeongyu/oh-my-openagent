@@ -1,6 +1,8 @@
 // The ports of first-party design 4.6, each replaced by a fake in the conformance test, with the operations a scenario
 // may expect a fake to observe. `remote` is the thread SDK's cross-device port and `engine` the engine's exported
-// functions (slice E1a). P1b's fakes implement exactly these operations; a scenario naming another one fails.
+// functions (slice E1a). `peer` is the protected delivery's channel and `mcp` the MCP client core's token store (security
+// design 5.0, 5.2, 5.5); `opencodeServer` is the OpenCode edition's server and `loop` the delegated loop component.
+// P1b's fakes implement exactly these operations; a scenario naming another one fails.
 export const PORT_OPERATIONS = {
   host: [
     "list_sessions",
@@ -35,6 +37,8 @@ export const PORT_OPERATIONS = {
     "set_archived",
     "register_extension",
     "extension_call",
+    "session_ops",
+    "session_call",
   ],
   remote: [
     "sessions.list",
@@ -55,6 +59,8 @@ export const PORT_OPERATIONS = {
     "aliases.clear",
     "devices.list",
     "devices.resolve",
+    "sessions.attach",
+    "sessions.answer",
   ],
   deviceService: [
     "service.info",
@@ -75,8 +81,21 @@ export const PORT_OPERATIONS = {
     "sync.status",
     "sync.disable",
     "sync.approve",
+    "sign_in",
+    "sync.enable",
+    "sync.recover",
   ],
-  credentialStore: ["read", "write", "clear", "store.status", "store.enable", "store.disable"],
+  credentialStore: [
+    "read",
+    "write",
+    "clear",
+    "store.status",
+    "store.enable",
+    "store.disable",
+    "keys.init",
+    "keys.status",
+  ],
+  peer: ["open", "verify", "write"],
   terminal: ["write", "read"],
   process: ["spawn", "signal"],
   fs: ["read", "write", "remove", "list"],
@@ -99,6 +118,25 @@ export const PORT_OPERATIONS = {
     "schedule.run",
     "sessionOfPid",
     "sessions.exportHtml",
+    "auth.check",
+    "auth.credentials",
+    "auth.apiKey",
+    "auth.bearerToken",
+    "trust.ensure",
+  ],
+  mcp: ["oauth.login", "oauth.logout", "oauth.status"],
+  opencodeServer: ["open_session", "prompt", "wait_complete"],
+  loop: [
+    "forSession",
+    "addGoal",
+    "checkpoint",
+    "completeGoals",
+    "createGoals",
+    "criteria",
+    "recordEvidence",
+    "recordReviewBlockers",
+    "status",
+    "steer",
   ],
 } as const satisfies Readonly<Record<string, readonly string[]>>
 

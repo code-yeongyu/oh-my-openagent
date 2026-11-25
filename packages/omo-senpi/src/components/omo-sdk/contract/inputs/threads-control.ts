@@ -12,26 +12,32 @@ import {
   threadToolParamSchemas,
 } from "../../../thread/contracts/params"
 import { AliasName, Attachments, DeadlineMs, Thread } from "./thread-fields"
+import { Author, LaunchSpec, SessionCallable } from "./threads-authority"
 
-// The writing and control calls of first-party design 6.2, over the tool schemas themselves. Inputs that carry a
-// principal or a launch option (`author`, `launch_spec`, an extension's session-callable operations) are held for slice
-// P1a-s (contract/gated.ts) and are not typed here.
-export const ThreadsSend = Type.Object({ ...ThreadSendParams.properties, attachments: Attachments })
+// The writing and control calls of first-party design 6.2, over the tool schemas themselves. The inputs that carry a
+// principal or a launch option (`author`, `launch_spec`, an extension's session-callable operations) are slice P1a-s's,
+// from inputs/threads-authority.ts.
+export const ThreadsSend = Type.Object({ ...ThreadSendParams.properties, attachments: Attachments, author: Author })
 
 export const ThreadsSendAndFollow = Type.Object({ ...ThreadsSend.properties, deadline_ms: DeadlineMs })
 
-/** The first message: the tool's string, or the object form of 6.2 (the remote module's `first`) without `author`. */
+/** The first message: the tool's string, or the object form of 6.2 (the remote module's `first`). */
 const FirstPrompt = Type.Optional(
   Type.Union([
     Type.String({ minLength: 1, maxLength: THREAD_MESSAGE_MAX_BYTES }),
     Type.Object({
       ...Type.Pick(ThreadSendParams, ["message", "delivery", "expected_turn_id", "summary"]).properties,
       attachments: Attachments,
+      author: Author,
     }),
   ]),
 )
 
-export const ThreadsCreate = Type.Object({ ...ThreadCreateParams.properties, prompt: FirstPrompt })
+export const ThreadsCreate = Type.Object({
+  ...ThreadCreateParams.properties,
+  prompt: FirstPrompt,
+  launch_spec: LaunchSpec,
+})
 
 export const ThreadsInterrupt = ThreadInterruptParams
 
@@ -86,6 +92,7 @@ export const ThreadsExtensionsRegister = Type.Object({
   name: Type.String({ minLength: 1 }),
   migrations: Type.Array(Type.Array(Type.String())),
   moduleUrl: Type.String({ minLength: 1, description: "Absolute file URL of compiled JavaScript." }),
+  sessionCallable: SessionCallable,
   wakeDir: Type.Optional(Type.String({ minLength: 1 })),
 })
 

@@ -29,6 +29,12 @@ export type TableScenario = {
   readonly invalid?: true
   readonly refusal?: string
   readonly expect: readonly Expectation[]
+  /** The principal the root is built for (security design 3); absent, the root's default. */
+  readonly principal?: { readonly kind: string } & Readonly<Record<string, unknown>>
+  /** Root options the scenario's root is built with: a selector or an origin the cell is about. */
+  readonly root?: Readonly<Record<string, unknown>>
+  /** An approved behaviour change of the security design's section 10; its evidence flag selects what is asserted. */
+  readonly change?: string
 }
 
 export type ScenarioTableFile = {

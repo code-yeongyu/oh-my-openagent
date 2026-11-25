@@ -1,8 +1,10 @@
 import { Type } from "typebox"
 
-// The engine calls of first-party design 6.8 that carry no credential or launch option. `trust` is the project-trust
-// choice of --approve and --no-approve, kept in the type as ruled; who may pass it is wired later. The launch `setup`
-// of models.list and promptSizes is held for P1a-s.
+import { LaunchSetup } from "./launch"
+
+// The engine calls of first-party design 6.8 that carry no credential. `trust` is the project-trust choice of --approve
+// and --no-approve, kept in the type as ruled; who may pass it is wired later. The `setup` of models.list and promptSizes
+// is LaunchOptions' own setup part (inputs/launch.ts).
 const None = Type.Object({})
 const Source = Type.String({ minLength: 1 })
 const Local = Type.Optional(Type.Boolean())
@@ -24,13 +26,16 @@ export const EngineConfigSetResource = Type.Object({
   state: Type.Optional(Type.Union([Type.Literal("inherit"), Type.Literal("load"), Type.Literal("unload")])),
 })
 export const EngineModelsDiscover = Type.Object({ provider: Type.String({ minLength: 1 }) })
-export const EngineModelsList = Type.Object({ pattern: Type.Optional(Type.String({ minLength: 1 })) })
+export const EngineModelsList = Type.Object({
+  pattern: Type.Optional(Type.String({ minLength: 1 })),
+  setup: LaunchSetup,
+})
 export const EngineModelsUpdate = None
 export const EnginePackagesInstall = Type.Object({ source: Source, local: Local, trust: Trust })
 export const EnginePackagesRemove = Type.Object({ source: Source, local: Local, trust: Trust })
 export const EnginePackagesList = Type.Object({ trust: Trust })
 export const EnginePackagesUpdate = Type.Object({ source: Type.Optional(Source), trust: Trust })
-export const EnginePromptSizes = None
+export const EnginePromptSizes = Type.Object({ setup: LaunchSetup })
 export const EngineTips = None
 export const EngineScheduleList = None
 export const EngineScheduleCancel = Type.Object({ id: Type.String({ minLength: 1 }) })

@@ -11,10 +11,58 @@
       ],
       "input": {
         "properties": {
-          "provider": {},
-          "model": {}
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "terminal"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "pid",
+                  "started_at"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "peer"
+                  },
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
         },
-        "required": []
+        "required": [
+          "destination"
+        ]
       },
       "cli": [
         {
@@ -51,11 +99,62 @@
       ],
       "input": {
         "properties": {
-          "provider": {},
-          "model": {},
-          "min_expiry_ms": {}
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "min_expiry_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "terminal"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "pid",
+                  "started_at"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "peer"
+                  },
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
         },
-        "required": []
+        "required": [
+          "destination"
+        ]
       },
       "cli": [
         {
@@ -94,8 +193,14 @@
       ],
       "input": {
         "properties": {
-          "provider": {},
-          "model": {},
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
           "refresh": {
             "type": "boolean"
           }
@@ -142,11 +247,61 @@
       ],
       "input": {
         "properties": {
-          "provider": {},
-          "model": {},
-          "refresh": {}
+          "provider": {
+            "type": "string",
+            "minLength": 1
+          },
+          "model": {
+            "type": "string",
+            "minLength": 1
+          },
+          "refresh": {
+            "type": "boolean"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "terminal"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "pid",
+                  "started_at"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "peer"
+                  },
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
         },
-        "required": []
+        "required": [
+          "destination"
+        ]
       },
       "cli": [
         {
@@ -366,58 +521,196 @@
       "input": {
         "properties": {
           "session": {
+            "type": "object",
             "properties": {
-              "continue": {},
-              "path": {},
-              "id": {},
-              "fork": {},
-              "rebind": {},
-              "ephemeral": {},
-              "dir": {},
-              "spawned_by": {},
-              "name": {}
-            }
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "setup": {
+            "type": "object",
             "properties": {
-              "model": {},
-              "provider": {},
-              "model_patterns": {},
-              "reasoning": {},
-              "system_prompt": {},
-              "append_system_prompt": {},
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
               "tools": {
+                "type": "object",
                 "properties": {
-                  "allow": {},
-                  "deny": {},
-                  "none": {},
-                  "no_builtin": {}
-                }
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "extensions": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "skills": {
+                "type": "object",
                 "properties": {
-                  "names": {},
-                  "none": {}
-                }
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "prompt_templates": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "themes": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {},
-                  "use": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               },
               "context_files": {
                 "type": "boolean"
@@ -425,25 +718,78 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
-              "session_runtime": {},
-              "tool_runtime": {},
-              "auto_title": {}
-            }
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "input": {},
-          "presenter": {
+          "input": {
+            "type": "object",
             "properties": {
-              "bootstrap_fd": {},
-              "enforcement": {}
-            }
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "gated": {
+            "type": "object",
             "properties": {
-              "grok_neo": {}
-            }
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "api_key": {}
+          "api_key": {
+            "type": "object"
+          }
         },
         "required": []
       },
@@ -523,58 +869,196 @@
       "input": {
         "properties": {
           "session": {
+            "type": "object",
             "properties": {
-              "continue": {},
-              "path": {},
-              "id": {},
-              "fork": {},
-              "rebind": {},
-              "ephemeral": {},
-              "dir": {},
-              "spawned_by": {},
-              "name": {}
-            }
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "setup": {
+            "type": "object",
             "properties": {
-              "model": {},
-              "provider": {},
-              "model_patterns": {},
-              "reasoning": {},
-              "system_prompt": {},
-              "append_system_prompt": {},
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
               "tools": {
+                "type": "object",
                 "properties": {
-                  "allow": {},
-                  "deny": {},
-                  "none": {},
-                  "no_builtin": {}
-                }
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "extensions": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "skills": {
+                "type": "object",
                 "properties": {
-                  "names": {},
-                  "none": {}
-                }
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "prompt_templates": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "themes": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {},
-                  "use": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               },
               "context_files": {
                 "type": "boolean"
@@ -582,26 +1066,82 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
-              "session_runtime": {},
-              "tool_runtime": {},
-              "auto_title": {}
-            }
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "listen": {},
-          "input": {},
-          "presenter": {
+          "listen": {
+            "type": "string",
+            "minLength": 1
+          },
+          "input": {
+            "type": "object",
             "properties": {
-              "bootstrap_fd": {},
-              "enforcement": {}
-            }
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
+            "properties": {
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "gated": {
+            "type": "object",
             "properties": {
-              "grok_neo": {}
-            }
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "api_key": {}
+          "api_key": {
+            "type": "object"
+          }
         },
         "required": []
       },
@@ -682,58 +1222,196 @@
       "input": {
         "properties": {
           "session": {
+            "type": "object",
             "properties": {
-              "continue": {},
-              "path": {},
-              "id": {},
-              "fork": {},
-              "rebind": {},
-              "ephemeral": {},
-              "dir": {},
-              "spawned_by": {},
-              "name": {}
-            }
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "setup": {
+            "type": "object",
             "properties": {
-              "model": {},
-              "provider": {},
-              "model_patterns": {},
-              "reasoning": {},
-              "system_prompt": {},
-              "append_system_prompt": {},
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
               "tools": {
+                "type": "object",
                 "properties": {
-                  "allow": {},
-                  "deny": {},
-                  "none": {},
-                  "no_builtin": {}
-                }
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "extensions": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "skills": {
+                "type": "object",
                 "properties": {
-                  "names": {},
-                  "none": {}
-                }
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "prompt_templates": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "themes": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {},
-                  "use": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               },
               "context_files": {
                 "type": "boolean"
@@ -741,38 +1419,100 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
-              "session_runtime": {},
-              "tool_runtime": {},
-              "auto_title": {}
-            }
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "input": {
+            "type": "object",
             "properties": {
-              "messages": {},
-              "files": {},
-              "stdin": {}
-            }
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "gated": {
+            "type": "object",
             "properties": {
-              "grok_neo": {}
-            }
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "tui_mode": {},
-          "verbose": {},
+          "tui_mode": {
+            "enum": [
+              "regular",
+              "fullscreen"
+            ]
+          },
+          "verbose": {
+            "type": "boolean"
+          },
           "attach": {
+            "type": "object",
+            "required": [
+              "socket"
+            ],
             "properties": {
-              "socket": {}
-            }
+              "socket": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
             "properties": {
-              "bootstrap_fd": {},
-              "enforcement": {}
-            }
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "api_key": {}
+          "api_key": {
+            "type": "object"
+          }
         },
         "required": []
       },
@@ -858,58 +1598,196 @@
       "input": {
         "properties": {
           "session": {
+            "type": "object",
             "properties": {
-              "continue": {},
-              "path": {},
-              "id": {},
-              "fork": {},
-              "rebind": {},
-              "ephemeral": {},
-              "dir": {},
-              "spawned_by": {},
-              "name": {}
-            }
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "setup": {
+            "type": "object",
             "properties": {
-              "model": {},
-              "provider": {},
-              "model_patterns": {},
-              "reasoning": {},
-              "system_prompt": {},
-              "append_system_prompt": {},
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
               "tools": {
+                "type": "object",
                 "properties": {
-                  "allow": {},
-                  "deny": {},
-                  "none": {},
-                  "no_builtin": {}
-                }
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "extensions": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "skills": {
+                "type": "object",
                 "properties": {
-                  "names": {},
-                  "none": {}
-                }
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "prompt_templates": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "themes": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {},
-                  "use": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               },
               "context_files": {
                 "type": "boolean"
@@ -917,32 +1795,84 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
-              "session_runtime": {},
-              "tool_runtime": {},
-              "auto_title": {}
-            }
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "input": {
+            "type": "object",
             "properties": {
-              "messages": {},
-              "files": {},
-              "stdin": {}
-            }
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "gated": {
+            "type": "object",
             "properties": {
-              "grok_neo": {}
-            }
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "mode": {},
+          "mode": {
+            "enum": [
+              "text",
+              "json"
+            ]
+          },
           "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
             "properties": {
-              "bootstrap_fd": {},
-              "enforcement": {}
-            }
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "api_key": {}
+          "api_key": {
+            "type": "object"
+          }
         },
         "required": [
           "input",
@@ -1031,58 +1961,196 @@
       "input": {
         "properties": {
           "session": {
+            "type": "object",
             "properties": {
-              "continue": {},
-              "path": {},
-              "id": {},
-              "fork": {},
-              "rebind": {},
-              "ephemeral": {},
-              "dir": {},
-              "spawned_by": {},
-              "name": {}
-            }
+              "continue": {
+                "type": "boolean",
+                "const": true
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "fork": {
+                "type": "string",
+                "minLength": 1
+              },
+              "rebind": {
+                "type": "string",
+                "minLength": 1
+              },
+              "ephemeral": {
+                "type": "boolean",
+                "const": true
+              },
+              "dir": {
+                "type": "string",
+                "minLength": 1
+              },
+              "spawned_by": {
+                "type": "object",
+                "required": [
+                  "parentSessionId",
+                  "rootSessionId",
+                  "taskId"
+                ],
+                "properties": {
+                  "parentSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "rootSessionId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "taskId": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "additionalProperties": false
           },
           "setup": {
+            "type": "object",
             "properties": {
-              "model": {},
-              "provider": {},
-              "model_patterns": {},
-              "reasoning": {},
-              "system_prompt": {},
-              "append_system_prompt": {},
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
               "tools": {
+                "type": "object",
                 "properties": {
-                  "allow": {},
-                  "deny": {},
-                  "none": {},
-                  "no_builtin": {}
-                }
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "extensions": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "skills": {
+                "type": "object",
                 "properties": {
-                  "names": {},
-                  "none": {}
-                }
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "prompt_templates": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
               },
               "themes": {
+                "type": "object",
                 "properties": {
-                  "paths": {},
-                  "none": {},
-                  "use": {}
-                }
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
               },
               "context_files": {
                 "type": "boolean"
@@ -1090,27 +2158,85 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
-              "session_runtime": {},
-              "tool_runtime": {},
-              "auto_title": {}
-            }
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
           "gated": {
+            "type": "object",
             "properties": {
-              "grok_neo": {}
-            }
+              "grok_neo": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "listen": {},
-          "multi_session": {},
+          "listen": {
+            "type": "string",
+            "minLength": 1
+          },
+          "multi_session": {
+            "type": "boolean"
+          },
           "presenter": {
+            "type": "object",
+            "required": [
+              "bootstrap_fd"
+            ],
             "properties": {
-              "bootstrap_fd": {},
-              "enforcement": {}
-            }
+              "bootstrap_fd": {
+                "type": "number",
+                "const": 4
+              },
+              "enforcement": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
           },
-          "input": {},
-          "api_key": {}
+          "input": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "files": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "stdin": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          },
+          "api_key": {
+            "type": "object"
+          }
         },
         "required": []
       },
@@ -1241,7 +2367,164 @@
             "type": "string",
             "minLength": 1
           },
-          "setup": {}
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": []
       },
@@ -1560,7 +2843,164 @@
       ],
       "input": {
         "properties": {
-          "setup": {}
+          "setup": {
+            "type": "object",
+            "properties": {
+              "model": {
+                "type": "string",
+                "minLength": 1
+              },
+              "provider": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model_patterns": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "minItems": 1
+              },
+              "reasoning": {
+                "type": "string",
+                "minLength": 1
+              },
+              "system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "append_system_prompt": {
+                "type": "string",
+                "minLength": 1
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "allow": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "deny": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "skills": {
+                "type": "object",
+                "properties": {
+                  "names": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "prompt_templates": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "themes": {
+                "type": "object",
+                "properties": {
+                  "paths": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "minItems": 1
+                  },
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "use": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {
+                "type": "boolean"
+              },
+              "session_runtime": {
+                "enum": [
+                  "in-process",
+                  "worker"
+                ]
+              },
+              "tool_runtime": {
+                "enum": [
+                  "in-process",
+                  "child"
+                ]
+              },
+              "auto_title": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
         },
         "required": []
       },
@@ -1898,8 +3338,13 @@
       ],
       "input": {
         "properties": {
-          "wait": {},
-          "lease_pid": {}
+          "wait": {
+            "type": "boolean"
+          },
+          "lease_pid": {
+            "type": "integer",
+            "minimum": 1
+          }
         },
         "required": []
       },

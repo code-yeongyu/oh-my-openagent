@@ -61,9 +61,9 @@ type FollowEventOf<Stream> =
 type FollowStep = FollowEventOf<ReturnType<OmoSdkRoot["threads"]["follow"]>>
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
 export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true] = [
-  // H1: the object form of create's prompt is typed, without the author P1a-s holds.
+  // H1: the object form of create's prompt is typed, with the connector's author slice P1a-s typed (#14949).
   true satisfies Equal<
-    "author" extends keyof PromptObject ? false : "message" extends keyof PromptObject ? true : false,
+    "author" extends keyof PromptObject ? ("message" extends keyof PromptObject ? true : false) : false,
     true
   >,
   true satisfies Equal<Exclude<Leaves<OmoSdkRoot>, "close" | "dispose">, RootCallKey>,

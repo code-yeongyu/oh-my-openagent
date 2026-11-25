@@ -11,9 +11,16 @@
       ],
       "input": {
         "properties": {
-          "replace": {}
+          "replace": {
+            "type": "boolean"
+          },
+          "credential": {
+            "type": "object"
+          }
         },
-        "required": []
+        "required": [
+          "credential"
+        ]
       },
       "cli": [
         {
@@ -52,10 +59,62 @@
       ],
       "input": {
         "properties": {
-          "what": {}
+          "what": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "access_token"
+              },
+              {
+                "type": "string",
+                "const": "stored_credential"
+              }
+            ]
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": [
+                  "kind"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "terminal"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": [
+                  "kind",
+                  "pid",
+                  "started_at"
+                ],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "peer"
+                  },
+                  "pid": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "started_at": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          }
         },
         "required": [
-          "what"
+          "what",
+          "destination"
         ]
       },
       "cli": [
@@ -270,9 +329,15 @@
       "input": {
         "properties": {
           "method": {
-            "enum": [
-              "device_code",
-              "browser"
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "device_code"
+              },
+              {
+                "type": "string",
+                "const": "browser"
+              }
             ]
           },
           "open_browser": {
@@ -280,8 +345,13 @@
           },
           "onUserCode": {},
           "onOpenUrl": {},
-          "deviceName": {},
-          "replace": {},
+          "deviceName": {
+            "type": "string",
+            "minLength": 1
+          },
+          "replace": {
+            "type": "boolean"
+          },
           "signal": {}
         },
         "required": [

@@ -30,7 +30,7 @@ function expectationProblems(at: string, expectations: readonly Expectation[], c
   return problems
 }
 
-function scenarioShapeProblems(scenario: TableScenario, row: Row, domain: string, contract: Contract): string[] {
+export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain: string, contract: Contract): string[] {
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)

@@ -15,7 +15,12 @@ type Node = FieldSchema & { readonly anyOf?: readonly Node[] }
 type Mutable = { properties?: Record<string, Node>; anyOf?: Node[]; required?: string[] }
 
 const project = (schema: unknown): Node =>
-  JSON.parse(JSON.stringify(schema, (key, value: unknown) => (key === "description" ? undefined : value))) as Node
+  JSON.parse(
+    // A description annotation is prose and is dropped; a property named "description" is a field and is kept.
+    JSON.stringify(schema, (key, value: unknown) =>
+      key === "description" && typeof value === "string" ? undefined : value,
+    ),
+  ) as Node
 
 // Puts the row's own node at a held nested path back into the generated field, in the union variant that has the parent.
 const restore = (target: Node, source: Node | undefined, path: readonly string[]): Node => {

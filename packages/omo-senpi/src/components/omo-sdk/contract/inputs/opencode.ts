@@ -1,7 +1,7 @@
 import { Type } from "typebox"
 
-// The OpenCode-edition calls of first-party design 6.11 that P1a types. codex_autonomous on install.plugin is held for
-// P1a-s (contract/gated.ts). The provider inputs are the twelve keys of InstallArgs, as the registry enumerates them.
+// The OpenCode-edition calls of first-party design 6.11. codex_autonomous on install.plugin is slice P1a-s's (security
+// design 4.4): who may pass it is the principal matrix. The provider inputs are the twelve keys of InstallArgs, as the registry enumerates them.
 const YesNo = Type.Optional(Type.Enum(["no", "yes"]))
 const Path = Type.String({ minLength: 1 })
 const Platform = Type.Enum(["opencode", "codex", "both", "native", "native-dev"])
@@ -21,6 +21,7 @@ export const InstallPlugin = Type.Object({
   minimaxCnCodingPlan: YesNo,
   minimaxCodingPlan: YesNo,
   vercelAiGateway: YesNo,
+  codex_autonomous: Type.Optional(Type.Boolean()),
   skip_auth: Type.Boolean(),
 })
 export const InstallCleanup = Type.Object({
