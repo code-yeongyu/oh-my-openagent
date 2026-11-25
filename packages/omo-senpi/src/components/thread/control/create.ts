@@ -232,7 +232,7 @@ export async function createThread(
         if (found === undefined) throw error
         outcome = found
       }
-    if (outcome.kind === "error") return outcome
+    if (outcome.kind === "error") return keyedRetryHint(outcome, value.idempotency_key, createdId, plan.host.device)
     opened = outcome.thread
     const created: ThreadToolResult = {
       ...openedResult(outcome.thread, deduplicated),
@@ -537,4 +537,27 @@ function keptWorktree(note: string | null | undefined): ThreadWorktree | undefin
     typeof repository === "string"
     ? (kept as ThreadWorktree)
     : undefined
+}
+
+/**
+ * #15002: a keyed create on another device whose open ended uncertain (its reply or its channel was lost) is safe to retry
+ * under the same key: the session that open made is opened under the id the key derives, so the retry adopts it and never
+ * opens a second one. Saying so spares the caller a scan of every listed thread before it can decide.
+ */
+function keyedRetryHint(
+  outcome: Extract<ThreadToolResult, { readonly kind: "error" }>,
+  key: string | undefined,
+  createdId: string | undefined,
+  device: string | undefined,
+): ThreadToolResult {
+  if (outcome.error.code !== "idempotency_uncertain" || key === undefined || createdId === undefined || device === undefined)
+    return outcome
+  return {
+    ...outcome,
+    error: {
+      ...outcome.error,
+      next_action: `Retry thread_create with the same idempotency_key (${key}): a session this call did open is adopted, never opened twice.`,
+      details: { ...outcome.error.details, retry_same_key_safe: true, idempotency_key: key },
+    },
+  }
 }
