@@ -50,6 +50,14 @@ function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): Om
   }
 }
 
+const isAbsoluteFileUrl = (value: string): boolean => {
+  try {
+    return new URL(value).protocol === "file:"
+  } catch {
+    return false
+  }
+}
+
 const LIST = ["all_scope", "state"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope"]
 const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
@@ -75,6 +83,8 @@ export function threadsNamespace(options: {
   readonly endpoint?: Endpoint
   readonly threads?: ThreadNamespaceOptions
   readonly ports?: ThreadPorts
+  /** The public root refuses a module URL that is not an absolute file URL before any effect; the shipped facade does not. */
+  readonly checkModuleUrl?: boolean
 }): NamespaceServing & { readonly releaseLocated: ThreadCore["releaseRow"] } {
   // Only a script or a person reaches the thread core through the root; every allowed cell of another principal is
   // slice T2's or X1b's (design lane ruling), and the refused cells are answered before this at the root's boundary.
@@ -120,6 +130,16 @@ export function threadsNamespace(options: {
     "threads.release": async (input) =>
       unbuilt("threads.release", input, ["thread", "interrupt", "force"]) ?? onRoot(await thread().release(input)),
     "threads.extensions.register": async (input) => {
+      if (options.checkModuleUrl !== false && !isAbsoluteFileUrl(input.moduleUrl))
+        return {
+          kind: "error",
+          error: {
+            code: "invalid_arguments",
+            message: "moduleUrl must be an absolute file URL of compiled JavaScript.",
+            next_action: "Pass a file:// URL to the extension's built module.",
+            details: { field: "moduleUrl" },
+          },
+        }
       const registered = await thread().extensions.register(input)
       return registered.kind === "ok" ? registered : extensionFailure(registered)
     },

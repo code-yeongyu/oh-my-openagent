@@ -17,6 +17,7 @@ export function threadsServing(
   env: Readonly<Record<string, string | undefined>>,
   cwd: string,
   principal: OmoPrincipal,
+  checkModuleUrl = true,
 ) {
   const ports = options.ports ?? {}
   return threadsNamespace({
@@ -26,6 +27,7 @@ export function threadsServing(
     user: options.user ?? userInfo().username,
     env,
     principal,
+    checkModuleUrl,
     ...(options.endpoint === undefined ? {} : { endpoint: options.endpoint }),
     ...(options.threads === undefined ? {} : { threads: options.threads }),
     ports: {
@@ -48,7 +50,7 @@ export function assembleThreadFacade(options: OmoSdkOptions): { readonly root: O
   const env = options.env ?? process.env
   const cwd = options.cwd ?? process.cwd()
   const principal = options.principal ?? { kind: "script", uid: options.uid ?? processUid() }
-  const threads = threadsServing(options, env, cwd, principal)
+  const threads = threadsServing(options, env, cwd, principal, false)
   const root = assembleRoot([threads], {}, { env, cwd, principal }, boundaryRefusals(principal, options))
   return { root, releaseLocated: threads.releaseLocated }
 }
