@@ -99,7 +99,7 @@ function exportDeclarationEdge(node: ts.ExportDeclaration, specifier: string): I
   return { kind: "export-from", specifier, typeOnly: node.isTypeOnly, names, whole: clause === undefined }
 }
 
-function scanSource(file: string, text: string): FileFacts {
+export function scanSource(file: string, text: string): FileFacts {
   const kind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : /\.[cm]?js$/.test(file) ? ts.ScriptKind.JS : ts.ScriptKind.TS
   const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, false, kind)
   const edges: ImportEdge[] = []

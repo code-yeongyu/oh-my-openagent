@@ -1,9 +1,9 @@
-import { execFileSync } from "node:child_process"
+import { execFileSync, spawnSync } from "node:child_process"
 import { basename, dirname, relative, sep } from "node:path"
 
 import { createResolver, type Resolver, type ResolverFiles } from "./remote-import-guard-resolve"
 import { ADAPTER_RULES } from "./remote-import-guard-rules"
-import { type FileFacts, scanRepository } from "./remote-import-guard-scan"
+import { type FileFacts, scanSource } from "./remote-import-guard-scan"
 
 // The two sides of the moved-file check, read from git at their exact revisions (a sha for the merge base, `HEAD` for the
 // head), never from a working tree or a branch name. Each revision is listed once (`git ls-tree -r`) and its blobs are
@@ -15,6 +15,8 @@ import { type FileFacts, scanRepository } from "./remote-import-guard-scan"
 export type GitReader = (args: readonly string[]) => string | undefined
 /** Reads objects by `<rev>:<path>` name in one process; a name absent from the answer could not be read. */
 export type BlobBatch = (names: readonly string[]) => ReadonlyMap<string, string>
+/** The paths at HEAD containing any of the needles; [] when none does, undefined when the search itself failed. */
+export type ImporterSearch = (needles: readonly string[]) => readonly string[] | undefined
 
 export type Trees = {
   readonly base: string
@@ -86,14 +88,25 @@ function catFileBatch(repoRoot: string): BlobBatch {
 
 type Revision = { readonly files: ReadonlySet<string>; readonly children: ReadonlyMap<string, ReadonlySet<string>> }
 
+function gitGrep(repoRoot: string): ImporterSearch {
+  return (needles) => {
+    const args = ["grep", "-l", "-F", ...needles.flatMap((needle) => ["-e", needle]), "HEAD", "--", "packages"]
+    const run = spawnSync("git", args, { cwd: repoRoot, encoding: "utf8", maxBuffer: 1 << 28 })
+    if (run.status === 0) return lines(run.stdout).map((line) => line.replace(/^HEAD:/, ""))
+    return run.status === 1 && run.stdout === "" && run.stderr === "" ? [] : undefined
+  }
+}
+
 /** Both sides from git at their exact revisions; `prefetch` names the paths read in the first batch of each revision. */
 export function gitTrees(
   git: GitReader,
   base: string,
   repoRoot: string,
   prefetch: (files: ReadonlySet<string>) => readonly string[],
-  batch: BlobBatch = catFileBatch(repoRoot),
+  ports: { readonly batch?: BlobBatch; readonly search?: ImporterSearch } = {},
 ): Trees {
+  const batch = ports.batch ?? catFileBatch(repoRoot)
+  const search = ports.search ?? gitGrep(repoRoot)
   const missing = new Set<string>()
   const revisions = new Map<string, Revision>()
   const blobs = new Map<string, string>()
@@ -142,17 +155,29 @@ export function gitTrees(
       directories: (path) => [...(revision(ref).children.get(inRepo(path)) ?? [])],
     }
   }
+  const resolver = (ref: string): Resolver => {
+    const resolve = resolvers.get(ref) ?? createResolver(repoRoot, files(ref))
+    resolvers.set(ref, resolve)
+    return resolve
+  }
+  // The importer question is answered at HEAD alone: the search, the candidates' text and the resolution all read HEAD.
   const importedAnswers = new Map<string, boolean>()
   const isImported = (file: string): boolean => {
     const known = importedAnswers.get(file)
     if (known !== undefined) return known
-    const resolve = createResolver(repoRoot)
-    const needles = specifierNeedles(file, resolve, (dir) => read("HEAD", `${dir}package.json`))
-    const grep = git(["grep", "-l", "-F", ...needles.flatMap((needle) => ["-e", needle]), "HEAD", "--", "packages"])
-    const candidates = lines(grep)
-      .map((line) => line.replace(/^HEAD:/, ""))
-      .filter((path) => SOURCE.test(path) && path !== file)
-    const answer = importsOf(scanRepository(repoRoot, candidates), resolve, file)
+    const resolve = resolver("HEAD")
+    const found = search(specifierNeedles(file, resolve, (dir) => read("HEAD", `${dir}package.json`)))
+    if (found === undefined)
+      missing.add(`the importer search at HEAD for ${file} failed, so it cannot be shown unreachable`)
+    const candidates = (found ?? []).filter(
+      (path) => SOURCE.test(path) && path !== file && revision("HEAD").files.has(path),
+    )
+    load("HEAD", candidates)
+    const facts = candidates.flatMap((path) => {
+      const text = blobs.get(`HEAD:${path}`)
+      return text === undefined ? [] : [scanSource(path, text)]
+    })
+    const answer = found === undefined || importsOf(facts, resolve, file)
     importedAnswers.set(file, answer)
     return answer
   }
@@ -160,11 +185,7 @@ export function gitTrees(
     base,
     read,
     list: (ref, directory) => [...revision(ref).files].filter((file) => file.startsWith(directory)).toSorted(),
-    resolver: (ref) => {
-      const resolve = resolvers.get(ref) ?? createResolver(repoRoot, files(ref))
-      resolvers.set(ref, resolve)
-      return resolve
-    },
+    resolver,
     isImported,
     missing: () => [...missing],
   }
