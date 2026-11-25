@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { Database } from "bun:sqlite"
 import { mkdtempSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -56,6 +57,36 @@ const directories: string[] = []
 afterEach(() => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
+
+// The gateway store is read column by column, not as bytes (design lane ruling): a caller's input may sit in exactly one
+// place, the delivery payload of a send (deliveries.body, the store of record for a message that must be delivered);
+// an asset canary sits nowhere. Its WAL and shared-memory files are read through the database, not searched as bytes.
+const GATEWAY_STORE = "gateway.sqlite"
+const INPUT_ALLOWED_IN_STORE = ["deliveries.body"] as const
+
+function storeColumnsHolding(path: string, canaries: readonly string[]): string[] {
+  const db = new Database(path, { readonly: true })
+  try {
+    const tables = db.query("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[]
+    return tables.flatMap(({ name }) => {
+      const rows = db.query(`SELECT * FROM "${name.replaceAll('"', '""')}"`).all() as Record<string, unknown>[]
+      const columns = new Set<string>()
+      for (const row of rows)
+        for (const [column, value] of Object.entries(row))
+          if (
+            canaries.some((canary) =>
+              String(value instanceof Uint8Array ? Buffer.from(value).toString("latin1") : value).includes(canary),
+            )
+          )
+            columns.add(`${name}.${column}`)
+      return [...columns]
+    })
+  } finally {
+    db.close()
+  }
+}
+
+const isStoreFile = (path: string) => /gateway\.sqlite(-wal|-shm)?$/.test(path)
 
 function filesUnder(root: string): string[] {
   return readdirSync(root).flatMap((name) => {
@@ -225,6 +256,20 @@ describe("the non-disclosure scan over the whole root", () => {
     expect(canariesIn(planted).length).toBeGreaterThanOrEqual(3)
   })
 
+  test("#given a store holding canaries in two tables #when it is read column by column #then each column is named (negative control)", () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-store-"))
+    directories.push(home)
+    const path = join(home, GATEWAY_STORE)
+    const db = new Database(path)
+    db.run("CREATE TABLE deliveries (body TEXT, sender TEXT)")
+    db.run("CREATE TABLE receipts (result TEXT)")
+    db.query("INSERT INTO deliveries VALUES (?, ?)").run(`hi ${INPUT_CANARY}`, "s")
+    db.query("INSERT INTO receipts VALUES (?)").run(`echo ${INPUT_CANARY} ${CANARIES.accessToken}`)
+    db.close()
+    expect(storeColumnsHolding(path, [INPUT_CANARY]).toSorted()).toEqual(["deliveries.body", "receipts.result"])
+    expect(storeColumnsHolding(path, CANARY_VALUES)).toEqual(["receipts.result"])
+  })
+
   test("#given every call of the root #when the driver builds its inputs #then both pass the call's schema, so the scan is never refused for its input", () => {
     const keys = Object.keys(ROOT_CALLS) as RootCallKey[]
     const refused = keys.flatMap((key) =>
@@ -271,7 +316,17 @@ describe("the non-disclosure scan over the whole root", () => {
         } finally {
           for (const undo of restore) undo()
         }
-        const written = filesUnder(home).map((path) => ({ path, text: readFileSync(path, "latin1") }))
+        const paths = filesUnder(home)
+        const written = paths
+          .filter((path) => !isStoreFile(path))
+          .map((path) => ({ path, text: readFileSync(path, "latin1") }))
+        const stores = paths.filter((path) => path.endsWith(GATEWAY_STORE))
+        expect(stores.flatMap((path) => storeColumnsHolding(path, CANARY_VALUES))).toEqual([])
+        expect(
+          stores
+            .flatMap((path) => storeColumnsHolding(path, [INPUT_CANARY]))
+            .filter((column) => !(INPUT_ALLOWED_IN_STORE as readonly string[]).includes(column)),
+        ).toEqual([])
         const echoed = captured.filter((entry) => isB8Echo(entry) && canariesIn(entry.answer).length > 0)
         const strict = captured.filter((entry) => !echoed.includes(entry))
         const everyCanary = [...CANARY_VALUES, INPUT_CANARY]
