@@ -224,15 +224,19 @@ describe("a built call's nested schema change (design 7.4 amendments 5 and 7, re
     expect(declared.digest).not.toBe(silent.digest)
     // Equal outcomes on both trees (the fixture's s1): the declared id still reaches the digest the reviewer signs.
     expect(declared.digest).toBe(candidateDigest(HEAD, [...declared.candidates, "threads.locate#changed"]))
-    const both = gateReport(
+    // The two lines speak about disjoint sets (candidates are unresolved rows; a declared id has left that record), so a
+    // body may need both: no failure, and the digest covers the candidates and the declared id.
+    const withCandidate = gateReport(
       input({
         body: "SDK-Parity-Unchanged: yes\nSDK-Parity-Changed: threads.locate",
         head: { ...input().head, unresolved: cleared },
+        changedFiles: ["packages/omo-native/bin/lib/thread.js"],
       }),
     )
-    expect(both.failures).toContain(
-      "the body carries both SDK-Parity-Unchanged: yes and SDK-Parity-Changed: they contradict each other; keep the one that is true",
-    )
+    expect(withCandidate.candidates).toEqual(["threads.send"])
+    expect(withCandidate.failures).toEqual([])
+    expect(withCandidate.digest).toBe(candidateDigest(HEAD, ["threads.send", "threads.locate#changed"]))
+    expect(renderReport(withCandidate)).toContain("DECLARED CHANGE: threads.locate:")
     expect(gateReport(input({ body: "SDK-Parity-Changed: threads.teleport" })).failures).toContain(
       "SDK-Parity-Changed names threads.teleport, which is not a registry row",
     )

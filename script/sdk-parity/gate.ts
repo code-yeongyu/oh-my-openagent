@@ -164,10 +164,6 @@ export function gateReport(input: GateInput): GateReport {
       failures.push(
         `SDK-Parity-Changed names ${id}, which is still in unresolved.json; a declared change leaves it with its run evidence`,
       )
-  if (declared.length > 0 && UNCHANGED_LINE.test(input.body))
-    failures.push(
-      "the body carries both SDK-Parity-Unchanged: yes and SDK-Parity-Changed: they contradict each other; keep the one that is true",
-    )
   const changedRows = declared.filter((id) => rowIds.has(id) && !unresolved.has(id))
   return {
     failures,
@@ -223,6 +219,11 @@ export function renderReport(report: GateReport): string {
   if (report.liveSchema.length > 0)
     lines.push(
       `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer confirms against the live schema that the set of accepted inputs is the same in both directions (nothing newly refused, nothing newly accepted) before CLEAR.`,
+      "",
+    )
+  if (report.changed.length > 0)
+    lines.push(
+      `DECLARED CHANGE: ${report.changed.join(", ")}: rows the body declares changed on purpose; the reviewer confirms each change is the one intended before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")

@@ -80,7 +80,8 @@ const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim(
 // A run stopped by a signal skips the finally below, which left the base worktree and its scratch directory behind; the
 // handler removes them and exits with the signal's code.
 // Idempotent: the signal handler and the finally may both run. prune clears a worktree record left half-created.
-// The cleanup is installed before anything is created, so a failure or a signal at any step leaves nothing behind.
+// The cleanup is installed before anything is created, so a failure or a signal at any step leaves nothing behind. A
+// signal sent to the gate's pid alone is handled only after the synchronous child it is waiting on returns.
 let scratch: string | undefined
 let removed = false
 const removeBaseTree = (): void => {
