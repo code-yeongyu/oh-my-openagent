@@ -76,6 +76,9 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
     ]
   if (record.kind === "effect" && record.code !== undefined)
     return [`${where} answered ${record.code} where an effect was expected`]
+  // Design 4.4: success is the root contract's discriminator, `kind: "ok"`, not the absence of a code (review 6062344773).
+  if (record.kind === "effect" && Reflect.get(Object(record.answered), "kind") !== "ok")
+    return [`${where} answered ${JSON.stringify(record.answered)}, not a successful result (kind "ok")`]
   // A PURE row (closed list in the schema) touches nothing: its answer builds it only when the trace is EMPTY, reads
   // included, and an answer is stated. Every other effect scenario must state a port effect.
   if (record.kind === "effect" && row.pure === true) {

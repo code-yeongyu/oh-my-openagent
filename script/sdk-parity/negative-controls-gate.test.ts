@@ -179,27 +179,32 @@ describe("the descriptor and its contract annotation (design 7.4 amendment 5, re
   })
 })
 
-describe("a built call's nested schema change (design 7.4 amendment 5, review 6061874518)", () => {
-  test("#given a built row whose nested input shape changed with equal outcomes #then it is marked for the live-schema check and the verifier withholds without a review", () => {
-    const head = rows.map((row): Row =>
+describe("a built call's nested schema change (design 7.4 amendments 5 and 7, review 6061874518)", () => {
+  // The check is two-way: a newly accepted input changes behaviour as much as a newly refused one.
+  const strict = { type: "string", minLength: 1 }
+  const withThread = (schema: object): Row[] =>
+    rows.map((row): Row =>
       row.id === "threads.locate"
-        ? {
-            ...row,
-            input: { ...row.input, properties: { ...row.input.properties, thread: { type: "string", minLength: 1 } } },
-          }
+        ? { ...row, input: { ...row.input, properties: { ...row.input.properties, thread: schema } } }
         : row,
     )
-    const builtBase = {
-      ...input().base,
-      unresolved: unresolved.entries.filter((entry) => entry.id !== "threads.locate"),
-    }
-    const builtHead = { ...input().head, rows: head, unresolved: builtBase.unresolved }
-    const report = gateReport(input({ base: builtBase, head: builtHead }))
-    expect(report.failures).toEqual([])
-    expect(report.liveSchema).toEqual(["threads.locate"])
-    const output = renderReport(report)
-    expect(output).toContain("LIVE SCHEMA CHECK: threads.locate")
-    expect(output).toContain(`count=1 ids=threads.locate#live-schema`)
-    expect(verifyReview(output, "SDK-Parity-Unchanged: yes\n", "").decision).toBe("withheld")
-  })
+  const built = unresolved.entries.filter((entry) => entry.id !== "threads.locate")
+  for (const [direction, base, head] of [
+    ["narrowing", withThread({}), withThread(strict)],
+    ["widening", withThread(strict), withThread({})],
+  ] as const)
+    test(`#given a built row whose nested input shape changed by ${direction} with equal outcomes #then it is marked for the live-schema check and the verifier withholds without a review`, () => {
+      const report = gateReport(
+        input({
+          base: { ...input().base, rows: base, unresolved: built },
+          head: { ...input().head, rows: head, unresolved: built },
+        }),
+      )
+      expect(report.failures).toEqual([])
+      expect(report.liveSchema).toEqual(["threads.locate"])
+      const output = renderReport(report)
+      expect(output).toContain("LIVE SCHEMA CHECK: threads.locate")
+      expect(output).toContain("count=1 ids=threads.locate#live-schema")
+      expect(verifyReview(output, "SDK-Parity-Unchanged: yes\n", "").decision).toBe("withheld")
+    })
 })
