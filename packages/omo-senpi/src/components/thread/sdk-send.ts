@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto"
 import { toThreadAddressEntries } from "./address-book"
 import type { resolve as Resolve } from "./address/contract"
 import type { ResolvePrincipal } from "./address/principal"
@@ -101,6 +102,8 @@ export async function sendToTarget(
     args,
     ...(inboundHop === undefined || inboundHop <= 0 ? {} : { inbound_hop: inboundHop }),
     ...(authority === undefined ? {} : { authority }),
+    // A person's prompt to another device is named by a client message id, the delivery_id its answer carries.
+    ...(sender.kind === "person" ? { client_message_id: randomUUID() } : {}),
   })
 }
 

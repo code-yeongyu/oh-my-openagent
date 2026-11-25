@@ -805,14 +805,17 @@ export function createRelayTransport(
     sending: () => void,
     retryUnlisted: (outcome: Exclude<RemoteCommandOutcome, { kind: "ok" }>) => Promise<SendOutcome> | undefined,
   ): Promise<SendOutcome> => {
-    const ok = (kind: GatewayDeliveryDelivery): RelayDeliverySuccess => ({
+    const ok = (kind: GatewayDeliveryDelivery, deliveryId?: string): RelayDeliverySuccess => ({
       kind: "ok",
       thread_id: rowKey(row),
       delivery: kind,
       deduplicated: false,
       device: row.device,
+      ...(deliveryId === undefined ? {} : { delivery_id: deliveryId }),
       effective_mode: kind.kind === "steered" ? "steer" : kind.kind === "started" ? "start" : "follow_up",
     })
+    // The prompt is named by the client message id its caller stamped on it: the delivery id its answer carries.
+    const named = delivery.client_message_id
     if (delivery.mode === "steer") {
       const state = await remote.sessions.sessionCommand(row.device, row.session_id, {
         type: "get_state",
@@ -875,7 +878,7 @@ export function createRelayTransport(
           sessionId: row.session_id,
           message: delivery.text,
           streamingBehavior: "followUp",
-          ...(delivery.client_message_id === undefined ? {} : { clientMessageId: delivery.client_message_id }),
+          ...(named === undefined ? {} : { clientMessageId: named }),
         },
         1,
       ),
@@ -884,7 +887,7 @@ export function createRelayTransport(
     const reply = replyData(sent.response)
     const turnId = reply["turnId"]
     if (reply["disposition"] === "started" && typeof turnId === "string" && turnId.length > 0)
-      return ok({ kind: "started", turn_id: turnId })
+      return ok({ kind: "started", turn_id: turnId }, named)
     const after = await remote.sessions.sessionCommand(row.device, row.session_id, {
       type: "get_state",
       sessionId: row.session_id,
@@ -895,7 +898,7 @@ export function createRelayTransport(
         : { phase: "idle" as const, turnEpoch: null, pending: null }
     // An engine whose prompt reply names no turn (engines through 2026.11.5-1) reports the running turn in get_state.
     if (reply["disposition"] === "started" && settled.turnEpoch !== null)
-      return ok({ kind: "started", turn_id: String(settled.turnEpoch) })
+      return ok({ kind: "started", turn_id: String(settled.turnEpoch) }, named)
     if (settled.pending === null)
       return fail(
         "idempotency_uncertain",
@@ -903,7 +906,7 @@ export function createRelayTransport(
         "Read the thread before deciding whether to send again.",
         { device: row.device },
       )
-    return ok({ kind: "queued", queue_position: settled.pending })
+    return ok({ kind: "queued", queue_position: settled.pending }, named)
   }
 
   return {
