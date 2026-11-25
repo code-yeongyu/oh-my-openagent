@@ -1,4 +1,4 @@
-import type { Namespace, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
+import type { Namespace, OmoFailure, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
 import { ROOT_CALLS } from "../contract/calls"
 import type { CoreContext, CoreLoaders, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
@@ -64,6 +64,16 @@ const loadFailure = (namespace: string) => async () => ({
   },
 })
 
+function refusing(key: RootCallKey, error: OmoFailure["error"]): Call {
+  if (ROOT_CALLS[key].answer !== "stream") return async () => ({ kind: "error", error })
+  return () => ({
+    stop: () => undefined,
+    async *[Symbol.asyncIterator]() {
+      yield { kind: "end", failure: error }
+    },
+  })
+}
+
 function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {
   const [namespace, ...rest] = key.split(".") as [Namespace, ...string[]]
   const load = loads.get(namespace)
@@ -88,10 +98,16 @@ export function assembleRoot(
   servings: readonly NamespaceServing[],
   loaders: CoreLoaders,
   context: CoreContext,
+  refusals: ReadonlyMap<RootCallKey, OmoFailure["error"]>,
 ): OmoSdkRoot {
   const tree: Node = {}
   const loads = namespaceLoads(loaders, context)
   for (const key of Object.keys(ROOT_CALLS) as RootCallKey[]) {
+    const refused = refusals.get(key)
+    if (refused !== undefined) {
+      place(tree, key, refusing(key, refused))
+      continue
+    }
     const served = servings.find((serving) => serving.members[key] !== undefined)?.members[key]
     place(tree, key, served ?? loaded(key, loads) ?? notImplemented(key))
   }

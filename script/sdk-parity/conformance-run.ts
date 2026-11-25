@@ -1,10 +1,14 @@
+import { existsSync, readdirSync } from "node:fs"
+import { join } from "node:path"
+
 import type { ConformanceContext, EffectEvidence } from "./conformance"
 import type { ObservedCall, TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
 // The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
 // the row's SDK member through a forwarding proxy that records the member actually invoked, and the fakes report every
-// port call they observed. P0 ships no SDK call, so the list is empty; slice P1b's drivers supply one run per scenario.
+// port call they observed. Each slice keeps its drivers in its own module under runs/ (one per namespace), which the
+// collector below reads, so no two slices edit one list.
 //
 // The stream contract (review 6061874518 M3, design 4.4): a member that answers an AsyncIterable is consumed to its one
 // terminal event, `{ kind: "end", outcome | failure | cancelled }`; the run's answer is that event's outcome, a failure is
@@ -20,7 +24,28 @@ export type ScenarioSetup = {
 
 export type ScenarioRun = { readonly scenario: TableScenario; readonly setup: () => ScenarioSetup }
 
-export const SCENARIO_RUNS: readonly ScenarioRun[] = []
+export const RUNS_DIR = join(import.meta.dir, "runs")
+
+/** Every run of every module under `dir` (each exports `runs`); a scenario id that two modules run is refused. */
+export async function loadScenarioRuns(dir: string = RUNS_DIR): Promise<ScenarioRun[]> {
+  if (!existsSync(dir)) return []
+  const modules = readdirSync(dir)
+    .filter((name) => name.endsWith(".ts") && !name.endsWith(".test.ts"))
+    .toSorted()
+  const owner = new Map<string, string>()
+  const runs: ScenarioRun[] = []
+  for (const name of modules) {
+    const loaded = (await import(join(dir, name))) as { readonly runs?: readonly ScenarioRun[] }
+    for (const run of loaded.runs ?? []) {
+      const first = owner.get(run.scenario.id)
+      if (first !== undefined)
+        throw new Error(`scenario ${run.scenario.id} is run by both runs/${first} and runs/${name}`)
+      owner.set(run.scenario.id, name)
+      runs.push(run)
+    }
+  }
+  return runs
+}
 
 // P0 has no run and no port list of its own: slice P1a's PORT_EFFECTS replaces this, and until then any observed call is
 // on an unclassified port and fails (conformance.ts), so an empty table can never pass a run silently.
@@ -114,7 +139,7 @@ async function invoke(
 // before it left. Each call's evidence carries only the port calls observed during that call.
 export async function runEffectScenarios(
   rows: readonly Row[],
-  runs: readonly ScenarioRun[] = SCENARIO_RUNS,
+  runs: readonly ScenarioRun[],
 ): Promise<EffectEvidence[]> {
   const evidence: EffectEvidence[] = []
   for (const { scenario, setup } of runs) {

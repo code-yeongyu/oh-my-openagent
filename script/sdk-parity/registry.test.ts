@@ -16,7 +16,7 @@ import {
 } from "./arity-check"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
-import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
+import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { baseRecord, mergeBase } from "./git-base"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
@@ -105,7 +105,7 @@ describe("SDK parity registry (#14947)", () => {
     // A recurring check (review 6061267823 H1): read from git at every pull request, so the first correct gap closure
     // passes here exactly as it passes the gate; the initialization admission applies only while the base has no record.
     const unresolved = JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline
-    const evidence = await runEffectScenarios(rows)
+    const evidence = await runEffectScenarios(rows, await loadScenarioRuns())
     const state = {
       rows,
       originalText: repoFile(ORIGINAL_PATH),
