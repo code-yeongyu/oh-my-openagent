@@ -81,14 +81,28 @@ const AccountFields = {
   signedOut: Type.Optional(Type.Boolean()),
   store: Type.Optional(Type.Literal("claude-cli")),
   signedInAt: Type.Optional(Epoch),
-  email: Type.Optional(Text),
-  orgName: Type.Optional(Text),
-  subscriptionType: Type.Optional(Text),
   signIn: Type.Optional(Type.Enum(["signed_in", "needs_sign_in"])),
   active: Type.Optional(Type.Boolean()),
   paused: Type.Optional(Type.Literal(true)),
+}
+
+/** What the provider's profile supplies, as `omo auth check --json` prints it to a person or a script. */
+const ProviderFields = {
+  email: Type.Optional(Text),
+  orgName: Type.Optional(Text),
+  subscriptionType: Type.Optional(Text),
   usageUrl: Type.Optional(Text),
 }
+
+/**
+ * The only provider-supplied strings a session receives (security design 4.3, the owner's decision at 169406bab8): the
+ * account's email, syntactically an address of at most 254 characters, and its organisation name, at most 100 characters
+ * with control and newline characters stripped. A value outside these bounds is not a session answer; the engine
+ * (slice E1a-s) strips or omits it where it splits the code from the provider's text.
+ */
+export const SESSION_EMAIL = Type.String({ minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" })
+export const SESSION_ORG_NAME = Type.String({ minLength: 1, maxLength: 100, pattern: "^[^\\u0000-\\u001f\\u007f]*$" })
+const SessionProviderFields = { email: Type.Optional(SESSION_EMAIL), orgName: Type.Optional(SESSION_ORG_NAME) }
 const CheckCore = {
   model: Text,
   outcome: Type.Enum(["ok", "failed"]),
@@ -100,6 +114,7 @@ const CheckCore = {
 const AuthAccount = Type.Object(
   {
     ...AccountFields,
+    ...ProviderFields,
     check: Type.Optional(
       Type.Object({ ...CheckCore, reason: Type.Optional(Text), message: Type.Optional(Type.String()) }, closed),
     ),
@@ -115,6 +130,7 @@ export const SESSION_CHECK_CODES = ["auth_error", "account_disabled", "rate_limi
 const SessionAuthAccount = Type.Object(
   {
     ...AccountFields,
+    ...SessionProviderFields,
     check: Type.Optional(
       Type.Object({ ...CheckCore, code: Type.Optional(Type.Enum([...SESSION_CHECK_CODES])) }, closed),
     ),

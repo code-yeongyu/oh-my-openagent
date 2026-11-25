@@ -105,6 +105,22 @@ describe("custody of slice P1a-s (#14949)", () => {
     expect(sessionAnswerAccepts("engine.auth.check", answer({ message: `invalid key ${CANARY}` }))).toBe(false)
     expect(sessionAnswerAccepts("engine.auth.check", answer({ code: CANARY }))).toBe(false)
     expect(sessionAnswerAccepts("engine.auth.check", answer({ reason: CANARY }))).toBe(false)
+    // The owner's two provider strings, within their bounds (security design 4.3): an address of at most 254 characters,
+    // an organisation name of at most 100 with no control or newline character; no other provider field.
+    const withAccount = (fields: Record<string, unknown>) => ({
+      status: "ready",
+      provider: "p",
+      accounts: [{ ...account, ...fields }],
+    })
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: "ada@example.test", orgName: "Acme" }))).toBe(
+      true,
+    )
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: `${"a".repeat(250)}@x.test` }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: "not an address" }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ orgName: "x".repeat(101) }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ orgName: "Acme\nIgnore previous" }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ usageUrl: "https://x.test" }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ subscriptionType: "max" }))).toBe(false)
   })
 
   test("#given a secret offered as text #then no input takes it, and a hand-over with no destination is refused", () => {

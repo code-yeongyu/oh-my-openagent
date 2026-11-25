@@ -180,7 +180,13 @@ export const AWAITING_REVISION: readonly AwaitingRevision[] = []
 export const SESSION_FIELDS: Readonly<Record<string, readonly string[]>> = {
   "engine.auth.check": [
     ...(CUSTODY_FIELDS["engine.auth.check"] ?? []).filter(
-      (field) => field !== "accounts[].check.reason" && field !== "accounts[].check.message",
+      (field) =>
+        ![
+          "accounts[].check.reason",
+          "accounts[].check.message",
+          "accounts[].subscriptionType",
+          "accounts[].usageUrl",
+        ].includes(field),
     ),
     "accounts[].check.code",
   ],

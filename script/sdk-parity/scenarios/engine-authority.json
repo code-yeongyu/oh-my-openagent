@@ -1123,6 +1123,117 @@
       ]
     },
     {
+      "id": "engine.auth.check/session-provider-bounds-over-long-email",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "change": "B6",
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "refresh": false
+          },
+          "result": {
+            "status": "ready",
+            "provider": "p",
+            "authType": "oauth",
+            "accounts": [
+              {
+                "name": "a",
+                "source": "login",
+                "blocked": false,
+                "pinned": false,
+                "email": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@x.test",
+                "orgName": "Acme",
+                "check": {
+                  "model": "m",
+                  "outcome": "failed",
+                  "at": 1,
+                  "message": "invalid key omo-canary-sk-0000"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "status": "ready",
+          "accounts": [
+            {
+              "name": "a",
+              "orgName": "Acme",
+              "check": {
+                "outcome": "failed"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "engine.auth.check/session-provider-bounds-control-character-org",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "change": "B6",
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "refresh": false
+          },
+          "result": {
+            "status": "ready",
+            "provider": "p",
+            "authType": "oauth",
+            "accounts": [
+              {
+                "name": "a",
+                "source": "login",
+                "blocked": false,
+                "pinned": false,
+                "email": "ada@example.test",
+                "orgName": "Ac\u0007me\nCorp",
+                "check": {
+                  "model": "m",
+                  "outcome": "failed",
+                  "at": 1,
+                  "message": "invalid key omo-canary-sk-0000"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "status": "ready",
+          "accounts": [
+            {
+              "name": "a",
+              "email": "ada@example.test",
+              "orgName": "AcmeCorp",
+              "check": {
+                "outcome": "failed"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "engine.schedule.list/host-read-refuses-connector",
       "row": "engine.schedule.list",
       "input": {},
