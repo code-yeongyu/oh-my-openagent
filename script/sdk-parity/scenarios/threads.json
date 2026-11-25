@@ -1369,6 +1369,31 @@
       "target": "this_device"
     },
     {
+      "id": "threads.locate/out-of-scope",
+      "row": "threads.locate",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.locate/missing",
       "row": "threads.locate",
       "kind": "refusal",
@@ -3797,6 +3822,36 @@
         "name": "review"
       },
       "target": "this_device"
+    },
+    {
+      "id": "threads.rename/out-of-scope",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        }
+      ]
     },
     {
       "id": "threads.rename/idempotent-repeat",
