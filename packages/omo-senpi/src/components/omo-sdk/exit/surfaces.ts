@@ -1,4 +1,5 @@
 import type { SurfaceExits } from "."
+import { ACCOUNT_SURFACE_EXITS } from "./account"
 
 /** `omo thread` (omo-native bin/lib/thread.js threadExitCode, THREAD_EXIT): 3 unavailable, 5 internal_error. */
 const THREAD: SurfaceExits = {
@@ -156,4 +157,5 @@ export const SURFACE_EXITS: Readonly<Record<string, SurfaceExits>> = {
   "remote sessions": REMOTE,
   "remote disable": REMOTE,
   "remote wake": REMOTE,
+  ...ACCOUNT_SURFACE_EXITS,
 }

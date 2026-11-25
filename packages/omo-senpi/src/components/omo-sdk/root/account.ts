@@ -120,13 +120,17 @@ export function accountNamespace(options: {
           if (forgotten.kind === "ok") return { kind: "ok", value: { forgotten: true, ...auditNote(forgotten.value) } }
           switch (forgotten.code) {
             case "empty_device":
-              return failed("invalid_arguments", "device must name this device's id.", { field: "device" })
+              return failed("invalid_arguments", "device must name this device's id.", {
+                field: "device",
+                reason: "empty_device",
+              })
             case "other_device":
               return failed(
                 "invalid_arguments",
                 "account.forget acts on this device only; another device is devices.revoke.",
                 {
                   field: "device",
+                  reason: "other_device",
                   device: forgotten.device,
                 },
               )
