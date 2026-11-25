@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { DISPLAY_UNSAFE, ORDINARY, unsafeCodeUnits } from "@oh-my-opencode/utils/testing/display-unsafe"
-import { runThreadCommand } from "../bin/lib/thread.js"
+import { loadThreadSdk, runThreadCommand } from "../bin/lib/thread.js"
 import { humanLines } from "../bin/lib/thread-output.js"
 
 function capture() {
@@ -140,6 +140,59 @@ describe("omo thread error lines", () => {
         read: { kind: "error", error: { code: "not_found", message: text, next_action: text } },
       })
       expect(human.stderr).toContain(text)
+    }
+  })
+})
+
+describe("omo thread diagnostic lines", () => {
+  test("#given a gateway store whose close fails with each fixture #when a command finishes #then the diagnostic line holds no unsafe unit", async () => {
+    for (const fixture of DISPLAY_UNSAFE) {
+      const stderr = capture()
+      await runThreadCommand(["list"], {
+        engine: { run: () => ({ exitCode: 0, stdout: "", stderr: "" }) },
+        pluginRoot: "/plugin",
+        agentDir: "/agent",
+        env: {},
+        cwd: "/work",
+        stdout: capture(),
+        stderr,
+        platform: "darwin",
+        loadSqlite: async () => ({}),
+        importSdk: async () => ({
+          createThreadSdk: () => ({
+            list: async () => ({ kind: "ok", scope: "workspace", threads: [] }),
+            principal: "cli:501",
+            dispose: async () => {
+              throw new Error(fixture)
+            },
+          }),
+        }),
+        identity: { uid: 501, user: "qa" },
+      })
+      for (const line of linesOf(stderr.text())) expect(unsafeCodeUnits(line)).toEqual([])
+      expect(stderr.text()).toContain("closing the gateway store failed")
+    }
+  })
+
+  test("#given a thread client that fails to load with each fixture #when the SDK loads #then the diagnostic line holds no unsafe unit", async () => {
+    for (const fixture of DISPLAY_UNSAFE) {
+      const stderr = capture()
+      await loadThreadSdk({
+        pluginRoot: "/plugin",
+        agentDir: "/agent",
+        env: {},
+        cwd: "/work",
+        stderr,
+        reinstall: fixture,
+        loadSqlite: async () => ({}),
+        importSdk: async () => ({ createThreadSdk: () => ({ dispose: async () => {} }) }),
+        importThreadClient: async () => {
+          throw new Error(fixture)
+        },
+        identity: { uid: 501, user: "qa" },
+      })
+      for (const line of linesOf(stderr.text())) expect(unsafeCodeUnits(line)).toEqual([])
+      expect(stderr.text()).toContain("could not be loaded")
     }
   })
 })
