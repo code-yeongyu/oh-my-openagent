@@ -25,12 +25,12 @@ function rootOn() {
   return { a, s, root }
 }
 
-describe("threads.list filters", () => {
-  const threads = (answer: unknown) =>
-    ((answer as { threads?: readonly { thread: string; state?: string; cwd?: string }[] }).threads ?? []).map(
-      (row) => row.thread,
-    )
+const threads = (answer: unknown) =>
+  ((answer as { threads?: readonly { thread: string; state?: string; cwd?: string }[] }).threads ?? []).map(
+    (row) => row.thread,
+  )
 
+describe("threads.list filters", () => {
   test("#given threads here and on device b #when the root lists by device, name and project #then only the matching rows", async () => {
     const { root } = rootOn()
     expect(threads(await root.threads.list({ all_scope: true, device: "b" }))).toEqual(["dur-on-b"])
@@ -66,6 +66,39 @@ describe("threads.list filters", () => {
       kind: "error",
       error: { code: "idempotency_conflict" },
     })
+  })
+})
+
+describe("a keyed read is bound to its caller's principal", () => {
+  test("#given one key used by the tool (a session), the SDK root (cli:501) and a root for another uid (cli:502) with different filters #when each lists #then none replays or conflicts with another", async () => {
+    const { a, s, root } = rootOn()
+    const other = assembleOmoSdk(
+      {
+        agentDir: s.agentDir,
+        cwd: process.cwd(),
+        uid: 502,
+        user: "qa2",
+        ports: { host: s.host, store: s.store, remote: a.remote },
+      },
+      {},
+    )
+    const key = "k-shared"
+    const viaTool = (await s.run("thread_list", { all_scope: true, idempotency_key: key })) as {
+      kind: string
+      threads: unknown[]
+    }
+    const viaRoot = (await root.threads.list({ all_scope: true, device: "b", idempotency_key: key })) as {
+      kind: string
+      threads: unknown[]
+    }
+    const viaOther = (await other.threads.list({ all_scope: true, device: "here", idempotency_key: key })) as {
+      kind: string
+      threads: unknown[]
+    }
+    expect([viaTool.kind, viaRoot.kind, viaOther.kind]).toEqual(["ok", "ok", "ok"])
+    expect(threads(viaRoot)).toEqual(["dur-on-b"])
+    expect(threads(viaOther)).toEqual(["dur-local"])
+    expect(threads(viaTool).sort()).toEqual(["dur-local", "dur-on-b"])
   })
 })
 
