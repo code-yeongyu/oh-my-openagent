@@ -25,6 +25,7 @@
     "packages/omo-opencode/src/cli/service-auth/devices.ts": "packages/account-core/src/devices.ts",
     "packages/omo-opencode/src/cli/service-auth/index.ts": "packages/account-core/src/index.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/access-pinned.test.ts": "packages/account-core/src/keychain-helper/access-pinned.test.ts",
+    "packages/omo-opencode/src/cli/service-auth/keychain-helper/access-unsigned.test.ts": "packages/omo-native/test/keychain-helper-access-unsigned.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/access.test.ts": "packages/account-core/src/keychain-helper/access.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/access.ts": "packages/account-core/src/keychain-helper/access.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/acl-denial.test.ts": "packages/account-core/src/keychain-helper/acl-denial.test.ts",
@@ -47,6 +48,7 @@
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/location.test.ts": "packages/account-core/src/keychain-helper/location.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/location.ts": "packages/account-core/src/keychain-helper/location.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/migration.ts": "packages/account-core/src/keychain-helper/migration.ts",
+    "packages/omo-opencode/src/cli/service-auth/keychain-helper/owner-marker.test.ts": "packages/omo-native/test/keychain-helper-owner-marker.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/owner-marker.ts": "packages/account-core/src/keychain-helper/owner-marker.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/pin.test.ts": "packages/account-core/src/keychain-helper/pin.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/pin.ts": "packages/account-core/src/keychain-helper/pin.ts",
@@ -63,6 +65,7 @@
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/session-dev-contracts.test.ts": "packages/account-core/src/keychain-helper/session-dev-contracts.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/session-helper.test.ts": "packages/account-core/src/keychain-helper/session-helper.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/session-relogin.test.ts": "packages/account-core/src/keychain-helper/session-relogin.test.ts",
+    "packages/omo-opencode/src/cli/service-auth/keychain-helper/signature.test.ts": "packages/omo-native/test/keychain-helper-signature.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/signature.ts": "packages/account-core/src/keychain-helper/signature.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding-injected.test.ts": "packages/account-core/src/keychain-helper/store-binding-injected.test.ts",
     "packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding-retry.test.ts": "packages/account-core/src/keychain-helper/store-binding-retry.test.ts",
@@ -114,6 +117,7 @@
     "packages/omo-opencode/src/cli/service-auth/test-support.ts": "packages/account-core/src/test-support.ts",
     "packages/omo-opencode/src/cli/service-auth/tls-refresh.test.ts": "packages/account-core/src/tls-refresh.test.ts",
     "packages/omo-opencode/src/cli/service-auth/tls-test-certificate.ts": "packages/account-core/src/tls-test-certificate.ts",
-    "packages/omo-opencode/src/cli/service-auth/versioned-keystore.test.ts": "packages/account-core/src/versioned-keystore.test.ts"
+    "packages/omo-opencode/src/cli/service-auth/versioned-keystore.test.ts": "packages/account-core/src/versioned-keystore.test.ts",
+    "packages/omo-opencode/src/shared/bun-ffi-shim.ts": "packages/utils/src/bun-ffi.ts"
   }
 }

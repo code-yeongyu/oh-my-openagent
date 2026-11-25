@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 
 import type { offenderGrowth } from "../remote-import-guard-adapter"
-import { offenderBaseGrowth } from "../remote-import-guard-moves"
+import { gitTrees, offenderBaseGrowth } from "../remote-import-guard-moves"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
 import { P0_CONTEXT } from "./conformance-run"
@@ -90,10 +90,20 @@ export function offenderBaseProblems(git: GitPort, head: OffenderRecord, ref: st
   if (!probe.readable) return { skipped: probe.reason }
   const recorded = showAt(git, probe.base, "script/remote-import-guard-adapter-offenders.json")
   return {
-    problems: offenderBaseGrowth(recorded === undefined ? undefined : JSON.parse(recorded), head, {
-      base: probe.base,
-      read: (at, path) => showAt(git, at, path),
-      list: (at, directory) => git(["ls-tree", "-r", "--name-only", at, "--", directory]).split("\n").filter(Boolean),
-    }),
+    problems: offenderBaseGrowth(
+      recorded === undefined ? undefined : JSON.parse(recorded),
+      head,
+      gitTrees(
+        (args) => {
+          try {
+            return git(args)
+          } catch {
+            return undefined
+          }
+        },
+        probe.base,
+        REPO_ROOT,
+      ),
+    ),
   }
 }
