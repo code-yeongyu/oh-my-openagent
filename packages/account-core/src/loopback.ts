@@ -118,10 +118,11 @@ export async function loginLoopback(
   const keys = generateDeviceKeys()
   for (;;) {
     const authorization = await authorize({ accounts: options.accounts, open: options.open, signal: session.signal })
+    session.signal?.throwIfAborted()
     try {
       const grant = parseReply(
         grantSchema,
-        await session.request(
+        await session.exchange(
           "/v1/session/exchange",
           jsonRequest({
             ...authorization,

@@ -127,9 +127,10 @@ async function authorizeDevice(
     session.signal?.throwIfAborted()
     if (now() >= expiresAt) break
     try {
+      session.signal?.throwIfAborted()
       const { replacedDeviceId, ...grant } = parseReply(
         deviceTokenGrantSchema,
-        await session.request(
+        await session.exchange(
           "/v1/device/token",
           jsonRequest({
             deviceCode: minted.deviceCode,

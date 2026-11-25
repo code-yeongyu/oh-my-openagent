@@ -50,7 +50,7 @@ const failed = (
 
 // A refusal's message and next action are the core's own words; the lower layer's error (`cause`) never leaves.
 function refusalOf(refused: SignInFailure): OmoFailure {
-  // Today's answer to an abort, the shipped launcher child's (account/sign-in.ts), at every stage.
+  // Today's answer to an abort before the commit point, the shipped launcher child's (account/sign-in.ts).
   if (refused.code === "cancelled")
     return {
       kind: "error",

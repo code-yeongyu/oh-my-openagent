@@ -129,6 +129,7 @@ async function run(
         method: options.device ? "device_code" : "browser",
         openBrowser: options.browser !== false,
         accounts: accountsOrigin(options, process.env),
+        signal: controller.signal,
         onStarted: () => {
           if (api !== DEFAULT_API_ORIGIN) console.log(`OmO API: ${api}`)
         },
@@ -165,10 +166,10 @@ async function run(
     noteDedicatedStore()
   } catch (error) {
     console.error(
-      controller.signal.aborted
-        ? "Sign-in cancelled."
-        : error instanceof SignInError
-          ? error.message
+      error instanceof SignInError
+        ? error.message
+        : controller.signal.aborted
+          ? "Sign-in cancelled."
           : "OmO sign-in stopped on an unexpected error. Run the command again, and report it with /bug if it keeps failing.",
     )
     process.exitCode = 1

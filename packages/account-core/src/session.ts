@@ -128,19 +128,24 @@ export function createSession(options: {
   const markerPath = signedOutMarkerPath(options.home ?? homedir(), credentialId(api))
   // Any approval dialog happens in prepare(), before the lock: no access dialog is ever open while it is held. Inside,
   // every section first converges an interrupted migration (#11262 design 3.2, 3.4); a nested section reuses the outer one.
-  async function locked<T>(action: (view: LockedStore<Credentials> | null) => Promise<T>): Promise<T> {
-    signal?.throwIfAborted()
+  // A section that commits a grant the service already issued runs to its end whatever the caller's signal says: a
+  // cancelled sign-in never leaves a device the account knows and this machine does not hold.
+  async function locked<T>(action: (view: LockedStore<Credentials> | null) => Promise<T>, commits = false): Promise<T> {
+    const stop = commits ? undefined : signal
+    stop?.throwIfAborted()
     if (heldCredentialLease(api, options.home) === undefined) await store.prepare?.()
     return withCredentialLock(
       api,
       async (lease) => {
-        signal?.throwIfAborted()
+        stop?.throwIfAborted()
         return action((await store.underLock?.(lease)) ?? null)
       },
       options.home,
     )
   }
   const request = (path: string, init: RequestInit) => requestApi(api, path, init, signal)
+  /** The request that turns an approval into a granted device: once sent it is not cancelled, so its grant is kept. */
+  const exchange = (path: string, init: RequestInit) => requestApi(api, path, init)
   /**
    * The account a token's sign-in belongs to; undefined when the service does not say (never blocks logout). `stop`
    * aborts the read: the session's signal unless a caller with a tighter bound (the post-refresh fix-up) names its own.
@@ -329,6 +334,7 @@ export function createSession(options: {
   }
   return {
     request,
+    exchange,
     signal,
     transaction: locked,
     async ready() {
@@ -348,7 +354,7 @@ export function createSession(options: {
         // An item nobody here can read reads as missing above; row 8b moving it aside is still a discard, reported first.
         await store.write(value, "fresh-sign-in", () => beforeKeysDiscarded({ kind: "unreadable" }))
         await clearSignedOutMarker(markerPath)
-      })
+      }, true)
       // After the marker is gone, so a stale marker from an earlier sign-out cannot park this sign-in; from the value
       // in memory, never read back from the store.
       await deviceService?.adopt(value)

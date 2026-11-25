@@ -38,7 +38,7 @@ export type SignInDependencies = {
   /** Whether OmO accounts are open; while closed only the device-code method is admitted. */
   readonly accountsOpen: boolean
   /** The device-service setup a fresh sign-in runs (launcher code); absent, it is not run and the answer says so. */
-  readonly setUpDeviceService?: () => Promise<Exclude<DeviceServiceOutcome, "not_run">>
+  readonly setUpDeviceService?: (signal?: AbortSignal) => Promise<Exclude<DeviceServiceOutcome, "not_run">>
   readonly machineDigest?: () => Promise<string | undefined>
   readonly now?: () => number
   readonly sleep?: (ms: number) => Promise<void>
@@ -52,7 +52,8 @@ export type SignInRequest = {
   readonly openBrowser?: boolean
   readonly accounts?: string
   readonly deviceName?: string
-  readonly onUserCode: (code: DisplayCode) => void | Promise<void>
+  /** Receives the code a person approves, and the call's signal so a pending callback can stop with it. */
+  readonly onUserCode: (code: DisplayCode, signal?: AbortSignal) => void | Promise<void>
   /** Opens the sign-in page; absent, the system browser. Answers whether a page opened. */
   readonly onOpenUrl?: (url: string) => Promise<boolean>
   /** Called once the service answered its health probe, before any code is minted or page opened. */
@@ -61,22 +62,60 @@ export type SignInRequest = {
   readonly chooseDevice?: ChooseDevice
   /** Whether to replace this machine's earlier device when the service names one; absent, it is not replaced. */
   readonly replaceDevice?: (existing: MachineDevice) => Promise<boolean>
-  /** Cancels the sign-in; the answer is then the `cancelled` refusal and nothing is stored. */
+  /**
+   * Cancels the sign-in. The commit point is the request that turns the approval into a granted device together with
+   * the store write after it; an abort never splits it. Before it, the call answers `cancelled`: nothing is stored and
+   * no device was granted. At or after it, this machine is signed in: the call answers signed in, the device-service
+   * setup not run or no longer waited on (`not_on`, the answer when the setup does not finish). A pending onUserCode or
+   * setup is not waited on once the signal aborts; each receives the signal.
+   */
   readonly signal?: AbortSignal
 }
 
 export type SignInFailure = SignInRefusal | { readonly code: "accounts_closed" } | { readonly code: "cancelled" }
 
+const ABORTED = Symbol("aborted")
+
+/** Settles with the work, or with ABORTED the moment the signal aborts; the work is not waited on after that. */
+function untilAborted<T>(work: Promise<T>, signal: AbortSignal | undefined): Promise<T | typeof ABORTED> {
+  if (signal === undefined) return work
+  if (signal.aborted) return Promise.resolve(ABORTED)
+  return new Promise((resolve, reject) => {
+    const stop = () => resolve(ABORTED)
+    signal.addEventListener("abort", stop, { once: true })
+    work.then(
+      (value) => {
+        signal.removeEventListener("abort", stop)
+        resolve(value)
+      },
+      (error: unknown) => {
+        signal.removeEventListener("abort", stop)
+        reject(error)
+      },
+    )
+  })
+}
+
 export function accountSignIn(
   deps: SignInDependencies,
   request: SignInRequest,
 ): Promise<CallOutcome<Audited<SignedIn>, SignInFailure>> {
-  return audited(deps.custody, "account.signIn", () => signIn(deps, request))
+  // A sign-in the caller cancelled after the commit point is signed in without its setup: partial in the custody log.
+  return audited(
+    deps.custody,
+    "account.signIn",
+    () => signIn(deps, request),
+    (value) =>
+      request.signal?.aborted === true && value.deviceService === "not_on"
+        ? { outcome: "partial", code: "setup_cancelled" }
+        : { outcome: "ok" },
+  )
 }
 
 async function signIn(deps: SignInDependencies, request: SignInRequest): Promise<CallOutcome<SignedIn, SignInFailure>> {
   if (!deps.accountsOpen && request.method !== "device_code") return refusedWith({ code: "accounts_closed" })
-  const cancelled = (): boolean => request.signal?.aborted === true
+  const { signal } = request
+  const cancelled = (): boolean => signal?.aborted === true
   if (cancelled()) return refusedWith({ code: "cancelled" })
   let limitDevices: readonly ListedDevice[] | undefined
   let callback: Promise<void> = Promise.resolve()
@@ -115,15 +154,19 @@ async function signIn(deps: SignInDependencies, request: SignInRequest): Promise
         ...(deps.now === undefined ? {} : { now: deps.now }),
         ...(deps.sleep === undefined ? {} : { sleep: deps.sleep }),
         show: (code) => {
-          callback = Promise.resolve(request.onUserCode(code))
+          callback = Promise.resolve(request.onUserCode(code, signal))
         },
       },
     })
     replacedDeviceId = result.replacedDeviceId
-    await callback
+    // Past the commit point: a callback still pending is no longer waited on once the caller aborts.
+    await untilAborted(callback, signal)
   } catch (error) {
-    await callback.catch(() => undefined)
-    if (cancelled()) return refusedWith({ code: "cancelled" })
+    await untilAborted(
+      callback.catch(() => undefined),
+      signal,
+    )
+    if (cancelled() && (await deps.store.read().catch(() => null)) === null) return refusedWith({ code: "cancelled" })
     return refusedWith(signInRefusal(error, limitDevices))
   }
   const stored = await deps.store.read()
@@ -134,10 +177,17 @@ async function signIn(deps: SignInDependencies, request: SignInRequest): Promise
       next_action: "sign in again",
       cause: undefined,
     })
-  const deviceService: DeviceServiceOutcome =
-    deps.setUpDeviceService === undefined ? "not_run" : await deps.setUpDeviceService().catch(() => "not_on" as const)
-  // An abort during the setup answers as the launcher child answered it: cancelled, with the approved sign-in stored.
-  if (cancelled()) return refusedWith({ code: "cancelled" })
+  const setUp = deps.setUpDeviceService
+  const settled =
+    setUp === undefined
+      ? ("not_run" as const)
+      : cancelled()
+        ? ABORTED
+        : await untilAborted(
+            setUp(signal).catch(() => "not_on" as const),
+            signal,
+          )
+  const deviceService: DeviceServiceOutcome = settled === ABORTED ? "not_on" : settled
   return ok({
     api: deps.api,
     device: { id: stored.device.id, name: stored.device.name },
