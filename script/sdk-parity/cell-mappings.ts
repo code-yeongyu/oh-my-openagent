@@ -4,9 +4,7 @@ const plain = (cell: string): string => cell.replace(/\\\|/g, "|").replace(/\*\*
 
 // Cells that name a group of flags in words instead of listing them (review M7): exact both ways, so a flag the group
 // gains or loses fails until this list and the published cell agree.
-export const CELL_ABBREVIATIONS: Readonly<
-  Record<string, { readonly flags: readonly string[]; readonly reason: string }>
-> = {
+const CELL_ABBREVIATIONS: Readonly<Record<string, { readonly flags: readonly string[]; readonly reason: string }>> = {
   "6.11#1": {
     flags: [
       "--claude",
@@ -45,7 +43,7 @@ export const CELL_ABBREVIATIONS: Readonly<
 }
 
 // Flags a cell names only as a usage refusal (`omo update --all` is refused, `--force` alone is refused): not mappings.
-export const CELL_REFUSALS: Readonly<Record<string, readonly string[]>> = {
+const CELL_REFUSALS: Readonly<Record<string, readonly string[]>> = {
   "6.8#4": ["--all"],
   "6.7#15": ["--all", "--force"],
 }

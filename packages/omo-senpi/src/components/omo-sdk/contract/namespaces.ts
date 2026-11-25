@@ -1,5 +1,5 @@
 // The namespaces of the root (first-party design 4.2), in the order the design lists them.
-export const NAMESPACES = [
+const NAMESPACES = [
   "threads",
   "devices",
   "account",

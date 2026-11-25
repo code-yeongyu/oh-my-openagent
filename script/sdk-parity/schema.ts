@@ -3,22 +3,22 @@ import { scopeProblems } from "./row-scopes"
 // The parity registry's row schema (design section 7.2). A row is one leaf capability of section 6 in both editions;
 // `sdk` is required for every row, so an SDK omission cannot be written down.
 
-export const EDITIONS = ["native", "opencode"] as const
+const EDITIONS = ["native", "opencode"] as const
 export type Edition = (typeof EDITIONS)[number]
 
-export const ROW_KINDS = ["capability", "reserved", "internal", "retired", "render"] as const
+const ROW_KINDS = ["capability", "reserved", "internal", "retired", "render"] as const
 export type RowKind = (typeof ROW_KINDS)[number]
 
-export const SDK_TODAY = ["yes", "partial", "no"] as const
+const SDK_TODAY = ["yes", "partial", "no"] as const
 export type SdkToday = (typeof SDK_TODAY)[number]
 
 // How a route reaches its implementation today: the launcher's own tables, the engine it forwards argv to, a Commander
 // program, or the delegated loop component.
-export const VIAS = ["launcher", "engine", "commander", "loop"] as const
+const VIAS = ["launcher", "engine", "commander", "loop"] as const
 export type Via = (typeof VIAS)[number]
 
 // The root options of design 4.1 that a CLI flag may fill instead of a call input.
-export const ROOT_OPTIONS = [
+const ROOT_OPTIONS = [
   "api",
   "accounts",
   "env",
