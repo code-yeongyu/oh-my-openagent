@@ -43,6 +43,23 @@ describe("the idempotency key on a thread SDK control call", () => {
     expect(again).toEqual(first)
   })
 
+  test.each(["sdk", "tool"] as const)(
+    "#given an interrupt of a thread on device b whose reply the relay lost after b's engine acted #when the %s repeats it under the same key #then b's engine is interrupted once",
+    async (via) => {
+      const a = account({ losesReplyOf: { type: "interrupt", count: 1 } })
+      const s = surface(a.remote)
+      const sdk = s.sdk()
+      const interrupt = () =>
+        via === "sdk"
+          ? sdk.interrupt({ thread: "dur-on-b", idempotency_key: "k-lost" })
+          : s.run("thread_interrupt", { thread: "dur-on-b", idempotency_key: "k-lost" })
+      const lost = await interrupt()
+      const again = await interrupt()
+      expect(interruptsOn(a.sent)).toBe(1)
+      expect(again).toEqual(lost)
+    },
+  )
+
   test("#given a rename repeated under one key with other arguments #when it runs #then idempotency_conflict and nothing is renamed twice", async () => {
     const s = surface(account().remote)
     const sdk = s.sdk()

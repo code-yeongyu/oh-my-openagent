@@ -214,6 +214,8 @@ export function createRemoteThreadFixture() {
       admitRefuse?: string
       admitOutcome?: RemoteCommandOutcome
       stateOutcomes?: readonly RemoteCommandOutcome[]
+      /** b's engine runs the first N records of this type and the device service loses each reply (uncertain reply_lost). */
+      losesReplyOf?: { readonly type: string; readonly count: number }
       heldDraft?: number
       openData?: JsonObject
       failSessionsList?: boolean
@@ -368,6 +370,7 @@ export function createRemoteThreadFixture() {
     let heldDraft = options.heldDraft ?? 0
     // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
     const stateOutcomes = [...(options.stateOutcomes ?? [])]
+    let repliesToLose = options.losesReplyOf?.count ?? 0
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -862,6 +865,10 @@ export function createRemoteThreadFixture() {
           if (rpc["type"] === "admit_external_message" && options.admitThrows !== undefined)
             throw new Error(options.admitThrows)
           const outcome = answer(rpc, session)
+          if (rpc["type"] === options.losesReplyOf?.type && outcome.kind === "ok" && repliesToLose > 0) {
+            repliesToLose -= 1
+            return { kind: "uncertain", reason: "reply_lost" }
+          }
           if (rpc["type"] === "prompt" && outcome.kind === "ok") {
             answeredPrompt = true
             promptClientMessageId = rpc["clientMessageId"]
