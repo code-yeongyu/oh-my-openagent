@@ -11,7 +11,9 @@
       ],
       "input": {
         "properties": {
-          "apply": {},
+          "apply": {
+            "type": "boolean"
+          },
           "older_than_days": {},
           "repos": {}
         },
@@ -25,7 +27,7 @@
             "worktree-sweep"
           ],
           "flags": {
-            "--apply": "apply",
+            "--apply": "apply=true",
             "--older-than": "older_than_days",
             "--repo": "repos",
             "--json": "render"

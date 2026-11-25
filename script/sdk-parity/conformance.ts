@@ -13,6 +13,7 @@ export type EffectEvidence = {
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
   readonly expect: readonly Expectation[]
+  readonly target?: "this_device" | "other_device"
   readonly observed: readonly ObservedCall[]
   readonly refusal?: string
   readonly code?: string
@@ -80,6 +81,11 @@ export function evidenceProblems(
     if (found.length === 0) passing.push(record)
   }
   if (row.scenarios.effect.length > 0) problems.push(...coverageProblems(row, passing, inert))
+  // Design 7.3: a row that takes a thread address is proven on a thread of this device and on one of another device.
+  if (Object.hasOwn(row.input.properties, "thread"))
+    for (const target of ["this_device", "other_device"] as const)
+      if (!passing.some((record) => record.kind === "effect" && record.target === target))
+        problems.push(`row ${row.id}: no passing effect scenario addresses a thread on ${target}; add one`)
   return problems
 }
 

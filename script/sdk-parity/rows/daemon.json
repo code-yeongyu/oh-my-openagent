@@ -15,7 +15,9 @@
           "policy": {},
           "pinned": {},
           "launch_spec": {},
-          "mcp_presenter_enforcement": {}
+          "mcp_presenter_enforcement": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -32,7 +34,7 @@
             "--policy": "policy",
             "--socket": "root.endpoint.socket",
             "--rpc-key-root": "root.endpoint.key_root",
-            "--mcp-presenter-enforcement": "mcp_presenter_enforcement"
+            "--mcp-presenter-enforcement": "mcp_presenter_enforcement=true"
           },
           "positionals": {},
           "values": []
@@ -60,7 +62,9 @@
       ],
       "input": {
         "properties": {
-          "prune_store_index": {},
+          "prune_store_index": {
+            "type": "boolean"
+          },
           "agent_dir": {}
         },
         "required": []
@@ -74,7 +78,7 @@
             "gc"
           ],
           "flags": {
-            "--prune-store-index": "prune_store_index",
+            "--prune-store-index": "prune_store_index=true",
             "--json": "render"
           },
           "positionals": {},
@@ -124,7 +128,9 @@
             ]
           },
           "launch_spec": {},
-          "allow_downgrade": {},
+          "allow_downgrade": {
+            "type": "boolean"
+          },
           "when": {
             "properties": {
               "idle": {
@@ -165,7 +171,7 @@
             "--launch-spec": "launch_spec",
             "--policy": "policy",
             "--socket": "root.endpoint.socket",
-            "--allow-downgrade": "allow_downgrade",
+            "--allow-downgrade": "allow_downgrade=true",
             "--when": "when.idle",
             "--operation": "when.idle.operation",
             "--if-instance": "when.idle.if_instance",
@@ -199,8 +205,12 @@
       "input": {
         "properties": {
           "stores": {},
-          "allow_missing_index": {},
-          "dry_run": {}
+          "allow_missing_index": {
+            "type": "boolean"
+          },
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -214,8 +224,8 @@
           ],
           "flags": {
             "--store": "stores",
-            "--allow-missing-index": "allow_missing_index",
-            "--dry-run": "dry_run",
+            "--allow-missing-index": "allow_missing_index=true",
+            "--dry-run": "dry_run=true",
             "--json": "render"
           },
           "positionals": {},
@@ -251,7 +261,9 @@
               "never"
             ]
           },
-          "pinned": {}
+          "pinned": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -265,7 +277,7 @@
           ],
           "flags": {
             "--no-upgrade": "policy=never",
-            "--pinned": "pinned",
+            "--pinned": "pinned=true",
             "--json": "render"
           },
           "positionals": {},
@@ -342,8 +354,12 @@
       ],
       "input": {
         "properties": {
-          "all": {},
-          "include_workers": {}
+          "all": {
+            "type": "boolean"
+          },
+          "include_workers": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -356,7 +372,7 @@
             "status"
           ],
           "flags": {
-            "--include-workers": "include_workers",
+            "--include-workers": "include_workers=true",
             "--json": "render"
           },
           "positionals": {},
@@ -370,8 +386,8 @@
             "status"
           ],
           "flags": {
-            "--all": "all",
-            "--include-workers": "include_workers",
+            "--all": "all=true",
+            "--include-workers": "include_workers=true",
             "--socket": "root.endpoint.socket"
           },
           "positionals": {},
@@ -400,10 +416,14 @@
       ],
       "input": {
         "properties": {
-          "drain": {},
+          "drain": {
+            "type": "boolean"
+          },
           "instance": {},
           "wait_ms": {},
-          "force": {},
+          "force": {
+            "type": "boolean"
+          },
           "expected_generation": {}
         },
         "required": []
@@ -417,7 +437,7 @@
             "stop"
           ],
           "flags": {
-            "--drain": "drain"
+            "--drain": "drain=true"
           },
           "positionals": {},
           "values": []
@@ -430,10 +450,10 @@
             "stop"
           ],
           "flags": {
-            "--drain": "drain",
+            "--drain": "drain=true",
             "--instance": "instance",
             "--wait-ms": "wait_ms",
-            "--force": "force",
+            "--force": "force=true",
             "--expected-generation": "expected_generation",
             "--socket": "root.endpoint.socket"
           },
@@ -463,8 +483,12 @@
       ],
       "input": {
         "properties": {
-          "drain": {},
-          "wait": {},
+          "drain": {
+            "type": "boolean"
+          },
+          "wait": {
+            "type": "boolean"
+          },
           "deadline_ms": {}
         },
         "required": []
@@ -479,8 +503,8 @@
           ],
           "flags": {
             "--all": "when",
-            "--drain": "drain",
-            "--wait": "wait",
+            "--drain": "drain=true",
+            "--wait": "wait=true",
             "--timeout": "deadline_ms"
           },
           "positionals": {},

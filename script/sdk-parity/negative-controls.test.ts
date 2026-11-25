@@ -3,7 +3,9 @@ import { readFileSync } from "node:fs"
 
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
 import { mappingProblems } from "./cell-mappings"
+import { arityProblems, nativeTableArity } from "./arity-check"
 import { cellProblems } from "./cells"
+import { takesValue } from "./descriptor-dispatch"
 import { argvProblems, commanderProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory, scanArgvComparisons } from "./native-inventory"
 import { opencodeInventory } from "./opencode-inventory"
@@ -152,6 +154,30 @@ describe("negative controls: exact route correspondence and the published mappin
     expect(mappingProblems(template, added)).toContainEqual(
       "6.1#3: threads.read maps --since, which the published cell does not show",
     )
+  })
+})
+
+describe("negative controls: the parsing contract (review 6061874518 M4)", () => {
+  test("#given a presence flag written as a value flag #then the parser that owns it names the row", () => {
+    const read = row("threads.read")
+    const entry = read.cli.find((cli) => cli.route.join(" ") === "thread read")
+    if (entry === undefined) throw new Error("no thread read entry")
+    Object.assign(entry.flags, { "--all-scope": "all_scope" })
+    expect(arityProblems([read], [nativeTableArity(REPO_ROOT)])).toEqual([
+      'row threads.read: native "thread read --all-scope" is value in the row but presence in the native parser tables; write it as all_scope=true',
+    ])
+  })
+
+  test("#given a value flag whose field is typed boolean #then the schema names it and parsing does not follow the type", () => {
+    const read = row("threads.read")
+    const typed = {
+      ...read,
+      input: { ...read.input, properties: { ...read.input.properties, cursor: { type: "boolean" } } },
+    }
+    expect(rowProblems(typed)).toContainEqual(expect.stringContaining("takes a value but fills cursor, a boolean"))
+    const entry = typed.cli.find((cli) => cli.route.join(" ") === "thread read")
+    if (entry === undefined) throw new Error("no thread read entry")
+    expect(takesValue(entry, "--cursor")).toBe(true)
   })
 })
 

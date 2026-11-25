@@ -141,7 +141,7 @@
             "checkpoint"
           ],
           "flags": {
-            "--print-template": "printTemplate",
+            "--print-template": "printTemplate=true",
             "--goal-id": "goalId",
             "--goal": "goalId",
             "--status": "status",
@@ -199,7 +199,7 @@
             "complete-goals"
           ],
           "flags": {
-            "--retry-failed": "retryFailed",
+            "--retry-failed": "retryFailed=true",
             "--json": "render",
             "--help": "render",
             "-h": "render",
@@ -265,10 +265,10 @@
           "flags": {
             "--brief": "brief",
             "--brief-file": "brief",
-            "--from-stdin": "brief",
+            "--from-stdin": "parse",
             "--codex-goal-mode": "codexGoalMode",
             "--validation-batch-json": "validationBatchesJson",
-            "--force": "force",
+            "--force": "force=true",
             "--after-json": "parse",
             "--directive-json": "parse",
             "--directive-file": "parse",
@@ -286,7 +286,8 @@
             "--after-json": "its value is removed from the positional brief; nothing reads it",
             "--directive-json": "its value is removed from the positional brief; nothing reads it",
             "--directive-file": "its value is removed from the positional brief; nothing reads it",
-            "--target-goal-id": "its value is removed from the positional brief; nothing reads it"
+            "--target-goal-id": "its value is removed from the positional brief; nothing reads it",
+            "--from-stdin": "the adapter reads the brief from standard input; the call takes brief as text"
           }
         }
       ],

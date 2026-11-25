@@ -11,7 +11,9 @@
       ],
       "input": {
         "properties": {
-          "replace": {}
+          "replace": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -24,7 +26,7 @@
             "adopt"
           ],
           "flags": {
-            "--replace": "replace"
+            "--replace": "replace=true"
           },
           "positionals": {},
           "values": []
@@ -275,7 +277,9 @@
           "onUserCode": {},
           "onOpenUrl": {},
           "deviceName": {},
-          "replace": {},
+          "replace": {
+            "type": "boolean"
+          },
           "signal": {}
         },
         "required": [
@@ -293,7 +297,7 @@
           "flags": {
             "--device": "method=device_code",
             "--no-browser": "open_browser=false",
-            "--replace": "replace",
+            "--replace": "replace=true",
             "--api": "root.api",
             "--accounts": "root.accounts"
           },
@@ -322,7 +326,7 @@
           "flags": {
             "--device": "method=device_code",
             "--no-browser": "open_browser=false",
-            "--replace": "replace",
+            "--replace": "replace=true",
             "--api": "root.api",
             "--accounts": "root.accounts",
             "--help": "render"
@@ -443,7 +447,9 @@
       ],
       "input": {
         "properties": {
-          "discard": {}
+          "discard": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -457,7 +463,7 @@
             "disable"
           ],
           "flags": {
-            "--discard": "discard"
+            "--discard": "discard=true"
           },
           "positionals": {},
           "values": []

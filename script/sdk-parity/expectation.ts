@@ -11,6 +11,36 @@ export type Expectation = {
   readonly result?: unknown
 }
 
+// Design 4.6: one injected fault at a time, each meaningful on the ports listed here (a lost reply on the host socket and
+// the relay, a lock timeout on the store, unauthorized from the account session and the device service, a timeout read
+// from the clock, a refusal by the peer device). A fault on any other port is a scenario error.
+export const FAULT_PORTS = {
+  lost_reply: ["host", "remote"],
+  lock_timeout: ["store"],
+  unauthorized: ["session", "deviceService"],
+  timeout: ["clock"],
+  refused: ["remote"],
+} as const satisfies Readonly<Record<string, readonly string[]>>
+
+export type FaultName = keyof typeof FAULT_PORTS
+
+export type Fault = {
+  readonly port: string
+  readonly op: string
+  readonly fault: FaultName
+  /** The Nth call of that op (default 1). */
+  readonly occurrence?: number
+}
+
+export type ScenarioStep = {
+  readonly input: Readonly<Record<string, unknown>>
+  readonly kind: "effect" | "refusal"
+  readonly refusal?: string
+  readonly expect: readonly Expectation[]
+  /** One fault at a time (design 4.6). */
+  readonly fault?: Fault
+}
+
 export type TableScenario = {
   /** `<row id>/<slug>`: stable, never reused for another behaviour. */
   readonly id: string
@@ -21,24 +51,14 @@ export type TableScenario = {
   readonly invalid?: true
   readonly refusal?: string
   readonly expect: readonly Expectation[]
-  /** Declarative fixture state of a fake port before the call (sessions it lists, a stored idempotency record, a device's online flag). */
+  /** Declarative state of a fake port before the call: sessions it lists, a stored idempotency record, a device's flag. */
   readonly given?: readonly { readonly port: string; readonly state: Readonly<Record<string, unknown>> }[]
-  /** One injected fault (design 4.6), on the Nth call of that op (default 1). */
-  readonly faults?: readonly {
-    readonly port: string
-    readonly op: string
-    readonly fault: "lost_reply" | "timeout" | "lock_timeout" | "unauthorized" | "refused"
-    readonly occurrence?: number
-  }[]
+  /** One fault at a time (design 4.6). */
+  readonly fault?: Fault
   /** Where the addressed thread lives, so a matched pair of 7.3 is two scenarios with the same input. */
   readonly target?: "this_device" | "other_device"
   /** Calls made after the first, in order, on the state the first left (a retry under the same key after a lost reply). */
-  readonly then?: readonly {
-    readonly input: Readonly<Record<string, unknown>>
-    readonly kind: "effect" | "refusal"
-    readonly refusal?: string
-    readonly expect: readonly Expectation[]
-  }[]
+  readonly then?: readonly ScenarioStep[]
 }
 
 export type ScenarioTableFile = {
@@ -81,14 +101,33 @@ export function expectationProblems(expect: readonly Expectation[], observed: re
   return problems
 }
 
-// The closed list of port operations is the contract package's (slice P1a); it is passed in, never restated here.
+// The closed list of port operations is the contract package's (slice P1a); it is passed in, never restated here. Every
+// port and op a scenario names (expected, injected, given) must be in it, and a fault must be meaningful on its port.
 export function portProblems(scenarios: readonly TableScenario[], ports: PortOperations): string[] {
-  return scenarios.flatMap((scenario) =>
-    scenario.expect
-      .filter((expectation) => !(ports[expectation.port] ?? []).includes(expectation.op))
+  const isOp = (port: string, op: string): boolean => (ports[port] ?? []).includes(op)
+  const faultProblems = (id: string, fault: Fault | undefined): string[] => [
+    ...(fault === undefined ? [] : [fault]).flatMap((fault) => [
+      ...(isOp(fault.port, fault.op)
+        ? []
+        : [`scenario ${id} injects ${fault.fault} on ${fault.port}.${fault.op}, which is not a port operation`]),
+      ...((FAULT_PORTS[fault.fault] as readonly string[]).includes(fault.port)
+        ? []
+        : [
+            `scenario ${id} injects ${fault.fault} on ${fault.port}; it means something only on ${FAULT_PORTS[fault.fault].join(", ")}`,
+          ]),
+    ]),
+  ]
+  return scenarios.flatMap((scenario) => [
+    ...[...scenario.expect, ...(scenario.then ?? []).flatMap((step) => step.expect)]
+      .filter((expectation) => !isOp(expectation.port, expectation.op))
       .map(
         (expectation) =>
           `scenario ${scenario.id} expects ${expectation.port}.${expectation.op}, which is not a port operation`,
       ),
-  )
+    ...faultProblems(scenario.id, scenario.fault),
+    ...(scenario.then ?? []).flatMap((step, index) => faultProblems(`${scenario.id} step ${index + 2}`, step.fault)),
+    ...(scenario.given ?? [])
+      .filter((given) => ports[given.port] === undefined)
+      .map((given) => `scenario ${scenario.id} gives state to ${given.port}, which is not a port`),
+  ])
 }

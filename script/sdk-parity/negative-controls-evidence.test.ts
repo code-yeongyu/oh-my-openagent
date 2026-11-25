@@ -30,15 +30,23 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
   const built: Row = {
     ...locate,
     today: "yes",
-    scenarios: { effect: ["threads.locate/by-id", "threads.locate/all-scope"], refusal: [] },
+    scenarios: {
+      effect: ["threads.locate/by-id", "threads.locate/all-scope", "threads.locate/other-device"],
+      refusal: [],
+    },
   }
   const builtRows = rows.map((row) => (row.id === "threads.locate" ? built : row))
   const open = new Set(unresolved.entries.map((entry) => entry.id).filter((id) => id !== "threads.locate"))
 
-  const scenario = (id: string, scopeAll: boolean | undefined): TableScenario => ({
+  const scenario = (
+    id: string,
+    scopeAll: boolean | undefined,
+    target: "this_device" | "other_device" = "this_device",
+  ): TableScenario => ({
     id: `threads.locate/${id}`,
     row: "threads.locate",
     kind: "effect",
+    target,
     input: scopeAll === undefined ? { thread: "t1" } : { thread: "t1", all_scope: scopeAll },
     expect: [{ port: "host", op: "listSessions", args: { allScope: scopeAll === true } }],
   })
@@ -61,7 +69,11 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       return { root: { threads: { locate: (input: unknown) => member(calls, input) } }, calls: () => calls }
     },
   })
-  const pair = [run(scenario("by-id", undefined)), run(scenario("all-scope", true))]
+  const pair = [
+    run(scenario("by-id", undefined)),
+    run(scenario("all-scope", true)),
+    run(scenario("other-device", undefined, "other_device")),
+  ]
 
   test("#given a stub answering not_implemented on a row counted as built #then it is named", async () => {
     const evidence = await runEffectScenarios(builtRows, [
@@ -93,7 +105,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
 
   test("#given a run whose port calls do not match the expected effect #then it does not build the row (review 6061624223 H1)", async () => {
     const silent = run(scenario("by-id", undefined), { kind: "ok" }, () => ({ kind: "ok" }))
-    const evidence = await runEffectScenarios(builtRows, [silent, pair[1] as ScenarioRun])
+    const evidence = await runEffectScenarios(builtRows, [silent, ...pair.slice(1)])
     expect(conformanceProblems(builtRows, open, evidence)).toContainEqual(
       'row threads.locate: scenario threads.locate/by-id: host.listSessions {"allScope":false} expected 1 call(s), observed 0',
     )
@@ -106,6 +118,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const evidence = await runEffectScenarios(onlyOne, [pair[0] as ScenarioRun])
     expect(conformanceProblems(onlyOne, open, evidence)).toEqual([
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",
+      "row threads.locate: no passing effect scenario addresses a thread on other_device; add one",
     ])
   })
 
@@ -125,21 +138,30 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const faulty: TableScenario = {
       ...scenario("by-id", undefined),
       given: [{ port: "vault", state: {} }],
-      faults: [{ port: "host", op: "kill", fault: "timeout" }],
-      then: [{ input: {}, kind: "effect", expect: [{ port: "host", op: "spawn" }] }],
+      fault: { port: "host", op: "kill", fault: "lost_reply" },
+      then: [
+        {
+          input: {},
+          kind: "effect",
+          expect: [{ port: "host", op: "spawn" }],
+          fault: { port: "store", op: "listSessions", fault: "lost_reply" },
+        },
+      ],
     }
-    expect(portProblems([faulty], { host: ["listSessions"] })).toEqual([
+    expect(portProblems([faulty], { host: ["listSessions"], store: ["listSessions"] })).toEqual([
       "scenario threads.locate/by-id expects host.spawn, which is not a port operation",
-      "scenario threads.locate/by-id injects timeout on host.kill, which is not a port operation",
+      "scenario threads.locate/by-id injects lost_reply on host.kill, which is not a port operation",
+      "scenario threads.locate/by-id step 2 injects lost_reply on store; it means something only on host, remote",
       "scenario threads.locate/by-id gives state to vault, which is not a port",
     ])
   })
 
   test("#given the first correct closure of a gap with evidence matching every scenario #then the baseline admits it (positive control)", async () => {
     const evidence = await runEffectScenarios(builtRows, pair)
-    expect(evidence.map((record) => record.observed)).toEqual([
-      [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }],
-      [{ port: "host", op: "listSessions", args: { allScope: true, limit: 50 } }],
+    expect(evidence.map((record) => [record.target, record.observed])).toEqual([
+      ["this_device", [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }]],
+      ["this_device", [{ port: "host", op: "listSessions", args: { allScope: true, limit: 50 } }]],
+      ["other_device", [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }]],
     ])
     const cleared = { ...unresolved, entries: unresolved.entries.filter((entry) => entry.id !== "threads.locate") }
     const state = {

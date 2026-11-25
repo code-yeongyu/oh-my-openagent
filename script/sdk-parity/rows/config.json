@@ -80,7 +80,9 @@
       ],
       "input": {
         "properties": {
-          "dry_run": {}
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -93,7 +95,7 @@
             "migrate"
           ],
           "flags": {
-            "--dry-run": "dry_run",
+            "--dry-run": "dry_run=true",
             "--json": "render"
           },
           "positionals": {},

@@ -12,7 +12,9 @@
       ],
       "input": {
         "properties": {
-          "dry_run": {}
+          "dry_run": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -25,7 +27,7 @@
           ],
           "flags": {
             "--fix": "when",
-            "--dry-run": "dry_run"
+            "--dry-run": "dry_run=true"
           },
           "positionals": {},
           "values": []
@@ -136,8 +138,12 @@
       ],
       "input": {
         "properties": {
-          "status": {},
-          "verbose": {},
+          "status": {
+            "type": "boolean"
+          },
+          "verbose": {
+            "type": "boolean"
+          },
           "platform": {}
         },
         "required": []
@@ -160,8 +166,8 @@
             "doctor"
           ],
           "flags": {
-            "--status": "status",
-            "--verbose": "verbose",
+            "--status": "status=true",
+            "--verbose": "verbose=true",
             "--json": "render",
             "--platform": "platform"
           },

@@ -217,7 +217,15 @@ export function rowProblems(row: Row): string[] {
       return
     }
     const allowed = allowedValues(schema)
-    if (value !== undefined && allowed === undefined)
+    // A presence flag that creates an object field (`--worktree`) writes `=true`: the object exists, its children filled
+    // by other flags.
+    const createsObject = value === "true" && (schema.type === "object" || schema.properties !== undefined)
+    // A value flag cannot fill a boolean field: the parser would read the next word as its value (review 6061874518 M4).
+    if (value === undefined && where.includes(" flag ") && schema.type === "boolean")
+      problems.push(
+        `${at}: ${where} takes a value but fills ${path}, a boolean; write it as ${path}=true if it is a presence flag`,
+      )
+    if (value !== undefined && allowed === undefined && !createsObject)
       problems.push(`${at}: ${where} sets ${path} to "${value}", but its schema lists no allowed values; declare them`)
     if (value !== undefined && allowed !== undefined && !allowed.map(String).includes(value))
       problems.push(

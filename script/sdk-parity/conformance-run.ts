@@ -48,6 +48,7 @@ export async function runEffectScenarios(
       kind: scenario.kind,
       input: scenario.input,
       expect: scenario.expect,
+      ...(scenario.target === undefined ? {} : { target: scenario.target }),
       ...(scenario.refusal === undefined ? {} : { refusal: scenario.refusal }),
     }
     try {
