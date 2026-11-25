@@ -39,6 +39,52 @@ function formatTomlString(value: string): string {
   return JSON.stringify(value)
 }
 
+interface SpawnInvocation {
+  readonly command: string
+  readonly args: readonly string[]
+  readonly home: string | undefined
+}
+
+interface RealRepoInstall {
+  readonly codexHome: string
+  readonly repoRoot: string
+  readonly result: Awaited<ReturnType<typeof runCodexInstaller>>
+  readonly invocations: readonly SpawnInvocation[]
+}
+
+// Installing from the real repo copies the whole plugin tree twice (plugin cache and local
+// marketplace snapshot), so its wall time grows steeply on a starved CPU (#14000). The tests that
+// assert on the real shipped payload share one install per file; tests about config or codexHome
+// state install the small fixture repo instead.
+let realRepoInstall: Promise<RealRepoInstall> | undefined
+
+function installRealRepoOnce(): Promise<RealRepoInstall> {
+  realRepoInstall ??= installRealRepo()
+  return realRepoInstall
+}
+
+async function installRealRepo(): Promise<RealRepoInstall> {
+  const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
+  const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-"))
+  const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
+  const repoRoot = process.cwd()
+  const legacyCacheRoot = join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0")
+  await mkdir(legacyCacheRoot, { recursive: true })
+  await writeFile(join(legacyCacheRoot, ".mcp.json"), JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }))
+  const invocations: SpawnInvocation[] = []
+  const result = await runCodexInstaller({
+    codexHome,
+    binDir,
+    repoRoot,
+    astGrepInstaller: skipAstGrepInstall,
+    env: { HOME: home },
+    runCommand: async (command, args, options) => {
+      invocations.push({ command, args: [...args], home: options.env?.HOME })
+    },
+  })
+  return { codexHome, repoRoot, result, invocations }
+}
+
 describe("install-codex", () => {
   test("#given npm platform binary package #when resolving vendored repo root #then finds sibling wrapper package", async () => {
     // given
@@ -134,25 +180,9 @@ describe("install-codex", () => {
   test(
     "#given codex installer #when installing omo #then registers local marketplace and cached plugin",
     async () => {
-      // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-"))
-      const repoRoot = process.cwd()
-      const legacyCacheRoot = join(codexHome, "plugins", "cache", "code-yeongyu-codex-plugins", "omo", "0.1.0")
-      await mkdir(legacyCacheRoot, { recursive: true })
-      await writeFile(
-        join(legacyCacheRoot, ".mcp.json"),
-        JSON.stringify({ mcpServers: { lsp: { args: ["old-lsp"] } } }),
-      )
-
+      // given a legacy cache under the old marketplace name (seeded by installRealRepo)
       // when
-      const first = await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        runCommand: async () => undefined,
-      })
+      const { codexHome, repoRoot, result: first } = await installRealRepoOnce()
 
       // then
       expect(first.marketplaceName).toBe("sisyphuslabs")
@@ -254,28 +284,8 @@ describe("install-codex", () => {
   test(
     "#given codex installer #when installing omo #then never spawns a repo script that is not shipped",
     async () => {
-      // given
-      const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-home-sot-"))
-      const binDir = await mkdtemp(join(tmpdir(), "omo-codex-bin-sot-"))
-      const home = await mkdtemp(join(tmpdir(), "omo-codex-user-home-sot-"))
-      const repoRoot = process.cwd()
-      const invocations: Array<{
-        readonly command: string
-        readonly args: readonly string[]
-        readonly home: string | undefined
-      }> = []
-
       // when
-      await runCodexInstaller({
-        codexHome,
-        binDir,
-        repoRoot,
-        astGrepInstaller: skipAstGrepInstall,
-        env: { HOME: home },
-        runCommand: async (command, args, options) => {
-          invocations.push({ command, args: [...args], home: options.env?.HOME })
-        },
-      })
+      const { invocations, repoRoot } = await installRealRepoOnce()
 
       // then
       const missingScripts = await findMissingSpawnedScripts({ invocations, repoRoot })
@@ -338,7 +348,7 @@ describe("install-codex", () => {
         await runCodexInstaller({
           codexHome,
           binDir,
-          repoRoot: process.cwd(),
+          repoRoot: await createRepoWithBuiltComponentBins(),
           astGrepInstaller: skipAstGrepInstall,
           runCommand: async () => undefined,
           env: { HOME: home },
@@ -367,7 +377,7 @@ describe("install-codex", () => {
       // given
       const codexHome = await mkdtemp(join(tmpdir(), "omo-codex-autonomous-home-"))
       const binDir = await mkdtemp(join(tmpdir(), "omo-codex-autonomous-bin-"))
-      const repoRoot = process.cwd()
+      const repoRoot = await createRepoWithBuiltComponentBins()
 
       // when
       await runCodexInstaller({

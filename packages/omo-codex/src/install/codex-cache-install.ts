@@ -1,8 +1,9 @@
+import { readFileSync, readdirSync } from "node:fs"
 import { cp, mkdir, readFile, readdir, rename, rm } from "node:fs/promises"
 import { basename, dirname, join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { removeCachedManagedNpmBinShims } from "./codex-cache-bins"
-import { fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
+import { copyDirectoryTree, fileExistsStrict, isPlainRecord } from "./codex-cache-fs"
 import { rewriteCachedPackageLocalFileDependencies } from "./codex-cache-local-dependencies"
 import { rewriteCachedManifestRoot, rewriteCachedMcpManifest } from "./codex-cache-mcp-manifest"
 import { finalizeCachedPluginPayload } from "./codex-cache-payload"
@@ -33,7 +34,7 @@ export async function installCachedPlugin(input: {
   const tempPath = createTempSiblingPath(targetPath)
   await rm(tempPath, { recursive: true, force: true })
   try {
-    await copyDirectory(input.sourcePath, tempPath)
+    copyDirectory(input.sourcePath, tempPath)
     const rewroteLocalFileDependencies = await rewriteCachedPackageLocalFileDependencies(tempPath, input.sourcePath)
     await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: input.sourcePath })
     await copyRootRuntimeDists({ pluginRoot: tempPath, sourcePath: input.sourcePath })
@@ -48,7 +49,7 @@ export async function installCachedPlugin(input: {
     await maybeRunNpmInstall(tempPath, input.runCommand, npmInstallEnv, installArgs)
     await removeCachedManagedNpmBinShims(tempPath)
     if (input.buildSource === false) await maybeRunNpmSyncSkills(tempPath, input.runCommand, env)
-    await assertNoRemovedSparkshellPromptReferences(tempPath)
+    assertNoRemovedSparkshellPromptReferences(tempPath)
     await rewriteCachedMcpManifest(tempPath, input.sourcePath)
     await rewriteCachedManifestRoot(tempPath, tempPath, targetPath)
     await assertHookCommandTargets(tempPath)
@@ -108,9 +109,8 @@ function createBackupSiblingPath(targetPath: string): string {
   return join(dirname(targetPath), `.backup-${basename(targetPath)}-${process.pid}-${Date.now()}`)
 }
 
-async function copyDirectory(sourcePath: string, targetPath: string): Promise<void> {
-  await mkdir(dirname(targetPath), { recursive: true })
-  await cp(sourcePath, targetPath, { recursive: true, filter: (source) => shouldCopyPluginPath(source, sourcePath) })
+function copyDirectory(sourcePath: string, targetPath: string): void {
+  copyDirectoryTree(sourcePath, targetPath, (source) => shouldCopyPluginPath(source, sourcePath))
 }
 
 async function promoteDirectory(tempPath: string, targetPath: string, renameDirectory: RenameDirectory): Promise<void> {
@@ -161,26 +161,25 @@ const removedSparkshellPromptSurfaceDirs = new Set([".codex-plugin", "agents", "
 const removedSparkshellPromptSurfaceFiles = new Set(["directive.md", "plugin.json"])
 const removedSparkshellTextFilePattern = /\.(?:json|md|toml|ya?ml)$/i
 
-async function assertNoRemovedSparkshellPromptReferences(pluginRoot: string): Promise<void> {
-  for (const filePath of await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, "")) {
-    const content = await readFile(join(pluginRoot, filePath), "utf8")
+// Sync on purpose: the scan lists and reads the prompt surface (every skill file), which through
+// Bun's async fs pool cost seconds on a starved CPU (#14000).
+function assertNoRemovedSparkshellPromptReferences(pluginRoot: string): void {
+  for (const filePath of listRemovedSparkshellPromptSurfaceFiles(pluginRoot, "")) {
+    const content = readFileSync(join(pluginRoot, filePath), "utf8")
     if (!removedSparkshellReferencePattern.test(content)) continue
     throw new Error(`removed sparkshell reference found in Codex plugin prompt surface: ${filePath}`)
   }
 }
 
-async function listRemovedSparkshellPromptSurfaceFiles(
-  pluginRoot: string,
-  relativeDirectory: string,
-): Promise<readonly string[]> {
+function listRemovedSparkshellPromptSurfaceFiles(pluginRoot: string, relativeDirectory: string): readonly string[] {
   const directory = relativeDirectory === "" ? pluginRoot : join(pluginRoot, relativeDirectory)
-  const entries = await readdir(directory, { withFileTypes: true })
+  const entries = readdirSync(directory, { withFileTypes: true })
   const files: string[] = []
   for (const entry of entries) {
     const relativePath = relativeDirectory === "" ? entry.name : join(relativeDirectory, entry.name)
     if (entry.isDirectory()) {
       if (shouldDescendIntoRemovedSparkshellPromptSurface(relativePath)) {
-        files.push(...(await listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativePath)))
+        files.push(...listRemovedSparkshellPromptSurfaceFiles(pluginRoot, relativePath))
       }
       continue
     }
@@ -220,7 +219,7 @@ async function copyRootRuntimeDists(input: {
     const sourcePath = join(repoRoot, runtimePath)
     if (!(await fileExistsStrict(join(sourcePath, "index.js")))) continue
     await mkdir(dirname(join(input.pluginRoot, runtimePath)), { recursive: true })
-    await cp(sourcePath, join(input.pluginRoot, runtimePath), { recursive: true })
+    copyDirectoryTree(sourcePath, join(input.pluginRoot, runtimePath))
   }
 }
 

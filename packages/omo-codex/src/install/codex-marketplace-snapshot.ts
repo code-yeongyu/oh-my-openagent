@@ -1,7 +1,8 @@
-import { cp, mkdir, rename, rm, writeFile } from "node:fs/promises"
+import { mkdir, rename, rm, writeFile } from "node:fs/promises"
 import { join, sep } from "node:path"
 import { copyBundledMcpRuntimeDists } from "./codex-cache-bundled-mcps"
 import { rewriteCachedMcpManifest } from "./codex-cache"
+import { copyDirectoryTree } from "./codex-cache-fs"
 import type { MarketplaceManifest } from "./types"
 
 const INSTALLED_MARKETPLACES_DIR = ".tmp/marketplaces"
@@ -53,10 +54,7 @@ async function writeSnapshotPlugin(
   const targetPath = join(pluginsDir, plugin.name)
   const tempPath = join(pluginsDir, `.tmp-${plugin.name}-${process.pid}-${Date.now()}`)
   await rm(tempPath, { recursive: true, force: true })
-  await cp(plugin.sourcePath, tempPath, {
-    recursive: true,
-    filter: (source) => shouldCopyMarketplaceSourcePath(source, plugin.sourcePath),
-  })
+  copyDirectoryTree(plugin.sourcePath, tempPath, (source) => shouldCopyMarketplaceSourcePath(source, plugin.sourcePath))
   await copyBundledMcpRuntimeDists({ pluginRoot: tempPath, sourceRoot: plugin.sourcePath })
   await rm(targetPath, { recursive: true, force: true })
   await rename(tempPath, targetPath)

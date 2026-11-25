@@ -1,6 +1,6 @@
 import { isPlainRecord } from "./codex-cache-fs"
-import { realpathSync } from "node:fs"
-import { readFile, readdir, writeFile } from "node:fs/promises"
+import { readdirSync, realpathSync } from "node:fs"
+import { readFile, writeFile } from "node:fs/promises"
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 import { isPathInside } from "./codex-cache-paths"
 
@@ -9,7 +9,7 @@ export async function rewriteCachedPackageLocalFileDependencies(
   sourceRoot: string,
 ): Promise<boolean> {
   const packageJsonPaths: string[] = []
-  await collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths)
+  collectPackageJsonPaths(pluginRoot, pluginRoot, packageJsonPaths)
   const packageLock = await readPackageLock(pluginRoot)
   let rewroteAnyPackageJson = false
   for (const packageJsonPath of packageJsonPaths) {
@@ -130,8 +130,10 @@ function canonicalizeExistingPath(path: string): string {
   }
 }
 
-async function collectPackageJsonPaths(directory: string, root: string, paths: string[]): Promise<void> {
-  const entries = await readdir(directory, { withFileTypes: true })
+// Listed synchronously: the walk covers the whole copied plugin tree, and Bun's async readdir cost
+// seconds there on a starved CPU (#14000).
+function collectPackageJsonPaths(directory: string, root: string, paths: string[]): void {
+  const entries = readdirSync(directory, { withFileTypes: true })
   if (entries.some((entry) => entry.isFile() && entry.name === "package.json")) {
     paths.push(join(directory, "package.json"))
   }
@@ -140,6 +142,6 @@ async function collectPackageJsonPaths(directory: string, root: string, paths: s
     if (entry.name === "node_modules" || entry.name === ".git" || entry.name === "dist") continue
     const childPath = join(directory, entry.name)
     if (!isPathInside(childPath, root)) continue
-    await collectPackageJsonPaths(childPath, root, paths)
+    collectPackageJsonPaths(childPath, root, paths)
   }
 }
