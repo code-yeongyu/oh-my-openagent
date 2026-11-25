@@ -66,6 +66,10 @@ const PRINCIPALS: readonly OmoPrincipal[] = [
   { kind: "service" },
 ]
 
+const touchless = async <T>(): Promise<T> => {
+  throw new Error("signOut does not update the store")
+}
+
 describe("custody records at the root", () => {
   for (const principal of PRINCIPALS)
     test(`#given a ${principal.kind} root #when it calls a custody-bearing call its boundary refuses #then one refused record with the code`, async () => {
@@ -109,6 +113,77 @@ describe("custody records at the root", () => {
     )
     expect(await call("account.signIn")).toMatchObject({ kind: "ok" })
     expect(calls).toEqual(["begin account.signIn", "end account.signIn ok"])
+  })
+
+  test("#given a session root asked for the browser sign-in #then its unsupported refusal is recorded", async () => {
+    const { calls, sdk } = rootOf({ kind: "session", session_id: "01-session" }, {})
+    expect(await sdk.account.signIn({ method: "browser", onUserCode: () => undefined })).toMatchObject({
+      kind: "error",
+      error: { code: "unsupported" },
+    })
+    expect(calls).toEqual(["refused account.signIn unsupported"])
+  })
+
+  test("#given forget with an empty device #then the refusal is recorded inside the operation, before nothing is touched", async () => {
+    const touched: string[] = []
+    const touch = (port: string) => async (): Promise<never> => {
+      touched.push(port)
+      throw new Error(`${port} was touched`)
+    }
+    const { calls, sdk } = rootOf(
+      { kind: "person", uid: 501 },
+      {
+        accountSession: {
+          session: {
+            logout: touch("logout"),
+            forget: touch("forget"),
+            update: touch("update"),
+            discard: touch("discard"),
+          },
+          store: { clear: touch("clear") },
+        },
+      },
+    )
+    expect(await sdk.account.forget({ device: "" })).toMatchObject({
+      kind: "error",
+      error: { details: { reason: "empty_device" } },
+    })
+    expect({ calls, touched }).toEqual({
+      calls: ["begin account.forget", "end account.forget refused empty_device"],
+      touched: [],
+    })
+  })
+
+  test("#given a custody log that cannot be written #when a person signs out #then the answer carries audit_unavailable", async () => {
+    const unwritable: CustodyLog = {
+      begin: async () => ({ recorded: false, end: async () => false }),
+      refused: async () => false,
+    }
+    const sdk = assembleOmoSdk(
+      {
+        principal: { kind: "person", uid: 501 },
+        env: { OMO_SERVICE_API_URL: "https://accounts.example.test" },
+        cwd: "/work",
+        ports: {
+          desktopLaunch: () => false,
+          custody: unwritable,
+          accountSession: {
+            session: {
+              logout: async () => true,
+              forget: async () => undefined,
+              update: touchless,
+              discard: async () => undefined,
+            },
+            store: { clear: async () => undefined },
+          },
+        },
+      },
+      {},
+    )
+    expect(await sdk.account.signOut()).toEqual({
+      kind: "ok",
+      value: { signedOut: true, revoked: true, audit_unavailable: true },
+    })
   })
 
   test("#given the store switch #then enable and disable write their records", async () => {

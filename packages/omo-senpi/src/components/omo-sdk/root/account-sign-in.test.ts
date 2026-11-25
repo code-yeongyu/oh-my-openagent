@@ -84,7 +84,7 @@ describe("account.signIn on the root", () => {
     expect(
       (await sdk.account.signIn({ method: "device_code", replace: true, onUserCode: () => undefined })) as unknown,
     ).toMatchObject({ kind: "ok", value: { device_service: "on" } })
-    expect(stdins.map((line) => JSON.parse(line))).toEqual([{ replace: true }])
+    expect(stdins.map((line) => JSON.parse(line))).toEqual([{ replace: true, custodyRecordedByCaller: true }])
   })
 
   test("#given an in-process sign-in #when the device code is approved #then the code reaches onUserCode and the answer names the device", async () => {

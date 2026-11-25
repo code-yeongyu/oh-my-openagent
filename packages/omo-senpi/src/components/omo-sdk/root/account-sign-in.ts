@@ -137,7 +137,8 @@ export function accountSignIn(
         expires_at: code.expiresAt,
       })
     if (inProcess === undefined) {
-      if (input.method !== "device_code" || input.open_browser !== undefined || input.onOpenUrl !== undefined)
+      if (input.method !== "device_code" || input.open_browser !== undefined || input.onOpenUrl !== undefined) {
+        await custody.refused("account.signIn", "unsupported").catch(() => false)
         return failed(
           "unsupported",
           "This root signs in through the omo launcher, which offers the device code only.",
@@ -145,6 +146,7 @@ export function accountSignIn(
             reason: "child_backed_sign_in",
           },
         )
+      }
       const answer = await childSignIn(
         () =>
           account.signIn({
