@@ -67,20 +67,34 @@ function outcome(result: ReturnType<typeof spawnSync>, fixture: ReturnType<typeo
 }
 
 describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage whose write throws", () => {
-  // The compiled entry has no catch of its own: the fault ends as the runtime's unhandled-error report. Its stack
-  // carries source line numbers, so the pin holds what is stable: the exit, the error line and the report's marks.
-  test("#given the compiled entry #then the credentials stage's write stays and the fault is an unhandled-error report, exit 1", () => {
+  // #15001: the compiled entry ends the way the npm launcher does, through the same report: one line, exit 1, and the
+  // full report only under OMO_DEBUG.
+  test("#given the compiled entry #then the credentials stage's write stays, the error is printed and the exit is 1", () => {
     const fixture = faultFixture()
     const result = spawnSync(process.execPath, [join(SOURCE_ROOT, "compile-entry.ts"), "setup", "--yes"], {
       encoding: "utf8",
       env: fixture.env,
     })
     const seen = outcome(result, fixture)
-    expect({ status: seen.status, imported: seen.imported }).toEqual({ status: 1, imported: ["google"] })
-    expect(seen.stderr).toContain("ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'")
-    expect(seen.stderr).toContain("at applySetupStages (")
-    expect(seen.stderr).toMatch(/\nBun v\d+\.\d+\.\d+ /)
-    expect(seen.stderr).not.toContain("omo: ENOTDIR")
+    expect({ status: seen.status, imported: seen.imported, stderr: seen.stderr }).toEqual({
+      status: 1,
+      imported: ["google"],
+      stderr: "omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n",
+    })
+  })
+
+  test("#given the compiled entry under OMO_DEBUG #then the line is followed by the thrown error's stack", () => {
+    const fixture = faultFixture()
+    const result = spawnSync(process.execPath, [join(SOURCE_ROOT, "compile-entry.ts"), "setup", "--yes"], {
+      encoding: "utf8",
+      env: { ...fixture.env, OMO_DEBUG: "1" },
+    })
+    const seen = outcome(result, fixture)
+    expect(seen.status).toBe(1)
+    expect(seen.stderr.startsWith("omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n")).toBe(
+      true,
+    )
+    expect(seen.stderr).toContain("at applyAssets (")
   })
 
   test("#given the npm launcher #then the credentials stage's write stays, the error is printed and the exit is 1", () => {
