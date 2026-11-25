@@ -105,7 +105,6 @@ export const PORT_OPERATIONS = {
 } as const satisfies Readonly<Record<string, readonly string[]>>
 
 export type Port = keyof typeof PORT_OPERATIONS
-export const PORTS = Object.keys(PORT_OPERATIONS) as readonly Port[]
 
 /**
  * The operations of each port that change something (write, send, start), agreed with P0's matcher: a run that shows an

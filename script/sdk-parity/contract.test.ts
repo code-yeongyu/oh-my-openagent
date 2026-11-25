@@ -15,6 +15,7 @@ import type {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   cancellationOf,
+  PORT_EFFECTS,
   GATED,
   HONOURED_CALLS,
   HELD_CODES,
@@ -36,6 +37,7 @@ import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { portProblems } from "./expectation"
 import { loadScenarioTable } from "./scenario-table"
+import { syncRow } from "./sync-inputs"
 import { tableProblems } from "./scenario-rules"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
@@ -69,7 +71,7 @@ type AttachmentBytes = Extract<
   { readonly bytes: unknown }
 >["bytes"]
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
-export const rootTypeChecks: readonly true[] = [
+const rootTypeChecks: readonly true[] = [
   // Review 6061836983 H2: an instant call whose input has required fields takes that input as required.
   true satisfies Equal<undefined extends Parameters<OmoSdkRoot["daemon"]["shardPath"]>[0] ? true : false, false>,
   // H1: install.setup.apply takes the plan as required, as design 6.7 and the row have it.
@@ -253,5 +255,24 @@ describe("the table under P0's shared scenario rules", () => {
       scenarios.flatMap((file) => file.scenarios),
     )
     expect(problems).toEqual([])
+  })
+})
+
+describe("tables the root's consumers read", () => {
+  test("#given the root's compile-time assertions #then every one of them holds", () => {
+    expect(rootTypeChecks.every((holds) => holds)).toBe(true)
+  })
+
+  test("#given the effect classification P0's matcher takes #then every effect is an operation of its port", () => {
+    const strays = Object.entries(PORT_EFFECTS).flatMap(([port, effects]) =>
+      effects.filter(
+        (op) => !(PORT_OPERATIONS[port as keyof typeof PORT_OPERATIONS] as readonly string[]).includes(op),
+      ),
+    )
+    expect(strays).toEqual([])
+  })
+
+  test("#given every registry row #then its input is the root schema's typing of the fields it has (sync-inputs)", () => {
+    expect(rows.filter((row) => JSON.stringify(syncRow(row)) !== JSON.stringify(row)).map((row) => row.id)).toEqual([])
   })
 })

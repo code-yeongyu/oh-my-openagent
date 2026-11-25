@@ -9,7 +9,7 @@ import { PARITY_DIR } from "./registry"
 // expectation.ts; this module only loads the table.
 export type { Expectation, ScenarioTableFile, TableScenario } from "./expectation"
 
-export const SCENARIOS_DIR = join(PARITY_DIR, "scenarios")
+const SCENARIOS_DIR = join(PARITY_DIR, "scenarios")
 
 export function loadScenarioTable(dir: string = SCENARIOS_DIR): ScenarioTableFile[] {
   return readdirSync(dir)

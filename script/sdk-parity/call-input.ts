@@ -12,7 +12,7 @@ type ObjectSchema = {
 }
 type Schema = ObjectSchema & { readonly anyOf?: readonly ObjectSchema[] }
 
-export const projectSchema = (schema: unknown): Schema =>
+const projectSchema = (schema: unknown): Schema =>
   JSON.parse(JSON.stringify(schema, (key, value: unknown) => (key === "description" ? undefined : value))) as Schema
 
 export function callInputOf(schema: unknown): CallInput {
