@@ -2,6 +2,8 @@ import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import type { CallOptions, OmoValue, RootCallInput } from "../contract"
 import type { OmoResult } from "../result"
 import type { MemberOf } from "./members"
+import { inputAccepts } from "../contract/validate"
+import { invalidInput } from "./assemble"
 import { notImplemented } from "./not-implemented"
 
 type RootSignedIn =
@@ -22,6 +24,7 @@ export function accountSignIn(account: AccountApi, origin: string): SignIn {
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
     if (!isRootInput(input)) return account.signIn(input)
+    if (!inputAccepts("account.signIn", input)) return { kind: "error", error: invalidInput("account.signIn") }
     if (input.method !== "device_code" || input.open_browser !== undefined || input.onOpenUrl !== undefined)
       return (await notImplemented("account.signIn")()) as OmoValue<RootSignedIn>
     const signal = input.signal ?? callOptions?.signal

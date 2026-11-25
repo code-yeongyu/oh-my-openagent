@@ -1,6 +1,6 @@
 import type { WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
-import { assembleForFacade } from "../omo-sdk/assembly"
+import { assembleThreadFacade } from "../omo-sdk/thread-assembly"
 import type { OmoFailure } from "../omo-sdk/contract"
 import { storeRefusal } from "../omo-sdk/root/extension-codes"
 import { threadToolFailureOf } from "../omo-sdk/root/thread-failures"
@@ -157,7 +157,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   assertThreadSdkOptions(options)
   const { agentDir, cwd, uid, user, env, host, store, remote, now, onUnexpected } = options
   const { provenanceWorkspaces, engineStatusAll, workerModuleUrl, firstPromptWaitMs } = options
-  const { root, releaseLocated } = assembleForFacade({
+  const { root, releaseLocated } = assembleThreadFacade({
     agentDir,
     cwd,
     uid,

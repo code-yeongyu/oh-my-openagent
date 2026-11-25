@@ -1332,12 +1332,12 @@
       "expect": [
         {
           "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "workspace"
-          }
+          "op": "list_sessions"
         }
       ],
+      "answer": {
+        "thread": "t-1"
+      },
       "target": "this_device"
     },
     {
@@ -1348,15 +1348,24 @@
         "thread": "t-1",
         "all_scope": true
       },
-      "expect": [
+      "given": [
         {
           "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "all"
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
           }
         }
       ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        }
+      ],
+      "answer": {
+        "thread": "t-1"
+      },
       "target": "this_device"
     },
     {
@@ -3760,13 +3769,19 @@
         "name": "review",
         "all_scope": true
       },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
       "expect": [
         {
           "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "all"
-          }
+          "op": "list_sessions"
         },
         {
           "port": "host",
@@ -3777,6 +3792,10 @@
           }
         }
       ],
+      "answer": {
+        "thread": "t-1",
+        "name": "review"
+      },
       "target": "this_device"
     },
     {
@@ -5469,8 +5488,7 @@
           "count": 0
         }
       ],
-      "refusal": "release_unsupported",
-      "refusal_from": "value"
+      "refusal": "unsupported"
     },
     {
       "id": "threads.adopt/on-other-device",
