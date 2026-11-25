@@ -12,6 +12,18 @@ afterEach(cleanup)
 const interruptsOn = (sent: readonly { rpc?: Record<string, unknown> }[]) =>
   sent.filter((entry) => entry.rpc?.["type"] === "interrupt").length
 
+describe("X1a finding 1: a thread the SDK creates on another device", () => {
+  test("#given the SDK creates a thread on device b with a first prompt #when it runs #then the prompt reaches b as the person's prompt, as the tool's does", async () => {
+    const a = account()
+    const sdk = surface(a.remote).sdk()
+    const created = await sdk.create({ device: "b", prompt: "start here" })
+    expect(created).toMatchObject({ kind: "ok", device: "b", prompt: { delivery: { kind: "started" } } })
+    expect(a.sent.filter((entry) => entry.rpc?.["type"] === "prompt")).toEqual([
+      expect.objectContaining({ rpc: expect.objectContaining({ message: "start here" }) }),
+    ])
+  })
+})
+
 describe("the idempotency key on a thread SDK control call", () => {
   test("#given a close on this device whose answer the caller lost #when the caller repeats it under the same key #then the holder closes once and the repeat answers the first outcome", async () => {
     const s = surface(account().remote)

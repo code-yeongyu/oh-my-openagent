@@ -8,7 +8,6 @@ import { resolveAddress } from "./address"
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
 import {
-  DEFAULT_THREAD_DELIVERY,
   parseThreadParams,
   threadToolParamSchemas,
   type ThreadCloseInput,
@@ -19,7 +18,7 @@ import {
   type ThreadState,
   type ThreadToolResult,
 } from "./contracts"
-import { sendThread, viewForSend } from "./sdk-send"
+import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 import { createThread } from "./control/create"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "./control/prompt-start"
 import { locateControl } from "./control/locate"
@@ -448,17 +447,18 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
           retrying,
           view,
           deliverPrompt: async (_current, target, send, key) => {
-            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does.
-            const sent = await pipeline.deliver({
-              sender: { kind: "cli", uid: options.uid, user: options.user },
-              caller_id: principal,
+            // The script created the thread, so its first prompt carries the creator's authority (#14045), as the tool's does,
+            // and goes the way every send of this SDK goes: on another device as the person's own prompt (#15006).
+            const sent = await sendToTarget(
+              controls,
+              pipeline,
               target,
-              text: send.message,
-              mode: send.delivery ?? DEFAULT_THREAD_DELIVERY,
-              idempotency_key: key,
-              args: send,
-              authority: "creator",
-            })
+              send,
+              key,
+              { kind: "operator", uid: options.uid, user: options.user },
+              send,
+              "creator",
+            )
             if (sent.kind === "error") return { kind: "error", error: sent.error }
             const { thread_id, ...facts } = sent
             return { ...facts, thread: thread_id } as ThreadToolResult

@@ -2122,15 +2122,12 @@ describe("T1b pins: the X1a findings", () => {
             "link": "[thread](omo-thread://v1/dur-new-on-b)",
             "name": "",
             "prompt": {
-              "error": {
-                "code": "unsupported",
-                "details": {
-                  "device": "b",
-                  "reason": "sender_not_allowed",
-                },
-                "message": "A command-line sender cannot reach a session on device b: the engine admits a command-line delivery only from its own machine.",
-                "next_action": "Use omo remote send b/dur-new-on-b instead.",
+              "deduplicated": false,
+              "delivery": {
+                "kind": "started",
+                "turn_id": "turn-b",
               },
+              "effective_mode": "start",
             },
             "state": "idle",
             "status": "live",
