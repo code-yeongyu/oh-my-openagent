@@ -30,6 +30,174 @@
       "differs": "A thread with no live owner is refused not_resumable instead of renamed in its session file (control/rename.ts:31).",
       "owner": "T1a",
       "retires_with": "T1a"
+    },
+    {
+      "id": "threads.send/all-scope",
+      "differs": "A send lists the endpoints as one offline view (host.list_sessions {offline: true}); all_scope widens which threads the address may resolve to, never the listing request, so no list_sessions {scope: \"all\"} is made (sdk-send.ts viewForSend).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/attachments",
+      "differs": "attachments is not acted on, so the call answers not_implemented (omo-sdk/root/threads.ts unbuilt).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/author-refuses-session",
+      "differs": "The root builds threads.send for a person and a script only; a session principal's call answers not_implemented before author is read.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/authority-author",
+      "differs": "The default (script) root refuses author with invalid_arguments, a connector's field (security design 4.1, author on a send); the scenario expects the script's delivery to carry it.",
+      "owner": "P1b",
+      "retires_with": "P1b"
+    },
+    {
+      "id": "threads.send/authority-base",
+      "differs": "The fakes hold no thread named studio on this device (the host lists t-1 and t-3; studio is the other device), so the address answers not_found before any delivery.",
+      "owner": "P1b",
+      "retires_with": "P1b"
+    },
+    {
+      "id": "threads.send/chain-limit",
+      "differs": "The fake store reads no given state; chain_length at_limit is not modelled, so the send is delivered.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/device-not-answering",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/device-offline",
+      "differs": "A device the account lists offline is refused device_offline before anything is sent (relay-session-host.ts, A3: nothing is queued for it); the scenario expects the relay to queue it offline.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/idempotent-repeat",
+      "differs": "The scenario expects store.idempotency_get, which no send makes: the send book (sdk-core/send-book.ts) answers a repeat from the receipt book the fake keeps unrecorded, and the first call delivers.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/key-reused",
+      "differs": "The scenario expects store.idempotency_get with other arguments, which no send makes; a single call under a fresh key delivers.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/no-relay-transport",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/parked-agent-only",
+      "differs": "The fake store reads no given state; a parked intake that accepts only agents is not modelled, so the send is delivered.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/relay-host-error",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/relay-silent",
+      "differs": "A stated {code: delivered_unconfirmed} refuses the relay command, which the relay leg answers host_unavailable (remote/outcome.ts), not delivered_unconfirmed.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/relay-transport-expired",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/relay-unconfirmed",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/relay-undelivered",
+      "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/remote-not-steerable",
+      "differs": "A steer's expected turn is the engine's turn number; turn-3 is refused turn_conflict before the relay is asked (remote steer check).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/send-another-device-refuses-connector",
+      "differs": "The root builds threads.send for a person and a script only; a connector's call answers not_implemented, not unsupported.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/send-another-device-refuses-service",
+      "differs": "The root builds threads.send for a person and a script only; a service's call answers not_implemented, not sender_not_allowed.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-connector",
+      "differs": "The root builds threads.send for a person and a script only; a connector's call answers not_implemented, not unsupported.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-person",
+      "differs": "The fakes hold no thread named studio on this device, so the address answers not_found before the person's send is refused unsupported.",
+      "owner": "P1b",
+      "retires_with": "P1b"
+    },
+    {
+      "id": "threads.send/send-this-device-refuses-service",
+      "differs": "The root builds threads.send for a person and a script only; a service's call answers not_implemented, not sender_not_allowed.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/session-ended",
+      "differs": "The answer names the lane as delivery.kind (queued_offline), not delivery.lane.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/steer",
+      "differs": "A steer's expected turn on this device is the engine's turn number; turn-3 is refused turn_conflict before any delivery (gateway/local-transport.ts).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/summary",
+      "differs": "summary is not acted on, so the call answers not_implemented (omo-sdk/root/threads.ts unbuilt).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/too-large",
+      "differs": "The root's send is bounded by the engine's 1 MiB (gateway/constants.ts TARGET_MAX_BYTES), not the tools' 32 KiB, so 32,770 bytes are delivered.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/turn-moved",
+      "differs": "A steer's expected turn on this device is the engine's turn number; turn-1 is refused turn_conflict before get_state is read (gateway/local-transport.ts).",
+      "owner": "T1b",
+      "retires_with": "T1b"
     }
   ]
 }

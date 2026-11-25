@@ -17,7 +17,7 @@ import { fsPort, processPort } from "./process-fs"
 import { createRecorder } from "./recorder"
 import { FAKE_HOME_PREFIX, scenarioSetup } from "./setup"
 
-// P1b's eight rows judged as isBuilt will judge them once the rows list their scenarios: each row's `scenarios` filled
+// P1b's rows, and T1b's threads.send, judged as isBuilt will judge them once the rows list their scenarios: each row's `scenarios` filled
 // from the table, the real effect classification (PORT_EFFECTS) and the table's inert fields. Every scenario the real
 // root answers differently from the table is an entry of the closed record scenario-differences.json, checked both
 // ways: a difference with no entry fails, and an entry whose scenario now passes fails as stale.
@@ -44,6 +44,7 @@ const ROWS = [
   "threads.locate",
   "threads.release",
   "threads.rename",
+  "threads.send",
   "config.status",
 ]
 const table = loadScenarioTable()
@@ -91,9 +92,9 @@ async function judged(changed: TableScenario): Promise<string[]> {
 }
 
 describe("P1b scenario drivers over the real omo SDK root", () => {
-  test("#given the three runs modules #then every table scenario of the eight rows has exactly one run", () => {
+  test("#given the three runs modules #then every table scenario of the run rows has exactly one run", () => {
     expect(RUNS.map((run) => run.scenario.id).toSorted()).toEqual(scenarios.map((s) => s.id).toSorted())
-    expect(RUNS).toHaveLength(58)
+    expect(RUNS).toHaveLength(100)
   })
 
   test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {
