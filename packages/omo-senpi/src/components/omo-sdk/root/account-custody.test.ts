@@ -57,7 +57,7 @@ function rootOf(principal: OmoPrincipal, ports: OmoSdkPorts, signIn?: Parameters
     (key.split(".").reduce<unknown>((node, part) => Reflect.get(Object(node), part), sdk) as (i: unknown) => unknown)(
       INPUTS[key] ?? {},
     )
-  return { sdk, calls, call }
+  return { sdk, calls, call, log }
 }
 
 const PRINCIPALS: readonly OmoPrincipal[] = [
@@ -89,12 +89,12 @@ describe("custody records at the root", () => {
 
   test("#given the in-process sign-in #then it is handed the root's custody log", async () => {
     const handed: CustodyLog[] = []
-    const { call } = rootOf({ kind: "script", uid: 501 }, {}, async (_api, _request, custody) => {
+    const { call, log } = rootOf({ kind: "script", uid: 501 }, {}, async (_api, _request, custody) => {
       handed.push(custody)
       return { kind: "refused", code: "cancelled" }
     })
     await call("account.signIn")
-    expect(handed.length).toBe(1)
+    expect(handed.length === 1 && handed[0] === log).toBe(true)
   })
 
   test("#given a session's child-backed sign-in #then the root writes its started and terminal records", async () => {
@@ -117,7 +117,10 @@ describe("custody records at the root", () => {
         platform: "darwin",
         available: async () => true,
         status: () => ({ store: "login", state: "absent", path: "/store" }),
-        enable: async () => ({ kind: "ok", value: { store: "omo", created: true, moved: "none", loginLeftover: false } }),
+        enable: async () => ({
+          kind: "ok",
+          value: { store: "omo", created: true, moved: "none", loginLeftover: false },
+        }),
         disable: async () => ({ kind: "ok", value: { store: "login", moved: "none", erased: true } }),
       },
     }
