@@ -241,8 +241,8 @@
             "config"
           ],
           "flags": {
-            "-l": "local",
-            "--local": "local",
+            "-l": "local=true",
+            "--local": "local=true",
             "--approve": "trust=true",
             "--no-approve": "trust=false"
           },
@@ -353,12 +353,16 @@
         "properties": {
           "session": {
             "properties": {
-              "continue": {},
+              "continue": {
+                "type": "boolean"
+              },
               "path": {},
               "id": {},
               "fork": {},
               "rebind": {},
-              "ephemeral": {},
+              "ephemeral": {
+                "type": "boolean"
+              },
               "dir": {},
               "spawned_by": {},
               "name": {}
@@ -376,32 +380,44 @@
                 "properties": {
                   "allow": {},
                   "deny": {},
-                  "none": {},
-                  "no_builtin": {}
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
                 }
               },
               "extensions": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "skills": {
                 "properties": {
                   "names": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "prompt_templates": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "themes": {
                 "properties": {
                   "paths": {},
-                  "none": {},
+                  "none": {
+                    "type": "boolean"
+                  },
                   "use": {}
                 }
               },
@@ -411,22 +427,30 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
+              "offline": {
+                "type": "boolean"
+              },
               "session_runtime": {},
               "tool_runtime": {},
-              "auto_title": {}
+              "auto_title": {
+                "type": "boolean"
+              }
             }
           },
           "input": {},
           "presenter": {
             "properties": {
               "bootstrap_fd": {},
-              "enforcement": {}
+              "enforcement": {
+                "type": "boolean"
+              }
             }
           },
           "gated": {
             "properties": {
-              "grok_neo": {}
+              "grok_neo": {
+                "type": "boolean"
+              }
             }
           },
           "api_key": {}
@@ -439,12 +463,12 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--continue": "session.continue",
+            "--continue": "session.continue=true",
             "--session": "session.path",
             "--session-id": "session.id",
             "--fork": "session.fork",
             "--rebind": "session.rebind",
-            "--no-session": "session.ephemeral",
+            "--no-session": "session.ephemeral=true",
             "--session-dir": "session.dir",
             "--spawned-by": "session.spawned_by",
             "--name": "session.name",
@@ -456,27 +480,27 @@
             "--append-system-prompt": "setup.append_system_prompt",
             "--tools": "setup.tools.allow",
             "--exclude-tools": "setup.tools.deny",
-            "--no-tools": "setup.tools.none",
-            "--no-builtin-tools": "setup.tools.no_builtin",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
             "--extension": "setup.extensions.paths",
-            "--no-extensions": "setup.extensions.none",
+            "--no-extensions": "setup.extensions.none=true",
             "--skill": "setup.skills.names",
-            "--no-skills": "setup.skills.none",
+            "--no-skills": "setup.skills.none=true",
             "--prompt-template": "setup.prompt_templates.paths",
-            "--no-prompt-templates": "setup.prompt_templates.none",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
             "--theme": "setup.themes.paths",
-            "--no-themes": "setup.themes.none",
+            "--no-themes": "setup.themes.none=true",
             "--use-theme": "setup.themes.use",
             "--no-context-files": "setup.context_files=false",
             "--approve": "setup.project_trust=true",
             "--no-approve": "setup.project_trust=false",
-            "--offline": "setup.offline",
+            "--offline": "setup.offline=true",
             "--session-runtime": "setup.session_runtime",
             "--tool-runtime": "setup.tool_runtime",
-            "--auto-title-sessions": "setup.auto_title",
+            "--auto-title-sessions": "setup.auto_title=true",
             "--mcp-presenter-fd": "presenter.bootstrap_fd",
-            "--mcp-presenter-enforcement": "presenter.enforcement",
-            "--grok-neo": "gated.grok_neo",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
             "--api-key": "api_key",
             "--hand": "when"
           },
@@ -510,12 +534,16 @@
         "properties": {
           "session": {
             "properties": {
-              "continue": {},
+              "continue": {
+                "type": "boolean"
+              },
               "path": {},
               "id": {},
               "fork": {},
               "rebind": {},
-              "ephemeral": {},
+              "ephemeral": {
+                "type": "boolean"
+              },
               "dir": {},
               "spawned_by": {},
               "name": {}
@@ -533,32 +561,44 @@
                 "properties": {
                   "allow": {},
                   "deny": {},
-                  "none": {},
-                  "no_builtin": {}
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
                 }
               },
               "extensions": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "skills": {
                 "properties": {
                   "names": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "prompt_templates": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "themes": {
                 "properties": {
                   "paths": {},
-                  "none": {},
+                  "none": {
+                    "type": "boolean"
+                  },
                   "use": {}
                 }
               },
@@ -568,10 +608,14 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
+              "offline": {
+                "type": "boolean"
+              },
               "session_runtime": {},
               "tool_runtime": {},
-              "auto_title": {}
+              "auto_title": {
+                "type": "boolean"
+              }
             }
           },
           "listen": {},
@@ -579,12 +623,16 @@
           "presenter": {
             "properties": {
               "bootstrap_fd": {},
-              "enforcement": {}
+              "enforcement": {
+                "type": "boolean"
+              }
             }
           },
           "gated": {
             "properties": {
-              "grok_neo": {}
+              "grok_neo": {
+                "type": "boolean"
+              }
             }
           },
           "api_key": {}
@@ -597,12 +645,12 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--continue": "session.continue",
+            "--continue": "session.continue=true",
             "--session": "session.path",
             "--session-id": "session.id",
             "--fork": "session.fork",
             "--rebind": "session.rebind",
-            "--no-session": "session.ephemeral",
+            "--no-session": "session.ephemeral=true",
             "--session-dir": "session.dir",
             "--spawned-by": "session.spawned_by",
             "--name": "session.name",
@@ -614,27 +662,27 @@
             "--append-system-prompt": "setup.append_system_prompt",
             "--tools": "setup.tools.allow",
             "--exclude-tools": "setup.tools.deny",
-            "--no-tools": "setup.tools.none",
-            "--no-builtin-tools": "setup.tools.no_builtin",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
             "--extension": "setup.extensions.paths",
-            "--no-extensions": "setup.extensions.none",
+            "--no-extensions": "setup.extensions.none=true",
             "--skill": "setup.skills.names",
-            "--no-skills": "setup.skills.none",
+            "--no-skills": "setup.skills.none=true",
             "--prompt-template": "setup.prompt_templates.paths",
-            "--no-prompt-templates": "setup.prompt_templates.none",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
             "--theme": "setup.themes.paths",
-            "--no-themes": "setup.themes.none",
+            "--no-themes": "setup.themes.none=true",
             "--use-theme": "setup.themes.use",
             "--no-context-files": "setup.context_files=false",
             "--approve": "setup.project_trust=true",
             "--no-approve": "setup.project_trust=false",
-            "--offline": "setup.offline",
+            "--offline": "setup.offline=true",
             "--session-runtime": "setup.session_runtime",
             "--tool-runtime": "setup.tool_runtime",
-            "--auto-title-sessions": "setup.auto_title",
+            "--auto-title-sessions": "setup.auto_title=true",
             "--mcp-presenter-fd": "presenter.bootstrap_fd",
-            "--mcp-presenter-enforcement": "presenter.enforcement",
-            "--grok-neo": "gated.grok_neo",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
             "--api-key": "api_key",
             "--headless": "when",
             "--listen": "listen"
@@ -669,12 +717,16 @@
         "properties": {
           "session": {
             "properties": {
-              "continue": {},
+              "continue": {
+                "type": "boolean"
+              },
               "path": {},
               "id": {},
               "fork": {},
               "rebind": {},
-              "ephemeral": {},
+              "ephemeral": {
+                "type": "boolean"
+              },
               "dir": {},
               "spawned_by": {},
               "name": {}
@@ -692,32 +744,44 @@
                 "properties": {
                   "allow": {},
                   "deny": {},
-                  "none": {},
-                  "no_builtin": {}
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
                 }
               },
               "extensions": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "skills": {
                 "properties": {
                   "names": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "prompt_templates": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "themes": {
                 "properties": {
                   "paths": {},
-                  "none": {},
+                  "none": {
+                    "type": "boolean"
+                  },
                   "use": {}
                 }
               },
@@ -727,10 +791,14 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
+              "offline": {
+                "type": "boolean"
+              },
               "session_runtime": {},
               "tool_runtime": {},
-              "auto_title": {}
+              "auto_title": {
+                "type": "boolean"
+              }
             }
           },
           "input": {
@@ -742,11 +810,15 @@
           },
           "gated": {
             "properties": {
-              "grok_neo": {}
+              "grok_neo": {
+                "type": "boolean"
+              }
             }
           },
           "tui_mode": {},
-          "verbose": {},
+          "verbose": {
+            "type": "boolean"
+          },
           "attach": {
             "properties": {
               "socket": {}
@@ -755,7 +827,9 @@
           "presenter": {
             "properties": {
               "bootstrap_fd": {},
-              "enforcement": {}
+              "enforcement": {
+                "type": "boolean"
+              }
             }
           },
           "api_key": {}
@@ -768,12 +842,12 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--continue": "session.continue",
+            "--continue": "session.continue=true",
             "--session": "session.path",
             "--session-id": "session.id",
             "--fork": "session.fork",
             "--rebind": "session.rebind",
-            "--no-session": "session.ephemeral",
+            "--no-session": "session.ephemeral=true",
             "--session-dir": "session.dir",
             "--spawned-by": "session.spawned_by",
             "--name": "session.name",
@@ -785,30 +859,30 @@
             "--append-system-prompt": "setup.append_system_prompt",
             "--tools": "setup.tools.allow",
             "--exclude-tools": "setup.tools.deny",
-            "--no-tools": "setup.tools.none",
-            "--no-builtin-tools": "setup.tools.no_builtin",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
             "--extension": "setup.extensions.paths",
-            "--no-extensions": "setup.extensions.none",
+            "--no-extensions": "setup.extensions.none=true",
             "--skill": "setup.skills.names",
-            "--no-skills": "setup.skills.none",
+            "--no-skills": "setup.skills.none=true",
             "--prompt-template": "setup.prompt_templates.paths",
-            "--no-prompt-templates": "setup.prompt_templates.none",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
             "--theme": "setup.themes.paths",
-            "--no-themes": "setup.themes.none",
+            "--no-themes": "setup.themes.none=true",
             "--use-theme": "setup.themes.use",
             "--no-context-files": "setup.context_files=false",
             "--approve": "setup.project_trust=true",
             "--no-approve": "setup.project_trust=false",
-            "--offline": "setup.offline",
+            "--offline": "setup.offline=true",
             "--session-runtime": "setup.session_runtime",
             "--tool-runtime": "setup.tool_runtime",
-            "--auto-title-sessions": "setup.auto_title",
+            "--auto-title-sessions": "setup.auto_title=true",
             "--mcp-presenter-fd": "presenter.bootstrap_fd",
-            "--mcp-presenter-enforcement": "presenter.enforcement",
-            "--grok-neo": "gated.grok_neo",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
             "--api-key": "api_key",
             "--tui-mode": "tui_mode",
-            "--verbose": "verbose",
+            "--verbose": "verbose=true",
             "--attach": "attach.socket"
           },
           "positionals": {
@@ -845,12 +919,16 @@
         "properties": {
           "session": {
             "properties": {
-              "continue": {},
+              "continue": {
+                "type": "boolean"
+              },
               "path": {},
               "id": {},
               "fork": {},
               "rebind": {},
-              "ephemeral": {},
+              "ephemeral": {
+                "type": "boolean"
+              },
               "dir": {},
               "spawned_by": {},
               "name": {}
@@ -868,32 +946,44 @@
                 "properties": {
                   "allow": {},
                   "deny": {},
-                  "none": {},
-                  "no_builtin": {}
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
                 }
               },
               "extensions": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "skills": {
                 "properties": {
                   "names": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "prompt_templates": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "themes": {
                 "properties": {
                   "paths": {},
-                  "none": {},
+                  "none": {
+                    "type": "boolean"
+                  },
                   "use": {}
                 }
               },
@@ -903,10 +993,14 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
+              "offline": {
+                "type": "boolean"
+              },
               "session_runtime": {},
               "tool_runtime": {},
-              "auto_title": {}
+              "auto_title": {
+                "type": "boolean"
+              }
             }
           },
           "input": {
@@ -918,14 +1012,18 @@
           },
           "gated": {
             "properties": {
-              "grok_neo": {}
+              "grok_neo": {
+                "type": "boolean"
+              }
             }
           },
           "mode": {},
           "presenter": {
             "properties": {
               "bootstrap_fd": {},
-              "enforcement": {}
+              "enforcement": {
+                "type": "boolean"
+              }
             }
           },
           "api_key": {}
@@ -941,12 +1039,12 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--continue": "session.continue",
+            "--continue": "session.continue=true",
             "--session": "session.path",
             "--session-id": "session.id",
             "--fork": "session.fork",
             "--rebind": "session.rebind",
-            "--no-session": "session.ephemeral",
+            "--no-session": "session.ephemeral=true",
             "--session-dir": "session.dir",
             "--spawned-by": "session.spawned_by",
             "--name": "session.name",
@@ -958,27 +1056,27 @@
             "--append-system-prompt": "setup.append_system_prompt",
             "--tools": "setup.tools.allow",
             "--exclude-tools": "setup.tools.deny",
-            "--no-tools": "setup.tools.none",
-            "--no-builtin-tools": "setup.tools.no_builtin",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
             "--extension": "setup.extensions.paths",
-            "--no-extensions": "setup.extensions.none",
+            "--no-extensions": "setup.extensions.none=true",
             "--skill": "setup.skills.names",
-            "--no-skills": "setup.skills.none",
+            "--no-skills": "setup.skills.none=true",
             "--prompt-template": "setup.prompt_templates.paths",
-            "--no-prompt-templates": "setup.prompt_templates.none",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
             "--theme": "setup.themes.paths",
-            "--no-themes": "setup.themes.none",
+            "--no-themes": "setup.themes.none=true",
             "--use-theme": "setup.themes.use",
             "--no-context-files": "setup.context_files=false",
             "--approve": "setup.project_trust=true",
             "--no-approve": "setup.project_trust=false",
-            "--offline": "setup.offline",
+            "--offline": "setup.offline=true",
             "--session-runtime": "setup.session_runtime",
             "--tool-runtime": "setup.tool_runtime",
-            "--auto-title-sessions": "setup.auto_title",
+            "--auto-title-sessions": "setup.auto_title=true",
             "--mcp-presenter-fd": "presenter.bootstrap_fd",
-            "--mcp-presenter-enforcement": "presenter.enforcement",
-            "--grok-neo": "gated.grok_neo",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
             "--api-key": "api_key",
             "--print": "when",
             "-p": "when",
@@ -1018,12 +1116,16 @@
         "properties": {
           "session": {
             "properties": {
-              "continue": {},
+              "continue": {
+                "type": "boolean"
+              },
               "path": {},
               "id": {},
               "fork": {},
               "rebind": {},
-              "ephemeral": {},
+              "ephemeral": {
+                "type": "boolean"
+              },
               "dir": {},
               "spawned_by": {},
               "name": {}
@@ -1041,32 +1143,44 @@
                 "properties": {
                   "allow": {},
                   "deny": {},
-                  "none": {},
-                  "no_builtin": {}
+                  "none": {
+                    "type": "boolean"
+                  },
+                  "no_builtin": {
+                    "type": "boolean"
+                  }
                 }
               },
               "extensions": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "skills": {
                 "properties": {
                   "names": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "prompt_templates": {
                 "properties": {
                   "paths": {},
-                  "none": {}
+                  "none": {
+                    "type": "boolean"
+                  }
                 }
               },
               "themes": {
                 "properties": {
                   "paths": {},
-                  "none": {},
+                  "none": {
+                    "type": "boolean"
+                  },
                   "use": {}
                 }
               },
@@ -1076,23 +1190,33 @@
               "project_trust": {
                 "type": "boolean"
               },
-              "offline": {},
+              "offline": {
+                "type": "boolean"
+              },
               "session_runtime": {},
               "tool_runtime": {},
-              "auto_title": {}
+              "auto_title": {
+                "type": "boolean"
+              }
             }
           },
           "gated": {
             "properties": {
-              "grok_neo": {}
+              "grok_neo": {
+                "type": "boolean"
+              }
             }
           },
           "listen": {},
-          "multi_session": {},
+          "multi_session": {
+            "type": "boolean"
+          },
           "presenter": {
             "properties": {
               "bootstrap_fd": {},
-              "enforcement": {}
+              "enforcement": {
+                "type": "boolean"
+              }
             }
           },
           "input": {},
@@ -1106,12 +1230,12 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--continue": "session.continue",
+            "--continue": "session.continue=true",
             "--session": "session.path",
             "--session-id": "session.id",
             "--fork": "session.fork",
             "--rebind": "session.rebind",
-            "--no-session": "session.ephemeral",
+            "--no-session": "session.ephemeral=true",
             "--session-dir": "session.dir",
             "--spawned-by": "session.spawned_by",
             "--name": "session.name",
@@ -1123,31 +1247,31 @@
             "--append-system-prompt": "setup.append_system_prompt",
             "--tools": "setup.tools.allow",
             "--exclude-tools": "setup.tools.deny",
-            "--no-tools": "setup.tools.none",
-            "--no-builtin-tools": "setup.tools.no_builtin",
+            "--no-tools": "setup.tools.none=true",
+            "--no-builtin-tools": "setup.tools.no_builtin=true",
             "--extension": "setup.extensions.paths",
-            "--no-extensions": "setup.extensions.none",
+            "--no-extensions": "setup.extensions.none=true",
             "--skill": "setup.skills.names",
-            "--no-skills": "setup.skills.none",
+            "--no-skills": "setup.skills.none=true",
             "--prompt-template": "setup.prompt_templates.paths",
-            "--no-prompt-templates": "setup.prompt_templates.none",
+            "--no-prompt-templates": "setup.prompt_templates.none=true",
             "--theme": "setup.themes.paths",
-            "--no-themes": "setup.themes.none",
+            "--no-themes": "setup.themes.none=true",
             "--use-theme": "setup.themes.use",
             "--no-context-files": "setup.context_files=false",
             "--approve": "setup.project_trust=true",
             "--no-approve": "setup.project_trust=false",
-            "--offline": "setup.offline",
+            "--offline": "setup.offline=true",
             "--session-runtime": "setup.session_runtime",
             "--tool-runtime": "setup.tool_runtime",
-            "--auto-title-sessions": "setup.auto_title",
+            "--auto-title-sessions": "setup.auto_title=true",
             "--mcp-presenter-fd": "presenter.bootstrap_fd",
-            "--mcp-presenter-enforcement": "presenter.enforcement",
-            "--grok-neo": "gated.grok_neo",
+            "--mcp-presenter-enforcement": "presenter.enforcement=true",
+            "--grok-neo": "gated.grok_neo=true",
             "--api-key": "api_key",
             "--mode": "when",
             "--listen": "listen",
-            "--multi-session": "multi_session"
+            "--multi-session": "multi_session=true"
           },
           "positionals": {},
           "values": []
@@ -1326,8 +1450,8 @@
             "install"
           ],
           "flags": {
-            "-l": "local",
-            "--local": "local",
+            "-l": "local=true",
+            "--local": "local=true",
             "--approve": "trust=true",
             "--no-approve": "trust=false"
           },
@@ -1425,8 +1549,8 @@
             "remove"
           ],
           "flags": {
-            "-l": "local",
-            "--local": "local",
+            "-l": "local=true",
+            "--local": "local=true",
             "--approve": "trust=true",
             "--no-approve": "trust=false"
           },
@@ -1442,8 +1566,8 @@
             "uninstall"
           ],
           "flags": {
-            "-l": "local",
-            "--local": "local",
+            "-l": "local=true",
+            "--local": "local=true",
             "--approve": "trust=true",
             "--no-approve": "trust=false"
           },
@@ -1708,7 +1832,7 @@
             "run"
           ],
           "flags": {
-            "--watch": "watch",
+            "--watch": "watch=true",
             "--exec": "exec",
             "--poll-seconds": "poll_seconds",
             "--timeout-seconds": "timeout_seconds",
@@ -1875,7 +1999,9 @@
       ],
       "input": {
         "properties": {
-          "wait": {},
+          "wait": {
+            "type": "boolean"
+          },
           "lease_pid": {}
         },
         "required": []
@@ -1890,7 +2016,7 @@
           ],
           "flags": {
             "--json": "render",
-            "--wait": "wait",
+            "--wait": "wait=true",
             "--lease-pid": "lease_pid"
           },
           "positionals": {},

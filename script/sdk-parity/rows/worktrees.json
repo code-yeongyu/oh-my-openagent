@@ -37,7 +37,7 @@
             "worktree-sweep"
           ],
           "flags": {
-            "--apply": "apply",
+            "--apply": "apply=true",
             "--older-than": "older_than_days",
             "--repo": "repos",
             "--json": "render"

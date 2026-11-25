@@ -88,6 +88,9 @@ export type Row = {
   readonly scenarios: { readonly effect: readonly string[]; readonly refusal: readonly string[] }
   readonly modules: readonly string[]
   readonly note?: string
+  /** Host-local (design 7.3): the call acts on the calling device's session host only. Closed list: HOST_LOCAL_ROWS. */
+  readonly addressScope?: "this_device"
+  readonly addressReason?: string
 }
 
 // One rendered row of a section 6 table: which capabilities it stands for and its cells exactly as published.
@@ -170,10 +173,20 @@ const allowedValues = (schema: FieldSchema): readonly unknown[] | undefined => {
 }
 
 /** Every rule a row must satisfy on its own; each message names the row and the field or flag to fix. */
+// The rows that may declare addressScope "this_device" (design 7.3 ruling): the design does not make them cross-device.
+export const HOST_LOCAL_ROWS = ["threads.adopt", "threads.release", "threads.unload"] as const
+
 export function rowProblems(row: Row): string[] {
   const problems: string[] = []
   const at = `row ${row.id}`
   if (row.sdk.trim() === "") problems.push(`${at}: sdk is required; name the SDK call this capability has`)
+  if (row.addressScope !== undefined) {
+    if (!(HOST_LOCAL_ROWS as readonly string[]).includes(row.id))
+      problems.push(
+        `${at}: only ${HOST_LOCAL_ROWS.join(", ")} may declare addressScope; this row addresses threads on every device`,
+      )
+    if ((row.addressReason ?? "").trim() === "") problems.push(`${at}: addressScope needs a written addressReason`)
+  }
   if (row.kind === "reserved" && (row.cli.length > 0 || row.tool.length > 0))
     problems.push(`${at}: a reserved name has no CLI or tool surface`)
   for (const surface of ["cli", "tool"] as const) {
@@ -217,7 +230,15 @@ export function rowProblems(row: Row): string[] {
       return
     }
     const allowed = allowedValues(schema)
-    if (value !== undefined && allowed === undefined)
+    // A presence flag that creates an object field (`--worktree`) writes `=true`: the object exists, its children filled
+    // by other flags.
+    const createsObject = value === "true" && (schema.type === "object" || schema.properties !== undefined)
+    // A value flag cannot fill a boolean field: the parser would read the next word as its value (review 6061874518 M4).
+    if (value === undefined && where.includes(" flag ") && schema.type === "boolean")
+      problems.push(
+        `${at}: ${where} takes a value but fills ${path}, a boolean; write it as ${path}=true if it is a presence flag`,
+      )
+    if (value !== undefined && allowed === undefined && !createsObject)
       problems.push(`${at}: ${where} sets ${path} to "${value}", but its schema lists no allowed values; declare them`)
     if (value !== undefined && allowed !== undefined && !allowed.map(String).includes(value))
       problems.push(

@@ -1,4 +1,4 @@
-import { type CliEntry, type Edition, type Row, schemaAt } from "./schema"
+import type { CliEntry, Edition, Row } from "./schema"
 
 // The descriptor seam (design 3.2, reviews 6061267823 M8 and 6061624223 M3): the rows are the descriptors, and this is
 // the one dispatch over them. An argv selects one entry by its longest route, then by the branch flags (`when`) it
@@ -19,12 +19,12 @@ const whenFlags = (entry: CliEntry): string[] =>
     .filter(([, target]) => target === "when")
     .map(([flag]) => flag)
 
-// A flag takes the next word as its value when it maps to an input field that is not a boolean and names no fixed value.
-export function takesValue(row: Row, entry: CliEntry, flag: string): boolean {
+// The parsing contract is the descriptor's own notation (review 6061874518 M4): a flag mapped to `field` takes the next
+// word as its value, a presence flag is written `field=true` (or another fixed value). No type annotation is read, and
+// arity-check.ts ties the notation to each command's real parser.
+export function takesValue(entry: CliEntry, flag: string): boolean {
   const target = entry.flags[flag]
-  if (target === undefined || !isInputTarget(target) || target.includes("=")) return false
-  const type = schemaAt(row.input, target)?.type
-  return type !== "boolean" && !(Array.isArray(type) && type.length === 1 && type[0] === "boolean")
+  return target !== undefined && isInputTarget(target) && !target.includes("=")
 }
 
 export function positionalsOf(row: Row, entry: CliEntry, rest: readonly string[]): string[] {
@@ -32,7 +32,7 @@ export function positionalsOf(row: Row, entry: CliEntry, rest: readonly string[]
   for (let index = 0; index < rest.length; index++) {
     const word = rest[index] ?? ""
     if (word.startsWith("-")) {
-      if (takesValue(row, entry, word)) index++
+      if (takesValue(entry, word)) index++
       continue
     }
     out.push(word)
@@ -91,7 +91,7 @@ export function buildInput(row: Row, entry: CliEntry, rest: readonly string[]): 
     const at = rest.indexOf(flag)
     if (at < 0 || !isInputTarget(target)) continue
     const [path = "", fixed] = target.split("=")
-    const value = fixed !== undefined ? fixed : takesValue(row, entry, flag) ? rest[at + 1] : true
+    const value = fixed !== undefined ? fixed : takesValue(entry, flag) ? rest[at + 1] : true
     setPath(input, path, fixed === "true" ? true : fixed === "false" ? false : value)
   }
   const targets = Object.values(entry.positionals)

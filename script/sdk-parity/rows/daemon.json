@@ -32,7 +32,9 @@
             "type": "boolean"
           },
           "launch_spec": {},
-          "mcp_presenter_enforcement": {}
+          "mcp_presenter_enforcement": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -49,7 +51,7 @@
             "--policy": "policy",
             "--socket": "root.endpoint.socket",
             "--rpc-key-root": "root.endpoint.key_root",
-            "--mcp-presenter-enforcement": "mcp_presenter_enforcement"
+            "--mcp-presenter-enforcement": "mcp_presenter_enforcement=true"
           },
           "positionals": {},
           "values": []
@@ -96,7 +98,7 @@
             "gc"
           ],
           "flags": {
-            "--prune-store-index": "prune_store_index",
+            "--prune-store-index": "prune_store_index=true",
             "--json": "render"
           },
           "positionals": {},
@@ -223,7 +225,7 @@
             "--launch-spec": "launch_spec",
             "--policy": "policy",
             "--socket": "root.endpoint.socket",
-            "--allow-downgrade": "allow_downgrade",
+            "--allow-downgrade": "allow_downgrade=true",
             "--when": "when.idle",
             "--operation": "when.idle.operation",
             "--if-instance": "when.idle.if_instance",
@@ -283,8 +285,8 @@
           ],
           "flags": {
             "--store": "stores",
-            "--allow-missing-index": "allow_missing_index",
-            "--dry-run": "dry_run",
+            "--allow-missing-index": "allow_missing_index=true",
+            "--dry-run": "dry_run=true",
             "--json": "render"
           },
           "positionals": {},
@@ -345,7 +347,7 @@
           ],
           "flags": {
             "--no-upgrade": "policy=never",
-            "--pinned": "pinned",
+            "--pinned": "pinned=true",
             "--json": "render"
           },
           "positionals": {},
@@ -457,7 +459,7 @@
             "status"
           ],
           "flags": {
-            "--include-workers": "include_workers",
+            "--include-workers": "include_workers=true",
             "--json": "render"
           },
           "positionals": {},
@@ -471,8 +473,8 @@
             "status"
           ],
           "flags": {
-            "--all": "all",
-            "--include-workers": "include_workers",
+            "--all": "all=true",
+            "--include-workers": "include_workers=true",
             "--socket": "root.endpoint.socket"
           },
           "positionals": {},
@@ -555,7 +557,7 @@
             "stop"
           ],
           "flags": {
-            "--drain": "drain"
+            "--drain": "drain=true"
           },
           "positionals": {},
           "values": []
@@ -568,10 +570,10 @@
             "stop"
           ],
           "flags": {
-            "--drain": "drain",
+            "--drain": "drain=true",
             "--instance": "instance",
             "--wait-ms": "wait_ms",
-            "--force": "force",
+            "--force": "force=true",
             "--expected-generation": "expected_generation",
             "--socket": "root.endpoint.socket"
           },
@@ -624,8 +626,8 @@
           ],
           "flags": {
             "--all": "when",
-            "--drain": "drain",
-            "--wait": "wait",
+            "--drain": "drain=true",
+            "--wait": "wait=true",
             "--timeout": "deadline_ms"
           },
           "positionals": {},

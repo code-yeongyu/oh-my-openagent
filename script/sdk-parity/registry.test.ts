@@ -5,9 +5,18 @@ import { join } from "node:path"
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { mappingProblems } from "./cell-mappings"
+import { cliProgram } from "../../packages/omo-opencode/src/cli/cli-program"
+import {
+  arityProblems,
+  commanderArity,
+  engineParseArgs,
+  engineRootArity,
+  loopArity,
+  nativeTableArity,
+} from "./arity-check"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
-import { runEffectScenarios } from "./conformance-run"
+import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { baseRecord, mergeBase } from "./git-base"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
@@ -39,6 +48,16 @@ describe("SDK parity registry (#14947)", () => {
     expect(rendered).toBe(committed)
     expect(cellProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
     expect(mappingProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
+  })
+
+  test("#given each command's own parser #then every mapped flag takes a value or is presence exactly as its row writes it", async () => {
+    const sources = [
+      commanderArity(cliProgram),
+      loopArity(join(REPO_ROOT, "packages/omo-codex/plugin/components/ulw-loop/src")),
+      nativeTableArity(REPO_ROOT),
+      engineRootArity(await engineParseArgs()),
+    ]
+    expect(arityProblems(rows, sources)).toEqual([])
   })
 
   test("#given every native dispatcher #then each flag is mapped on the route that accepts it, shared flags on every verb", () => {
@@ -93,9 +112,12 @@ describe("SDK parity registry (#14947)", () => {
       pinText: repoFile(PIN_PATH),
       unresolved,
       evidence,
+      context: P0_CONTEXT,
       atBase: baseRecord(mergeBase()),
     }
     expect(baselineProblems(state)).toEqual([])
-    expect(conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence)).toEqual([])
+    expect(
+      conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
+    ).toEqual([])
   })
 })

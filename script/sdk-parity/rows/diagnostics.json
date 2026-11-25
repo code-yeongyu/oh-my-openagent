@@ -27,7 +27,7 @@
           ],
           "flags": {
             "--fix": "when",
-            "--dry-run": "dry_run"
+            "--dry-run": "dry_run=true"
           },
           "positionals": {},
           "values": []
@@ -184,8 +184,8 @@
             "doctor"
           ],
           "flags": {
-            "--status": "status",
-            "--verbose": "verbose",
+            "--status": "status=true",
+            "--verbose": "verbose=true",
             "--json": "render",
             "--platform": "platform"
           },
