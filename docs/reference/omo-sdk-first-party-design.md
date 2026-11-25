@@ -14,7 +14,7 @@ The owner's rulings on #14943 are the whole requirement:
 4. **The SDK is the superset: SDK ⊇ CLI and SDK ⊇ tools.** Every capability exists in the SDK, with no exception. An adapter may expose less than the SDK, and each omission carries a written reason. The SDK never exposes less than an adapter. A capability that the CLI or a tool has and the SDK lacks is a defect, and its fix is the SDK call.
 5. **Parity is a merge requirement of the same pull request.** A pull request that changes what a CLI verb or a tool does carries the SDK call and the parity test for that capability. It is not a follow-up.
 
-Scope: the `omo` binary of the native edition (`omo-ai`), its thread tools, the SDK entries that ship with it, and, by the scope ruling recorded in section 6.11, every verb of the OpenCode-edition binary that shares a domain core with the native edition.
+Scope: the `omo` binary of the native edition (`omo-ai`), its thread tools, the SDK entries that ship with it, and, by the scope decision recorded on #14943 and in section 6.11, every verb of the OpenCode-edition binary. No binary is carved out.
 
 Three terms are used the same way everywhere below.
 
@@ -147,7 +147,7 @@ The facades are removed only by a later, announced release, after their callers 
 
 ### 4.2 Namespaces
 
-`threads`, `devices`, `account`, `deviceService`, `sync`, `config`, `daemon`, `diagnostics`, `install`, `engine`, `mcp`, `toolkit`, plus `close()` and `dispose()`. Method names are camelCase. The root's input types for the thread calls are the schemas in `T/contracts/params.ts` and `create-params.ts` themselves (field names, optionality, bounds and defaults), not a copy; where the root adds an input a tool lacks, it extends that schema. The method and input list is section 6.
+`threads`, `devices`, `account`, `deviceService`, `sync`, `config`, `daemon`, `diagnostics`, `install`, `engine`, `mcp`, `boulder`, `worktrees`, `toolkit`, plus `close()` and `dispose()`. Method names are camelCase. The root's input types for the thread calls are the schemas in `T/contracts/params.ts` and `create-params.ts` themselves (field names, optionality, bounds and defaults), not a copy; where the root adds an input a tool lacks, it extends that schema. The method and input list is section 6.
 
 ### 4.3 Authority
 
@@ -420,10 +420,11 @@ The engine's exported `Args` schema (slice E1a) is the typed source for these in
 
 ### 6.11 The OpenCode-edition binary
 
-`packages/omo-opencode` ships a different binary (`oh-my-opencode`, `oh-my-openagent`). The scope ruling on #14943 (2026-11-25, decided on the owner's delegation):
+`packages/omo-opencode` ships a different binary (`oh-my-opencode`, `oh-my-openagent`). The scope decision on #14943 (2026-11-25, made for the owner under his standing order, his to override) is **both editions**: everything a CLI can do works through the SDK, with no carve-out by binary.
 
 - A verb that shares a domain core with the native edition goes through the **same core and the same SDK call**. The OpenCode-edition CLI becomes one more adapter; it gets no second implementation.
-- A verb that exists only in that edition and has no native equivalent is registered as an **edition adapter with no SDK call yet**, with that written reason and its own issue. No slice of this program waits on it, and the zero-gap gate does not cover it.
+- A verb that exists only in that edition gets an SDK call of its own under the same rule.
+- Order: the native-edition slices first, then the OpenCode-edition slices with their own rows. #14943 closes only when both editions are at zero gaps.
 
 | Capability and SDK inputs | CLI (OpenCode edition) | SDK today | Adapter |
 |---|---|---|---|
@@ -436,16 +437,11 @@ The engine's exported `Args` schema (slice E1a) is the typed source for these in
 | `mcp.oauth.login({ server, server_url?, client_id?, scopes? })`, `.logout({ server, server_url? })`, `.status({ server? })`, over `packages/mcp-client-core`. The tokens are credentials | `mcp oauth login <server-name> [--server-url] [--client-id] [--scopes ...]`; `mcp oauth logout <server-name> [--server-url]`; `mcp oauth status [server-name]` | **no**; custody (S0) | Planned (OC1), after S0 |
 | `account.keys.init()`, `.status()`: this device's keyring, answering the device id and the public signing and sealing keys only | `account keys init`; `account keys status` | **no**; custody (S0) | Planned (OC1), after S0 |
 | `toolkit.*` | `ulw-loop [args...]` | yes | None: a pass-through to the toolkit |
+| `boulder.status({ directory?, work_id? })`, over `packages/boulder-state` | `boulder [-d\|--directory] [-w\|--work-id] [--json]` | **no** | Planned (OC2) |
+| `worktrees.sweep({ apply?, older_than_days?, repos? })`: a dry-run plan unless `apply` is set, answering what was or would be removed | `worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]` | **no** | Planned (OC2) |
+| `install.cleanup({ codex_home?, project? })`, answering what it removed | `cleanup` (alias `uninstall`) `[--codex-home] [--project] [--json]` | **no** | Planned (OC2) |
 
-Edition adapters with no SDK call yet, by the ruling:
-
-| CLI (OpenCode edition) | Reason | Tracking |
-|---|---|---|
-| `boulder [-d\|--directory] [-w\|--work-id] [--json]` | It reports that edition's own work tracking; the native edition has no equivalent verb and no caller outside that edition asks for it | Its own issue under #14943, opened with the slices |
-| `worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]` | A maintenance command of that edition's worktrees; no native equivalent | Same issue |
-| `cleanup` (alias `uninstall`) `[--codex-home] [--project] [--json]` | It removes that edition's installed artifacts; no native equivalent | Same issue |
-
-These three are the only rows in the registry without an `sdk` field. They carry `edition: "opencode"`, `scope: "edition_only"`, the reason and the issue, and a fourth such row cannot be added without a scope ruling recorded the same way.
+The OpenCode-edition binary has no thread tools of its own in this table: its agent-facing tools are that edition's plugin tools, outside the three surfaces this issue names.
 
 ## 7. Holding parity in CI
 
@@ -471,7 +467,7 @@ The first review showed that a row table, an import guard and sampled scenarios 
   "projection": {} }
 ```
 
-- `sdk` is required by the schema for every row in scope. An SDK omission cannot be written. The schema admits a row without it only with `scope: "edition_only"`, a reason and an issue, and a test pins that set to the three rows of 6.11.
+- `sdk` is required by the schema for every row, in both editions. An SDK omission cannot be written.
 - An empty `cli` or `tool` cell needs either `planned` (a slice) or `omitted` (a reason). The two are different fields, so pending work is never recorded as a decision.
 - **CLI ⊆ SDK.** Every descriptor has a row, and every mapped flag's field exists in the SDK call's input schema.
 - **Tools ⊆ SDK.** Tools are discovered from a test engine session's registry (`getAllTools()` on the pinned engine, as `eval-only.test.ts` already builds one), so a tool registered at run time, such as a store extension's, is seen. For each tool the SDK call's effective input schema is compared recursively with the tool's: every property, nested object, optionality, bound and default. A declared `projection` (for example `text` to `message` on the legacy facade) is the only accepted difference.
@@ -490,7 +486,7 @@ Rule 5 of section 1 is enforced per capability, not per count.
 
 - `script/sdk-parity/baseline.json` freezes today's defects as exact entries: capability id, the missing SDK input or call, and the issue that fixes it. It is written once, in slice P0, and is pinned by hash. Entries can only be removed.
 - **Changed-capability gate.** A script compares the descriptors and tool schemas of the pull request's head with its merge base. Any descriptor or schema that was added or changed must have no baseline entry at the head: a pull request cannot add an alias, a flag or a tool field under an existing gap. It adds the SDK call and its scenario in the same pull request, or it fails.
-- **Zero-gap gate.** #14943 closes only when the baseline is empty for everything in scope: the native edition, the engine rows, and the shared-domain verbs of the OpenCode edition (6.11). The three edition-only rows of 6.11 are outside it by ruling.
+- **Zero-gap gate.** #14943 closes only when the baseline is empty for both editions, engine rows included.
 
 ### 7.5 Adapter purity, and what is not provable
 
@@ -536,7 +532,8 @@ Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`,
 | E1a | Engine: a typed function and exported metadata per leaf of 6.8 and 6.9, by group (packages, settings, schedules, queries, launch options; provider credentials after S0) | new, on the engine | none |
 | E1b | Engine release and the omo pin | release train | E1a |
 | E1c | `engine.*` on the root, generated descriptors, and the engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
-| OC1 | The OpenCode-edition CLI becomes an adapter for its shared-domain verbs (6.11): `install.plugin`, the session-host port for `run`, `diagnostics`, `install.version` and `localVersion`, `config.migrate`, `config.modelCapabilities.refresh`; `mcp.oauth.*` and `account.keys.*` after S0 | new | P1b, C1b, C1c, T1c |
+| OC1 | The OpenCode-edition CLI becomes an adapter for its shared-domain verbs (6.11): `install.plugin`, the session-host port for `run`, `diagnostics`, `install.version` and `localVersion`, `config.migrate`, `config.modelCapabilities.refresh`; `mcp.oauth.*` and `account.keys.*` after S0 | new | P1b, C1b, C1c, T1c, and after the native slices |
+| OC2 | The OpenCode-edition-only verbs get their SDK calls: `boulder.status`, `worktrees.sweep`, `install.cleanup` | new | OC1 |
 | X1a | The thread proof of section 9, recorded on #14943 | new | T1d, T2, T3 |
 | X1b | Closure: the zero-gap gate, the non-thread acceptance rows, `docs/reference/omo-sdk.md`, the skills re-pointed at the SDK (#13415, #14932) | new | every slice above |
 | X2 | The omo-harness skill: the steps omo-harness-skill#23 left on the CLI move to the SDK | new, on that repository | the release that carries the calls it needs |
@@ -582,7 +579,7 @@ The runs use a sanctioned test account and a scripted or low-cost model. They ma
 | 3 | The principal is fixed at construction | Revise | The principal selects a leg; authority is checked in the core against a principal-by-capability matrix, approved in S0 before principals are wired (4.3) |
 | 4 | Engine commands get real SDK calls through engine exports | Accept conditionally | Each leaf and flag is a row now (6.8, 6.9); the typed functions are settled in the engine first, with an explicit export, release and pin sequence and a compatibility test this program owns (E1a to E1c) |
 | 5 | `omo remote` session verbs become aliases | Accept conditionally | Both historical projections (flags, wait default, JSON, exit codes) are pinned by tests before the implementations converge; an alias is removed only after one release and only when its descriptor's tests show no caller-visible difference; sender admission is not widened |
-| 6 | The OpenCode-edition binary | Scope decision required | Ruled on #14943: shared-domain verbs go through the same core and SDK call (slice OC1); three edition-only verbs are registered with a reason and their own issue (6.11) |
+| 6 | The OpenCode-edition binary | Scope decision required | Decided on #14943: both editions. Shared-domain verbs go through the same core and SDK call (OC1), the three edition-only verbs get SDK calls of their own (OC2), and the issue closes at zero gaps in both (6.11) |
 
 ## 11. Not in this program
 
