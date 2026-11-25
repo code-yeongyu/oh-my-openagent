@@ -18,6 +18,7 @@ import {
   S3_OFFENDERS,
 } from "./remote-import-guard-rules"
 import { scanRepository } from "./remote-import-guard-scan"
+import { ADDRESS_PURITY_OFFENDERS, ADDRESS_PURITY_RULES } from "./address-purity-rules"
 
 // Guard G1 of the "one remote module" design (v6 sections 1 and 12): the vendored local-API client (L0) is imported only
 // by device-service-core (L1), and the functions that open a local-API connection or a relay transport are called only
@@ -57,6 +58,43 @@ describe("remote import guard G1 over packages/**", () => {
   test("#given non-literal import() outside tests #then no file gains one", () => {
     const outsideTests = [...repo.nonLiteralImports].filter(([file]) => !REMOTE_IMPORT_RULES.testFile(file))
     expect(Object.fromEntries(outsideTests)).toEqual(NON_LITERAL_IMPORT_OFFENDERS)
+  })
+})
+
+describe("address purity (#14943 T1a, design section 5)", () => {
+  test("#given every entry and adapter #then only the listed ones still hold a ladder, a locator or a device lookup", () => {
+    // An architecture contract: a new holder fails here, and a removed one must leave ADDRESS_PURITY_OFFENDERS in the same PR.
+    const repo = checkImports(repoFacts, createResolver(REPO_ROOT), ADDRESS_PURITY_RULES)
+    expect(asRecord(repo.s2)).toEqual(usesOf(ADDRESS_PURITY_OFFENDERS))
+  })
+
+  test("#given an adapter that imports the ladder directly or through a barrel #then it is named; the address core is not", () => {
+    const root = mkdtempSync(join(tmpdir(), "address-purity-"))
+    try {
+      const thread = "packages/omo-senpi/src/components/thread"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${thread}/address/resolve.ts`, "export const resolveAddress = () => 1\n")
+      put(
+        `${thread}/address/contract.ts`,
+        'import { resolveAddress } from "./resolve.ts"\nexport const resolve = () => resolveAddress()\n',
+      )
+      put(`${thread}/barrel.ts`, 'export { resolveAddress } from "./address/resolve.ts"\n')
+      put(`${thread}/tools.ts`, 'import { resolveAddress } from "./barrel.ts"\nresolveAddress()\n')
+      put(`${thread}/sdk.ts`, 'import { resolve } from "./address/contract.ts"\nresolve()\n')
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkImports(scanRepository(root), createResolver(root), ADDRESS_PURITY_RULES)
+      expect(asRecord(found.s2)).toEqual({
+        [`${thread}/barrel.ts`]: ["resolveAddress"],
+        [`${thread}/tools.ts`]: ["resolveAddress"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
