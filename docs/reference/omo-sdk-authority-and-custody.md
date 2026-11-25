@@ -4,7 +4,7 @@ Slice S0 of #14943. Issue: #14945. Status: security design, under review. No cod
 
 This design is the gate named in the first-party SDK design (#14944, sections 4.3 and 4.5). It covers both editions. No schema, export or adapter that carries a principal, a credential, an endpoint selector or a launch option is fixed before this document's review is CLEAR (that design's slices P1a-s, P1b, T1c's attach, T1e, A1d, A2b, A2c, the daemon's endpoint inputs, E1a-s, OC1b, OC1c). Slices that touch none of those do not wait on it.
 
-The approval is a recorded artifact: the review's verdict comment at an exact head of this document, linked from #14945. The refusal rows of section 4 are reused, unchanged, as acceptance scenarios by every slice they touch.
+The approval is three recorded artifacts, each at an exact revision and each linked from #14945: the design review's verdict on this document; the independent review of the closed per-operation matrix, which lives in the private security-review record and is linked by number only; and the security owner's approval of the custody matrix (5.0) and of every decision in section 11 that changes behaviour. S0 is CLEAR only when all three exist for the same revision. If a decision changes this document, that delta is reviewed before the gate is marked. The refusal rows of section 4 are reused, unchanged, as acceptance scenarios by every slice they touch.
 
 Source was read at `dev` `2e2a815ac8` and at the engine's `main` `48983b7bf8` on 2026-11-25. Nothing was run, and no privilege or credential experiment was made. Path abbreviations: `N/` = `packages/omo-native/`, `T/` = `packages/omo-senpi/src/components/thread/`, `R/` = `packages/omo-senpi/src/components/remote/`, `S/` = `packages/omo-senpi/src/components/omo-sdk/`, `A/` = `packages/omo-opencode/src/cli/service-auth/`, `E/` = the engine's `packages/coding-agent/src/`.
 
@@ -18,7 +18,7 @@ Making the SDK the superset of the CLI puts on an importable surface calls that 
 | I2 | Capability per principal: who may run what is decided in the core and behind it, never by an export or an import rule | 3, 4 |
 | I3 | Revocation reaches a live SDK instance, an open stream and a handed-over credential, with a stated bound where it cannot be immediate | 7 |
 | I4 | Audit trail: every custody-bearing call and every command that crosses a device leaves a record that names who, what, where and the outcome, and never a secret | 8 |
-| I5 | No new authority and no lost capability: after the migration each principal can do exactly what it can do today | 4, 9 |
+| I5 | No new authority and no lost capability: after the migration each principal can do exactly what it can do today. The one exception is a narrowing the security owner decides and section 11 records; the migration itself never narrows | 4, 9, 11 |
 | I6 | A ceremony a person performs stays a ceremony a person performs. A model-driven or unattended process is refused before any secret exists | 5.1 |
 
 One definition is used by every section. An **authorized custody operation** is an operation listed in the custody matrix of section 5.0, and nothing else. For each, the matrix fixes the secret, the one destination and who owns it, who is authorized to receive it, the minimum data that moves, and what happens when the transfer fails or is cancelled. Moving a secret by any path that is not a row of that matrix violates I1, whatever a compatibility note elsewhere says, and no row may permit general-purpose disclosure. The matrix needs the security owner's approval as a whole; a row is not approved by this document's review alone.
@@ -162,6 +162,7 @@ A session can run any `omo` command through a shell today, including the ones ma
 | `project_trust` on a launch or a package call | A, passed explicitly, never defaulted to trust | R **new** | R | R | `--approve`, `--no-approve` |
 | The presenter inputs of `engine.launch.rpc` and of the host's ensure and handoff (`bootstrap_fd`, `enforcement`) | A only from the launcher that starts a host today. Proposed here and unproven until the closed matrix cites its enforcement | R **new** | R | R | `--mcp-presenter-fd`, `--mcp-presenter-enforcement` (`E/cli/args.ts:347-351`) |
 | `codex_autonomous` on `install.plugin`: `true` configures that platform's autonomous permissions, `false` leaves existing settings unchanged, absent takes the mode's default | A | R **new** | R | R | `C/cli-program.ts:74-76`, `C/install-validators.ts:244` |
+| `toolkit.forSession({ cwd, session_id? })`: binding the loop operations to one loop session | A for the session it names, as the `--session-id` flag and the session environment allow today | A only for its own session, with the id from the engine and never from an argument | R | R | The loop component's scope resolution (`packages/omo-codex/plugin/components/ulw-loop/src/cli-commands.ts:110-131`) |
 | A provider API key as a launch input | A, through the carrier of 5.5 | R **new** | R | R | `--api-key` |
 | `threads.runToCompletion` (OpenCode edition) | A | R **new** | R | R | That edition's `run` command |
 | `on_complete` on `runToCompletion`: runs a command as the caller's OS user | A | R **new** | R | R | `--on-complete` |
@@ -200,17 +201,19 @@ Every authorized custody operation, and only these. The subsections that follow 
 |---|---|---|---|---|---|
 | `sync.enable` | The recovery phrase, at creation | The controlling terminal of the calling process; the person at it | That person | The phrase, shown once | Nothing is shown before eligibility passes; a cancel after display voids the ceremony as it does today |
 | `sync.recover` | The recovery phrase, typed | Read from the controlling terminal with echo off; the recovery engine | The recovery engine | The phrase, held in memory for the ceremony | A failed or cancelled recovery keeps nothing |
-| `account.credentials.handOver` (`access_token`) | The account access token | A handle the caller already holds; the caller's own process | Another process of ours that the caller pipes it to | The token and its non-secret metadata; never refresh material | One write; a failed write delivers nothing usable and is recorded `not_delivered` |
-| `account.credentials.handOver` (`stored_credential`) | The stored credential | As above | A process that will `adopt` it | The record `adopt` needs | As above |
+| `account.credentials.handOver` (`access_token`) | The account access token | A channel the core itself opens to a verified peer process. Never a surface a model can read: not an SDK return value, not standard output, not a tool result, not a log | A peer whose identity the core verifies: the same OS user by a peer-credential check on the channel, and an executable or signature on the allowlist | The token and its non-secret metadata; never refresh material | An unverified or unlisted peer gets nothing and the store is not read; one write; a failed write delivers nothing usable and is recorded `not_delivered` |
+| `account.credentials.handOver` (`stored_credential`) | The stored credential | As above | As above, and the peer must be one that will `adopt` it | The record `adopt` needs | As above |
 | `account.adopt` | A handed-over credential, incoming | The credential store of this device; this device | This device's session | The record as received | A conflict or an invalid record stores nothing |
 | `account.signIn` | The user code, matching code and verification URL, while valid | The `onUserCode` callback; the person who must approve | That person | The codes and their expiry | An expired or denied approval leaves no credential |
-| `engine.auth.credentials`, `apiKey`, `bearerToken` | A provider credential | A handle the caller already holds | The caller's process | The one credential asked for | As the account hand-over |
+| `engine.auth.credentials`, `apiKey`, `bearerToken` | A provider credential | As the account hand-over: a channel the core opens to a verified peer, never a model-readable surface. This is not the default path: the default for a provider credential is injection at launch (the next row) | A named principal that holds this capability explicitly. It is off by default | The one credential asked for | As the account hand-over |
 | A provider API key at launch | A provider credential, incoming | The engine process being launched | That process | The key | A refused launch keeps nothing |
 | `mcp.oauth.login` | OAuth tokens | The MCP client core's token store | That store | The tokens the server issued | A failed or cancelled flow stores nothing |
 | `account.keys.init` | This device's private keys | The OS key store | The key store | The key material | A failed init leaves no partial keyring |
 | The transport's read of a socket secret or a key under `key_root` | An endpoint credential | The endpoint it authenticates to | That endpoint | The credential | A failed connection sends nothing further |
 
 The security owner approves this matrix as a whole. Until then every row is a proposal.
+
+Approval status, from the security owner of record on 2026-11-25, reviewing this table at `e593eddc2d`: the rows for `sync.enable`, `sync.recover`, `account.adopt`, `account.signIn`, a provider key at launch, `mcp.oauth.login`, `account.keys.init` and the transport's secret read are approved as written. The rows that return a credential to a caller were sent back with three requirements, which the rows above now state: no raw secret through any surface a model can read; injection as the default path for a provider credential, with return to a caller an explicit, audited capability of named principals that is off by default; and an audit record for every successful delivery that names the destination's identity. Those rows are proposals again until the owner approves this wording. The owner's message named the access-token row and the provider-credential row; this revision applies the same requirements to the stored-credential row, which holds more than either, and asks the owner to confirm that.
 
 ### 5.1 The sync recovery phrase
 
@@ -226,9 +229,11 @@ The first-party design proposed a caller-supplied sink for the phrase. This desi
 
 `omo account token` prints the access token with its expiry, the device and the owner; `omo account export` prints the whole stored credential (`N/account-cli.ts:118-146`). Both exist so that another of our own processes can take over a sign-in.
 
-- `account.credentials.handOver({ what, to })`. `to` is a writable handle the caller already holds: a pipe or a file descriptor. The core writes the same JSON record the verb prints today to that handle and to nothing else. The call returns the non-secret part: `{ delivered: true, device, expires_at, owner? }`.
-- Principals: person and script only (4.2). A session or a connector is refused before the credential store is read.
-- Checks before the store is read: the root is open, the launch is not a desktop launch, the principal is allowed, the handle is writable. A failed check reads nothing.
+- `account.credentials.handOver({ what, peer })`. The caller does not supply a destination to write to. The core opens the channel to `peer` itself and verifies who is on the other end before the credential store is read: the peer is the same OS user by a peer-credential check on the channel, and its executable or signature is on the allowlist. The core then writes the JSON record to that channel and to nothing else. The call returns the non-secret part: `{ delivered: true, device, expires_at, owner?, destination }`, where `destination` is the verified peer's identity, not the value.
+- No surface a model can read is ever a destination: not the SDK's return value, not the CLI's standard output, not a tool result, not a log. `omo account token` and `omo account export` therefore stop writing a credential to standard output for whoever happens to read it. They hand over only to a verified, allowlisted peer, which is how our own processes use them, and answer a typed refusal to any other reader. That is a narrowing of what a caller can do today, decided by the security owner and recorded in section 11; the parity migration did not choose it.
+- The allowlist starts with the callers of these verbs that exist today, so their flows do not break. Which callers exist is a column of the closed matrix; a caller that is not on the list gets the refusal, with the step that enrolls it as its next action.
+- Principals: person and script only (4.2), and only toward a verified peer. A session or a connector is refused before the credential store is read.
+- Checks before the store is read: the root is open, the launch is not a desktop launch, the principal is allowed, the peer is verified and listed. A failed check reads nothing.
 - Partial outcomes: the record is written in one write. If the write fails, the call answers a failure whose message is the core's own words, and the audit record (section 8) says `not_delivered`. The failure never quotes what was written.
 - `export` moves refresh material and device keys: whoever holds it can become this device. This design keeps it because the CLI has it (I5) and lists a narrowing in section 11.
 
@@ -244,7 +249,9 @@ When a session calls `account.signIn` (allowed today), the codes reach its callb
 
 ### 5.5 Model provider and MCP credentials
 
-- `engine.auth.apiKey`, `engine.auth.bearerToken` and `engine.auth.check` with credentials write to a handle the caller holds, as 5.2, and return non-secret metadata (provider, model, expiry, whether a refresh ran). `check` without credentials returns status only.
+- The default path for a provider credential is injection: the engine process being launched receives the key it needs, and no caller ever holds the value.
+- Returning a provider credential to a caller (`engine.auth.credentials`, `apiKey`, `bearerToken`) is a separate, explicit capability. It is off by default, is held only by principals named in configuration, delivers only to a verified peer as 5.2 does, and writes an audit record for every delivery. `omo auth print-api-key`, `omo auth print-bearer-token` and `omo auth check --credentials` follow the same rule as the account verbs: no credential on standard output for an unverified reader. `check` without credentials returns status only.
+- A caller that uses one of those commands today as a credential helper keeps working only once it is a named principal and a listed peer. The closed matrix records which such callers exist; none is assumed.
 - A provider API key given at launch (`--api-key`) is an input: it is read from a readable handle or the environment the engine already reads, never accepted as a field that a list row, a `threads.get` answer, a receipt or a log would echo.
 - `mcp.oauth.login` runs the browser flow and stores tokens in the MCP client core's store; `status` returns non-secret state; `logout` removes the tokens. No call returns a token.
 
@@ -307,7 +314,7 @@ Acceptance: one synthetic-clock row for every cell above whose bound the SDK con
 
 ### 8.2 What this design adds
 
-1. **A local custody log.** One append-only file in the account home, owner-only, one JSON line per custody-bearing call (every call of section 5, plus `devices.revoke`, `account.signOut` and `forget`): in the schema below. Two records per operation, `started` and `terminal`, joined by the operation id. The `started` record is written before the secret moves; if it cannot be written the operation fails closed and moves nothing. If the `terminal` record cannot be written, the operation's result says so and the next call that can write records the gap. Kept 90 days, pruned on write.
+1. **A local custody log.** One append-only file in the account home, owner-only, one JSON line per custody-bearing call (every call of section 5, plus `devices.revoke`, `account.signOut` and `forget`): in the schema below. Two records per operation, `started` and `terminal`, joined by the operation id. The `started` record is written before the secret moves; if it cannot be written, a delivery of a credential to a caller fails closed and moves nothing (every other operation is covered below). If the `terminal` record cannot be written, the operation's result says so and the next call that can write records the gap. Kept 90 days, pruned on write.
 2. **Cross-device control is attributable on the target.** A control command that arrives from another device (interrupt, close, unload, set model, set reasoning, rename, archive, attach, an answered dialog) leaves a record on the device that ran it, naming the sender principal, the sending device and the command id. Slice T1b verifies with a test which of these the engine and the device service already record and adds what is missing; a command that changes a session with no such record does not pass.
 3. **A read call.** `account.audit.list({ since? })`, person and script only, returns the custody log's records. The file is owner-only; no other principal and no tool reads it.
 
@@ -320,12 +327,13 @@ The record schema, for both kinds of record:
 | `principal` | Kind and id of the caller: a uid, a durable session id, a connector binding |
 | `capability` | The operation's registry id |
 | `target` | The device and thread it acted on, where it has one |
+| `destination` | For a custody operation: the identity of where the secret went (the verified peer's executable or signature id, the launched process, the store), never the value |
 | `phase` | `started` or `terminal` |
 | `outcome` | On `terminal`: `ok`, `refused`, `cancelled`, `partial` or `failed`, with the typed code |
 
 A record never holds a credential, a code, a handle's content, a message body, an argument's text or any other caller-supplied string that could carry a secret: only ids, kinds and codes. The schema is reviewed independently with the closed matrix.
 
-When the audit mechanism is unavailable: a custody operation, a revoke, a sign-out and a forget fail closed. A cross-device control command is not refused for it, because refusing would remove a capability callers have today (I5); the command runs, its result carries an `audit_unavailable` note in `details`, and a `diagnostics.run` finding reports it.
+When the audit mechanism is unavailable: a delivery of a credential to a caller (the hand-over rows of 5.0) fails closed, because the security owner's ruling requires an audit record for every such delivery. Nothing else is refused for it. A sign-out, a forget, a revoke and a cross-device control command run exactly as they do today. Making any of them wait on an audit write would add a prerequisite the existing contract does not have, and a sign-out or a revoke that an unwritable log could block would weaken the guarantee it exists for. Their result carries an `audit_unavailable` note in `details`, and a `diagnostics.run` finding reports the gap. Whether an existing lifecycle operation should ever fail closed on audit is a behaviour change; it is listed in section 11 for the owner and is not assumed here.
 
 Acceptance: for every operation of the custody matrix and every cross-device command of the closed matrix, a synthetic run of each terminal outcome (ok, refused, cancelled, partial, failed) asserts the pair of records and their correlation, and the unavailable-audit behaviour above.
 
@@ -336,10 +344,11 @@ No audit record is a place a secret can land: the non-disclosure test of section
 | Slice | Before it starts | In its pull request |
 |---|---|---|
 | P1a-s and P1b (the sensitive contracts, the root and principals) | This design CLEAR | The matrix of section 4 as conformance scenarios, one per R cell; the non-disclosure test over every namespace present; the revocation tests of section 7 for the calls it wires |
-| A1d (adopt, hand-over) | This design CLEAR | 5.2 and 5.3; the custody log; the fail-closed test |
+| A1d (adopt, hand-over) | This design CLEAR and the owner's approval of the revised rows of 5.0 | 5.2 and 5.3; the custody log; the fail-closed test. Two tests that fail before the implementation exists: a model-readable surface asking for the value is refused (the SDK return value, standard output, a tool result), and an unverified or unlisted peer gets nothing and the store is not read |
 | A1b, A1c (sign-out, forget, revoke) | none beyond P1b | The custody log lines; the R cells for session and connector |
 | A2b, A2c (sync) | This design CLEAR | 5.1 with the fake phrase terminal; the agent-marker and no-terminal refusals before any secret exists |
-| E1a-s for the launch options, the endpoint options and provider credentials; OC1b for `on_complete`; OC1c for MCP OAuth and account keys | This design CLEAR | 4.4, 5.5 and 5.7 |
+| E1a-s for the launch options, the endpoint options and provider credentials; OC1b for `on_complete`; OC1c for MCP OAuth and account keys | This design CLEAR, and for provider credentials the owner's approval of the revised row | 4.4, 5.5 and 5.7. For provider credentials the same two failing-first tests as A1d, plus: with no named principal configured, every return call is refused, and injection at launch still works |
+| OC2 for the loop's session binding | This design CLEAR | A person or a script binds the session it names; a session is bound only to its own, with the id from the engine and never from an argument |
 | T1c for attach and answering a dialog; T1e for the extension session operations | This design CLEAR | The refusal rows of 4.1 for every principal but the allowed one |
 | T1b (control calls) | none beyond P1b | 8.2 item 2 |
 
@@ -355,10 +364,11 @@ No audit record is a place a secret can land: the non-disclosure test of section
 
 Each of these would change what a principal can do today, so none is part of the parity migration (I5). They are listed for the owner, and none blocks a slice. The rule for anything found later is the same: a discrepancy between the matrix and the code is not settled by changing an existing capability under the label of parity. It is recorded here and goes to the owner as its own decision.
 
-1. **Narrowing `export`.** Replace the standalone stored-credential export with a paired hand-over that only another `adopt` on the same machine can consume.
-2. **Refusing the hand-over verbs under an agent marker**, as the sync ceremony already does. Today a session can run `omo account token` through a shell.
+1. **Decided by the security owner of record, 2026-11-25: no credential on a model-readable surface.** The account hand-over verbs and the provider-credential verbs deliver only to a verified, allowlisted peer, and returning a provider credential is off by default (5.0, 5.2, 5.5). This narrows what a caller can do today: a person or a program that reads one of these values from standard output no longer can, unless it is enrolled. It is recorded here because the migration's own rule (I5) would not have made it. Its consequence for a caller that exists today, and the enrollment that keeps that caller working, are rows of the closed matrix, and the owner confirms the list before A1d and E1a-s start.
+2. **Narrowing `export` further.** Replace the standalone stored-credential export with a paired hand-over that only another `adopt` on the same machine can consume. Not decided.
 3. **`account.signIn` from a session.** The shipped SDK allows it and the codes reach the session's callback. Refusing it, or routing the codes to a person-only surface, would be a behaviour change.
 4. **The access token's lifetime** as the bound of a hand-over's revocation: confirm the number, and decide whether a hand-over should request a shorter-lived token.
+5. **Failing an existing lifecycle operation closed when its audit record cannot be written** (sign-out, forget, revoke, a cross-device control command). Not decided. Today's behaviour is kept: they run, and the gap is reported (8.2).
 
 ## 12. Review checklist
 
