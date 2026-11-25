@@ -96,14 +96,17 @@ export const ADAPTER_RULES: AdapterRules = {
     REMOTE,
     DEVICE_SERVICE_CORE,
     BUNSHIN_TS_RELAY,
+    `${OPENCODE_CLI}service-auth/`,
+    `${OPENCODE_CLI}account-keys/`,
     ACCOUNT_CORE,
     `${NATIVE}device-service-handoff.ts`,
   ],
   forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],
 }
 
-// A layer that moved keeps its offenders (#14364): the merge base's record names the old place, so the growth check reads
-// it under the new one. A reach of the moved layer is not a new reach.
+// A layer whose code moved keeps its offenders (#14364): the account core left the two cli directories, which keep only the
+// CLI's own commands and wiring, so a base row that names either directory also admits the account core. A reach of the
+// moved code is not a new reach.
 export const ADAPTER_LAYER_RENAMES: Readonly<Record<string, string>> = {
   [`${OPENCODE_CLI}service-auth/`]: ACCOUNT_CORE,
   [`${OPENCODE_CLI}account-keys/`]: ACCOUNT_CORE,

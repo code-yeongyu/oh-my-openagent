@@ -87,9 +87,13 @@ describe("adapter import family A (#14943 design 7.5)", () => {
     expect(offenderGrowth(baseRecord, ADAPTER_OFFENDERS, ADAPTER_LAYER_RENAMES)).toEqual([])
   })
 
-  test("#given a layer that moved #then its old name in the base record counts as the new one, and nothing else does", () => {
+  test("#given a layer whose code moved #then a base row naming it also admits the new layer, and nothing else does", () => {
     const base = { "a.ts": { uses: ["old/", "L1"] } }
     expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L1"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "old/"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L2"] } }, { "old/": "new/" })).toEqual([
+      "a.ts gained L2, which the merge base's record does not list; route it through the SDK",
+    ])
     expect(offenderGrowth(base, { "a.ts": { uses: ["new/"] } })).toEqual([
       "a.ts gained new/, which the merge base's record does not list; route it through the SDK",
     ])

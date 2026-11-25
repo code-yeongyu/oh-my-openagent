@@ -31,7 +31,6 @@ export const ACCOUNT_LOGIC_MARKERS: Readonly<Record<string, readonly string[]>> 
     "find-generic-password",
     "org.freedesktop.secrets",
     "secret-tool",
-    "libsecret",
     "CredentialReadW",
   ],
   "device-code flow": ["/v1/device/code", "/v1/device/token"],

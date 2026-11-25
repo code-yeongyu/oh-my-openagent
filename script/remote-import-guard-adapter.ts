@@ -21,7 +21,7 @@ type OffenderRecord = Readonly<Record<string, { readonly uses: readonly string[]
 
 // The record may only shrink against the merge base (review 6061267823 H5): a new offending file, or a new layer for a
 // file the base listed, fails; removing either passes. A base with no record (the pull request that introduces it) admits
-// the record as it is. A layer the head renamed is read under its new name in the base's record.
+// the record as it is. A base use of a layer whose code moved also admits the layer it moved to.
 export function offenderGrowth(
   base: OffenderRecord | undefined,
   head: OffenderRecord,
@@ -35,7 +35,7 @@ export function offenderGrowth(
       problems.push(`${file} is a new adapter offender (${offender.uses.join(", ")}); route it through the SDK instead`)
       continue
     }
-    const beforeUses = before.uses.map((use) => renames[use] ?? use)
+    const beforeUses = before.uses.flatMap((use) => [use, ...(renames[use] === undefined ? [] : [renames[use]])])
     for (const use of offender.uses)
       if (!beforeUses.includes(use))
         problems.push(`${file} gained ${use}, which the merge base's record does not list; route it through the SDK`)
