@@ -1,9 +1,10 @@
 import { execFileSync } from "node:child_process"
-import { appendFileSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync } from "node:fs"
+import { appendFileSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
+import { isolationProblems, prepareBaseTree } from "./base-tree"
 import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
@@ -49,21 +50,6 @@ function baseRows(ref: string): DomainFile[] | undefined {
     .map((name) => JSON.parse(show(ref, `script/sdk-parity/rows/${name}`) ?? "{}") as DomainFile)
 }
 
-function linkDependencies(base: string): void {
-  const walk = (relative: string, depth: number): void => {
-    const here = join(REPO_ROOT, relative)
-    for (const entry of readdirSync(here, { withFileTypes: true })) {
-      if (!entry.isDirectory() || entry.name === ".git") continue
-      const child = relative === "" ? entry.name : `${relative}/${entry.name}`
-      if (entry.name === "node_modules") {
-        if (existsSync(join(base, relative)) && !existsSync(join(base, child)))
-          symlinkSync(join(REPO_ROOT, child), join(base, child))
-      } else if (depth < 5) walk(child, depth + 1)
-    }
-  }
-  walk("", 0)
-}
-
 function runSide(tree: string): { outcomes: Record<string, Outcome>; tools: DiscoveredTool[] } {
   const text = execFileSync(
     process.execPath,
@@ -78,6 +64,15 @@ function runSide(tree: string): { outcomes: Record<string, Outcome>; tools: Disc
 }
 
 const started = Date.now()
+// In CI the check runs at the pull request's own head (review 6061267823 H4), never at a synthetic merge commit: the
+// digest a reviewer copies is bound to the head this compares, so a checkout of any other commit stops here.
+const expectedHead = arg("--expect-head")
+if (expectedHead !== undefined && git("rev-parse", "HEAD").trim() !== expectedHead) {
+  process.stderr.write(
+    `sdk-parity gate: checked out ${git("rev-parse", "HEAD").trim()}, not the pull request head ${expectedHead}; check out the head itself\n`,
+  )
+  process.exit(1)
+}
 const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim()
 const scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
 const baseTree = join(scratch, "tree")
@@ -89,7 +84,9 @@ try {
       cwd: baseTree,
       stdio: "inherit",
     })
-  else linkDependencies(baseTree)
+  else prepareBaseTree(REPO_ROOT, baseTree)
+  const isolation = [...isolationProblems(baseTree), ...isolationProblems(REPO_ROOT)]
+  if (isolation.length > 0) throw new Error(isolation.join("\n"))
   const baseSide = runSide(baseTree)
   const headSide = runSide(REPO_ROOT)
   const comparedMs = Date.now() - started

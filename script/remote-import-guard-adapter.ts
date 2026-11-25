@@ -17,6 +17,27 @@ export type AdapterRules = {
 const layerOf = (target: string, forbidden: readonly string[]): string | undefined =>
   forbidden.find((prefix) => (prefix.endsWith("/") ? target.startsWith(prefix) : target === prefix))
 
+type OffenderRecord = Readonly<Record<string, { readonly uses: readonly string[] }>>
+
+// The record may only shrink against the merge base (review 6061267823 H5): a new offending file, or a new layer for a
+// file the base listed, fails; removing either passes. A base with no record (the pull request that introduces it) admits
+// the record as it is.
+export function offenderGrowth(base: OffenderRecord | undefined, head: OffenderRecord): string[] {
+  if (base === undefined) return []
+  const problems: string[] = []
+  for (const [file, offender] of Object.entries(head)) {
+    const before = base[file]
+    if (before === undefined) {
+      problems.push(`${file} is a new adapter offender (${offender.uses.join(", ")}); route it through the SDK instead`)
+      continue
+    }
+    for (const use of offender.uses)
+      if (!before.uses.includes(use))
+        problems.push(`${file} gained ${use}, which the merge base's record does not list; route it through the SDK`)
+  }
+  return problems
+}
+
 export function checkAdapterImports(
   facts: readonly FileFacts[],
   resolve: Resolver,

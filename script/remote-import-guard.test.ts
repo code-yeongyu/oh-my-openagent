@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { checkAdapterImports } from "./remote-import-guard-adapter"
+import { checkAdapterImports, offenderGrowth } from "./remote-import-guard-adapter"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
@@ -64,6 +64,33 @@ describe("adapter import family A (#14943 design 7.5)", () => {
     // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
     const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ADAPTER_RULES)
     expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
+  })
+
+  test("#given the merge base's offender record #then this head's record only shrinks against it", () => {
+    const base = execFileSync("git", ["merge-base", process.env.SDK_PARITY_BASE ?? "origin/dev", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).trim()
+    let recorded: string | undefined
+    try {
+      recorded = execFileSync("git", ["show", `${base}:script/remote-import-guard-adapter-offenders.json`], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+    } catch {
+      recorded = undefined
+    }
+    expect(offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS)).toEqual([])
+  })
+
+  test("#given a record that drops a reach #then it passes; one that adds a file or a layer #then each is named", () => {
+    const base = { "a.ts": { uses: ["L1", "L2"] }, "b.ts": { uses: ["L1"] } }
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1"] } })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1", "L3"] }, "c.ts": { uses: ["L1"] } })).toEqual([
+      "a.ts gained L3, which the merge base's record does not list; route it through the SDK",
+      "c.ts is a new adapter offender (L1); route it through the SDK instead",
+    ])
   })
 
   test("#given an adapter that imports the delivery pipeline, directly or through a helper #then the reach is named, and the walk stops at the SDK entry", () => {

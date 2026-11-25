@@ -4,6 +4,7 @@ import { join } from "node:path"
 
 import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ulw-loop/src/sdk/manifest"
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
+import { mappingProblems } from "./cell-mappings"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
 import { runEffectScenarios } from "./conformance-run"
@@ -37,6 +38,7 @@ describe("SDK parity registry (#14947)", () => {
     expect(firstDifferences(rendered, committed)).toEqual([])
     expect(rendered).toBe(committed)
     expect(cellProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
+    expect(mappingProblems(readFileSync(TEMPLATE_PATH, "utf8"), files)).toEqual([])
   })
 
   test("#given every native dispatcher #then each flag is mapped on the route that accepts it, shared flags on every verb", () => {

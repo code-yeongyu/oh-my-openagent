@@ -214,22 +214,12 @@
         "properties": {},
         "required": []
       },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "launcher",
-          "route": [
-            "doctor"
-          ],
-          "flags": {},
-          "positionals": {},
-          "values": []
-        }
-      ],
+      "cli": [],
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "CLI planned only if #14366 asks for a verb"
+        "tool": "CLI planned only if #14366 asks for a verb",
+        "cli": "CLI omitted: omo doctor prints it in its WARN config: lines, through diagnostics.run"
       },
       "projection": {},
       "scenarios": {

@@ -380,22 +380,12 @@
         "properties": {},
         "required": []
       },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "launcher",
-          "route": [
-            "setup"
-          ],
-          "flags": {},
-          "positionals": {},
-          "values": []
-        }
-      ],
+      "cli": [],
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Tool omitted: plan, consent, write is a person's flow"
+        "tool": "Tool omitted: plan, consent, write is a person's flow",
+        "cli": "CLI omitted: omo setup detects before it plans and applies, through install.setup.apply"
       },
       "projection": {},
       "scenarios": {

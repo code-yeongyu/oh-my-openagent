@@ -281,27 +281,12 @@
         },
         "required": []
       },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "engine",
-          "route": [
-            "config"
-          ],
-          "flags": {
-            "-l": "local",
-            "--local": "local",
-            "--approve": "trust=true",
-            "--no-approve": "trust=false"
-          },
-          "positionals": {},
-          "values": []
-        }
-      ],
+      "cli": [],
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Tool omitted: #14366 decides what a session may edit"
+        "tool": "Tool omitted: #14366 decides what a session may edit",
+        "cli": "CLI omitted: the omo config TUI sets a resource after it lists them through engine.config.resources"
       },
       "projection": {},
       "scenarios": {
@@ -1518,14 +1503,6 @@
           },
           "positionals": {},
           "values": []
-        },
-        {
-          "edition": "native",
-          "via": "engine",
-          "route": [],
-          "flags": {},
-          "positionals": {},
-          "values": []
         }
       ],
       "tool": [],
@@ -1739,7 +1716,7 @@
           "via": "engine",
           "route": [],
           "flags": {
-            "--export": "session"
+            "--export": "when"
           },
           "positionals": {
             "file": "session",
@@ -1774,14 +1751,6 @@
         "required": []
       },
       "cli": [
-        {
-          "edition": "native",
-          "via": "engine",
-          "route": [],
-          "flags": {},
-          "positionals": {},
-          "values": []
-        },
         {
           "edition": "native",
           "via": "engine",

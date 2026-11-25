@@ -1,37 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-
-import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, sha256, UNRESOLVED_PATH } from "./baseline"
+import { type Baseline, baselineProblems, PIN_PATH, sha256 } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
 import { runEffectScenarios, type EffectScenario } from "./conformance-run"
-import { candidateDigest, gateReport, goldenProblems, type GateInput, renderReport } from "./gate"
-import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
-import type { Scenario } from "./scenarios"
+import { candidateDigest, gateReport, goldenProblems, renderReport } from "./gate"
+import { HEAD, input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
-import { verifyReview } from "./verify-review"
 
 // Negative controls of design 7.6 for the baseline, the changed-capability gate (with the two tiers of amendment 2),
 // the goldens and the conformance rule: each one breaks one thing and expects a message naming what to fix.
-
-const rows = allRows(loadDomainFiles())
-const text = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8")
-const original = text(ORIGINAL_PATH)
-const unresolved = JSON.parse(text(UNRESOLVED_PATH)) as Baseline
-const HEAD = "a".repeat(40)
-const EARLIER = "b".repeat(40)
-const scenario: Scenario = { id: "s1", capability: "threads.send", surface: "native", argv: ["thread", "send", "x"] }
-
-const input = (overrides: Partial<GateInput> = {}): GateInput => ({
-  base: { rows, tools: [], outcomes: { s1: { exit: 2 } }, unresolved: unresolved.entries },
-  head: { rows, tools: [], outcomes: { s1: { exit: 2 } }, unresolved: unresolved.entries },
-  scenarios: [scenario],
-  closures: new Map([["threads.send", new Set(["packages/omo-native/bin/lib/thread.js"])]]),
-  changedFiles: [],
-  body: "",
-  headSha: HEAD,
-  ...overrides,
-})
 
 describe("negative controls: the changed-capability gate (7.6)", () => {
   test("#given a parser that answers differently with its descriptor untouched #then the capability fails", () => {
@@ -85,45 +61,6 @@ describe("negative controls: the changed-capability gate (7.6)", () => {
       'engine.trust.ensure: only slice C1a clears this gap; name it with an "SDK-Parity-Slice: C1a" line or keep the entry',
     ])
     expect(gateReport(input({ head, body: "SDK-Parity-Slice: C1a\n" })).failures).toEqual([])
-  })
-})
-
-describe("negative controls: the candidate verifier (7.4, 7.6)", () => {
-  const output = renderReport(
-    gateReport(input({ changedFiles: ["packages/omo-native/bin/lib/thread.js"], body: "SDK-Parity-Unchanged: yes\n" })),
-  )
-  const digest = candidateDigest(HEAD, ["threads.send"])
-
-  test("#given a candidate and a verdict without the reviewed line #then the verifier withholds", () => {
-    expect(verifyReview(output, `CLEAR at ${HEAD}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict lacks SDK-Parity-Reviewed; the check printed 1 candidate(s), digest ${digest}`,
-    })
-  })
-
-  test("#given the same change with the matching line at that head #then the verifier accepts", () => {
-    expect(verifyReview(output, `CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${digest}\n`).decision).toBe("accepted")
-  })
-
-  test("#given a digest the check did not print #then the verifier withholds", () => {
-    const other = candidateDigest(HEAD, ["threads.close"])
-    expect(verifyReview(output, `CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${other}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict carries ${other}, a digest the check did not print at ${HEAD.slice(0, 10)} (${digest})`,
-    })
-  })
-
-  test("#given a verdict given at an earlier head #then the verifier withholds", () => {
-    const earlier = candidateDigest(EARLIER, ["threads.send"])
-    expect(verifyReview(output, `CLEAR at ${EARLIER}\nSDK-Parity-Reviewed: ${earlier}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict was not given at ${HEAD} (it names ${EARLIER})`,
-    })
-  })
-
-  test("#given equal outcomes and no verdict line at all #then the verifier withholds; with no candidate it accepts", () => {
-    expect(verifyReview(output, "").decision).toBe("withheld")
-    expect(verifyReview(renderReport(gateReport(input())), "").decision).toBe("accepted")
   })
 })
 

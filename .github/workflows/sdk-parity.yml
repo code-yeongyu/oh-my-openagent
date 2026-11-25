@@ -18,8 +18,10 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     steps:
+      # The pull request's own head, not GitHub's merge ref: the gate's digest is bound to the head a reviewer reads.
       - uses: actions/checkout@v7
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - uses: actions/setup-node@v6
@@ -39,13 +41,16 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Registry, inventories, import family and negative controls
-        run: bun test --timeout 180000 script/sdk-parity script/remote-import-guard.test.ts
+        env:
+          SDK_PARITY_BASE: origin/${{ github.base_ref }}
+        run: bun test --timeout 20000 script/sdk-parity script/remote-import-guard.test.ts
 
       - name: Changed-capability gate
         env:
           BASE_REF: ${{ github.base_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           SDK_PARITY_PR_BODY: ${{ github.event.pull_request.body }}
-        run: bun script/sdk-parity/gate-cli.ts --base "origin/$BASE_REF"
+        run: bun script/sdk-parity/gate-cli.ts --base "origin/$BASE_REF" --expect-head "$HEAD_SHA"
 
       - name: Write job summary
         if: always()
