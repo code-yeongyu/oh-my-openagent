@@ -18,15 +18,15 @@ afterEach(() => {
 })
 
 const deps = { version: "5.1.74", stateDir: "/nonexistent-p1b-pin", timers: fakeClock() }
-const FACTORIES = [
+const FACTORIES: ReadonlyArray<readonly [string, () => RemoteClient]> = [
   ["person", () => remoteClientForPerson(deps)],
   ["session", () => remoteClientForSession("dur-1", deps)],
   ["connector", () => remoteClientForConnector("binding-1", deps)],
   ["cli", () => remoteClientForCli("501", deps)],
   ["service", () => remoteClientForService(deps)],
-] as const
+]
 
-const memberTree = (client: RemoteClient) =>
+const memberTree = (client: RemoteClient): Record<string, unknown> =>
   Object.fromEntries(
     Object.entries(client).map(([name, member]) => [
       name,
@@ -39,7 +39,7 @@ const memberTree = (client: RemoteClient) =>
 const fns = (...names: string[]) => Object.fromEntries(names.map((name) => [name, "function"]))
 
 describe("remote client factories: the member tree", () => {
-  test.each(FACTORIES)("#given the %s factory #when its client is built #then its members are exactly the shipped tree", (_kind, build) => {
+  for (const [kind, build] of FACTORIES) test(`#given the ${kind} factory #when its client is built #then its members are exactly the shipped tree`, () => {
     const client = build()
     clients.push(client)
     expect(memberTree(client)).toEqual({

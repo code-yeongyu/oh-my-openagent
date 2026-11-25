@@ -4,7 +4,7 @@ import type { Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
 // Public API contract of the shipped omo SDK (OMO_SDK_ROOT, first-party design 4.1): P1b extends createOmoSdk into the
-// root additively, so the four shipped namespaces, their members and the synchronous close() must stay exactly as here.
+// root additively, so every shipped member and the synchronous close() must stay, with what each answers.
 
 const credentials: Credentials = {
   accessToken: "access-fixture",
@@ -41,19 +41,25 @@ function sdkWithRecording() {
 const codeOf = (result: OmoResult<unknown>) => (result.kind === "error" ? result.error.code : "ok")
 
 describe("omo SDK: the shipped surface", () => {
-  test("#given an omo SDK #when its members are listed #then the four namespaces and close are exactly the shipped ones", () => {
+  test("#given an omo SDK #when the shipped members are looked up #then every one is still a function, close included", () => {
     const { sdk } = sdkWithRecording()
-    const tree = Object.fromEntries(
-      Object.entries(sdk).map(([name, member]) => [
-        name,
-        typeof member === "function" ? "function" : Object.keys(member as object).sort(),
-      ]),
-    )
-    expect(tree).toEqual({
-      account: ["signIn", "whoami"],
-      devices: ["list", "rename"],
-      deviceService: ["status"],
-      config: ["status"],
+    const shipped = {
+      account: sdk.account,
+      devices: sdk.devices,
+      deviceService: sdk.deviceService,
+      config: sdk.config,
+    }
+    expect({
+      account: [typeof shipped.account.signIn, typeof shipped.account.whoami],
+      devices: [typeof shipped.devices.list, typeof shipped.devices.rename],
+      deviceService: [typeof shipped.deviceService.status],
+      config: [typeof shipped.config.status],
+      close: typeof sdk.close,
+    }).toEqual({
+      account: ["function", "function"],
+      devices: ["function", "function"],
+      deviceService: ["function"],
+      config: ["function"],
       close: "function",
     })
   })
