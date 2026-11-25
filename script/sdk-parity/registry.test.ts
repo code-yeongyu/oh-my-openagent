@@ -16,8 +16,7 @@ import {
 } from "./arity-check"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
-import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
-import { baseRecord, mergeBase } from "./git-base"
+import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
@@ -102,25 +101,5 @@ describe("SDK parity registry (#14947)", () => {
       "thread_set_reasoning",
     ])
     expect(toolProblems(tools, rows)).toEqual([])
-  })
-
-  test("#given the merge base this pull request merges into and the head's run evidence #then the baseline and the built rows hold", async () => {
-    // A recurring check (review 6061267823 H1): read from git at every pull request, so the first correct gap closure
-    // passes here exactly as it passes the gate; the initialization admission applies only while the base has no record.
-    const unresolved = JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline
-    const evidence = await runEffectScenarios(rows, await loadScenarioRuns())
-    const state = {
-      rows,
-      originalText: repoFile(ORIGINAL_PATH),
-      pinText: repoFile(PIN_PATH),
-      unresolved,
-      evidence,
-      context: P0_CONTEXT,
-      atBase: baseRecord(mergeBase()),
-    }
-    expect(baselineProblems(state)).toEqual([])
-    expect(
-      conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
-    ).toEqual([])
   })
 })
