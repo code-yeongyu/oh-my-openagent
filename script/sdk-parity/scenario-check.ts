@@ -9,6 +9,9 @@ import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-t
 
 const ID = /^[a-z][A-Za-z0-9.]*\/[a-z0-9]+(-[a-z0-9]+)*$/
 
+const withoutResult = (expectations: readonly Expectation[]): readonly Omit<Expectation, "result">[] =>
+  expectations.map(({ result: _stimulus, ...rest }) => rest)
+
 const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, inner: unknown) =>
     inner !== null && typeof inner === "object" && !Array.isArray(inner)
@@ -81,10 +84,37 @@ function coverageProblems(
         (partner) =>
           !(field in partner.input) &&
           canonical(partner.input) === rest &&
-          (partner.kind !== scenario.kind || canonical(partner.expect) !== canonical(scenario.expect)),
+          (partner.kind !== scenario.kind ||
+            canonical(withoutResult(partner.expect)) !== canonical(withoutResult(scenario.expect))),
       )
     })
     if (!paired) problems.push(`row ${row.id}: input ${field} has no scenario pair that differs in ${field} alone`)
+  }
+  problems.push(...enumProblems(row, scenarios, contract))
+  return problems
+}
+
+// The values an input field enumerates (an enum, or a union of constants), each of which some admitted scenario must
+// pass: a pair proves the field is honoured, not that every value of it is (design 6.11, one scenario per key and value).
+const enumerated = (schema: unknown): readonly unknown[] | undefined => {
+  const node = schema as {
+    readonly enum?: readonly unknown[]
+    readonly anyOf?: readonly { readonly const?: unknown }[]
+  }
+  if (node.enum !== undefined) return node.enum
+  if (node.anyOf !== undefined && node.anyOf.length > 0 && node.anyOf.every((variant) => "const" in variant))
+    return node.anyOf.map((variant) => variant.const)
+  return undefined
+}
+
+function enumProblems(row: Row, scenarios: readonly TableScenario[], contract: Contract): string[] {
+  const problems: string[] = []
+  for (const [field, schema] of Object.entries(contract.calls[row.sdk]?.properties ?? {})) {
+    const values = enumerated(schema)
+    if (values === undefined) continue
+    for (const value of values)
+      if (!scenarios.some((scenario) => canonical(scenario.input[field]) === canonical(value)))
+        problems.push(`row ${row.id}: input ${field} value ${JSON.stringify(value)} is in no scenario`)
   }
   return problems
 }

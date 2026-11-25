@@ -3,7 +3,12 @@ import type { Namespace } from "./namespaces"
 // The code registry of design 4.4: every failure code a P1a row returns in its refusal scenarios, the namespaces that
 // may return it, and the form of its next_action (the SDK operation to call next, never a CLI verb). A code of the three
 // source lists that no P1a row returns is in HELD_CODES with the reason; the check fails on a code in neither.
-type CodeEntry = { readonly namespaces: readonly Namespace[]; readonly next_action: string }
+/** `retires_with`: the slice after which no root call returns the code any more; its scenario flips there. */
+type CodeEntry = {
+  readonly namespaces: readonly Namespace[]
+  readonly next_action: string
+  readonly retires_with?: string
+}
 
 export const OMO_CODE_REGISTRY = {
   alias_taken: {
@@ -25,6 +30,14 @@ export const OMO_CODE_REGISTRY = {
   caller_context_missing: {
     namespaces: ["threads"],
     next_action: "Name the thread: self is an address only a session can use.",
+  },
+  cancelled: {
+    namespaces: ["threads"],
+    next_action: "Call it again if it is still wanted.",
+  },
+  chain_count_limit: {
+    namespaces: ["threads"],
+    next_action: "End the chain; it is longer than the delivery chain limit.",
   },
   credential_store_locked: {
     namespaces: ["account"],
@@ -66,6 +79,14 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["threads"],
     next_action: "Update omo (install.update), restart this session, then retry.",
   },
+  host_error: {
+    namespaces: ["threads"],
+    next_action: "It may have run; read the session's current state before resending.",
+  },
+  host_not_answering: {
+    namespaces: ["threads"],
+    next_action: "Call devices.list to see whether the device is online, then retry.",
+  },
   host_unavailable: {
     namespaces: ["daemon", "deviceService", "devices", "threads"],
     next_action: "Call deviceService.status or daemon.status to see why, then retry.",
@@ -73,6 +94,18 @@ export const OMO_CODE_REGISTRY = {
   idempotency_conflict: {
     namespaces: ["daemon", "threads"],
     next_action: "Retry with a new idempotency_key, or repeat the original arguments.",
+  },
+  idempotency_in_progress: {
+    namespaces: ["threads"],
+    next_action: "Wait, then repeat the call with the same idempotency_key for its stored result.",
+  },
+  idempotency_uncertain: {
+    namespaces: ["threads"],
+    next_action: "Read the target's current state before repeating; it may have run.",
+  },
+  internal_error: {
+    namespaces: ["account", "devices"],
+    next_action: "Retry; if it fails again, report it with the details.",
   },
   invalid_arguments: {
     namespaces: [
@@ -91,6 +124,15 @@ export const OMO_CODE_REGISTRY = {
     ],
     next_action: "Fix the named input and call it again.",
   },
+  local_only: {
+    namespaces: ["threads"],
+    next_action: "Call it on the device that holds the thread.",
+    retires_with: "T1d",
+  },
+  loop_detected: {
+    namespaces: ["threads"],
+    next_action: "Stop the exchange; the same delivery is circling between threads.",
+  },
   message_too_large: {
     namespaces: ["threads"],
     next_action: "Send less in one call.",
@@ -107,6 +149,10 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["threads"],
     next_action: "Choose another name, or address the thread that holds it.",
   },
+  no_transport: {
+    namespaces: ["threads"],
+    next_action: "Call deviceService.status to see why this device has no relay transport, then retry.",
+  },
   not_found: {
     namespaces: ["boulder", "daemon", "devices", "diagnostics", "engine", "sync", "threads", "worktrees"],
     next_action: "Call threads.list or devices.list for the current ids, then call it again.",
@@ -115,17 +161,37 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["threads"],
     next_action: "Call threads.get for the thread's state; open it again with threads.create before controlling it.",
   },
+  not_steerable: {
+    namespaces: ["threads"],
+    next_action: "Send with delivery auto or follow_up instead of steer.",
+  },
+  overloaded: {
+    namespaces: ["threads"],
+    next_action: "Retry after a short wait.",
+  },
   pair_loop_guard: {
     namespaces: ["threads"],
     next_action: "This is a send loop; send to this target again after details.retry_after_ms.",
+  },
+  partial_commit: {
+    namespaces: ["threads"],
+    next_action: "Read details.partial for what was done, then call it again for the rest.",
   },
   queue_full: {
     namespaces: ["threads"],
     next_action: "Wait for the target to read its queue (threads.wait), then send again.",
   },
+  relay_requires_paid_plan: {
+    namespaces: ["threads"],
+    next_action: "The account's plan has no relay; upgrade it, then call deviceService.status.",
+  },
   scope_denied: {
     namespaces: ["daemon", "diagnostics", "engine", "threads"],
     next_action: "Call it again with all_scope, or with an input this caller may pass.",
+  },
+  sender_not_allowed: {
+    namespaces: ["threads"],
+    next_action: "This caller may not send there; send as the principal that may.",
   },
   service_refused: {
     namespaces: ["account", "sync"],
@@ -151,6 +217,10 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["daemon"],
     next_action: "Retry the call; if it changes something, read the current state first.",
   },
+  transport_expired: {
+    namespaces: ["threads"],
+    next_action: "It may have run; read the session's current state before resending.",
+  },
   turn_active: {
     namespaces: ["threads"],
     next_action: "Wait for the turn with threads.wait, or pass the input that interrupts it, then retry.",
@@ -158,6 +228,14 @@ export const OMO_CODE_REGISTRY = {
   turn_conflict: {
     namespaces: ["threads"],
     next_action: "Call threads.get for the active turn, then retry with that expected_turn_id.",
+  },
+  unconfirmed: {
+    namespaces: ["threads"],
+    next_action: "It may have run; read the session's current state before resending.",
+  },
+  undelivered: {
+    namespaces: ["threads"],
+    next_action: "Nothing ran; resend with a new idempotency_key.",
   },
   unsupported: {
     namespaces: ["account", "daemon", "deviceService", "engine", "install", "threads"],
@@ -167,34 +245,44 @@ export const OMO_CODE_REGISTRY = {
 
 export type OmoCode = keyof typeof OMO_CODE_REGISTRY
 
-export const HELD_CODES: Readonly<Record<string, string>> = {
-  accounts_unreachable: "returned only by account.signIn, which P1a holds for P1a-s",
-  already_signed_in: "returned only by account.signIn, which P1a holds for P1a-s",
-  approval_route_locked: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  approval_unavailable: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  cancelled: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  chain_count_limit: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  device_limit: "returned only by account.signIn, which P1a holds for P1a-s",
-  host_error: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  host_not_answering: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  idempotency_in_progress: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  idempotency_uncertain: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  internal_error: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  local_only: "a sender-kind or locality refusal of the security design's principal rows (P1a-s)",
-  loop_detected: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  machine_exists: "returned only by account.signIn, which P1a holds for P1a-s",
-  no_active_turn: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  no_transport: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  not_steerable: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  orphaned: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  overloaded: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  partial_commit: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  prompt_not_started: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  relay_requires_paid_plan: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  reply_target_mismatch: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  sender_not_allowed: "a sender-kind or locality refusal of the security design's principal rows (P1a-s)",
-  transport_closed: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  transport_expired: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  unconfirmed: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
-  undelivered: "no P1a row returns it in a scenario; it enters the registry with the first row that does",
+export type HeldCode =
+  | { readonly because: "held-rows"; readonly rows: readonly string[] }
+  | { readonly because: "no-producer"; readonly note: string }
+  | { readonly because: "inside-ok-answer"; readonly row: string; readonly note: string }
+  | { readonly because: "principal-only"; readonly note: string }
+
+// A source code no P1a call returns as its failure, with the checked reason: only rows P1a holds return it, no core
+// produces it today (a grep of thread/, remote/ and omo-sdk/ finds no producer), it is part of an ok answer, or only a
+// principal P1a-s wires can meet it.
+export const HELD_CODES: Readonly<Record<string, HeldCode>> = {
+  accounts_unreachable: { because: "held-rows", rows: ["account.signIn"] },
+  already_signed_in: { because: "held-rows", rows: ["account.signIn"] },
+  device_limit: { because: "held-rows", rows: ["account.signIn"] },
+  machine_exists: { because: "held-rows", rows: ["account.signIn"] },
+  approval_route_locked: {
+    because: "no-producer",
+    note: "no producer in the source today (declared in THREAD_ERROR_CODES only); answering a dialog is attach's, held for P1a-s",
+  },
+  approval_unavailable: {
+    because: "no-producer",
+    note: "no producer in the source today (declared in THREAD_ERROR_CODES only); answering a dialog is attach's, held for P1a-s",
+  },
+  orphaned: { because: "no-producer", note: "no producer in the source today (declared in THREAD_ERROR_CODES only)" },
+  no_active_turn: {
+    because: "no-producer",
+    note: "no producer in the source today (declared in THREAD_ERROR_CODES only); an idle interrupt answers ok with interrupted false",
+  },
+  transport_closed: {
+    because: "no-producer",
+    note: "no producer in the source today (declared in THREAD_ERROR_CODES only); a closed socket maps to host_unavailable",
+  },
+  prompt_not_started: {
+    because: "inside-ok-answer",
+    row: "threads.create",
+    note: "carried inside an ok answer: the thread is created and the first prompt's failure is its prompt.error",
+  },
+  reply_target_mismatch: {
+    because: "principal-only",
+    note: "the reply policy refuses a session answering a delivery (T1a); a script holds no reply allowance",
+  },
 }

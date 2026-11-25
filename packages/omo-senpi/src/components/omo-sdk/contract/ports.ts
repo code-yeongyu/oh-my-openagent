@@ -19,6 +19,7 @@ export const PORT_OPERATIONS = {
     "get_entries",
     "get_messages",
     "wait_idle",
+    "subscribe",
     "warm",
     "ensure",
     "status",
@@ -50,6 +51,7 @@ export const PORT_OPERATIONS = {
     "sessions.setReasoning",
     "sessions.close",
     "sessions.archive",
+    "sessions.rename",
     "aliases.resolve",
     "aliases.set",
     "aliases.clear",
@@ -104,3 +106,59 @@ export const PORT_OPERATIONS = {
 
 export type Port = keyof typeof PORT_OPERATIONS
 export const PORTS = Object.keys(PORT_OPERATIONS) as readonly Port[]
+
+/**
+ * The operations of each port that change something (write, send, start), agreed with P0's matcher: a run that shows an
+ * effect no expectation states fails, while a read the core makes stays free. Every other operation is a read.
+ */
+export const PORT_EFFECTS: { readonly [P in Port]: readonly (typeof PORT_OPERATIONS)[P][number][] } = {
+  host: [
+    "open_session",
+    "prompt",
+    "steer",
+    "follow_up",
+    "abort",
+    "close_session",
+    "unload_session",
+    "release_session",
+    "set_model",
+    "set_thinking_level",
+    "rename_session",
+    "warm",
+    "ensure",
+    "stop",
+    "handoff",
+    "gc",
+  ],
+  store: ["insert_delivery", "idempotency_put", "set_archived", "register_extension", "extension_call"],
+  remote: [
+    "sessions.open",
+    "sessions.send",
+    "sessions.interrupt",
+    "sessions.setModel",
+    "sessions.setReasoning",
+    "sessions.close",
+    "sessions.archive",
+    "sessions.rename",
+    "aliases.set",
+    "aliases.clear",
+  ],
+  deviceService: ["service.setEnabled", "service.setControl", "service.setWake", "service.bootstrap"],
+  session: ["devices.rename", "devices.revoke", "sign_out", "sync.disable", "sync.approve"],
+  credentialStore: ["write", "clear", "store.enable", "store.disable"],
+  terminal: ["write"],
+  process: ["spawn", "signal"],
+  fs: ["write", "remove"],
+  clock: [],
+  engine: [
+    "config.setResource",
+    "models.discover",
+    "models.update",
+    "packages.install",
+    "packages.remove",
+    "packages.update",
+    "schedule.cancel",
+    "schedule.run",
+    "sessions.exportHtml",
+  ],
+}

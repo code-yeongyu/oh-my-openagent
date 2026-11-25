@@ -673,6 +673,28 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "account.whoami/after-close",
+      "row": "account.whoami",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
+          "port": "session",
+          "state": {
+            "closed": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
     }
   ]
 }

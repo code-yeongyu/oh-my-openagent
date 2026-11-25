@@ -414,7 +414,8 @@
             "max_bytes": 131072
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/older-page",
@@ -433,7 +434,8 @@
             "cursor": "c1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/budget",
@@ -452,7 +454,8 @@
             "max_bytes": 4096
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/all-scope",
@@ -478,7 +481,8 @@
             "max_bytes": 131072
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/idempotent-repeat",
@@ -504,7 +508,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/limit",
@@ -535,7 +540,8 @@
           },
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/missing",
@@ -551,7 +557,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/stale-cursor",
@@ -573,7 +580,8 @@
             "revision_moved": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/bad-cursor",
@@ -590,7 +598,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.read/other-workspace",
@@ -606,7 +615,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/settles",
@@ -632,7 +642,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/page",
@@ -659,7 +670,8 @@
             "cursor": "c1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/budget",
@@ -686,7 +698,8 @@
             "max_bytes": 4096
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/all-scope",
@@ -719,7 +732,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/idempotent-repeat",
@@ -746,7 +760,8 @@
           "op": "wait_idle",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/times-out",
@@ -782,7 +797,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/missing",
@@ -799,7 +815,8 @@
           "op": "wait_idle",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.readAfterWait/no-wait",
@@ -816,7 +833,8 @@
           "op": "wait_idle",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.receipt/own-delivery",
@@ -840,7 +858,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.receipt/all-scope",
@@ -867,7 +886,8 @@
             "delivery_id": "d1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.receipt/unknown-thread",
@@ -884,7 +904,8 @@
           "op": "read_receipt",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/tail",
@@ -901,7 +922,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/since",
@@ -920,7 +942,8 @@
             "since": "e10"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/before",
@@ -939,7 +962,8 @@
             "before": "e10"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/tail-count",
@@ -958,7 +982,8 @@
             "tail": 20
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/limit",
@@ -977,7 +1002,8 @@
             "limit": 50
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/budget",
@@ -996,7 +1022,8 @@
             "max_bytes": 65536
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/missing",
@@ -1012,7 +1039,8 @@
           "op": "get_entries",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.entries/unknown-before",
@@ -1034,7 +1062,8 @@
             "code": "invalid_request"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.messages/list",
@@ -1052,7 +1081,8 @@
             "all": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.messages/missing",
@@ -1068,7 +1098,8 @@
           "op": "get_messages",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.get/state",
@@ -1085,7 +1116,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.get/missing",
@@ -1101,7 +1133,8 @@
           "op": "get_state",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.wait/until-idle",
@@ -1118,7 +1151,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.wait/anchored",
@@ -1140,7 +1174,8 @@
             "delivery_id": "d1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.wait/until-done",
@@ -1159,7 +1194,8 @@
             "until": "done"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.wait/deadline",
@@ -1187,7 +1223,8 @@
             "ms": 50
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.wait/missing",
@@ -1203,7 +1240,8 @@
           "op": "wait_idle",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.follow/from-now",
@@ -1220,7 +1258,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.follow/anchored",
@@ -1244,7 +1283,8 @@
             }
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.follow/missing",
@@ -1260,7 +1300,8 @@
           "op": "sessions.follow",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.follow/old-device",
@@ -1278,7 +1319,8 @@
             "code": "unsupported"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.locate/here",
@@ -1295,7 +1337,8 @@
             "scope": "workspace"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.locate/all-scope",
@@ -1313,7 +1356,8 @@
             "scope": "all"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.locate/missing",
@@ -1328,7 +1372,8 @@
           "port": "host",
           "op": "list_sessions"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.locate/no-host",
@@ -1346,7 +1391,8 @@
             "error": "closed"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/auto",
@@ -1372,7 +1418,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/steer",
@@ -1402,7 +1449,8 @@
             "turn_id": "turn-3"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/follow-up",
@@ -1429,7 +1477,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/summary",
@@ -1457,7 +1506,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/idempotent-repeat",
@@ -1489,7 +1539,8 @@
           "op": "prompt",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/collapse",
@@ -1518,7 +1569,8 @@
           "op": "prompt",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/all-scope",
@@ -1552,7 +1604,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/attachments",
@@ -1591,7 +1644,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/other-device",
@@ -1614,7 +1668,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.send/missing",
@@ -1631,7 +1686,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/turn-moved",
@@ -1657,7 +1713,8 @@
           "op": "steer",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/too-large",
@@ -1674,7 +1731,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/key-reused",
@@ -1702,7 +1760,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/queue-full",
@@ -1726,7 +1785,8 @@
           "op": "prompt",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/send-loop",
@@ -1750,7 +1810,8 @@
           "op": "prompt",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.send/relay-silent",
@@ -1774,7 +1835,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/auto",
@@ -1801,7 +1863,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/steer",
@@ -1831,7 +1894,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/summary",
@@ -1859,7 +1923,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/idempotent-repeat",
@@ -1889,7 +1954,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/collapse",
@@ -1916,7 +1982,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/all-scope",
@@ -1950,7 +2017,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/attachments",
@@ -1989,7 +2057,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/deadline",
@@ -2022,7 +2091,8 @@
             "ms": 100
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/missing",
@@ -2039,7 +2109,8 @@
           "op": "sessions.send",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.sendAndFollow/turn-moved",
@@ -2065,7 +2136,8 @@
           "op": "sessions.follow",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/new-here",
@@ -2085,7 +2157,8 @@
           "op": "sessions.open",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/open-existing",
@@ -2106,7 +2179,8 @@
             "thread": "t-9"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/on-device",
@@ -2130,7 +2204,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.create/alias",
@@ -2154,7 +2229,8 @@
             "alias": "rev"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/name",
@@ -2172,7 +2248,8 @@
             "name": "review"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/cwd",
@@ -2196,7 +2273,8 @@
             "cwd": "/w/app"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/worktree",
@@ -2229,7 +2307,8 @@
             "worktree": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/skills",
@@ -2251,7 +2330,8 @@
             ]
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/model",
@@ -2269,7 +2349,8 @@
             "model": "anthropic/m-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/reasoning",
@@ -2287,7 +2368,8 @@
             "reasoning": "high"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/narrower-preset",
@@ -2305,7 +2387,8 @@
             "permission_preset": "read-only"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/prompt-text",
@@ -2333,7 +2416,8 @@
           "port": "host",
           "op": "prompt"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/prompt-object",
@@ -2366,7 +2450,8 @@
           "port": "host",
           "op": "follow_up"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/delivery",
@@ -2395,7 +2480,8 @@
           "port": "host",
           "op": "steer"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/idempotent-retry",
@@ -2420,7 +2506,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/fork",
@@ -2436,7 +2523,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/wider-preset",
@@ -2452,7 +2540,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/missing-cwd",
@@ -2478,7 +2567,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/name-taken",
@@ -2503,7 +2593,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/alias-taken",
@@ -2529,7 +2620,8 @@
           "op": "open_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/unknown-model",
@@ -2547,7 +2639,8 @@
             "code": "model_unavailable"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/level-unsupported",
@@ -2565,7 +2658,8 @@
             "code": "invalid_level"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.create/device-offline",
@@ -2591,7 +2685,8 @@
           "op": "sessions.open",
           "count": 0
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.interrupt/newest-turn",
@@ -2608,7 +2703,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.interrupt/named-turn",
@@ -2627,7 +2723,8 @@
             "turn_id": "turn-3"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.interrupt/all-scope",
@@ -2652,7 +2749,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.interrupt/idempotent-repeat",
@@ -2678,7 +2776,8 @@
           "op": "abort",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.interrupt/missing",
@@ -2694,7 +2793,8 @@
           "op": "abort",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.interrupt/not-live",
@@ -2717,7 +2817,8 @@
           "op": "abort",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/named",
@@ -2734,7 +2835,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/force",
@@ -2753,7 +2855,8 @@
             "force": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/graceful",
@@ -2773,7 +2876,8 @@
             "wait_ms": 30000
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/graceful-wait",
@@ -2794,7 +2898,8 @@
             "wait_ms": 5000
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/all-scope",
@@ -2819,7 +2924,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/idempotent-repeat",
@@ -2845,7 +2951,8 @@
           "op": "close_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/self-from-script",
@@ -2859,7 +2966,8 @@
           "op": "close_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/unread-messages",
@@ -2882,7 +2990,8 @@
           "op": "close_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.close/no-host",
@@ -2900,7 +3009,8 @@
             "error": "closed"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/idle",
@@ -2917,7 +3027,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/interrupt",
@@ -2942,7 +3053,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/force",
@@ -2961,7 +3073,8 @@
             "force": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/clear-queue",
@@ -2980,7 +3093,8 @@
             "clear_queue": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/detach-children",
@@ -2999,7 +3113,8 @@
             "children": "detach"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/missing",
@@ -3015,7 +3130,8 @@
           "op": "unload_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.unload/running",
@@ -3038,7 +3154,8 @@
           "op": "unload_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/plain",
@@ -3056,7 +3173,8 @@
             "reason": "takeover"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/interrupt",
@@ -3075,7 +3193,8 @@
             "interrupt": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/force",
@@ -3094,7 +3213,8 @@
             "force": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/move",
@@ -3119,7 +3239,8 @@
             }
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/missing",
@@ -3135,7 +3256,8 @@
           "op": "release_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.release/no-endpoint",
@@ -3151,7 +3273,8 @@
           "op": "release_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.adopt/plan",
@@ -3176,7 +3299,8 @@
             "queued": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.adopt/interrupt",
@@ -3203,7 +3327,8 @@
             "queued": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.adopt/force",
@@ -3230,7 +3355,8 @@
             "queued": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.adopt/missing",
@@ -3246,7 +3372,8 @@
           "op": "release_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.adopt/running",
@@ -3264,7 +3391,8 @@
             "refused": "turn_running"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/exact",
@@ -3283,7 +3411,8 @@
             "model": "anthropic/m-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/provider",
@@ -3304,7 +3433,8 @@
             "provider": "anthropic"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/all-scope",
@@ -3331,7 +3461,8 @@
             "model": "anthropic/m-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/idempotent-repeat",
@@ -3358,7 +3489,8 @@
           "op": "set_model",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/unknown",
@@ -3377,7 +3509,8 @@
             "code": "model_unavailable"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/several",
@@ -3400,7 +3533,8 @@
             ]
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/not-live",
@@ -3424,7 +3558,8 @@
           "op": "set_model",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/session",
@@ -3444,7 +3579,8 @@
             "scope": "session"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/turn",
@@ -3465,7 +3601,8 @@
             "scope": "turn"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/all-scope",
@@ -3493,7 +3630,8 @@
             "scope": "session"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/idempotent-repeat",
@@ -3520,7 +3658,8 @@
           "op": "set_thinking_level",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/unsupported-level",
@@ -3539,7 +3678,8 @@
             "code": "invalid_level"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setReasoning/not-live",
@@ -3563,7 +3703,8 @@
           "op": "set_thinking_level",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/name",
@@ -3582,7 +3723,8 @@
             "name": "review"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/alias",
@@ -3606,7 +3748,8 @@
           "op": "rename_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/all-scope",
@@ -3633,7 +3776,8 @@
             "name": "review"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/idempotent-repeat",
@@ -3660,7 +3804,8 @@
           "op": "rename_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/self-from-script",
@@ -3676,7 +3821,8 @@
           "op": "rename_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/name-taken",
@@ -3702,7 +3848,8 @@
           "op": "rename_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/alias-taken",
@@ -3721,7 +3868,8 @@
             "code": "alias_taken"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.rename/nothing-to-set",
@@ -3737,7 +3885,8 @@
           "op": "rename_session",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.aliases.resolve/held",
@@ -3794,7 +3943,8 @@
             "alias": "rev"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.aliases.set/self-from-script",
@@ -3810,7 +3960,8 @@
           "op": "aliases.set",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.aliases.set/taken",
@@ -3829,7 +3980,8 @@
             "code": "alias_taken"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.aliases.clear/named",
@@ -3846,7 +3998,8 @@
             "thread": "t-1"
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.aliases.clear/missing",
@@ -3862,7 +4015,8 @@
           "op": "aliases.clear",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/archive",
@@ -3880,7 +4034,8 @@
             "archived": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/unarchive",
@@ -3899,7 +4054,8 @@
             "archived": false
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/all-scope",
@@ -3925,7 +4081,8 @@
             "archived": true
           }
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/idempotent-repeat",
@@ -3951,7 +4108,8 @@
           "op": "set_archived",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/own-running-turn",
@@ -3974,7 +4132,8 @@
           "op": "set_archived",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.archive/missing",
@@ -3990,7 +4149,8 @@
           "op": "set_archived",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/exact",
@@ -4019,7 +4179,8 @@
           "port": "host",
           "op": "prompt"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/fuzzy",
@@ -4049,7 +4210,8 @@
           "port": "host",
           "op": "prompt"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/steer",
@@ -4081,7 +4243,8 @@
           "port": "host",
           "op": "steer"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/summary",
@@ -4112,7 +4275,8 @@
           "port": "host",
           "op": "prompt"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/idempotent-repeat",
@@ -4139,7 +4303,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/all-scope",
@@ -4170,7 +4335,8 @@
           "port": "host",
           "op": "prompt"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/close-runner-up",
@@ -4198,7 +4364,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/missing",
@@ -4219,7 +4386,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.extensions.register/register",
@@ -4382,7 +4550,8 @@
           "op": "steer",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.sendAndFollow/follow-up",
@@ -4410,7 +4579,8 @@
             "from": "receipt"
           }
         }
-      ]
+      ],
+      "target": "other_device"
     },
     {
       "id": "threads.sendAndFollow/steer-without-turn",
@@ -4428,7 +4598,8 @@
           "op": "sessions.send",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/follow-up",
@@ -4458,7 +4629,8 @@
           "port": "host",
           "op": "follow_up"
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.handoff/steer-without-turn",
@@ -4476,7 +4648,8 @@
           "op": "insert_delivery",
           "count": 0
         }
-      ]
+      ],
+      "target": "this_device"
     },
     {
       "id": "threads.setModel/fragment",
@@ -4494,6 +4667,1550 @@
             "thread": "t-1",
             "model": "m-1"
           }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.wait/until-idle-value",
+      "row": "threads.wait",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "until": "idle"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "args": {
+            "thread": "t-1",
+            "until": "idle"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/delivery-auto",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "delivery": "auto"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.sendAndFollow/delivery-auto",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "delivery": "auto"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "args": {
+            "thread": "t-1",
+            "from": "receipt"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.create/reasoning-off",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "reasoning": "off"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "reasoning": "off"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/reasoning-minimal",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "reasoning": "minimal"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "reasoning": "minimal"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/reasoning-low",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "reasoning": "low"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "reasoning": "low"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/reasoning-medium",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "reasoning": "medium"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "reasoning": "medium"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/reasoning-xhigh",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "reasoning": "xhigh"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "reasoning": "xhigh"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/permission-preset-workspace",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "permission_preset": "workspace"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "permission_preset": "workspace"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/permission-preset-accept-edits",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "permission_preset": "accept-edits"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "permission_preset": "accept-edits"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/permission-preset-auto",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "permission_preset": "auto"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "permission_preset": "auto"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/permission-preset-ask",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "permission_preset": "ask"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller",
+            "permission_preset": "ask"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/delivery-auto",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": "hello",
+        "delivery": "auto"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.create/delivery-follow-up",
+      "row": "threads.create",
+      "kind": "effect",
+      "input": {
+        "prompt": "hello",
+        "delivery": "follow_up"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "cwd": "caller"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up"
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.unload/children-refuse",
+      "row": "threads.unload",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "children": "refuse"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "t-1",
+            "children": "refuse"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/level-off",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "off"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "off",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/level-minimal",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "minimal"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "minimal",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/level-low",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "low"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "low",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/level-medium",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "medium"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "medium",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/level-xhigh",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "xhigh"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "xhigh",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setReasoning/scope-session",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "level": "high",
+        "scope": "session"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "high",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.handoff/match-exact",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "input": {
+        "thread": "review",
+        "message": "take over",
+        "match": "exact"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "args": {
+            "match": "exact"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.handoff/delivery-auto",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "input": {
+        "thread": "review",
+        "message": "take over",
+        "delivery": "auto"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "args": {
+            "match": "exact"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt"
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.read/on-other-device",
+      "row": "threads.read",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2",
+            "max_bytes": 131072
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.readAfterWait/on-other-device",
+      "row": "threads.readAfterWait",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "wait_ms": 5000
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.wait",
+          "args": {
+            "thread": "studio/t-2",
+            "wait_ms": 5000
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.receipt/on-other-device",
+      "row": "threads.receipt",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "delivery_id": "d1"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "read_receipt",
+          "args": {
+            "thread": "studio/t-2",
+            "delivery_id": "d1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "count": 0
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.entries/on-other-device",
+      "row": "threads.entries",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.messages/on-other-device",
+      "row": "threads.messages",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.read",
+          "args": {
+            "thread": "studio/t-2",
+            "all": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.get/on-other-device",
+      "row": "threads.get",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.wait/on-other-device",
+      "row": "threads.wait",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.wait",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.follow/on-other-device",
+      "row": "threads.follow",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.locate/on-other-device",
+      "row": "threads.locate",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.resolve",
+          "args": {
+            "scope": "workspace"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.sendAndFollow/on-other-device",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "args": {
+            "thread": "studio/t-2",
+            "from": "receipt"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.interrupt/on-other-device",
+      "row": "threads.interrupt",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.close/on-other-device",
+      "row": "threads.close",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.unload/on-other-device",
+      "row": "threads.unload",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "unload_session",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "error": "unknown_session"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.release/on-other-device",
+      "row": "threads.release",
+      "kind": "refusal",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "release_session",
+          "count": 0
+        }
+      ],
+      "refusal": "release_unsupported",
+      "refusal_from": "value"
+    },
+    {
+      "id": "threads.adopt/on-other-device",
+      "row": "threads.adopt",
+      "kind": "refusal",
+      "refusal": "unsupported",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "release_session",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/on-other-device",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setReasoning/on-other-device",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "level": "high"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "args": {
+            "thread": "studio/t-2",
+            "level": "high",
+            "scope": "session"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.rename/on-other-device",
+      "row": "threads.rename",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "name": "review"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "args": {
+            "thread": "studio/t-2",
+            "name": "review"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.aliases.set/on-other-device",
+      "row": "threads.aliases.set",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "alias": "rev"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "aliases.set",
+          "args": {
+            "thread": "studio/t-2",
+            "alias": "rev"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.aliases.clear/on-other-device",
+      "row": "threads.aliases.clear",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "aliases.clear",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.archive/on-other-device",
+      "row": "threads.archive",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "args": {
+            "thread": "studio/t-2",
+            "archived": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.handoff/on-other-device",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "take over"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.resolve",
+          "args": {
+            "match": "exact"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.send"
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.follow/on-this-device-today",
+      "row": "threads.follow",
+      "kind": "refusal",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "args": {
+            "thread": "t-1"
+          },
+          "result": {
+            "code": "local_only"
+          }
+        },
+        {
+          "port": "host",
+          "op": "subscribe",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "refusal": "local_only",
+      "retires_with": "T1d"
+    },
+    {
+      "id": "threads.sendAndFollow/on-this-device-today",
+      "row": "threads.sendAndFollow",
+      "kind": "refusal",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "t-1"
+          },
+          "result": {
+            "code": "local_only"
+          }
+        },
+        {
+          "port": "host",
+          "op": "subscribe",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "refusal": "local_only",
+      "retires_with": "T1d"
+    },
+    {
+      "id": "threads.wait/caller-cancels",
+      "row": "threads.wait",
+      "kind": "refusal",
+      "refusal": "cancelled",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "target": "this_device",
+      "abort": {
+        "after_ms": 10
+      }
+    },
+    {
+      "id": "threads.send/chain-limit",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "chain_count_limit",
+      "input": {
+        "thread": "t-1",
+        "message": "x"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "given": [
+        {
+          "port": "store",
+          "state": {
+            "chain_length": "at_limit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.send/relay-host-error",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "host_error",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "host_error",
+            "uncertain": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/device-not-answering",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "host_not_answering",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "host_not_answering"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/no-relay-transport",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "no_transport",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "no_transport"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/relay-transport-expired",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "transport_expired",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "transport_expired",
+            "uncertain": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/relay-unconfirmed",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "unconfirmed",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "unconfirmed",
+            "uncertain": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/relay-undelivered",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "undelivered",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "outcome": "undelivered"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/remote-not-steerable",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "not_steerable",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?",
+        "delivery": "steer",
+        "expected_turn_id": "turn-3"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2",
+            "mode": "steer"
+          },
+          "result": {
+            "outcome": "not_steerable"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/delivery-loop",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "loop_detected",
+      "input": {
+        "thread": "t-1",
+        "message": "x"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "result": {
+            "code": "loop_detected"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/store-overloaded",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "overloaded",
+      "input": {
+        "thread": "t-1",
+        "message": "x"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "result": {
+            "code": "overloaded"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/parked-agent-only",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "input": {
+        "thread": "t-1",
+        "message": "x"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "given": [
+        {
+          "port": "store",
+          "state": {
+            "session": "t-1",
+            "intake": "parked",
+            "accepts": "agent"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.create/key-in-flight",
+      "row": "threads.create",
+      "kind": "refusal",
+      "refusal": "idempotency_in_progress",
+      "input": {
+        "idempotency_key": "k5"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "idempotency_get",
+          "args": {
+            "key": "k5"
+          }
+        },
+        {
+          "port": "host",
+          "op": "open_session",
+          "count": 0
+        }
+      ],
+      "target": "this_device",
+      "given": [
+        {
+          "port": "store",
+          "state": {
+            "idempotency": {
+              "key": "k5",
+              "state": "in_progress"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.create/worktree-then-open-fails",
+      "row": "threads.create",
+      "kind": "refusal",
+      "refusal": "partial_commit",
+      "input": {
+        "worktree": {
+          "branch": "feat/y"
+        }
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "branch": "feat/y"
+          }
+        },
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "worktree": true
+          }
+        }
+      ],
+      "target": "this_device",
+      "fault": {
+        "port": "host",
+        "op": "open_session",
+        "fault": "refused"
+      }
+    },
+    {
+      "id": "threads.create/relay-plan",
+      "row": "threads.create",
+      "kind": "refusal",
+      "refusal": "relay_requires_paid_plan",
+      "input": {
+        "device": "studio",
+        "cwd": "/w/app"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.open",
+          "args": {
+            "device": "studio"
+          },
+          "result": {
+            "code": "plan_required"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.create/lost-ack-then-retry",
+      "row": "threads.create",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "target": "other_device",
+      "input": {
+        "device": "studio",
+        "cwd": "/w/app",
+        "idempotency_key": "k9"
+      },
+      "fault": {
+        "port": "remote",
+        "op": "sessions.open",
+        "fault": "lost_reply"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "idempotency_put",
+          "args": {
+            "key": "k9"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.open",
+          "args": {
+            "device": "studio",
+            "cwd": "/w/app"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "device": "studio",
+            "cwd": "/w/app",
+            "idempotency_key": "k9"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "store",
+              "op": "idempotency_get",
+              "args": {
+                "key": "k9"
+              }
+            },
+            {
+              "port": "remote",
+              "op": "sessions.list",
+              "args": {
+                "device": "studio"
+              }
+            },
+            {
+              "port": "remote",
+              "op": "sessions.open",
+              "count": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "threads.follow/on-this-device",
+      "row": "threads.follow",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "subscribe",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/on-this-device",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "message": "status?"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "subscribe",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "count": 0
         }
       ]
     }

@@ -118,7 +118,7 @@ export type SetupPlan = Static<typeof SetupPlanSchema>
 export type SetupInventory = Static<typeof SetupInventorySchema>
 
 export const InstallSetupApply = Type.Object({
-  plan: Type.Optional(SetupPlanSchema),
+  plan: SetupPlanSchema,
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),

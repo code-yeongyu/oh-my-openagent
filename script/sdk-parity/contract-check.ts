@@ -21,6 +21,12 @@ export type GatedEntry = {
   readonly rowExists: boolean
 }
 
+export type HeldReason =
+  | { readonly because: "held-rows"; readonly rows: readonly string[] }
+  | { readonly because: "no-producer"; readonly note: string }
+  | { readonly because: "inside-ok-answer"; readonly row: string; readonly note: string }
+  | { readonly because: "principal-only"; readonly note: string }
+
 export type Contract = {
   readonly calls: Readonly<Record<string, CallInput>>
   readonly gated: readonly GatedEntry[]
@@ -28,7 +34,7 @@ export type Contract = {
   readonly sections: readonly string[]
   readonly rootOptions: readonly string[]
   readonly registry: Readonly<Record<string, { readonly namespaces: readonly string[]; readonly next_action: string }>>
-  readonly heldCodes: Readonly<Record<string, string>>
+  readonly heldCodes: Readonly<Record<string, HeldReason>>
   readonly sourceCodes: readonly string[]
   readonly accepts: (call: string, input: unknown) => boolean
 }
@@ -158,7 +164,9 @@ const usedCodes = (
   const used = new Map<string, Set<string>>()
   for (const scenario of files.flatMap((file) => file.scenarios)) {
     const row = inScope.get(scenario.row)
-    if (scenario.refusal === undefined || row === undefined) continue
+    // A refusal read from the answered value (release's engine reply) is the engine's own error, not an OmoCode.
+    const fromValue = (scenario as { readonly refusal_from?: string }).refusal_from === "value"
+    if (scenario.refusal === undefined || row === undefined || fromValue) continue
     used.set(scenario.refusal, (used.get(scenario.refusal) ?? new Set()).add(namespaceOf(row.sdk)))
   }
   return used
@@ -189,7 +197,13 @@ export function codeProblems(rows: readonly Row[], contract: Contract, files: re
   for (const code of sources)
     if (contract.registry[code] === undefined && contract.heldCodes[code] === undefined)
       problems.push(`code ${code}: a source code of design 4.4 that is neither in the registry nor held with a reason`)
-  for (const code of Object.keys(contract.heldCodes))
+  const typed = new Set(p1aRows(rows, contract.gated).map((row) => row.id))
+  for (const [code, held] of Object.entries(contract.heldCodes)) {
     if (!sources.has(code)) problems.push(`held code ${code}: not a source code; remove it`)
+    if (held.because === "held-rows")
+      for (const row of held.rows)
+        if (typed.has(row)) problems.push(`held code ${code}: names row ${row}, which P1a types; register the code`)
+    if (held.because !== "held-rows" && held.note.trim() === "") problems.push(`held code ${code}: say why in note`)
+  }
   return problems
 }

@@ -78,10 +78,10 @@ describe("negative controls of the P1a checks", () => {
   })
 
   test("#given a registered code no row returns #then the code check names it", () => {
-    const registry = { ...contract.registry, local_only: { namespaces: ["threads"], next_action: "x" } }
-    const heldCodes = Object.fromEntries(Object.entries(contract.heldCodes).filter(([code]) => code !== "local_only"))
+    const registry = { ...contract.registry, orphaned: { namespaces: ["threads"], next_action: "x" } }
+    const heldCodes = Object.fromEntries(Object.entries(contract.heldCodes).filter(([code]) => code !== "orphaned"))
     expect(codeProblems(rows, { ...contract, registry, heldCodes }, scenarios).join("\n")).toContain(
-      "code local_only: no row returns it",
+      "code orphaned: no row returns it",
     )
   })
 
@@ -234,6 +234,54 @@ describe("negative controls added by the second review", () => {
     )
     expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
       "row threads.setModel: input provider has no scenario pair that differs in provider alone",
+    )
+  })
+})
+
+// Review 6061836983: held codes carry a checked reason and enumerated values are each exercised. Fixtures, faults and
+// address coverage are P0's checks over the one scenario shape in expectation.ts.
+describe("negative controls added by the third review", () => {
+  test("#given a held code whose reason names a row P1a types #then the code check names it", () => {
+    const heldCodes = {
+      ...contract.heldCodes,
+      internal_error: { because: "held-rows" as const, rows: ["account.whoami"] },
+    }
+    const registry = Object.fromEntries(Object.entries(contract.registry).filter(([code]) => code !== "internal_error"))
+    expect(codeProblems(rows, { ...contract, registry, heldCodes }, scenarios).join("\n")).toContain(
+      "held code internal_error: names row account.whoami, which P1a types; register the code",
+    )
+  })
+
+  test("#given an enumerated input value no scenario passes #then the scenario check names the value", () => {
+    const files = scenarios.map((file) => ({
+      ...file,
+      scenarios: file.scenarios.filter(
+        (scenario) => !(scenario.row === "engine.config.setResource" && scenario.input["state"] === "unload"),
+      ),
+    }))
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      'row engine.config.setResource: input state value "unload" is in no scenario',
+    )
+  })
+})
+
+describe("negative controls added with the design lane's ruling on release", () => {
+  test("#given a refusal read from the answered value #then its engine code needs no registry entry, while a root refusal does", () => {
+    const fromValue = {
+      id: "threads.release/value-refusal",
+      row: "threads.release",
+      kind: "refusal" as const,
+      refusal: "engine_specific_error",
+      refusal_from: "value",
+      input: { thread: "t-1" },
+      expect: [{ port: "host", op: "release_session", count: 0 }],
+    }
+    expect(codeProblems(rows, contract, withScenario(scenarios, fromValue)).join("\n")).not.toContain(
+      "engine_specific_error",
+    )
+    const fromRoot = { ...fromValue, id: "threads.release/root-refusal", refusal_from: undefined }
+    expect(codeProblems(rows, contract, withScenario(scenarios, fromRoot)).join("\n")).toContain(
+      "code engine_specific_error: returned by threads and missing from the code registry",
     )
   })
 })

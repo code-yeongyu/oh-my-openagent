@@ -587,6 +587,28 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "devices.list/after-close",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
+          "port": "session",
+          "state": {
+            "closed": true
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "session",
+          "op": "devices.list",
+          "count": 0
+        }
+      ]
     }
   ]
 }

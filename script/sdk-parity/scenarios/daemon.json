@@ -1645,6 +1645,126 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "daemon.run/policy-upgrade",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "upgrade"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.run/policy-fallback",
+      "row": "daemon.run",
+      "kind": "effect",
+      "input": {
+        "policy": "fallback"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "fallback"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm"
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/policy-upgrade",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "upgrade"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.ensure/policy-never",
+      "row": "daemon.ensure",
+      "kind": "effect",
+      "input": {
+        "policy": "never"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "ensure",
+          "args": {
+            "policy": "never"
+          }
+        },
+        {
+          "port": "host",
+          "op": "warm",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/policy-upgrade",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "policy": "upgrade"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "policy": "upgrade"
+          }
+        }
+      ]
+    },
+    {
+      "id": "daemon.handoff/policy-fallback",
+      "row": "daemon.handoff",
+      "kind": "effect",
+      "input": {
+        "policy": "fallback"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "handoff",
+          "args": {
+            "policy": "fallback"
+          }
+        }
+      ]
     }
   ]
 }
