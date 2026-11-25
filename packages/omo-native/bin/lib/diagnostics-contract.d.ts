@@ -73,7 +73,10 @@ export type ReapReport = { readonly engines: readonly ReapedEngine[] }
 /** The resolver's own view, as `omo doctor --models --json` prints it. */
 export type ModelChainView = import("../../category-coverage-entry").ModelChainsView
 
-export type DiagnosticsErrorCode = "diagnostics_unavailable"
+export type ReapFailureCode =
+  "not_found" | "scope_denied" | "foreign_live_owner" | "internal_error" | "invalid_arguments"
+
+export type DiagnosticsErrorCode = ReapFailureCode
 
 export type DiagnosticsResult<T> =
   | { readonly kind: "ok"; readonly value: T }

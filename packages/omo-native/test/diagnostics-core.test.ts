@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync } from "node:fs"
 import type { DiagnosticsCalls, ProcessEntry } from "../bin/lib/diagnostics-contract"
 import { fixReflectionLock, models, reapStaleEngines } from "../bin/lib/diagnostics.js"
-import { asInstall, createInstall, importInstalled } from "./doctor-golden.test-support"
+import { asInstall, capture, createInstall, importInstalled } from "./doctor-golden.test-support"
 
 const roots: string[] = []
 afterEach(() => {
@@ -59,6 +59,59 @@ describe("diagnostics.reapStaleEngines", () => {
   })
 })
 
+describe("diagnostics.reapStaleEngines when nothing is reaped", () => {
+  const noSignal = (pid: number) => {
+    throw new Error(`no pid may be signalled, got ${pid}`)
+  }
+
+  test("#given every named pid refused for one cause #when reaping #then the failure carries that cause's code and every outcome", async () => {
+    const result = await reapStaleEngines({ pids: [13] }, { list: () => PROCESSES, kill: noSignal })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "scope_denied",
+        details: { engines: [{ pid: 13, outcome: "refused", reason: "managed_engine" }] },
+      },
+    })
+  })
+
+  test("#given an absent pid and a managed one #when reaping #then the failure is invalid_arguments with each pid's own outcome", async () => {
+    const result = await reapStaleEngines({ pids: [404, 13] }, { list: () => PROCESSES, kill: noSignal })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: {
+        code: "invalid_arguments",
+        details: {
+          engines: [
+            { pid: 404, outcome: "not_found" },
+            { pid: 13, outcome: "refused", reason: "managed_engine" },
+          ],
+        },
+      },
+    })
+  })
+
+  test("#given an absent pid and a managed one #when omo doctor --reap renders the failure #then each pid keeps today's line and the exit code is 1", async () => {
+    const install = createInstall(roots)
+    const { runDoctor } = await importInstalled<{
+      runDoctor(inventory: unknown, args: string[], options: Record<string, unknown>): Promise<void>
+    }>(install, "bin/lib/doctor.js")
+    const result = await asInstall(install, () =>
+      capture(install.root, () =>
+        runDoctor({ harnesses: [] }, ["--reap", "404", "13"], { list: () => PROCESSES, kill: noSignal }),
+      ),
+    )
+    expect(result).toEqual({
+      stdout: [
+        "FAIL refusing pid 404: it is not an omo engine process",
+        "FAIL refusing pid 13: it is a managed engine (--mode), owned by whatever started it",
+      ].join("\n"),
+      stderr: "",
+      exitCode: 1,
+    })
+  })
+})
+
 describe("diagnostics.fixReflectionLock", () => {
   test("#given no memory #when a dry run sweeps #then it answers dry_run and one finding entry, nothing failed", async () => {
     const install = createInstall(roots)
@@ -78,7 +131,7 @@ describe("diagnostics.fixReflectionLock", () => {
 })
 
 describe("diagnostics.models", () => {
-  test("#given a runtime that cannot load #when models runs #then it answers diagnostics_unavailable with the reason in details", async () => {
+  test("#given a runtime that cannot load #when models runs #then it answers internal_error with the reason in details", async () => {
     const result = await models(
       {},
       {
@@ -90,7 +143,7 @@ describe("diagnostics.models", () => {
     expect(result).toEqual({
       kind: "error",
       error: {
-        code: "diagnostics_unavailable",
+        code: "internal_error",
         message: "the model chains could not be resolved",
         next_action: "run omo doctor to check the installation, then retry",
         details: { reason: "bundle missing (fixture)" },

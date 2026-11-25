@@ -47,5 +47,39 @@ export async function reapStaleEngines(input, ports = {}) {
       }
     }
   }
-  return { kind: "ok", value: { engines } }
+  if (engines.some((engine) => engine.outcome === "reaped")) return { kind: "ok", value: { engines } }
+  return nothingReaped(engines)
+}
+
+/** @type {Readonly<Record<string, { code: import("./diagnostics-contract").ReapFailureCode, next_action: string }>>} */
+const CAUSES = {
+  not_found: { code: "not_found", next_action: "name the stale engines diagnostics.run lists, then call it again" },
+  not_an_engine: { code: "not_found", next_action: "name the stale engines diagnostics.run lists, then call it again" },
+  managed_engine: { code: "scope_denied", next_action: "stop a managed engine through whatever started it" },
+  live_session: { code: "foreign_live_owner", next_action: "end that session through its own launcher" },
+  signal_failed: {
+    code: "internal_error",
+    next_action: "retry; if the signal fails again, report it with the details",
+  },
+}
+
+// Nothing was signalled: one shared cause answers its own code; causes that differ answer invalid_arguments, so no code
+// chosen by request order speaks for the other pids. Every pid's outcome rides in details either way.
+/** @param {readonly ReapedEngine[]} engines */
+function nothingReaped(engines) {
+  const causes = [
+    ...new Set(engines.map((engine) => CAUSES[engine.outcome === "refused" ? engine.reason : engine.outcome])),
+  ]
+  const [only] = causes
+  const cause = causes.length === 1 && only !== undefined ? only : undefined
+  return {
+    kind: /** @type {const} */ ("error"),
+    error: {
+      code: cause?.code ?? /** @type {const} */ ("invalid_arguments"),
+      message: "no named pid is a stale engine that could be signalled",
+      next_action:
+        cause?.next_action ?? "fix the pids details.engines names, each with its own reason, then call it again",
+      details: { engines },
+    },
+  }
 }

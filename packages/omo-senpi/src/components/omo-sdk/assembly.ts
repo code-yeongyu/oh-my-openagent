@@ -38,6 +38,7 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
     ...(options.home === undefined ? {} : { home: options.home }),
     ...(ports.signInProcess === undefined ? {} : { signInProcess: ports.signInProcess }),
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
+    ...(ports.fileSystem === undefined ? {} : { fileSystem: ports.fileSystem }),
   })
   const root = assembleRoot([shipped], cores, {
     env,

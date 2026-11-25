@@ -101,6 +101,33 @@
       ]
     },
     {
+      "id": "diagnostics.models/runtime-unavailable",
+      "row": "diagnostics.models",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "input": {},
+      "given": [
+        {
+          "port": "fs",
+          "state": {
+            "unreadable": [
+              "plugin/runtime/category-coverage/index.js"
+            ]
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "/agent/models.json"
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "diagnostics.fixReflectionLock/reap-stale-locks",
       "row": "diagnostics.fixReflectionLock",
       "kind": "effect",
@@ -276,6 +303,40 @@
               "ppid": 777,
               "engine": true,
               "interactive": true
+            }
+          ]
+        },
+        {
+          "port": "process",
+          "op": "signal",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "diagnostics.reapStaleEngines/two-pids-different-causes",
+      "row": "diagnostics.reapStaleEngines",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "pids": [
+          4242,
+          4343
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "ps"
+          },
+          "result": [
+            {
+              "pid": 4343,
+              "ppid": 1,
+              "engine": true,
+              "interactive": false
             }
           ]
         },

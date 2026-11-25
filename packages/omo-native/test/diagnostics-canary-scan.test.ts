@@ -104,3 +104,15 @@ test("#given a canary planted in turn in each input the model view reads #when d
   }
   expect(reached).toEqual(["config value"])
 })
+
+test("#given a canary in the model runtime's own error #when diagnostics.models answers a person (it is refused to a session) #then the canary is in details.reason and in no other field", async () => {
+  const canary = "canaryruntimeerror5c2f0a"
+  const result = await models(
+    {},
+    { loadRuntime: async () => Promise.reject(new Error(`cannot read ${canary}/index.js`)) },
+  )
+  if (result.kind !== "error") throw new Error("a runtime that cannot load must answer an error")
+  const { details, ...rest } = result.error
+  expect(details).toEqual({ reason: `cannot read ${canary}/index.js` })
+  expect(JSON.stringify(rest)).not.toContain(canary)
+})

@@ -41,7 +41,7 @@ export async function reapStaleEngines(args, options = {}) {
   }
   if (pids.length === 0) return { lines, failed: true, reaped: [] }
   const result = await reap({ pids }, options)
-  const { engines } = result.value
+  const engines = result.kind === "ok" ? result.value.engines : result.error.details.engines
   lines.push(...engines.map(reapLine))
   return {
     lines,

@@ -10,7 +10,7 @@ export const NOT_ARGV: Readonly<Record<string, NotArgv>> = {
     tokens: ["alias", "device"],
     reason: "the local API's command target fields",
   },
-  "packages/omo-native/bin/lib/doctor.js": {
+  "packages/omo-native/bin/lib/engine-processes.js": {
     tokens: ["--internal-", "upgrade"],
     reason: "matches the command line of running engine processes, not omo's argv",
   },

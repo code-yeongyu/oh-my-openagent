@@ -37,7 +37,15 @@ describe("the root's launcher-side cores", () => {
             loads += 1
             return {
               run: async () => ({ kind: "ok", value: { findings: [] } }),
-              models: async () => ({ kind: "ok", value: { findings: [] } }),
+              models: async () => ({
+                kind: "ok",
+                value: {
+                  excludeModels: [],
+                  categories: [],
+                  agents: [],
+                  modelProfile: { profile: "default", selection: "default", rungs: [] },
+                },
+              }),
             }
           },
         },

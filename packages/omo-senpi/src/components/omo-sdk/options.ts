@@ -1,6 +1,6 @@
 import type { AccessPorts } from "./access"
 import type { AccountApi, SignInProcess } from "./account"
-import type { ConfigApi } from "./config"
+import type { ConfigApi, ConfigFileSystemPort } from "./config"
 import type { Endpoint, OmoPrincipal, OmoSdkRoot } from "./contract"
 import type { DeviceServiceApi, DeviceServiceStatusPort } from "./device-service"
 import type { DevicesApi } from "./devices"
@@ -9,6 +9,8 @@ export type OmoSdkPorts = AccessPorts & {
   readonly deviceServiceStatus?: DeviceServiceStatusPort
   /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
   readonly signInProcess?: SignInProcess
+  /** The files `config.status` reads; absent, the real file system. */
+  readonly fileSystem?: ConfigFileSystemPort
 }
 
 export type OmoSdkOptions = {

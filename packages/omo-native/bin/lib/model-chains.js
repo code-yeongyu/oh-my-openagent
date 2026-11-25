@@ -89,8 +89,9 @@ async function loadRuntime() {
 }
 
 /**
- * `diagnostics.models`: the view the runtime's resolvers answer. A runtime or engine that cannot answer
- * is `diagnostics_unavailable`, with the reason it gave in `details.reason`.
+ * `diagnostics.models`: the view the runtime's resolvers answer. A runtime or engine that cannot answer is
+ * `internal_error` with the reason it gave in `details.reason`: free text that can embed what the runtime read (a path,
+ * a config value), so the call is refused to a session.
  * @type {import("./diagnostics-contract").DiagnosticsCalls["models"]}
  */
 export async function models(_input = {}, ports = {}) {
@@ -108,7 +109,7 @@ export async function models(_input = {}, ports = {}) {
     return {
       kind: "error",
       error: {
-        code: "diagnostics_unavailable",
+        code: "internal_error",
         message: "the model chains could not be resolved",
         next_action: "run omo doctor to check the installation, then retry",
         details: { reason: error instanceof Error ? error.message : String(error) },

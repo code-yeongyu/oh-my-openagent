@@ -2,6 +2,7 @@ import {
   loadOmoConfig,
   type OmoConfigDiagnostic,
   type OmoConfigEnv,
+  type OmoConfigReadFileSystem,
   type OmoConfigSource,
 } from "@oh-my-opencode/omo-config-core"
 import { failure } from "../access"
@@ -14,11 +15,22 @@ export type ConfigStatus = {
 
 export type ConfigApi = { readonly status: () => Promise<OmoResult<ConfigStatus>> }
 
-export function createConfigApi(options: { readonly cwd: string; readonly env: OmoConfigEnv }): ConfigApi {
+export type ConfigFileSystemPort = OmoConfigReadFileSystem
+
+export function createConfigApi(options: {
+  readonly cwd: string
+  readonly env: OmoConfigEnv
+  readonly fileSystem?: ConfigFileSystemPort
+}): ConfigApi {
   return {
     async status() {
       try {
-        const { sources, diagnostics } = loadOmoConfig({ cwd: options.cwd, env: options.env, harness: "senpi" })
+        const { sources, diagnostics } = loadOmoConfig({
+          cwd: options.cwd,
+          env: options.env,
+          harness: "senpi",
+          ...(options.fileSystem === undefined ? {} : { fileSystem: options.fileSystem }),
+        })
         return ok({ files: sources, diagnostics })
       } catch (error) {
         return failure(error)
