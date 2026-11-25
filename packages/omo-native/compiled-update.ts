@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process"
 import { realpathSync } from "node:fs"
+import { INSTALL_EXIT_BY_CODE, INSTALL_FAILED_EXIT } from "./bin/lib/install-calls.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { isProvisionedExecutable } from "./compile-runtime"
 import {
@@ -302,22 +303,22 @@ export async function compiledUpdate(
   const details = answer.error.details
   switch (details.reason) {
     case "package_manager_owned":
-      return { output: ownedUpdateLine(details), exitCode: 1, stream: "stderr" }
+      return { output: ownedUpdateLine(details), exitCode: INSTALL_EXIT_BY_CODE.unsupported, stream: "stderr" }
     case "release_unresolved":
       return {
         output: `omo update could not resolve a release (${details.cause}). Download ${details.asset} from ${RELEASES_URL}`,
-        exitCode: 1,
+        exitCode: INSTALL_EXIT_BY_CODE.service_unreachable,
       }
     case "provisioned_copy":
       return {
         output: `omo ${details.version} is available (running ${details.before}), but ${details.destination} is the provisioned runtime copy, not the installed omo. Update the installed omo with:\n${details.installer}`,
-        exitCode: 1,
+        exitCode: INSTALL_EXIT_BY_CODE.unsupported,
         stream: "stderr",
       }
     case "binary_install":
       return {
         output: `omo update: ${details.error_code}: ${details.cause}`,
-        exitCode: 1,
+        exitCode: INSTALL_FAILED_EXIT.binary_install,
         stream: "stderr",
         errorCode: details.error_code,
       }

@@ -22,6 +22,7 @@ export const OMO_SDK_CODES = [
   "machine_exists",
   "accounts_unreachable",
   "internal_error",
+  "install_failed",
 ] as const satisfies readonly OmoErrorCode[]
 
 type Missing = Exclude<OmoErrorCode, (typeof OMO_SDK_CODES)[number]>

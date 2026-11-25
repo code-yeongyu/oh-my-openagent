@@ -1,5 +1,7 @@
 import { type Static, Type } from "typebox"
 
+import type { SetupPlan as SetupPlanResult } from "../results/host"
+
 import { LaunchSpec } from "./threads-authority"
 
 // The daemon, diagnostics, install and config calls of first-party design 6.7 and 6.11. The endpoint flags (socket,
@@ -125,11 +127,23 @@ export const SetupPlanSchema = Type.Object({
 export type SetupPlan = Static<typeof SetupPlanSchema>
 export type SetupInventory = Static<typeof SetupInventorySchema>
 
+/** The stages `omo setup` plans, in apply order (omo-native bin/lib/setup-stream.js). */
+export type SetupStageId = "credentials" | "assets" | "providers" | "model-choices"
+
+// A caller-supplied function: typed for the caller, with no JSON schema (as account.signIn's onUserCode).
+const callback = <Fn>() => Type.Unsafe<Fn>({})
+
 export const InstallSetupApply = Type.Object({
-  plan: SetupPlanSchema,
+  // The value install.setup.plan answered, passed back as it is: its static type is that result.
+  plan: Type.Unsafe<SetupPlanResult>(SetupPlanSchema),
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),
+  decide: Type.Optional(
+    callback<
+      (stage: { readonly id: SetupStageId; readonly description: string }) => "apply" | "skip" | Promise<"apply" | "skip">
+    >(),
+  ),
 })
 export const InstallUpdate = Type.Object({ dry_run: Type.Optional(Type.Boolean()) })
 export const InstallVersion = None

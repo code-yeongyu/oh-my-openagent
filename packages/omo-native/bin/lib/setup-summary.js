@@ -392,6 +392,7 @@ const CLASS_LABELS = {
  * What `omo setup` found, as data: sources, one row per class with its typed items and their phrases, coverage, notes
  * with their origin. Holds no stage plan, no file bytes and no key.
  * `context`: `{ home, agentDir, inventory, credentials, assets, providers, modelChoices, categories? }`.
+ * @returns {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupSummary}
  */
 export function setupSummary(context) {
   const rows = [

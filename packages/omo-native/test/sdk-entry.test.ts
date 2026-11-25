@@ -14,9 +14,14 @@ describe("omo-ai/sdk", () => {
     })
   })
 
-  test("#given an install call slice C1c has not landed #when it runs #then it answers not_implemented from the loaded install core", async () => {
+  test("#given the entry #when install.version runs #then the loaded install core answers this package's version and its engine", async () => {
     const sdk = createOmoSdk({ env, cwd: "/work" })
-    expect(await sdk.install.version()).toMatchObject({ kind: "error", error: { code: "not_implemented" } })
+    const answer = await sdk.install.version()
+    if (answer.kind !== "ok") throw new Error(`install.version failed: ${answer.error.code}`)
+    expect(answer.value.version).toBe(
+      (await Bun.file(join(import.meta.dir, "..", "package.json")).json()).version,
+    )
+    expect(typeof answer.value.engine).toBe("string")
   })
 
   test("#given a caller that passes cores to the entry #when the root is built #then the type rejects it and construction refuses it", () => {

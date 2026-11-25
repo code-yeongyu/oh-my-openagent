@@ -1,4 +1,4 @@
-import { update, readInstalledVersion } from "./install-calls.js"
+import { INSTALL_EXIT_BY_CODE, INSTALL_FAILED_EXIT, readInstalledVersion, update } from "./install-calls.js"
 import { isPrintOnlyUpdate, updateUsageAnswer } from "./update-args.js"
 import { versionedUpdateLines } from "./versioned-install.js"
 
@@ -69,7 +69,7 @@ export async function runSelfUpdate(args, options = {}) {
   )
   if (answer.kind === "ok") {
     const value = answer.value
-    if (value.state === "printed") log(formatUpdateCommand(value))
+    if (value.state === "printed") log(formatUpdateCommand({ manager: value.manager, command: value.command_line }))
     else if (value.state === "up_to_date")
       log(`omo ${value.before.omo} is up to date (omo-ai@${value.channel} is ${value.version})`)
     else if (value.versioned !== undefined) {
@@ -80,7 +80,7 @@ export async function runSelfUpdate(args, options = {}) {
     return 0
   }
   for (const line of failureLines(answer.error)) error(line)
-  return answer.error.details?.exit_status ?? 1
+  return exitCodeOf(answer.error)
 }
 
 function renderProgress(event, log, error) {
@@ -109,8 +109,23 @@ function renderProgress(event, log, error) {
   }
 }
 
+function exitCodeOf(failure) {
+  if (failure.code !== "install_failed") return INSTALL_EXIT_BY_CODE[failure.code] ?? 1
+  const exit = INSTALL_FAILED_EXIT[failure.details.reason]
+  return exit === "exit_status" ? failure.details.exit_status : exit
+}
+
+const VERSIONED_KIND = {
+  no_bun: "no_bun",
+  busy: "busy",
+  bun_install_failed: "install_failed",
+  wrong_version: "wrong_version",
+  path_still_old: "not_on_path",
+}
+
 function failureLines(failure) {
   const details = failure.details ?? {}
+  const retry = `omo: update failed; retry with: ${details.command}`
   switch (details.reason) {
     case "registry_unconfirmed":
       return [
@@ -118,33 +133,44 @@ function failureLines(failure) {
       ]
     case "engine_missing":
       return [
-        `omo ${details.version} is up to date, but its engine files are missing or incomplete; reinstall with: ${details.command}`,
+        `omo ${details.before} is up to date, but its engine files are missing or incomplete; reinstall with: ${details.command}`,
       ]
     case "versioned": {
-      const lines = versionedUpdateLines(details.outcome, {
-        install: details.install,
-        before: details.before,
-        target: details.target,
-      })
+      const lines = versionedUpdateLines(
+        {
+          kind: VERSIONED_KIND[details.cause],
+          finalDir: details.final_dir,
+          holder: details.holder,
+          reported: details.reported,
+          updated: details.updated,
+          onPath: details.on_path,
+          onPathReal: details.on_path_real,
+          seen: details.seen,
+          exitCode: details.exit_status,
+        },
+        {
+          install: { versionsDir: details.versions_dir, current: details.current, versionDir: details.version_dir },
+          before: details.before,
+          target: details.target,
+        },
+      )
       return [...lines.log, ...lines.error]
     }
     case "not_moved":
-      return [
-        `omo is still ${details.installed}; ${details.target} is published`,
-        `omo: update failed; retry with: ${details.command}`,
-      ]
+      return [`omo is still ${details.after}; ${details.target} is published`, retry]
     case "file_held":
-      if (details.installed_now === details.before) return [`omo: omo ${details.before} is still installed.`]
-      if (details.installed_now !== undefined) {
-        return [
-          `omo: omo ${details.installed_now} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`,
-        ]
+      if (details.restore === "not_needed") {
+        return details.installed_now === details.before
+          ? [`omo: omo ${details.before} is still installed.`]
+          : [
+              `omo: omo ${details.installed_now} is installed, but the package manager did not finish; run omo update again afterwards to complete it.`,
+            ]
       }
-      if (details.restored) return [`omo: restored omo ${details.before}.`]
+      if (details.restore === "restored") return [`omo: restored omo ${details.before}.`]
       return [
         `omo: the previous omo ${details.before} could not be restored; ${details.holders.length > 0 ? "after quitting the holder" : "once the file is released"}, run: ${details.previous_command}`,
       ]
     default:
-      return [`omo: update failed; retry with: ${details.command}`]
+      return [retry]
   }
 }

@@ -25,25 +25,22 @@ import { applySetupStages, collectSetupPlans, scanSetup, setupEntryText, setupSt
 import { displayPath, setupSummary } from "./setup-summary.js"
 
 /**
- * @typedef {{ code: string, message: string, next_action: string, details?: Record<string, unknown> }} FailureBody
- * @typedef {{ kind: "error", error: FailureBody }} Failure
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/failure.ts").OmoFailure} Failure
  */
 /**
  * @template T
- * @typedef {{ kind: "ok", value: T } | Failure} Result
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/failure.ts").OmoValue<T>} Result
  */
 
-/** @param {string} code @param {string} message @param {string} next_action @param {Record<string, unknown>} [details] @returns {Failure} */
+/**
+ * @param {Exclude<import("../../../omo-senpi/src/components/omo-sdk/contract/codes.ts").OmoCode, "not_implemented">} code @param {string} message @param {string} next_action
+ * @param {Record<string, unknown>} [details] @returns {Failure}
+ */
 function failure(code, message, next_action, details) {
   return { kind: "error", error: { code, message, next_action, ...(details === undefined ? {} : { details }) } }
 }
 
-/**
- * @typedef {{ commit: string, committedAt: string, branch: string }} BuildComponent
- * @typedef {{ command: string, omo: BuildComponent, engine: BuildComponent }} OmoBuild
- * @typedef {{ scheme: "epoch" | "nodef", epoch: number, sha7: string, source: "buildInfo" | "senpi-package" | "omitted" }} EngineBuild
- * @typedef {{ version: string, engine: string, omo_build?: OmoBuild, engine_build?: EngineBuild }} InstallVersion
- */
+/** @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").InstallVersion} InstallVersion */
 
 /** The npm edition's answer: this package's version and the engine it resolved; "unknown" when the engine tree cannot be read. */
 export function readInstalledVersion() {
@@ -58,7 +55,7 @@ export function readInstalledVersion() {
 
 /**
  * install.version(): what `omo --version` and `-v` print, as data. The root admits the caller (security design 4.3).
- * @param {Record<string, never>} [_input]
+ * @param {object} [_input]
  * @param {{ read?: () => InstallVersion }} [ports]
  * @returns {{ kind: "ok", value: InstallVersion }}
  */
@@ -81,18 +78,7 @@ export function version(_input = {}, ports = {}) {
  *   | { kind: "installing", manager: string, command: string }
  *   | { kind: "retrying", file: string | undefined, delay_ms: number, attempt: number, attempts: number }
  *   | { kind: "held", file: string | undefined, attempts: number, holders: Holder[] }} UpdateProgress
- * @typedef {{
- *   state: "printed" | "up_to_date" | "updated",
- *   version: string,
- *   channel: string,
- *   manager: string,
- *   command: string,
- *   argv: string[],
- *   ran: boolean,
- *   before: Installed,
- *   after?: Installed,
- *   versioned?: { final_dir: string, kept: string },
- * }} InstallUpdate
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").InstallUpdate} InstallUpdate
  * @typedef {{
  *   resolveUpdate?: (targetVersion?: string) => UpdateTarget,
  *   fetchDistTags?: () => Record<string, unknown> | null,
@@ -110,6 +96,45 @@ export function version(_input = {}, ports = {}) {
  */
 
 const INSTALL_NEXT = "Read details.reason, fix what it names, then call install.update again."
+
+/**
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").InstallFailedDetails} InstallFailedDetails
+ * @typedef {InstallFailedDetails["reason"]} InstallFailedReason
+ */
+
+/**
+ * The exit code \`omo update\` ends with for each install_failed reason: a number, or "exit_status" to pass the failed
+ * command's own status through. Data, not code: it moves unchanged to the descriptor's exit slot once slice P1b's exit
+ * projection defines one.
+ * @satisfies {{ readonly [Reason in InstallFailedReason]: number | "exit_status" }}
+ */
+export const INSTALL_FAILED_EXIT = /** @type {const} */ ({
+  engine_missing: 1,
+  manager_not_started: 1,
+  manager_failed: "exit_status",
+  not_moved: 1,
+  file_held: 1,
+  versioned: "exit_status",
+  binary_install: 1,
+})
+
+/**
+ * The exit code of every other failure an install call answers; the usage refusal is the command's own (2).
+ * @type {{ readonly internal_error: number, readonly service_unreachable: number, readonly unsupported: number }}
+ */
+export const INSTALL_EXIT_BY_CODE = { internal_error: 1, service_unreachable: 1, unsupported: 1 }
+
+/** @type {{ readonly [Kind in Exclude<import("./versioned-install.js").VersionedOutcome["kind"], "updated">]: Extract<InstallFailedDetails, { reason: "versioned" }>["cause"] }} */
+const VERSIONED_CAUSE = {
+  no_bun: "no_bun",
+  busy: "busy",
+  install_failed: "bun_install_failed",
+  wrong_version: "wrong_version",
+  not_on_path: "path_still_old",
+}
+
+/** @param {InstallFailedDetails} details @param {string} message @returns {Failure} */
+const installFailed = (details, message) => failure("install_failed", message, INSTALL_NEXT, details)
 
 /**
  * install.update({ dry_run? }): moves this npm install to the version its channel's dist-tag names, or with dry_run
@@ -166,8 +191,8 @@ export async function update(input = {}, ports = {}) {
       version: target ?? "",
       channel,
       manager: resolved.manager,
-      command: resolved.command,
-      argv: resolved.argv,
+      command: resolved.argv,
+      command_line: resolved.command,
       ran,
       before,
       ...extra,
@@ -179,16 +204,9 @@ export async function update(input = {}, ports = {}) {
   if (target !== undefined && target === before.omo) {
     // Already on the target, the update installs nothing, so a broken engine tree needs the reinstall named.
     if (before.engine === "unknown") {
-      return failure(
-        "install_failed",
+      return installFailed(
+        { reason: "engine_missing", before: before.omo, command: resolved.command },
         `omo ${before.omo} is up to date, but its engine files are missing or incomplete`,
-        INSTALL_NEXT,
-        {
-          reason: "engine_missing",
-          version: before.omo,
-          command: resolved.command,
-          exit_status: 1,
-        },
       )
     }
     return answer("up_to_date", false)
@@ -202,14 +220,29 @@ export async function update(input = {}, ports = {}) {
         versioned: { final_dir: outcome.finalDir, kept: versioned.versionDir },
       })
     }
-    return failure("install_failed", `the versioned install did not move to ${target}`, INSTALL_NEXT, {
-      reason: "versioned",
-      exit_status: outcome.exitCode,
-      outcome,
-      install: versioned,
-      before: before.omo,
-      target,
-    })
+    return installFailed(
+      {
+        reason: "versioned",
+        cause: VERSIONED_CAUSE[outcome.kind],
+        exit_status: outcome.exitCode,
+        before: before.omo,
+        target,
+        versions_dir: versioned.versionsDir,
+        current: versioned.current,
+        version_dir: versioned.versionDir,
+        ...("finalDir" in outcome ? { final_dir: outcome.finalDir } : {}),
+        ...("holder" in outcome ? { holder: outcome.holder } : {}),
+        ...("reported" in outcome ? { reported: outcome.reported } : {}),
+        ...(outcome.kind === "not_on_path"
+          ? {
+              updated: outcome.updated,
+              seen: outcome.seen,
+              ...(outcome.onPath === undefined ? {} : { on_path: outcome.onPath, on_path_real: outcome.onPathReal }),
+            }
+          : {}),
+      },
+      `the versioned install did not move to ${target}`,
+    )
   }
 
   /** @param {UpdateTarget} spec */
@@ -227,11 +260,10 @@ export async function update(input = {}, ports = {}) {
   /** @param {ChildResult} result */
   const heldOnWindows = (result) => platform === "win32" && !result.signal && isLockFailure(result.stderr)
   const spawnFailed = () =>
-    failure("install_failed", "the package manager could not be started", INSTALL_NEXT, {
-      reason: "spawn_failed",
-      command: resolved.command,
-      exit_status: 1,
-    })
+    installFailed(
+      { reason: "manager_not_started", command: resolved.command },
+      "the package manager could not be started",
+    )
 
   /** @type {ChildResult} */
   let result
@@ -255,30 +287,24 @@ export async function update(input = {}, ports = {}) {
 
   if (failed(result) && heldOnWindows(result)) {
     const held = await heldInstall({ result, before, install, resolveUpdate, readInstalled, ports, progress })
-    return failure("install_failed", "Windows would not let the package manager replace a file", INSTALL_NEXT, {
-      reason: "file_held",
-      exit_status: 1,
-      before: before.omo,
-      ...held,
-    })
+    return installFailed(
+      { reason: "file_held", attempts: LOCK_RETRY_DELAYS_MS.length + 1, before: before.omo, ...held },
+      "Windows would not let the package manager replace a file",
+    )
   }
   if (failed(result)) {
-    return failure("install_failed", "the package manager failed", INSTALL_NEXT, {
-      reason: "manager_failed",
-      command: resolved.command,
-      exit_status: result.status ?? 1,
-    })
+    return installFailed(
+      { reason: "manager_failed", exit_status: result.status ?? 1, command: resolved.command },
+      "the package manager failed",
+    )
   }
 
   const after = readInstalled()
   if (target !== undefined && after.omo !== target) {
-    return failure("install_failed", `omo is still ${after.omo}; ${target} is published`, INSTALL_NEXT, {
-      reason: "not_moved",
-      installed: after.omo,
-      target,
-      command: resolved.command,
-      exit_status: 1,
-    })
+    return installFailed(
+      { reason: "not_moved", before: before.omo, after: after.omo, target, command: resolved.command },
+      `omo is still ${after.omo}; ${target} is published`,
+    )
   }
   return answer("updated", true, { after })
 }
@@ -311,7 +337,9 @@ async function heldInstall({ result, before, install, resolveUpdate, readInstall
   }))
   progress({ kind: "held", file, attempts: LOCK_RETRY_DELAYS_MS.length + 1, holders })
   const now = readInstalledOrUndefined(readInstalled)
-  if (now !== undefined) return { file, holders, installed_now: now.omo }
+  const named = file === undefined ? {} : { file }
+  if (now !== undefined)
+    return { ...named, holders, restore: /** @type {const} */ ("not_needed"), installed_now: now.omo }
   // Any readable omo is a working install, even when the pinned target is unknown (registry down): the manager can
   // fail moving an old dependency after the new omo-ai is in place, and reinstalling over it would undo a working
   // update and hit the same held file. Only an unreadable install is restored.
@@ -323,24 +351,22 @@ async function heldInstall({ result, before, install, resolveUpdate, readInstall
     restored = { status: 1, signal: null }
   }
   const after = readInstalledOrUndefined(readInstalled)
+  const back = (restored.status ?? 1) === 0 && !restored.signal && after?.omo === before.omo
   return {
-    file,
+    ...named,
     holders,
-    restored: (restored.status ?? 1) === 0 && !restored.signal && after?.omo === before.omo,
+    restore: /** @type {"restored" | "failed"} */ (back ? "restored" : "failed"),
     previous_command: previous.command,
   }
 }
 
 /**
- * @typedef {import("./setup-stream.js").SetupStageId} SetupStageId
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupStageId} SetupStageId
  * @typedef {import("./setup-stream.js").SetupPlanEntry & { readonly text: string }} InstallSetupPlanEntry
  * @typedef {import("./setup-stream.js").SetupCountEntry & { readonly text: string }} InstallSetupCountEntry
- * @typedef {import("./setup-stream.js").SetupInventory} InstallSetupInventory
- * @typedef {{ id: SetupStageId, description: string, present: boolean, pending: number, entries: InstallSetupPlanEntry[] }} InstallSetupStage
- * @typedef {{ inventory: InstallSetupInventory, stages: InstallSetupStage[], summary: ReturnType<typeof setupSummary>,
- *   pending: number, target_roots: string[] }} InstallSetupPlan
- * @typedef {{ id: SetupStageId, outcome: "applied" | "skipped" | "nothing_pending", entries: InstallSetupCountEntry[] }} InstallSetupStageApplied
- * @typedef {{ applied: SetupStageId[], skipped: SetupStageId[], stages: InstallSetupStageApplied[] }} InstallSetupApplied
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupInventory} InstallSetupInventory
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupPlan} InstallSetupPlan
+ * @typedef {import("../../../omo-senpi/src/components/omo-sdk/contract/results/host.ts").SetupApplied} InstallSetupApplied
  * @typedef {{ home?: string, env?: NodeJS.ProcessEnv, loadCoverageRuntime?: () => Promise<any>,
  *   loadCoverageEngine?: () => Promise<any>, loadModelCatalog?: () => Promise<any>, pluginRoot?: string,
  *   onProgress?: (event: { kind: "notice", text: string }) => void }} SetupPorts
@@ -387,7 +413,7 @@ function targetRoots(plans, agentDir, home) {
 export const setup = {
   /**
    * install.setup.detect(): the harnesses found on this machine and what each holds, read only.
-   * @param {Record<string, never>} [_input] @param {SetupPorts} [ports]
+   * @param {object} [_input] @param {SetupPorts} [ports]
    * @returns {Promise<Result<InstallSetupInventory>>}
    */
   async detect(_input = {}, ports = {}) {
@@ -406,7 +432,7 @@ export const setup = {
 
   /**
    * install.setup.plan(): what `omo setup --dry-run` prints, as data. Nothing is written.
-   * @param {Record<string, never>} [_input] @param {SetupPorts} [ports]
+   * @param {object} [_input] @param {SetupPorts} [ports]
    * @returns {Promise<Result<InstallSetupPlan>>}
    */
   async plan(_input = {}, ports = {}) {
@@ -437,7 +463,7 @@ export const setup = {
       })
       /** @type {InstallSetupPlan} */
       const value = {
-        inventory,
+        inventory: /** @type {InstallSetupInventory} */ (/** @type {unknown} */ (inventory)),
         stages,
         summary: setupSummary({ home, agentDir, inventory, ...plans, categories }),
         pending: stages.reduce((total, stage) => total + stage.pending, 0),
@@ -453,8 +479,7 @@ export const setup = {
   /**
    * install.setup.apply({ plan, consent, decide? }): writes what the plan holds. consent "all" applies every pending
    * stage; "each" calls decide once per pending stage, in plan order, before that stage's write.
-   * @param {{ plan: InstallSetupPlan, consent: "all" | "each",
-   *   decide?: (stage: { id: SetupStageId, description: string }) => "apply" | "skip" | Promise<"apply" | "skip"> }} input
+   * @param {import("../../../omo-senpi/src/components/omo-sdk/contract/root.ts").RootCallInput<"install.setup.apply">} input
    * @param {SetupPorts} [ports]
    * @returns {Promise<Result<InstallSetupApplied>>}
    */
