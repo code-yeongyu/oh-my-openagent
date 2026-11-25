@@ -5,7 +5,8 @@ import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
 
-import { countTransientMemoryIdentities, formatTransientMemoryLines } from "../bin/lib/doctor.js"
+import { countTransientMemoryIdentities, transientMemoryFindings } from "../bin/lib/memory-identities.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 
 const SOURCE_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)))
 const roots: string[] = []
@@ -44,11 +45,11 @@ describe("omo doctor transient memory identities", () => {
     })
 
     expect(counts).toBeUndefined()
-    expect(formatTransientMemoryLines(counts)).toEqual([])
+    expect(renderFindings(transientMemoryFindings(counts))).toEqual([])
   })
 
   test("#given a counted memory root #when formatted #then one INFO line reports the transient count", () => {
-    expect(formatTransientMemoryLines({ durable: 46, transient: 475, runs: 2 })).toEqual([
+    expect(renderFindings(transientMemoryFindings({ durable: 46, transient: 475, runs: 2 }))).toEqual([
       "INFO memory identities: 46 durable, 475 transient (no repo/); transient run roots: 2",
     ])
   })

@@ -21,7 +21,7 @@ function homeWithUserConfig(document: string): string {
   return home
 }
 
-function captureDoctor(options: Record<string, unknown>): string {
+async function captureDoctor(options: Record<string, unknown>): Promise<string> {
   const originalLog = console.log
   const originalExitCode = process.exitCode
   const output: string[] = []
@@ -29,7 +29,12 @@ function captureDoctor(options: Record<string, unknown>): string {
     output.push(String(value))
   }
   try {
-    runDoctor({ harnesses: [] }, [], { list: () => [], fetchDistTags: () => null, daemonReport: () => [], ...options })
+    await runDoctor({ harnesses: [] }, [], {
+      list: () => [],
+      fetchDistTags: () => null,
+      daemonReport: () => [],
+      ...options,
+    })
     return output.join("\n")
   } finally {
     console.log = originalLog
@@ -86,8 +91,8 @@ describe("omo doctor config lines", () => {
     expect(lines).toEqual(["WARN config: diagnostics unavailable: missing bundle"])
   })
 
-  test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", () => {
-    const stdout = captureDoctor({
+  test("#given config lines from the launcher #when doctor prints its report #then every line appears in the output", async () => {
+    const stdout = await captureDoctor({
       configDiagnostics: ["WARN config: ~/.omo/omo.jsonc: task.host_engine_policy ignored (invalid value)"],
     })
 

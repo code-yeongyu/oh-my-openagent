@@ -171,7 +171,7 @@ describe("category coverage from the engine's model list", () => {
 
 describe("category coverage reaches the commands", () => {
   describe("#given coverage lines from the launcher", () => {
-    test("#when doctor runs #then it prints them", () => {
+    test("#when doctor runs #then it prints them", async () => {
       const { home } = sandbox()
       const output: string[] = []
       const originalLog = console.log
@@ -180,7 +180,7 @@ describe("category coverage reaches the commands", () => {
         output.push(String(value))
       }
       try {
-        runDoctor({ harnesses: [] }, [], {
+        await runDoctor({ harnesses: [] }, [], {
           list: () => [],
           env: { HOME: home },
           fetchDistTags: () => ({ beta: "0.0.0-test" }),

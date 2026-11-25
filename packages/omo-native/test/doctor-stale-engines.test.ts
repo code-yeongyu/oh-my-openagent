@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
 import { join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
-import { classifyEngineProcesses, formatStaleEngineLines, reapStaleEngines } from "../bin/lib/doctor.js"
+import { reapStaleEngines } from "../bin/lib/doctor.js"
+import { classifyEngineProcesses, staleEngineFindings } from "../bin/lib/engine-processes.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 
 const LAUNCHER = join(resolve(fileURLToPath(new URL("..", import.meta.url))), "bin", "omo.js")
 
@@ -78,7 +80,7 @@ describe("omo doctor stale engine detection", () => {
   describe("#given stale engines were found", () => {
     describe("#when the report is rendered", () => {
       test("#then each line carries pid, age, tty and the explicit reap command", () => {
-        const lines = formatStaleEngineLines([entry({ pid: 90387, elapsed: "21:44:07", tty: "ttys005" })])
+        const lines = renderFindings(staleEngineFindings([entry({ pid: 90387, elapsed: "21:44:07", tty: "ttys005" })]))
         const rendered = lines.join("\n")
         expect(rendered).toContain("WARN")
         expect(rendered).toContain("90387")
@@ -88,16 +90,16 @@ describe("omo doctor stale engine detection", () => {
       })
 
       test("#then no stale engines render no lines at all", () => {
-        expect(formatStaleEngineLines([])).toEqual([])
+        expect(renderFindings(staleEngineFindings([]))).toEqual([])
       })
     })
   })
 
   describe("#given an explicit reap request", () => {
     describe("#when the named pid is a reparented interactive engine", () => {
-      test("#then exactly that pid is signaled", () => {
+      test("#then exactly that pid is signaled", async () => {
         const signaled: Array<{ pid: number; signal: string }> = []
-        const result = reapStaleEngines(["75183"], {
+        const result = await reapStaleEngines(["75183"], {
           list: () => [entry({ pid: 75183 }), entry({ pid: 90387 })],
           kill: (pid: number, signal: string) => signaled.push({ pid, signal }),
         })
@@ -114,9 +116,9 @@ describe("omo doctor stale engine detection", () => {
         ["a print engine", entry({ pid: 4243, command: `bun ${ENGINE} --mode print` })],
         ["a live attached engine", entry({ pid: 12811, ppid: 12806 })],
       ] as const) {
-        test(`#then ${label} is refused and nothing is signaled`, () => {
+        test(`#then ${label} is refused and nothing is signaled`, async () => {
           const signaled: number[] = []
-          const result = reapStaleEngines([String(unsafe.pid)], {
+          const result = await reapStaleEngines([String(unsafe.pid)], {
             list: () => [unsafe],
             kill: (pid: number) => signaled.push(pid),
           })
@@ -129,9 +131,9 @@ describe("omo doctor stale engine detection", () => {
     })
 
     describe("#when the named pid is not an omo engine at all", () => {
-      test("#then it is refused rather than killed", () => {
+      test("#then it is refused rather than killed", async () => {
         const signaled: number[] = []
-        const result = reapStaleEngines(["1"], {
+        const result = await reapStaleEngines(["1"], {
           list: () => [entry({ pid: 75183 })],
           kill: (pid: number) => signaled.push(pid),
         })
@@ -143,9 +145,9 @@ describe("omo doctor stale engine detection", () => {
     })
 
     describe("#when no pid is given", () => {
-      test("#then nothing is signaled and the explicit form is explained", () => {
+      test("#then nothing is signaled and the explicit form is explained", async () => {
         const signaled: number[] = []
-        const result = reapStaleEngines([], {
+        const result = await reapStaleEngines([], {
           list: () => [entry({ pid: 75183 })],
           kill: (pid: number) => signaled.push(pid),
         })
@@ -171,9 +173,9 @@ describe("omo doctor stale engine detection", () => {
     })
 
     describe("#when several pids are named and one is unsafe", () => {
-      test("#then the safe pid is still reaped and the unsafe one is refused", () => {
+      test("#then the safe pid is still reaped and the unsafe one is refused", async () => {
         const signaled: number[] = []
-        const result = reapStaleEngines(["75183", "4242"], {
+        const result = await reapStaleEngines(["75183", "4242"], {
           list: () => [entry({ pid: 75183 }), entry({ pid: 4242, command: `bun ${ENGINE} --mode rpc` })],
           kill: (pid: number) => signaled.push(pid),
         })
@@ -185,10 +187,10 @@ describe("omo doctor stale engine detection", () => {
 
     describe("#when a pid is spelled as something other than a positive integer", () => {
       for (const spelling of ["0", "-1", "abc", "12.5", ""]) {
-        test(`#then ${JSON.stringify(spelling)} is refused before any process lookup`, () => {
+        test(`#then ${JSON.stringify(spelling)} is refused before any process lookup`, async () => {
           const signaled: number[] = []
           let listed = 0
-          const result = reapStaleEngines([spelling], {
+          const result = await reapStaleEngines([spelling], {
             list: () => {
               listed += 1
               return [entry({ pid: 75183 })]
@@ -242,9 +244,9 @@ describe("standalone binary engines", () => {
     expect(result.stale).toEqual([])
   })
 
-  test("#given an orphaned binary engine #when reaped by pid #then it is signalled", () => {
+  test("#given an orphaned binary engine #when reaped by pid #then it is signalled", async () => {
     const signalled: number[] = []
-    const result = reapStaleEngines(["75183"], {
+    const result = await reapStaleEngines(["75183"], {
       list: () => [binary(runtime)],
       kill: (pid: number) => {
         signalled.push(pid)
@@ -261,7 +263,7 @@ describe("app-server daemons left over from an older version (#10033)", () => {
   test("#given an orphaned npm-engine app-server daemon #when reported #then it is named as a removed command, not an orphaned session", () => {
     const daemon = entry({ command: `bun ${ENGINE} app-server --listen stdio:// --extension ${PLUGIN}` })
     const { stale } = classifyEngineProcesses([daemon])
-    const lines = formatStaleEngineLines(stale)
+    const lines = renderFindings(staleEngineFindings(stale))
     expect(stale.map((item) => item.pid)).toEqual([75183])
     // Scripts grep doctor output for `WARN stale engine pid`; a retired daemon is still a stale engine.
     expect(lines[0]).toStartWith("WARN stale engine pid 75183 ")
@@ -272,20 +274,20 @@ describe("app-server daemons left over from an older version (#10033)", () => {
 
   test("#given an orphaned binary-runtime app-server daemon #when reported #then it gets the same removed-command line", () => {
     const { stale } = classifyEngineProcesses([entry({ command: `${runtime} app-server daemon start` })])
-    expect(formatStaleEngineLines(stale)[0]).toContain("app-server daemon started by an older version")
+    expect(renderFindings(staleEngineFindings(stale))[0]).toContain("app-server daemon started by an older version")
   })
 
   test("#given an ordinary orphaned session whose prompt mentions app-server #when reported #then it keeps the orphaned-session line", () => {
     const { stale } = classifyEngineProcesses([
       entry({ command: `bun ${ENGINE} --extension ${PLUGIN} explain app-server` }),
     ])
-    expect(formatStaleEngineLines(stale)[0]).toContain("orphaned by a signaled launcher")
+    expect(renderFindings(staleEngineFindings(stale))[0]).toContain("orphaned by a signaled launcher")
   })
 
-  test("#given an orphaned app-server daemon #when reaped by pid #then it is signalled like any stale engine", () => {
+  test("#given an orphaned app-server daemon #when reaped by pid #then it is signalled like any stale engine", async () => {
     const signalled: number[] = []
     const daemon = entry({ command: `${runtime} app-server` })
-    const result = reapStaleEngines(["75183"], {
+    const result = await reapStaleEngines(["75183"], {
       list: () => [daemon],
       kill: (pid: number) => {
         signalled.push(pid)

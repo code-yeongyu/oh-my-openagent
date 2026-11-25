@@ -4,7 +4,8 @@ import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { spawnSync } from "node:child_process"
 import { fileURLToPath } from "node:url"
-import { latestFromDistTags, runDoctor } from "../bin/lib/doctor.js"
+import { latestFromDistTags } from "../bin/lib/diagnostics-install-checks.js"
+import { runDoctor } from "../bin/lib/doctor.js"
 import { fetchNpmDistTagsSync } from "../bin/lib/npm-dist-tags.js"
 import { packageManifest, updateTarget } from "../bin/lib/package-paths.js"
 
@@ -78,7 +79,9 @@ function run(fixture: Fixture, env: NodeJS.ProcessEnv = {}) {
   })
 }
 
-function captureDoctor(options: Record<string, unknown> = {}): { stdout: string; exitCode: number | undefined } {
+async function captureDoctor(
+  options: Record<string, unknown> = {},
+): Promise<{ stdout: string; exitCode: number | undefined }> {
   const output: string[] = []
   const originalLog = console.log
   const originalExitCode = process.exitCode
@@ -87,7 +90,7 @@ function captureDoctor(options: Record<string, unknown> = {}): { stdout: string;
   }
   process.exitCode = undefined
   try {
-    runDoctor({ harnesses: [] }, [], {
+    await runDoctor({ harnesses: [] }, [], {
       list: () => [],
       ...options,
     })
@@ -118,9 +121,9 @@ afterEach(() => {
 describe("omo doctor edition summary", () => {
   describe("#given a complete packaged installation", () => {
     describe("#when diagnostics run", () => {
-      test("#then the summary names Native edition, the installed version with engine, and Latest", () => {
+      test("#then the summary names Native edition, the installed version with engine, and Latest", async () => {
         const distTags = { beta: "5.0.0-0.beta.99", latest: "4.9.0" }
-        const captured = captureDoctor({ fetchDistTags: () => distTags })
+        const captured = await captureDoctor({ fetchDistTags: () => distTags })
         const version = packageManifest().version
         const expectedLatest = latestFromDistTags(distTags, version)
 
@@ -131,8 +134,8 @@ describe("omo doctor edition summary", () => {
         )
       })
 
-      test("#then the update command is the next line and is copyable on its own", () => {
-        const captured = captureDoctor({ fetchDistTags: () => ({ beta: "5.0.0-0.beta.99", latest: "4.9.0" }) })
+      test("#then the update command is the next line and is copyable on its own", async () => {
+        const captured = await captureDoctor({ fetchDistTags: () => ({ beta: "5.0.0-0.beta.99", latest: "4.9.0" }) })
         const summary = editionLine(captured.stdout)
         expect(lineAfter(captured.stdout, summary)).toBe(`INFO Update: ${updateTarget().command}`)
       })
@@ -175,8 +178,8 @@ describe("omo doctor edition summary", () => {
   })
 
   describe("#given the registry cannot be reached", () => {
-    test("#then Latest is could not check and diagnostics still pass", () => {
-      const captured = captureDoctor({
+    test("#then Latest is could not check and diagnostics still pass", async () => {
+      const captured = await captureDoctor({
         fetchDistTags: () => {
           throw new Error("ECONNREFUSED")
         },

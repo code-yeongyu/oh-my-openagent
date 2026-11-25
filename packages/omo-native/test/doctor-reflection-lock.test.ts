@@ -318,7 +318,7 @@ describe("omo doctor reflection lock report (#10377)", () => {
     expect(lines).toHaveLength(1)
     expect(lines[0]?.length).toBeGreaterThan(0)
   })
-  test("#given precomputed report lines #when omo doctor runs #then it prints them", () => {
+  test("#given precomputed report lines #when omo doctor runs #then it prints them", async () => {
     const logged: string[] = []
     const original = console.log
     const originalExitCode = process.exitCode
@@ -326,7 +326,7 @@ describe("omo doctor reflection lock report (#10377)", () => {
       logged.push(args.join(" "))
     }
     try {
-      runDoctor({ harnesses: [] }, [], {
+      await runDoctor({ harnesses: [] }, [], {
         list: () => [],
         fetchDistTags: () => null,
         daemonReport: () => [],

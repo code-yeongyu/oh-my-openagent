@@ -619,7 +619,7 @@ describe("omo doctor migration checks", () => {
   })
 
   describe("#given runDoctor with an injected migration environment", () => {
-    test("#then the migration lines follow the Update line", () => {
+    test("#then the migration lines follow the Update line", async () => {
       const sandbox = createSandbox()
       installNpmLegacy(sandbox)
       installBunNative(sandbox)
@@ -630,7 +630,7 @@ describe("omo doctor migration checks", () => {
         output.push(String(value))
       }
       try {
-        runDoctor({ harnesses: [] }, [], {
+        await runDoctor({ harnesses: [] }, [], {
           list: () => [],
           fetchDistTags: () => null,
           daemonReport: () => [],
