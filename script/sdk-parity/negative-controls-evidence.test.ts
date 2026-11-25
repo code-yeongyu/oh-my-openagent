@@ -95,16 +95,24 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
           input: {},
           kind: "effect",
           expect: [{ port: "host", op: "spawn" }],
-          fault: { port: "store", op: "listSessions", fault: "lost_reply" },
+          fault: { port: "clock", op: "listSessions", fault: "lost_reply" },
         },
       ],
     }
-    expect(portProblems([faulty], { host: ["listSessions"], store: ["listSessions"] })).toEqual([
+    expect(portProblems([faulty], { host: ["listSessions"], clock: ["listSessions"] })).toEqual([
       "scenario threads.locate/by-id expects host.spawn, which is not a port operation",
       "scenario threads.locate/by-id injects lost_reply on host.kill, which is not a port operation",
-      "scenario threads.locate/by-id step 2 injects lost_reply on store; it means something only on host, remote",
+      "scenario threads.locate/by-id step 2 injects lost_reply on clock; it means something only on host, remote, store",
       "scenario threads.locate/by-id gives state to vault, which is not a port",
     ])
+  })
+
+  test("#given a lost reply on the gateway store's committed reservation (P1a's create recovery) #then it is a valid fault", () => {
+    const recovery: TableScenario = {
+      ...scenario("by-id", undefined),
+      fault: { port: "store", op: "idempotency_put", fault: "lost_reply", occurrence: 2 },
+    }
+    expect(portProblems([recovery], { host: ["listSessions"], store: ["idempotency_put"] })).toEqual([])
   })
 
   test("#given the first correct closure of a gap with evidence matching every scenario #then the baseline admits it (positive control)", async () => {
