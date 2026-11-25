@@ -1,10 +1,17 @@
 import { isAbsolute } from "node:path"
 
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import { commandWaitMs } from "../../call-budget/call-deadline"
 import type { ThreadToolResult } from "../contracts"
 import { threadToolFailure } from "../errors"
 import { endpointOutcomeFailure } from "./outcome"
-import { type JsonObject, type RemoteCommandOutcome, type RemoteSessionRow, type RemoteThreadSurface } from "./ports"
+import {
+  rowStatus,
+  type JsonObject,
+  type RemoteCommandOutcome,
+  type RemoteSessionRow,
+  type RemoteThreadSurface,
+} from "./ports"
 import { replyData } from "./remote-ops"
 
 // What an engine that predates `find_session` (senpi#6429) answers it with; relayd refuses a record type the engine's
@@ -34,6 +41,9 @@ const isFound = (outcome: RemoteCommandOutcome): boolean => {
   return recordOf(data["found"]) !== undefined || data["ambiguous"] === true
 }
 
+const diskOnly = (outcome: RemoteCommandOutcome): boolean =>
+  outcome.kind === "ok" && recordOf(replyData(outcome.response)["found"])?.["open"] === false
+
 /** The whole fallback (every listed engine) shares this budget, so a non-live send never waits minutes (omo#14271 review L1). */
 const FALLBACK_TOTAL_MS = 15_000
 
@@ -61,10 +71,20 @@ type FindSessionAnswer = {
   readonly uncertain: boolean
 }
 
-async function findSession(remote: RemoteThreadSurface, device: string, thread: string): Promise<FindSessionAnswer> {
+async function findSession(
+  remote: RemoteThreadSurface,
+  device: string,
+  thread: string,
+  listedLive = false,
+): Promise<FindSessionAnswer> {
   const rpc = { type: "find_session", durableSessionId: thread }
   const primary = await remote.sessions.endpointCommand(device, rpc)
-  if (!lacksFindSession(primary) || remote.sessions.endpointKeys === undefined)
+  const unlisted =
+    primary.kind === "refused" && (primary.reason === "no_primary_endpoint" || primary.reason === "route_unlisted")
+  // After a live row loses its route, finding its file on the primary does not establish that it
+  // is parked: the primary's open flag only covers its own registry.
+  const seekOwner = unlisted || (listedLive && diskOnly(primary))
+  if ((!seekOwner && !lacksFindSession(primary)) || remote.sessions.endpointKeys === undefined)
     return { outcome: primary, listed: false, uncertain: false }
   let listed: { readonly keys: readonly string[]; readonly primary?: string }
   try {
@@ -75,16 +95,22 @@ async function findSession(remote: RemoteThreadSurface, device: string, thread: 
   }
   const deadline = Date.now() + FALLBACK_TOTAL_MS
   let uncertain = false
+  let disk = diskOnly(primary) ? primary : undefined
   for (const endpoint of listed.keys) {
-    // The primary was already asked; skip it by the key the device names, never by position.
-    if (endpoint === listed.primary) continue
-    const remaining = deadline - Date.now()
+    // Skip a primary that answered. An unlisted route reached no engine; a freshly listed primary
+    // may itself be the owner that just came back.
+    if (!unlisted && endpoint === listed.primary) continue
+    const remaining = commandWaitMs(deadline - Date.now())
     if (remaining <= 0) break
     const outcome = await remote.sessions.endpointCommand(device, rpc, { endpoint, waitMs: remaining })
-    if (isFound(outcome)) return { outcome, listed: true, uncertain: false }
+    if (isFound(outcome)) {
+      // Engines sharing an agent dir see the same file. Only its owner sees it open.
+      if (seekOwner && diskOnly(outcome)) disk ??= outcome
+      else return { outcome, listed: true, uncertain: false }
+    }
     if (isNonAnswer(outcome)) uncertain = true
   }
-  return { outcome: primary, listed: true, uncertain }
+  return { outcome: disk ?? primary, listed: true, uncertain }
 }
 
 const refusal = (
@@ -110,7 +136,7 @@ export async function holderView(remote: RemoteThreadSurface, row: RemoteSession
   // find_session looks a session up by its durable id; a row without one cannot be looked up.
   const thread = row.durable_id ?? ""
   if (thread === "") return "unknown"
-  const { outcome } = await findSession(remote, row.device, thread)
+  const { outcome } = await findSession(remote, row.device, thread, rowStatus(row) === "live")
   if (outcome.kind !== "ok") return "unknown"
   const data = replyData(outcome.response)
   const found = recordOf(data["found"])
