@@ -13,6 +13,8 @@ export async function readReceipt(
   thread: string,
   id: string,
   now: number,
+  /** The principal this caller's deliveries on this device carry: a session's own, or a script's `cli:<uid>`. */
+  localPrincipal = `session:${caller}`,
 ): Promise<ThreadReceiptResult | ThreadDataError> {
   // Only the authenticated caller's existing send may authorize a remote lookup.
   const request = { now, principal: `session:${caller}`, delivery_id: id }
@@ -28,7 +30,7 @@ export async function readReceipt(
     kind: "ok",
     thread,
     delivery_id: id,
-    outcome: await store.receiptOutcome({ ...request, target_durable_id: thread }),
+    outcome: await store.receiptOutcome({ ...request, principal: localPrincipal, target_durable_id: thread }),
   }
 }
 

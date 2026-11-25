@@ -113,6 +113,11 @@ export function threadsNamespace(options: {
         onRoot((await thread().create(input as Parameters<ThreadCore["create"]>[0])) as result.ThreadCreateResult)
       )
     },
+    "threads.receipt": async (input) => onRoot((await thread().receipt(input)) as result.ThreadReceiptResult),
+    "threads.readAfterWait": async (input) =>
+      unbuilt("threads.readAfterWait", input, [...READ, "wait_ms"]) ??
+      onRoot((await thread().readAfterWait(input)) as result.ThreadReadAfterWaitResult),
+    "threads.messages": async (input) => onRoot((await thread().messages(input)) as result.ThreadMessagesResult),
     "threads.interrupt": async (input) => onRoot((await thread().interrupt(input)) as result.ThreadInterruptResult),
     "threads.close": async (input = {}) => onRoot((await thread().close(input)) as result.ThreadCloseResult),
     "threads.rename": async (input = {}) => onRoot((await thread().rename(input)) as result.ThreadRenameResult),
