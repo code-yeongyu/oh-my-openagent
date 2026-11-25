@@ -122,6 +122,17 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(portProblems([scenario("by-id", undefined)], { host: ["list"] })).toEqual([
       "scenario threads.locate/by-id expects host.listSessions, which is not a port operation",
     ])
+    const faulty: TableScenario = {
+      ...scenario("by-id", undefined),
+      given: [{ port: "vault", state: {} }],
+      faults: [{ port: "host", op: "kill", fault: "timeout" }],
+      then: [{ input: {}, kind: "effect", expect: [{ port: "host", op: "spawn" }] }],
+    }
+    expect(portProblems([faulty], { host: ["listSessions"] })).toEqual([
+      "scenario threads.locate/by-id expects host.spawn, which is not a port operation",
+      "scenario threads.locate/by-id injects timeout on host.kill, which is not a port operation",
+      "scenario threads.locate/by-id gives state to vault, which is not a port",
+    ])
   })
 
   test("#given the first correct closure of a gap with evidence matching every scenario #then the baseline admits it (positive control)", async () => {

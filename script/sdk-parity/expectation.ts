@@ -21,6 +21,24 @@ export type TableScenario = {
   readonly invalid?: true
   readonly refusal?: string
   readonly expect: readonly Expectation[]
+  /** Declarative fixture state of a fake port before the call (sessions it lists, a stored idempotency record, a device's online flag). */
+  readonly given?: readonly { readonly port: string; readonly state: Readonly<Record<string, unknown>> }[]
+  /** One injected fault (design 4.6), on the Nth call of that op (default 1). */
+  readonly faults?: readonly {
+    readonly port: string
+    readonly op: string
+    readonly fault: "lost_reply" | "timeout" | "lock_timeout" | "unauthorized" | "refused"
+    readonly occurrence?: number
+  }[]
+  /** Where the addressed thread lives, so a matched pair of 7.3 is two scenarios with the same input. */
+  readonly target?: "this_device" | "other_device"
+  /** Calls made after the first, in order, on the state the first left (a retry under the same key after a lost reply). */
+  readonly then?: readonly {
+    readonly input: Readonly<Record<string, unknown>>
+    readonly kind: "effect" | "refusal"
+    readonly refusal?: string
+    readonly expect: readonly Expectation[]
+  }[]
 }
 
 export type ScenarioTableFile = {
