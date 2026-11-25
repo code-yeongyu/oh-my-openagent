@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { askHost } from "../../../../senpi-task/src/runners/rpc-host/host-request"
 import { classifyWarmReply, type WarmAnswer } from "../../../../senpi-task/src/runners/rpc-host/host-warm-reply"
 
-import { resolveAddress } from "./address"
+import { resolve } from "./address"
 import { toThreadAddressEntries, type AddressEntry } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
 import {
@@ -303,15 +303,6 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
     return await locateControl(controls, await view(), address, allScope, UNKNOWN_CALLER)
   }
 
-  // The shared resolver's context, as far as it is fixed for this SDK instance (the local book each call builds
-  // is spread in per call). `self` never resolves for the CLI (UNKNOWN_CALLER), exactly as before.
-  const resolveContext = (local: readonly ThreadAddressEntry[]) => ({
-    remote: options.remote,
-    callerWorkspaceRoot: surface.callerWorkspaceRoot(),
-    local,
-    callerId: UNKNOWN_CALLER,
-  })
-
   function named(sent: DeliveryOutcome): ThreadSdkSendResult {
     if (sent.kind !== "ok") return sent
     const { thread_id, ...facts } = sent
@@ -357,7 +348,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         const routed = await sendThread(
           controls,
           pipeline,
-          resolveAddress,
+          resolve,
           current,
           {
             thread: request.thread,
@@ -378,14 +369,15 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         const refused = unknownKeys(request, LOCATE_KEYS)
         if (refused !== undefined) return refused
         const current = await view()
-        const resolved = await resolveAddress(
-          resolveContext(toThreadAddressEntries(addressBook(surface, current))),
+        const book = toThreadAddressEntries(addressBook(surface, current))
+        const resolved = await resolve(
+          { remote: options.remote, workspace: surface.callerWorkspaceRoot(), book: () => book },
           request.thread,
-          { all_scope: request.all_scope, probe: true },
+          { operation: "locate", principal: { kind: "script" }, scope: { all_scope: request.all_scope }, probe: true },
         )
         if (resolved.kind === "error") return { kind: "error", error: resolved } as const
         // A thread on another device: the same located shape, carrying its device and the address every tool takes.
-        if (resolved.where.kind === "device") {
+        if (resolved.holder.kind === "device") {
           const { thread_id, name, cwd, status } = resolved.entry
           return {
             kind: "ok",
@@ -398,17 +390,17 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
               endpoint: null,
               surface: null,
               alive: status === "live",
-              device: resolved.where.row.device,
-              address: resolved.address,
+              device: resolved.holder.row.device,
+              address: resolved.thread,
             },
           } as const
         }
-        const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.thread)
+        const entries = addressBook(surface, current).filter((entry) => entry.thread_id === resolved.id)
         const entry = entries.find((candidate) => candidate.alive) ?? entries[0]
         if (entry === undefined)
           return fail(
             "not_found",
-            `Thread ${resolved.thread} is not in the address book.`,
+            `Thread ${resolved.id} is not in the address book.`,
             "Run omo thread list --all-scope.",
           )
         const { thread_id, title, cwd, status, session_path, endpoint, surface: where, alive } = entry
