@@ -14,7 +14,7 @@ const Optional = Type.Optional
 
 /** A stream the caller already holds; the core reads it once. A string, a path or an environment name is not one. */
 export type ReadableHandle = Readable | ReadableStream<Uint8Array>
-export const Handle = Type.Unsafe<ReadableHandle>({ type: "object" })
+const Handle = Type.Unsafe<ReadableHandle>({ type: "object" })
 
 const callback = <Fn>() => Type.Unsafe<Fn>({})
 const Signal = Optional(Type.Unsafe<AbortSignal>({}))
@@ -23,7 +23,7 @@ const Signal = Optional(Type.Unsafe<AbortSignal>({}))
  * Where a credential goes (5.2): an admitted terminal, or a peer process the core opens its channel to and verifies by
  * executable identity. A pid alone is not an identity, so the peer is named with its start time; nothing names a path.
  */
-export const Destination = Type.Union([
+const Destination = Type.Union([
   Type.Object({ kind: Type.Literal("terminal") }, closed),
   Type.Object({ kind: Type.Literal("peer"), pid: Pid, started_at: Name }, closed),
 ])

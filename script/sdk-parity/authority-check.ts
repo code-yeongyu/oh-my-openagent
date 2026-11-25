@@ -115,7 +115,7 @@ export type CallAlias = {
 
 // The calls a row of section 4 names: each backticked token that is a registry row, or completes one against the last
 // full name before it (`daemon.ensure`, `stop` is daemon.stop), or a wildcard (`account.store.*`). Other tokens are prose.
-export function documentCalls(capability: string, ids: ReadonlySet<string>, aliases: readonly CallAlias[]): string[] {
+function documentCalls(capability: string, ids: ReadonlySet<string>, aliases: readonly CallAlias[]): string[] {
   const calls: string[] = []
   let prefix = ""
   for (const match of capability.matchAll(/`([^`]+)`/g)) {
