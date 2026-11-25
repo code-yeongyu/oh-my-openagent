@@ -42,6 +42,21 @@ const started = (fields: Partial<CustodyRecord> & { readonly at: string; readonl
     ...fields,
   })
 
+// An operation past retention that closed: both its records are the prune's to drop.
+const closedLongAgo = (operation_id: string) => [
+  started({ at: "2020-01-01T00:00:00.000Z", operation_id }),
+  JSON.stringify({
+    id: `t-${operation_id}`,
+    at: "2020-01-01T00:00:00.000Z",
+    operation_id,
+    principal: { kind: "session", id: "01-session" },
+    capability: "account.store.enable",
+    destination: "store",
+    phase: "terminal",
+    outcome: "ok",
+  }),
+]
+
 async function deadPid(): Promise<number> {
   const child = Bun.spawn(["true"])
   await child.exited
@@ -94,7 +109,7 @@ describe("the custody log's recovery", () => {
 
   test("#given a record past retention and twenty calls from twenty logs at once #then the prune loses none of theirs", async () => {
     const home = await temporaryHome()
-    seed(home, [started({ at: "2020-01-01T00:00:00.000Z", operation_id: "op-expired" })])
+    seed(home, [...closedLongAgo("op-expired")])
     await Promise.all(
       Array.from({ length: 20 }, (_, index) =>
         audited(custodyLog({ home, principal: { kind: "script", id: String(index) } }), "account.signOut", async () =>
@@ -114,7 +129,7 @@ describe("the custody log's recovery", () => {
     const home = await temporaryHome()
     const odd = ["null", "5", '"text"', "[]", "{}", "not json", '{ "spaced" :  true }']
     seed(home, [
-      started({ at: "2020-01-01T00:00:00.000Z", operation_id: "op-expired" }),
+      ...closedLongAgo("op-expired"),
       ...odd,
       started({ at: new Date().toISOString(), operation_id: "op-dead", pid: await deadPid() }),
     ])
@@ -126,6 +141,31 @@ describe("the custody log's recovery", () => {
         .filter((record) => record.operation_id === "op-dead")
         .map((record) => record.outcome),
     ).toEqual([undefined, "interrupted"])
+  })
+
+  test("#given a started record past retention whose operation never closed #then the prune keeps it; a closed one past retention goes", async () => {
+    const home = await temporaryHome()
+    const old = "2020-01-01T00:00:00.000Z"
+    seed(home, [
+      started({ at: old, operation_id: "op-open", pid: livePid() }),
+      started({ at: old, operation_id: "op-closed" }),
+      JSON.stringify({
+        id: "t",
+        at: old,
+        operation_id: "op-closed",
+        principal: { kind: "session", id: "01-session" },
+        capability: "account.store.enable",
+        destination: "store",
+        phase: "terminal",
+        outcome: "ok",
+      }),
+    ])
+    await custodyLog({ home, principal }).refused("account.signOut", "sender_not_allowed")
+    expect(
+      records(home)
+        .map((record) => `${record.operation_id} ${record.phase}`)
+        .filter((row) => row.startsWith("op-")),
+    ).toEqual(["op-open started"])
   })
 
   test("#given a log that already exists readable by others #when the next record is written #then the file is owner-only", async () => {

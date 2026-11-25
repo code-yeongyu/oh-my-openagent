@@ -6,7 +6,8 @@ import type { CustodyRecord } from "./custody-log"
 // the log's lock: an operation whose starter is provably gone is closed as `interrupted`, under the operation's own
 // principal and capability, with the cause as its code. A starter that is alive is never closed by anyone but itself,
 // however long it runs; only a `started` record that names no process falls back to a deadline. Records past
-// retention are dropped; every other line, a line that does not parse included, is kept byte for byte.
+// retention whose operation is closed are dropped; every other line, a line that does not parse included, is kept byte
+// for byte.
 
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000
 /** For a `started` record that names no process: past this, nothing is waiting on it. */
@@ -36,15 +37,22 @@ function interruption(record: CustodyRecord, now: number): "starter_ended" | "de
   return now - Date.parse(record.at) >= OPERATION_DEADLINE_MS ? "deadline_passed" : undefined
 }
 
-const expired = (record: CustodyRecord | undefined, now: number): boolean => {
+// Past retention, and its operation closed (security design 8.2): an operation still open keeps its records.
+const expired = (record: CustodyRecord | undefined, now: number, closed: ReadonlySet<string>): boolean => {
   const at = record === undefined ? Number.NaN : Date.parse(record.at)
-  return Number.isFinite(at) && now - at >= RETENTION_MS
+  return record !== undefined && closed.has(record.operation_id) && Number.isFinite(at) && now - at >= RETENTION_MS
 }
 
 export async function recoverCustodyLog(path: string, now: number): Promise<void> {
   const text = await readFile(path, "utf8").catch(() => "")
   const lines = text.split("\n").filter(Boolean)
-  const kept = lines.filter((line) => !expired(parse(line), now))
+  const closed = new Set(
+    lines
+      .map(parse)
+      .filter((record) => record?.phase === "terminal")
+      .map((record) => record?.operation_id ?? ""),
+  )
+  const kept = lines.filter((line) => !expired(parse(line), now, closed))
   if (kept.length !== lines.length) {
     const staging = `${path}.${process.pid}.tmp`
     await writeFile(staging, kept.map((line) => `${line}\n`).join(""), { mode: 0o600 })
