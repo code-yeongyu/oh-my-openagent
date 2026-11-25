@@ -22,6 +22,8 @@ export type EffectEvidence = {
   readonly input: Readonly<Record<string, unknown>>
   /** The state the scenario's fakes start from; every producer states it, an empty list when the scenario gives none. */
   readonly given: readonly unknown[]
+  /** The scenario's other fixture forms (`before` calls, a `callbacks` script), when it uses them. */
+  readonly setup?: Readonly<Record<string, unknown>>
   /** Set when the call's answer differed between two runs of the same input after the goldens' normalisation. */
   readonly unstableAnswer?: true
   readonly expect: readonly Expectation[]
@@ -162,7 +164,8 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              JSON.stringify(canonical(a.given)) === JSON.stringify(canonical(b.given)) &&
+              JSON.stringify(canonical([a.given, a.setup ?? {}])) ===
+                JSON.stringify(canonical([b.given, b.setup ?? {}])) &&
               (a.kind !== b.kind || effectOf(a) !== effectOf(b) || answersDiffer(a, b)),
           ),
         ),

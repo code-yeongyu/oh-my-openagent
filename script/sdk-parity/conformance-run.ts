@@ -162,6 +162,19 @@ export async function runEffectScenarios(
   return evidence
 }
 
+// The scenario's other fixture forms (calls run before it, a scripted callback): part of where it starts, so two records
+// that differ in them never pair as proof of an input's effect.
+const SETUP_FIELDS = ["before", "callbacks"] as const
+const fixtureSetup = (scenario: TableScenario): { readonly setup?: Readonly<Record<string, unknown>> } => {
+  const setup = Object.fromEntries(
+    SETUP_FIELDS.flatMap((field) => {
+      const value: unknown = Reflect.get(scenario, field)
+      return value === undefined ? [] : [[field, value]]
+    }),
+  )
+  return Object.keys(setup).length === 0 ? {} : { setup }
+}
+
 // Each record's answer as the goldens normalise it: the fixture's own directory under a fixed name.
 const answerText = (answered: unknown, sandbox: string | undefined): string =>
   normalizer(sandbox === undefined ? [] : [[sandbox, "<sandbox>"]])(JSON.stringify(answered ?? null))

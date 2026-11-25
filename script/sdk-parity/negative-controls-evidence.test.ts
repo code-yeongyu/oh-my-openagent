@@ -91,6 +91,9 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(
       problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }, [{ port: "host", state: { moved: true } }])),
     ).toContain(uncovered)
+    const [setupA, setupB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (setupA === undefined || setupB === undefined) throw new Error("no pair")
+    expect(problems([setupA, { ...setupB, setup: { before: [{ row: "threads.create" }] } }])).toContain(uncovered)
     const [answeredA, silentB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
     if (answeredA === undefined || silentB === undefined) throw new Error("no pair")
     const { answer: _dropped, ...withoutAnswer } = silentB
