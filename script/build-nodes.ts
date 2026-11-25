@@ -97,7 +97,7 @@ export const BUILD_NODES: BuildNode[] = [
  * binary build.
  */
 export const BUILD_PROFILES: Record<string, readonly string[]> = {
-  "omo-native": ["lsp-daemon", "ast-grep-mcp", "service-auth"],
+  "omo-native": ["lsp-daemon", "ast-grep-mcp", "service-auth", "remote-sdk"],
 }
 
 export function selectBuildNodes(
