@@ -175,6 +175,17 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(absent.given).toBeUndefined()
   })
 
+  test("#given a row resolved and filled by another slice #when no run carries its evidence #then it still fails by name (fixture scoping leaves no hole)", () => {
+    const filled = builtRows.map((row) =>
+      row.id === "devices.list" ? { ...row, scenarios: { effect: ["devices.list/plain"], refusal: [] } } : row,
+    )
+    const resolved = new Set([...open].filter((id) => id !== "devices.list"))
+    expect(open.has("devices.list")).toBe(true)
+    expect(conformanceProblems(filled, resolved, [], CONTEXT)).toContainEqual(
+      "row devices.list: scenario devices.list/plain has no run record at the head",
+    )
+  })
+
   test("#given the matching rules #then args are a subset, count 0 means never, result is never compared", () => {
     const observed: ObservedCall[] = [{ port: "store", op: "read", args: { id: "a", extra: 1 } }]
     expect(
