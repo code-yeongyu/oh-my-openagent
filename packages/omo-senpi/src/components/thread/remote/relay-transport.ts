@@ -476,6 +476,15 @@ export function createRelayTransport(
       )
     }
     const located = await remote.sessions.locate(listed.device, listed.durable_id ?? "")
+    // #15004: the holder said an engine runs it, yet its host routes no key for it now (an engine that missed its routing
+    // deadline on a starved host). Nothing proves it stopped and nothing was dispatched: a busy host to retry.
+    if (located.kind !== "ok" && located.reason === "route_unlisted")
+      return fail(
+        "host_unavailable",
+        `Device ${listed.device} runs ${thread} but did not route it just now (route_unlisted); nothing was sent.`,
+        "Retry in a few seconds: the device may be too busy to answer its routing now.",
+        { ...details, reason: "route_unlisted" },
+      )
     if (located.kind !== "ok")
       return fail(
         "not_resumable",
