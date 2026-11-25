@@ -13,7 +13,7 @@ import { createCliDriver } from "./drivers/cli.ts"
 import { type Driver, isRecord } from "./drivers/driver.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
 import { redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
-import { type KeyedRecord, keyedTable, runKeyedPairs } from "./keyed.ts"
+import { type KeyedRecord, keyedTable, openKeyedThread, runKeyedPairs } from "./keyed.ts"
 import { SCENARIO } from "./scenario.ts"
 import { runSteps } from "./steps.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
@@ -61,9 +61,17 @@ async function runKeyed(world: World): Promise<KeyedRecord[]> {
     await Promise.all(SURFACES.map(async (surface) => [surface, await driverFor(surface, world)] as const)),
   ) as Record<Surface, Driver>
   try {
-    const before = await world.observer.keys()
-    const opened = await drivers.cli.run({ op: "create", input: { device: DEVICE_B.id, prompt: "x1a keyed pairs" } })
-    return await runKeyedPairs(drivers, opened.thread, await world.observer.adopt(before), world.observer)
+    const opened = await openKeyedThread(drivers.cli, DEVICE_B.id, world.observer)
+    return await runKeyedPairs(
+      drivers,
+      opened.thread,
+      opened.key,
+      world.observer,
+      undefined,
+      opened.stalled
+        ? "the thread for the pairs did not open within the step deadline (the harness: no answer to attribute)"
+        : undefined,
+    )
   } finally {
     await Promise.all(SURFACES.map((surface) => drivers[surface].close()))
   }

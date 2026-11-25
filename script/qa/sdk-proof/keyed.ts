@@ -29,6 +29,7 @@ export async function runKeyedPairs(
   key: string | undefined,
   observer: Pick<Observer, "judge">,
   deadlineMs = KEYED_DEADLINE_MS,
+  openFailure = "no thread was opened on B for the pairs",
 ): Promise<KeyedRecord[]> {
   const surfaces = Object.keys(drivers) as Surface[]
   const pairs = surfaces.flatMap((first) =>
@@ -110,6 +111,26 @@ export async function runKeyedPairs(
     })
   }
   return records
+}
+
+/**
+ * Opens the thread the pairs share, through the CLI, under the same step deadline: a stalled open is the harness's, and
+ * every pair is then not reached (runKeyedPairs with no thread).
+ */
+export async function openKeyedThread(
+  cli: Driver,
+  device: string,
+  observer: Pick<Observer, "keys" | "adopt">,
+  deadlineMs = KEYED_DEADLINE_MS,
+): Promise<{ readonly thread: string | undefined; readonly key: string | undefined; readonly stalled: boolean }> {
+  const before = await observer.keys()
+  const opened = await withinStep(
+    (signal) => cli.run({ op: "create", input: { device, prompt: "x1a keyed pairs" } }, signal),
+    "cli open",
+    deadlineMs,
+  )
+  if ("stalled" in opened) return { thread: undefined, key: undefined, stalled: true }
+  return { thread: opened.thread, key: await observer.adopt(before), stalled: false }
 }
 
 export const keyedTable = (records: readonly KeyedRecord[]): string =>

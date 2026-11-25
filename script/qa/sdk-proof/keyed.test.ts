@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Driver } from "./drivers/driver.ts"
-import { runKeyedPairs } from "./keyed.ts"
+import { openKeyedThread, runKeyedPairs } from "./keyed.ts"
 import type { Surface } from "./evidence.ts"
 import { OPS } from "./scenario.ts"
 
@@ -42,5 +42,20 @@ describe("the keyed pairs on a stalled surface", () => {
     expect(records.slice(1).every((record) => record.cell === "not reached")).toBe(true)
     expect(signals.map((signal) => signal.aborted)).toEqual([true])
     expect(judged).toEqual([])
+  })
+})
+
+describe("opening the keyed pairs' thread", () => {
+  test("#given a CLI open that never answers #when the thread is opened #then the call is aborted and no thread is taken", async () => {
+    // given
+    const signals: AbortSignal[] = []
+    const observer = { keys: async () => new Set<string>(), adopt: async () => "adopted" }
+
+    // when
+    const opened = await openKeyedThread(stalling(signals), "dev-b", observer, 20)
+
+    // then
+    expect(opened).toEqual({ thread: undefined, key: undefined, stalled: true })
+    expect(signals.map((signal) => signal.aborted)).toEqual([true])
   })
 })
