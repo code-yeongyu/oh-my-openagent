@@ -56,7 +56,13 @@ describe("the idempotency key on a thread SDK control call", () => {
       const lost = await interrupt()
       const again = await interrupt()
       expect(interruptsOn(a.sent)).toBe(1)
-      expect(again).toEqual(lost)
+      // The uncertain answer is the relay's own sentence, which carries no template provenance: the receipt records its
+      // code and details, and a repeat answers those with the code's fixed text (#14951 ruling c).
+      const { message: _message, next_action: _next, ...recorded } = (lost as { error: Record<string, unknown> }).error
+      expect(again as unknown).toEqual({
+        kind: "error",
+        error: { ...recorded, message: expect.any(String), next_action: expect.any(String) },
+      })
     },
   )
 

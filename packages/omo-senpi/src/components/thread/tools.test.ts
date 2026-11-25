@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { parseThreadParams, threadToolParamSchemas, type ThreadToolName, type ThreadToolResult } from "./contracts"
+import { storedKey } from "./control/receipt-record"
 import type { GatewayEndpointRef } from "./gateway/adapter"
 import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
@@ -1344,7 +1345,12 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
   ): Promise<void> {
     const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
     if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
-    const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
+    // The book stores the key as its hash over the scope (#14951).
+    const scope = {
+      principal: "session:caller",
+      operation,
+      idempotency_key: storedKey("session:caller", operation, String(args["idempotency_key"])),
+    }
     const now = Date.now()
     expect(await f.store.toolReceiptBegin({ ...scope, now, args_hash: hashArgs(parsed.value) })).toEqual({
       kind: "accepted",
@@ -1405,6 +1411,15 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       rename: await run("thread_rename", renamed, "caller"),
       read: await run("thread_read", ambiguous, "caller"),
     }
+    // A keyed read records only its outcome code and a repeat runs the read again (#14951 ruling e): the stored list and
+    // read are never answered, each repeat answers what the same read answers now.
+    const now = {
+      list: await run("thread_list", { idempotency_key: "list-now" }, "caller"),
+      read: await run("thread_read", { thread: "twin", idempotency_key: "read-now" }, "caller"),
+    }
+    // The fixture's listing stamps created_at at each read, so two reads differ there only.
+    const unstamped = (answer: unknown): unknown =>
+      JSON.parse(JSON.stringify(answer), (key, value: unknown) => (key === "created_at" ? undefined : value))
 
     // then: the whole result, in the shape a current call answers
     const row = {
@@ -1418,7 +1433,9 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       surface: "daemon",
       state: "idle",
     }
-    const candidates = oldCandidates.map(({ id, ...rest }) => ({ thread: id, ...rest }))
+    expect(JSON.stringify([replayed.list, replayed.read])).not.toContain("/tmp/thread-tools-test.sock")
+    expect(JSON.stringify(replayed.read)).not.toContain("Two threads are named twin.")
+    expect(unstamped(replayed.list)).toStrictEqual(unstamped(now.list))
     expect(replayed).toStrictEqual({
       create: {
         kind: "ok",
@@ -1427,17 +1444,9 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
         deduplicated: true,
         prompt: { delivery: { kind: "started", turn_id: "1" }, deduplicated: false },
       },
-      list: { kind: "ok", threads: [row], scope: "workspace" },
+      list: replayed.list,
       rename: { kind: "ok", thread: "dur-peer", name: "Renamed" },
-      read: {
-        kind: "error",
-        error: {
-          code: "ambiguous_target",
-          message: "Two threads are named twin.",
-          next_action: "Pass one thread.",
-          details: { candidates },
-        },
-      },
+      read: now.read,
     } as unknown as typeof replayed)
     expect(f.setSessionName).not.toHaveBeenCalled()
     expect(f.prompt).not.toHaveBeenCalled()
@@ -1498,11 +1507,22 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     const run = runner(f, "caller")
     const replayed: string[] = []
     for (const receipt of receipts) replayed.push(JSON.stringify(await run(receipt.operation, receipt.args, "caller")))
+    // A keyed list or read runs again on a repeat (#14951 ruling e): it answers what the same read answers now.
+    // The fixture's listing stamps created_at at each read, so two reads differ there only.
+    const unstamped = (answer: string): string =>
+      JSON.stringify(JSON.parse(answer, (key, value: unknown) => (key === "created_at" ? undefined : value)))
+    const rerun = async (operation: ThreadToolName, args: Record<string, unknown>) =>
+      unstamped(JSON.stringify(await run(operation, { ...args, idempotency_key: `${operation}-now` }, "caller")))
 
     // then
-    expect(replayed).toEqual(
-      receipts.map(({ operation, result }) =>
-        JSON.stringify(operation === "thread_create" ? { ...result, deduplicated: true } : result),
+    const rereads = (operation: ThreadToolName | undefined) => operation === "thread_list" || operation === "thread_read"
+    expect(replayed.map((answer, index) => (rereads(receipts[index]?.operation) ? unstamped(answer) : answer))).toEqual(
+      await Promise.all(
+        receipts.map(async ({ operation, args, result }) =>
+          rereads(operation)
+            ? await rerun(operation, args)
+            : JSON.stringify(operation === "thread_create" ? { ...result, deduplicated: true } : result),
+        ),
       ),
     )
     expect(f.setSessionName).not.toHaveBeenCalled()

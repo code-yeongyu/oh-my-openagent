@@ -4,8 +4,9 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "../gateway/constants"
 import { hashArgs } from "../gateway/hash-args"
 import { isLockWaitExceeded } from "../gateway/lock-wait"
 import type { GatewayStore } from "../gateway/store"
-import { reportUnexpected, thrown, UNEXPECTED_FAILURE_MESSAGE } from "../sdk-core/failures"
-import { failure, uncertainFailure, uncertainNote } from "../tools/internals"
+import { reportUnexpected, thrown } from "../sdk-core/failures"
+import { failure, uncertainFailure } from "../tools/internals"
+import { decodeNote, decodeResult, encodeNote, encodeResult, RERUN_ON_REPEAT, storedKey } from "./receipt-record"
 import { currentResult } from "../tools/thread-row"
 
 /** How many keys a surface keeps for recovering receipts whose admission reply was lost. */
@@ -57,8 +58,7 @@ export const withReceiptExpiry = (result: ThreadToolResult, expiresAt: number): 
  * text (a schema refusal, `host_unavailable:`, `unsupported:`), never an unexpected exception's message.
  */
 function failureNote(error: unknown): string {
-  if (thrown(error).error.code === "internal_error") return UNEXPECTED_FAILURE_MESSAGE
-  return error instanceof Error ? error.message : String(error)
+  return JSON.stringify({ message: thrown(error).error.code })
 }
 
 export function createReceipts(
@@ -100,7 +100,19 @@ export function createReceipts(
     if (calls <= 1) admitting.delete(key)
     else admitting.set(key, calls - 1)
   }
-  const keyOf = (scope: ReceiptScope) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
+  // The store sees the key only as its hash over the book's scope, so a lookup and the stored value agree and the store
+  // cannot list anyone's keys (receipt-record.ts).
+  const storedScope = (scope: ReceiptScope): ReceiptScope => ({
+    ...scope,
+    idempotency_key: storedKey(scope.principal, scope.operation, scope.idempotency_key),
+  })
+  const keyOf = (scope: ReceiptScope) => storedScope(scope).idempotency_key
+  // The input of each call this instance runs, for its record (references, never text) and a re-run read's settle.
+  const inputs = new Map<string, unknown>()
+  const rerunning = new Set<string>()
+  // The stored note of each uncertain call this instance retries: the retry's own answer reads it with its references
+  // filled, and its receipt keeps it as stored (references, never the input).
+  const firstNotes = new Map<string, string | null>()
   const unrecorded = (scope: ReceiptScope, what: string) => (settleError: unknown) => {
     reportUnexpected(onUnexpected, settleError)
     unsettled.set(keyOf(scope), `${what}, and its receipt could not be recorded.`)
@@ -127,7 +139,7 @@ export function createReceipts(
     admitting.set(key, (admitting.get(key) ?? 0) + 1)
     try {
       admission = await store.toolReceiptBegin({
-        ...scope,
+        ...storedScope(scope),
         now: at,
         args_hash: hashArgs(value),
         retry_uncertain: RETRIES_UNCERTAIN.has(scope.operation),
@@ -167,8 +179,13 @@ export function createReceipts(
           ? { kind: "accepted", expires_at: admission.expires_at }
           : { kind: "retry", error_note: admission.recovery.error_note, expires_at: admission.expires_at }
     unanswered.delete(key)
+    if (admission.kind === "replay" && RERUN_ON_REPEAT.has(scope.operation)) {
+      // A keyed read records no content: a repeat with the same fingerprint runs the read again (#14951).
+      rerunning.add(key)
+      return { kind: "run", expires_at: admission.expires_at }
+    }
     if (admission.kind === "replay") {
-      const result = currentResult(admission.result as ThreadToolResult)
+      const result = currentResult(decodeResult(admission.result, value))
       const replayed =
         scope.operation === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result
       return { kind: "answer", result: explicit ? withReceiptExpiry(replayed, admission.expires_at) : replayed }
@@ -203,11 +220,17 @@ export function createReceipts(
     }
     // #14060: a call that failed after it may have acted recovers by running again; the call itself refuses unless it finds
     // what the first run did. The store reserved the receipt for this retry alone (#14623 H1).
-    if (admission.kind === "uncertain") return { kind: "answer", result: uncertainFailure(admission.error_note) }
+    if (admission.kind === "uncertain")
+      return { kind: "answer", result: uncertainFailure(decodeNote(admission.error_note, value)) }
     running.add(key)
-    return admission.kind === "retry"
-      ? { kind: "run", retrying: { error_note: admission.error_note }, expires_at: admission.expires_at }
-      : { kind: "run", expires_at: admission.expires_at }
+    inputs.set(key, value)
+    if (admission.kind !== "retry") return { kind: "run", expires_at: admission.expires_at }
+    firstNotes.set(key, admission.error_note)
+    return {
+      kind: "run",
+      retrying: { error_note: decodeNote(admission.error_note, value) },
+      expires_at: admission.expires_at,
+    }
   }
 
   /** The call ran and answered `result`; a call that may have acted without an answer stays uncertain under its note. */
@@ -224,13 +247,18 @@ export function createReceipts(
       RETRIES_UNCERTAIN.has(scope.operation) &&
       result.kind === "error" &&
       (result.error.code === "idempotency_uncertain" || retrying !== undefined)
-        ? (retrying?.error_note ?? uncertainNote(result.error))
+        ? ((retrying === undefined ? undefined : firstNotes.get(keyOf(scope))) ??
+          encodeNote(result.error, inputs.get(keyOf(scope))))
         : undefined
+    firstNotes.delete(keyOf(scope))
+    if (rerunning.delete(keyOf(scope))) return
+    const record = encodeResult(scope.operation, result, inputs.get(keyOf(scope)))
+    inputs.delete(keyOf(scope))
     await store
       .toolReceiptSettle({
-        ...scope,
+        ...storedScope(scope),
         now: now(),
-        ...(undecided === undefined ? { result } : { error_note: undecided }),
+        ...(undecided === undefined ? { result: record } : { error_note: undecided }),
       })
       .then(
         (settled) => {
@@ -244,8 +272,11 @@ export function createReceipts(
   /** The call threw after it was admitted: it may have acted, so its receipt records the failure as uncertain. */
   async function fail(scope: ReceiptScope, error: unknown): Promise<void> {
     const note = failureNote(error)
+    inputs.delete(keyOf(scope))
+    firstNotes.delete(keyOf(scope))
+    if (rerunning.delete(keyOf(scope))) return
     await store
-      .toolReceiptSettle({ ...scope, now: now(), error_note: note })
+      .toolReceiptSettle({ ...storedScope(scope), now: now(), error_note: note })
       .catch(unrecorded(scope, `the call failed (${note})`))
     running.delete(keyOf(scope))
   }

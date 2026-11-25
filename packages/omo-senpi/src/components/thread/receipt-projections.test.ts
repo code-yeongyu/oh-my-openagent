@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test"
 
+import { storedKey } from "./control/receipt-record"
 import { hashArgs } from "./gateway/hash-args"
 import { createRemoteThreadFixture } from "./thread-remote-fixture"
 
@@ -25,7 +26,7 @@ test("#given the same keyed close through the tool and through the SDK #when eac
   const stored = await sdkSide.store.toolReceiptBegin({
     principal: "cli:501",
     operation: "thread_close",
-    idempotency_key: "k-projection",
+    idempotency_key: storedKey("cli:501", "thread_close", "k-projection"),
     now: Date.now(),
     args_hash: hashArgs(args),
   })

@@ -4,6 +4,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "../gateway/constants"
 import { hashArgs } from "../gateway/hash-args"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
+import { storedKey } from "./receipt-record"
 import { createdThreadId } from "./session-host"
 
 // omo#14060: the connection to this device's host can close after the host made the session and before its reply
@@ -75,7 +76,12 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const a = account()
     const { run, store } = surface(a.remote)
     const args = { device: "studio", name: "remote-retry", idempotency_key: "atomic-4" }
-    const scope = { principal: "session:dur-caller", operation: "thread_create", idempotency_key: "atomic-4" }
+    // The book stores the key as its hash over the scope (#14951), so the row is seeded under that.
+    const scope = {
+      principal: "session:dur-caller",
+      operation: "thread_create",
+      idempotency_key: storedKey("session:dur-caller", "thread_create", "atomic-4"),
+    }
     const now = Date.now()
     expect(await store.toolReceiptBegin({ ...scope, now, args_hash: hashArgs(args) })).toEqual({
       kind: "accepted",
@@ -84,7 +90,7 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     await store.toolReceiptSettle({
       ...scope,
       now: Date.now(),
-      error_note: "the call failed after b opened the session",
+      error_note: JSON.stringify({ message: "internal_error" }),
     })
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     expect(a.sent.filter((entry) => entry.rpc?.["type"] === "open_session")).toEqual([])
