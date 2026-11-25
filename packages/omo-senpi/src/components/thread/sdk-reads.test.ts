@@ -83,15 +83,19 @@ describe("a keyed read is bound to its caller's principal", () => {
       {},
     )
     const key = "k-shared"
-    const viaTool = (await s.run("thread_list", { all_scope: true, idempotency_key: key })) as {
+    const viaTool = (await s.run("thread_list", { all_scope: true, idempotency_key: key })) as unknown as {
       kind: string
       threads: unknown[]
     }
-    const viaRoot = (await root.threads.list({ all_scope: true, device: "b", idempotency_key: key })) as {
+    const viaRoot = (await root.threads.list({ all_scope: true, device: "b", idempotency_key: key })) as unknown as {
       kind: string
       threads: unknown[]
     }
-    const viaOther = (await other.threads.list({ all_scope: true, device: "here", idempotency_key: key })) as {
+    const viaOther = (await other.threads.list({
+      all_scope: true,
+      device: "here",
+      idempotency_key: key,
+    })) as unknown as {
       kind: string
       threads: unknown[]
     }
