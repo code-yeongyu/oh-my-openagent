@@ -11,6 +11,7 @@ import {
   type RootCallInput,
 } from "../contract"
 import type { OmoResult } from "../result"
+import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
 import type { MemberOf } from "./members"
 
 type RootSignedIn =
@@ -23,6 +24,12 @@ type SignIn = AccountApi["signIn"] & MemberOf<"account.signIn">
  * sign-in dependencies (the omo-ai/sdk entry); an entry without it keeps the shipped launcher child.
  */
 export type InProcessSignIn = (api: string, request: SignInRequest) => Promise<CallOutcome<CoreSignedIn, SignInFailure>>
+
+// B4 (security design 10): replace from a session is refused once the change's evidence exists; until then today's
+// behaviour holds. The behaviour-change table decides, so the root and its scenario never disagree.
+const B4 = BEHAVIOUR_CHANGES.find((change) => change.id === "B4")
+if (B4 === undefined) throw new Error("the behaviour-change table has no B4")
+const REPLACE_FROM_SESSION = assertedExpectation(B4)
 
 const isRootInput = (input: SignInOptions | RootInput): input is RootInput => "method" in input
 
@@ -72,7 +79,7 @@ export function accountSignIn(
     input: SignInOptions | RootInput,
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
-    if (input.replace === true && principalIsSession())
+    if (input.replace === true && principalIsSession() && REPLACE_FROM_SESSION.outcome === "refuse")
       return failed("sender_not_allowed", "A session cannot replace this machine's earlier device.", {
         principal: "session",
         change: "B4",

@@ -7,8 +7,8 @@ import type { InProcessSignIn } from "./account-sign-in"
 
 // account.signIn on the root (first-party design 6.4, security design 4.2, 5.4, slice A1b). With an in-process sign-in
 // (the omo-ai/sdk entry) both methods run in this process; without one the shipped launcher child keeps running the
-// device code (child-backed-members.json). Replace from a session is refused before either path is touched (B4), and
-// the lower layer's error never reaches an answer.
+// device code (child-backed-members.json). Replace from a session follows B4's asserted expectation (today's, until its
+// evidence exists), and the lower layer's error never reaches an answer.
 
 const CODE = {
   verificationUri: "https://signin.example/device",
@@ -58,25 +58,22 @@ const signedIn =
   }
 
 describe("account.signIn on the root", () => {
-  test("#given a session principal #when it asks to replace #then it is refused before either sign-in path runs (B4)", async () => {
+  test("#given a session principal #when it asks to replace #then it runs as today until B4's evidence exists", async () => {
     const requests: SignInRequest[] = []
-    const { sdk, touched } = rootWith({
+    const { sdk } = rootWith({
       principal: { kind: "session", session_id: "01-session" },
       inProcess: async (api, request) => {
         requests.push(request)
         return signedIn("on")(api, request)
       },
     })
-    const codes: unknown[] = []
-    const answer = await sdk.account.signIn({
+    const answer = (await sdk.account.signIn({
       method: "device_code",
       replace: true,
-      onUserCode: (code: unknown) => {
-        codes.push(code)
-      },
-    })
-    expect(answer).toMatchObject({ kind: "error", error: { code: "sender_not_allowed", details: { change: "B4" } } })
-    expect({ requests, touched, codes }).toEqual({ requests: [], touched: [], codes: [] })
+      onUserCode: () => undefined,
+    })) as unknown
+    expect(answer).toMatchObject({ kind: "ok" })
+    expect(await requests[0]?.replaceDevice?.({ deviceId: "earlier" } as never)).toBe(true)
   })
 
   test("#given an in-process sign-in #when the device code is approved #then the code reaches onUserCode and the answer names the device", async () => {
