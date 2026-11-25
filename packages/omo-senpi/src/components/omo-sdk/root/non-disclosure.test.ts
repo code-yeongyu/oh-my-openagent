@@ -9,7 +9,11 @@ import { type OmoPrincipal, ROOT_CALLS, type RootCallKey } from "../contract"
 import { inputAccepts } from "../contract/validate"
 import type { OmoSdkPorts } from "../options"
 import { assembleOmoSdk } from "../assembly"
-import type { GatewayStore } from "../../thread/gateway/store"
+import { createGatewayStore, type GatewayStore } from "../../thread/gateway/store"
+import type { RemoteThreadSurface } from "../../thread/remote/ports"
+import type { TableScenario } from "../../../../../../script/sdk-parity/expectation"
+import { createRecorder } from "../../../../../../script/sdk-parity/fakes/recorder"
+import { remotePort } from "../../../../../../script/sdk-parity/fakes/remote"
 import type { ThreadHost } from "../../thread/tools"
 import { createThreadSdk } from "../../thread/sdk"
 import { invalidInput } from "./assemble"
@@ -128,8 +132,52 @@ function faultingStore(): GatewayStore {
   })
 }
 
-function canaryPorts(fault: boolean): OmoSdkPorts {
-  return {
+// The scan runs only on fakes (design lane ruling after a default port reached a real keychain helper): every port the
+// root takes is listed here, the type forces the list to name every port, and the scan fails by name before any call
+// when one is missing or not a registered fake. A slice that adds calls with new ports adds their fakes here.
+const FAKES = new WeakSet<object>()
+const fake = <T extends object>(port: T): T => {
+  FAKES.add(port)
+  return port
+}
+const PORT_NAMES = {
+  session: true,
+  credentialStore: true,
+  desktopLaunch: true,
+  host: true,
+  store: true,
+  remote: true,
+  now: true,
+  deviceServiceStatus: true,
+  signInProcess: true,
+} as const satisfies Record<keyof OmoSdkPorts, true>
+
+function notFake(ports: OmoSdkPorts): string[] {
+  return Object.keys(PORT_NAMES).filter((name) => {
+    const port: unknown = Reflect.get(ports, name)
+    return typeof port !== "object" && typeof port !== "function" ? true : port === null || !FAKES.has(port)
+  })
+}
+
+// A remote surface whose every operation fails (or, healthy, answers nothing), at any depth; closing it is quiet.
+function fakeRemote(fault: boolean): unknown {
+  const node = (): unknown =>
+    new Proxy(function () {}, {
+      get: (_target, name) => (name === "then" ? undefined : name === "close" ? async () => undefined : node()),
+      apply: () => (fault ? failing(CANARIES.socketSecret)() : Promise.resolve(undefined)),
+    })
+  return node()
+}
+
+// Healthy, the remote answers as the real one does from the scenario drivers' fake (a device listing other threads), so
+// a thread the caller names that no device lists reaches the core's not-found answer.
+function listingRemote(): RemoteThreadSurface {
+  const scenario = { id: "scan/listing", row: "threads.list", kind: "effect", input: {}, expect: [] } as TableScenario
+  return remotePort(createRecorder(scenario)).remote
+}
+
+function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
+  return withFakes(fault, home, {
     desktopLaunch: () => false,
     credentialStore: {
       read: fault
@@ -150,9 +198,27 @@ function canaryPorts(fault: boolean): OmoSdkPorts {
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
     host: canaryHost(fault),
-    // With ports faulting the gateway store faults too; healthy, the store is real, so its file is read column by column.
-    ...(fault ? { store: faultingStore() } : {}),
-  }
+    // With ports faulting the gateway store faults too; healthy, it is a store the scan builds in its own scratch agent
+    // dir, so its file is read column by column.
+    store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
+    remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
+    now: () => 1_764_000_000_000,
+  })
+}
+
+function scanPorts(fault: boolean, home: string): OmoSdkPorts {
+  const ports = canaryPorts(fault, home)
+  const missing = notFake(ports)
+  if (missing.length > 0)
+    throw new Error(
+      `the scan runs only on fake ports; not a fake: ${missing.join(", ")} (add the fake for every port a call uses)`,
+    )
+  return ports
+}
+
+function withFakes(_fault: boolean, _home: string, ports: OmoSdkPorts): OmoSdkPorts {
+  for (const port of Object.values(ports)) if (typeof port === "object" || typeof port === "function") fake(port)
+  return ports
 }
 
 const PRINCIPALS = [
@@ -170,18 +236,17 @@ type Captured = { readonly key: RootCallKey; readonly answer: unknown }
 let running: RootCallKey | undefined
 const touches: { readonly key: RootCallKey; readonly port: string }[] = []
 function recorded<T>(value: T, port: string): T {
-  if (typeof value === "function")
-    return function (this: unknown, ...args: unknown[]) {
+  if ((typeof value !== "object" && typeof value !== "function") || value === null || Array.isArray(value)) return value
+  return new Proxy(value as object, {
+    apply: (target, self, args) => {
       if (running !== undefined) touches.push({ key: running, port })
-      return (value as (...inner: unknown[]) => unknown).apply(this, args)
-    } as T
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
-  return new Proxy(value, {
+      return Reflect.apply(target as (...inner: unknown[]) => unknown, self, args)
+    },
     get: (target, name, receiver) =>
       typeof name === "symbol" || name === "then"
         ? Reflect.get(target, name, receiver)
         : recorded(Reflect.get(target, name, receiver), `${port}.${name}`),
-  })
+  }) as T
 }
 
 // The pure calls (the registry's closed list): they touch no port.
@@ -321,6 +386,15 @@ describe("the non-disclosure scan over the whole root", () => {
     expect(canariesIn(planted).length).toBeGreaterThanOrEqual(3)
   })
 
+  test("#given the scan's ports with one left at its default #then the scan refuses to run, naming it (control)", () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-default-port-"))
+    directories.push(home)
+    const { remote: _remote, ...withoutRemote } = canaryPorts(true, home)
+    expect(notFake(withoutRemote)).toEqual(["remote"])
+    expect(notFake({ ...withoutRemote, remote: fakeRemote(true) as RemoteThreadSurface })).toEqual(["remote"])
+    expect(notFake(canaryPorts(true, home))).toEqual([])
+  })
+
   test("#given a store holding canaries in two tables #when it is read column by column #then each column is named (negative control)", () => {
     const home = mkdtempSync(join(tmpdir(), "non-disclosure-store-"))
     directories.push(home)
@@ -388,7 +462,7 @@ describe("the non-disclosure scan over the whole root", () => {
           home,
           agentDir: home,
           ...(principal === undefined ? {} : { principal }),
-          ports: recorded(canaryPorts(fault), "ports"),
+          ports: recorded(scanPorts(fault, home), "ports"),
         }
         try {
           const root = assembleOmoSdk(options, {})
