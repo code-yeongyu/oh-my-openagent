@@ -40,6 +40,7 @@ const viaFacade = (sdk: Sdk, op: Op, input: Readonly<Record<string, string>>): P
         text: input["message"],
         mode: input["delivery"],
         ...(input["expected_turn_id"] === undefined ? {} : { expected_turn_id: input["expected_turn_id"] }),
+        ...(input["idempotency_key"] === undefined ? {} : { idempotency_key: input["idempotency_key"] }),
       })
     case "read":
       return member(sdk, "read", { thread: input["thread"] })

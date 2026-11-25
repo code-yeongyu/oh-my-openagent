@@ -31,6 +31,7 @@ const toolCall = (
           message: input["message"],
           delivery: input["delivery"],
           ...(input["expected_turn_id"] === undefined ? {} : { expected_turn_id: input["expected_turn_id"] }),
+          ...(input["idempotency_key"] === undefined ? {} : { idempotency_key: input["idempotency_key"] }),
         },
       }
     case "read":

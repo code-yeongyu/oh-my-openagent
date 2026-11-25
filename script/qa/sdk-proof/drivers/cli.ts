@@ -32,6 +32,7 @@ const argvOf = (op: Op, input: Readonly<Record<string, string>>): string[] => {
         "--mode",
         at("delivery"),
         ...(input["expected_turn_id"] === undefined ? [] : ["--expected-turn", at("expected_turn_id")]),
+        ...(input["idempotency_key"] === undefined ? [] : ["--idempotency-key", at("idempotency_key")]),
         "--json",
       ]
     case "read":

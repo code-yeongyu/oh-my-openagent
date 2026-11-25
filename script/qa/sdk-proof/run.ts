@@ -13,6 +13,7 @@ import { createCliDriver } from "./drivers/cli.ts"
 import { type Driver, isRecord } from "./drivers/driver.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
 import { redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
+import { type KeyedRecord, keyedTable, runKeyedPairs } from "./keyed.ts"
 import { SCENARIO } from "./scenario.ts"
 import { runSteps } from "./steps.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
@@ -54,6 +55,20 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
   }
 }
 
+// The keyed pairs share one thread on B, opened through the CLI (the surface whose open delivers its first prompt today).
+async function runKeyed(world: World): Promise<KeyedRecord[]> {
+  const drivers = Object.fromEntries(
+    await Promise.all(SURFACES.map(async (surface) => [surface, await driverFor(surface, world)] as const)),
+  ) as Record<Surface, Driver>
+  try {
+    const before = await world.observer.keys()
+    const opened = await drivers.cli.run({ op: "create", input: { device: DEVICE_B.id, prompt: "x1a keyed pairs" } })
+    return await runKeyedPairs(drivers, opened.thread, await world.observer.adopt(before), world.observer)
+  } finally {
+    await Promise.all(SURFACES.map((surface) => drivers[surface].close()))
+  }
+}
+
 async function main(): Promise<void> {
   const only = (arg("--only") ?? SURFACES.join(","))
     .split(",")
@@ -69,10 +84,15 @@ async function main(): Promise<void> {
   const redaction = { roots: world.roots, devices: { [DEVICE_A.id]: "<device-a>", [DEVICE_B.id]: "<device-b>" } }
   const runs: Record<Surface, StepRecord[]> = { sdk: [], tools: [], cli: [] }
   let isolation: Isolation = { refused: [], guarded: 0, sessionBus: false }
+  let keyed: KeyedRecord[] = []
   try {
     for (const surface of only) {
       runs[surface] = await runSurface(surface, world)
       writeFileSync(join(evidence, `${surface}.md`), redact(transcript(surface, build, runs[surface]), redaction))
+    }
+    if (only.length === SURFACES.length) {
+      keyed = await runKeyed(world)
+      writeFileSync(join(evidence, "keyed.json"), redact(JSON.stringify(keyed, null, 2), redaction))
     }
   } finally {
     isolation = world.isolation()
@@ -101,15 +121,16 @@ async function main(): Promise<void> {
     `Isolation: ${isolation.refused.length} request(s) to a non-loopback address refused; the loopback guard loaded in ${isolation.guarded} world processes; session bus in the world's environment: ${isolation.sessionBus ? "present" : "absent"}.`,
     "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",
   ])
-  writeFileSync(join(evidence, "summary.md"), table)
-  writeFileSync(join(import.meta.dir, "RESULTS.md"), table)
+  const results = keyed.length === 0 ? table : `${table}${keyedTable(keyed)}`
+  writeFileSync(join(evidence, "summary.md"), results)
+  writeFileSync(join(import.meta.dir, "RESULTS.md"), results)
   // The synthetic credential must leave no trace: every evidence file and RESULTS.md is scanned for its canary.
   const leaked = [
     ...readdirSync(evidence).map((name) => join(evidence, name)),
     join(import.meta.dir, "RESULTS.md"),
   ].filter((path) => readFileSync(path, "utf8").includes(CANARY))
   if (leaked.length > 0) process.stderr.write(`x1a: the credential canary appears in ${leaked.join(", ")}\n`)
-  process.stdout.write(`${table}\nevidence: ${evidence}\n`)
+  process.stdout.write(`${results}\nevidence: ${evidence}\n`)
   if (!isolated || leaked.length > 0) process.exitCode = 1
 }
 

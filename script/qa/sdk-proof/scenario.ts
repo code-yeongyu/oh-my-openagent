@@ -199,9 +199,9 @@ export const ISSUES: Readonly<Record<string, string>> = {
   "sdk:set-model-parked": "#14939",
   "tools:set-model-parked": "#14939",
   "cli:set-model-parked": "#14939",
-  "sdk:after-compaction": "#14939",
-  "tools:after-compaction": "#14939",
-  "cli:after-compaction": "#14939",
+  "sdk:after-compaction": "#15026, senpi#7482",
+  "tools:after-compaction": "#15026, senpi#7482",
+  "cli:after-compaction": "#15026, senpi#7482",
   "cli:close": "#14992",
 }
 
