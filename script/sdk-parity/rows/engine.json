@@ -273,7 +273,8 @@
       "input": {
         "properties": {
           "local": {
-            "type": "boolean"
+            "type": "boolean",
+            "const": true
           },
           "trust": {
             "type": "boolean"

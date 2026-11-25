@@ -1,6 +1,4 @@
-import { Type } from "typebox"
-
-import type { SetupPlan } from "../results/host"
+import { type Static, Type } from "typebox"
 
 // The daemon, diagnostics, install and config calls of first-party design 6.7 and 6.11. The endpoint flags (socket,
 // key_root), launch_spec and mcp_presenter_enforcement are held for P1a-s (contract/gated.ts); every other host option
@@ -96,8 +94,31 @@ export const DiagnosticsReapStaleEngines = Type.Object({ pids: Type.Array(Count,
 
 export const InstallSetupDetect = None
 export const InstallSetupPlan = None
+/** `omo setup`'s inventory (N/bin/lib/setup-report.js): one row per harness found on this machine. */
+export const SetupInventorySchema = Type.Object({
+  harnesses: Type.Array(
+    Type.Object({
+      id: Type.String(),
+      installed: Type.Boolean(),
+      providers: Type.Array(Type.String()),
+      credentialTypes: Type.Array(Type.String()),
+      modelHint: Type.String(),
+      notices: Type.Array(Type.String()),
+      importableCount: Type.Integer({ minimum: 0 }),
+    }),
+  ),
+})
+
+/** What `omo setup --dry-run` prints and install.setup.apply takes back: the stages a person consents to. */
+export const SetupPlanSchema = Type.Object({
+  inventory: SetupInventorySchema,
+  stages: Type.Array(Type.Object({ id: Type.String({ minLength: 1 }), description: Type.String() })),
+})
+export type SetupPlan = Static<typeof SetupPlanSchema>
+export type SetupInventory = Static<typeof SetupInventorySchema>
+
 export const InstallSetupApply = Type.Object({
-  plan: Type.Optional(Type.Unsafe<SetupPlan>({ type: "object", description: "What install.setup.plan answered." })),
+  plan: Type.Optional(SetupPlanSchema),
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),

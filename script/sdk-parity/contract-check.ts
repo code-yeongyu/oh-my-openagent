@@ -9,6 +9,7 @@ import { schemaDifferences } from "./tool-check"
 export type CallInput = {
   readonly properties: Readonly<Record<string, FieldSchema>>
   readonly required: readonly string[]
+  readonly formRequired?: readonly string[]
 }
 
 export type GatedEntry = {

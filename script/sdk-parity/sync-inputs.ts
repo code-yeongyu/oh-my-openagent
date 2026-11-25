@@ -2,20 +2,19 @@ import { readdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { GATED, ROOT_CALLS } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
+import { callInputOf } from "./call-input"
 import { ROWS_DIR } from "./registry"
 import type { DomainFile, FieldSchema, Row } from "./schema"
 
 // Types the `input` of every P1a row from the input schema of its root call (slice P1a, #14948), so the row's fields,
-// the call's static type and its schema are one value; contract.test.ts fails when they drift. It types the fields the
-// row has and adds none: a field the schema has and the row lacks is P0's row to fix, and the input check reports it. A field P1a holds for
-// P1a-s keeps the row's own value, a nested one (`prompt.author`) inside the generated field. Run: bun
-// script/sdk-parity/sync-inputs.ts [--check]
+// the call's static type and its schema are one value; contract.test.ts fails when they drift. It is contract
+// annotation only (design lane ruling, 2026-11-25): it types the fields a row has, their shape, enums and nesting, and
+// never adds, drops or renames a field or writes the row's required list; such a difference is P0's row to fix, and the
+// input check reports it. A field P1a holds for P1a-s keeps the row's own value, a nested one (`prompt.author`) inside
+// the generated field. Run: bun script/sdk-parity/sync-inputs.ts [--check]
 
 type Node = FieldSchema & { readonly anyOf?: readonly Node[] }
 type Mutable = { properties?: Record<string, Node>; anyOf?: Node[]; required?: string[] }
-
-const project = (schema: unknown): Node =>
-  JSON.parse(JSON.stringify(schema, (key, value: unknown) => (key === "description" ? undefined : value))) as Node
 
 // Puts the row's own node at a held nested path back into the generated field, in the union variant that has the parent.
 const restore = (target: Node, source: Node | undefined, path: readonly string[]): Node => {
@@ -40,7 +39,7 @@ const restore = (target: Node, source: Node | undefined, path: readonly string[]
 export function syncRow(row: Row): Row {
   const call = (ROOT_CALLS as Readonly<Record<string, { readonly input: unknown }>>)[row.sdk]
   if (call === undefined || row.kind !== "capability") return row
-  const schema = project(call.input) as { properties: Record<string, Node>; required?: readonly string[] }
+  const schema = callInputOf(call.input) as { properties: Record<string, Node> }
   const held = GATED.filter((entry) => entry.row === row.id && entry.field !== undefined).map(
     (entry) => entry.field ?? "",
   )
@@ -55,9 +54,7 @@ export function syncRow(row: Row): Row {
         generated,
       )
   }
-  const heldRequired = row.input.required.filter((field) => held.includes(field))
-  const required = [...new Set([...(schema.required ?? []).filter((field) => field in properties), ...heldRequired])]
-  return { ...row, input: { properties, required } }
+  return { ...row, input: { properties, required: row.input.required } }
 }
 
 if (import.meta.main) {

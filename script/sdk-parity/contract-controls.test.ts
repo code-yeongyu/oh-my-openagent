@@ -11,7 +11,8 @@ import {
   SECURITY_SECTIONS,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import { type CallInput, codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
+import { callInputOf } from "./call-input"
+import { codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
 import { scenarioProblems } from "./scenario-check"
 import { allRows, loadDomainFiles } from "./registry"
 import type { Row } from "./schema"
@@ -20,12 +21,8 @@ import { loadScenarioTable, type ScenarioTableFile, type TableScenario } from ".
 // Negative controls of the P1a checks (design 7.6): each check fails on one fixture that breaks it, with a message that
 // names what to fix.
 
-const asInput = (schema: unknown): CallInput => {
-  const json = JSON.parse(JSON.stringify(schema)) as Partial<CallInput>
-  return { properties: json.properties ?? {}, required: json.required ?? [] }
-}
 const contract: Contract = {
-  calls: Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, asInput(call.input)])),
+  calls: Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, callInputOf(call.input)])),
   gated: GATED,
   ports: PORT_OPERATIONS,
   sections: SECURITY_SECTIONS,
@@ -183,7 +180,7 @@ describe("negative controls added by the first review", () => {
           },
     )
     expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
-      "row threads.setModel: input provider has no effect scenario whose expectations differ",
+      "row threads.setModel: input provider has no scenario pair that differs in provider alone",
     )
   })
 
@@ -207,5 +204,36 @@ describe("negative controls added by the first review", () => {
       { row: "threads.list", field: "workspace", s0: ["9.9"], reason: "x", rowExists: true },
     ]
     expect(scopeProblems(rows, { ...contract, gated }).join("\n")).toContain("cites section 9.9")
+  })
+})
+
+// Review 6061577043 M2: an input changes behaviour only when a scenario that differs from another in that input alone
+// expects something else.
+describe("negative controls added by the second review", () => {
+  test("#given a field whose only partner also differs in another field #then the scenario check names the field", () => {
+    const pair = (id: string, input: Record<string, unknown>, op: string): TableScenario => ({
+      id: `threads.setModel/${id}`,
+      row: "threads.setModel",
+      kind: "effect",
+      input,
+      expect: [{ port: "host", op }],
+    })
+    const files = scenarios.map((file) =>
+      file.domain !== "threads"
+        ? file
+        : {
+            ...file,
+            scenarios: [
+              ...file.scenarios.filter((scenario) => scenario.row !== "threads.setModel"),
+              pair("plain", { thread: "a", model: "m" }, "set_model"),
+              pair("provider-and-scope", { thread: "a", model: "m", provider: "p", all_scope: true }, "set_model"),
+              pair("scope", { thread: "a", model: "m", all_scope: true }, "set_model"),
+              pair("key", { thread: "a", model: "m", idempotency_key: "k" }, "set_model"),
+            ],
+          },
+    )
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      "row threads.setModel: input provider has no scenario pair that differs in provider alone",
+    )
   })
 })

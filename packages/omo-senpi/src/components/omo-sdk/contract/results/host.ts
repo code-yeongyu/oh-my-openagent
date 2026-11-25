@@ -59,23 +59,7 @@ export type ReapStaleEngines = {
   }[]
 }
 
-/** `omo setup`'s inventory (N/bin/lib/setup-report.js): one row per harness found on this machine. */
-export type SetupInventory = {
-  readonly harnesses: readonly {
-    readonly id: string
-    readonly installed: boolean
-    readonly providers: readonly string[]
-    readonly credentialTypes: readonly string[]
-    readonly modelHint: string
-    readonly notices: readonly string[]
-    readonly importableCount: number
-  }[]
-}
-/** What `omo setup --dry-run` prints: the stages `apply` would run, each a write the person consents to. */
-export type SetupPlan = {
-  readonly inventory: SetupInventory
-  readonly stages: readonly { readonly id: string; readonly description: string }[]
-}
+export type { SetupInventory, SetupPlan } from "../inputs/host"
 export type SetupApplied = { readonly applied: readonly string[]; readonly skipped: readonly string[] }
 export type InstallUpdate = { readonly version: string; readonly command: readonly string[]; readonly ran: boolean }
 export type InstallVersion = { readonly version: string }

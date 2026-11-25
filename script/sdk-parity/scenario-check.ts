@@ -1,4 +1,5 @@
 import { namespaceOf, p1aRows, type Contract } from "./contract-check"
+import { decodeFixtures } from "./bytes-fixtures"
 import type { Row } from "./schema"
 import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-table"
 
@@ -34,7 +35,7 @@ function scenarioShapeProblems(scenario: TableScenario, row: Row, domain: string
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-  const accepted = contract.accepts(row.sdk, scenario.input)
+  const accepted = contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
@@ -46,16 +47,23 @@ function scenarioShapeProblems(scenario: TableScenario, row: Row, domain: string
   return problems
 }
 
-// An input changes behaviour only if a scenario that passes it expects something no scenario without it expects.
+const without = (input: Readonly<Record<string, unknown>>, field: string): Record<string, unknown> =>
+  Object.fromEntries(Object.entries(input).filter(([key]) => key !== field))
+
+// An optional input changes behaviour only if a scenario that passes it has a partner whose input is the same without
+// it (effect or refusal, so a field that makes a call admissible pairs with the refusal it lifts) and whose kind or
+// expectations differ. A required input, or one every form that has it requires, pairs with none.
 function coverageProblems(
   row: Row,
-  effects: readonly TableScenario[],
+  scenarios: readonly TableScenario[],
   inert: ReadonlyMap<string, string>,
   contract: Contract,
 ): string[] {
   const problems: string[] = []
+  const effects = scenarios.filter((scenario) => scenario.kind === "effect")
   if (effects.length === 0) problems.push(`row ${row.id}: no effect scenario; add one the fake ports observe`)
-  for (const field of Object.keys(contract.calls[row.sdk]?.properties ?? {})) {
+  const call = contract.calls[row.sdk]
+  for (const field of Object.keys(call?.properties ?? {})) {
     const reason = inert.get(`${row.id}.${field}`)
     const withField = effects.filter((scenario) => field in scenario.input)
     if (withField.length === 0) {
@@ -66,13 +74,17 @@ function coverageProblems(
       continue
     }
     if (reason !== undefined) problems.push(`row ${row.id}: input ${field} is listed inert and has an effect scenario`)
-    const without = new Set(
-      effects.filter((scenario) => !(field in scenario.input)).map((scenario) => canonical(scenario.expect)),
-    )
-    if (without.size > 0 && withField.every((scenario) => without.has(canonical(scenario.expect))))
-      problems.push(
-        `row ${row.id}: input ${field} has no effect scenario whose expectations differ from those without it`,
+    if (call?.required.includes(field) === true || call?.formRequired?.includes(field) === true) continue
+    const paired = withField.some((scenario) => {
+      const rest = canonical(without(scenario.input, field))
+      return scenarios.some(
+        (partner) =>
+          !(field in partner.input) &&
+          canonical(partner.input) === rest &&
+          (partner.kind !== scenario.kind || canonical(partner.expect) !== canonical(scenario.expect)),
       )
+    })
+    if (!paired) problems.push(`row ${row.id}: input ${field} has no scenario pair that differs in ${field} alone`)
   }
   return problems
 }
@@ -85,7 +97,7 @@ export function scenarioProblems(
   const problems: string[] = []
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
   const seen = new Set<string>()
-  const effects = new Map<string, TableScenario[]>()
+  const byRow = new Map<string, TableScenario[]>()
   for (const file of files)
     for (const scenario of file.scenarios) {
       if (seen.has(scenario.id)) problems.push(`scenario ${scenario.id}: the id is used twice`)
@@ -98,12 +110,11 @@ export function scenarioProblems(
         continue
       }
       problems.push(...scenarioShapeProblems(scenario, row, file.domain, contract))
-      if (scenario.kind === "effect" && scenario.invalid !== true)
-        effects.set(row.id, [...(effects.get(row.id) ?? []), scenario])
+      if (scenario.invalid !== true) byRow.set(row.id, [...(byRow.get(row.id) ?? []), scenario])
     }
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
   for (const row of inScope.values()) {
-    problems.push(...coverageProblems(row, effects.get(row.id) ?? [], inert, contract))
+    problems.push(...coverageProblems(row, byRow.get(row.id) ?? [], inert, contract))
     const named = [...row.scenarios.effect, ...row.scenarios.refusal]
     if (named.length > 0)
       problems.push(`row ${row.id}: scenarios stays empty in P1a; P1b fills it once its drivers ran`)

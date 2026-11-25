@@ -595,12 +595,7 @@
                             "name"
                           ],
                           "properties": {
-                            "bytes": {
-                              "type": "string",
-                              "minLength": 1,
-                              "contentEncoding": "base64",
-                              "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                            },
+                            "bytes": {},
                             "name": {
                               "type": "string",
                               "minLength": 1
@@ -1991,12 +1986,7 @@
                     "name"
                   ],
                   "properties": {
-                    "bytes": {
-                      "type": "string",
-                      "minLength": 1,
-                      "contentEncoding": "base64",
-                      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                    },
+                    "bytes": {},
                     "name": {
                       "type": "string",
                       "minLength": 1
@@ -2200,12 +2190,7 @@
                     "name"
                   ],
                   "properties": {
-                    "bytes": {
-                      "type": "string",
-                      "minLength": 1,
-                      "contentEncoding": "base64",
-                      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                    },
+                    "bytes": {},
                     "name": {
                       "type": "string",
                       "minLength": 1

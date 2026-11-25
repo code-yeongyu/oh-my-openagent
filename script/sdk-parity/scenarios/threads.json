@@ -1961,7 +1961,13 @@
         "message": "status?",
         "attachments": [
           {
-            "bytes": "aGk=",
+            "bytes": {
+              "$bytes": {
+                "fixture": "hi",
+                "length": 2,
+                "sha256": "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4"
+              }
+            },
             "name": "a.txt"
           }
         ]
@@ -4351,6 +4357,142 @@
           "op": "extension_call",
           "result": {
             "code": "extension_unknown_op"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.send/steer-without-turn",
+      "row": "threads.send",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "delivery": "steer"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        },
+        {
+          "port": "host",
+          "op": "steer",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/follow-up",
+      "row": "threads.sendAndFollow",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "delivery": "follow_up"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "t-1",
+            "mode": "follow_up"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.follow",
+          "args": {
+            "thread": "t-1",
+            "from": "receipt"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.sendAndFollow/steer-without-turn",
+      "row": "threads.sendAndFollow",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "delivery": "steer"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/follow-up",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "input": {
+        "thread": "review",
+        "message": "take over",
+        "delivery": "follow_up"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions",
+          "args": {
+            "match": "exact"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "follow_up"
+          }
+        },
+        {
+          "port": "host",
+          "op": "follow_up"
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/steer-without-turn",
+      "row": "threads.handoff",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "input": {
+        "thread": "review",
+        "message": "take over",
+        "delivery": "steer"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/fragment",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "m-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "m-1"
           }
         }
       ]
