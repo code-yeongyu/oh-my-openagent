@@ -633,7 +633,11 @@ export function createRemoteThreadFixture() {
           return ok({ kind: "steered", turnId: epoch })
         }
         admitted.add(id)
-        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: epoch })
+        // The contract: a started admission names the turn the admitted message starts, the one after the idle epoch.
+        // The engine answers the idle epoch today (code-yeongyu/senpi#7478, omo#15013); the fake models the contract,
+        // and the cross-device proof harness against the real engine is what shows the defect.
+        const started = /^\d+$/.test(epoch) ? String(Number(epoch) + 1) : epoch
+        return ok(engine.streaming ? { kind: "queued", turnId: epoch } : { kind: "started", turnId: started })
       }
       if (rpc["type"] === "get_available_models")
         return ok({
