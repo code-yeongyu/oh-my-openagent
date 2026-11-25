@@ -57,6 +57,40 @@ describe("loadAgents", () => {
     expect(result.agents.finder?.prompt).toBe("project senpi\n")
   })
 
+  test("#given agents in the omo agent home and the project .omo directory #when loading #then both load and the project file wins", () => {
+    // given
+    const fixture = makeFixture()
+    writeText(join(fixture.home, ".omo", "agent", "settings.json"), "{}")
+    writeText(join(fixture.home, ".omo", "agent", "agents", "writer.md"), agentMarkdown("omo-home", "omo home"))
+    writeText(join(fixture.home, ".omo", "agent", "agents", "finder.md"), agentMarkdown("omo-home", "omo home"))
+    writeText(join(fixture.project, ".omo", "agents", "finder.md"), agentMarkdown("project-omo", "project omo"))
+
+    // when
+    const result = loadAgents({ homeDir: fixture.home, projectDir: fixture.project })
+
+    // then
+    expect(result.diagnostics).toEqual([])
+    expect(result.agents.writer?.model).toBe("omo-home")
+    expect(result.agents.finder?.model).toBe("project-omo")
+  })
+
+  test("#given an agent dir override #when loading #then markdown agents load from that dir", () => {
+    // given
+    const fixture = makeFixture()
+    const agentDir = join(fixture.home, "custom-agent-dir")
+    writeText(join(agentDir, "agents", "writer.md"), agentMarkdown("override-home", "override home"))
+
+    // when
+    const result = loadAgents({
+      homeDir: fixture.home,
+      projectDir: fixture.project,
+      env: { OMO_CODING_AGENT_DIR: agentDir },
+    })
+
+    // then
+    expect(result.agents.writer?.model).toBe("override-home")
+  })
+
   test("#given markdown at a configured root #when loading #then only agent subdirectories are scanned", () => {
     // given
     const fixture = makeFixture()

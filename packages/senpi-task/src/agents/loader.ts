@@ -2,6 +2,7 @@ import { resolve } from "node:path"
 
 import { MERGED_OMO_CONFIG_PATH } from "@oh-my-opencode/omo-config-core"
 
+import { resolveAgentHome } from "../agent-home"
 import { categoryShadowedAgentNames, categoryShadowMessage } from "./category-shadow"
 import { loadMarkdownAgent } from "./markdown"
 import { loadOmoAgentOverlays } from "./omo-overlay"
@@ -57,14 +58,20 @@ export function loadAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
 }
 
 /**
- * The markdown half of `loadAgents`: `agent/` and `agents/` under each pi and Senpi location, later
- * locations overriding earlier names field by field.
+ * The markdown half of `loadAgents`: `agent/` and `agents/` under each pi, Senpi and omo location
+ * (the engine's agent dir and the project's `.omo` included), later locations overriding earlier
+ * names field by field. The task engine layers these between the builtins and `omo.json` agents.
  */
 export function loadMarkdownAgents(options: LoadAgentsOptions = {}): LoadAgentsResult {
   const resolvedOptions = resolveLoadAgentsOptions(options)
   const agents = new Map<string, AgentDefinition>()
   const diagnostics: AgentLoaderDiagnostic[] = []
-  for (const location of resolveAgentDefinitionLocations(resolvedOptions)) {
+  const locations = resolveAgentDefinitionLocations({
+    ...resolvedOptions,
+    agentHome: resolveAgentHome({ env: resolvedOptions.env, homeDir: resolvedOptions.homeDir }),
+  })
+
+  for (const location of locations) {
     const listed = listMarkdownAgentFiles(location)
     diagnostics.push(...listed.diagnostics)
     for (const path of listed.files) {
