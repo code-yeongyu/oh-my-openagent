@@ -53,6 +53,16 @@ describe("negative controls: routes and flags (7.6)", () => {
     expect(problems).toContainEqual(expect.stringContaining('"detour"'))
   })
 
+  test("#given a value table of a positional that no row names (P1a finding on remote control|wake) #then the inventory names each value", () => {
+    const findings = scanArgvComparisons(
+      "packages/omo-native/remote-local.ts",
+      'const MODE_VALUES = ["loud", "quiet"] as const\nexport const parse = (args) => MODE_VALUES.includes(args[1])\n',
+    )
+    const problems = argvProblems(findings, rows, { edition: "native", own: "launcher", also: ["engine"] }, {})
+    expect(problems).toContainEqual(expect.stringContaining('compares argv with "loud", which no native row names'))
+    expect(problems).toContainEqual(expect.stringContaining('compares argv with "quiet", which no native row names'))
+  })
+
   test("#given a flag with no mapping #then the schema names the field to add", () => {
     const send = row("threads.send")
     const thread = send.cli.find((entry) => entry.route.join(" ") === "thread send")

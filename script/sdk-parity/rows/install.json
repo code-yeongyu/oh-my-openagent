@@ -327,6 +327,7 @@
       ],
       "input": {
         "properties": {
+          "plan": {},
           "consent": {
             "enum": [
               "all",
@@ -335,7 +336,8 @@
           }
         },
         "required": [
-          "consent"
+          "consent",
+          "plan"
         ]
       },
       "cli": [
@@ -363,7 +365,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "With neither flag the command asks once and, when accepted, applies every stage: that is consent all, the prompt being the adapter's rendering; --yes is the same call with the prompt answered. A declined prompt makes no call."
     },
     {
       "id": "install.setup.detect",
