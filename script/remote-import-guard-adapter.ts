@@ -21,8 +21,12 @@ type OffenderRecord = Readonly<Record<string, { readonly uses: readonly string[]
 
 // The record may only shrink against the merge base (review 6061267823 H5): a new offending file, or a new layer for a
 // file the base listed, fails; removing either passes. A base with no record (the pull request that introduces it) admits
-// the record as it is.
-export function offenderGrowth(base: OffenderRecord | undefined, head: OffenderRecord): string[] {
+// the record as it is. A layer the head renamed is read under its new name in the base's record.
+export function offenderGrowth(
+  base: OffenderRecord | undefined,
+  head: OffenderRecord,
+  renames: Readonly<Record<string, string>> = {},
+): string[] {
   if (base === undefined) return []
   const problems: string[] = []
   for (const [file, offender] of Object.entries(head)) {
@@ -31,11 +35,30 @@ export function offenderGrowth(base: OffenderRecord | undefined, head: OffenderR
       problems.push(`${file} is a new adapter offender (${offender.uses.join(", ")}); route it through the SDK instead`)
       continue
     }
+    const beforeUses = before.uses.map((use) => renames[use] ?? use)
     for (const use of offender.uses)
-      if (!before.uses.includes(use))
+      if (!beforeUses.includes(use))
         problems.push(`${file} gained ${use}, which the merge base's record does not list; route it through the SDK`)
   }
   return problems
+}
+
+// Each file outside `owner` that holds one of the markers, with the kinds of logic it names. Sources are the caller's:
+// tracked, non-test files.
+export function logicOutside(
+  sources: readonly { readonly file: string; readonly text: string }[],
+  owner: string,
+  markers: Readonly<Record<string, readonly string[]>>,
+): ReadonlyMap<string, readonly string[]> {
+  const found = new Map<string, readonly string[]>()
+  for (const { file, text } of sources) {
+    if (file.startsWith(owner)) continue
+    const kinds = Object.entries(markers)
+      .filter(([, literals]) => literals.some((literal) => text.includes(literal)))
+      .map(([kind]) => kind)
+    if (kinds.length > 0) found.set(file, kinds)
+  }
+  return new Map([...found].toSorted(([a], [b]) => a.localeCompare(b)))
 }
 
 export function checkAdapterImports(

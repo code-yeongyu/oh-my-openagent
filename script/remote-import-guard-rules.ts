@@ -1,3 +1,4 @@
+import { ACCOUNT_CORE } from "./remote-import-guard-account-rules"
 import type { AdapterRules } from "./remote-import-guard-adapter"
 import type { GuardRules } from "./remote-import-guard-check"
 import adapterOffenders from "./remote-import-guard-adapter-offenders.json"
@@ -95,11 +96,17 @@ export const ADAPTER_RULES: AdapterRules = {
     REMOTE,
     DEVICE_SERVICE_CORE,
     BUNSHIN_TS_RELAY,
-    `${OPENCODE_CLI}service-auth/`,
-    `${OPENCODE_CLI}account-keys/`,
+    ACCOUNT_CORE,
     `${NATIVE}device-service-handoff.ts`,
   ],
   forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],
+}
+
+// A layer that moved keeps its offenders (#14364): the merge base's record names the old place, so the growth check reads
+// it under the new one. A reach of the moved layer is not a new reach.
+export const ADAPTER_LAYER_RENAMES: Readonly<Record<string, string>> = {
+  [`${OPENCODE_CLI}service-auth/`]: ACCOUNT_CORE,
+  [`${OPENCODE_CLI}account-keys/`]: ACCOUNT_CORE,
 }
 
 // Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
