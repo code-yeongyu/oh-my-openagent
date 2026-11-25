@@ -19,7 +19,8 @@ export type Via = (typeof VIAS)[number]
 export const ROOT_OPTIONS = ["api", "accounts", "env", "cwd", "home", "agentDir", "uid", "user", "endpoint", "platform"] as const
 
 // A flag or positional fills one SDK input field (`field`, `field=value`, `field.nested`), a root option (`root.<name>`),
-// or is not an input: `render` (output shape), `process` (the CLI process itself), `when` (selects this branch).
+// or is not an input: `render` (output shape), `process` (the CLI process itself), `when` (selects this branch),
+// `parse` (read only by the adapter's parser; the entry's `parseOnly` gives the written reason).
 export type Target = string
 
 export type FieldSchema = {
@@ -49,6 +50,7 @@ export type CliEntry = {
   readonly flags: Readonly<Record<string, Target>>
   readonly positionals: Readonly<Record<string, Target>>
   readonly values: readonly string[]
+  readonly parseOnly?: Readonly<Record<string, string>>
 }
 
 export type ToolEntry = {
@@ -74,6 +76,7 @@ export type Row = {
   readonly projection: Readonly<Record<string, string>>
   readonly scenarios: { readonly effect: readonly string[]; readonly refusal: readonly string[] }
   readonly modules: readonly string[]
+  readonly note?: string
 }
 
 // One rendered row of a section 6 table: which capabilities it stands for and its cells exactly as published.
@@ -106,6 +109,10 @@ export function rowProblems(row: Row): string[] {
   const inputs = new Set(Object.keys(row.input.properties))
   const checkTarget = (where: string, target: Target): void => {
     if (target === "render" || target === "process" || target === "when") return
+    if (target === "parse") {
+      if (parseReason === undefined) problems.push(`${at}: ${where} is a parse flag with no written reason in parseOnly`)
+      return
+    }
     if (target.startsWith("root.")) {
       const option = target.slice("root.".length).split(/[.=]/)[0] ?? ""
       if (!(ROOT_OPTIONS as readonly string[]).includes(option))
@@ -115,9 +122,14 @@ export function rowProblems(row: Row): string[] {
     if (!inputs.has(fieldOf(target)))
       problems.push(`${at}: ${where} fills "${fieldOf(target)}", which ${row.sdk} does not take; add it to the SDK input`)
   }
+  let parseReason: string | undefined
   for (const entry of row.cli) {
     const verb = `${entry.edition} "${entry.route.join(" ")}"`
-    for (const [flag, target] of Object.entries(entry.flags)) checkTarget(`${verb} flag ${flag}`, target)
+    for (const [flag, target] of Object.entries(entry.flags)) {
+      parseReason = entry.parseOnly?.[flag]
+      checkTarget(`${verb} flag ${flag}`, target)
+    }
+    parseReason = undefined
     for (const [name, target] of Object.entries(entry.positionals)) checkTarget(`${verb} <${name}>`, target)
   }
   for (const tool of row.tool)

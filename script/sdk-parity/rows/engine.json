@@ -385,7 +385,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.headless",
@@ -470,7 +471,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.interactive",
@@ -562,7 +564,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Also serves the internal __kill-guard. The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.print",
@@ -655,7 +658,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.rpc",
@@ -742,7 +746,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.models.discover",
@@ -1397,6 +1402,51 @@
         "refusal": []
       },
       "modules": []
+    },
+    {
+      "id": "engine.trust.ensure",
+      "kind": "capability",
+      "sdk": "engine.trust.ensure",
+      "today": "no",
+      "slices": [
+        "C1a"
+      ],
+      "input": {
+        "properties": {
+          "wait": {},
+          "lease_pid": {}
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "trust",
+            "ensure"
+          ],
+          "flags": {
+            "--json": "render",
+            "--wait": "wait",
+            "--lease-pid": "lease_pid"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a host integration's call that writes the trust store"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Answers the JSON record the verb prints. Security-gated: the security design (S0) covers it before any slice clears it (amendment 2, D1)."
     }
   ],
   "tables": [

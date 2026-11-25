@@ -4,7 +4,7 @@
     {
       "id": "internal.kill-guard",
       "kind": "internal",
-      "sdk": "daemon.stop",
+      "sdk": "engine.launch.interactive",
       "today": "no",
       "slices": [],
       "input": {
@@ -31,7 +31,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The judge the session runtime's shell shims ask before a kill; it serves the launch operations of 6.9 and is anchored on the interactive launch (amendment 2, D5)."
     },
     {
       "id": "internal.loro-smoke",
@@ -130,44 +131,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
-    },
-    {
-      "id": "internal.trust-ensure",
-      "kind": "internal",
-      "sdk": "diagnostics.run",
-      "today": "no",
-      "slices": [],
-      "input": {
-        "properties": {},
-        "required": []
-      },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "launcher",
-          "route": [
-            "trust",
-            "ensure"
-          ],
-          "flags": {
-            "--json": "render",
-            "--wait": "process",
-            "--lease-pid": "process"
-          },
-          "positionals": {},
-          "values": []
-        }
-      ],
-      "tool": [],
-      "planned": {},
-      "omitted": {},
-      "projection": {},
-      "scenarios": {
-        "effect": [],
-        "refusal": []
-      },
-      "modules": []
+      "modules": [],
+      "note": "A task shard supervisor's fast path into the engine route (amendment 2, D2)."
     },
     {
       "id": "render.help",
@@ -421,7 +386,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
     },
     {
       "id": "toolkit.hook.pre-tool-use",
@@ -456,7 +422,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
     },
     {
       "id": "toolkit.hook.pre-tool-use-spawn",
@@ -491,7 +458,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
     },
     {
       "id": "toolkit.hook.stop",
@@ -526,7 +494,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
     },
     {
       "id": "toolkit.hook.user-prompt-submit",
@@ -563,7 +532,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
     }
   ],
   "tables": [

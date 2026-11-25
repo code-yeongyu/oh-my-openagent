@@ -11,6 +11,9 @@ export type BaselineEntry = {
   readonly gap: string
   readonly slice: string
   readonly issue: string
+  // A gap only one slice may clear (a security-gated input or call): the pull request that removes the entry names that
+  // slice in an `SDK-Parity-Slice:` body line, and the gate refuses the removal otherwise.
+  readonly clearedOnlyBy?: string
 }
 
 export type Baseline = { readonly version: 1; readonly entries: readonly BaselineEntry[] }

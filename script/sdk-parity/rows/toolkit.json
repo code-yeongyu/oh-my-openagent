@@ -118,7 +118,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "advance is filled by --no-advance and is missing from the component manifest; the gap stays in the baseline (amendment 2, D3)."
     },
     {
       "id": "toolkit.completeGoals",
@@ -203,10 +204,10 @@
             "--codex-goal-mode": "codexGoalMode",
             "--validation-batch-json": "validationBatchesJson",
             "--force": "force",
-            "--after-json": "process",
-            "--directive-json": "process",
-            "--directive-file": "process",
-            "--target-goal-id": "process",
+            "--after-json": "parse",
+            "--directive-json": "parse",
+            "--directive-file": "parse",
+            "--target-goal-id": "parse",
             "--json": "render",
             "--help": "render",
             "-h": "render",
@@ -215,7 +216,13 @@
           "positionals": {
             "brief": "brief"
           },
-          "values": []
+          "values": [],
+          "parseOnly": {
+            "--after-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-file": "its value is removed from the positional brief; nothing reads it",
+            "--target-goal-id": "its value is removed from the positional brief; nothing reads it"
+          }
         }
       ],
       "tool": [],
