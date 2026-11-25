@@ -9,6 +9,9 @@ import type { RemoteCommandDependencies } from "./remote-cli"
 import { REMOTE_EXIT } from "./remote-exit"
 import { parseSession } from "./remote-session-args"
 import { personSenderProvenance, runSession } from "./remote-session-verbs"
+import { useIsolatedAgentDir } from "./test/remote-cli-harness"
+
+useIsolatedAgentDir()
 
 // The command reaches its client through the state dir it is connected on; a connected device service has its endpoint file there.
 const connectedStateDir = (): string => {

@@ -24,10 +24,6 @@ export const REFUSAL_CODES: Readonly<Record<string, { readonly code: ThreadError
     code: "not_resumable",
     next: "A newer message from the same sender with the same collapse_key replaced this one before the target read it; nothing to do.",
   },
-  binding_closed: {
-    code: "invalid_arguments",
-    next: "The binding this message was queued under was detached or rebound; re-read the binding and send again.",
-  },
 }
 
 /** What a row the receiver admitted to its queue waits on, if anything: the hold it was kept under, or the approval its receiver was parked on. */
