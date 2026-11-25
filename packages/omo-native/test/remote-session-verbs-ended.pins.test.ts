@@ -68,7 +68,7 @@ const PINS: readonly Pin[] = [
     code: REMOTE_EXIT.ok,
     out: ["Sent to b/dur-on-b: turn turn-b started."],
     err: [],
-    sent: ["session:prompt"],
+    sent: ["endpoint:find_session", "session:prompt"],
   },
   {
     args: ["send", "b/dur-on-b", "hi", "--no-wait", "--json"],
@@ -77,7 +77,7 @@ const PINS: readonly Pin[] = [
       '{"kind":"ok","thread":"dur-on-b","link":"[on b](omo-thread://v1/dur-on-b)","delivery":{"kind":"started","turn_id":"turn-b"},"deduplicated":false,"device":"b"}',
     ],
     err: [],
-    sent: ["session:prompt"],
+    sent: ["endpoint:find_session", "session:prompt"],
   },
 ]
 
