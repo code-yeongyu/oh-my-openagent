@@ -1,21 +1,21 @@
 import { Command } from "commander"
 import { isCancel, select, confirm } from "@clack/prompts"
-import { serviceAccountsOpen } from "./accounts-gate"
+import { serviceAccountsOpen } from "@oh-my-opencode/account-core/accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
-import { openSignInBrowser } from "./browser"
-import { deviceName, devicePlatform } from "./device-name"
-import { advertisesMachineIdentity, readMachineDigest } from "./machine-digest"
-import { createCredentialStore, INTERACTIVE_READ_WAIT } from "./keystore"
-import { beginLogin } from "./login-prelude"
-import { signInByRoute } from "./login-routes"
-import { type ChooseDevice, type ListedDevice, serviceOrigin, SignInError } from "./protocol"
-import { decideReplace } from "./replace-device"
+import { openSignInBrowser } from "@oh-my-opencode/account-core/browser"
+import { deviceName, devicePlatform } from "@oh-my-opencode/account-core/device-name"
+import { advertisesMachineIdentity, readMachineDigest } from "@oh-my-opencode/account-core/machine-digest"
+import { createCredentialStore, INTERACTIVE_READ_WAIT } from "@oh-my-opencode/account-core/keystore"
+import { beginLogin } from "@oh-my-opencode/account-core/login-prelude"
+import { signInByRoute } from "@oh-my-opencode/account-core/login-routes"
+import { type ChooseDevice, type ListedDevice, serviceOrigin, SignInError } from "@oh-my-opencode/account-core/protocol"
+import { decideReplace } from "@oh-my-opencode/account-core/replace-device"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 
-import { createSession, type DeviceServiceHandoff } from "./session"
-import { retireSyncPinOnDiscard } from "./sync-pin-retire"
-import { terminalText } from "./terminal-text"
-import { dedicatedStoreState } from "./keychain-helper/dedicated-store"
+import { createSession, type DeviceServiceHandoff } from "@oh-my-opencode/account-core/session"
+import { retireSyncPinOnDiscard } from "@oh-my-opencode/account-core/sync-pin-retire"
+import { terminalText } from "@oh-my-opencode/account-core/terminal-text"
+import { dedicatedStoreState } from "@oh-my-opencode/account-core/keychain-helper/dedicated-store"
 
 // #13116 design 7: a sign-in kept in OmO's own keychain says so; the login keychain default adds no line.
 function noteDedicatedStore(): void {
@@ -180,7 +180,7 @@ async function run(
   }
 }
 
-export { SERVICE_ACCOUNTS_OPEN } from "./accounts-gate"
+export { SERVICE_ACCOUNTS_OPEN } from "@oh-my-opencode/account-core/accounts-gate"
 
 /** #13265: the forms of omo login that still refuse while accounts are closed hear a refusal that names the route. */
 export const CLOSED_LOGIN_MESSAGE =

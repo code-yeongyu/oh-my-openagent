@@ -1,6 +1,6 @@
-import { CredentialStoreError, type CredentialStore } from "../omo-opencode/src/cli/service-auth/keystore"
-import { RecoveryExhausted, RecoveryPending } from "../omo-opencode/src/cli/service-auth/owned-refresh"
-import { type Session, SessionEnded } from "../omo-opencode/src/cli/service-auth/session"
+import { CredentialStoreError, type CredentialStore } from "../account-core/src/keystore"
+import { RecoveryExhausted, RecoveryPending } from "../account-core/src/owned-refresh"
+import { type Session, SessionEnded } from "../account-core/src/session"
 import { ACCOUNT_EXIT } from "./account-show"
 
 export interface SessionOutcomeDependencies {

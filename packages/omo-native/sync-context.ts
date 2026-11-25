@@ -11,16 +11,16 @@ import type { SyncOperationAuthority } from "../memory-core/src/sync/operation-a
 import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
-import { signInHint } from "../omo-opencode/src/cli/service-auth/accounts-gate"
+import { signInHint } from "../account-core/src/accounts-gate"
 import {
   type CredentialStore,
   createCredentialStore,
   INTERACTIVE_READ_WAIT,
-} from "../omo-opencode/src/cli/service-auth/keystore"
-import { type LiveDevice, listLiveDevices } from "../omo-opencode/src/cli/service-auth/devices"
-import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
-import { createSession } from "../omo-opencode/src/cli/service-auth/session"
-import { retireSyncPinOnDiscard } from "../omo-opencode/src/cli/service-auth/sync-pin-retire"
+} from "../account-core/src/keystore"
+import { type LiveDevice, listLiveDevices } from "../account-core/src/devices"
+import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../account-core/src/protocol"
+import { createSession } from "../account-core/src/session"
+import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 
 export interface SyncContext {
   readonly account: string

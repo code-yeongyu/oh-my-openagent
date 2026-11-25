@@ -7,7 +7,7 @@ import {
   privateKeys,
   refusal,
   temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+} from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 for (const code of ["device_revoked", "unknown_refusal"]) {

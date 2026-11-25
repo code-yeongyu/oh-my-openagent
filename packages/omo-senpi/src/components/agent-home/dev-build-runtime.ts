@@ -2,7 +2,7 @@ import { lstatSync, readFileSync, readlinkSync, realpathSync, statSync } from "n
 import { homedir } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 
-import { type PlatformFacts, systemPlatformFacts, userRecordHome } from "@oh-my-opencode/omo-opencode/account-home"
+import { type PlatformFacts, systemPlatformFacts, userRecordHome } from "@oh-my-opencode/account-core/account-home"
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null

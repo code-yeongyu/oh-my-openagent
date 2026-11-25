@@ -12,7 +12,7 @@ import {
 } from "./sync-phrase-tty"
 import type { Command } from "commander"
 
-import { SignInError } from "../omo-opencode/src/cli/service-auth/protocol"
+import { SignInError } from "../account-core/src/protocol"
 import { type SyncContext, signedInSyncContext } from "./sync-context"
 import { approve, spacedCode } from "./sync-approve-cli"
 import { deliverVoidNotice } from "./sync-void-notice"

@@ -1,4 +1,4 @@
-import { spawn } from "../../../shared/bun-spawn-shim"
+import { spawn } from "@oh-my-opencode/utils/runtime"
 
 export type MarkerProbe = (
   service: string,

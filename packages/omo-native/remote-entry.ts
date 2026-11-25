@@ -1,5 +1,5 @@
 import { deviceServiceStateDir } from "../device-service-core/src/device-service.ts"
-import { createCredentialStore, SESSION_READ_WAIT } from "../omo-opencode/src/cli/service-auth/keystore"
+import { createCredentialStore, SESSION_READ_WAIT } from "../account-core/src/keystore"
 import { accountServiceApi } from "./account-show"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { cliDeviceServiceHandoff } from "./device-service-handoff"

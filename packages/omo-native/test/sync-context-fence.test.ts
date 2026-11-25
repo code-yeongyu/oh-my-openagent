@@ -5,7 +5,7 @@
 import { expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
 
-import { fakeApi, grant, memorySecrets, temporaryHome } from "../../omo-opencode/src/cli/service-auth/test-support"
+import { fakeApi, grant, memorySecrets, temporaryHome } from "../../account-core/src/test-support"
 import { signedInSyncContext } from "../sync-context"
 
 const der = (key: { export(options: { format: "der"; type: "pkcs8" }): Buffer }) =>

@@ -2,7 +2,7 @@
 // lines (the recovery hint for an invalid stored sign-in) to its error sink, never into the stdout the remote verbs parse.
 import { describe, expect, test } from "bun:test"
 
-import { createCredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
+import { createCredentialStore } from "../../account-core/src/keystore"
 import { ACCOUNT_EXIT, readAccountInProcess } from "../account-show"
 
 describe("omo remote account read", () => {

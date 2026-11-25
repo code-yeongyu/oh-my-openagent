@@ -4,8 +4,8 @@ import {
   type Harness,
   isDarwin,
   userSearchList,
-} from "../../../../../omo-native/test/keychain-helper.test-support"
-import { probeOwnerMarker } from "./owner-marker"
+} from "./keychain-helper.test-support"
+import { probeOwnerMarker } from "../../account-core/src/keychain-helper/owner-marker"
 
 const OWNED = "e".repeat(64)
 const FOREIGN = "f".repeat(64)

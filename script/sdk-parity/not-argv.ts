@@ -18,7 +18,7 @@ export const NOT_ARGV: Readonly<Record<string, NotArgv>> = {
     tokens: ["--batch", "-c"],
     reason: "arguments of the git child process the memory core runs",
   },
-  "packages/omo-opencode/src/cli/service-auth/keychain-helper/owner-marker.ts": {
+  "packages/account-core/src/keychain-helper/owner-marker.ts": {
     tokens: ["-a", "-s"],
     reason: "arguments of the macOS security child process",
   },

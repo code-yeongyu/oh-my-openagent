@@ -1,8 +1,8 @@
 import { describe, expect, test, spyOn } from "bun:test"
 import { Command } from "commander"
 import { createPublicKey, verify } from "node:crypto"
-import { initializeDeviceKeyring, loadDeviceKeyring } from "./keyring"
-import { createOsKeyStore, type KeyStore, type RunSecretCommand } from "./keystore"
+import { initializeDeviceKeyring, loadDeviceKeyring } from "@oh-my-opencode/account-core/keyring/keyring"
+import { createOsKeyStore, type KeyStore, type RunSecretCommand } from "@oh-my-opencode/account-core/keyring/keystore"
 import { configureAccountKeysCommands } from "./commands"
 
 function memoryStore(): KeyStore {

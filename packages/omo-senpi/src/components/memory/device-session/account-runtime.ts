@@ -6,7 +6,7 @@
 // order every entry (the desktop's included) follows.
 
 import { sessionWorkerData } from "@code-yeongyu/senpi/session-worker-data"
-import { serviceOrigin } from "@oh-my-opencode/omo-opencode/service-auth"
+import { serviceOrigin } from "@oh-my-opencode/account-core"
 import { MEMORY_SYNC_WORKER_DATA, type MemorySyncSelection } from "../desktop-sync/hostSelection"
 import { launchCarriedPrivateTable } from "../desktop-sync/launchClassification"
 import { workerMemorySyncSource } from "../desktop-sync/workerPort"

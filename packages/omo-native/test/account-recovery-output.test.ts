@@ -1,6 +1,6 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
-import type { CredentialStore } from "../../omo-opencode/src/cli/service-auth/keystore"
-import { RecoveryExhausted, RecoveryPending } from "../../omo-opencode/src/cli/service-auth/owned-refresh"
+import type { CredentialStore } from "../../account-core/src/keystore"
+import { RecoveryExhausted, RecoveryPending } from "../../account-core/src/owned-refresh"
 import {
   fakeApi,
   grant,
@@ -8,7 +8,7 @@ import {
   privateKeys,
   refusal,
   temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+} from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }

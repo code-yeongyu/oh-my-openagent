@@ -9,7 +9,7 @@ import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import { createDeviceKeyring } from "@oh-my-opencode/memory-core/keyring"
 import { deviceKeyringFromMaterial } from "@oh-my-opencode/memory-core/sync-engine"
 import type { AccountSessionOptions, SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
-import { type CredentialStore, type Credentials, SignInError } from "@oh-my-opencode/omo-opencode/service-auth"
+import { type CredentialStore, type Credentials, SignInError } from "@oh-my-opencode/account-core"
 
 import * as syncRuntime from "../sync-runtime"
 import { createCliAccountSource, type CliDeviceAccount } from "./account-source"

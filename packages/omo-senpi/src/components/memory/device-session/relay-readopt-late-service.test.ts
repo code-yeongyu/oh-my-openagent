@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { connectDeviceService } from "@oh-my-opencode/device-service-core"
-import type { CredentialStore, Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { CredentialStore, Credentials } from "@oh-my-opencode/account-core"
 
 import {
   startFakeOwner,

@@ -1,5 +1,5 @@
 import { join } from "node:path"
-import type { CredentialStore } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { CredentialStore } from "@oh-my-opencode/account-core"
 
 import type { OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
 import { resolveAgentHome } from "../agent-home/resolve-agent-home"

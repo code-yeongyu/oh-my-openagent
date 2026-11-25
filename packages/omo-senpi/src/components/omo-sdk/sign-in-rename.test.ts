@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { ApiRefusal, type Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import { ApiRefusal, type Credentials } from "@oh-my-opencode/account-core"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts, type SignInProcess, type UserCode } from "."
 
 const ORIGIN = "https://accounts.example.test"

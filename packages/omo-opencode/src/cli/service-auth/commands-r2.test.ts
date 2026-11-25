@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import * as commands from "./commands"
-import { deviceListSchema } from "./protocol"
+import { deviceListSchema } from "@oh-my-opencode/account-core/protocol"
 
 test("device chooser builds inert labels from hostile server device names", () => {
   const { devices } = deviceListSchema.parse({

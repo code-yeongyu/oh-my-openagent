@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
-import { createCredentialStore, quietNotice } from "@oh-my-opencode/omo-opencode/service-auth"
+import { createCredentialStore, quietNotice } from "@oh-my-opencode/account-core"
 
 import { readMemoryStatusSegments } from "../status"
 import { createSyncRunner } from "../sync-runner"

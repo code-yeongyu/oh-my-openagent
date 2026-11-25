@@ -29,7 +29,7 @@ const CAPABILITIES_BYTES = '{"keychainHandoff":1}\n'
 const SPAWN_TIMEOUT_MS = 20_000
 const TEST_TIMEOUT_MS = 30_000
 const REAL_CAPABILITIES_MODULE = new URL(
-  "../packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities.ts",
+  "../packages/account-core/src/keychain-helper/runtime-capabilities.ts",
   import.meta.url,
 )
 

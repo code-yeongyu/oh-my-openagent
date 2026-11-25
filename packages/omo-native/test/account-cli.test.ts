@@ -13,10 +13,10 @@ import {
   type CredentialStore,
   KeychainLockedError,
   type SecretApi,
-} from "../../omo-opencode/src/cli/service-auth/keystore"
-import type { Credentials } from "../../omo-opencode/src/cli/service-auth/protocol"
-import type { BeforeKeysDiscarded } from "../../omo-opencode/src/cli/service-auth/session"
-import { retireSyncPinOnDiscard } from "../../omo-opencode/src/cli/service-auth/sync-pin-retire"
+} from "../../account-core/src/keystore"
+import type { Credentials } from "../../account-core/src/protocol"
+import type { BeforeKeysDiscarded } from "../../account-core/src/session"
+import { retireSyncPinOnDiscard } from "../../account-core/src/sync-pin-retire"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 const homes: string[] = []

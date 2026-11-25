@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join } from "node:path"
-import { gatedSecrets } from "../service-auth/keychain-helper/secrets-gate"
+import { gatedSecrets } from "../keychain-helper/secrets-gate"
 
 export type KeyStore = {
   readonly read: () => Promise<string | null>

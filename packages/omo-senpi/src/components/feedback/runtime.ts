@@ -8,7 +8,7 @@ import {
   type CredentialStore,
   quietNotice,
   SignInError,
-} from "@oh-my-opencode/omo-opencode/service-auth"
+} from "@oh-my-opencode/account-core"
 import type { ComponentLogger } from "../../extension/types"
 
 import { collectHostSections, type HostSessionView } from "./collect-host"

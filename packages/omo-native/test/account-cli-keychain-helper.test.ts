@@ -5,7 +5,7 @@ import {
   credentials,
   fakeKeychain,
   helperSession,
-} from "../../omo-opencode/src/cli/service-auth/keychain-helper/fake-keychain.test-support"
+} from "../../account-core/src/keychain-helper/fake-keychain.test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 async function account(keychain: ReturnType<typeof fakeKeychain>, args: string[], stdin = "") {

@@ -211,14 +211,6 @@ describe("config-migration public subpath", () => {
         import: "./src/shared/binary-downloader.ts",
         types: "./src/shared/binary-downloader.ts",
       },
-      "./service-auth": {
-        import: "./src/cli/service-auth/index.ts",
-        types: "./src/cli/service-auth/index.ts",
-      },
-      "./account-home": {
-        import: "./src/cli/service-auth/account-home.ts",
-        types: "./src/cli/service-auth/account-home.ts",
-      },
     })
   })
 
