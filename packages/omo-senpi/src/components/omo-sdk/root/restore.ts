@@ -33,7 +33,9 @@ export function withRestore(
 ): Details | undefined {
   const details = original["details"] as Details | undefined
   const extraKeys = Object.keys(original).filter((key) => !shape.includes(key))
-  if (held === undefined && extraKeys.length === 0) return details
+  // The inverse rebuilds the shape's fields in the shape's order; any other order is recorded, so the JSON is identical.
+  const inShapeOrder = shape.filter((key) => Object.hasOwn(original, key)).join() === Object.keys(original).join()
+  if (held === undefined && extraKeys.length === 0 && inShapeOrder) return details
   const restore: Restore = {
     ...(held === undefined ? {} : { code: held }),
     details: details !== undefined,

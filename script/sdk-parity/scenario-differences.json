@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "config.status/reads-config-files",
+      "differs": "The config core reads the config files itself, so no fs.read reaches a port (omo-sdk/config/index.ts:21).",
+      "owner": "C1b",
+      "retires_with": "C1b"
+    },
+    {
+      "id": "threads.extensions.register/authority-base",
+      "differs": "The table's placeholder moduleUrl \"x-moduleUrl\" is not a file URL, so the root refuses it invalid_arguments before store.register_extension (omo-sdk/root/threads.ts:149).",
+      "owner": "P1b",
+      "retires_with": "P1b"
+    },
+    {
+      "id": "threads.extensions.register/authority-session-callable",
+      "differs": "The table's placeholder moduleUrl \"x-moduleUrl\" is not a file URL, so the root refuses it invalid_arguments before store.register_extension (omo-sdk/root/threads.ts:149).",
+      "owner": "P1b",
+      "retires_with": "P1b"
+    },
+    {
+      "id": "threads.locate/on-other-device",
+      "differs": "The address is resolved over the account listing (sessions.list, aliases.resolve), never through remote sessions.resolve (sdk-core/reads.ts:70).",
+      "owner": "T1a",
+      "retires_with": "T1a"
+    },
+    {
+      "id": "threads.release/move",
+      "differs": "move is not acted on, so the call answers not_implemented (omo-sdk/root/threads.ts:121).",
+      "owner": "T1c",
+      "retires_with": "T1c"
+    },
+    {
+      "id": "threads.rename/idempotent-repeat",
+      "differs": "The idempotency key goes to the alias registry only, so no store.idempotency_get is made and the rename runs again (sdk-core/controls.ts:102).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.rename/session-ended",
+      "differs": "A thread with no live owner is refused not_resumable instead of renamed in its session file (control/rename.ts:31).",
+      "owner": "T1a",
+      "retires_with": "T1a"
+    }
+  ]
+}
