@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import { type Credentials, KeychainLockedError } from "@oh-my-opencode/omo-opencode/service-auth"
 import { closeClients, type FakeClock, fakeClock, startModeOwner, startOwner } from "../remote/testing/fake-service"
-import { createOmoSdk, type OmoResult, type OmoSdk } from "."
+import { createOmoSdk, type OmoErrorCode, type OmoResult, type OmoSdk } from "."
 
 // devices.list is the remote module's devices.list (omo#13413, one listing path): the omo SDK builds a session client
 // through the remote barrel against this machine's device service and answers the rows in its own LiveDevice shape.
@@ -27,13 +27,20 @@ const SIGNED_IN: Credentials = {
   sealingPrivateKey: "sealing-key-fixture",
 }
 
-// By default a credential store that would answer signed_out: a listing the device service answers never reads the
-// account sign-in. Only a listing with no device service asks it, to tell a signed-out device from a missing service.
-const sdkOn = (stateDir: string, clock: FakeClock = fakeClock(), stored: Credentials | null = null): OmoSdk => {
+type Account = { readonly read: () => Promise<Credentials | null>; readonly desktopLaunch: boolean }
+const SIGNED_IN_ACCOUNT: Account = { read: async () => SIGNED_IN, desktopLaunch: false }
+
+// By default a signed-in device: devices.list keeps the account precondition it always had (closed, desktop launch,
+// signed out, credential store) before it opens any device-service connection.
+const sdkOn = (stateDir: string, clock: FakeClock = fakeClock(), account: Account = SIGNED_IN_ACCOUNT): OmoSdk => {
   const sdk = createOmoSdk({
     env: { OMO_DEVICE_SERVICE_STATE_DIR: stateDir },
     cwd: tmpdir(),
-    ports: { desktopLaunch: () => false, credentialStore: { read: async () => stored }, remoteTimers: clock },
+    ports: {
+      desktopLaunch: () => account.desktopLaunch,
+      credentialStore: { read: account.read },
+      remoteTimers: clock,
+    },
   })
   sdks.push(sdk)
   return sdk
@@ -86,23 +93,43 @@ describe("omo SDK devices.list through the remote module", () => {
     const empty = mkdtempSync(join(tmpdir(), "omo-sdk-no-service-"))
     dirs.push(empty)
 
-    expect(errorOf(await sdkOn(empty, fakeClock(), SIGNED_IN).devices.list())).toMatchObject({
+    expect(errorOf(await sdkOn(empty).devices.list())).toMatchObject({
       code: "device_service_unavailable",
       details: { code: "not_installed" },
     })
   })
 
-  test("#given no device service on a device that is not signed in #when devices.list runs #then it answers signed_out, the reason no service runs", async () => {
-    const empty = mkdtempSync(join(tmpdir(), "omo-sdk-no-service-"))
-    dirs.push(empty)
+  const refusals: ReadonlyArray<readonly [string, Account, OmoErrorCode]> = [
+    ["a device that is not signed in", { read: async () => null, desktopLaunch: false }, "signed_out"],
+    ["a desktop launch", { read: async () => SIGNED_IN, desktopLaunch: true }, "desktop_sign_in"],
+    [
+      "a locked credential store",
+      {
+        read: async () => {
+          throw new KeychainLockedError("locked")
+        },
+        desktopLaunch: false,
+      },
+      "credential_store_locked",
+    ],
+  ]
+  test.each(refusals)(
+    "#given %s and a running device service #when devices.list runs #then it answers the account's refusal and opens no connection",
+    async (_given, account, code) => {
+      const owner = await startOwner()
 
-    expect(errorOf(await sdkOn(empty).devices.list()).code).toBe("signed_out")
-  })
+      const error = errorOf(await sdkOn(owner.stateDir, fakeClock(), account).devices.list())
+
+      expect(error.code).toBe(code)
+      expect(error.next_action).not.toBe("")
+      expect(owner.state.conns.size).toBe(0)
+    },
+  )
 
   test("#given a device service that never completes its handshake #when the deadline passes #then the module's failure maps to device_service_unavailable with its code", async () => {
     const { owner, withheld } = await startModeOwner("silent-handshake")
     const clock = fakeClock()
-    const listing = sdkOn(owner.stateDir, clock, SIGNED_IN).devices.list()
+    const listing = sdkOn(owner.stateDir, clock).devices.list()
     await withheld("welcome")
 
     clock.advance(60_000)

@@ -108,6 +108,14 @@ describe("createOmoSdk reads", () => {
     })
   })
 
+  test("#given the account lists a revoked device #when account.devices runs #then only live devices return with the account's own fields, this one current", async () => {
+    const { ports } = fakes()
+    expect(valueOf(await sdkWith(ports).account.devices())).toEqual([
+      { id: "dev_this", name: "device-a", kind: "cli", platform: "linux", current: true },
+      { id: "dev_other", name: "device-b", platform: "macos", machineBound: true, current: false },
+    ])
+  })
+
   test("#given every read #when its value is scanned by key and value #then no token, secret or private key is in it", async () => {
     const { ports } = fakes()
     const home = mkdtempSync(join(tmpdir(), "omo-sdk-home-"))

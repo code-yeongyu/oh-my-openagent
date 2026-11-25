@@ -1,14 +1,20 @@
 import { ApiRefusal, type LiveDevice, renameDevice } from "@oh-my-opencode/omo-opencode/service-auth"
 import { type DeviceRow, type RemoteClientDeps, type RemoteFailure, remoteClientForSession } from "../../remote"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
-import { type AccountAccess, closedRefusal } from "../access"
+import type { AccountAccess } from "../access"
 import { ok, type OmoResult, refused } from "../result"
 
 export type { LiveDevice }
 
+/**
+ * A device as this machine's device service lists it. The device service's roster has no `createdAt`, `machineBound` or
+ * `syncing`; those are the account view's (`account.devices`).
+ */
+export type ListedDevice = Omit<LiveDevice, "createdAt" | "machineBound" | "syncing">
+
 export type DevicesApi = {
   /** The account's devices as this machine's device service lists them, this device `current`. */
-  readonly list: () => Promise<OmoResult<readonly LiveDevice[]>>
+  readonly list: () => Promise<OmoResult<readonly ListedDevice[]>>
   /** Renames a device of this account and answers it as the account lists it afterwards. */
   readonly rename: (target: { readonly id: string; readonly name: string }) => Promise<OmoResult<LiveDevice>>
 }
@@ -22,7 +28,7 @@ export type DeviceListing = {
 // cell that names no session of its own; the listing never reads the sender's id, only that it is a session.
 const SENDER = "omo-sdk"
 
-const live = (row: DeviceRow): LiveDevice => ({
+const listedDevice = (row: DeviceRow): ListedDevice => ({
   id: row.id,
   name: row.name,
   ...(row.kind === undefined ? {} : { kind: row.kind }),
@@ -67,7 +73,10 @@ function listingFailure(failure: RemoteFailure): OmoResult<never> {
 export function createDevicesApi(access: AccountAccess, listing: DeviceListing): DevicesApi {
   return {
     list: async () => {
-      if (access.signal.aborted) return closedRefusal()
+      // The account precondition the listing always had: a closed SDK, a desktop launch, a device that is not signed in
+      // or a credential store that cannot be read refuses before any device-service connection opens.
+      const account = await access.signedIn(async () => undefined)
+      if (account.kind === "error") return account
       const client = remoteClientForSession(SENDER, {
         version: createOmoNativeProductConfig().packageVersion,
         stateDir: listing.stateDir(),
@@ -75,20 +84,13 @@ export function createDevicesApi(access: AccountAccess, listing: DeviceListing):
       })
       try {
         const listed = await client.devices.list({ signal: access.signal })
-        // With no device service the module answers this machine as a local-only row, which is no account device.
-        const noService =
-          listed.kind === "error" ? UNAVAILABLE.has(listed.code) : listed.value.some((row) => row.kind === "local")
-        // A device that is not signed in has no service to ask: that is the reason to report, not the missing service.
-        if (noService) {
-          const account = await access.signedIn(async () => undefined)
-          if (account.kind === "error" && account.error.code === "signed_out") return account
-        }
         if (listed.kind === "error") return listingFailure(listed)
-        if (noService)
+        // With no device service the module answers this machine as a local-only row, which is no account device.
+        if (listed.value.some((row) => row.kind === "local"))
           return refused("device_service_unavailable", "no device service runs on this machine", SERVICE_CHECK, {
             code: "not_installed",
           })
-        return ok(listed.value.map(live))
+        return ok(listed.value.map(listedDevice))
       } finally {
         client.close()
       }

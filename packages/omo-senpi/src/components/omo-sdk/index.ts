@@ -11,7 +11,7 @@ export type { CredentialStorePort, SessionPort } from "./access"
 export type { SignedIn, SignInOptions, SignInProcess, UserCode, WhoAmI } from "./account"
 export type { ConfigStatus } from "./config"
 export type { DeviceServiceStatus, DeviceServiceStatusPort } from "./device-service"
-export type { LiveDevice } from "./devices"
+export type { ListedDevice, LiveDevice } from "./devices"
 export type { OmoError, OmoErrorCode, OmoResult } from "./result"
 
 export type OmoSdkPorts = AccessPorts & {

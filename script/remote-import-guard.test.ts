@@ -52,8 +52,9 @@ describe("remote import guard G1 over packages/**", () => {
   })
 })
 
-// omo#13413: the omo SDK's devices.list is the remote module's devices.list, so the account has one device listing for a
-// script. A second path (the account service's own listing, or a remote client built past the barrel) fails here.
+// omo#13413: the omo SDK's devices.list is the remote module's devices.list, so a script has one device-service listing.
+// The account service's own listing is the SDK's account view (account.devices, the fields only the account holds) and
+// nothing else: devices.list reaching it, or a remote client built past the barrel, fails here.
 describe("the omo SDK's one device listing", () => {
   const root = join(import.meta.dir, "..")
   const resolve = createResolver(root)
@@ -64,7 +65,7 @@ describe("the omo SDK's one device listing", () => {
       !REMOTE_IMPORT_RULES.testFile(fact.file),
   )
 
-  test("#given the omo SDK's sources #then none imports the account service's device listing", () => {
+  test("#given the omo SDK's sources #then only the account view imports the account service's device listing", () => {
     const listings = sdkFiles.flatMap((fact) =>
       fact.edges
         .filter(
@@ -74,7 +75,9 @@ describe("the omo SDK's one device listing", () => {
         )
         .map((edge) => `${fact.file} <- ${edge.specifier}`),
     )
-    expect(listings).toEqual([])
+    expect(listings).toEqual([
+      "packages/omo-senpi/src/components/omo-sdk/account/index.ts <- @oh-my-opencode/omo-opencode/service-auth",
+    ])
   })
 
   test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
