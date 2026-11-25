@@ -34,6 +34,10 @@ Object.defineProperty(Bun, "secrets", {
     [Symbol.for("omo.test.injectedSecrets")]: true,
   },
 })
+// A granted test login must not install or link a device service on the host running the suite (omo#13627): the
+// post-login remote setup would install the real device service as a user service whose state dir is this temp HOME,
+// and that service keeps writing there after the test removed the HOME.
+Object.assign(globalThis, { [Symbol.for("omo.test.skipRemoteLoginSetup")]: true })
 // On Linux the CLI asks the Secret Service over D-Bus whether the default collection is locked; answer unlocked.
 if (process.platform === "linux") {
   if (!process.env.HOME) throw new Error("a temporary HOME is required")

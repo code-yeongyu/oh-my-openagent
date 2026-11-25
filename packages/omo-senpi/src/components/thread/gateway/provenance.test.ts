@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 
-import { renderDeliveryText } from "./provenance"
+import { renderDeliveryDisplayText, renderDeliveryText } from "./provenance"
 import type { DeliveryRow, EnvelopeOrigin } from "./types"
 
 function delivery(): DeliveryRow {
@@ -121,4 +121,17 @@ test("#given only required provenance labels #when rendering #then optional segm
       envelope: { ...row.envelope, provenance: { workspace: "Example", project: "project" } },
     }).split("\n")[0],
   ).toStartWith("From Example / project [OMO_GATEWAY v=1 ")
+})
+
+// #14045: thread_create's first prompt reaches the new thread as its own first user message, with the creator's authority.
+test("#given a creator-authority delivery #when rendering #then the body comes first with no gateway header and the creator stays answerable", () => {
+  const row = delivery()
+  const creator = { ...row, envelope: { ...row.envelope, authority: "creator" as const } }
+  const text = renderDeliveryText(creator)
+  expect(text).toStartWith(row.body)
+  expect(text).not.toContain("OMO_GATEWAY")
+  expect(text).toContain('thread: "sender"')
+  expect(renderDeliveryDisplayText(creator)).toBe(row.body)
+  expect(renderDeliveryText(row).split("\n")[0]).toContain("[OMO_GATEWAY v=1 source=peer_agent")
+  expect(renderDeliveryDisplayText(row)).not.toBe(row.body)
 })

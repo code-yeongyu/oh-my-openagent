@@ -10,6 +10,7 @@ import {
   settings,
   tempProject,
 } from "./__fixtures__/manager-fakes"
+import { ownedTaskState } from "../store/__fixtures__/owned-task-state"
 
 afterEach(cleanupProjects)
 
@@ -33,7 +34,7 @@ test("delta-2 LOW: resuming a lost child with the cutoff the run already observe
   }
   const manager = createTaskManager({
     cwd,
-    store: createTaskRecordStore({ project_dir: cwd }),
+    store: createTaskRecordStore(ownedTaskState(cwd)),
     config: settings(),
     planner: categoryPlanner(),
     runners: { "in-process": runner, process: runner },

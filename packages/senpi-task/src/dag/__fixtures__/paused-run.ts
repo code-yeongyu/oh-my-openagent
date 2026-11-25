@@ -4,6 +4,7 @@ import type { DagRunRecordV1 } from "../manager"
 import { createDagFileStore } from "../store"
 import type { DagNodeId, DagRunId } from "../types"
 import type { DagSchedulerOptions } from "../scheduler"
+import { ownedTaskState } from "../../store/__fixtures__/owned-task-state"
 
 export async function pausedRun() {
   const h = makeManager()
@@ -23,7 +24,7 @@ export async function pausedRun() {
   const compiled = compileDag(definition, { at })
   if (!compiled.ok) throw new Error("invalid fixture definition")
   const runId = "paused-controls" as DagRunId
-  const store = createDagFileStore({ project_dir: h.project })
+  const store = createDagFileStore(ownedTaskState(h.project))
   const record: DagRunRecordV1 = {
     schemaVersion: 1,
     checkpointSeq: 0,

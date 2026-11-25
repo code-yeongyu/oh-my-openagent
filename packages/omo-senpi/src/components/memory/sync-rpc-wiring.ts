@@ -4,6 +4,7 @@ import type { MemoryRpcSync } from "./memory-rpc-sync"
 import { createSyncRpcClaims } from "./sync-rpc-claims"
 import type { SyncRpcAccount, SyncRpcRegistration } from "./sync-rpc-ports"
 import { registerSyncRpc } from "./sync-rpc-registration"
+import { phraseGateFrom } from "./sync-phrase-gate"
 
 export function wireSyncRpc(options: {
   readonly rpc: SyncRpcRegistration
@@ -12,6 +13,10 @@ export function wireSyncRpc(options: {
   readonly pinDir: string
   readonly signal: AbortSignal
   readonly syncStatus: () => Promise<MemoryRpcSync | undefined>
+  readonly stopSync?: () => Promise<void>
+  readonly resumeSync?: () => Promise<void>
+  readonly env: Readonly<Record<string, string | undefined>>
+  readonly logger: { error(message: string, fields?: Record<string, unknown>): void }
   readonly warn?: (message: string, fields: Record<string, unknown>) => void
 }) {
   let warnedLegacy = false
@@ -30,13 +35,19 @@ export function wireSyncRpc(options: {
     },
     runtime: {
       enableSync: async (input) => (await import("#omo-memory-sync-runtime")).enableSync(input),
+      disableSync: async (input) => (await import("#omo-memory-sync-runtime")).disableSync(input),
       joinAccount: async (input) => (await import("#omo-memory-sync-runtime")).joinAccount(input),
       approveDevice: async (input) => (await import("#omo-memory-sync-runtime")).approveDevice(input),
+      phraseNoticeStatus: async (place) => (await import("#omo-memory-sync-runtime")).phraseNoticeStatus(place),
+      acknowledgePhraseVoid: async (input) => (await import("#omo-memory-sync-runtime")).acknowledgePhraseVoid(input),
     },
     claims: createSyncRpcClaims(join(options.memoryRoot, "runtime", "sync-rpc-claims")),
     pinDir: options.pinDir,
     signal: options.signal,
     syncStatus: options.syncStatus,
+    ...(options.stopSync === undefined ? {} : { stopSync: options.stopSync }),
+    ...(options.resumeSync === undefined ? {} : { resumeSync: options.resumeSync }),
+    phraseGate: phraseGateFrom(options.env, options.logger),
     ...(options.warn === undefined ? {} : { warn: options.warn }),
   })
 }

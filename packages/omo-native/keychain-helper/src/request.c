@@ -5,8 +5,8 @@
 #include <string.h>
 #include <unistd.h>
 
-// One flat JSON object {"v":1,"verb":"...","account":"...","value":"..."}. Unknown or duplicate keys, any other `v`,
-// trailing bytes and malformed JSON are refused, so the helper never guesses at a request it does not understand.
+// One flat JSON object {"v":1,"verb":"...","account":"...","value":"...","store":"..."} (store: omo, omo-migrate or
+// login, #13116). Unknown or duplicate keys, any other `v`, trailing bytes and malformed JSON are refused, so the helper never guesses at a request it does not understand.
 
 typedef struct {
   const char *at;
@@ -118,6 +118,7 @@ static const char *parse_member(cursor *c, request *req) {
     else if (buffer_is(&key, "verb")) seen = &req->has_verb, target = &req->verb;
     else if (buffer_is(&key, "account")) seen = &req->has_account, target = &req->account;
     else if (buffer_is(&key, "value")) seen = &req->has_value, target = &req->value;
+    else if (buffer_is(&key, "store")) seen = &req->has_store, target = &req->store;
     if (seen == NULL) refusal = "unknown-key";
     else if (*seen) refusal = "duplicate-key";
     else {
@@ -158,6 +159,9 @@ const char *parse_request(const char *line, size_t length, request *req) {
   if (c.at != c.end) return "malformed";
   if (!req->has_v) return "unknown-v";
   if (!req->has_verb || !req->has_account) return "malformed";
+  if (req->has_store && !buffer_is(&req->store, "omo") && !buffer_is(&req->store, "omo-migrate") &&
+      !buffer_is(&req->store, "login"))
+    return "store";
   return NULL;
 }
 

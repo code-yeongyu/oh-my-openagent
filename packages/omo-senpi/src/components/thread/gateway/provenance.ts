@@ -1,6 +1,6 @@
 import { GATEWAY_PEER_REPLY_SENTENCE, GATEWAY_PROVENANCE_SENTENCE } from "./constants"
 import type { DeliverySender } from "./adapter"
-import type { DeliveryRow, Provenance } from "./types"
+import type { DeliveryRow, Provenance, StoredDeliveryEnvelope } from "./types"
 
 function headerValue(value: string): string {
   const cleaned = value.replace(/[\s\[\]=]+/g, "_")
@@ -50,8 +50,30 @@ export function deliverySender(row: DeliveryRow): DeliverySender {
   return { kind: "external", platform: origin.external.platform, ...(author === undefined ? {} : { author }) }
 }
 
+/**
+ * thread_create's first prompt is the created thread's own brief from the session that owns it (#14045): it arrives as
+ * that session's first user message, as if typed there, with no relay header or untrusted-content sentence. One line
+ * after it names the creator, so the thread can still answer the session that made it.
+ */
+function renderCreatorPrompt(row: RenderedDelivery): string {
+  const origin = row.envelope.origin
+  if (!("session" in origin)) return row.body
+  return `${row.body}\n\n(This thread was created by session ${origin.session}; report to it with tool.thread_send({ thread: "${origin.session}", message }) inside an eval cell.)`
+}
+
+/** The text a person sees for a delivery: the creator's prompt as written, any other delivery under its provenance line. */
+export function renderDeliveryDisplayText(row: {
+  readonly envelope: Pick<StoredDeliveryEnvelope, "provenance" | "authority">
+  readonly body: string
+}): string {
+  return row.envelope.authority === "creator"
+    ? row.body
+    : `${deliveryProvenanceLine(row.envelope.provenance)}\n${row.body}`
+}
+
 export function renderDeliveryText(row: RenderedDelivery): string {
   const envelope = row.envelope
+  if (envelope.authority === "creator") return renderCreatorPrompt(row)
   const source = "session" in envelope.origin ? "peer_agent" : "external"
   const senderSession = "session" in envelope.origin ? envelope.origin.session : "-"
   const effective = row.mode_effective ?? row.mode_requested

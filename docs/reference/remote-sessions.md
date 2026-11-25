@@ -13,23 +13,70 @@ remote operation's typed result as one JSON line (`packages/omo-native/remote-se
 
 ```bash
 omo remote status [--json]       # the device service's connection state
-omo remote devices [--json]      # the devices on this account
+omo remote devices [--json]      # the devices on this account, this device first
 omo remote sessions [--device D] [--project P] [--state running|idle|ended] [--json]
 omo remote enable | disable [--json]   # set this device up and turn remote sessions on, or turn them off
 omo remote control [on|off]      # whether your other devices may view and command this device's sessions
 omo remote wake [on|off|default] # whether a message from your other devices may start a session here that is not running
 omo remote bootstrap [--json]    # set up the device service for your sign-in (every omo start runs it)
-omo remote attach <device>/<session>   # open a session on another device in the terminal UI, to watch and type
-omo remote open <device> [--project P] [--model M] [--permission-preset MODE] [--json]
+omo remote attach <session>      # open a session in the terminal UI, to watch and type
+omo remote open <device> [--project P] [--model provider/id] [--thinking LEVEL] [--permission-preset MODE]
+                [--worktree [--branch B] [--base REF]] [--prompt TEXT [--steer|--follow-up]] [--json]
                                  # start a session on another device; prints <device>/<session>
-omo remote send <device>/<session> <text> [--steer|--follow-up] [--no-wait] [--json]
+omo remote send <session> <text> [--steer|--follow-up] [--no-wait] [--json]
                                  # send a message and print the answer as it arrives
-omo remote model <device>/<session> <provider/id> [--json]   # switch the session's model
-omo remote interrupt <device>/<session> [--json]   # stop the session's running turn
-omo remote close <device>/<session> [--json]       # end the session on its device
+omo remote model <session> <provider/id> [--json]   # switch the session's model
+omo remote interrupt <session> [--json]   # stop the session's running turn
+omo remote close <session> [--force] [--json]  # end the session on its device; --force also drops messages it has not read
 ```
 
-`open` runs the new session in `MODE` (default: this device's own setting, else full-access). `send`
+`devices` lists this device first. With `--json`, every row has `id`, `name`, `platform`, `online`,
+`last_seen_ms` and `caps` (`attach`, `machine`, `control`), and `kind` when one is reported (this device's row has
+none when the account roster does not list it). Only this device's row has `self: true`; the other rows have no
+`self` key. When the device service reports this device, its row reads online only while that service is
+connected; with no device service, or one that does not report this device, the row is a local one (`id: "local"`,
+`kind: "local"`) that reads online. While the device service answers, `sessions --device D` for a device that is
+neither this device nor on the account fails with exit 2 and names it.
+
+`open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the
+model and thinking level given (default: that device's own); a model that device cannot run opens
+nothing and fails with `model_not_found`. `--worktree` starts the session in a new git worktree of the
+repository at `--project` on that device, on branch `B` (default `omo/thread-<time>`) at `REF` (default
+its HEAD). `--prompt` hands the new session its first message, delivered as `send --no-wait` delivers
+it; with `--json` the result's `prompt` field names that delivery or its failure (the session stays
+open). The agent tool `thread_create` takes the same options as `model`, `reasoning`,
+`permission_preset`, `worktree`, `prompt` and `delivery`; there `permission_preset` may only keep or
+narrow the calling session's own mode.
+
+## Addresses
+
+Every session verb - `send`, `model`, `interrupt`, `close`, `attach` - takes one address, resolved by the one
+resolver the thread tools use (#14305), so the same text works everywhere:
+
+```text
+address   := bare | device "/" thread
+bare      := thread-id | session-id | alias | name | id-prefix
+thread    := bare                      (resolved among that device's sessions only)
+device    := device-id | "here" | device-name | device-id-prefix
+```
+
+- A thread id is the `thread` value `open --json` prints; it is the canonical identity of the session. A session id
+  is the listing key of the `SESSION` column. A name compares as thread names do (case and spacing folded). An id
+  prefix is 8+ hex characters naming one thread; a device-id prefix is 6+ characters.
+- A bare address searches the account's listing; `<device>/<thread>` searches that device's sessions only. A thread id
+  or a listing key that device does not list yet (a session opened a moment ago) is asked of the device itself, when
+  this device's service is 0.1.31 or later; an older service answers `host_unavailable` (`wake_unavailable`) and
+  sends nothing, so wait for the session to appear in `omo remote sessions`, or update OmO. A name, an alias or an id
+  prefix is always taken from the listing.
+- `here` names this device. `omo remote` commands the OTHER devices' sessions: a thread this device holds, by any form,
+  answers `not_found` and nothing is sent; reach it with `omo thread send <thread>`.
+- Failures are typed. `model`, `interrupt`, `close` and `attach` need the device online and refuse `device_offline`
+  without queueing. A device that missed this listing round answers `host_unavailable`, never an empty miss. An
+  ambiguous device, name or prefix, or a thread id two devices list, is `ambiguous_target`: nothing runs, and the
+  candidates are printed one per line (in `--json`, under `details.candidates`). `/session` and `device/` are usage
+  errors.
+
+`send`
 with `--steer` goes into the running turn, and `--no-wait` returns once the session took the message
 instead of printing the answer.
 
@@ -39,7 +86,31 @@ for every stop, including a failed verification or install.
 
 ## Set up a device
 
-After `omo login`, one command sets the device up:
+Remote sessions are **on by default**. When `omo login` completes, it turns them on for this device ([how to sign in from a terminal](./cli.md#omo-login-omo-logout-omo-whoami-omo-native)). What it prints
+depends on whether this device already runs the current device service.
+
+If it does, login switches remote sessions on right away and prints:
+
+```text
+Remote is on for this device: other signed-in devices can reach it. Turn off: omo remote disable
+```
+
+If it does not (a new device, or one still running an older service), login does not wait for the install. It starts
+`omo remote enable --after-login` in the background, exits, and prints:
+
+```text
+Remote is turning on for this device in the background. Check: omo remote status. Turn off: omo remote disable
+```
+
+The background enable installs the service and then switches remote sessions on. Check how far it got with
+`omo remote status`. To turn remote off, run `omo remote disable`, even while the background enable is still running:
+the enable sees the record and leaves remote off.
+
+Every omo start then keeps the device set up (`omo remote bootstrap`). `omo remote disable` turns remote sessions
+off and records that in `~/.omo/remote-sessions.json`, so neither `omo login` nor an omo start turns them on again;
+`omo login` then says so (`Remote is off for this device, as you set it with omo remote disable. Turn on: omo remote
+enable`). The bootstrap never turns the device service's switch on by itself: a switch turned off another way (the
+OmO desktop app) stays off. `omo remote enable` turns remote sessions back on and clears the record:
 
 ```bash
 omo remote enable
@@ -47,8 +118,8 @@ omo remote enable
 
 It runs the bootstrap first (`packages/omo-native/remote-bootstrap.ts`): it installs the pinned device service when
 none runs, connects, and registers this omo's agent dir with it (the service only creates endpoints and delivery
-consumers for agent dirs it knows). It then turns remote sessions on, and installs and starts the always-on session host
-unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
+consumers for agent dirs it knows). It then turns remote sessions on, links a sign-in the service has not seen (a sign-in made before the service was
+installed), and installs and starts the always-on session host unit (see [Session host unit and cold wake](#session-host-unit-and-cold-wake)). Each step is idempotent, so running it
 again changes nothing that is already in place. Signed out, it stops before anything is installed, with exit `3`.
 
 `omo remote status` reads the result back. Besides the service's own state it shows this device's two units as the
@@ -177,11 +248,12 @@ not running (`packages/device-service-core/src/cold-wake/`).
 | --- | --- | --- |
 | Unit | systemd user unit `~/.config/systemd/user/omo-session-host.service`, enabled (`WantedBy=default.target`) | LaunchAgent `ai.omo.session-host`, `~/Library/LaunchAgents/ai.omo.session-host.plist` |
 | Runs | `<omo> daemon run --pinned` (an npm launcher script under the runtime that ran it), with `OMO_CODING_AGENT_DIR` set to the agent dir the bootstrap registers and `PATH` as it was at install | same |
-| Always on | `Restart=always`, `RestartSec=30`, `StartLimitIntervalSec=0`, `KillMode=process` | `RunAtLoad`, `KeepAlive`, `ThrottleInterval` 30, `AbandonProcessGroup` |
+| Runs when | `Type=oneshot`, `TimeoutStartSec=300` (a hung start ends as failed), `StartLimitIntervalSec=0`, `KillMode=process`: at login and on every start | `RunAtLoad`, `AbandonProcessGroup`: at load and on every `launchctl kickstart` |
 | Table entry | `OMO_RELAYD_SERVICES` entry `"omo": {"systemd_user": "omo-session-host.service", "senders": []}` in the drop-in `~/.config/systemd/user/omo-relay-daemon.service.d/50-omo-cold-wake.conf` | entry `"omo": {"launchd": "ai.omo.session-host", "senders": []}` in the device service's plist `EnvironmentVariables` |
 
-`omo daemon run` ensures the host, which detaches, and exits; the service manager runs it again after every
-exit, at most every 30 seconds, so a host that ended is started again and a running one is reused. Stopping or
+`omo daemon run` ensures the host, which detaches, and exits. The unit runs it once per start: at login, on
+every `omo remote bootstrap`, and on every cold wake (the device service starts the unit), so a host that ended is
+started again when it is needed and a running one is reused. Nothing re-runs it on a timer. Stopping or
 restarting the unit never ends the host or its sessions. `--pinned` makes the host it starts never idle-exit
 (see [`omo daemon`](omo-daemon.md)); a host another omo already started is reused as it is, and once it
 idles out the next run starts a pinned one.

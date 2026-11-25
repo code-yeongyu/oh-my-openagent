@@ -9,7 +9,7 @@ import { readBoulderState, clearBoulderState } from "../../features/boulder-stat
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { createUlwExecuteHook } from "./ulw-execute-hook"
 import { ULW_EXECUTE_TEMPLATE } from "../../features/builtin-commands/templates/ulw-execute"
-import { createPrDeliveryBlock } from "./worktree-block"
+import { createLightProfileBlock, createPrDeliveryBlock } from "./worktree-block"
 
 describe("ulw-execute hook platform session ids", () => {
   let testDir: string
@@ -161,6 +161,26 @@ ${args}
       })
     },
   )
+
+  test("#given --light #when processing #then the light profile block is injected and the plan still resolves", async () => {
+    const prompt = createUlwExecutePromptWithArgs("work --light")
+    const hook = createHookForDir(testDir)
+    const output = { parts: [{ type: "text", text: prompt }] }
+
+    await hook["chat.message"]({ sessionID: "light-sess" }, output)
+
+    expect(output.parts[0].text).toContain(createLightProfileBlock())
+    expect(readBoulderState(testDir)).toMatchObject({ plan_name: "work" })
+  })
+
+  test("#given no --light #when processing #then no light profile block is injected", async () => {
+    const hook = createHookForDir(testDir)
+    const output = { parts: [{ type: "text", text: createUlwExecutePromptWithArgs("work --ship") }] }
+
+    await hook["chat.message"]({ sessionID: "default-profile-sess" }, output)
+
+    expect(output.parts[0].text).not.toContain("## Light Profile")
+  })
 
   test("#given no delivery flags #when processing #then no PR delivery block is injected", async () => {
     // given - a plain work request renders neither shipped delivery branch

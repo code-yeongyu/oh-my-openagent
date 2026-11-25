@@ -39,6 +39,8 @@ describe("model family detectors", () => {
       " GPT-6-Astra ",
       "gpt-6-astra:high",
       "gpt-6-astra-fast:max",
+      "gpt-6.2-astra-ultrafast",
+      "chatgpt-subscription/gpt-6.2-astra-ultrafast:xhigh",
       "chatgpt-subscription/gpt-6-astra (high)",
       "openai/gpt-6-astra-fast xhigh",
       "vercel/openai/gpt-6-astra: auto",

@@ -123,6 +123,24 @@ for (const [name, entry] of Object.entries({ launcher: entries.launcher, compile
   }, 60_000)
 }
 
+// #13461: logout and whoami answer --help with their own closed-mode text, as login does, instead of the refusal.
+for (const [name, entry] of Object.entries({ launcher: entries.launcher, compiled: entries.compiled })) {
+  test.each([
+    ["logout", "Sign out of OmO"],
+    ["whoami", "Show the current OmO device sign-in"],
+  ])(
+    `#given accounts are closed #when the ${name} runs omo %s --help #then it prints that command's help`,
+    async (command, help) => {
+      const result = await run(entry, [command, "--help"])
+      expect(result.code).toBe(0)
+      expect(result.stdout).toContain(help)
+      expect(result.stderr).not.toContain(CLOSED_LOGIN_MESSAGE)
+      expect(result.requests).toBe(0)
+    },
+    60_000,
+  )
+}
+
 // C4: logout and whoami run while closed. On an empty store whoami says so with the hint; logout signs out (no
 // device to revoke, so no request) and leaves the signed-out marker.
 test("#given accounts are closed and no sign-in is stored #when the launcher runs omo whoami #then it says so with the hint", async () => {
@@ -143,12 +161,16 @@ test("#given accounts are closed and no sign-in is stored #when the launcher run
 }, 60_000)
 
 // C4 grammar: logout and whoami take --api and refuse anything else with the route-naming refusal.
-test("#given accounts are closed #when the launcher runs omo logout with a stray operand #then it refuses naming the route", async () => {
-  const result = await run(entries.launcher, ["logout", "extra"])
-  expect(result.code).toBe(1)
-  expect(result.stderr.trim()).toBe(CLOSED_LOGIN_MESSAGE)
-  expect(result.requests).toBe(0)
-}, 60_000)
+test.each(["logout", "whoami"])(
+  "#given accounts are closed #when the launcher runs omo %s with a stray operand #then it refuses naming the route",
+  async (command) => {
+    const result = await run(entries.launcher, [command, "extra"])
+    expect(result.code).toBe(1)
+    expect(result.stderr.trim()).toBe(CLOSED_LOGIN_MESSAGE)
+    expect(result.requests).toBe(0)
+  },
+  60_000,
+)
 
 // Contract: every sign-in hint follows the same switch as the commands (#11379); while closed the hint names BOTH
 // routes (C11), because omo login now runs.

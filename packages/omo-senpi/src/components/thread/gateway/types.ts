@@ -4,9 +4,22 @@ export type GatewayDeliveryMode = "auto" | "steer" | "follow_up"
 
 export type DeliveryState = "queued" | "admitting" | "admitted" | "applied" | "refused" | "uncertain"
 
-export type EffectiveLane = "steer" | "follow_up"
+/**
+ * The lane a delivery took at its receiver: `start` began a turn on an idle session (through the engine's followUp lane),
+ * `steer` joined the running turn, `follow_up` waits behind a turn or a hold.
+ */
+export type EffectiveLane = "start" | "steer" | "follow_up"
 
-export type RefusalReason = "not_steerable" | "turn_conflict" | "expired" | "binding_closed" | "sender_not_admitted"
+export type RefusalReason =
+  | "not_steerable"
+  | "turn_conflict"
+  | "expired"
+  | "binding_closed"
+  | "sender_not_admitted"
+  /** The target was closed on request after the row was queued, before it took the message (#14273). */
+  | "target_closed"
+  /** A newer delivery from the same sender under the same collapse key replaced it before the target took it (#14428). */
+  | "superseded"
 
 export type ProcessIdentity = {
   readonly pid: number
@@ -56,6 +69,12 @@ export type Provenance = {
 /** No device service is set up here, it did not answer, or it answered without a device id. */
 export type DeviceAbsentReason = "no_device_service" | "device_service_unavailable" | "no_device_id"
 
+/**
+ * `creator`: the first prompt of a thread_create, sent by the session that created the target (#14045). The target
+ * receives it as its own first user message, with the creator's authority, instead of a relayed peer message.
+ */
+export type DeliveryAuthority = "creator"
+
 export type DeliveryEnvelope = {
   readonly provenance: Provenance
   readonly origin: EnvelopeOrigin
@@ -64,6 +83,7 @@ export type DeliveryEnvelope = {
   readonly root_id: string
   readonly hop: number
   readonly delivery_id: string
+  readonly authority?: DeliveryAuthority
 }
 
 /** JSON written before provenance was recorded remains readable, never attributed to the receiver. */
@@ -103,6 +123,8 @@ export type DeliveryRow = {
   /** The sender's rendered text and display text of such a delivery, handed to the engine unrendered; null on every other row. */
   readonly verbatim_text?: string | null
   readonly verbatim_display_text?: string | null
+  /** The sender's collapse key (#14428); null on a row sent without one. */
+  readonly collapse_key?: string | null
 }
 
 /** A delivery record another device's service attested, as the sender's relay leg writes it (`remote/relay-transport.ts`). */
@@ -179,6 +201,7 @@ export type EnqueueRequest = {
   readonly cause_delivery_id: string | null
   /** The highest hop an input of the sender's run arrived with from another device (no row here); the chain continues from it (K8). */
   readonly inbound_hop?: number
+  readonly authority?: DeliveryAuthority
   readonly claimed_root_id: string | null
   readonly origin: EnvelopeOrigin
   readonly actor: string
@@ -188,6 +211,8 @@ export type EnqueueRequest = {
   readonly binding: { readonly binding_id: string; readonly revision: number } | null
   readonly receipt: { readonly idempotency_key: string; readonly args_hash: string }
   readonly endpoint_kind: "rpc_host" | "tui" | null
+  /** Replaces the sender's earlier undelivered delivery to this target under the same key (#14428). */
+  readonly collapse_key?: string
 }
 
 export type StoreRefusal = {
@@ -199,6 +224,8 @@ export type StoreRefusal = {
 
 export type EnqueueOutcome =
   | { readonly kind: "inserted"; readonly row: DeliveryRow; readonly queue_position: number }
+  /** The sender's earlier delivery under the same collapse key, already in the session's runtime, absorbed this one. */
+  | { readonly kind: "collapsed"; readonly row: DeliveryRow; readonly queue_position: number }
   | { readonly kind: "replay"; readonly result: unknown }
   | StoreRefusal
   | { readonly kind: "busy" }
@@ -282,6 +309,8 @@ export type GatewayDeliverySuccess = {
   readonly effective_mode: GatewayDeliveryMode | EffectiveLane
   readonly endpoint_kind: "rpc_host" | "tui" | null
   readonly deduplicated: boolean
+  /** A collapse-key repeat the target already held an earlier message for: this send's text was not delivered (#14428). */
+  readonly collapsed?: true
 }
 
 export type GatewayDeliveryResult =

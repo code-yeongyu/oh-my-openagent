@@ -16,6 +16,9 @@ const repoRoot = join(import.meta.dir, "..", "..", "..")
 const at = (path: string) => join(repoRoot, path)
 
 const TRANSPORT = "packages/device-service-core/src/local-api/transport.ts"
+// The vendored transport has no unref'd mode (omo#13475), so the delivery consumer's long-lived connection opens through
+// device-service-core's own copy of the same two loopback connects; both are pinned to CONNECT_CALLS below.
+const BACKGROUND_TRANSPORT = "packages/device-service-core/src/background-transport.ts"
 const STORE = "packages/omo-senpi/src/components/thread/gateway/store.ts"
 const STORE_WORKER = "packages/omo-senpi/src/components/thread/gateway/store-worker.ts"
 const ROOTS: Record<string, readonly string[]> = {
@@ -35,7 +38,7 @@ const RUNTIME_WRAPPERS = "packages/utils/src/runtime/"
 
 // Rule 1: every reachable file importing node:child_process or a spawn wrapper (the utils runtime, the Bun spawn shim).
 const SPAWN_IMPORTERS = [
-  "packages/device-service-core/src/local-api/dacl.ts",
+  "packages/device-service-core/src/local-api/powershell.ts",
   "packages/memory-core/src/locks/process-identity.ts",
   "packages/omo-native/bin/lib/process-list.js",
   "packages/omo-opencode/src/cli/service-auth/account-home.ts",
@@ -55,25 +58,36 @@ const SPAWN_IMPORTERS = [
 const BUN_PRIMITIVE_USES: Record<string, number> = {}
 // Rule 3: every call that can start a process, with its command and argv as written (spawn-call-sites.ts).
 const SPAWN_CALL_SITES = [
-  "packages/device-service-core/src/local-api/dacl.ts: applyExactDacl(path; userSid)",
   "packages/device-service-core/src/local-api/dacl.ts: describeDacl(path; run)",
-  'packages/device-service-core/src/local-api/dacl.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
-  "packages/device-service-core/src/local-api/dacl.ts: run(APPLY; {LA_PATH,LA_SID,LA_KIND})",
+  "packages/device-service-core/src/local-api/dacl.ts: run(APPLY_DACL_SCRIPT; {LA_PATH,LA_SID,LA_KIND})",
   "packages/device-service-core/src/local-api/dacl.ts: run(CURRENT_USER_SID_SCRIPT; {})",
   "packages/device-service-core/src/local-api/dacl.ts: run(DESCRIBE_DACL_SCRIPT; {LA_PATH})",
-  "packages/device-service-core/src/local-api/dacl.ts: run(SID_TOKEN_SCRIPT; {LA_SID})",
-  "packages/device-service-core/src/local-api/dacl.ts: userSidToken(userSid; run)",
-  "packages/device-service-core/src/local-api/dacl.ts: verifyExactDacl(path; userSid)",
+  'packages/device-service-core/src/local-api/powershell.ts: node:child_process#spawn("powershell.exe"; ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-EncodedCommand", encoded])',
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#applyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: packages/device-service-core/src/local-api/dacl.ts#verifyExactDacl(path; userSid)",
+  "packages/device-service-core/src/local-api/secure-windows.ts: run(sddlReaderWith(LEVEL_READ); {OMO_LEVEL_PATH})",
+  'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "args=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("/bin/ps"; ["-o", "lstart=", "-p", String(pid)])',
   'packages/memory-core/src/locks/process-identity.ts: execFileText("powershell.exe"; [ "-NoProfile", "-Command", `(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).StartTime.ToUniversalTime().ToString(\'o\')`, ])',
+  'packages/memory-core/src/locks/process-identity.ts: execFileText("tasklist.exe"; ["/FI", `PID eq ${pid}`, "/FO", "CSV", "/NH"])',
   "packages/memory-core/src/locks/process-identity.ts: node:child_process#execFile(command; args)",
+  "packages/memory-core/src/locks/process-identity.ts: readWin32ImageName(pid; -)",
   "packages/memory-core/src/locks/process-identity.ts: readWin32StartIdentity(pid; -)",
   "packages/omo-native/account-show.ts: packages/omo-opencode/src/cli/service-auth/keystore.ts#createCredentialStore(api; {wait})",
   'packages/omo-native/bin/lib/process-list.js: node:child_process#spawnSync("ps"; ["-ww", "-axo", "pid=,ppid=,etime=,tty=,args="])',
   "packages/omo-native/remote-local.ts: packages/omo-native/remote-session-verbs.ts#runSession(service; parsed.session)",
   "packages/omo-native/remote-local.ts: runOn(service; parsed)",
+  "packages/omo-opencode/src/cli/service-auth/credential-lock.ts: credentialLockBusy(error; -)",
+  "packages/omo-opencode/src/cli/service-auth/credential-lock.ts: packages/memory-core/src/locks/process-identity.ts#getProcessCommandName(holder.ownerPid; -)",
+  // omo#13748: `open --prompt` hands the new session its first message through the same person pipeline as `send`.
+  "packages/omo-native/remote-session-verbs.ts: openOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
+  // The person client's sessions.open stamps this device's sender provenance (one git remote read), as the session verbs did.
+  "packages/omo-senpi/src/components/remote/sessions.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd,env}; -)",
+  "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
+  "packages/omo-native/remote-session-verbs.ts: personDelivery(remote; dependencies)",
   "packages/omo-native/remote-session-verbs.ts: personSenderProvenance(remote; -)",
+  "packages/omo-native/remote-session-verbs.ts: runSessionOn(remote; args)",
   "packages/omo-native/remote-session-verbs.ts: sendTo(remote; row)",
   'packages/omo-opencode/src/cli/service-auth/account-home.ts: facts.run("/usr/bin/id"; ["-P"])',
   'packages/omo-opencode/src/cli/service-auth/account-home.ts: facts.run(reg; ["query", key, "/v", "ProfileImagePath"])',
@@ -96,7 +110,11 @@ const SPAWN_CALL_SITES = [
   "packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding.ts: packages/omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend.ts#guardHelperlessRead(key.service; key.name)",
   'packages/omo-opencode/src/cli/service-auth/keystore.ts: createSealedStore(api; "omo-cli")',
   "packages/omo-opencode/src/cli/service-auth/keystore.ts: packages/omo-opencode/src/cli/service-auth/keychain-helper/store-binding.ts#bindKeychainHelper({platform,namespace,secrets,key,background,origin,notice,pending,...}; -)",
-  'packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: node:child_process#spawn("gdbus"; [ "call", "--session", "--dest", "org.freedesktop.secrets", "--object-path", DEFAULT_COLLECTION, "--method", "org.freedesktop.DBus.Properties.Get", "org.free...)',
+  'packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: gdbus([ "--object-path", "/org/freedesktop/secrets", "--method", "org.freedesktop.Secret.Service.Unlock", `[\'${DEFAULT_COLLECTION}\']`, ]; UNLOCK_TIMEOUT_MS)',
+  'packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: gdbus([ "--object-path", DEFAULT_COLLECTION, "--method", "org.freedesktop.DBus.Properties.Get", "org.freedesktop.Secret.Collection", "Locked", ]; timeoutMs)',
+  "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: readLocked(PROBE_TIMEOUT_MS; -)",
+  "packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: readLocked(UNLOCK_TIMEOUT_MS; -)",
+  'packages/omo-opencode/src/cli/service-auth/secret-service-lock.ts: node:child_process#spawn("gdbus"; ["call", "--session", "--dest", "org.freedesktop.secrets", ...args])',
   "packages/omo-senpi/src/components/thread/addressing.ts: gitWorktreeRoot(dir; -)",
   "packages/omo-senpi/src/components/thread/addressing.ts: gitWorktreeRoot(root; -)",
   'packages/omo-senpi/src/components/thread/addressing.ts: node:child_process#execFileSync("git"; ["-C", dir, "rev-parse", "--show-toplevel"])',
@@ -107,6 +125,7 @@ const SPAWN_CALL_SITES = [
   'packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts: node:child_process#execFile("git"; [...args])',
   "packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts: originRemote(cwd; env)",
   "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(row.admitted_by; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(row.admitted_by; -)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatch(request.op; request.args)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchWoken(ctx; op)",
   "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/process-identity.ts#isClaimantDead(claimant; -)",
@@ -115,11 +134,24 @@ const SPAWN_CALL_SITES = [
   'packages/omo-senpi/src/components/thread/gateway/store-worker.ts: takeOverWake(ctx; args as WokenRequest<"takeOver">)',
   "packages/omo-senpi/src/components/thread/gateway/store.ts: packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts#resolveProvenance({cwd}; -)",
   "packages/omo-senpi/src/components/thread/tools/internals.ts: packages/omo-senpi/src/components/thread/addressing.ts#workspaceDirectories(root; -)",
-  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; current)",
+  "packages/omo-senpi/src/components/thread/tools/internals.ts: sendAddressBook(options; view)",
   "packages/utils/src/runtime/spawn.ts: bun.spawn(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: bun.spawnSync(cmd; createBunSpawnOptions(options))",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawn(bin; args)",
   "packages/utils/src/runtime/spawn.ts: node:child_process#spawnSync(bin; args)",
+  // #14622 review M4: a source build about to migrate the gateway store reads the OS user record's home through the
+  // pinned account-home helper (/etc/passwd, `/usr/bin/id -P`, System32 whoami/reg), never a tool found on PATH.
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: accountHomes(process.env; options.facts ?? systemPlatformFacts)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: packages/omo-opencode/src/cli/service-auth/account-home.ts#userRecordHome(facts; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedAgentDir(ctx.config.agent_dir; {stores})",
+  // #14622 review M9: the guard also compares the database file the worker opened (links resolved) with each shared
+  // agent dir's database by identity; both checks list the shared agent dirs through sharedAgentDirs.
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts#isSharedStoreFile(ctx.databasePath; gatewayDatabasePath)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/agent-home/dev-build-runtime.ts: sharedAgentDirs(options; -)",
+  "packages/omo-senpi/src/components/thread/gateway/store-ops.ts: sourceBuildMigrationRefusal(ctx; opened)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: dispatchOp(ctx; op)",
+  "packages/omo-senpi/src/components/thread/gateway/store-worker.ts: packages/omo-senpi/src/components/thread/gateway/store-ops.ts#migrate(context; -)",
 ]
 const CONNECT_CALLS = [
   'createConnection({ host: "127.0.0.1", port })',
@@ -215,12 +247,13 @@ describe("remote local-path reachability", () => {
 
     // then: the positive controls are seen, so an empty result below is not a blind detector
     expect(fixtureCalls.length).toBeGreaterThan(0)
-    expect(importersOf(inputs, builtin("net"))).toEqual([TRANSPORT])
+    expect(importersOf(inputs, builtin("net"))).toEqual([BACKGROUND_TRANSPORT, TRANSPORT])
     expect(workers).toEqual([STORE])
     // then: the network rules
     expect(importersOf(inputs, (path) => NETWORK_MODULES.has(path.replace(/^node:/, "")))).toEqual([])
     expect(calls).toEqual([])
     expect(connectCalls(TRANSPORT)).toEqual(CONNECT_CALLS)
+    expect(connectCalls(BACKGROUND_TRANSPORT)).toEqual(CONNECT_CALLS)
     // then: the spawn rules
     expect(
       importersOf(

@@ -6,7 +6,7 @@ use crate::backend::{
     Refusal, Route, Semantic, SnapshotRequest, TaggedInput, Target, WindowFilter,
     PRESENCE_UNAVAILABLE,
 };
-use crate::error::{ComputerCode, EngineCode};
+use crate::error::{ComputerCode, EngineCode, Reason};
 use crate::params::{ObserveOptions, Point};
 use crate::results::PermissionState;
 
@@ -19,7 +19,7 @@ fn assert_refused<T: std::fmt::Debug>(
     result: Result<T, Refusal>,
     code: EngineCode,
     computer: &str,
-    reason: &str,
+    reason: Reason,
 ) {
     let refusal = result.expect_err("a default must refuse");
     assert_eq!((refusal.code, refusal.reason), (code, Some(reason)));
@@ -46,37 +46,37 @@ fn backend_defaults_refuse() {
         bare.windows(&WindowFilter::default()),
         EngineCode::Internal,
         "COMPUTER_UNAVAILABLE",
-        "windows_unsupported",
+        Reason::WindowsUnsupported,
     );
     assert_refused(
         bare.displays(),
         EngineCode::Internal,
         "COMPUTER_UNAVAILABLE",
-        "displays_unsupported",
+        Reason::DisplaysUnsupported,
     );
     assert_refused(
         bare.capture(&target, &capture),
         EngineCode::CaptureUnavailable,
         "COMPUTER_CAPTURE_UNAVAILABLE",
-        "capture_unsupported",
+        Reason::CaptureUnsupported,
     );
     assert_refused(
         bare.post_input(&input, Route::BackgroundPid),
         EngineCode::Internal,
         "COMPUTER_UNAVAILABLE",
-        "input_unsupported",
+        Reason::InputUnsupported,
     );
     assert_refused(
         bare.stop_listener().map(drop),
         EngineCode::StopPathUnavailable,
         "COMPUTER_SUPERVISOR_NOT_LIVE",
-        "no_listener",
+        Reason::NoListener,
     );
     assert_refused(
         bare.epoch_source().next_change(),
         EngineCode::Internal,
         "COMPUTER_UNAVAILABLE",
-        "epoch_source_unsupported",
+        Reason::EpochSourceUnsupported,
     );
     assert!(bare.presence().is_none(), "no presence surface by default");
     assert_eq!(
@@ -118,25 +118,25 @@ fn ax_backend_defaults_refuse() {
         bare.snapshot(&request),
         EngineCode::AxUnsupported,
         "COMPUTER_AX_UNAVAILABLE",
-        "snapshot_unsupported",
+        Reason::SnapshotUnsupported,
     );
     assert_refused(
         bare.resolve(&reference),
         EngineCode::AxUnsupported,
         "COMPUTER_AX_UNAVAILABLE",
-        "resolve_unsupported",
+        Reason::ResolveUnsupported,
     );
     assert_refused(
         bare.perform(&reference, &Semantic("press".to_owned())),
         EngineCode::AxUnsupported,
         "COMPUTER_AX_UNAVAILABLE",
-        "perform_unsupported",
+        Reason::PerformUnsupported,
     );
     assert_refused(
         bare.events().next_event(),
         EngineCode::AxUnsupported,
         "COMPUTER_AX_UNAVAILABLE",
-        "ax_events_unsupported",
+        Reason::AxEventsUnsupported,
     );
 }
 

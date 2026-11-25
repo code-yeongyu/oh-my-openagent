@@ -2,13 +2,13 @@
 
 // allow: SIZE_OK - legacy fixture-heavy resolver matrix; add new resolver behavior in focused sibling tests instead.
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test"
+import { afterEach, beforeEach, describe, expect, mock, spyOn, test } from "bun:test"
+import * as connectedProvidersCache from "../../../shared/connected-providers-cache"
+import * as agentLoader from "../../../features/claude-code-agent-loader"
 import type { DelegateTaskArgs } from "../types"
 import type { ExecutorContext } from "../executor-types"
 
 type SubagentResolverModule = typeof import("../subagent-resolver")
-
-const logMock = mock((..._args: unknown[]) => {})
 
 const readConnectedProvidersCacheMock = mock(() => null as string[] | null)
 const readProviderModelsCacheMock = mock(
@@ -20,15 +20,7 @@ const readProviderModelsCacheMock = mock(
     } | null,
 )
 
-type ClaudeCodeAgentRecord = Record<
-  string,
-  {
-    description?: string
-    mode?: string
-    prompt?: string
-    model?: string | { providerID: string; modelID: string }
-  }
->
+type ClaudeCodeAgentRecord = ReturnType<typeof agentLoader.loadUserAgents>
 
 const loadUserAgentsMock = mock((): ClaudeCodeAgentRecord => ({}))
 const loadProjectAgentsMock = mock((_directory?: string): ClaudeCodeAgentRecord => ({}))
@@ -71,7 +63,6 @@ describe("resolveSubagentExecution", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -80,24 +71,16 @@ describe("resolveSubagentExecution", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
-    mock.module("../../../features/claude-code-agent-loader/loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 
@@ -1300,7 +1283,6 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
 
   beforeEach(async () => {
     mock.restore()
-    logMock.mockClear()
     readConnectedProvidersCacheMock.mockReset()
     readProviderModelsCacheMock.mockReset()
     readConnectedProvidersCacheMock.mockReturnValue(null)
@@ -1309,24 +1291,16 @@ describe("resolveSubagentExecution - agent name sanitization", () => {
     loadProjectAgentsMock.mockReset()
     loadUserAgentsMock.mockImplementation(() => ({}))
     loadProjectAgentsMock.mockImplementation(() => ({}))
-    mock.module("../../../shared/logger", () => ({
-      log: logMock,
-    }))
-    mock.module("../../../shared/connected-providers-cache", () => ({
-      readConnectedProvidersCache: readConnectedProvidersCacheMock,
-      readProviderModelsCache: readProviderModelsCacheMock,
-      hasConnectedProvidersCache: () => readConnectedProvidersCacheMock() !== null,
-      hasProviderModelsCache: () => readProviderModelsCacheMock() !== null,
-      _resetMemCacheForTesting: () => {},
-    }))
-    mock.module("../../../features/claude-code-agent-loader/loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
-    mock.module("../../../features/claude-code-agent-loader", () => ({
-      loadUserAgents: loadUserAgentsMock,
-      loadProjectAgents: loadProjectAgentsMock,
-    }))
+    spyOn(connectedProvidersCache, "readConnectedProvidersCache").mockImplementation(readConnectedProvidersCacheMock)
+    spyOn(connectedProvidersCache, "readProviderModelsCache").mockImplementation(readProviderModelsCacheMock)
+    spyOn(connectedProvidersCache, "hasConnectedProvidersCache").mockImplementation(
+      () => readConnectedProvidersCacheMock() !== null,
+    )
+    spyOn(connectedProvidersCache, "hasProviderModelsCache").mockImplementation(
+      () => readProviderModelsCacheMock() !== null,
+    )
+    spyOn(agentLoader, "loadUserAgents").mockImplementation(loadUserAgentsMock)
+    spyOn(agentLoader, "loadProjectAgents").mockImplementation(loadProjectAgentsMock)
     ;({ resolveSubagentExecution } = await importFreshSubagentResolverModule())
   })
 

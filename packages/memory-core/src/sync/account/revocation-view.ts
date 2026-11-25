@@ -4,6 +4,7 @@
 // on a platform or of a kind this client does not know never stops a rotation. A row whose three
 // fields do not parse vouches for nothing; it does not fail the view.
 
+import { syncRequestHeaders } from "../contract-version.ts"
 import { AccountHttpError } from "./http.ts"
 
 export type RevocationView =
@@ -50,7 +51,7 @@ export function createRevocationView(options: {
   const doFetch = options.fetch ?? fetch
   return async () => {
     const response = await doFetch(`${options.baseUrl}/v1/devices`, {
-      headers: { authorization: `Bearer ${await options.token()}` },
+      headers: syncRequestHeaders(await options.token()),
     })
     if (!response.ok) throw new AccountHttpError(response.status >= 500 ? "unavailable" : "refused", response.status)
     return parseRevocationView(await response.json())

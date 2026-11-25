@@ -13,6 +13,9 @@ import {
 } from "../engine-trust-policy"
 import { runTrustStage, type TrustStageOptions } from "../trust-stage"
 import { issueCertificates } from "./trust-certificate-fixtures"
+import { usePrivateTmpdir } from "./trust-private-tmpdir"
+
+usePrivateTmpdir()
 
 let root: string
 let executable: string

@@ -1,9 +1,11 @@
-import { describe, test, expect, beforeEach, afterEach, afterAll, mock } from "bun:test"
-import { mkdirSync, writeFileSync, rmSync, existsSync, readdirSync } from "node:fs"
+import { describe, test, expect, beforeEach, afterEach, afterAll, mock, spyOn } from "bun:test"
+import { mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { randomUUID } from "node:crypto"
+import { preserveModuleMocksForTestFile } from "../../testing/module-mock-lifecycle"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import * as storageDetection from "../../shared/opencode-storage-detection"
 
 // Named, not a namespace spread: a spread counts every export as used and hides dead ones from knip.
 // satisfies flags a missing or extra key in the editor; no gate typechecks test files, so the export-list test below is
@@ -32,53 +34,24 @@ const realConstants = {
 } satisfies Record<keyof typeof import("./constants"), unknown>
 
 const TEST_DIR = join(tmpdir(), `omo-test-session-manager-${randomUUID()}`)
-const TEST_MESSAGE_STORAGE = join(TEST_DIR, "message")
-const TEST_PART_STORAGE = join(TEST_DIR, "part")
-const TEST_SESSION_STORAGE = join(TEST_DIR, "session")
 const TEST_TODO_DIR = join(TEST_DIR, "todos")
 const TEST_TRANSCRIPT_DIR = join(TEST_DIR, "transcripts")
-let sqliteBackend = false
+const fixtureDirs = new Set<string>()
 
 mock.module("./constants", () => ({
-  MESSAGE_STORAGE: TEST_MESSAGE_STORAGE,
-  PART_STORAGE: TEST_PART_STORAGE,
-  SESSION_STORAGE: TEST_SESSION_STORAGE,
   TODO_DIR: TEST_TODO_DIR,
   TRANSCRIPT_DIR: TEST_TRANSCRIPT_DIR,
-  SESSION_LIST_DESCRIPTION: "test",
-  SESSION_READ_DESCRIPTION: "test",
-  SESSION_SEARCH_DESCRIPTION: "test",
-  SESSION_INFO_DESCRIPTION: "test",
 }))
+preserveModuleMocksForTestFile(import.meta.url)
 
-mock.module("../../shared/opencode-storage-detection", () => ({
-  isSqliteBackend: () => sqliteBackend,
-  resetSqliteBackendCache: () => {},
-}))
+function makeFixtureDir(root: string, id: string): string {
+  const directory = join(root, id)
+  fixtureDirs.add(directory)
+  mkdirSync(directory, { recursive: true })
+  return directory
+}
 
-mock.module("../../shared/opencode-message-dir", () => ({
-  getMessageDir: (sessionID: string) => {
-    if (!sessionID.startsWith("ses_")) return null
-    if (/[/\\]|\.\./.test(sessionID)) return null
-    if (!existsSync(TEST_MESSAGE_STORAGE)) return null
-
-    const directPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    if (existsSync(directPath)) {
-      return directPath
-    }
-
-    for (const dir of readdirSync(TEST_MESSAGE_STORAGE)) {
-      const nestedPath = join(TEST_MESSAGE_STORAGE, dir, sessionID)
-      if (existsSync(nestedPath)) {
-        return nestedPath
-      }
-    }
-
-    return null
-  },
-}))
-
-test("#given the ./constants restore set #then it names every export the real module declares", async () => {
+test("#given the real ./constants snapshot #then it names every export the module declares", async () => {
   // Bun's parser lists the names constants.ts exports, its own declarations and its `export { ... } from` names. Reading
   // them is not a use for knip, but passing this check is: every name must also be destructured into the restore set
   // above, so a dead export added later stops being reported by knip once it is named there. When this fails on a new
@@ -89,10 +62,6 @@ test("#given the ./constants restore set #then it names every export the real mo
 })
 
 afterAll(async () => {
-  // ./constants re-exports the storage roots from ../../shared, so this restore also puts the real paths back
-  // into shared/opencode-storage-paths. That module is not mocked directly: a direct mock keeps its own
-  // namespace on the deleted fixture for every later test file, even after a re-mock.
-  mock.module("./constants", () => realConstants)
   mock.restore()
   // Boundary: later test files import these modules fresh, and the compaction-marker fixture writes under
   // PART_STORAGE. None of them may still name this file's fixture.
@@ -123,26 +92,28 @@ const { getAllSessions, getMessageDir, sessionExists, readSessionMessages, readS
 
 const storage = await import("./storage")
 
+afterEach(() => {
+  storage.resetStorageClient()
+  for (const directory of fixtureDirs) {
+    rmSync(directory, { recursive: true, force: true })
+  }
+  fixtureDirs.clear()
+  rmSync(TEST_DIR, { recursive: true, force: true })
+})
+
 describe("session-manager storage", () => {
+  let sqliteBackend = false
+  let restoreStorageDetection: () => void
+
   beforeEach(() => {
     sqliteBackend = false
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
-    }
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
+    const sqlite = spyOn(storageDetection, "isSqliteBackend").mockImplementation(() => sqliteBackend)
+    restoreStorageDetection = () => sqlite.mockRestore()
     mkdirSync(TEST_TODO_DIR, { recursive: true })
-    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
   })
 
   afterEach(() => {
-    sqliteBackend = false
-    storage.resetStorageClient()
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
-    }
+    restoreStorageDetection()
   })
 
   test("getAllSessions returns empty array when no sessions exist", async () => {
@@ -157,8 +128,7 @@ describe("session-manager storage", () => {
   test("getMessageDir finds session in direct path", () => {
     // given
     const sessionID = "ses_test123"
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    mkdirSync(sessionPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001", role: "user" }))
 
     // when
@@ -179,8 +149,7 @@ describe("session-manager storage", () => {
   test("sessionExists returns true for existing session", async () => {
     // given
     const sessionID = "ses_exists"
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    mkdirSync(sessionPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
     writeFileSync(join(sessionPath, "msg_001.json"), JSON.stringify({ id: "msg_001" }))
 
     // when
@@ -201,8 +170,7 @@ describe("session-manager storage", () => {
   test("readSessionMessages sorts messages by timestamp", async () => {
     // given
     const sessionID = "ses_test123"
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    mkdirSync(sessionPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
 
     writeFileSync(
       join(sessionPath, "msg_002.json"),
@@ -225,10 +193,8 @@ describe("session-manager storage", () => {
   test("readSessionMessages skips malformed message and part files", async () => {
     // given
     const sessionID = "ses_malformed_messages"
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    const partPath = join(TEST_PART_STORAGE, "msg_valid")
-    mkdirSync(sessionPath, { recursive: true })
-    mkdirSync(partPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
+    const partPath = makeFixtureDir(PART_STORAGE, "msg_valid")
 
     writeFileSync(join(sessionPath, "msg_bad.json"), "{")
     writeFileSync(
@@ -297,8 +263,7 @@ describe("session-manager storage", () => {
   test("getSessionInfo aggregates session metadata correctly", async () => {
     // given
     const sessionID = "ses_test123"
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    mkdirSync(sessionPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
 
     const now = Date.now()
     writeFileSync(
@@ -374,31 +339,12 @@ describe("session-manager storage", () => {
 })
 
 describe("session-manager storage - getMainSessions", () => {
-  beforeEach(() => {
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
-    }
-    mkdirSync(TEST_DIR, { recursive: true })
-    mkdirSync(TEST_MESSAGE_STORAGE, { recursive: true })
-    mkdirSync(TEST_PART_STORAGE, { recursive: true })
-    mkdirSync(TEST_SESSION_STORAGE, { recursive: true })
-    mkdirSync(TEST_TODO_DIR, { recursive: true })
-    mkdirSync(TEST_TRANSCRIPT_DIR, { recursive: true })
-  })
-
-  afterEach(() => {
-    if (existsSync(TEST_DIR)) {
-      rmSync(TEST_DIR, { recursive: true, force: true })
-    }
-  })
-
   function createSessionMetadata(
     projectID: string,
     sessionID: string,
     opts: { parentID?: string; directory: string; updated: number },
   ) {
-    const projectDir = join(TEST_SESSION_STORAGE, projectID)
-    mkdirSync(projectDir, { recursive: true })
+    const projectDir = makeFixtureDir(SESSION_STORAGE, projectID)
     writeFileSync(
       join(projectDir, `${sessionID}.json`),
       JSON.stringify({
@@ -412,8 +358,7 @@ describe("session-manager storage - getMainSessions", () => {
   }
 
   function createMessageForSession(sessionID: string, msgID: string, created: number) {
-    const sessionPath = join(TEST_MESSAGE_STORAGE, sessionID)
-    mkdirSync(sessionPath, { recursive: true })
+    const sessionPath = makeFixtureDir(MESSAGE_STORAGE, sessionID)
     writeFileSync(join(sessionPath, `${msgID}.json`), JSON.stringify({ id: msgID, role: "user", time: { created } }))
   }
 
@@ -541,8 +486,7 @@ describe("session-manager storage - getMainSessions", () => {
     // given
     const projectID = "proj_malformed"
     const now = Date.now()
-    const projectDir = join(TEST_SESSION_STORAGE, projectID)
-    mkdirSync(projectDir, { recursive: true })
+    const projectDir = makeFixtureDir(SESSION_STORAGE, projectID)
     writeFileSync(join(projectDir, "ses_bad.json"), "{")
     createSessionMetadata(projectID, "ses_valid", { directory: "/test/path", updated: now })
 
@@ -575,6 +519,7 @@ describe("session-manager storage - getMainSessions", () => {
 })
 
 describe("session-manager storage - SDK path (beta mode)", () => {
+  let restoreStorageDetection: () => void
   const mockClient = {
     session: {
       list: mock((): Promise<unknown> => Promise.resolve({ data: [] })),
@@ -584,16 +529,16 @@ describe("session-manager storage - SDK path (beta mode)", () => {
   }
 
   beforeEach(() => {
+    const sqlite = spyOn(storageDetection, "isSqliteBackend").mockReturnValue(true)
+    restoreStorageDetection = () => sqlite.mockRestore()
     // Reset mocks
     mockClient.session.list.mockClear()
     mockClient.session.messages.mockClear()
     mockClient.session.todo.mockClear()
   })
 
-  // #13502: this block reads through the same mocked storage root, so it cleans up like the two blocks above.
   afterEach(() => {
-    storage.resetStorageClient()
-    rmSync(TEST_DIR, { recursive: true, force: true })
+    restoreStorageDetection()
   })
 
   test("getMainSessions uses SDK when beta mode is enabled", async () => {
@@ -604,13 +549,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     ]
     mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
 
-    // Mock isSqliteBackend to return true
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
-    // Re-import to get fresh module with mocked isSqliteBackend
     const { setStorageClient, getMainSessions } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
@@ -629,11 +567,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
       { id: "ses_trail_sdk", directory: "/path/to/projectA", parentID: null, time: { created: 1000, updated: 2000 } },
     ]
     mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
-
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
 
     const { setStorageClient, getMainSessions } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
@@ -654,11 +587,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     ]
     mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
 
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
     const { setStorageClient, getAllSessions } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
@@ -678,11 +606,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
       { id: "ses_mid", directory: "/test", time: { created: 1500, updated: 2000 } },
     ]
     mockClient.session.list.mockImplementation(() => Promise.resolve({ data: mockSessions }))
-
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
 
     const { setStorageClient, getAllSessions } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
@@ -708,11 +631,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     ]
     mockClient.session.messages.mockImplementation(() => Promise.resolve({ data: mockMessages }))
 
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
     const { setStorageClient, readSessionMessages } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
@@ -736,11 +654,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     ]
     mockClient.session.todo.mockImplementation(() => Promise.resolve({ data: mockTodos }))
 
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
     const { setStorageClient, readSessionTodos } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
@@ -760,11 +673,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
     // given
     mockClient.session.messages.mockImplementation(() => Promise.reject(new Error("API error")))
 
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
     const { setStorageClient, readSessionMessages } = await import("./storage")
     setStorageClient(unsafeTestValue<Parameters<typeof setStorageClient>[0]>(mockClient))
 
@@ -773,11 +681,6 @@ describe("session-manager storage - SDK path (beta mode)", () => {
 
   test("SDK path returns empty array when client is not set", async () => {
     //#given beta mode enabled but no client set
-    mock.module("../../shared/opencode-storage-detection", () => ({
-      isSqliteBackend: () => true,
-      resetSqliteBackendCache: () => {},
-    }))
-
     //#when client is explicitly cleared and messages are requested
     const { resetStorageClient, readSessionMessages } = await import("./storage")
     resetStorageClient()

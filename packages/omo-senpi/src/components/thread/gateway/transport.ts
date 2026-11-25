@@ -1,5 +1,6 @@
 import type { RemoteSessionRow } from "../remote/ports"
 import type {
+  DeliveryAuthority,
   EffectiveLane,
   GatewayDeliveryDelivery,
   GatewayDeliveryMode,
@@ -27,6 +28,8 @@ export type OutboundDelivery = {
   /** As the caller wrote it; each transport validates it the way its receiver does (`^\d+$`). */
   readonly expected_turn_id?: string
   readonly idempotency_key: string
+  /** Replaces the sender's earlier undelivered delivery to the same target under this key (#14428); the local transport only. */
+  readonly collapse_key?: string
   /**
    * Set only by a sender that follows its own answer (`omo remote send --wait`): the relay transport carries it as the
    * started or queued prompt's `clientMessageId`, which senpi stamps on the user entry it stores, so the follow
@@ -37,6 +40,8 @@ export type OutboundDelivery = {
   readonly args: unknown
   /** The highest chain hop an input of the caller's run arrived with from another device; both transports continue it (K8). */
   readonly inbound_hop?: number
+  /** thread_create's first prompt to the thread it made: both transports deliver it with the creator's authority (#14045). */
+  readonly authority?: DeliveryAuthority
 }
 
 /** A delivery to another device has no gateway row on this device, so it names the device it reached instead of a row sequence. */

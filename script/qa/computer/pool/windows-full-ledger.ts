@@ -152,6 +152,26 @@ export function ledgerVerdicts(tsv: string): Readonly<Record<LegId, Verdict>> {
   return out
 }
 
+// Every leg whose verdict differs between the committed ledger and a fresh measurement; evidence text is free to change.
+export function compareLedgers(committedTsv: string, freshTsv: string): readonly string[] {
+  const read = (tsv: string): ReadonlyMap<string, string> =>
+    new Map(
+      tsv
+        .split(/\r?\n/)
+        .slice(1)
+        .map((line) => line.split("\t"))
+        .filter(([, leg]) => leg !== undefined && isLeg(leg))
+        .map(([, leg = "", verdict = ""]) => [leg, verdict]),
+    )
+  const committed = read(committedTsv)
+  const fresh = read(freshTsv)
+  return LEGS.flatMap(({ leg }) => {
+    const before = committed.get(leg) ?? "absent"
+    const after = fresh.get(leg) ?? "absent"
+    return before === after ? [] : [`leg ${leg}: committed ${before}, measured ${after}`]
+  })
+}
+
 export type PlannedLeg =
   | { readonly leg: LegId; readonly tier: "hosted" | "guest" }
   | { readonly leg: LegId; readonly tier: "blocked"; readonly reason: "no_windows_host" }

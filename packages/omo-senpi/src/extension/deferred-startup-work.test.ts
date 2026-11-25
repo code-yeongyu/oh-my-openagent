@@ -180,6 +180,7 @@ describe("deferred session_start work", () => {
 
     expect(pi.handlers.find((registration) => registration.event === "before_agent_start")?.options).toEqual({
       previewSafe: true,
+      runs: "brain",
     })
 
     // when

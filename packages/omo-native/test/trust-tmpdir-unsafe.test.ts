@@ -8,11 +8,15 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { runTrustStage } from "../trust-stage"
 import { unsafeAncestorProblem } from "../trust-generation"
+import { usePrivateTmpdir } from "./trust-private-tmpdir"
+
+usePrivateTmpdir()
 
 let root = ""
-const savedTmpdir = process.env.TMPDIR
+let savedTmpdir: string | undefined
 
 beforeAll(async () => {
+  savedTmpdir = process.env.TMPDIR
   root = await realpath(await mkdtemp(join(tmpdir(), "omo-trust-tmpdir-")))
   await chmod(root, 0o700)
 })
