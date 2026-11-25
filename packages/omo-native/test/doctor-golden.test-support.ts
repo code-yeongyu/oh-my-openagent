@@ -98,7 +98,8 @@ export async function capture(root: string, run: () => unknown): Promise<Capture
   } finally {
     console.log = log
     console.error = error
-    process.exitCode = previousExitCode
+    // Assigning undefined does not clear an exit code a run set, so the runner itself would exit 1.
+    process.exitCode = previousExitCode ?? 0
   }
 }
 
