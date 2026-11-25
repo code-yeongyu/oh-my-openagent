@@ -87,7 +87,12 @@ describe("OmO Native telemetry consent question", () => {
   it("#given a refusal #when the question is answered #then the decline is recorded and nothing is re-asked", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
     try {
-      const env = { POSTHOG_API_KEY: "test-api-key", SENPI_CODING_AGENT_DIR: stateDir, HOME: stateDir, OMO_TELEMETRY_ALLOW_AUTOMATION: "1" }
+      const env = {
+        POSTHOG_API_KEY: "test-api-key",
+        SENPI_CODING_AGENT_DIR: stateDir,
+        HOME: stateDir,
+        OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+      }
       const pi = new FakeExtensionAPI()
       createOmoNativeNoticeRegistration({ env, stateDir }).register(pi, {
         config: pi,
@@ -179,7 +184,12 @@ describe("OmO Native telemetry consent question", () => {
   it("#given a throwing dialog #when the question fails #then one diagnostic is reported and no answer is recorded", async () => {
     const stateDir = mkdtempSync(join(tmpdir(), "omo-consent-q-"))
     try {
-      const env = { POSTHOG_API_KEY: "test-api-key", SENPI_CODING_AGENT_DIR: stateDir, HOME: stateDir, OMO_TELEMETRY_ALLOW_AUTOMATION: "1" }
+      const env = {
+        POSTHOG_API_KEY: "test-api-key",
+        SENPI_CODING_AGENT_DIR: stateDir,
+        HOME: stateDir,
+        OMO_TELEMETRY_ALLOW_AUTOMATION: "1",
+      }
       const diagnostics: TelemetryDiagnosticInput[] = []
       const pi = new FakeExtensionAPI()
       createOmoNativeNoticeRegistration({
@@ -188,13 +198,17 @@ describe("OmO Native telemetry consent question", () => {
         diagnostics: (input) => diagnostics.push(input),
       }).register(pi, { config: pi, logger: createSilentLogger() })
 
-      await pi.dispatch("session_start", {}, {
-        ui: {
-          confirm: async () => {
-            throw new Error("dialog crashed")
+      await pi.dispatch(
+        "session_start",
+        {},
+        {
+          ui: {
+            confirm: async () => {
+              throw new Error("dialog crashed")
+            },
           },
         },
-      })
+      )
 
       expect(diagnostics).toHaveLength(1)
       expect(existsSync(consentMarkerPath(stateDir))).toBe(false)

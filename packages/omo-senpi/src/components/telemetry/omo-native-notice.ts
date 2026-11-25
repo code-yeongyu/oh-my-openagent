@@ -90,5 +90,7 @@ function consentUi(value: unknown): ConsentUi | undefined {
   const ui = (value as Record<string, unknown>)["ui"]
   if (typeof ui !== "object" || ui === null) return undefined
   const confirm = (ui as Record<string, unknown>)["confirm"]
-  return typeof confirm === "function" ? { confirm: (title, message) => (confirm as (t: string, m: string) => Promise<boolean>)(title, message) } : undefined
+  return typeof confirm === "function"
+    ? { confirm: (title, message) => (confirm as (t: string, m: string) => Promise<boolean>)(title, message) }
+    : undefined
 }
