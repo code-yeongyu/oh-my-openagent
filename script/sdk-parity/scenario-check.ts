@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 import { namespaceOf, p1aRows, type Contract } from "./contract-check"
 import { decodeFixtures } from "./bytes-fixtures"
 import type { Row } from "./schema"
@@ -152,10 +154,21 @@ function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): str
   )
 }
 
+/**
+ * Which slice fills each row's `scenarios` (row id to slice): each slice adds its own rows in its own pull request, and
+ * the check holds both ways: a filled row must be mapped, and a mapped row must be filled.
+ */
+const SCENARIO_FILL_OWNERS: Readonly<Record<string, string>> = (
+  JSON.parse(readFileSync(join(import.meta.dir, "scenario-fill-owners.json"), "utf8")) as {
+    readonly rows: Readonly<Record<string, string>>
+  }
+).rows
+
 export function scenarioProblems(
   rows: readonly Row[],
   contract: Contract,
   files: readonly ScenarioTableFile[],
+  owners: Readonly<Record<string, string>> = SCENARIO_FILL_OWNERS,
 ): string[] {
   const problems: string[] = []
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
@@ -180,10 +193,21 @@ export function scenarioProblems(
     problems.push(...coverageProblems(row, byRow.get(row.id) ?? [], inert, contract))
     problems.push(...targetStateProblems(row, byRow.get(row.id) ?? []))
     const named = [...row.scenarios.effect, ...row.scenarios.refusal]
-    if (named.length > 0)
-      problems.push(`row ${row.id}: scenarios stays empty in P1a; P1b fills it once its drivers ran`)
+    const owner = owners[row.id]
+    if (named.length > 0 && owner === undefined)
+      problems.push(
+        `row ${row.id}: scenarios stays empty in P1a until the slice that fills it maps the row to itself in scenario-fill-owners.json`,
+      )
+    if (named.length === 0 && owner !== undefined)
+      problems.push(
+        `row ${row.id}: scenario-fill-owners.json maps it to slice ${owner}, which has not filled its scenarios`,
+      )
     for (const id of named)
       if (!seen.has(id)) problems.push(`row ${row.id}: scenario ${id} is not in the scenario table`)
+  }
+  for (const [id, slice] of Object.entries(owners)) {
+    if (!inScope.has(id)) problems.push(`scenario-fill-owners.json names ${id}, which is not a P1a row`)
+    if (slice === "") problems.push(`scenario-fill-owners.json maps ${id} to no slice`)
   }
   for (const key of inert.keys()) {
     const cut = key.lastIndexOf(".")
