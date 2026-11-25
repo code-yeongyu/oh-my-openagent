@@ -35,11 +35,7 @@ export const SDK_WORDING: ThrownWording = {
  * fields; anything else, whatever it is (an Error, its stack and causes, a string, an object), is the fixed failure and
  * reaches only `onUnexpected`.
  */
-export function thrown(
-  error: unknown,
-  onUnexpected?: (error: unknown) => void,
-  wording: ThrownWording = SDK_WORDING,
-): Failure {
+export function thrown(error: unknown, onUnexpected?: UnexpectedPort, wording: ThrownWording = SDK_WORDING): Failure {
   // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
   const refusal = controlRefusalOf(error)
   if (refusal !== undefined) return { kind: "error", error: refusal }
@@ -69,29 +65,37 @@ export const UNEXPECTED_FAILURE_MESSAGE = "The thread operation failed unexpecte
  */
 export function unexpectedFailure(
   error: unknown,
-  onUnexpected?: (error: unknown) => void,
+  onUnexpected?: UnexpectedPort,
   next = "Run omo thread list and retry after checking the target.",
 ): Failure {
-  reportUnexpected(onUnexpected, error)
-  return fail("internal_error", UNEXPECTED_FAILURE_MESSAGE, next)
+  const written = reportUnexpected(onUnexpected, error)
+  // The fixed text names the local file the port wrote the details to (B8 sink ruling), only when it wrote it.
+  const message =
+    written === undefined ? UNEXPECTED_FAILURE_MESSAGE : `${UNEXPECTED_FAILURE_MESSAGE} The details are in ${written}.`
+  return fail("internal_error", message, next)
 }
 
+/**
+ * Where a surface records an unexpected exception (B8): the only place its text may go. A port that wrote it to a local
+ * file answers that file's path, which the fixed message then names; any other answer names nothing.
+ */
+export type UnexpectedPort = (error: unknown) => unknown
+
 /** Hands an exception to the logger port, isolated from the outcome: a port that throws changes no answer and no receipt. */
-export function reportUnexpected(onUnexpected: ((error: unknown) => void) | undefined, error: unknown): void {
+export function reportUnexpected(onUnexpected: UnexpectedPort | undefined, error: unknown): string | undefined {
   try {
     // Never awaited: a port that hangs holds nothing; one that rejects is caught here, never an unhandled rejection.
-    const pending: unknown = onUnexpected?.(error)
-    if (pending instanceof Promise) pending.catch(() => undefined)
+    const answered: unknown = onUnexpected?.(error)
+    if (answered instanceof Promise) answered.catch(() => undefined)
+    return typeof answered === "string" && answered !== "" ? answered : undefined
   } catch {
     // The port's own failure is dropped on purpose: reporting it would need the very sink that just failed.
+    return undefined
   }
 }
 
 // omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
-export async function guarded<T>(
-  body: () => Promise<T>,
-  onUnexpected?: (error: unknown) => void,
-): Promise<T | Failure> {
+export async function guarded<T>(body: () => Promise<T>, onUnexpected?: UnexpectedPort): Promise<T | Failure> {
   try {
     return await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, body)
   } catch (error) {

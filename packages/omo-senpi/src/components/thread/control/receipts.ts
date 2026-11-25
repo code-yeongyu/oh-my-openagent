@@ -62,7 +62,7 @@ export function createReceipts(
   store: Pick<GatewayStore, "toolReceiptBegin" | "toolReceiptSettle">,
   now: () => number,
   /** Where an unexpected store or call exception goes (B8); absent, nowhere. */
-  onUnexpected?: (error: unknown) => void,
+  onUnexpected?: (error: unknown) => unknown,
 ) {
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound): the row stays `prepared`
   // under this instance, which would answer `idempotency_in_progress` forever. A retry of such a key is

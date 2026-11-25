@@ -35,8 +35,9 @@ export type ThreadCoreOptions = {
   /**
    * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
    * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   * A port that wrote the details to a local file answers that file's path, and the fixed message names it.
    */
-  readonly onUnexpected?: (error: unknown) => void
+  readonly onUnexpected?: (error: unknown) => unknown
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
    * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the

@@ -256,8 +256,9 @@ export type ThreadToolSurfaceOptions = {
   /**
    * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
    * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   * A port that wrote the details to a local file answers that file's path, and the fixed message names it.
    */
-  readonly onUnexpected?: (error: unknown) => void
+  readonly onUnexpected?: (error: unknown) => unknown
   /**
    * How long a create waits for its first prompt to start on this device (`control/prompt-start.ts`); absent,
    * FIRST_PROMPT_START_WAIT_MS, cut to the call's budget. A test seam: a test with no drain sets it short.

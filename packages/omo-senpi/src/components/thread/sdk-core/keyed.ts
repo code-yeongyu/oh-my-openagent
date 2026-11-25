@@ -16,7 +16,7 @@ export function createKeyed(
   store: GatewayStore,
   principal: string,
   now: () => number,
-  onUnexpected: ((error: unknown) => void) | undefined,
+  onUnexpected: ((error: unknown) => unknown) | undefined,
 ) {
   const receipts = createReceipts(store, now, onUnexpected)
   return async function keyed(
