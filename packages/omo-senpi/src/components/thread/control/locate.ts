@@ -1,27 +1,17 @@
 import type { ThreadToolResult } from "../contracts"
-import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { workspaceEntries } from "../addressing"
 import { principalOf } from "../address/principal"
 import { resolve } from "../address/lazy"
-import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
-import type { RemoteSessionRow } from "../remote/ports"
 import { failure, sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
+import { notLiveRow, type NotLive } from "./not-live"
 import type { SessionControl } from "./port"
 
 export type LocatedControl =
   | { readonly kind: "control"; readonly control: SessionControl }
-  /** The address names a thread no engine holds live: its session file here, or an ended session on another device. */
-  | {
-      readonly kind: "not_live"
-      readonly thread_id: string
-      readonly title: string
-      readonly device?: string
-      /** The ended row of a session another device holds; a read reopens it there (omo#14799). */
-      readonly row?: RemoteSessionRow
-    }
+  | NotLive
   | { readonly kind: "error"; readonly result: ThreadToolResult }
 
 /**
@@ -56,9 +46,7 @@ export async function locateControl(
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
   if (resolved.holder.kind === "device" && options.remote !== undefined) {
     const row = resolved.holder.row
-    if (row.state === "ended")
-      return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
-    return { kind: "control", control: createRelayControl(options.remote, row) }
+    return notLiveRow(row) ?? { kind: "control", control: createRelayControl(options.remote, row) }
   }
   const session = targetSession(current, resolved.id)
   if (session === undefined) return { kind: "not_live", thread_id: resolved.id, title: resolved.entry.name }
