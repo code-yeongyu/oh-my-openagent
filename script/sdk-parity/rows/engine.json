@@ -2242,7 +2242,7 @@
       "cells": [
         "`engine.launch.interactive({ session?, setup?, input?, gated?, tui_mode?, verbose?, attach?: { socket, session } })`: starts the terminal UI on the caller's terminal",
         "`omo [flags] [messages] [@files] [-]`, `--tui-mode regular\\|fullscreen`, `--verbose`, `--attach <socket>` (what `omo remote attach` launches over `threads.attach().serveEndpoint`)",
-        "Resolves when the process exits: `{ exit_code, session }`",
+        "Resolves when the process exits: `{ exit_code, session? }`. `session` is the id the caller named; an ephemeral launch answers none; with no selector it is absent, because the engine has no channel that tells a parent which session a child opened",
         "none; omitted: a session has no terminal to give it",
         "**no**",
         "E1a-s, E1c"
@@ -2257,7 +2257,7 @@
       "cells": [
         "`engine.launch.print({ session?, setup?, input, gated?, mode: \"text\" \\| \"json\" })`: runs the input to the end in a new process",
         "`omo --print [flags] [messages] [@files] [-]`, `--mode text\\|json`",
-        "A stream of the run's events, then `{ exit_code, session }`",
+        "A stream of the run's events, then `{ exit_code, session? }`: the id the caller named, else the id in the json stream's session header, else absent; an ephemeral launch answers none",
         "none; omitted: a session delegates through its task tools",
         "**no**",
         "E1a-s, E1c"
