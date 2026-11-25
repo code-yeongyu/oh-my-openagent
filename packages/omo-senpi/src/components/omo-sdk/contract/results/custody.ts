@@ -64,7 +64,50 @@ export const Keyring = Type.Object({ device_id: Text, signing_public_key: Text, 
 export const SyncEnabled = Type.Object({ enabled: Type.Literal(true) }, closed)
 export const SyncRecovered = Type.Object({ recovered: Type.Literal(true) }, closed)
 
-/** The engine's AuthCheckResult: status only, never the credential. */
+const Epoch = Type.Integer({ minimum: 0 })
+
+/** The engine's CredentialAccountSummary (core/credential-accounts.ts): an account's state, never its credential. */
+const AuthAccount = Type.Object(
+  {
+    name: Text,
+    displayName: Type.Optional(Text),
+    source: Type.Enum(["login", "import", "env"]),
+    blocked: Type.Boolean(),
+    blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
+    blockedUntil: Type.Optional(Epoch),
+    pinned: Type.Boolean(),
+    blockedModels: Type.Optional(Type.Array(Type.Object({ model: Text, until: Epoch }, closed))),
+    unused: Type.Optional(Type.Literal(true)),
+    route: Type.Optional(Type.Enum(["siwc", "legacy"])),
+    planUsageEnabled: Type.Optional(Type.Boolean()),
+    signedOut: Type.Optional(Type.Boolean()),
+    store: Type.Optional(Type.Literal("claude-cli")),
+    signedInAt: Type.Optional(Epoch),
+    email: Type.Optional(Text),
+    orgName: Type.Optional(Text),
+    subscriptionType: Type.Optional(Text),
+    check: Type.Optional(
+      Type.Object(
+        {
+          model: Text,
+          outcome: Type.Enum(["ok", "failed"]),
+          reason: Type.Optional(Text),
+          message: Type.Optional(Type.String()),
+          status: Type.Optional(Type.Integer()),
+          at: Epoch,
+        },
+        closed,
+      ),
+    ),
+    signIn: Type.Optional(Type.Enum(["signed_in", "needs_sign_in"])),
+    active: Type.Optional(Type.Boolean()),
+    paused: Type.Optional(Type.Literal(true)),
+    usageUrl: Type.Optional(Text),
+  },
+  closed,
+)
+
+/** `omo auth check --json` without --credentials: the engine's AuthCheckResult and its accounts, never the credential. */
 export const AuthStatus = Type.Object(
   {
     status: Type.Enum(["ready", "not_ready", "invalid"]),
@@ -73,6 +116,7 @@ export const AuthStatus = Type.Object(
       Type.Enum(["provider_not_found", "credentials_not_configured", "credential_not_available", "invalid_state"]),
     ),
     authType: Type.Optional(Type.Enum(["api_key", "oauth"])),
+    accounts: Type.Array(AuthAccount),
   },
   closed,
 )
