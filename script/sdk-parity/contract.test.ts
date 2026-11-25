@@ -73,6 +73,23 @@ type AttachmentBytes = Extract<
   { readonly bytes: unknown }
 >["bytes"]
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
+// The root decides whether a call's input may be omitted with Partial<Input> extends Input (root.ts). It replaced
+// {} extends Input, written here as Record<never, never>; both forms must give the same answer on every shape a root
+// input can take and on every real root input.
+type OmittableBefore<T> = Record<never, never> extends T ? true : false
+type OmittableNow<T> = Partial<T> extends T ? true : false
+type Agrees<T> = Equal<OmittableBefore<T>, OmittableNow<T>>
+type Expect<T, Answer extends boolean> = Equal<OmittableNow<T>, Answer>
+const omittableChecks: readonly true[] = [
+  true satisfies Expect<{ readonly a: string }, false> & Agrees<{ readonly a: string }>,
+  true satisfies Expect<{ readonly a?: string }, true> & Agrees<{ readonly a?: string }>,
+  true satisfies Expect<Record<never, never>, true> & Agrees<Record<never, never>>,
+  true satisfies Expect<Record<string, unknown>, true> & Agrees<Record<string, unknown>>,
+  true satisfies Expect<{ readonly a?: string | undefined }, true> & Agrees<{ readonly a?: string | undefined }>,
+  true satisfies Expect<{ readonly a: string | undefined }, false> & Agrees<{ readonly a: string | undefined }>,
+  true satisfies Equal<{ [Key in RootCallKey]: Agrees<RootCallInput<Key>> }[RootCallKey], true>,
+]
+
 const rootTypeChecks: readonly true[] = [
   // Review 6061836983 H2: an instant call whose input has required fields takes that input as required.
   true satisfies Equal<undefined extends Parameters<OmoSdkRoot["daemon"]["shardPath"]>[0] ? true : false, false>,
@@ -262,7 +279,7 @@ describe("the table under P0's shared scenario rules", () => {
 
 describe("tables the root's consumers read", () => {
   test("#given the root's compile-time assertions #then every one of them holds", () => {
-    expect(rootTypeChecks.every((holds) => holds)).toBe(true)
+    expect([...rootTypeChecks, ...omittableChecks].every((holds) => holds)).toBe(true)
   })
 
   test("#given the effect classification P0's matcher takes #then every effect is an operation of its port", () => {
