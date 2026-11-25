@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto"
+import { clientMessageIdOf } from "../../remote/client-message-id"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
@@ -420,11 +421,15 @@ export function createRelayTransport(
     return result
   }
 
-  async function chain(): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
+  async function chain(
+    delivery: OutboundDelivery,
+  ): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
     const cause = options.callerCause?.()
     const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
     return {
-      delivery_id: randomUUID(),
+      // #15011: derived from the sender and the key, so a repeat from a process whose store holds no receipt reaches the
+      // receiving engine under the id it already admitted (admit_external_message answers already_admitted for it).
+      delivery_id: clientMessageIdOf(delivery.caller_id, delivery.idempotency_key),
       root_id: prior?.root_id ?? `root-${randomUUID()}`,
       hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1,
     }
@@ -585,7 +590,7 @@ export function createRelayTransport(
       if (decision.deliverAs === "steer") steerTurn = decision.expected_turn_id ?? expected
     }
     const facts = senderFacts(delivery.sender, await options.senderProvenance())
-    const ids = retry?.ids ?? (await chain())
+    const ids = retry?.ids ?? (await chain(delivery))
     const { delivery_id, root_id, hop } = ids
     const name = delivery.sender.kind === "session" ? delivery.sender.name?.trim() : undefined
     const recordFor = (effective: EffectiveLane) =>

@@ -71,6 +71,27 @@ async function admitted(sent: readonly Sent[], count: number): Promise<void> {
   }
 }
 
+// #15011: the receiving engine admits one delivery per delivery id (admit_external_message answers already_admitted for
+// an id its history holds). A keyed delivery's id is derived from the sender and the key, so a repeat from another
+// process, whose gateway store holds no receipt, reaches the holder under the id it already admitted.
+describe("a keyed delivery to another device is named by its sender and key", () => {
+  test("#given a keyed delivery #when a second process with an empty store sends it again #then both admit records carry one delivery id", async () => {
+    const a = account()
+    await transport(a.remote).relay.deliver(delivery("once", "k-same"))
+    await transport(a.remote).relay.deliver(delivery("once", "k-same"))
+    const ids = admits(a.sent).map((record) => record["deliveryId"])
+    expect({ admits: ids.length, ids: new Set(ids).size }).toEqual({ admits: 2, ids: 1 })
+  })
+
+  test("#given two unkeyed-looking deliveries under different keys #when each is sent #then their delivery ids differ", async () => {
+    const a = account()
+    await transport(a.remote).relay.deliver(delivery("one", "k-1"))
+    await transport(a.remote).relay.deliver(delivery("two", "k-2"))
+    const ids = admits(a.sent).map((record) => record["deliveryId"])
+    expect(new Set(ids).size).toBe(2)
+  })
+})
+
 describe("a delivery the receiver's open draft holds is queued at once, like a same-device one, and re-sent in the background", () => {
   // omo#14130 review H1: the call's budget bounds the call, never the background re-sends it queued.
   test("#given a held delivery sent inside a call whose budget is already spent #when it is re-sent in the background #then the re-send carries no inherited deadline and still goes out", async () => {
