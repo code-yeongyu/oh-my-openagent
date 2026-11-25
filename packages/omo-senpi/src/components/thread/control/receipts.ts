@@ -14,8 +14,11 @@ export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
 /**
  * The repeat horizon of a control call's idempotency key (#14951): for this long after a keyed call is admitted, a repeat
  * under the same key answers that call's first outcome and acts no second time; a repeat with other arguments is
- * `idempotency_conflict`. Receipts leave the store by time only, at this horizon, so a key reused after it is a new call.
- * Every answer to a call that named its key carries `receipt_expires_at`, so a caller decides without this constant.
+ * `idempotency_conflict`. Receipts leave the store by time only, at this horizon. For a CONTROL, a key reused after it is
+ * a new call (no holder keeps a book for it). For a SEND (B9, #15021) the horizon only bounds this device's cache: the
+ * holder still knows the key for the life of the thread, so a reuse past the horizon is answered as a repeat (the same
+ * message) or `idempotency_conflict` (another message), never delivered a second time; reusing a send key for another
+ * message is misuse. Every answer to a call that named its key carries `receipt_expires_at`.
  */
 export const RECEIPT_HORIZON_MS = GATEWAY_RECEIPT_RETENTION_MS
 

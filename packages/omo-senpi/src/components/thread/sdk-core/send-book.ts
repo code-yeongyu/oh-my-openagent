@@ -18,7 +18,9 @@ export type SendClass = "local" | "connector" | "service"
  * and identifiers only, never the message; a different message under the key is `idempotency_conflict`, with no text from
  * either side. Accepted within one class: a guessed key shows that a send under it exists, and a principal already
  * allowed to send to the thread can take a key first. Until the engine shares one id space between prompts and
- * deliveries (senpi#7479), the guarantee holds for sends from ONE device.
+ * deliveries (senpi#7479), the guarantee holds for sends from ONE device. This book is the device's cache (time-only
+ * eviction, `RECEIPT_HORIZON_MS`); the holder remembers the key for the thread's life (B9), so a reuse past the horizon
+ * is a repeat or a conflict there, never a second delivery.
  */
 export async function throughSendBook(
   store: GatewayStore,
