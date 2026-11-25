@@ -16,7 +16,7 @@ export const THREAD_CALLS = {
   "threads.wait": threadCall<result.ThreadWaitResult>()(read.ThreadsWait),
   "threads.follow": streamCall<result.ThreadFollowEvent, result.ThreadFollowOutcome>()(read.ThreadsFollow),
   "threads.locate": threadCall<result.ThreadLocateResult>()(read.ThreadsLocate),
-  "threads.send": threadCall<result.ThreadSendResult>()(input.ThreadsSend),
+  "threads.send": threadCall<result.ThreadSendAnswer>()(input.ThreadsSend),
   "threads.sendAndFollow": streamCall<result.ThreadFollowEvent, result.ThreadFollowOutcome>()(
     input.ThreadsSendAndFollow,
   ),

@@ -4,14 +4,16 @@ import type { ConfigApi, ConfigFileSystemPort } from "./config"
 import type { Endpoint, OmoPrincipal, OmoSdkRoot } from "./contract"
 import type { DeviceServiceApi, DeviceServiceStatusPort } from "./device-service"
 import type { DevicesApi } from "./devices"
+import type { ThreadNamespaceOptions, ThreadPorts } from "./root/threads"
 
-export type OmoSdkPorts = AccessPorts & {
-  readonly deviceServiceStatus?: DeviceServiceStatusPort
-  /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
-  readonly signInProcess?: SignInProcess
-  /** The files `config.status` reads; absent, the real file system. */
-  readonly fileSystem?: ConfigFileSystemPort
-}
+export type OmoSdkPorts = AccessPorts &
+  ThreadPorts & {
+    readonly deviceServiceStatus?: DeviceServiceStatusPort
+    /** Runs `omo account sign-in`; absent, the omo launcher this engine was started from (`OMO_BIN`). */
+    readonly signInProcess?: SignInProcess
+    /** The files `config.status` reads; absent, the real file system. */
+    readonly fileSystem?: ConfigFileSystemPort
+  }
 
 export type OmoSdkOptions = {
   /** The account service origin; else `OMO_SERVICE_API_URL` from `env`, else the production API. */
@@ -20,6 +22,12 @@ export type OmoSdkOptions = {
   readonly accounts?: string
   readonly env?: Readonly<Record<string, string | undefined>>
   readonly cwd?: string
+  /** The agent state the thread calls read; absent, the canonical one the omo launcher uses. */
+  readonly agentDir?: string
+  /** The OS user the thread calls act as; absent, this process's. */
+  readonly uid?: number
+  readonly user?: string
+  readonly threads?: ThreadNamespaceOptions
   /** The home the device service's state dir resolves under; absent, the user's own. */
   readonly home?: string
   /** Fixed for the root's life (security design 3); absent, a script run by this process's user. No call takes one. */

@@ -14,6 +14,7 @@ import type {
   ThreadWaitOutcome,
 } from "../../../thread/contracts/results"
 import type { ReleaseSessionReply } from "../../../thread/gateway/adapter"
+import type { GatewayDeliverySuccess } from "../../../thread/gateway/types"
 import type { LocatedThread } from "../../../thread/sdk"
 import type { FollowEvent, FollowOutcome, JsonObject, ReadPage, SessionDetail, SessionRow } from "../../../remote/types"
 
@@ -36,6 +37,16 @@ export type {
   ThreadSetModelResult,
   ThreadSetReasoningResult,
 }
+
+/**
+ * The tool's send answer plus `endpoint_kind` (design amendment on the send answer, P1b): the kind of endpoint this
+ * device queued the delivery for, as `omo thread send --json` prints it. Absent when another device took the delivery.
+ */
+export type ThreadSendAnswer =
+  | (Extract<ThreadSendResult, { readonly kind: "ok" }> & {
+      readonly endpoint_kind?: GatewayDeliverySuccess["endpoint_kind"]
+    })
+  | Exclude<ThreadSendResult, { readonly kind: "ok" }>
 
 export type ThreadReadAfterWaitResult = Exclude<ThreadReadResult, { readonly kind: "error" }> & {
   readonly wait: ThreadWaitOutcome
