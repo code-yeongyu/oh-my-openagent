@@ -1,5 +1,7 @@
 import type { Namespace, OmoFailure, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
+import { OMO_CODE_REGISTRY } from "../contract/codes"
 import { ROOT_CALLS } from "../contract/calls"
+import { inputAccepts } from "../contract/validate"
 import type { CoreContext, CoreLoaders, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
 
@@ -74,6 +76,32 @@ function refusing(key: RootCallKey, error: OmoFailure["error"]): Call {
   })
 }
 
+/** Design 4.4 and the design lane's ruling: an input outside its call's schema is refused before the member runs. */
+export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
+  code: "invalid_arguments",
+  message: `The input of ${key} does not match its schema.`,
+  next_action: OMO_CODE_REGISTRY.invalid_arguments.next_action,
+})
+
+/**
+ * Calls whose unknown top-level input keys are dropped before the schema check, as their shipped members ignore them
+ * today (design lane ruling on closed schemas). Closed list: slice P1a's follow-up fills it and pins each call; whether
+ * such a key should be refused instead is a later, recorded decision.
+ */
+const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
+
+/** The input as its schema sees it: for a call in the list, only the keys the schema names. */
+function checkedInput(key: RootCallKey, input: unknown): unknown {
+  if (!UNKNOWN_KEYS_DROPPED.includes(key) || typeof input !== "object" || input === null) return input
+  const named = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
+  return Object.fromEntries(Object.entries(input).filter(([field]) => named.includes(field)))
+}
+
+function checked(key: RootCallKey, member: Call): Call {
+  const refuse = refusing(key, invalidInput(key))
+  return (...args) => (inputAccepts(key, checkedInput(key, args[0] ?? {})) ? member(...args) : refuse())
+}
+
 function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {
   const [namespace, ...rest] = key.split(".") as [Namespace, ...string[]]
   const load = loads.get(namespace)
@@ -108,8 +136,10 @@ export function assembleRoot(
       place(tree, key, refusing(key, refused))
       continue
     }
-    const served = servings.find((serving) => serving.members[key] !== undefined)?.members[key]
-    place(tree, key, served ?? loaded(key, loads) ?? notImplemented(key))
+    const serving = servings.find((candidate) => candidate.members[key] !== undefined)
+    const member = serving?.members[key] ?? loaded(key, loads)
+    if (member === undefined) place(tree, key, notImplemented(key))
+    else place(tree, key, serving?.legacy?.includes(key) === true ? member : checked(key, member as Call))
   }
   const close = (): void => {
     for (const serving of servings) serving.close?.()
