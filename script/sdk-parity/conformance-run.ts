@@ -208,6 +208,7 @@ async function runOnce(
       member: invoked.slice(before).join(","),
       input: step.input,
       given: scenario.given ?? [],
+      ...fixtureSetup(scenario),
       expect: step.expect,
       observed: calls().slice(seen),
       ...(scenario.target === undefined ? {} : { target: scenario.target }),

@@ -137,6 +137,17 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(await problems(refused([{ port: "host", state: { moved: true } }]))).toContain(uncovered)
   })
 
+  test("#given a scenario with before calls #when the runner records it #then its record carries them as its setup", async () => {
+    const withBefore = {
+      ...scenario("by-id", undefined),
+      before: [{ row: "threads.create", input: {} }],
+    } as TableScenario
+    const [record] = await runEffectScenarios(builtRows, [run(withBefore)])
+    expect(record?.setup).toEqual({ before: [{ row: "threads.create", input: {} }] })
+    const [plain] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
+    expect(plain?.setup).toBeUndefined()
+  })
+
   test("#given a scenario whose answer carries a value generated per run #when it is run twice #then it fails by name and covers nothing", async () => {
     let generated = 0
     const unstable = run(
