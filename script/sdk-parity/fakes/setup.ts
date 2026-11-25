@@ -74,7 +74,9 @@ function callScoped(target: unknown, begin: () => void, end: () => Promise<void>
 
 export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {}): ScenarioSetup {
   const recorder = createRecorder(scenario)
-  const home = join(tmpdir(), `${FAKE_HOME_PREFIX}${randomUUID()}`)
+  const scenarioRoot = join(tmpdir(), `${FAKE_HOME_PREFIX}${randomUUID()}`)
+  const home = join(scenarioRoot, "home")
+  const elsewhere = join(scenarioRoot, "elsewhere")
   const agentDir = join(home, ".omo", "agent")
   const remote = remotePort(recorder)
   const fakes: ScenarioFakes = {
@@ -95,7 +97,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     ...(scenario.root as Partial<OmoSdkOptions> | undefined),
     ports: {
       ...accountPorts(recorder, { desktopLaunch: options.desktopLaunch === true }),
-      host: hostPort(recorder, { agentDir, cwd: home }),
+      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }),
       store: storePort(recorder, () => FIXED_NOW),
       remote: remote.remote,
       now: () => FIXED_NOW,
@@ -107,7 +109,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     mkdirSync(agentDir, { recursive: true })
   }
   const end = async (): Promise<void> => {
-    rmSync(home, { recursive: true, force: true })
+    rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
   return { root: callScoped(root, begin, end), calls: recorder.calls }

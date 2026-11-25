@@ -7,22 +7,31 @@ import type { Recorder } from "./recorder"
 // The engine host port (ThreadHost) over one recorder, shaped as the live surface is: `listView` lists every endpoint
 // (host.list_sessions, with the view request the core passed), the per-session methods act on the session the core
 // addressed (host.rename_session {thread, name}, host.release_session {thread, reason, ...}). Each thread it holds has a
-// session file under the agent dir, so a thread the scenario gives as ended is resumable from disk and not live.
+// session file under the agent dir, so a thread the scenario gives as ended is resumable from disk and not live. The
+// host spans two workspaces: t-1 runs in the caller's cwd and t-3 in another folder; a scenario moves a thread to that
+// other workspace with `given: {thread, workspace: "elsewhere"}`, so a call finds it only with all_scope.
 
 export const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
-export const HOST_THREADS = ["t-1"] as const
+export const HOST_THREADS = ["t-1", "t-3"] as const
+const ELSEWHERE_THREADS: readonly string[] = ["t-3"]
 
 const unused = (method: string) => async (): Promise<never> => {
   throw new Error(`fake host: ${method} is not faked; a scenario that reaches it needs this fake extended`)
 }
 
-export function hostPort(recorder: Recorder, where: { readonly agentDir: string; readonly cwd: string }): ThreadHost {
+export function hostPort(
+  recorder: Recorder,
+  where: { readonly agentDir: string; readonly cwd: string; readonly elsewhere: string },
+): ThreadHost {
   const given = recorder.given("host")
   const ended = given["session"] === "ended" ? [given["thread"]] : []
+  const moved = given["workspace"] === "elsewhere" ? [given["thread"]] : []
+  const cwdOf = (thread: string): string =>
+    ELSEWHERE_THREADS.includes(thread) || moved.includes(thread) ? where.elsewhere : where.cwd
   const session = (thread: string, name: string): ThreadHostSession => ({
     sessionId: `rpc-${thread}`,
     durableSessionId: thread,
-    cwd: where.cwd,
+    cwd: cwdOf(thread),
     name,
     status: "open",
     socket: HOST_SOCKET,
@@ -31,10 +40,11 @@ export function hostPort(recorder: Recorder, where: { readonly agentDir: string;
   const sessionsDir = join(where.agentDir, "sessions", "--fake--")
   const writeSessionFiles = (): void => {
     mkdirSync(sessionsDir, { recursive: true })
+    mkdirSync(where.elsewhere, { recursive: true })
     for (const thread of HOST_THREADS)
       writeFileSync(
         join(sessionsDir, `2026-11-01T00-00-00-000Z_${thread}.jsonl`),
-        `${JSON.stringify({ type: "session", id: thread, cwd: where.cwd, timestamp: "2026-11-01T00:00:00Z" })}\n`,
+        `${JSON.stringify({ type: "session", id: thread, cwd: cwdOf(thread), timestamp: "2026-11-01T00:00:00Z" })}\n`,
       )
   }
   const durableOf = (routing: string, durable?: string): string => durable ?? routing.replace(/^rpc-/, "")

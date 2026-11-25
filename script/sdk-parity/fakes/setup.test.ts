@@ -1,12 +1,14 @@
 import { afterEach, beforeAll, describe, expect, test } from "bun:test"
-import { readdirSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { PORT_EFFECTS } from "../../../packages/omo-senpi/src/components/omo-sdk/contract/ports"
 import { type ConformanceContext, conformanceProblems, type EffectEvidence } from "../conformance"
 import { runEffectScenarios, type ScenarioRun } from "../conformance-run"
 import { expectationProblems, type TableScenario } from "../expectation"
-import { allRows, loadDomainFiles } from "../registry"
+import { type Baseline, UNRESOLVED_PATH } from "../baseline"
+import { allRows, loadDomainFiles, REPO_ROOT } from "../registry"
 import { runs as configRuns } from "../runs/config"
 import { runs as deviceRuns } from "../runs/devices"
 import { runs as threadRuns } from "../runs/threads"
@@ -17,22 +19,22 @@ import { FAKE_HOME_PREFIX, scenarioSetup } from "./setup"
 
 // P1b's eight rows judged as isBuilt will judge them once the rows list their scenarios: each row's `scenarios` filled
 // from the table, the real effect classification (PORT_EFFECTS) and the table's inert fields. Every scenario the real
-// root answers differently from the table is named here with where the code does so; the list must match exactly, so a
-// fixed path or a new difference both fail this test.
-const DIFFERING: Readonly<Record<string, string>> = {
-  "config.status/reads-config-files": "the config core reads files itself, no fs port (omo-sdk/config/index.ts:21)",
-  "devices.rename/missing-name": "no input check; renameDevice runs without a name (omo-sdk/devices/index.ts:18)",
-  "threads.extensions.register/bad-module":
-    "moduleUrl is checked in the store worker (gateway/extension-registrations.ts:234)",
-  "threads.locate/here": "the host port takes no scope; the core scopes (tools/internals.ts:219)",
-  "threads.locate/all-scope": "the host port takes no scope; the core scopes (tools/internals.ts:219)",
-  "threads.locate/on-other-device": "resolved over the account listing, no sessions.resolve (sdk-core/reads.ts:70)",
-  "threads.release/move": "move is not acted on: not_implemented (omo-sdk/root/threads.ts:121)",
-  "threads.release/no-endpoint": "release_unsupported is answered as a value (sdk-core/lifecycle.ts:28)",
-  "threads.rename/all-scope": "the host port takes no scope; the core scopes (tools/internals.ts:219)",
-  "threads.rename/idempotent-repeat": "the key goes to the alias registry only (sdk-core/controls.ts:102)",
-  "threads.rename/session-ended": "a thread with no live owner is not_resumable (control/rename.ts:31)",
+// root answers differently from the table is an entry of the closed record scenario-differences.json, checked both
+// ways: a difference with no entry fails, and an entry whose scenario now passes fails as stale.
+type Difference = {
+  readonly id: string
+  readonly differs: string
+  readonly owner: string
+  readonly retires_with: string
 }
+const DIFFERENCES = (
+  JSON.parse(readFileSync(join(import.meta.dir, "..", "scenario-differences.json"), "utf8")) as {
+    readonly entries: readonly Difference[]
+  }
+).entries
+const UNRESOLVED = new Set(
+  (JSON.parse(readFileSync(join(REPO_ROOT, UNRESOLVED_PATH), "utf8")) as Baseline).entries.map((entry) => entry.id),
+)
 
 const ROWS = [
   "devices.list",
@@ -94,10 +96,25 @@ describe("P1b scenario drivers over the real omo SDK root", () => {
     expect(RUNS).toHaveLength(57)
   })
 
-  test("#given every run's record #then the failing scenarios are exactly the listed differences", () => {
+  test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {
+    const ids = DIFFERENCES.map((entry) => entry.id)
+    expect(ids).toEqual([...new Set(ids)].toSorted())
+    for (const entry of DIFFERENCES) {
+      expect(Object.keys(entry).toSorted()).toEqual(["differs", "id", "owner", "retires_with"])
+      expect([entry.differs, entry.owner, entry.retires_with].every((field) => field.trim() !== "")).toBe(true)
+      expect(UNRESOLVED.has(scenarioOf(entry.id).row)).toBe(true)
+    }
+  })
+
+  test("#given every run's record #then a difference with no entry and an entry that now passes both fail", () => {
     const problems = conformanceProblems(rows, NONE, evidence, CONTEXT)
-    expect(failing(problems)).toEqual(Object.keys(DIFFERING).toSorted())
-    const differingRows = new Set(Object.keys(DIFFERING).map((id) => scenarioOf(id).row))
+    const differing = failing(problems)
+    const recorded = DIFFERENCES.map((entry) => entry.id)
+    expect({
+      undocumented: differing.filter((id) => !recorded.includes(id)),
+      stale: recorded.filter((id) => !differing.includes(id)),
+    }).toEqual({ undocumented: [], stale: [] })
+    const differingRows = new Set(recorded.map((id) => scenarioOf(id).row))
     for (const row of rows.filter((candidate) => !differingRows.has(candidate.id)))
       expect(conformanceProblems([row], NONE, evidence, CONTEXT)).toEqual([])
     const rowLevel = problems.filter((problem) => !/ scenario \S+\//.test(problem))
@@ -109,7 +126,11 @@ describe("P1b scenario drivers over the real omo SDK root", () => {
     const of = (id: string) => evidence.find((record) => record.scenario === id)
     expect(of("devices.list/signed-out")).toMatchObject({ code: "signed_out", codeSource: "root" })
     expect(of("threads.rename/device-offline")).toMatchObject({ code: "device_offline", codeSource: "root" })
-    expect(of("threads.release/on-other-device")).toMatchObject({ code: "release_unsupported", codeSource: "value" })
+    expect(of("threads.release/on-other-device")).toMatchObject({
+      code: "unsupported",
+      codeSource: "root",
+      answered: { error: { details: { reason: "release_unsupported" } } },
+    })
     expect(of("threads.extensions.register/extension-refuses-session")?.code).toBe("sender_not_allowed")
   })
 })
@@ -151,5 +172,25 @@ describe("negative controls: a wrong expectation is reported for each fake famil
       expectationProblems([{ port: "fs", op: "read", args: { path: "/agent/x" } }], recorder.calls()),
     ).toHaveLength(1)
     expect(expectationProblems([{ port: "process", op: "signal", args: { pid: 7 } }], recorder.calls())).toHaveLength(1)
+  })
+})
+
+describe("the workspace scope is pinned by the scope scenarios' answers", () => {
+  const withoutAllScope = (id: string): TableScenario => {
+    const { all_scope: _dropped, ...input } = scenarioOf(id).input
+    return { ...scenarioOf(id), input }
+  }
+  const movedElsewhere = (id: string): TableScenario => ({
+    ...scenarioOf(id),
+    given: [{ port: "host", state: { thread: "t-1", workspace: "elsewhere" } }],
+  })
+
+  test.each([
+    ["threads.locate/all-scope", "all_scope dropped", withoutAllScope],
+    ["threads.rename/all-scope", "all_scope dropped", withoutAllScope],
+    ["threads.locate/here", "its thread moved out of the caller's workspace", movedElsewhere],
+  ] as const)("#given %s #when %s #then it no longer passes", async (id, _how, broken) => {
+    expect(await judged(scenarioOf(id))).toEqual([])
+    expect((await judged(broken(id))).length).toBeGreaterThan(0)
   })
 })
