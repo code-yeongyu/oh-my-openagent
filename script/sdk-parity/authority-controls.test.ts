@@ -3,6 +3,7 @@ import { describe, expect, test } from "bun:test"
 import {
   BEHAVIOUR_CHANGES,
   type BehaviourChange,
+  AUTH_CHECK_FREE_FIELDS,
   CUSTODY_RESULTS,
   GATED,
   type MatrixLine,
@@ -20,6 +21,7 @@ import {
 import { CALL_ALIASES, CUSTODY_FIELDS, HELD } from "./authority-expected"
 import { calls, files, isTyped, json, rows, securityDesign } from "./authority-scope"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
+import { freeFieldMappingProblems, loadSnapshot } from "./engine-snapshot-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
 
 // Negative controls of slice P1a-s's checks (#14949): each breaks one thing the real tree holds and expects the check to
@@ -154,5 +156,29 @@ describe("negative controls of custody and the held table (#14949)", () => {
     expect(GATED).toEqual([])
     const missing = [...HELD, { entry: "threads.send#nobody", typed: true }]
     expect(gatedProblems([], missing, isTyped).join("\n")).toContain("threads.send#nobody: left GATED but is not typed")
+  })
+
+  test("#given an engine entry with no omo field, or an omo field with no engine entry #then the mapping names it", () => {
+    const snapshot = loadSnapshot()
+    const engineExtra = [
+      ...snapshot.free_fields,
+      { call: "auth.check", field: "value.accounts.[].leaked", origin: "provider" as const, may_embed: true },
+    ]
+    expect(freeFieldMappingProblems(engineExtra, AUTH_CHECK_FREE_FIELDS).join("\n")).toContain(
+      "engine auth.check value.accounts.[].leaked: no omo field maps to it",
+    )
+    const omoExtra = [
+      ...AUTH_CHECK_FREE_FIELDS,
+      { field: "accounts[].extra", origin: "provider" as const, may_embed: true },
+    ]
+    expect(freeFieldMappingProblems(snapshot.free_fields, omoExtra).join("\n")).toContain(
+      "omo accounts[].extra: no entry of the engine's table maps to it",
+    )
+    const relabelled = AUTH_CHECK_FREE_FIELDS.map((entry) =>
+      entry.field === "accounts[].email" ? { ...entry, origin: "configuration" as const } : entry,
+    )
+    expect(freeFieldMappingProblems(snapshot.free_fields, relabelled).join("\n")).toContain(
+      "omo accounts[].email is configuration",
+    )
   })
 })

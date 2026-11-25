@@ -1,5 +1,7 @@
 import { type Static, Type } from "typebox"
 
+import { AuthStatus, SessionAuthStatus } from "./auth-check"
+
 // What the credential-bearing calls answer (security design #14945, 5.0 to 5.7, 8.2): the non-secret part only. Each
 // answer is a closed schema, so a field cannot be added without a test noticing (s0-contract.test.ts), and no answer has
 // a field a secret could ride in. The device-code event is the one exception by design: it is the argument of the
@@ -64,103 +66,6 @@ export const Keyring = Type.Object({ device_id: Text, signing_public_key: Text, 
 export const SyncEnabled = Type.Object({ enabled: Type.Literal(true) }, closed)
 export const SyncRecovered = Type.Object({ recovered: Type.Literal(true) }, closed)
 
-const Epoch = Type.Integer({ minimum: 0 })
-
-const AccountFields = {
-  name: Text,
-  displayName: Type.Optional(Text),
-  source: Type.Enum(["login", "import", "env"]),
-  blocked: Type.Boolean(),
-  blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
-  blockedUntil: Type.Optional(Epoch),
-  pinned: Type.Boolean(),
-  blockedModels: Type.Optional(Type.Array(Type.Object({ model: Text, until: Epoch }, closed))),
-  unused: Type.Optional(Type.Literal(true)),
-  route: Type.Optional(Type.Enum(["siwc", "legacy"])),
-  planUsageEnabled: Type.Optional(Type.Boolean()),
-  signedOut: Type.Optional(Type.Boolean()),
-  store: Type.Optional(Type.Literal("claude-cli")),
-  signedInAt: Type.Optional(Epoch),
-  signIn: Type.Optional(Type.Enum(["signed_in", "needs_sign_in"])),
-  active: Type.Optional(Type.Boolean()),
-  paused: Type.Optional(Type.Literal(true)),
-}
-
-/** What the provider's profile supplies, as `omo auth check --json` prints it to a person or a script. */
-const ProviderFields = {
-  email: Type.Optional(Text),
-  orgName: Type.Optional(Text),
-  subscriptionType: Type.Optional(Text),
-  usageUrl: Type.Optional(Text),
-}
-
-const CheckCore = {
-  model: Text,
-  outcome: Type.Enum(["ok", "failed"]),
-  status: Type.Optional(Type.Integer()),
-  at: Epoch,
-}
-
-/** The engine's CredentialAccountSummary (core/credential-accounts.ts), as `omo auth check --json` prints it. */
-const AuthAccount = Type.Object(
-  {
-    ...AccountFields,
-    ...ProviderFields,
-    check: Type.Optional(
-      Type.Object({ ...CheckCore, reason: Type.Optional(Text), message: Type.Optional(Type.String()) }, closed),
-    ),
-  },
-  closed,
-)
-
-/**
- * The connection test's result as a session receives it: a code from a closed list, never the provider's own text, which
- * can echo a key fragment. The engine builds the code (slice E1a-s).
- */
-export const SESSION_CHECK_CODES = ["auth_error", "account_disabled", "rate_limit", "other"] as const
-
-/**
- * An account as a session receives it (security design 4.3, the owner's option (c) at 137d6b9879): whether it is signed
- * in, and status codes from closed sets. No string at all: not its name, its email or its organisation name, which stay
- * on the person's and script's answer, and no text a provider returned.
- */
-const SessionAuthAccount = Type.Object(
-  {
-    signedIn: Type.Boolean(),
-    source: Type.Enum(["login", "import", "env"]),
-    blocked: Type.Boolean(),
-    blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
-    check: Type.Optional(
-      Type.Object(
-        { outcome: Type.Enum(["ok", "failed"]), code: Type.Optional(Type.Enum([...SESSION_CHECK_CODES])) },
-        closed,
-      ),
-    ),
-  },
-  closed,
-)
-
-const AuthStatusFields = {
-  status: Type.Enum(["ready", "not_ready", "invalid"]),
-  provider: Text,
-  reason: Type.Optional(
-    Type.Enum(["provider_not_found", "credentials_not_configured", "credential_not_available", "invalid_state"]),
-  ),
-  authType: Type.Optional(Type.Enum(["api_key", "oauth"])),
-}
-
-/** `omo auth check --json` without --credentials, for a person or a script: status and accounts, never the credential. */
-export const AuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(AuthAccount) }, closed)
-
-/** The same call's answer to a session: whether each account is signed in, the provider, and closed status codes. */
-export const SessionAuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(SessionAuthAccount) }, closed)
-
-/** Fields of a person's or script's answer that may embed provider-returned text; never part of a session's answer. */
-export const MAY_EMBED = { "engine.auth.check": ["accounts[].check.reason", "accounts[].check.message"] } as const
-
-/** Answers a session principal receives where they differ from the person's and the script's. */
-export const SESSION_RESULTS = { "engine.auth.check": SessionAuthStatus } as const
-
 export const TrustEnsured = Type.Object({ action: Type.Literal("ensure"), generation: Text }, closed)
 
 export const McpLoggedIn = Type.Object(
@@ -207,3 +112,6 @@ export type UserCode = {
   readonly matching_code: string
   readonly expires_at: string
 }
+
+/** Answers a session principal receives where they differ from the person's and the script's. */
+export const SESSION_RESULTS = { "engine.auth.check": SessionAuthStatus } as const
