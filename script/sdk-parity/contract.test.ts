@@ -15,7 +15,6 @@ import type {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   cancellationOf,
-  DESCRIPTOR_AHEAD,
   PORT_EFFECTS,
   GATED,
   HONOURED_CALLS,
@@ -30,6 +29,7 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { callInputOf } from "./call-input"
 import { codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
+import { TYPED_AHEAD_INPUTS } from "./typed-ahead"
 import { scenarioProblems } from "./scenario-check"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
@@ -54,7 +54,7 @@ const contract: Contract = {
   heldCodes: HELD_CODES,
   sourceCodes: SOURCE_CODES,
   accepts: (call, input) => inputAccepts(call, input),
-  ahead: DESCRIPTOR_AHEAD,
+  ahead: TYPED_AHEAD_INPUTS,
 }
 
 // The root's type is computed from ROOT_CALLS (design 4.1): these fail the typecheck when a member goes missing, takes
