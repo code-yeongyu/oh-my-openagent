@@ -127,8 +127,24 @@ export function threadsNamespace(options: {
     "threads.close": async (input = {}) => onRoot((await thread().close(input)) as result.ThreadCloseResult),
     "threads.rename": async (input = {}) => onRoot((await thread().rename(input)) as result.ThreadRenameResult),
     "threads.setModel": async (input) => onRoot((await thread().setModel(input)) as result.ThreadSetModelResult),
-    "threads.release": async (input) =>
-      unbuilt("threads.release", input, ["thread", "interrupt", "force"]) ?? onRoot(await thread().release(input)),
+    "threads.release": async (input) => {
+      const refused = unbuilt("threads.release", input, ["thread", "interrupt", "force"])
+      if (refused !== undefined) return refused
+      const released = onRoot(await thread().release(input))
+      // Design lane ruling: the root's failures are refusals; the engine's release_unsupported reply (a row with no
+      // local endpoint) is answered as one. The thread facade keeps the engine's shape through its own path.
+      if (released.kind === "ok" && !released.value.success && released.value.error === "release_unsupported")
+        return {
+          kind: "error",
+          error: {
+            code: "unsupported",
+            message: `The thread ${input.thread} has no endpoint on this device that can release it.`,
+            next_action: "Release it on the device that serves it.",
+            details: { reason: "release_unsupported" },
+          },
+        }
+      return released
+    },
     "threads.extensions.register": async (input) => {
       if (options.checkModuleUrl !== false && !isAbsoluteFileUrl(input.moduleUrl))
         return {

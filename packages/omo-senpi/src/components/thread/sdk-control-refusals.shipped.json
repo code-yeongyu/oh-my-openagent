@@ -1,7 +1,7 @@
 {
   "base": "cab771c00642b969d229869d2312996450ce1bf3",
   "command": "bun script/capture-shipped-thread-refusals.ts --base cab771c00642b969d229869d2312996450ce1bf3",
-  "count": 11,
+  "count": 12,
   "answers": {
     "interrupt": {
       "kind": "error",
@@ -121,6 +121,10 @@
           ]
         }
       }
+    },
+    "releaseNoEndpoint": {
+      "success": false,
+      "error": "release_unsupported"
     }
   }
 }

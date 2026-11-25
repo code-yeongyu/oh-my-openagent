@@ -45,6 +45,7 @@ const answers = {
   renameMissing: await sdk.rename({ thread: "nope-thread", name: "mine" }),
   setModelMissing: await sdk.set_model({ thread: "nope-thread", model: "opus" }),
   interruptBogus: await sdk.interrupt({ thread: "self", bogus: 1 }),
+  releaseNoEndpoint: await sdk.release({ thread_id: "dur-x", title: "x", cwd: "/w", status: "live", session_path: null, endpoint: null, surface: null, alive: true, device: "studio", address: "studio/dur-x" }, { interrupt: false }),
 }
 await sdk.dispose()
 await store.dispose()

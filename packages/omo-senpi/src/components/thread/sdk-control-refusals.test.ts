@@ -60,6 +60,21 @@ test("#given a script with no session of its own and an unknown thread #when eac
     renameMissing: await sdk.rename({ thread: "nope-thread", name: "mine" }),
     setModelMissing: await sdk.set_model({ thread: "nope-thread", model: "opus" }),
     interruptBogus: await sdk.interrupt({ thread: "self", bogus: 1 } as never),
+    releaseNoEndpoint: await sdk.release(
+      {
+        thread_id: "dur-x",
+        title: "x",
+        cwd: "/w",
+        status: "live",
+        session_path: null,
+        endpoint: null,
+        surface: null,
+        alive: true,
+        device: "studio",
+        address: "studio/dur-x",
+      },
+      { interrupt: false } as never,
+    ),
   }
   await sdk.dispose()
   await store.dispose()
