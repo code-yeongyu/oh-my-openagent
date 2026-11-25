@@ -8,6 +8,7 @@ import type { RemoteThreadSurface } from "../remote/ports"
 import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
+import { guarded, thrown } from "./failures"
 
 export type ThreadCoreOptions = {
   readonly agentDir: string
@@ -30,6 +31,11 @@ export type ThreadCoreOptions = {
   /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
   readonly firstPromptWaitMs?: number
   readonly now?: () => number
+  /**
+   * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
+   * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   */
+  readonly onUnexpected?: (error: unknown) => void
   /**
    * The account's other devices and its alias registry (the CLI passes the thread client sidecar's `createCliRemoteSurface`):
    * `read` then resolves an address exactly as the agent's `thread_read` does. Absent, it reads this device only; the
@@ -69,6 +75,7 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     callerSessionId: () => UNKNOWN_CALLER,
     callerWorkspaceRoot: () => options.cwd,
     now,
+    ...(options.onUnexpected === undefined ? {} : { onUnexpected: options.onUnexpected }),
   }
   const view = () => hostView(surface)
   const { pipeline } = createGatewayServices(
@@ -87,5 +94,8 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     local,
     callerId: UNKNOWN_CALLER,
   })
-  return { options, principal, env, host, store, surface, view, pipeline, controls, resolveContext }
+  // Every operation's failure mapping, bound to this core's logger port (B8): an unexpected exception reaches it alone.
+  const guard = <T>(body: () => Promise<T>) => guarded(body, options.onUnexpected)
+  const fault = (error: unknown) => thrown(error, options.onUnexpected)
+  return { options, principal, env, host, store, surface, view, pipeline, controls, resolveContext, guard, fault }
 }

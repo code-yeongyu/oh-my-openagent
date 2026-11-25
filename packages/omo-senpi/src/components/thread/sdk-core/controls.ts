@@ -21,7 +21,6 @@ import { sendToTarget } from "../sdk-send"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadCoreContext } from "./context"
-import { guarded } from "./failures"
 
 type ControlName = "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"
 
@@ -34,14 +33,14 @@ export function createControls(context: ThreadCoreContext) {
   const { options, principal, store, pipeline, controls, view } = context
   // One session control as its tool runs it: the tool's parameter schema, the receipt protocol its key is honoured by
   // (control/receipts.ts, the one the tools run), then its body; a control's typed refusal is data.
-  const receipts = createReceipts(store, context.surface.now ?? store.now)
+  const receipts = createReceipts(store, context.surface.now ?? store.now, options.onUnexpected)
   type Retrying = { readonly error_note: string | null } | undefined
   function control<I>(
     name: ControlName,
     request: I,
     body: (value: I, key: string, retrying: Retrying) => Promise<ThreadToolResult>,
   ): Promise<ThreadToolResult> {
-    return guarded(async () => {
+    return context.guard(async () => {
       const parsed = parseThreadParams(threadToolParamSchemas[name], request)
       if (parsed.kind === "error") return parsed as ThreadToolResult
       const value = parsed.value as I & { readonly idempotency_key?: string }
@@ -58,7 +57,7 @@ export function createControls(context: ThreadCoreContext) {
       try {
         result = await answered(() => body(value, scope.idempotency_key, admission.retrying))
       } catch (error) {
-        await receipts.fail(scope, error instanceof Error ? error.message : String(error))
+        await receipts.fail(scope, error)
         throw error
       }
       await receipts.settle(scope, result, admission.retrying)

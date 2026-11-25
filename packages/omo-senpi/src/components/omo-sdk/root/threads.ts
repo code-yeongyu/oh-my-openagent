@@ -26,6 +26,11 @@ export type ThreadPorts = {
   readonly store?: GatewayStore
   readonly remote?: RemoteThreadSurface
   readonly now?: () => number
+  /**
+   * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
+   * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).
+   */
+  readonly onUnexpected?: (error: unknown) => void
 }
 
 type Input = Readonly<Record<string, unknown>>

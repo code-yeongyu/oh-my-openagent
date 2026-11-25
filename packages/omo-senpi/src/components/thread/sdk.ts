@@ -155,7 +155,7 @@ function asThreadResult(answer: { readonly kind: string }): ThreadToolResult {
  */
 export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
   assertThreadSdkOptions(options)
-  const { agentDir, cwd, uid, user, env, host, store, remote, now } = options
+  const { agentDir, cwd, uid, user, env, host, store, remote, now, onUnexpected } = options
   const { provenanceWorkspaces, engineStatusAll, workerModuleUrl, firstPromptWaitMs } = options
   const { root, releaseLocated } = assembleForFacade({
     agentDir,
@@ -175,6 +175,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
       ...(store === undefined ? {} : { store }),
       ...(remote === undefined ? {} : { remote }),
       ...(now === undefined ? {} : { now }),
+      ...(onUnexpected === undefined ? {} : { onUnexpected }),
     },
   })
   const threads = root.threads

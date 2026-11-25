@@ -7,7 +7,7 @@ import { sendThread, viewForSend } from "../sdk-send"
 import { hostView } from "../tools/internals"
 import { sentThreadLink } from "../tools/send-link"
 import type { ThreadCoreContext } from "./context"
-import { type Failure, guarded } from "./failures"
+import { type Failure } from "./failures"
 import { unknownKeys } from "../contracts"
 
 export type CoreSendRequest = {
@@ -45,7 +45,7 @@ const SEND_KEYS = [
 export function createSend(context: ThreadCoreContext) {
   const { options, surface, pipeline, controls } = context
   return (request: CoreSendRequest): Promise<CoreSendResult> =>
-    guarded(async () => {
+    context.guard(async () => {
       const refused = unknownKeys(request, SEND_KEYS)
       if (refused !== undefined) return refused
       // The agent's send operation (sdk-send.ts): one locate, the stale-route recovery and the sender a principal takes. A

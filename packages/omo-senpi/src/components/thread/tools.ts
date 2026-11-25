@@ -73,6 +73,7 @@ import {
 } from "./tools/internals"
 import { threadRow } from "./tools/thread-row"
 import { createReceipts } from "./control/receipts"
+import { unexpectedFailure } from "./sdk-core/failures"
 
 export { RECEIPT_RECOVERY_MAX_KEYS } from "./control/receipts"
 export function createThreadTools(options: ThreadToolSurfaceOptions): readonly AnyTool[] {
@@ -95,7 +96,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     await options.ensureHost?.()
     return hostView(options, request)
   }
-  const receipts = createReceipts(store, now)
+  const receipts = createReceipts(store, now, options.onUnexpected)
   async function execute<T extends ThreadToolName>(
     name: T,
     callId: string,
@@ -144,7 +145,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     }
     const failed = async (error: unknown): Promise<ToolOutput> => {
       const message = error instanceof Error ? error.message : String(error)
-      if (receipted) await receipts.fail(scope, message)
+      if (receipted) await receipts.fail(scope, error)
       const schema = gatewaySchemaRefusal(error)
       if (schema !== undefined) return output({ kind: "error", error: schema })
       if (message.startsWith("host_unavailable:")) {
@@ -167,9 +168,9 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
         )
       }
       return output(
-        failure(
-          "internal_error",
-          `Thread operation failed: ${message}`,
+        unexpectedFailure(
+          error,
+          options.onUnexpected,
           "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
         ),
       )

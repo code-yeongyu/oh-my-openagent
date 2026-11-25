@@ -14,7 +14,7 @@ export function fail(
 }
 
 /** The same mapping the tools apply to a thrown surface failure, so a script sees data, never a stack. */
-export function thrown(error: unknown): Failure {
+export function thrown(error: unknown, onUnexpected?: (error: unknown) => void): Failure {
   // A control's typed refusal (another device's answer included) is the call's answer, as in the tools (#14755).
   const refusal = controlRefusalOf(error)
   if (refusal !== undefined) return { kind: "error", error: refusal }
@@ -34,18 +34,37 @@ export function thrown(error: unknown): Failure {
       "Use thread read to follow the session.",
       { command: message.slice("unsupported:".length) },
     )
-  return fail(
-    "internal_error",
-    `Thread operation failed: ${message}`,
-    "Run omo thread list and retry after checking the target.",
-  )
+  return unexpectedFailure(error, onUnexpected)
+}
+
+/** The one fixed text every thread surface answers for an unexpected exception (security ruling B8). */
+export const UNEXPECTED_FAILURE_MESSAGE = "The thread operation failed unexpectedly."
+
+/**
+ * An exception no rule expected: its message and stack go to `onUnexpected` alone, never into the answer (B8: a thrown
+ * message can carry a path, a token or another user's text). The tools, the SDK and `omo thread` all answer this.
+ */
+export function unexpectedFailure(
+  error: unknown,
+  onUnexpected?: (error: unknown) => void,
+  next = "Run omo thread list and retry after checking the target.",
+): Failure {
+  try {
+    onUnexpected?.(error)
+  } catch {
+    // A failing logger port must not turn a failure into a crash; the answer stays the fixed one.
+  }
+  return fail("internal_error", UNEXPECTED_FAILURE_MESSAGE, next)
 }
 
 // omo#14130: every SDK operation runs inside one tool-call budget, as an agent's thread tool call does (tools.ts).
-export async function guarded<T>(body: () => Promise<T>): Promise<T | Failure> {
+export async function guarded<T>(
+  body: () => Promise<T>,
+  onUnexpected?: (error: unknown) => void,
+): Promise<T | Failure> {
   try {
     return await withCallDeadline(Date.now() + TOOL_CALL_BUDGET_MS, body)
   } catch (error) {
-    return thrown(error)
+    return thrown(error, onUnexpected)
   }
 }

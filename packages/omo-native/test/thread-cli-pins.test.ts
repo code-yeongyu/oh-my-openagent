@@ -63,7 +63,7 @@ describe("omo thread pins: B8, an unexpected exception", () => {
           "json": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Run omo thread list and retry after checking the target.",
             },
             "kind": "error",
@@ -74,7 +74,7 @@ describe("omo thread pins: B8, an unexpected exception", () => {
           "json": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Run omo thread list and retry after checking the target.",
             },
             "kind": "error",

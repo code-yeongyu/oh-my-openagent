@@ -984,6 +984,8 @@ export function createRemoteThreadFixture() {
   function surface(
     remote: RemoteThreadSurface | undefined,
     extra: {
+      /** Where the surface reports an unexpected exception (B8): the tools and the SDK over this holder. */
+      onUnexpected?: (error: unknown) => void
       callerCause?: () => string | undefined
       callerChainHop?: () => number
       callerWorkspaceRoot?: string
@@ -1247,6 +1249,7 @@ export function createRemoteThreadFixture() {
       ...(extra.callerName === undefined ? {} : { callerName: extra.callerName }),
       ...(extra.env === undefined ? {} : { env: extra.env }),
       firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
+      ...(extra.onUnexpected === undefined ? {} : { onUnexpected: extra.onUnexpected }),
     }
     const tools = createThreadTools(toolOptions)
     const resolveMonitorTarget = createMonitorTargetResolver(toolOptions)
@@ -1276,6 +1279,7 @@ export function createRemoteThreadFixture() {
         store: countedStore,
         ...(remote === undefined ? {} : { remote }),
         firstPromptWaitMs: extra.firstPromptWaitMs ?? 0,
+        ...(extra.onUnexpected === undefined ? {} : { onUnexpected: extra.onUnexpected }),
       })
     return {
       run,

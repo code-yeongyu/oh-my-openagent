@@ -4,6 +4,7 @@ import { GATEWAY_RECEIPT_RETENTION_MS } from "../gateway/constants"
 import { hashArgs } from "../gateway/hash-args"
 import { isLockWaitExceeded } from "../gateway/lock-wait"
 import type { GatewayStore } from "../gateway/store"
+import { thrown, UNEXPECTED_FAILURE_MESSAGE } from "../sdk-core/failures"
 import { failure, uncertainFailure, uncertainNote } from "../tools/internals"
 import { currentResult } from "../tools/thread-row"
 
@@ -48,7 +49,21 @@ export const withReceiptExpiry = (result: ThreadToolResult, expiresAt: number): 
  * key once the call ran. The thread tools and the thread SDK each hold one instance and run every control through it, so a
  * key means the same on every surface.
  */
-export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "toolReceiptSettle">, now: () => number) {
+/**
+ * What a receipt records of a failed call, and so what a retry under its key replays (B8): an expected refusal's own
+ * text (a schema refusal, `host_unavailable:`, `unsupported:`), never an unexpected exception's message.
+ */
+function failureNote(error: unknown): string {
+  if (thrown(error).error.code === "internal_error") return UNEXPECTED_FAILURE_MESSAGE
+  return error instanceof Error ? error.message : String(error)
+}
+
+export function createReceipts(
+  store: Pick<GatewayStore, "toolReceiptBegin" | "toolReceiptSettle">,
+  now: () => number,
+  /** Where an unexpected store or call exception goes (B8); absent, nowhere. */
+  onUnexpected?: (error: unknown) => void,
+) {
   // Receipts this process began but could not settle (the store gave up at its lock-wait bound): the row stays `prepared`
   // under this instance, which would answer `idempotency_in_progress` forever. A retry of such a key is
   // `idempotency_uncertain` with the note instead.
@@ -84,10 +99,8 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
   }
   const keyOf = (scope: ReceiptScope) => `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
   const unrecorded = (scope: ReceiptScope, what: string) => (settleError: unknown) => {
-    unsettled.set(
-      keyOf(scope),
-      `${what}, and its receipt could not be recorded: ${settleError instanceof Error ? settleError.message : String(settleError)}`,
-    )
+    onUnexpected?.(settleError)
+    unsettled.set(keyOf(scope), `${what}, and its receipt could not be recorded.`)
   }
 
   /** `explicit`: the caller named the key, so its answers carry `receipt_expires_at`. */
@@ -130,11 +143,12 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
       const schema = gatewaySchemaRefusal(error)
       if (schema !== undefined) return { kind: "answer", result: { kind: "error", error: schema } }
       unanswered.set(key, at + GATEWAY_RECEIPT_RETENTION_MS)
+      onUnexpected?.(error)
       return {
         kind: "answer",
         result: failure(
           "internal_error",
-          `The gateway store could not record the call; nothing ran: ${message}`,
+          "The gateway store could not record the call; nothing ran.",
           "Retry the call; if it keeps failing, check the gateway store.",
         ),
       }
@@ -225,10 +239,11 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
   }
 
   /** The call threw after it was admitted: it may have acted, so its receipt records the failure as uncertain. */
-  async function fail(scope: ReceiptScope, message: string): Promise<void> {
+  async function fail(scope: ReceiptScope, error: unknown): Promise<void> {
+    const note = failureNote(error)
     await store
-      .toolReceiptSettle({ ...scope, now: now(), error_note: message })
-      .catch(unrecorded(scope, `the call failed (${message})`))
+      .toolReceiptSettle({ ...scope, now: now(), error_note: note })
+      .catch(unrecorded(scope, `the call failed (${note})`))
     running.delete(keyOf(scope))
   }
 

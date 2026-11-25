@@ -2120,7 +2120,7 @@ describe("T1b pins: B8, an unexpected exception", () => {
           "sdk": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Run omo thread list and retry after checking the target.",
             },
             "kind": "error",
@@ -2128,7 +2128,7 @@ describe("T1b pins: B8, an unexpected exception", () => {
           "tool": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
             },
             "kind": "error",
@@ -2138,7 +2138,7 @@ describe("T1b pins: B8, an unexpected exception", () => {
           "sdk": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Run omo thread list and retry after checking the target.",
             },
             "kind": "error",
@@ -2146,7 +2146,7 @@ describe("T1b pins: B8, an unexpected exception", () => {
           "tool": {
             "error": {
               "code": "internal_error",
-              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "message": "The thread operation failed unexpectedly.",
               "next_action": "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
             },
             "kind": "error",
@@ -2171,7 +2171,7 @@ describe("T1b pins: B8, a store that throws", () => {
         "sdk": {
           "error": {
             "code": "internal_error",
-            "message": "The gateway store could not record the call; nothing ran: canary-store-9c1d token=ghp_do-not-print",
+            "message": "The gateway store could not record the call; nothing ran.",
             "next_action": "Retry the call; if it keeps failing, check the gateway store.",
           },
           "kind": "error",
@@ -2179,7 +2179,7 @@ describe("T1b pins: B8, a store that throws", () => {
         "tool": {
           "error": {
             "code": "internal_error",
-            "message": "The gateway store could not record the call; nothing ran: canary-store-9c1d token=ghp_do-not-print",
+            "message": "The gateway store could not record the call; nothing ran.",
             "next_action": "Retry the call; if it keeps failing, check the gateway store.",
           },
           "kind": "error",

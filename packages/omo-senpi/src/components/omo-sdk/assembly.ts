@@ -78,6 +78,7 @@ function assembleWithInternals(
       ...(ports.store === undefined ? {} : { store: ports.store }),
       ...(ports.remote === undefined ? {} : { remote: ports.remote }),
       ...(ports.now === undefined ? {} : { now: ports.now }),
+      ...(ports.onUnexpected === undefined ? {} : { onUnexpected: ports.onUnexpected }),
     },
   })
   const root = assembleRoot(

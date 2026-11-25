@@ -11,7 +11,7 @@ import { controlIdentity, controlRefusalOf } from "../control/port"
 import type { ThreadTranscriptEntry } from "../reader"
 import { readReceipt } from "../remote/lazy-ops"
 import type { ThreadCoreContext } from "./context"
-import { type Failure, fail, guarded } from "./failures"
+import { type Failure, fail } from "./failures"
 import { unknownKeys } from "../contracts"
 
 type Scoped = { readonly all_scope?: boolean }
@@ -55,7 +55,7 @@ export function createReads(context: ThreadCoreContext) {
   const { options, principal, store, surface, view, resolveContext, controls } = context
   const readOptions = () => ({ ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) })
   const list = (request: CoreListRequest = {}): Promise<ThreadToolResult> =>
-    guarded(
+    context.guard(
       async () =>
         unknownKeys(request, LIST_KEYS) ??
         listAcross(
@@ -66,7 +66,7 @@ export function createReads(context: ThreadCoreContext) {
         ),
     )
   const read = (request: CoreReadRequest): Promise<ThreadToolResult> =>
-    guarded(
+    context.guard(
       async () =>
         unknownKeys(request, READ_KEYS) ??
         readThread(
@@ -82,7 +82,7 @@ export function createReads(context: ThreadCoreContext) {
         ),
     )
   const locate = (request: Scoped & { readonly thread: string }): Promise<CoreLocateResult> =>
-    guarded(async () => {
+    context.guard(async () => {
       const refused = unknownKeys(request, LOCATE_KEYS)
       if (refused !== undefined) return refused
       const current = await view()
@@ -129,7 +129,7 @@ export function createReads(context: ThreadCoreContext) {
   // view (no conversation read, nothing sent, nothing woken). Its deliveries here carry `cli:<uid>`; those to another
   // device were the person's own prompt, so their retained receipt is keyed by `person:<uid>`.
   const receipt = (request: CoreReceiptRequest): Promise<ThreadToolResult> =>
-    guarded(
+    context.guard(
       async () =>
         unknownKeys(request, RECEIPT_KEYS) ??
         readReceipt(
@@ -144,7 +144,7 @@ export function createReads(context: ThreadCoreContext) {
     )
   // thread_read's wait branch: wait for the turn to end, then the same bounded read.
   const readAfterWait = (request: CoreReadAfterWaitRequest): Promise<ThreadToolResult> =>
-    guarded(
+    context.guard(
       async () =>
         unknownKeys(request, [...READ_KEYS, "wait_ms"]) ??
         readThread(
@@ -163,7 +163,7 @@ export function createReads(context: ThreadCoreContext) {
   // The engine's whole message list for a live thread, wherever it is held (no tool has it: a session reads the bounded
   // transcript); a thread no engine holds answers as every control does.
   const messages = (request: Scoped & { readonly thread: string }): Promise<CoreMessagesResult> =>
-    guarded(async () => {
+    context.guard(async () => {
       const refused = unknownKeys(request, MESSAGES_KEYS)
       if (refused !== undefined) return refused
       const located = await locateControl(controls, await view(), request.thread, request.all_scope, UNKNOWN_CALLER)
