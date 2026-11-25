@@ -184,8 +184,8 @@ describe("account.signIn on the root", () => {
     expect(codes).toHaveLength(1)
   })
 
-  test("#given no in-process sign-in #when the browser method is asked for #then it is refused and the child never starts", async () => {
-    const { sdk, touched } = rootWith({})
+  test("#given the session's root #when the browser method is asked for #then it answers today's unsupported and the child never starts", async () => {
+    const { sdk, touched } = rootWith({ principal: { kind: "session", session_id: "01-session" } })
     expect((await sdk.account.signIn({ method: "browser", onUserCode: () => undefined })) as unknown).toMatchObject({
       kind: "error",
       error: { code: "unsupported", details: { reason: "child_backed_sign_in" } },
