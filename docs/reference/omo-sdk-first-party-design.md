@@ -1,8 +1,8 @@
 # The omo SDK as the first-party surface: design
 
-Tracking issue: #14943. Status: design, revision 2, after the first review of #14944. Nothing in this document is implemented by the pull request that adds it.
+Tracking issue: #14943. Status: design, revision 3, after two reviews of #14944. Nothing in this document is implemented by the pull request that adds it, and nothing in it is a security approval: authority and custody are settled by the separate security design (slice S0, #14945).
 
-Source was read at `dev` `2e2a815ac8` and at the engine's `main` `48983b7bf8` on 2026-11-25. No product command was run for this document; every "today" statement is a source reading with its file and line. Path abbreviations: `N/` = `packages/omo-native/`, `T/` = `packages/omo-senpi/src/components/thread/`, `R/` = `packages/omo-senpi/src/components/remote/`, `S/` = `packages/omo-senpi/src/components/omo-sdk/`, `E/` = the engine's `packages/coding-agent/src/`.
+Source was read at `dev` `2e2a815ac8` and at the engine's `main` `48983b7bf8` on 2026-11-25. No product command was run for this document; every "today" statement is a source reading with its file and line. Path abbreviations: `N/` = `packages/omo-native/`, `T/` = `packages/omo-senpi/src/components/thread/`, `R/` = `packages/omo-senpi/src/components/remote/`, `S/` = `packages/omo-senpi/src/components/omo-sdk/`, `C/` = `packages/omo-opencode/src/cli/`, `E/` = the engine's `packages/coding-agent/src/`.
 
 ## 1. The rule
 
@@ -14,13 +14,13 @@ The owner's rulings on #14943 are the whole requirement:
 4. **The SDK is the superset: SDK ⊇ CLI and SDK ⊇ tools.** Every capability exists in the SDK, with no exception. An adapter may expose less than the SDK, and each omission carries a written reason. The SDK never exposes less than an adapter. A capability that the CLI or a tool has and the SDK lacks is a defect, and its fix is the SDK call.
 5. **Parity is a merge requirement of the same pull request.** A pull request that changes what a CLI verb or a tool does carries the SDK call and the parity test for that capability. It is not a follow-up.
 
-Scope: the `omo` binary of the native edition (`omo-ai`), its thread tools, the SDK entries that ship with it, and, by the scope decision recorded on #14943 and in section 6.11, every verb of the OpenCode-edition binary. No binary is carved out.
+Scope: both editions. The `omo` binary of the native edition (`omo-ai`), its thread tools, the SDK entries that ship with it, and every verb of the OpenCode-edition binary (section 6.11), by the scope decision recorded on #14943. No binary is carved out.
 
 Three terms are used the same way everywhere below.
 
 - A **capability** is one thing a caller can make omo do or read, with its inputs and its typed outcome. It is a leaf: one operation, with every input that changes its behaviour. A namespace, a wildcard or a set of flags is not a capability.
 - A **core** is the module that implements a domain's capabilities: resolution, transport, state, policy, authority checks.
-- An **adapter** is a file that turns a surface's input into an SDK call and the SDK's answer into that surface's output. It parses, calls and renders.
+- An **adapter** is a file that turns a surface's input into one SDK call and the SDK's answer into that surface's output. It parses, calls and renders.
 
 ## 2. Today
 
@@ -28,21 +28,21 @@ Three terms are used the same way everywhere below.
 
 | Entry | How a caller finds it | What it answers | Result shape |
 |---|---|---|---|
-| Thread SDK, `createThreadSdk(options)` (declared `T/sdk.ts:119-162`, factory `T/sdk.ts:249`) | A file path inside the installed plugin, `runtime/thread-sdk/sdk.js` (`N/bin/lib/thread.js:163`); no environment variable names it | `list`, `read`, `send`, `locate`, `create`, `interrupt`, `close`, `rename`, `set_model`, `release`, `warmDaemon`, `dispose`, `principal`, the store extension API | `{ kind: "ok", ...fields }` or `{ kind: "error", error }`; `release` and `warmDaemon` answer the engine's own reply; a store extension call can answer `kind: "refused"` (`T/gateway/store-extensions.ts:52-72`) |
+| Thread SDK, `createThreadSdk(options)` (options `T/sdk.ts:54-80`, declared `:119-162`, factory `:249`) | A file path inside the installed plugin, `runtime/thread-sdk/sdk.js` (`N/bin/lib/thread.js:163`); no environment variable names it | `list`, `read`, `send`, `locate`, `create`, `interrupt`, `close`, `rename`, `set_model`, `release`, `warmDaemon`, `dispose`, `principal`, and the store extension API (`registerStoreExtension`, `extensionCall`) | `{ kind: "ok", ...fields }` or `{ kind: "error", error }`; `release` and `warmDaemon` answer the engine's own reply; a store extension call can answer `kind: "refused"` |
 | omo SDK, `createOmoSdk(options?)` (`S/index.ts:40-59`) | `OMO_SDK_ROOT` inside a session (`packages/omo-senpi/src/extension/sdk-root-provisioning.ts:8`) | `account.whoami`, `account.signIn`, `devices.list`, `devices.rename`, `deviceService.status`, `config.status`, a synchronous `close()` | `{ kind: "ok", value }` or `{ kind: "error", error }` (`S/result.ts:27`) |
-| Remote module, `remoteClientForPerson` and its sibling factories (`R/index.ts`, `R/factories.ts:14-33`, `R/types.ts:402-456`) | Source import only. The package export `omo-ai/remote` is #14881, open | `service.*`, `devices.*`, `sessions.*` (list, resolve, get, open, send, read, follow, wait, interrupt, setModel, setReasoning, close, archive), `attach`, `aliases.*` | `{ kind: "ok", value }` or a flat `{ kind: "error", code, message, ... }` with a branded thread handle and `Opts.deadlineMs` (`R/types.ts:55-74`) |
-
-Each entry was built for one caller. None of them is the place where every capability lives.
+| Remote module, `remoteClientForPerson` and its sibling factories (`R/index.ts`, `R/factories.ts:14-35`, `R/types.ts:402-456`) | Source import only at the pinned commit. The package export `omo-ai/remote` is #14881, in review, not shipped | `service.*`, `devices.*`, `sessions.*` (list, resolve, get, open, send, read, follow, wait, interrupt, setModel, setReasoning, close, archive), `attach`, `aliases.*` | `{ kind: "ok", value }` or a flat `{ kind: "error", code, message, ... }` with a branded thread handle and `Opts.deadlineMs` (`R/types.ts:55-74`) |
 
 ### 2.2 Where the superset rule is broken today
 
 SDK ⊉ tools:
 
 - `thread_set_reasoning`, `thread_archive` and `thread_handoff` are registered tools (`T/tools.ts:497-542`) with no thread SDK method (`T/sdk.ts:119-162`).
-- `thread_read` takes `wait_ms` and reads a delivery receipt by `delivery_id` (`T/contracts/params.ts:49-81`, `T/tools.ts:189-208`); the SDK's `read` takes neither.
-- The tool contract names a message `message` and its lane `delivery` (`T/contracts/params.ts:83-92`); the SDK's `send` names them `text` and `mode`. The two are a projection of each other, not one schema.
-- `thread_close` and `thread_rename` take an optional `thread` that defaults to the calling session (`T/contracts/params.ts:106-117`); the SDK acts as itself, so `self` answers `caller_context_missing` (`T/sdk.ts:178-181`).
-- The tools call the shared bodies directly (`createGatewayServices`, `locateControl`, `createThread`), so nothing forces a new tool capability through the SDK.
+- `thread_read` is one tool with three behaviours: a receipt lookup when `delivery_id` is given, which runs before the normal read and its admission (`T/tools.ts:189-208`), a read after a wait when `wait_ms` is given, and a plain read (`T/contracts/params.ts:49-81`). The SDK's `read` has only the last.
+- The tool contract names a message `message` and its lane `delivery` (`T/contracts/params.ts:83-92`); the SDK's `send` names them `text` and `mode`.
+- `thread_close` and `thread_rename` take an optional `thread` that defaults to the calling session (`T/contracts/params.ts:106-117`); the SDK acts as itself, so `self` answers `caller_context_missing` (`T/sdk.ts:142-146`).
+- The SDK's `close` and `set_model` accept the tool schema, `idempotency_key` included, but do not use the key (`T/sdk.ts:488-506`); the tools run the same bodies inside their receipt protocol (`T/tools.ts:199-209`). A field the parser accepts is not the capability.
+- A store extension's session-callable operations run through a session channel that the SDK deliberately does not expose, because the caller must be the one the engine resolved (`T/gateway/store-extensions.ts:107-139`).
+- The tools call the shared bodies directly, so nothing forces a new tool capability through the SDK.
 
 SDK ⊉ CLI:
 
@@ -50,14 +50,16 @@ SDK ⊉ CLI:
 - `omo remote attach`, `status`, `enable`, `disable`, `control`, `wake` and `bootstrap` have no call in either shipped SDK.
 - `omo logout`, `omo account show|adopt|token|export|forget|store|devices revoke|retire-sync` and every `omo sync` verb have no SDK call (`N/account-cli.ts:134-211`, `N/sync-cli.ts:208-249`).
 - `omo daemon`, `omo doctor`, `omo setup` and `omo update` are implemented in launcher modules under `N/bin/lib/` with no SDK call.
-- The engine's one-shot commands are forwarded as argv. `ENGINE_COMMANDS` lists `install`, `remove`, `uninstall`, `update`, `list`, `config`, `auth`, `host`, `schedule`, `session-of-pid` (`N/bin/lib/engine-commands.js:4-16`); `models discover` is a separate branch (`:18-22`); `update` is intercepted as the product's own update unless it names the engine's `--extensions` or `--models` targets (`N/bin/lib/update-args.js:23-34`). No importable call exists for any of them.
+- The engine's one-shot commands are forwarded as argv. `ENGINE_COMMANDS` lists `install`, `remove`, `uninstall`, `update`, `list`, `config`, `auth`, `host`, `schedule`, `session-of-pid` (`N/bin/lib/engine-commands.js:4-16`); `models discover` is a separate branch (`:18-22`). `update` is the product's own update unless it names an engine target (`N/bin/lib/update-args.js:23-34`). No importable call exists for any of them.
+- No verb of the OpenCode-edition binary has an SDK call (section 6.11).
 
 Several resolution entries:
 
-- The SDK's `send` resolves through `resolveAddress` and then builds its own delivery target after its owner fast path (#13016, rows OMO-MSG-07 and OMO-CLI-06, PARTIAL in the 2026-11-22 census). Its delivery to another device goes through the person leg (`T/sdk.ts:385-402`) and uses the listed session key directly, so it does not yet have the stale-route recovery the tool gets in #14937 (owner note on #14943, 14:01Z).
+- The SDK's `send` (`T/sdk.ts:351-402`) resolves through `resolveAddress` and then builds its own delivery target after its owner fast path (#13016, rows OMO-MSG-07 and OMO-CLI-06). Its delivery to another device goes through the person leg (`:385-402`) and uses the listed session key directly, so it does not have the stale-route recovery the tool gets in #14937 (owner note on #14943).
 - The thread SDK has its own `locate` (`T/sdk.ts:404-447`); `createThread` resolves an existing thread and a fork source itself (`T/control/create.ts:134-153, 477-495`); the remote module has `sessions.resolve` with a cached index, its own incomplete-listing semantics and alias lookup (`R/resolve.ts:241-291`), and its session and attach members canonicalize handles (`R/sessions.ts:377-398`, `R/attach.ts:409-437`); `omo remote` enters through `resolveTypedAddress`.
+- The tools' delivery locator carries policy the others lack: exact or fuzzy matching, reply pinning and the reply grant (`T/tools.ts:583-678`).
 - `omo remote model|interrupt|close|open` construct relay control outside `locateControl` and skip the ended-session short-circuit (#13016, rows OMO-CTL-26 and OMO-CLI-09).
-- `omo thread` and `omo remote` keep two verb tables, two flag sets and opposite wait defaults (#13016, rows OMO-CLI-01, -02, -30). The owner approved one verb table over the ports on 2026-11-10 (step 1 of that ruling); nobody has built it.
+- `omo thread` and `omo remote` keep two verb tables, two flag sets and opposite wait defaults (#13016, rows OMO-CLI-01, -02, -30). The owner approved one verb table over the ports on 2026-11-10 (step 1 of that ruling).
 - `omo remote` refuses a thread held on this device (`R/device-address.ts:31-41`), and `openRemote()` cannot open, send to, read or close a session on its own device (#14931).
 
 Downstream: the omo-harness skill is moving its `omo` driver and relay listing onto the shipped thread SDK and `createOmoSdk().devices.list` (omo-harness-skill#23). It keeps a CLI call only for a step the SDK does not cover, and each such step is an SDK gap reported on #14943.
@@ -67,15 +69,15 @@ Downstream: the omo-harness skill is moving its `omo` driver and relay listing o
 ```
           scripts, connectors, other harnesses, the desktop app
                                  |
-   CLI adapters      tool adapters      (parse, call, render; nothing else)
-        \                 |                 /
-         +---------- the omo SDK ----------+     one root, typed, data or a typed refusal
-                          |
-   threads  devices  account  deviceService  sync  config  daemon  diagnostics  install  engine  toolkit
-                          |                                          (one core per domain)
+   CLI adapters (both editions)      tool adapters      (parse, one call, render)
+        \                                 |                 /
+         +------------------ the omo SDK ------------------+     one root, typed, data or a typed refusal
+                                 |
+   threads  devices  account  deviceService  sync  config  daemon  diagnostics  install  engine  mcp  boulder  worktrees  toolkit
+                                 |                                 (one core per domain)
         ports: session host, delivery transport, device service, account service,
-               credential store, process, file system, clock
-                          |
+               credential store, phrase terminal, process, file system, clock
+                                 |
      this device's engine endpoints      the relay and other devices      the account service
 ```
 
@@ -86,39 +88,44 @@ Same-device and cross-device differ only in which transport a port resolves to. 
 | Domain | Core (the only implementation) | State today |
 |---|---|---|
 | `threads` | `T/`: `address/` (the resolver over `packages/thread-address-core`), `gateway/` (delivery pipeline, store, decision table), `control/` (`SessionControl`, `SessionHost`, create, close ladder, operations), `tools/read-ops.ts`, `tools/archive-ops.ts`; the cross-device leg is `R/` | Core exists. The SDK, the tools and two CLIs enter it at different depths |
-| `devices` | `R/` `devices.*` for the roster; the account service client for rename and revoke | Listing unified by #14881 (open). Revoke lives in a CLI file (`N/account-devices.ts:33-101`) |
-| `account` | Session, credential store, device-code flow and device keys, today under `packages/omo-opencode/src/cli/service-auth/` | Core exists but sits under a `cli/` directory and is reached through `service-auth.generated.js` |
+| `devices` | `R/` `devices.*` for the roster; the account service client for rename and revoke | Listing unified by #14881 (in review). Revoke lives in a CLI file (`N/account-devices.ts:33-101`) |
+| `account` | Session, credential store, device-code flow and device keys, today under `C/service-auth/`; the device keyring under `C/account-keys/` | Core exists but sits under a `cli/` directory |
 | `deviceService` | `R/` `service.*` plus `admin.ts` (bootstrap, cold wake, operator endpoint leg; #14890) | Core exists after #14890 |
-| `sync` | `packages/memory-core` (`enableSync`, `disableSync`, `joinAccount`) and the recovery engine under review in #14464 | Core exists; ceremony orchestration is in CLI files |
-| `config` | `packages/omo-config-core` | `config.status` shipped; #14366 defines the rest |
+| `sync` | `packages/memory-core` and the recovery engine under review in #14464 | Core exists; ceremony orchestration is in CLI files |
+| `config` | `packages/omo-config-core`; `packages/model-core` for model capabilities | `config.status` shipped; #14366 defines the editing calls |
 | `daemon` | The engine's host commands and the launch spec; omo's part is `N/bin/lib/daemon*.js` | Logic is in launcher modules |
-| `diagnostics` | `N/bin/lib/doctor*.js` and the runtime bundles they load | Logic is in launcher modules; the output is prose only |
-| `install` | `N/bin/lib/self-update.js`, `N/compiled-update*.ts`, `N/bin/lib/setup-*.js` | Logic is in launcher modules |
-| `engine` | The pinned engine's command implementations (packages, settings, provider credentials, schedules, models, session launch options, one-shot queries) | Engine-owned. Reached only by forwarding argv |
-| `toolkit` | The agent toolkit SDK (`OMO_AGENT_TOOLKIT_SDK_ROOT`) | Already SDK-only; re-exported under the root |
+| `diagnostics` | `N/bin/lib/doctor*.js`, the OpenCode edition's doctor, and the runtime bundles they load | Logic is in launcher and CLI modules; the output is prose only |
+| `install` | `N/bin/lib/self-update.js`, `N/compiled-update*.ts`, `N/bin/lib/setup-*.js`; the OpenCode edition's install, cleanup and version checks | Logic is in launcher and CLI modules |
+| `engine` | The pinned engine's command implementations (packages, settings, provider credentials, schedules, models, process launch, one-shot queries) | Engine-owned. Reached only by forwarding argv |
+| `mcp` | `packages/mcp-client-core` | Reached only from the OpenCode edition's CLI |
+| `boulder`, `worktrees` | `packages/boulder-state`; the OpenCode edition's worktree sweep | Reached only from that edition's CLI |
+| `toolkit` | The agent toolkit SDK (`OMO_AGENT_TOOLKIT_SDK_ROOT`) | SDK exists for the native edition; the OpenCode edition delegates to a separately installed CLI (6.11) |
 
 ### 3.2 The adapter rule
 
-An adapter is one **capability descriptor** per executable route, and every route of both entry paths (the npm launcher and the compiled binary) dispatches through the descriptor table:
+An adapter is one **capability descriptor** per executable route, and every route of both editions' entry paths dispatches through its descriptor table:
 
 ```ts
 { route: ["remote", "attach"],            // the argv path, or the tool name
-  flags: { /* typed: each flag names the SDK input field it fills, or is marked render */ },
-  capability: "threads.attach",           // the registry row
+  when: (input) => true,                  // which branch of a multi-behaviour route this is
+  flags: { /* typed: each flag names the SDK input field it fills, or is marked render or process */ },
+  call: sdkCall("threads.attach"),        // the one SDK member this branch invokes; it IS the registry key
   parse: (argv) => input,                 // surface input to SDK input
-  call: (sdk, input) => sdk.threads.attach(input),
   render: { human, json, exit } }         // SDK answer to surface output
 ```
 
-An adapter may contain argument or schema parsing, the SDK call, rendering, and for the tools the schema, the description and the receipt wrapper. It may not contain or import address or device resolution, transport or port construction, account or credential handling, or policy (delivery decisions, admission, idempotency, retries, deadlines).
+- `call` is not a free function. `sdkCall("threads.attach")` is a typed reference to one member of the root, so the capability a row names and the member the adapter invokes are one value, and a test runs the descriptor against a recording root to confirm the member invoked.
+- A route with several behaviours has several descriptors, told apart by `when`. `thread_read` is three: a receipt lookup (`delivery_id` present), a read with a wait, and a plain read. Each branch has its own input projection and its own registry row.
+- An adapter never composes SDK calls. Where a surface does two things today, the two things become one named SDK operation in the core: `daemon.run` (ensure, then warm), `threads.sendAndFollow` (send, then follow the answer), `threads.adopt` (release, then the launch plan), `engine.launch.print` (create, send, follow in a new process). The policy of the composition lives in the core, not in `parse` or `render`.
+- An adapter may contain argument or schema parsing, the one call, rendering, and for the tools the schema, the description and the receipt wrapper. It may not contain or import address or device resolution, transport or port construction, account or credential handling, or policy.
 
-What can be checked mechanically and what cannot is stated in section 7.5. In short: imports and descriptor shape are checked by CI; that an adapter does not compute a decision inline from plain code is held by the descriptor's structure, by the conformance test on sampled scenarios, and by review. It is not proven by any import rule.
+What CI can check of this and what it cannot is section 7.5.
 
 The process-level tail of a few verbs stays in the CLI because it is not a capability: replacing the terminal process with the engine after `daemon adopt` or `remote attach`, re-executing under another runtime, reading a TTY. Everything up to that point, including the plan for what to launch, is SDK data.
 
 ## 4. The SDK
 
-### 4.1 One root, and the entries that already shipped
+### 4.1 One root, and the entries that exist
 
 ```ts
 import { createOmoSdk } from "omo-ai/sdk"
@@ -126,57 +133,65 @@ import { createOmoSdk } from "omo-ai/sdk"
 const omo = createOmoSdk()
 const sent = await omo.threads.send({ thread: "studio/review", message: "status?" })
 if (sent.kind === "error") console.error(sent.error.code, sent.error.next_action)
-omo.close()
+await omo.dispose()
 ```
 
-The root is `createOmoSdk`, extended additively: its present options (`api`, `env`, `cwd`, `home`, `ports`) and its synchronous `close()` stay, and it gains the namespaces of 4.2, the thread options (`agentDir`, `uid`, `user`, with today's CLI defaults), `host` (a non-default engine endpoint: socket and credential root), `principal` (4.3) and an asynchronous `dispose()` that also closes the gateway store and remote sessions.
+The root is `createOmoSdk`, extended additively.
 
-Three shipped contracts are kept as **compatibility facades**: thin modules over the root that preserve their signature, results and lifecycle exactly, each pinned by its existing tests. They are projections, not second implementations.
+| Root option | Meaning |
+|---|---|
+| `api`, `accounts` | The account service origin and the sign-in page origin; else `OMO_SERVICE_API_URL` and `OMO_SERVICE_ACCOUNTS_URL`, else production |
+| `env`, `cwd`, `home` | As today |
+| `agentDir`, `uid`, `user` | The thread options, defaulting as the CLI defaults them today |
+| `endpoint` | A selector for a non-default engine endpoint: `{ socket?, key_root? }`. Paths only. Its contract is part of the security design |
+| `principal` | Section 4.3 |
+| `ports` | Injected dependencies for tests: today's `session`, `credentialStore`, `deviceServiceStatus`, `signInProcess`, and the thread SDK's `host`, `store`, `remote`, `now`. An injected `ports.host` replaces the engine host port; it is a different thing from the `endpoint` selector |
+
+Lifecycle: `close()` stays synchronous and does what it does today, aborting account and device requests in flight. `dispose()` is asynchronous: it calls `close()`, then closes the gateway store and the remote sessions. A caller that used a thread call awaits `dispose()`; a caller that used only account calls may keep calling `close()`.
+
+Two shipped contracts and one in review are kept as **compatibility facades**: thin modules over the root that preserve their signature, results and lifecycle exactly, each pinned by its existing tests. They are projections, not second implementations.
 
 | Facade | What it preserves | Projection onto the root |
 |---|---|---|
-| `createThreadSdk(options)` at `runtime/thread-sdk/sdk.js` | Required options; `principal`; `dispose`; `release(thread, request)` and `warmDaemon()` answering the engine's own replies; `set_model`; `send({ text, mode })`; `self` answering `caller_context_missing`; the store extension API with its `refused` branch and its present method names | `text` to `message`, `mode` to `delivery`; snake_case method names to camelCase |
+| `createThreadSdk(options)` at `runtime/thread-sdk/sdk.js` | Every option of `T/sdk.ts:54-80`: `agentDir`, `cwd`, `uid`, `user`, `env` map to the root's options of the same name; `host`, `store`, `remote`, `now` map to `ports.*`; `provenanceWorkspaces`, `engineStatusAll`, `workerModuleUrl`, `firstPromptWaitMs` map to thread-namespace options of the same meaning. It also keeps `principal`; `dispose`; `release(thread, request)` and `warmDaemon()` answering the engine's own replies; `set_model`; `send({ text, mode })`; `self` answering `caller_context_missing`; `registerStoreExtension` and `extensionCall` with their `refused` branch | `text` to `message`, `mode` to `delivery`; snake_case method names to camelCase; `release` to `threads.release`; the extension pair to `threads.extensions.register` and `.call` |
 | `createOmoSdk(options?)` at `OMO_SDK_ROOT` | Its four namespaces, their `value` results, synchronous `close()` | Identity: the root is this entry, extended |
-| `openRemote(options?)` at `omo-ai/remote` (#14881) | The remote client's member list, the flat failure, the branded thread handle, `Opts.deadlineMs`, `REMOTE_CODES` | Flat failure from the root's nested one; handle from the canonical address of section 5 |
+| `openRemote(options?)` at `omo-ai/remote` (#14881, once it ships) | The remote client's member list and input types, the flat failure, the branded thread handle, `Opts.deadlineMs`, `REMOTE_CODES` | Each member to the root call section 6 names for it; the flat failure from the root's (4.4); the handle from the canonical address of section 5 |
 
-The facades are removed only by a later, announced release, after their callers have moved.
+Every input and result field of the facades has a root field it projects from. Section 6 carries them, so a facade never implements one independently. The facades are removed only by a later, announced release, after their callers have moved.
 
-- Package name: `omo-ai/sdk`, added to the `exports` of `N/package.json` beside `./remote`.
+- Package name: `omo-ai/sdk`, added to the `exports` of `N/package.json`.
 - Outside a session with a global install: `omo sdk root` prints the directory of the built entry (an adapter over `install.sdkRoot()`).
 - Importing the entry has no side effect: no socket, no file, no process, no network. Each namespace loads its core on first use.
 
 ### 4.2 Namespaces
 
-`threads`, `devices`, `account`, `deviceService`, `sync`, `config`, `daemon`, `diagnostics`, `install`, `engine`, `mcp`, `boulder`, `worktrees`, `toolkit`, plus `close()` and `dispose()`. Method names are camelCase. The root's input types for the thread calls are the schemas in `T/contracts/params.ts` and `create-params.ts` themselves (field names, optionality, bounds and defaults), not a copy; where the root adds an input a tool lacks, it extends that schema. The method and input list is section 6.
+`threads`, `devices`, `account`, `deviceService`, `sync`, `config`, `daemon`, `diagnostics`, `install`, `engine`, `mcp`, `boulder`, `worktrees`, `toolkit`, plus `close()` and `dispose()`. Method names are camelCase.
+
+The root's input types for the thread calls are the schemas in `T/contracts/params.ts` and `create-params.ts` themselves (field names, optionality, bounds and defaults). Where one tool schema serves several behaviours, the root has one call per behaviour and each takes the part of the schema that behaviour reads; section 7.2 compares per branch. Where the root adds an input a tool lacks, it extends that schema.
 
 ### 4.3 Authority
 
 The SDK is a library in its caller's process. It is never the authority, and nothing in this program makes it one. A private export or an import rule is an architectural boundary; neither is evidence of authorization.
 
-Authority is enforced where it is enforced today, in the core and behind it:
+Authority is enforced where it is enforced today, in the core and behind it: the engine endpoint (socket credentials, `admitExternalMessage`, the sender kinds the gateway accepts), the device service and the relay (same-account admission, the sender kinds each transport accepts), and the account service (the signed-in device's session). The principal a root is built for selects which existing leg a call uses and what it stamps on what it sends. Availability of a method on the root is not permission to run it.
 
-- the engine endpoint: socket credentials, `admitExternalMessage`, the sender kinds the gateway accepts;
-- the device service and the relay: same-account admission and the sender kinds each transport accepts;
-- the account service: the signed-in device's session.
+A pre-review inventory of the rules the source enforces today, which this program preserves without widening. The complete matrix is the security design's, not this table's:
 
-The principal a root is built for selects which existing leg a call uses and what it stamps on what it sends. The remote module already builds one client per sender (`R/factories.ts:14-33`); the root does the same. Availability of a method on the root is not permission to run it: each core checks the principal against the capability and answers a typed refusal.
-
-What the source fixes today, and what this program preserves without widening:
-
-| Rule | Where |
+| Rule | Enforced at |
 |---|---|
-| A script acts as itself, never as a session: `self` is `caller_context_missing`, and a thread it creates records no creator | `T/sdk.ts:178-181` |
-| The local delivery transport refuses a person's prompt | `T/gateway/local-transport.ts:9-25` |
-| The relay transport refuses a command-line sender (`unsupported`, `sender_not_allowed`) | `T/remote/relay-transport.ts:895-910` |
+| A script acts as itself, never as a session: `self` is `caller_context_missing`, and a thread it creates records no creator | `T/sdk.ts:142-146, 305-312` |
+| The local delivery transport refuses a person's prompt | `T/gateway/local-transport.ts:12-20` |
+| The relay transport refuses a command-line sender (`unsupported`, `sender_not_allowed`) | `T/remote/relay-transport.ts:899-907` |
 | A parked session's intake accepts only an agent sender | `T/gateway/store-worker.ts:134-145` |
-| A session or a connector may keep or narrow its own approval mode when it opens a thread, never widen it (`scope_denied`, `permission_preset_wider`) | `T/contracts/create-params.ts:92-99`, `R/types.ts` (`OpenRequest`) |
-| `author` on a send is accepted only from a connector | `R/types.ts:124-125` |
-| Setting the wake switch is a person's call | `R/types.ts` (`service.setWake`) |
-| A store extension's session-callable operation runs only for the session it is authorized for | `T/gateway/store-extensions.ts:107-139` |
+| A session or a connector may keep or narrow its own approval mode when it opens a thread, never widen it (`scope_denied`, `permission_preset_wider`) | `R/sessions.ts:556-570` |
+| `author` on a send is accepted only from a connector | `R/sessions.ts:468` |
+| The device-service mutators (`setEnabled`, `setControl`, `setWake`) are a person's; bootstrap is a person's or the service's | `R/client.ts:395-431` |
+| A store extension's session-callable operation runs as the caller the engine resolved, never one named in its arguments | `T/gateway/store-extensions.ts:107-139` |
+| The sync phrase is written to and read from the controlling terminal only, and an agent harness is refused before anything secret exists | `N/sync-phrase-tty.ts:10-16` |
 
 Step 2 of the 2026-11-10 ruling on #13016 (both transports accepting both sender kinds) is not approved and stays out of scope.
 
-**Gate before code (slice S0).** A principal-by-capability matrix, every principal (script, person at a terminal, connector, session, service) against every capability row of section 6 with allow or refuse and the place that enforces it, is written and approved as a security design before the root wires any principal (slice P1b). It covers session creation, attach and answering a dialog, connector rights, and the person-only account, device and host administration. The parity migration exposes no authority that a caller does not have today; the matrix is how that is checked, and its refusals are scenarios of the conformance test.
+**Gate before the contracts are fixed (slice S0, #14945).** The security design settles, for both editions and for every present caller and surface: the threat model; a principal-by-capability matrix with allow or refuse and the place that enforces it; the contract of the `endpoint` selector, the launch options, the extension session operations, attach and the answering of a dialog; trusted caller provenance; rollout and rollback criteria. Its approval is a recorded artifact, and its refusal rows are reused as acceptance scenarios by every slice they touch. No schema, export or adapter that carries a principal, a credential, an endpoint or a launch option is fixed before that approval (section 8).
 
 ### 4.4 Results
 
@@ -190,268 +205,321 @@ type OmoFailure = {
     readonly message: string
     readonly next_action: string
     readonly details?: Readonly<Record<string, unknown>>
+    readonly uncertain?: true        // it may have run: read, never resend blindly
+    readonly command_id?: string     // the relay's id for a command that left this device
+    readonly partial?: unknown       // what was done before the failure
   }
 }
 ```
 
-- On the root, the error branch has one shape in every namespace. It is the shape the thread tools and the omo SDK already share. The remote module's flat failure is converted at the root's boundary by one function (`uncertain`, `command_id` and `partial` move into `details`) and converted back by the `omo-ai/remote` facade.
-- `OmoCode` is one registry: the union of `THREAD_ERROR_CODES`, the omo SDK's codes and `REMOTE_CODES`, one meaning per name.
-- The ok branch on the root has two shapes, both already shipped: `threads.*` answers the thread contract (`{ kind: "ok", thread, delivery, ... }`, `T/contracts/results.ts`), and every other namespace answers `{ kind: "ok", value }`. The thread contract is persisted in receipts, replayed and printed by `omo thread --json`, so it does not move. **The delivery result type does not move**: #14941 and the replay fix for a repeated idempotency key build on the present shape. This is a real cost to a generic caller, and the document does not claim one universal result.
+- On the root, the error branch has one shape in every namespace. It is the shape the thread tools and the omo SDK already share, with the remote module's three extra fields carried as optional first-class fields, not folded into `details`. The conversion to and from the remote module's flat failure is therefore lossless and cannot collide with a key an existing `details` object uses.
+- `OmoCode` is one registry: the union of `THREAD_ERROR_CODES`, the omo SDK's codes and `REMOTE_CODES`, one meaning per name. `not_implemented` is reserved for a call whose slice has not landed; it is never a valid outcome of a row counted as built (7.2).
+- The ok branch on the root has two shapes, both already shipped: `threads.*` answers the thread contract (`{ kind: "ok", thread, delivery, ... }`, `T/contracts/results.ts`), and every other namespace answers `{ kind: "ok", value }`. The thread contract is persisted in receipts, replayed and printed by `omo thread --json`, so it does not move. **The delivery result type does not move**: #14941 and the replay fix for a repeated idempotency key build on the present shape. This is a real cost to a generic caller, and the document does not claim one universal result. Calls that answer an engine reply today (`threads.release`, `daemon.warm`) keep that reply as their `value`.
 - Exit codes are a projection keyed by surface, not one table. Today `internal_error` exits 5 from `omo thread` (`N/bin/lib/thread.js:126-132`) and 1 from `omo remote` (`R/codes.ts:195-213`), and `omo account` and `omo daemon` have their own maps (`N/account-show.ts:24-36`, `N/bin/lib/daemon-args.js:7-13`). Each descriptor's `render.exit` names its surface's map; tests pin both the JSON and the exit outcome of every existing verb before any alias is removed or any wait default changes.
-- Streams (`threads.follow`, `threads.attach().events`) are `AsyncIterable` with a `stop()`. A stream ends with one terminal event that carries either the outcome or a failure; it never throws from `next()`, and `stop()` ends it with a terminal `cancelled` outcome.
+- Streams (`threads.follow`, `threads.sendAndFollow`, `threads.attach().events`, `engine.launch.print`) are `AsyncIterable` with a `stop()`. A stream ends with one terminal event that carries either the outcome or a failure; it never throws from `next()`, and `stop()` ends it with a terminal `cancelled` outcome.
 - Every call that can wait takes `{ signal?, deadline_ms? }`. A call that left this device and got no answer inside its budget answers `delivered_unconfirmed` or `idempotency_uncertain` as it does today, never a generic timeout, and a timeout or an authorization refusal never triggers a second write. A retried create under the original idempotency key returns the original thread, with the original caller identity, and no duplicate (#14560, #14569).
+- An `idempotency_key` on a control call means on the root what it means on the tool: a repeat under the same key answers the stored result and does not repeat the side effect. Accepting the field without honouring it does not count.
 
 ### 4.5 Credentials and custody
 
-Six groups of calls touch a credential or a secret a person must hold:
+Eight groups of calls touch a credential or a secret a person must hold:
 
 | Group | Today |
 |---|---|
 | The omo account's access token and stored credential | `omo account token` and `omo account export` print them with structured metadata (expiry, device, owner) for our own processes (`N/account-cli.ts:118-146`) |
 | A sign-in handed over by the desktop app | `omo account adopt` reads a credential |
-| The device-code sign-in | An event protocol: `ready`, `code` (verification URL, user code, matching code, expiry), `signed_in` (api, device, replaced device, device-service outcome), `refused` (`N/account-sign-in.ts:37-59, 173-232`) |
-| The sync recovery phrase | `omo sync enable` shows it once after an eligibility check that runs before any phrase exists (`N/sync-cli.ts:76-113`); `omo sync recover` takes it |
+| The device-code sign-in | `omo account sign-in` emits JSON events: `code` (verification URL, user code, matching code, expiry), then `signed_in` (api, device, replaced device, device-service outcome) or `refused`; `--check` is a separate no-op that answers `ready` (`N/account-sign-in.ts:37-59, 173-232`). `omo login` prints the same codes as lines for a person |
+| The sync recovery phrase | Shown and typed on the controlling terminal only, after an eligibility check that runs before any phrase exists (`N/sync-phrase-tty.ts:10-16`, `N/sync-cli.ts:76-113`) |
 | Model provider credentials | `omo auth check [--credentials]`, `omo auth print-api-key`, `omo auth print-bearer-token` (`E/cli/auth-command.ts:19-21`) and the launch input `--api-key` |
+| MCP OAuth tokens | The OpenCode edition's `mcp oauth login|logout|status` (`C/mcp-oauth/index.ts`) |
+| This device's keyring | The OpenCode edition's `account keys init|status`, which print the device id and public keys (`C/account-keys/commands.ts`) |
 | The engine endpoint's own credentials | `--rpc-key-root`, a terminal endpoint's socket secret |
 
-The superset rule requires an SDK call for each. The rule of this document is that **no secret is a field of a result, a failure, a stream event, a receipt or a log line**. The proposed carrier is a caller-supplied sink for a secret going out and a readable or a callback for one coming in.
+The superset rule requires an SDK call for each. The rule of this document is that **no secret is a field of a result, a failure, a stream event, a receipt or a log line**.
 
-That shape is a proposal, not a custody design, and avoiding a result field does not establish custody. A sink or a callback the caller defines proves nothing about who is entitled to the value. **Slice S0 settles the custody contract as a security design before any of these calls is written**, and it must cover, for every row above:
-
-- who may call it (the matrix of 4.3) and what provenance the core demands of that caller;
-- every check that runs before a secret exists or moves (the sync eligibility check is one);
-- the structured, non-secret metadata each call keeps returning, and the event order of the sign-in protocol;
-- failure paths and partial outcomes: what the sink has received when the call fails halfway, and what the failure says;
-- logging, telemetry, receipts and model-facing surfaces, with a non-disclosure test that plants canary secrets in fake ports and scans results, errors, logs, receipts, callback and stream handling;
-- the human-mediated steps (comparing codes, holding a phrase), which stay human-mediated.
-
-No tool exposes these calls. Until S0 is approved their registry rows stay recorded defects, and the pull requests of the memory-sync lane that touch recovery (#14464, #14891) carry the typed `sync.recover` call over their one recovery engine on the contract S0 and P1a publish; this program does not write a second recovery implementation.
+How each secret may move is not decided here. A caller-defined callback or sink proves nothing about who is entitled to the value, and this document claims no approval for any such carrier. **Slice S0 settles the custody contract before any of these calls, or the schema of any of them, is fixed.** Its draft takes the narrower rule the source already has for the phrase: the destination of a secret is fixed by the core (the controlling terminal for the phrase), or is a handle the caller already holds. Until S0 is approved the registry rows of these calls stay recorded defects, their input columns in section 6 name the non-secret inputs only, and the memory-sync lane's pull requests that touch recovery (#14464, #14891) carry `sync.recover` over their one recovery engine on the contract S0 approves; this program writes no second recovery implementation.
 
 Error messages are the core's own words. An exception from a lower layer is mapped to a code; its text is not appended (the thread SDK's `thrown` appends it today, `T/sdk.ts:178-203`).
 
 ### 4.6 Ports
 
-Every external dependency is behind a port that a test replaces: the engine host socket (`ThreadSdkOptions.host`), the gateway store, the device-service connection, the account session and credential store (`OmoSdkPorts`), the child process, the file system roots, and the clock. Timeouts, TTLs, the close ladder's waits and the device-code polling read the clock port, so their tests run on a virtual clock and inject one fault at a time (a lost reply, a store lock timeout, a 401) without waiting or breaking a real service. No test in this program sleeps for wall time except where time itself is the behaviour.
+Every external dependency is behind a port that a test replaces: the engine host socket, the gateway store, the device-service connection, the account session and credential store, the phrase terminal, the child process, the file system roots, and the clock. Timeouts, TTLs, the close ladder's waits and the device-code polling read the clock port, so their tests run on a virtual clock and inject one fault at a time (a lost reply, a store lock timeout, a 401) without waiting or breaking a real service. No test in this program sleeps for wall time except where time itself is the behaviour.
 
-The per-caller telemetry consent contract for engine open, attach and live updates (the engine's #7446) is an engine-owned dependency: the effective policy is decided in one core, and no adapter or resolver carries a copy of it.
+The per-caller telemetry consent contract for engine open, attach and live updates (the engine's #7446) is an engine-owned dependency with its own milestone in section 8: the effective policy is decided in one core, and no adapter or resolver carries a copy of it.
 
 ## 5. One resolution contract
 
 A thread is named by one string, `thread`, and every surface accepts exactly the strings every other surface prints (#14044).
 
-Grammar: `self`, a bare address, or `<device>/<thread>`, parsed only by `packages/thread-address-core` `parseAddress` (`parse.ts:26-59`), which excludes path-like text and takes optional scope and prefix controls, so not every string with a slash is a device address. The thread part resolves as durable id, session key, account alias, exact name in scope, then a unique id prefix (`ladder.ts:10-73`). The device part resolves as device id, `here`, device name, then a unique id prefix, with typed refusals for a shared name or prefix (`device.ts:24-76`).
+Grammar: `self`, a bare address, or `<device>/<thread>`. `parseAddress` takes the string alone and excludes path-like text (`packages/thread-address-core/src/parse.ts:26-59`), so not every string with a slash is a device address. The thread part resolves as durable id, session key, account alias, exact name in scope, then a unique id prefix; the scope and prefix controls are the ladder's options (`ladder.ts:10-73`, options at `:24-27, 66-73`). The device part resolves as device id, `here`, device name, then a unique id prefix, with typed refusals for a shared name or prefix (`device.ts:24-76`).
 
 The contract, one function that every entry goes through:
 
 ```ts
-resolve(address, { operation, principal, scope, need })
-  -> { kind: "ok", thread, device, holder, leg }      // thread: the canonical string every surface takes back
-   | OmoFailure                                        // not_found, ambiguous_target, scope_denied, device_offline, ...
+resolve(address, {
+  operation,        // deliver | control | read | attach | open_existing | fork_source | locate
+  principal, scope: { all_scope?, workspace? },
+  need,             // online | any; whether an incomplete listing is a refusal or a warning
+  match,            // exact | fuzzy            (fuzzy only for handoff)
+  reply,            // the delivery being answered, when the send is a reply
+  id_prefix,        // true | false | { exclude: caller }
+  unique_holder,    // a bare address must have exactly one holder on the account
+  probe })          // confirm the holder is reachable before answering
+  -> { kind: "ok", thread, device, holder, leg, all_scope }   // thread: the canonical string every surface takes back
+   | OmoFailure                                                // not_found, ambiguous_target, scope_denied, device_offline, ...
 ```
 
-- `operation` is one of `deliver`, `control`, `read`, `attach`, `open_existing`, `fork_source`, `locate`. It decides what the target must be (live for control, listed for read, any for a queued delivery) and which refusal an ended, inactive or offline target gets.
-- `principal` and `scope` are part of the input, not ambient. `self` resolves only for a session principal and is `caller_context_missing` for every other. `all_scope` widens this device's workspace scope only. A holder-qualified address (`<device>/<thread>`) is exact; a bare address that two holders answer is `ambiguous_target` with both candidates, never a pick.
-- `need` carries the listing requirement (`online`, `any`) and whether an incomplete listing is a refusal or a warning, which is the remote module's present distinction.
+The policy that today lives in the tools' delivery locator (`T/tools.ts:583-678`) is the contract's, owned by the core, with its present results:
+
+| Policy | Rule |
+|---|---|
+| Exact and fuzzy | `match: "fuzzy"` ranks partial names and workspace basenames and answers the leader only at the accept floor and margin the thread contract documents; every other operation is exact |
+| A reply | A send approved as a reply resolves only to the sender of the delivery it answers: by that sender's exact id or stated name, never by an id prefix; on this device among this device's entries; on another device pinned to that device. A hit that is not that sender is refused by name without sending |
+| The reply grant | A reply to a sender on this device in another workspace is answered without `all_scope`; only a scope refusal is widened, and the widened hit must still be that sender |
+| A sender this device does not hold | Looked up account-wide by exact id or name with `unique_holder`; a copy of the id on a second device makes it ambiguous |
+| A renamed sender | A stated name nobody carries any more is answered through the sender's recorded id |
+| The caller | A send never targets its own caller by an id prefix; `self` resolves only for a session principal and is `caller_context_missing` for every other |
+| Scope | `all_scope` widens this device's workspace scope only. A holder-qualified address is exact; a bare address two holders answer is `ambiguous_target` with both candidates, never a pick |
+
+Caller-specific defaults are inputs each caller's SDK operation sets, not branches inside adapters: `threads.send` from a session sets `id_prefix: { exclude: caller }` and passes `reply` when the engine's reply allowance approved the send; from a script it sets neither. These defaults are rows of the security design's matrix and scenarios of the conformance test.
 
 Every entry that resolves today enters this function and loses its own ladder:
 
 | Entry today | After |
 |---|---|
-| Tools: `locate` for delivery, `locateControl` | The two locators call `resolve` with `deliver` and `control` |
-| Thread SDK `send`'s own target construction, `locate` (`T/sdk.ts:404-447`) | `resolve` with `deliver`, `locate` |
+| The tools' delivery locator (`T/tools.ts:583-678`) and `locateControl` | They call `resolve` with `deliver` and `control`; the policy above moves into it |
+| Thread SDK `send`'s own target construction (`T/sdk.ts:351-402`) | `resolve` with `deliver` |
+| Thread SDK `locate` (`T/sdk.ts:404-447`) | `resolve` with `locate` |
 | `createThread`'s existing-thread and fork-source lookup (`T/control/create.ts:134-153, 477-495`) | `resolve` with `open_existing`, `fork_source` |
-| Remote module `sessions.resolve` (`R/resolve.ts:241-291`) and the handle canonicalization in `sessions.ts` and `attach.ts` | The account-side lookup becomes a port under `resolve` and keeps its cached index and incomplete-listing semantics as inputs; the `omo-ai/remote` facade's `sessions.resolve` and `aliases.resolve` call `resolve` |
+| Remote module `sessions.resolve` (`R/resolve.ts:241-291`) and the handle canonicalization in `sessions.ts` and `attach.ts` | The account-side lookup becomes a port under `resolve` and keeps its cached index and incomplete-listing semantics as inputs; the facade's `sessions.resolve` and `aliases.resolve` call `resolve` and keep their result contract (the session row) |
 | CLI `resolveTypedAddress` (`R/device-address.ts`) | Removed; the CLI passes the typed string to the SDK |
 
 What follows from one contract:
 
 - A thread opened over the relay is not special: `threads.create({ device })` answers a `thread` value, and every other call takes it back unchanged from the SDK, the tools and the CLI, on the device that opened it and on any other signed-in device.
-- The device is an optional part of the address. On the caller's own device every verb works, not only open: create, send, read, follow, wait, interrupt, set model, set reasoning, rename, archive, attach and close (#14931). The person client is given this device's operator endpoint leg lazily, from the remote module's `admin.ts` entry (#14890).
+- The device is an optional part of the address. On the caller's own device every verb works, not only open (#14931). The person client is given this device's operator endpoint leg lazily, from the remote module's `admin.ts` entry (#14890).
 - A stale route is recovered inside the core, once, by locating the live owner read-only and sending to the resolved key, with separate sender identities and with no second write after a timeout or an authorization refusal. That behaviour comes from #14937, which is held for its SDK-first fix; no adapter re-implements it.
 
-Tests, each as a matched pair for a target on this device and on another, for each principal that may run the operation: ambiguity (bare and holder-qualified), an inactive and an ended session, a stale listing, an alias, `here`, workspace scope with and without `all_scope`, and a relay-opened handle taken through every verb and back. A context-dependent operation asserts its expected refusal for the principals that lack the context; a deliberate principal difference is an expected outcome, not a failure.
+Tests, each as a matched pair for a target on this device and on another, for each principal that may run the operation: ambiguity (bare and holder-qualified), an inactive and an ended session, a stale listing, an alias, `here`, workspace scope with and without `all_scope`, every row of the policy table, and a relay-opened handle taken through every verb and back. A context-dependent operation asserts its expected refusal for the principals that lack the context; a deliberate principal difference is an expected outcome, not a failure.
 
 ## 6. Parity table
 
 Direction: **SDK ⊇ CLI and SDK ⊇ tools.** Every row is a leaf capability with its inputs and has an SDK call.
 
-- **SDK today**: **yes** (the root or a facade answers it with these inputs at the pinned commit), **partial** (one of the three entries answers part of it; the gap is named), **no** (a defect under the rule).
+- **SDK today**: **yes** (the root or a facade answers it, with these inputs honoured, at the pinned commit), **partial** (one of the entries answers part of it; the gap is named), **no** (a defect under the rule).
 - **Adapter**: for a CLI or tool cell that is empty, either **planned** with the slice that adds it, or **omitted** with the reason it is intentionally narrower. "Not built yet" is never a reason.
+- **Slice**: the slice of section 8 that builds the row's SDK call. Every row has one.
 
 ### 6.1 Threads: reading
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `threads.list({ all_scope?, state?, device?, project?, name?, archived?, idempotency_key? })`. `state` is the thread vocabulary (`opening`, `running`, `idle`, `inactive`, `archived`), repeatable; the remote alias's `ended` is accepted and mapped by a fixed table so that no ended row is dropped | `omo thread list [--all-scope] [--state ...]` (repeatable or comma-separated); `omo remote sessions [--device] [--project] [--state running\|idle\|ended]`; `omo host session list` | `thread_list { all_scope?, state?, idempotency_key? }` | partial: no `device`, `project`, `name`, `archived` filter in the thread SDK (remote module has them, `R/types.ts:233-239`) | Tool omits the four filters: rows carry `device`, `cwd`, `name` and status, and the listing is one bounded payload the model filters |
-| `threads.read({ thread, cursor?, max_bytes?, wait_ms?, all_scope?, idempotency_key?, limit? })`: the bounded transcript projection | `omo thread read <t> [--limit] [--max-bytes] [--cursor]` | `thread_read` | partial: no `wait_ms`, no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`) | None |
-| `threads.entries({ thread, since?, before?, tail?, limit?, max_bytes? })`: raw session entries by entry id. `since` is an entry id, not the read cursor | `omo host session read <ref> [--tail N] [--since <entryId>]` | none | partial: remote module `sessions.read(thread, { before, tail })` | Tool omitted: raw entries are unbounded engine records; the tool's read is the budgeted, model-shaped projection. CLI planned (T3) as `omo thread read --entries` |
-| `threads.messages({ thread })`: the engine's message list | `omo host session read <ref> --messages` | none | no | Tool omitted: same reason. CLI planned (T3) |
-| `threads.receipt({ thread, delivery_id, all_scope? })`: the outcome of the caller's own delivery to that exact thread; reads no conversation, sends nothing, wakes nothing | none | `thread_read { thread, delivery_id }` | no | CLI planned (T3): `omo thread receipt` |
-| `threads.get({ thread })`: model, reasoning, approval mode, turn, pending dialogs and queue | `omo host session state <ref>` | none | partial: remote module `sessions.get` | Tool planned (T2): the `thread_list` row gains `reasoning` and `pending`, which it lacks today (`T/contracts/results.ts:89-107`). CLI planned (T3): `omo thread state` |
-| `threads.wait({ thread, until?, deadline_ms? })` | `omo host session wait <ref> [--until idle\|done] [--timeout]` | `thread_read { wait_ms }` | partial: remote module `sessions.wait`; the local wait is inside the tool body | CLI planned (T3): `omo thread wait` |
-| `threads.follow({ thread, from? })`: status changes, turn ends and the turn's stream, with the promised receipt of the send it follows | `omo remote send` (its default; `--no-wait` and `--timeout` bound it) | none | partial: remote module `sessions.follow` | Tool omitted: a tool result is one bounded payload and nothing streams into a model call; an agent waits with `thread_read { wait_ms }` |
-| `threads.locate({ thread, all_scope? })` | none | none | yes | Tool and CLI omitted: resolution is internal to every verb, and the holder is on the list row. Kept for `daemon adopt` and connectors |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `threads.list({ all_scope?, workspace?, state?, device?, project?, name?, archived?, idempotency_key? })` | `omo thread list [--all-scope] [--state ...]` (repeatable or comma-separated); `omo remote sessions [--device] [--project] [--state running\|idle\|ended]`; `omo host session list` | `thread_list { all_scope?, state?, idempotency_key? }` | partial: no `workspace`, `device`, `project`, `name`, `archived` in the thread SDK (remote module has them, `R/types.ts:68, 233-239`) | Tool omits the five filters: rows carry `device`, `cwd`, `name` and status, and the listing is one bounded payload the model filters | T1b |
+| `threads.resolve({ address, all_scope?, workspace? })` answering the session row | none (implicit in every verb) | none | partial: remote module `sessions.resolve` | Tool and CLI omitted: resolution is part of each verb; kept because the remote facade has it | T1a |
+| `threads.read({ thread, cursor?, max_bytes?, all_scope?, idempotency_key?, limit? })`: the bounded transcript projection | `omo thread read <t> [--limit] [--max-bytes] [--cursor]` | `thread_read` (plain branch) | partial: no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`) | None | T1b |
+| `threads.readAfterWait({ thread, wait_ms, cursor?, max_bytes?, all_scope?, idempotency_key? })`: wait for the turn to end, then read, with the `wait` block | none | `thread_read { wait_ms }` (wait branch) | **no** | CLI planned (T3): `omo thread read --wait-ms` | T1b |
+| `threads.receipt({ thread, delivery_id, all_scope? })`: the outcome of the caller's own delivery to that exact thread; reads no conversation, sends nothing, wakes nothing, and runs before read admission | none | `thread_read { thread, delivery_id }` (receipt branch) | **no** | CLI planned (T3): `omo thread receipt` | T1b |
+| `threads.entries({ thread, since?, before?, tail?, limit?, max_bytes? })`: raw session entries by entry id. `since` is an entry id, not the read cursor | `omo host session read <ref> [--tail N] [--since <entryId>]` | none | partial: remote module `sessions.read(thread, { before, tail })` | Tool omitted: raw entries are unbounded engine records; the tool's read is the budgeted, model-shaped projection. CLI planned (T3) | T1b |
+| `threads.messages({ thread })`: the engine's message list | `omo host session read <ref> --messages` | none | **no** | Tool omitted: same reason. CLI planned (T3) | T1b |
+| `threads.get({ thread })`: model, reasoning, approval mode, turn, pending dialogs and queue | `omo host session state <ref>` | none | partial: remote module `sessions.get` | Tool planned (T2): the `thread_list` row gains `reasoning` and `pending`, which it lacks today (`T/contracts/results.ts:89-107`); until then the tool surface is narrower and the conformance test does not claim three-way equality for this row. CLI planned (T3): `omo thread state` | T1b |
+| `threads.wait({ thread, from?, until?, deadline_ms? })`; `from` is a send's receipt and anchors the wait on the turn that answers it | `omo host session wait <ref> [--until idle\|done] [--timeout]` | none (the wait branch of `thread_read` is its own row) | partial: remote module `sessions.wait`; the local wait is inside the tool body | CLI planned (T3): `omo thread wait` | T1b |
+| `threads.follow({ thread, from? })`: status changes, turn ends and the turn's stream | none by itself | none | partial: remote module `sessions.follow` | Tool omitted: a tool result is one bounded payload and nothing streams into a model call. CLI planned (T3): `omo thread follow` | T1c |
+| `threads.locate({ thread, all_scope? })` | none | none | yes | Tool and CLI omitted: resolution is internal to every verb, and the holder is on the list row | shipped |
+
+The `state` filter, as a fixed table. The thread vocabulary is `opening`, `running`, `idle`, `inactive`, `archived` (`T/contracts/params.ts:20-44`); the remote vocabulary is `running`, `idle`, `ended` with a separate `archived` flag on each row (`R/types.ts:87-104`).
+
+| Filter value | Rows on this device it keeps | Rows on other devices it keeps |
+|---|---|---|
+| `opening` | Rows a local engine handoff lists as opening | None: the remote row has no such state |
+| `running` | Running | State `running`, not archived |
+| `idle` | Idle | State `idle`, not archived |
+| `inactive` | No engine holds it, not archived | State `ended`, not archived |
+| `archived` | Archived | `archived: true`, whatever the state |
+| none given | Every state but `archived` | Every row with `archived: false` |
+| several | The union | The union |
+
+`ended` is not a root input. It is the alias `omo remote sessions --state ended`, which its descriptor maps to `state: ["inactive"]` with `device` scoped to other devices; the alias's rows keep their present shape, `state: "ended"` included, through its render projection. Before the alias converges, a golden test pins its present output; where this table and that output differ, the alias keeps its output and the table is corrected.
 
 ### 6.2 Threads: writing and control
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `threads.send({ thread, message, delivery?, expected_turn_id?, summary?, idempotency_key?, collapse_key?, all_scope?, attachments?, author? })`. `author` only from a connector | `omo thread send <t> <text> [--mode] [--expected-turn] [--idempotency-key] [--collapse-key]`; `omo remote send <s> <text> [--steer\|--follow-up] [--no-wait] [--timeout]`; `omo host session prompt\|steer <ref> <text\|@file>` | `thread_send` (all fields but `attachments`, `author`) | partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode` | Tool omits `attachments` and `author`: a session's message is text plus its provenance header, and `author` is a connector's identity field |
-| `threads.create({ thread?, device?, alias?, name?, cwd?, worktree?: { branch?, base? }, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key?, launch_spec? })`. `thread` (open an existing thread on whichever device holds it, optionally with `prompt`) never with `device`; `fork_from` is refused `unsupported` (`fork_unsupported`) until the engine forks on open; a wider `permission_preset` is `scope_denied` | `omo remote open <device> [--project] [--model] [--thinking] [--permission-preset] [--worktree [--branch] [--base]] [--prompt [--steer\|--follow-up]]`; `omo host session open --cwd [--model] [--name] [--prompt] [--launch-spec]` | `thread_create` (all fields but `launch_spec`) | partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec` | Tool omits `launch_spec`: which launch spec a host starts from is the installation's, not a session's choice. CLI planned (T3): `omo thread create`, with `--thinking` kept as the spelling of `reasoning` |
-| `threads.interrupt({ thread, turn_id?, all_scope?, idempotency_key? })` | `omo remote interrupt <s>`; `omo host session abort <ref>` | `thread_interrupt` | partial: no `idempotency_key` contract stated for the script principal | CLI planned (T3): `omo thread interrupt` |
-| `threads.close({ thread?, force?, graceful?, wait_ms?, idempotency_key?, all_scope? })`. `thread` omitted or `self` means the calling session and is `caller_context_missing` for any other principal | `omo thread close <t> [--force \| --graceful [--wait-ms]] [--idempotency-key]`; `omo remote close <s> [--force] [--graceful] [--wait-ms]`; `omo host session close <ref>` | `thread_close` | yes | None |
-| `threads.unload({ thread, interrupt?, force?, clear_queue?, children?: "refuse" \| "detach" })`: takes the session out of its host and keeps it resumable. It is not a close | `omo host session unload <ref> [--interrupt] [--force] [--clear-queue] [--children refuse\|detach]` | none | no | Tool omitted: an agent ends a peer through the close ladder, which chooses the step and reports what it dropped; choosing the raw step lets a session detach another session's children, which no ruling grants. CLI planned (T3) |
-| `threads.setModel({ thread, model, provider?, idempotency_key?, all_scope? })` | `omo remote model <s> <provider/id>`; `omo host session model <ref> <provider/id>` | `thread_set_model` | yes (`set_model` on the facade) | CLI planned (T3): `omo thread model` |
-| `threads.setReasoning({ thread, level, scope?, idempotency_key?, all_scope? })` | none | `thread_set_reasoning` | **no** in the thread SDK; remote module only | CLI planned (T3): `omo thread reasoning` |
-| `threads.rename({ thread?, name?, alias?, idempotency_key?, all_scope? })`, `thread` optional as for close | none | `thread_rename` | yes | CLI planned (T3): `omo thread rename` |
-| `threads.aliases.resolve({ alias })`, `.set({ thread, alias })`, `.clear({ thread })` | none | `thread_rename { alias }`, `thread_create { alias }` | partial: remote module `aliases.*` | CLI planned (T3) through `omo thread rename --alias`. Tool omits a bare `resolve`: every tool input already takes an alias |
-| `threads.archive({ thread, archived?, idempotency_key?, all_scope? })` | none | `thread_archive` | **no** in the thread SDK; remote module only | CLI planned (T3): `omo thread archive` |
-| `threads.handoff({ thread, match?, message, delivery?, expected_turn_id?, summary?, idempotency_key?, all_scope? })` | none | `thread_handoff` | **no** | CLI planned (T3): `omo thread handoff`, exact unless `--match fuzzy` |
-| `threads.attach({ thread })` answering `{ snapshot, events, read, pending, answer, command, serveEndpoint, detach }`; the served endpoint closes when the attach ends, including when the connection drops | `omo remote attach <s>` (TUI); `omo remote answer` arrives with #14890 | none | partial: remote module `attach` | Tool omitted: answering another session's approval dialog is an authority decision, and no ruling gives a session that authority over a peer |
-| `threads.adopt({ thread, interrupt?, force? })` answering the release and the launch plan: session path, working directory, and the queued prompts to replay in order | `omo daemon adopt <s> [--interrupt] [--force] [--json]` | none | partial: `locate` and `release`; the launch plan is built in the CLI (`N/bin/lib/daemon-adopt.js:118-155`) | Tool omitted: it ends in replacing a terminal process. That replacement stays in the CLI; the plan is SDK data |
-| `threads.extensions.declare(ops)`, `.call({ extension, op, input })`, and the session-callable variant that runs only for its authorized session, with each operation's declared input schema | none | `ext_<extension>_<tool>`, one per declared operation, registered at session start | yes on the facade (`registerStoreExtension`, `extensionCall`) | CLI omitted: an extension declares session tools; no person-facing verb exists or is asked for |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `threads.send({ thread, message, delivery?, expected_turn_id?, summary?, idempotency_key?, collapse_key?, all_scope?, attachments?, author? })`. `author` only from a connector | `omo thread send <t> <text> [--mode] [--expected-turn] [--idempotency-key] [--collapse-key]`; `omo remote send <s> <text> [--steer\|--follow-up] --no-wait`; `omo host session prompt\|steer <ref> <text\|@file>` | `thread_send` (all fields but `attachments`, `author`) | partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode` | Tool omits `attachments` and `author`: a session's message is text plus its provenance header, and `author` is a connector's identity field | T1a (locator), T1b (inputs) |
+| `threads.sendAndFollow({ ...send inputs, deadline_ms? })`: one operation that sends and streams the answer, the receipt first | `omo remote send <s> <text> [--steer\|--follow-up] [--timeout]` (its default) | none | partial: remote module `sessions.send` then `follow` with the promised receipt (`R/follow.ts`) | Tool omitted: nothing streams into a model call; an agent sends, then reads after a wait | T1c |
+| `threads.create({ thread?, device?, alias?, name?, cwd?, worktree?: { branch?, base? }, fork_from?, skills?, model?, reasoning?, permission_preset?, prompt?, delivery?, idempotency_key?, launch_spec? })`. `prompt` is a string, or `{ message, delivery?, expected_turn_id?, summary?, attachments?, author? }` (the remote module's `first`). `thread` (open an existing thread on whichever device holds it, optionally with `prompt`) never with `device`; `fork_from` on a host open is refused `unsupported` (`fork_unsupported`) until the engine forks on open (a terminal process forks through `engine.launch`, 6.9); a wider `permission_preset` is `scope_denied` | `omo remote open <device> [--project] [--model] [--thinking] [--permission-preset] [--worktree [--branch] [--base]] [--prompt [--steer\|--follow-up]]`; `omo host session open --cwd [--model] [--name] [--prompt] [--launch-spec]` | `thread_create` (all fields but `launch_spec` and the object form of `prompt`) | partial: the thread SDK creates; `omo remote open` skips the create orchestration (#13016 OMO-CTL-26); no `launch_spec`, no prompt metadata | Tool omits `launch_spec` (which launch spec a host starts from is the installation's choice) and the prompt's attachments and author (as for send). CLI planned (T3): `omo thread create`, with `--thinking` kept as the spelling of `reasoning` | T1b |
+| `threads.interrupt({ thread, turn_id?, all_scope?, idempotency_key? })` | `omo remote interrupt <s>`; `omo host session abort <ref>` | `thread_interrupt` | partial: the key is accepted and not honoured outside the tool's receipt | CLI planned (T3): `omo thread interrupt` | T1b |
+| `threads.close({ thread?, force?, graceful?, wait_ms?, idempotency_key?, all_scope? })`. `thread` omitted or `self` means the calling session and is `caller_context_missing` for any other principal | `omo thread close <t> [--force \| --graceful [--wait-ms]] [--idempotency-key]`; `omo remote close <s> [--force] [--graceful] [--wait-ms]`; `omo host session close <ref>` | `thread_close` | partial: the key is accepted and not honoured (`T/sdk.ts:488-495`) | None | T1b |
+| `threads.unload({ thread, interrupt?, force?, clear_queue?, children?: "refuse" \| "detach" })`: takes the session out of its host and keeps it resumable. It is not a close | `omo host session unload <ref> [--interrupt] [--force] [--clear-queue] [--children refuse\|detach]` | none | **no** | Tool omitted: an agent ends a peer through the close ladder, which chooses the step and reports what it dropped; choosing the raw step lets a session detach another session's children, which no ruling grants. CLI planned (T3) | T1b |
+| `threads.release({ thread, interrupt?, force?, move?: { id, target } })`, answering the engine's release reply (session path, attachments, what was dropped) | part of `omo daemon adopt` | none | yes on the facade (`release(located, request)`, `T/sdk.ts:153-156, 508-517`) | Tool omitted: it takes a session away from its host. CLI: reached through adopt | T1c |
+| `threads.adopt({ thread, interrupt?, force? })`: one operation that releases and answers the launch plan: session path, working directory, and the queued prompts to replay in order | `omo daemon adopt <s> [--interrupt] [--force] [--json]` | none | partial: `locate` and `release`; the launch plan is built in the CLI (`N/bin/lib/daemon-adopt.js:118-155`) | Tool omitted: it ends in replacing a terminal process. That replacement stays in the CLI; the plan is SDK data | T1c |
+| `threads.setModel({ thread, model, provider?, idempotency_key?, all_scope? })` | `omo remote model <s> <provider/id>`; `omo host session model <ref> <provider/id>` | `thread_set_model` | partial: `set_model` on the facade; the key is accepted and not honoured (`T/sdk.ts:501-506`) | CLI planned (T3): `omo thread model` | T1b |
+| `threads.setReasoning({ thread, level, scope?, idempotency_key?, all_scope? })` | none | `thread_set_reasoning` | **no** in the thread SDK; remote module only | CLI planned (T3): `omo thread reasoning` | T1b |
+| `threads.rename({ thread?, name?, alias?, idempotency_key?, all_scope? })`, `thread` optional as for close | none | `thread_rename` | yes | CLI planned (T3): `omo thread rename` | shipped; key semantics T1b |
+| `threads.aliases.resolve({ alias })`, `.set({ thread, alias })`, `.clear({ thread })` | none | `thread_rename { alias }`, `thread_create { alias }` | partial: remote module `aliases.*` | CLI planned (T3) through `omo thread rename --alias`. Tool omits a bare `resolve`: every tool input already takes an alias | T1c |
+| `threads.archive({ thread, archived?, idempotency_key?, all_scope? })` | none | `thread_archive` | **no** in the thread SDK; remote module only | CLI planned (T3): `omo thread archive` | T1b |
+| `threads.handoff({ thread, match?, message, delivery?, expected_turn_id?, summary?, idempotency_key?, all_scope? })` | none | `thread_handoff` | **no** | CLI planned (T3): `omo thread handoff`, exact unless `--match fuzzy` | T1c |
+| `threads.attach({ thread })` answering `{ snapshot, events, read, pending, answer, command, serveEndpoint, detach }`; the served endpoint closes when the attach ends, including when the connection drops | `omo remote attach <s>` (TUI); `omo remote answer` arrives with #14890 | none | partial: remote module `attach` | Tool omitted: answering another session's approval dialog is an authority decision, and no ruling gives a session that authority over a peer | T1c, after S0 |
+| `threads.extensions.register({ name, migrations, moduleUrl, sessionCallable?, wakeDir? })` answering `{ version }`; `.call({ name, op, args })` | none | none | yes on the facade (`T/gateway/store-extensions.ts:42-49`) | CLI and tool omitted: a connector registers its extension from its own process | shipped; root wiring P1b |
+| `threads.extensions.sessionOps()` listing the declared session operations with their input schemas; `.sessionCall({ name, op, args })`, which runs the operation as the root's session principal, the caller the engine resolved, and then its declared await. Refused for every other principal | none | `ext_<extension>_<tool>`, one per declared operation, registered at session start | **no**: the session channel is reachable only from the session's own extension tools today (`T/gateway/store-extensions.ts:107-139`) | CLI omitted: a session operation has no caller outside a session | T1e, after S0 |
 
 ### 6.3 Devices
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `devices.list()` | `omo remote devices`; `omo account devices` | `thread_list` (its `devices` block) | yes; one listing after #14881 | None |
-| `devices.resolve({ device })` | implicit in every `<device>/...` | none | partial: remote module | Tool and CLI omitted: resolution is part of each verb |
-| `devices.rename({ id, name })`, the name bounded as the sign-in bounds it (#14523) | none | none | yes | CLI planned (A1c): `omo account devices rename`. Tool omitted: an account-level change a person makes |
-| `devices.revoke({ device, confirm_name })`: by id, name or unique prefix; an ambiguity revokes nothing; never this device | `omo account devices revoke <id>` | none | **no** (#14364 keeps it as its last step) | Tool omitted: it destroys a sign-in and is the person's decision |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `devices.list()` | `omo remote devices`; `omo account devices` | `thread_list` (its `devices` block) | yes; one listing after #14881 | None | shipped |
+| `devices.resolve({ device })` | implicit in every `<device>/...` | none | partial: remote module | Tool and CLI omitted: resolution is part of each verb | T1a |
+| `devices.rename({ id, name })`, the name bounded as the sign-in bounds it (#14523) | none | none | yes | CLI planned (A1c): `omo account devices rename`. Tool omitted: an account-level change a person makes | A1c |
+| `devices.revoke({ device, confirm_name })`: by id, name or unique prefix; an ambiguity revokes nothing; never this device | `omo account devices revoke <id>` | none | **no** (#14364 keeps it as its last step) | Tool omitted: it destroys a sign-in and is the person's decision | A1c |
 
 `devices.enroll` (#14365) is outside this program; the name is reserved.
 
 ### 6.4 Account
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `account.whoami()`, `account.show({ account? })` | `omo whoami [--api]`; `omo account show [--account]` | none | partial: `whoami` | Tool omitted: a session reads it from the SDK in an eval cell |
-| `account.signIn({ method?, onUserCode, onOpenUrl?, deviceName?, replace?, signal? })` answering the device, the replaced device and the device-service outcome, with the event order `ready`, `code`, `signed_in` or `refused`; `account.signInCheck()`. The service origins come from the root's `api` and `accounts` options. While accounts are closed, only the device-code route is admitted and every other combination is a typed refusal, as the CLI refuses it today | `omo login [--device] [--no-browser] [--replace] [--api] [--accounts]`; `omo account sign-in [--stdin\|--check]` | none | partial: device code only, and it runs the CLI as a child (`S/account/sign-in-process.ts`) | Tool omitted: a sign-in needs a person at a browser. The SDK stops running the CLI; the CLI calls the SDK |
-| `account.signOut()`, `account.forget({ device? })` (this device only; another device is `devices.revoke`) | `omo logout [--api]`; `omo account forget [--device <id>]` | none | **no** | Tool omitted: ends the session's own sign-in |
-| `account.adopt({ credential, replace? })`, the credential an input, with the keep-current and replace rules of today | `omo account adopt [--replace]` | none | **no**; custody (S0) | Tool omitted: a hand-over between our own processes |
-| `account.credentials.handOver({ what: "access_token" \| "stored_credential", sink })`, returning the non-secret metadata the verbs print today (expiry, device, owner) | `omo account token`; `omo account export` | none | **no**; custody (S0) | Tool omitted: section 4.5 |
-| `account.store.status()`, `.enable()`, `.disable({ discard? })` | `omo account store status\|enable\|disable [--discard]` | none | **no** | Tool omitted: changes where credentials live on the machine |
+Both editions register `login`, `logout` and `whoami` over the same core (`C/cli-program.ts:236-238`, `C/service-auth/commands.ts:234-315`), each with its own hooks. Each edition has its own descriptor rows over the calls below and keeps its present admission, help and refusal outcomes, including the hidden routes that exist while accounts are closed.
+
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `account.whoami()`, `account.show({ account? })` | `omo whoami [--api]`; `omo account show [--account]` | none | partial: `whoami` | Tool omitted: a session reads it from the SDK in an eval cell | A1b |
+| `account.signIn({ method: "device_code" \| "browser", open_browser?, onUserCode, onOpenUrl?, deviceName?, replace?, signal? })`. The codes go to `onUserCode` in a `code` event; the result is the `signed_in` content (api, device, replaced device, device-service outcome) or a typed refusal. `method: "browser"` is the callback flow of `omo login`; `open_browser: false` is `--no-browser`. While accounts are closed only `device_code` is admitted and every other combination is the refusal the CLI gives today. Two CLI projections of the one call: `omo login` renders the `code` event as its three lines; `omo account sign-in` renders each event as one JSON line | `omo login [--device] [--no-browser] [--replace] [--api] [--accounts]`; `omo account sign-in [--stdin]` | none | partial: device code only, and it runs the CLI as a child (`S/account/sign-in-process.ts`) | Tool omitted: a sign-in needs a person at a browser. The SDK stops running the CLI; the CLI calls the SDK | A1b, after S0 |
+| `account.signInCheck()` answering `{ ready: true }`: a probe that the sign-in call exists; it touches nothing | `omo account sign-in --check` | none | **no** | Tool omitted: a driver's probe | A1b |
+| `account.signOut()`, `account.forget({ device? })` (this device only; another device is `devices.revoke`) | `omo logout [--api]`; `omo account forget [--device <id>]` | none | **no** | Tool omitted: ends the session's own sign-in | A1b |
+| `account.adopt({ replace? })`, the credential an input whose carrier S0 fixes, with the keep-current and replace rules of today | `omo account adopt [--replace]` | none | **no**; custody (S0) | Tool omitted: a hand-over between our own processes | A1d |
+| `account.credentials.handOver({ what: "access_token" \| "stored_credential" })`, the destination fixed by S0, returning the non-secret metadata the verbs print today (expiry, device, owner) | `omo account token`; `omo account export` | none | **no**; custody (S0) | Tool omitted: section 4.5 | A1d |
+| `account.store.status()`, `.enable()`, `.disable({ discard? })` | `omo account store status\|enable\|disable [--discard]` | none | **no** | Tool omitted: changes where credentials live on the machine | A1b |
+| `account.keys.init()`, `.status()`: this device's keyring, answering the device id and the public signing and sealing keys only, with the typed refusal for a missing key | OpenCode edition: `account keys init`; `account keys status` | none | **no**; custody (S0) | Tool omitted: creates key material | OC1c |
 
 ### 6.5 Device service (remote switches)
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `deviceService.status()` with the local service units; `deviceService.info()` | `omo remote status` | none | partial: the omo SDK's narrower status; remote module `service.status`, `service.info` | Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on |
-| `deviceService.enable()`, `.disable()`, with the opt-out record and the cold-wake steps the CLI runs around them today | `omo remote enable`; `omo remote disable` | none | partial: remote module `service.setEnabled`, `admin.ts` | Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's |
-| `deviceService.control()`, `.setControl(on)` | `omo remote control [on\|off]` | none | partial: remote module | Same reason |
-| `deviceService.wake()`, `.setWake(on \| null)`, person only | `omo remote wake [on\|off\|default]` | none | partial: remote module | Same reason |
-| `deviceService.bootstrap({ install?, adopt? })` | `omo remote bootstrap` | none | partial: remote module, `admin.ts` | Tool omitted: it downloads and installs a service |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `deviceService.status()` with the local service units; `deviceService.info()` | `omo remote status` | none | partial: the omo SDK's narrower status; remote module `service.status`, `service.info` | Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on | A2a |
+| `deviceService.enable()`, `.disable()`, with the opt-out record and the cold-wake steps the CLI runs around them today, as one operation each | `omo remote enable`; `omo remote disable` | none | partial: remote module `service.setEnabled`, `admin.ts` | Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's | A2a |
+| `deviceService.control()`, `.setControl(on)` | `omo remote control [on\|off]` | none | partial: remote module | Same reason | A2a |
+| `deviceService.wake()`, `.setWake(on \| null)`, person only | `omo remote wake [on\|off\|default]` | none | partial: remote module | Same reason | A2a |
+| `deviceService.bootstrap({ account?, install?, adopt? })` (`R/types.ts:218-222`) | `omo remote bootstrap` | none | partial: remote module, `admin.ts` | Tool omitted: it downloads and installs a service | A2a |
 
 ### 6.6 Sync
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `sync.enable({ onCode, confirm, phrase: sink, signal? })`, eligibility checked before a phrase exists | `omo sync enable` | none | **no**; custody (S0) | Tool omitted: the ceremony has a person compare codes on two screens and keep a phrase |
-| `sync.disable()` | `omo sync disable` | none | **no** | Tool omitted: a person's choice about this device's memory |
-| `sync.status()` | `omo sync status [--json]` | none | **no** | Tool omitted: read from the SDK in an eval cell |
-| `sync.approve({ id?, confirmCode })` | `omo sync approve [id]` | none | **no** | Tool omitted: the approval is the comparison a person makes |
-| `sync.recover({ phrase: readable, confirm })`, over the one recovery engine of #14464 | `omo sync recover` | none | **no**; custody (S0); built in the memory-sync lane's pull requests | Tool omitted: takes the recovery phrase |
-| `sync.retirePin({ account })` | `omo account retire-sync --account <id>` | none | **no** | Tool omitted: called by the desktop app when it discards its own sealed session |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `sync.enable({ onCode, confirm, signal? })`, eligibility checked before a phrase exists; the phrase's surface is fixed by S0 | `omo sync enable` | none | **no**; custody (S0) | Tool omitted: the ceremony has a person compare codes on two screens and keep a phrase | A2b |
+| `sync.disable()` | `omo sync disable` | none | **no** | Tool omitted: a person's choice about this device's memory | A2b |
+| `sync.status()` | `omo sync status [--json]` | none | **no** | Tool omitted: read from the SDK in an eval cell | A2b |
+| `sync.approve({ id?, confirmCode })` | `omo sync approve [id]` | none | **no** | Tool omitted: the approval is the comparison a person makes | A2b |
+| `sync.recover({ confirm, signal? })`, over the one recovery engine of #14464; the phrase's surface is fixed by S0 | `omo sync recover` | none | **no**; custody (S0); built in the memory-sync lane's pull requests | Tool omitted: takes the recovery phrase | A2c |
+| `sync.retirePin({ account })` | `omo account retire-sync --account <id>` | none | **no** | Tool omitted: called by the desktop app when it discards its own sealed session | A2b |
 
 ### 6.7 Config, daemon and hosts, diagnostics, install
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `config.status()` | `omo doctor` (its `WARN config:` lines) | none | yes | CLI planned only if #14366 asks for a verb |
-| `config.explain`, `.check`, `.edit`, `.revert`, `.modelSwaps` (#14366) | none | none | no | Owned by #14366; the names are reserved here |
-| `daemon.ensure({ policy?, pinned?, launch_spec?, socket?, mcp_presenter_enforcement? })`, then `daemon.warm({ cwd?, kind?, context? })` | `omo daemon run [--no-upgrade] [--pinned] [--json]`; `omo host ensure [--launch-spec] [--policy upgrade\|fallback\|never] [--socket] [--rpc-key-root] [--mcp-presenter-enforcement]` | none | partial: `warmDaemon` only | Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call |
-| `daemon.status({ all?, include_workers?, socket? })`, each terminal row with its last activity | `omo daemon status [--include-workers]`; `omo host status [--all] [--include-workers] [--socket]` | none | **no** | Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) |
-| `daemon.stop({ drain?, instance?, wait_ms?, force?, expected_generation?, socket? })` | `omo daemon stop [--drain]`; `omo host stop [--drain [--instance] [--wait-ms]] [--force] [--expected-generation] [--socket]` | none | **no** | Same reason as ensure |
-| `daemon.stopAll({ drain?, wait?, deadline_ms? })` | `omo daemon stop --all [--drain] [--wait [--timeout]]` | none | **no** | Same reason |
-| `daemon.handoff({ launch_spec?, socket?, allow_downgrade?, when?: { idle: { operation, if_instance, if_generation, target_build } } })` | `omo daemon handoff`; `omo host handoff [--launch-spec] [--socket] [--allow-downgrade] [--when idle --operation --if-instance --if-generation --target-build]` | none | **no** | Same reason |
-| `daemon.gc({ prune_store_index?, agent_dir? })` | `omo daemon gc [--prune-store-index]`; `omo host gc [--agent-dir]` | none | **no** | Same reason |
-| `daemon.rollbackPrepare({ stores?, allow_missing_index?, dry_run? })` | `omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run]` | none | **no** | Same reason |
-| `daemon.shardPath({ kind, owner, root? })` | `omo host shard-path --kind p\|i --owner <id> [--root]` | none | **no** | Tool omitted: an endpoint internal |
-| `diagnostics.run()` answering findings as data, `.models()`, `.fixReflectionLock({ dry_run? })`, `.reapStaleEngines({ pids })` | `omo doctor`; `--models`; `--fix [--dry-run]`; `--reap` | none | **no** | Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only |
-| `install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent })` (asked once, or per stage as `--ask-each` does) | `omo setup [--yes] [--ask-each] [--dry-run]` | none | **no** | Tool omitted: plan, consent, write is a person's flow |
-| `install.update({ dry_run? })` | `omo update [--dry-run \| --print] [--self]`, and the `self`, `senpi`, `omo` targets | none | **no** | Tool omitted: replaces the binary the session runs on |
-| `install.version()`, `install.sdkRoot()` | `omo --version`, `-v`; `omo sdk root` (new) | none | **no** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment |
-| `toolkit.*` (the agent toolkit SDK) | `omo ulw-loop` answers that it moved to the SDK | n/a | yes | The CLI verb is already retired in favour of the SDK |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `config.status()` | `omo doctor` (its `WARN config:` lines) | none | yes | CLI planned only if #14366 asks for a verb | shipped |
+| `config.explain`, `.check`, `.edit`, `.revert`, `.modelSwaps` (#14366) | none | none | no | Owned by #14366; the names are reserved here | #14366 |
+| `daemon.run({ policy?, pinned? })`: one operation that ensures the operator daemon and then warms it; a refused or failed warm is reported in the value and the run still succeeds, as today | `omo daemon run [--no-upgrade] [--pinned] [--json]` | none | partial: `warmDaemon` only | Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call | C1a |
+| `daemon.ensure({ policy?, pinned?, launch_spec?, mcp_presenter_enforcement? })`, the endpoint from the root's `endpoint`; `daemon.warm({ cwd?, kind?, context? })` | `omo host ensure [--launch-spec] [--policy upgrade\|fallback\|never] [--socket] [--rpc-key-root] [--mcp-presenter-enforcement]` | none | partial: `warmDaemon` | Same reason | C1a, after S0 |
+| `daemon.status({ all?, include_workers? })`, each terminal row with its last activity | `omo daemon status [--include-workers]`; `omo host status [--all] [--include-workers] [--socket]` | none | **no** | Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) | C1a |
+| `daemon.stop({ drain?, instance?, wait_ms?, force?, expected_generation? })` | `omo daemon stop [--drain]`; `omo host stop [--drain [--instance] [--wait-ms]] [--force] [--expected-generation] [--socket]` | none | **no** | Same reason as run | C1a |
+| `daemon.stopAll({ drain?, wait?, deadline_ms? })` | `omo daemon stop --all [--drain] [--wait [--timeout]]` | none | **no** | Same reason | C1a |
+| `daemon.handoff({ policy?, launch_spec?, allow_downgrade?, when?: { idle: { operation, if_instance, if_generation, target_build } } })`. `policy` is `upgrade`, `fallback` or `never`; omo's verb takes it from the config's `task.host_engine_policy`, and `--no-upgrade` is `never` (`N/bin/lib/daemon.js:61-66, 236-246`) | `omo daemon handoff [--no-upgrade]`; `omo host handoff [--launch-spec] [--policy] [--socket] [--allow-downgrade] [--when idle --operation --if-instance --if-generation --target-build]` | none | **no** | Same reason | C1a |
+| `daemon.gc({ prune_store_index?, agent_dir? })` | `omo daemon gc [--prune-store-index]`; `omo host gc [--agent-dir]` | none | **no** | Same reason | C1a |
+| `daemon.rollbackPrepare({ stores?, allow_missing_index?, dry_run? })` | `omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index] [--dry-run]` | none | **no** | Same reason | C1a |
+| `daemon.shardPath({ kind, owner, root? })` | `omo host shard-path --kind p\|i --owner <id> [--root]` | none | **no** | Tool omitted: an endpoint internal | C1a |
+| `diagnostics.run({ status?, verbose?, platform? })` answering findings as data; `.models()`; `.fixReflectionLock({ dry_run? })`; `.reapStaleEngines({ pids })` | `omo doctor`; `--models`; `--fix [--dry-run]`; `--reap`. OpenCode edition: `doctor [--status] [--verbose] [--json] [--platform]`, keeping its platform selection and its output-mode precedence | none | **no** | Tool omitted: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only | C1b; OC1a |
+| `install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent })` (asked once, or per stage as `--ask-each` does) | `omo setup [--yes] [--ask-each] [--dry-run]` | none | **no** | Tool omitted: plan, consent, write is a person's flow | C1c |
+| `install.update({ dry_run? })`. Flags it does not know are a usage refusal today (`--all`, `--force` alone), and stay one | `omo update [--dry-run \| --print] [--self]`, and the `self`, `senpi`, `omo` targets (`N/bin/lib/update-args.js:23-52`) | none | **no** | Tool omitted: replaces the binary the session runs on | C1c |
+| `install.version()`, `install.sdkRoot()` | `omo --version`, `-v`; `omo sdk root` (new) | none | **no** | Tool omitted: `OMO_SDK_ROOT` is already in a session's environment | C1c |
 
 ### 6.8 Engine commands forwarded by the launcher
 
-The launcher forwards these to the pinned engine unchanged. Their core is the engine's. Under the rule each still needs an SDK call. The engine exports a typed function per leaf operation, with no process exit and no printing, and its own CLI calls the same function; the omo SDK re-exports it. The SDK does not start the engine CLI as a child for them. Forwarding an argv today proves nothing about an importable equivalent, so these functions and their ownership of lifecycle and output are settled in the engine first (slice E1a).
+The launcher forwards these to the pinned engine unchanged. Their core is the engine's. Under the rule each still needs an SDK call. The engine exports a typed function per leaf operation, with no process exit and no printing, and its own CLI calls the same function; the omo SDK re-exports it. The SDK does not start the engine CLI as a child for them. Forwarding an argv today proves nothing about an importable equivalent, so these functions and their ownership of lifecycle and output are settled in the engine first (slice E1a). `trust` below is the project-trust choice of `--approve` and `--no-approve`.
 
-| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter |
-|---|---|---|---|---|
-| `engine.packages.install({ source, local?, trust? })` | `omo install <source> [-l\|--local] [--approve\|--no-approve]` | none | **no** | Tool omitted: installs code into the engine |
-| `engine.packages.remove({ source, local?, trust? })` | `omo remove\|uninstall <source> [-l] [--approve\|--no-approve]` | none | **no** | Same reason |
-| `engine.packages.list({ trust? })` | `omo list [--approve\|--no-approve]` | none | **no** | Same reason |
-| `engine.packages.update({ source?, all?, trust? })` | `omo update --extensions`, `--extension <source>`, `<source>`, `--all` (its package half) | none | **no** | Same reason. The product half of `--all` and a bare `update` are `install.update`; the launcher's routing between the two is a typed rule in the descriptor, and a combination it refuses today stays refused |
-| `engine.models.update()` | `omo update --models` | none | **no** | Tool omitted: `thread_set_model` resolves against the catalog the target already has |
-| `engine.models.discover()`, `engine.models.list({ pattern? })` | `omo models discover`; `omo --list-models [pattern]` | none | **no** | Same reason |
-| `engine.config.agentDir()` | `omo config agent-dir --json` | none | **no** | Tool omitted: a host integration's lookup |
-| `engine.config.resources({ local?, trust? })` read, and `.setResource(...)` write: enabling and disabling package resources | `omo config [-l] [--approve\|--no-approve]` (a TUI) | none | **no** | Tool omitted: #14366 decides what a session may edit. The TUI is a renderer over the two calls |
-| `engine.auth.check({ provider?, model?, refresh? })` | `omo auth check --provider <p> [--model] [--json] [--no-refresh]` | none | **no** | Tool omitted: provider credentials |
-| `engine.auth.check({ ..., credentials: sink })`, `engine.auth.apiKey({ provider?, model?, sink })`, `engine.auth.bearerToken({ provider?, model?, min_expiry_ms?, sink })` | `omo auth check --credentials`; `omo auth print-api-key`; `omo auth print-bearer-token [--min-expiry]` | none | **no**; custody (S0) | Tool omitted: section 4.5 |
-| `engine.schedule.list()` | `omo schedule list [--json]` | none | **no** | Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one |
-| `engine.schedule.cancel({ id })` | `omo schedule cancel <id>` | none | **no** | Same reason |
-| `engine.schedule.run({ watch?, exec?, poll_seconds?, timeout_seconds?, concurrency?, signal? })`, a stream of deliveries when watching | `omo schedule run [--watch] [--exec] [--poll-seconds] [--timeout-seconds] [--concurrency]` | none | **no** | Tool omitted: it resumes sessions headlessly on this machine, an operator's runner |
-| `engine.sessionOfPid({ pid })` | `omo session-of-pid <pid> --json` | none | **no** | Tool omitted: a host integration's lookup |
-| `engine.sessions.exportHtml({ session, out })` | `omo --export <file>` | none | **no** | Tool omitted: writes a file for a person |
-| `engine.promptSizes(options)`, `engine.tips()` | `omo --print-prompt-sizes`; `omo --list-tips` | none | **no** | Tool omitted: installation diagnostics |
-| Host sessions | `omo host session open\|close\|unload\|model\|prompt\|steer\|abort\|read\|state\|list\|wait [--socket] [--rpc-key-root]` | the thread tools | partial | The `threads.*` rows of 6.1 and 6.2; the endpoint is the root's `host` option |
+| Capability and SDK inputs | CLI today | Tool | SDK today | Adapter | Slice |
+|---|---|---|---|---|---|
+| `engine.packages.install({ source, local?, trust? })` | `omo install <source> [-l\|--local] [--approve\|--no-approve]` | none | **no** | Tool omitted: installs code into the engine | E1a |
+| `engine.packages.remove({ source, local?, trust? })` | `omo remove\|uninstall <source> [-l\|--local] [--approve\|--no-approve]` | none | **no** | Same reason | E1a |
+| `engine.packages.list({ trust? })` | `omo list [--approve\|--no-approve]` | none | **no** | Same reason | E1a |
+| `engine.packages.update({ source?, trust? })`: every installed package, or one | `omo update --extensions`; `omo update --extension <source>`; `omo update <source>`; each with `[--approve\|--no-approve]` | none | **no** | Same reason. These are the engine targets the launcher forwards today. `omo update --all` is not one of them: the launcher takes it as a product update with an unknown flag and refuses it, and that refusal is kept | E1a |
+| `engine.models.update()` | `omo update --models` | none | **no** | Tool omitted: `thread_set_model` resolves against the catalog the target already has | E1a |
+| `engine.models.discover()`, `engine.models.list({ pattern? })` | `omo models discover`; `omo --list-models [pattern]` | none | **no** | Same reason | E1a |
+| `engine.config.agentDir()` answering the versioned record the command prints | `omo config agent-dir --json` | none | **no** | Tool omitted: a host integration's lookup | E1a |
+| `engine.config.resources({ local?, trust? })` answering the resolved package resources with whether each is enabled; `engine.config.setResource({ local?, trust?, source, resource: { type, path }, enabled })` answering the changed entry. The resource type is the engine's own (`E/core/package-manager.ts:82-97`) | `omo config [-l\|--local] [--approve\|--no-approve]` (a TUI) | none | **no** | Tool omitted: #14366 decides what a session may edit. The TUI is a renderer over the two calls | E1a |
+| `engine.auth.check({ provider?, model?, refresh? })` answering status only | `omo auth check --provider <p> [--model] [--json] [--no-refresh]` | none | **no** | Tool omitted: provider credentials | E1a-s |
+| `engine.auth.credentials({ provider?, model?, refresh? })`, `engine.auth.apiKey({ provider?, model? })`, `engine.auth.bearerToken({ provider?, model?, min_expiry_ms? })`; where the credential goes is fixed by S0 | `omo auth check --credentials`; `omo auth print-api-key`; `omo auth print-bearer-token [--min-expiry]` | none | **no**; custody (S0) | Tool omitted: section 4.5 | E1a-s |
+| `engine.schedule.list()` | `omo schedule list [--json]` | none | **no** | Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one | E1a |
+| `engine.schedule.cancel({ id })` | `omo schedule cancel <id>` | none | **no** | Same reason | E1a |
+| `engine.schedule.run({ watch?, exec?, poll_seconds?, timeout_seconds?, concurrency?, signal? })`, a stream of deliveries when watching | `omo schedule run [--watch] [--exec] [--poll-seconds] [--timeout-seconds] [--concurrency]` | none | **no** | Tool omitted: it resumes sessions headlessly on this machine, an operator's runner | E1a |
+| `engine.sessionOfPid({ pid })` | `omo session-of-pid <pid> --json` | none | **no** | Tool omitted: a host integration's lookup | E1a |
+| `engine.sessions.exportHtml({ session, out? })` answering the written path; `out` omitted lets the engine choose it, as today | `omo --export <file> [<out>]` | none | **no** | Tool omitted: writes a file for a person | E1a |
+| `engine.promptSizes({ setup })`, taking the same `setup` object as a launch (6.9) and answering the size of each prompt part; `engine.tips()` | `omo --print-prompt-sizes` with any launch setup flags; `omo --list-tips` | none | **no** | Tool omitted: installation diagnostics | E1a |
+| Host sessions | `omo host session open\|close\|unload\|model\|prompt\|steer\|abort\|read\|state\|list\|wait [--socket] [--rpc-key-root]` | the thread tools | partial | The `threads.*` rows of 6.1 and 6.2; the endpoint is the root's `endpoint` | T1b |
 
-### 6.9 Launching a session process
+### 6.9 Launching an engine process
 
-`omo [flags] [prompt]` starts an engine process. Its flags are of three kinds, and each flag is its own registry row.
+`omo [flags] [prompt]` starts an engine process. That is a different capability from opening a thread on a host (`threads.create`), and it is where a fork is supported today: the terminal process forks a session (`E/main.ts:438-445`), while a host open refuses `fork_from`. The launch is its own set of SDK operations, all taking one `LaunchOptions` type, which the engine exports as its `Args` schema (slice E1a-s). The classification below is from the engine's parser and help text (`E/cli/args.ts`).
 
-| Kind | Flags (`E/cli/args.ts`) | SDK |
+`LaunchOptions`:
+
+| Part | Fields | Flags |
 |---|---|---|
-| Which session | `--continue`, `--resume` (a picker), `--session <path>`, `--session-id <id>`, `--fork <path\|id>`, `--rebind <path\|id>`, `--no-session`, `--session-dir <dir>`, `--spawned-by <json>`, `--name` | Inputs of `threads.create`: `session: { continue? \| path? \| id? \| fork? \| rebind? \| ephemeral? }`, `session_dir?`, `spawned_by?`, `name?`. The picker is a renderer over `threads.list`. Ancestry (`spawned_by`) is accepted only from the principals that may set it today |
-| How the session is set up | `--model`, `--provider`, `--models <patterns>`, `--thinking`, `--system-prompt`, `--append-system-prompt`, `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools`, `--extension`, `--no-extensions`, `--skill`, `--no-skills`, `--prompt-template`, `--no-prompt-templates`, `--theme`, `--no-themes`, `--use-theme`, `--no-context-files`, `--approve`, `--no-approve`, `--offline`, `--session-runtime`, `--tool-runtime`, `--auto-title-sessions`, `--api-key` | Inputs of `threads.create` under `setup`: `{ model?, provider?, model_patterns?, reasoning?, system_prompt?, append_system_prompt?, tools?: { allow?, deny?, none?, no_builtin? }, extensions?, skills?, prompt_templates?, themes? (each with its discovery switch), context_files?, project_trust?, offline?, session_runtime?, tool_runtime?, auto_title? }`. `--api-key` is a credential input and belongs to the custody design (S0). Themes are a terminal's rendering and are accepted and ignored by a headless create |
-| How the process presents the session | `--print`, `--mode text\|json\|rpc`, `--listen <address>`, `--multi-session`, `--hand`, `--headless`, `--attach <socket>`, `--tui-mode`, `--verbose`, `--grok-neo` and other feature-gated modes, `--mcp-presenter-fd`, `--mcp-presenter-enforcement` | Not capabilities of their own: each is a process boundary or a renderer over calls that exist. Print and JSON mode render `threads.create` + `threads.send` + `threads.follow`. `--mode rpc` and `--listen` serve the engine RPC that the SDK's host port speaks; a listening multi-session host is what `daemon.ensure` brings up. `--hand` and `--headless` start the hand and the machine-owned session host that the device service's remote legs reach. `--attach` presents a session another endpoint serves, which is what `omo remote attach` launches over `threads.attach().serveEndpoint`. Each is registered as `process` with the capability it presents, and a new mode needs that classification to pass the check |
+| `session` | One of `{ continue: true }`, `{ path }`, `{ id }` (created if missing), `{ fork }` (never with the others), `{ rebind }`, `{ ephemeral: true }`; plus `dir?`, `spawned_by?: { parentSessionId, rootSessionId, taskId }`, `name?` | `--continue`, `--session <path>`, `--session-id <id>`, `--fork <path\|id>`, `--rebind <path\|id>`, `--no-session`, `--session-dir <dir>`, `--spawned-by <json>`, `--name`. `--resume` is a picker: a renderer over `threads.list` that fills `session.path` |
+| `setup` | `model?`, `provider?`, `model_patterns?`, `reasoning?`, `system_prompt?`, `append_system_prompt?`, `tools?: { allow?, deny?, none?, no_builtin? }`, `extensions?: { paths?, none? }`, `skills?: { names?, none? }`, `prompt_templates?: { paths?, none? }`, `themes?: { paths?, none?, use? }`, `context_files?: boolean`, `project_trust?: boolean`, `offline?`, `session_runtime?: "in-process" \| "worker"`, `tool_runtime?: "in-process" \| "child"`, `auto_title?`, `extension_flags?` | `--model`, `--provider`, `--models`, `--thinking`, `--system-prompt`, `--append-system-prompt`, `--tools`, `--exclude-tools`, `--no-tools`, `--no-builtin-tools`, `--extension`, `--no-extensions`, `--skill`, `--no-skills`, `--prompt-template`, `--no-prompt-templates`, `--theme`, `--no-themes`, `--use-theme`, `--no-context-files`, `--approve`, `--no-approve`, `--offline`, `--session-runtime`, `--tool-runtime`, `--auto-title-sessions`; a flag an extension registers (the engine's help names `--plan`) fills `extension_flags` and is discovered from a test engine session |
+| A credential | A provider API key for the run; its carrier is fixed by S0 | `--api-key` |
 
-An extension can register launch flags of its own (the engine's help names `--plan` from its plan-mode extension as an example). They are session setup inputs owned by that extension: the registry discovers them from a test engine session, as it discovers run-time tools, and each maps to `setup.extension_flags`.
+Operations:
 
-The engine's exported `Args` schema (slice E1a) is the typed source for these inputs; the classification above is from the engine's parser and help text.
+| Capability | CLI today | Outcome | Tool | SDK today | Slice |
+|---|---|---|---|---|---|
+| `engine.launch.interactive({ ...LaunchOptions, prompt?, tui_mode?, verbose?, attach?: { socket, session } })`: starts the terminal UI on the caller's terminal | `omo [flags] [prompt]`, `--tui-mode regular\|fullscreen`, `--verbose`, `--attach <socket>` (what `omo remote attach` launches over `threads.attach().serveEndpoint`) | Resolves when the process exits: `{ exit_code, session }` | none; omitted: a session has no terminal to give it | **no** | E1a-s, E1c |
+| `engine.launch.print({ ...LaunchOptions, prompt, mode: "text" \| "json" })`: runs the prompt to the end in a new process | `omo --print [flags] <prompt>`, `--mode text\|json` | A stream of the run's events, then `{ exit_code, session }` | none; omitted: a session delegates through its task tools | **no** | E1a-s, E1c |
+| `engine.launch.rpc({ ...LaunchOptions, listen?, multi_session? })`: starts an engine that serves its RPC on stdio or on an address | `omo --mode rpc`, `--listen <address>`, `--multi-session`, `--mcp-presenter-fd`, `--mcp-presenter-enforcement` | `{ address, pid }` and a handle whose `stop()` ends it; on stdio the handle is the duplex stream | none; omitted: the host a session runs on is not the session's to start | **no** | E1a-s, E1c |
+| `engine.launch.hand()`: starts a hand that runs tool calls for a remote loop | `omo --hand` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
+| `engine.launch.headless()`: starts the machine-owned session host | `omo --headless` | `{ socket, pid }` and a stop handle | none; omitted, same reason | **no** | E1a-s, E1c |
+
+Feature-gated launch modes (the engine's `--grok-neo` is one) are registered the same way: each needs its own row with an operation and an outcome to pass the check.
 
 ### 6.10 Rows that are not capabilities
 
 - **Internal**: entries the binary dispatches for its own processes (`__kill-guard`, `__device-service-bootstrap` from #14890, `remote enable --after-login`, the engine's `--omo-local-update-worker`, and the compiled binary's `loro-smoke` at `N/compile-entry.ts:180-183`, a self-check that the bundled sync runtime initializes and reproduces its committed encodings). Each is registered as `internal` with the capability it serves (`deviceService.bootstrap`, `install.update`, and a finding of `diagnostics.run` for the self-check), so a hidden verb cannot bypass the check by being hidden.
-- **Retired**: a verb that only answers where it went (`omo app-server`, `omo ulw-loop`), registered with the call that replaced it.
-- **Render**: `--help`, `-h`, `--json`, `--verbose` on any verb.
+- **Retired**: a verb that only answers where it went (`omo app-server`, the native `omo ulw-loop`), registered with the call that replaced it.
+- **Render**: `--help`, `-h`, `--json`, `--verbose`, `--no-timestamp` on any verb.
 
 ### 6.11 The OpenCode-edition binary
 
-`packages/omo-opencode` ships a different binary (`oh-my-opencode`, `oh-my-openagent`). The scope decision on #14943 (2026-11-25, made for the owner under his standing order, his to override) is **both editions**: everything a CLI can do works through the SDK, with no carve-out by binary.
+`C/` ships a different binary (`oh-my-opencode`, `oh-my-openagent`). The scope decision on #14943 (2026-11-25, made for the owner under his standing order, his to override) is **both editions**: everything a CLI can do works through the SDK, with no carve-out by binary.
 
-- A verb that shares a domain core with the native edition goes through the **same core and the same SDK call**. The OpenCode-edition CLI becomes one more adapter; it gets no second implementation.
-- A verb that exists only in that edition gets an SDK call of its own under the same rule.
-- Order: the native-edition slices first, then the OpenCode-edition slices with their own rows. #14943 closes only when both editions are at zero gaps.
+- A verb that shares a domain core with the native edition goes through the same core and the same SDK call. The OpenCode-edition CLI becomes one more adapter; it gets no second implementation.
+- A verb that exists only in that edition gets an SDK call of its own.
+- Order: the native-edition slices first, then the OpenCode-edition slices. #14943 closes only when both editions are at zero gaps.
 
-| Capability and SDK inputs | CLI (OpenCode edition) | SDK today | Adapter |
-|---|---|---|---|
-| `install.plugin({ interactive?, subscriptions, codex_autonomous?, skip_auth?, platform? })`: writes the plugin's configuration for the chosen provider subscriptions | `install` (alias `setup`) `[--no-tui] [one flag per provider subscription] [--codex-autonomous \| --no-codex-autonomous] [--skip-auth] [--platform]` | **no** | Planned (OC1). The interactive prompts are a renderer over the same call |
-| `threads.create({ ..., agent? })` + `threads.send` + `threads.follow`, through a session-host port for that edition's server; the endpoint (`--port`, `--attach <url>`) is the root's `host` option | `run <message> [-a\|--agent] [-m\|--model] [-d\|--directory] [-p\|--port] [--attach <url>] [--session-id] [--on-complete <command>] [--json] [--no-timestamp] [--verbose]` | partial: the calls exist for the native engine only | Planned (OC1). `--on-complete` runs a shell command after the process is done and stays a process-level tail of the CLI |
-| `diagnostics.run({ status?, verbose?, platform? })` | `doctor [--status] [--verbose] [--json] [--platform]` | **no** | Planned (OC1), on the findings shape of C1b |
-| `install.version()`, `install.localVersion({ directory? })` | `version`; `get-local-version [-d\|--directory] [--json]` | **no** | Planned (OC1) |
-| `config.migrate({ dry_run? })` answering the transform, the backup move plan and the conflicts | `config migrate [--dry-run] [--json]` | **no** | Planned (OC1) |
-| `config.modelCapabilities.refresh({ directory?, source_url? })`, over `packages/model-core` | `refresh-model-capabilities [-d\|--directory] [--source-url] [--json]` | **no** | Planned (OC1). The ruling does not name this verb; it is classified as shared because its core is a shared package |
-| `mcp.oauth.login({ server, server_url?, client_id?, scopes? })`, `.logout({ server, server_url? })`, `.status({ server? })`, over `packages/mcp-client-core`. The tokens are credentials | `mcp oauth login <server-name> [--server-url] [--client-id] [--scopes ...]`; `mcp oauth logout <server-name> [--server-url]`; `mcp oauth status [server-name]` | **no**; custody (S0) | Planned (OC1), after S0 |
-| `account.keys.init()`, `.status()`: this device's keyring, answering the device id and the public signing and sealing keys only | `account keys init`; `account keys status` | **no**; custody (S0) | Planned (OC1), after S0 |
-| `toolkit.*` | `ulw-loop [args...]` | yes | None: a pass-through to the toolkit |
-| `boulder.status({ directory?, work_id? })`, over `packages/boulder-state` | `boulder [-d\|--directory] [-w\|--work-id] [--json]` | **no** | Planned (OC2) |
-| `worktrees.sweep({ apply?, older_than_days?, repos? })`: a dry-run plan unless `apply` is set, answering what was or would be removed | `worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]` | **no** | Planned (OC2) |
-| `install.cleanup({ codex_home?, project? })`, answering what it removed | `cleanup` (alias `uninstall`) `[--codex-home] [--project] [--json]` | **no** | Planned (OC2) |
+Its routes are Commander registrations; the registry reads them from the program object (commands, aliases, options, hidden routes, root options), not from this table.
+
+| Capability and SDK inputs | CLI (OpenCode edition) | SDK today | Adapter | Slice |
+|---|---|---|---|---|
+| `install.plugin({ interactive, platform?, claude?, openai?, copilot?, opencodeZen?, zaiCodingPlan?, kimiForCoding?, opencodeGo?, bailianCodingPlan?, vercelAiGateway?, and the three further provider inputs of `InstallArgs`, codex_autonomous?, skip_auth })`. `claude` is `no`, `yes` or `max20`; every other provider input is `no` or `yes`; each is its own typed field, one per key of `InstallArgs` (`C/types.ts:3-21`), and the registry row lists all twelve from that type. `platform` is `opencode`, `codex`, `both`, `native` or `native-dev`; it defaults to `codex` when the binary is invoked as that edition, and `native-dev` is refused unless the release enables it (`C/install-command-options.ts:23-36`). `codex_autonomous` is three-valued: set, cleared, or absent to leave the existing permission settings unchanged. The call answers what it installed and wrote per platform | `install` (alias `setup`) `[--no-tui] [one flag per provider input] [--codex-autonomous \| --no-codex-autonomous] [--skip-auth]`, with the root option `--platform` | **no** | Planned (OC1a). The interactive prompts are a renderer over the same call | OC1a |
+| `threads.runToCompletion({ message, agent?, model?, directory?, session_id?, endpoint?: { port } \| { attach_url }, on_complete?: { command }, signal? })`: one operation that opens or reuses a session on that edition's server, sends the message, and waits until the run is complete by that edition's rule (the todos and child sessions are done and the run did meaningful work), then runs `on_complete`. It streams the run's events and answers `{ session_id, success, duration_ms, message_count, summary }` (`C/run/types.ts:4-29`, `C/run/runner.ts:145-177`). `port` and `attach_url` exclude each other. `on_complete` runs a command as the caller's OS user after completion; it is an effect of the operation, so who may pass it is a row of the security design | `run <message> [-a\|--agent] [-m\|--model] [-d\|--directory] [-p\|--port] [--attach <url>] [--session-id] [--on-complete <command>] [--json] [--no-timestamp] [--verbose]` | **no** | Planned (OC1b). The existing exit mapping and cancellation are the descriptor's projection | OC1b, after S0 |
+| `diagnostics.run({ status?, verbose?, platform? })` | `doctor [--status] [--verbose] [--json] [--platform]` | **no** | Planned (OC1a), on the findings shape of C1b | OC1a |
+| `install.version()` | `version`; the root option `--version`, `-v` | **no** | Planned (OC1a), with the edition's own version projection | OC1a |
+| `install.localVersion({ directory? })` answering the installed version, the latest published one, whether it is up to date, and the local-development or pinned mode | `get-local-version [-d\|--directory] [--json]` | **no** | Planned (OC1a) | OC1a |
+| `config.migrate({ dry_run? })`: with `dry_run`, the transform, the backup move plan and the conflicts; without, what was applied | `config migrate [--dry-run] [--json]` | **no** | Planned (OC1a) | OC1a |
+| `config.modelCapabilities.refresh({ directory?, source_url? })`, over `packages/model-core` | `refresh-model-capabilities [-d\|--directory] [--source-url] [--json]` | **no** | Planned (OC1a) | OC1a |
+| `mcp.oauth.login({ server, server_url?, client_id?, scopes? })`, `.logout({ server, server_url? })`, `.status({ server? })`, over `packages/mcp-client-core` | `mcp oauth login <server-name> [--server-url] [--client-id] [--scopes ...]`; `mcp oauth logout <server-name> [--server-url]`; `mcp oauth status [server-name]` | **no**; custody (S0) | Planned (OC1c) | OC1c |
+| `account.keys.*`, and `account.signIn`, `signOut`, `whoami` | `account keys init\|status`; `login`, `logout`, `whoami` | 6.4 | 6.4 | OC1c |
+| The toolkit operations of the loop | `ulw-loop [args...]`, which today starts a separately installed component's CLI as a child with the arguments unchanged (`C/codex-ulw-loop.ts:31-73`) | partial: the native edition has the agent toolkit SDK with a manifest of loop operations; that each argument form of the delegated CLI has a manifest operation is not shown | Planned (OC2): the delegated CLI's sub-commands are enumerated from that component's own dispatch and each is mapped to a `toolkit` operation; an unmapped one is a recorded gap | OC2 |
+| `boulder.status({ directory?, work_id? })`, over `packages/boulder-state` | `boulder [-d\|--directory] [-w\|--work-id] [--json]` | **no** | Planned (OC2) | OC2 |
+| `worktrees.sweep({ apply?, older_than_days?, repos? })`: a plan unless `apply` is set, with today's refusals and deletion guard | `worktree-sweep [--apply] [--older-than <days>] [--repo <path>]... [--json]` | **no** | Planned (OC2) | OC2 |
+| `install.cleanup({ platform?, codex_home?, project? })`, answering what it removed; `platform` is `codex`, the sub-command's value before the root option's | `cleanup` (alias `uninstall`) `[--platform] [--codex-home] [--project] [--json]` | **no** | Planned (OC2) | OC2 |
 
 The OpenCode-edition binary has no thread tools of its own in this table: its agent-facing tools are that edition's plugin tools, outside the three surfaces this issue names.
 
 ## 7. Holding parity in CI
 
-The first review showed that a row table, an import guard and sampled scenarios do not enforce the rule by themselves. The checks below say what each one fails on and what it cannot see.
+Two reviews showed what a row table, an import guard and sampled scenarios cannot do. The checks below say what each one fails on and what it cannot see.
 
-### 7.1 Descriptors: every route is a leaf with typed inputs
+### 7.1 A complete route inventory, for both editions
 
-- Both entry paths dispatch only through the descriptor table of section 3.2. A test parses `N/bin/omo.js`, `N/bin/lib/launcher.js` and `N/compile-entry.ts` and fails on any comparison of an argv element against a string literal outside the table lookup. Today's early branches (`remote attach` before the remote table, `models discover` outside `ENGINE_COMMANDS`, `loro-smoke` in the compiled entry) become descriptors.
+- Each binary has one dispatch function that looks up the descriptor table and does nothing else. The delegated parsers that decide a route today become descriptors or are generated from them: the remote verb table and its parser (`N/remote-cli.ts:43-86`, `N/remote-local.ts:127-164`), `remote attach` before that table, the engine-command predicate and its `models discover` branch (`N/bin/lib/engine-commands.js`), the compiled entry's early branches, and the OpenCode edition's Commander registrations.
+- Three inventories are compared with the descriptors, and each must match exactly: (1) a scan of every module reachable from each binary's entry points for a comparison of an argv element against a string literal outside the dispatch function; (2) for the Commander program, a walk of the program object at run time: every command, alias, option, hidden route and root option; (3) for the engine, its exported command metadata (E1a), and until that export exists a pinned snapshot of the engine's leaf commands and flags written into the baseline by hand from sections 6.8 and 6.9.
 - Every flag of a descriptor names the SDK input field it fills, or is marked `render` or `process`. A flag with no mapping fails.
-- For engine-forwarded commands the descriptors are generated from the engine's exported command metadata (E1a). Until that export exists, the baseline of 7.4 lists every engine leaf and flag of sections 6.8 and 6.9 explicitly; a wildcard or a namespace cannot stand for them.
 
 ### 7.2 The registry: SDK ⊇ CLI, SDK ⊇ tools
 
@@ -464,39 +532,45 @@ The first review showed that a row table, an import guard and sampled scenarios 
   "tool": "thread_set_reasoning",
   "planned": { "cli": "T3" },
   "omitted": {},
-  "projection": {} }
+  "projection": {},
+  "scenarios": { "effect": ["set-reasoning-turn", "set-reasoning-session"], "refusal": ["level-unsupported"] } }
 ```
 
 - `sdk` is required by the schema for every row, in both editions. An SDK omission cannot be written.
-- An empty `cli` or `tool` cell needs either `planned` (a slice) or `omitted` (a reason). The two are different fields, so pending work is never recorded as a decision.
+- An empty `cli` or `tool` cell needs either `planned` (a slice) or `omitted` (a reason). They are different fields, so pending work is never recorded as a decision.
+- **The descriptor and the row are one value.** A descriptor's `sdkCall` key is its row's `sdk`; a test runs each descriptor against a recording root and fails when the member invoked is not that key or when more than one member is invoked.
 - **CLI ⊆ SDK.** Every descriptor has a row, and every mapped flag's field exists in the SDK call's input schema.
-- **Tools ⊆ SDK.** Tools are discovered from a test engine session's registry (`getAllTools()` on the pinned engine, as `eval-only.test.ts` already builds one), so a tool registered at run time, such as a store extension's, is seen. For each tool the SDK call's effective input schema is compared recursively with the tool's: every property, nested object, optionality, bound and default. A declared `projection` (for example `text` to `message` on the legacy facade) is the only accepted difference.
-- **A row's call is real.** A row without a baseline entry must name at least one conformance scenario (7.3) that passes through the SDK driver. A function that answers `unsupported` is a stub and fails this; being a function on the root is not enough.
+- **Tools ⊆ SDK.** Tools are discovered from a test engine session's registry, so a tool registered at run time is seen. Store-extension tools are declared at run time by whoever registers the extension, so their check sits at the declaration: `threads.extensions.register` refuses a session operation whose input schema is not the one `sessionCall` validates, and a fixture extension drives it. For each static tool, each descriptor branch's projected schema is compared recursively with the SDK call's: every property, nested object, optionality, bound and default. A declared `projection` (for example `text` to `message` on the legacy facade) is the only accepted difference.
+- **A row's call is real.** A row counts as built only with, for each input that changes behaviour, a scenario whose expected outcome is an effect the fake ports observed, plus its declared refusals. `not_implemented` is the only code a stub may answer, and a scenario that expects it fails; a context-dependent refusal such as `fork_unsupported` is a declared `refusal` scenario and is not mistaken for a stub. A refusal scenario alone never certifies an input the SDK ignores.
 - The published table of section 6 is rendered from the rows and compared byte for byte.
 
-### 7.3 One scenario table, three drivers
+### 7.3 One scenario table, the drivers that apply
 
-`sdk-conformance.test.ts` extends `T/route-parity.test.ts` and the device-service conformance owner that #14890's tests run on. Each scenario is driven three ways against the same fake engine endpoints and fake device service: the SDK directly, the tool's `execute`, and the CLI's descriptor with `--json`. The three typed outcomes must be equal after each surface's declared projection, and the fakes must have received the same calls. Scenarios, with a target on this device and on another for each: every address form of section 5; send in each mode; create with a lost acknowledgement and a retry under the same key, keeping caller identity and the original session; every control verb on a live, an ended and an offline target; each refusal code; a timeout and an authorization refusal with no second write; a stream cancelled midway and its terminal outcome; a held delivery, a capped delivery and a repeated key reporting the current kind (#14941); the refusals of the authority matrix. Non-thread domains have the same table with two drivers (SDK and CLI). All of it runs on the virtual clock.
+`sdk-conformance.test.ts` extends `T/route-parity.test.ts` and the device-service conformance owner that #14890's tests run on. A scenario is driven through every surface that has the capability: the SDK directly, always; the tool's `execute` where the row has a tool; the CLI's descriptor with `--json` where the row has a verb in that edition. A row with an omitted surface names it in `omitted`, and the test does not invent a driver for it. Where two or more drivers apply, their typed outcomes must be equal after each surface's declared projection, for comparable inputs and principals, and the fakes must have received the same calls.
+
+Scenarios, with a target on this device and on another for each where the capability has a target: every address form and every policy row of section 5; send in each mode; a receipt for a named delivery and for one that is not the caller's; raw entry paging by `since`, `before` and `tail`; a wait anchored on a send and one that is not; an alias that two threads would answer; a repeated `idempotency_key` on every control call; every option of close (`force`, `graceful`, `wait_ms`) and of unload; create with a lost acknowledgement and a retry under the same key, keeping caller identity and the original session; every control verb on a live, an ended and an offline target; each refusal code; a timeout and an authorization refusal with no second write; a stream cancelled midway and its terminal outcome; a held delivery, a capped delivery and a repeated key reporting the current kind (#14941); the refusal rows of the security design. Every domain outside threads has the same table with the drivers its rows have. All of it runs on the virtual clock.
 
 This check sees a behaviour difference only on a sampled scenario. It does not prove an adapter is pure.
 
 ### 7.4 The baseline, and the same-pull-request gate
 
-Rule 5 of section 1 is enforced per capability, not per count.
+Rule 5 of section 1 is enforced per capability, by behaviour.
 
-- `script/sdk-parity/baseline.json` freezes today's defects as exact entries: capability id, the missing SDK input or call, and the issue that fixes it. It is written once, in slice P0, and is pinned by hash. Entries can only be removed.
-- **Changed-capability gate.** A script compares the descriptors and tool schemas of the pull request's head with its merge base. Any descriptor or schema that was added or changed must have no baseline entry at the head: a pull request cannot add an alias, a flag or a tool field under an existing gap. It adds the SDK call and its scenario in the same pull request, or it fails.
-- **Zero-gap gate.** #14943 closes only when the baseline is empty for both editions, engine rows included.
+- **Two files.** `script/sdk-parity/baseline.original.json` is the record of the defects that existed when the gate was introduced, for both editions: capability id, the missing SDK input or call, and the issue that fixes it. It is written once and pinned by hash, and never changes. `script/sdk-parity/unresolved.json` is the working manifest: it must be a subset of the original, entries are only ever removed, and an entry not in the original is rejected.
+- **Initialization.** Slice P0 adds every descriptor under gaps that already exist. The gate admits exactly one pull request in that state: the one whose merge base has no `baseline.original.json` and which creates it, its hash pin and the goldens below together, and changes no behaviour (its goldens are generated from the pre-change binaries and must still match after the change).
+- **Behaviour goldens.** For every capability, the CLI and tool drivers' outcomes over its scenarios are stored as goldens. A capability is *changed* by a pull request when any of these moved: its descriptor, its tool schema, a module in the import closure of its `parse` or `render`, or one of its goldens. A golden moves when the behaviour moves, wherever the edit was made, so a change inside a parser, a renderer or the core is caught even when the descriptor and schema text are untouched.
+- **Changed-capability gate.** A changed capability must have no entry in `unresolved.json` at the head, and its scenarios must have run and passed at that head. A pull request therefore cannot add an alias, a flag or a tool field, or alter what one does, under an existing gap. It adds the SDK call and its scenarios in the same pull request, or it fails.
+- **Zero-gap gate.** #14943 closes only when `unresolved.json` is empty for both editions, engine rows included.
 
 ### 7.5 Adapter purity, and what is not provable
 
-- **Imports** (`script/remote-import-guard-*`, one more rule family): an adapter's direct imports, and those of any helper it imports that is not the SDK entry, may reach only the SDK entry, its own parse and render modules, and platform built-ins that are not sockets or `fetch`. Today's violations go into an offender list that only shrinks. This fails on an adapter that imports a resolver or a transport.
-- **Descriptor shape**: a lint over the descriptor table requires `call` to be a single SDK invocation whose arguments come from `parse`'s output, with no branch on an SDK result, no loop and no second call. This catches an adapter that composes several calls or decides something from an answer.
-- **Not provable by either**: an adapter whose `parse` or `render` computes a decision inline from plain code, importing nothing. The conformance test catches it only where a scenario exercises the difference. The remaining control is review: the pull request template of every slice carries the line "this adapter holds no resolution, transport or policy" for the reviewer to verify against the diff. This document does not claim the four checks prove purity.
+- **Imports** (`script/remote-import-guard-*`, one more rule family): an adapter's direct imports, and those of any helper it imports that is not the SDK entry, may reach only the SDK entry, its own parse and render modules, and platform built-ins that are not sockets or `fetch`. Today's violations go into an offender list that only shrinks; a new offender fails, and so does a listed one that no longer offends. This fails on an adapter that imports a resolver or a transport.
+- **Descriptor shape**: `call` is an `sdkCall` reference, so an adapter cannot invoke two members or branch on an answer there; orchestration lives in named SDK operations (3.2).
+- **Not provable by either**: an adapter whose `parse` or `render` computes a decision inline from plain code, importing nothing. The conformance test catches it only where a scenario exercises the difference. The control is a mandatory review gate, not an automated pass: every slice's pull request carries the line "this adapter holds no resolution, transport or policy", and its reviewer verifies it against the diff before the verdict. This document does not claim the checks prove purity.
 
 ### 7.6 Negative controls
 
-The checks are themselves tested. Fixtures add, one at a time: a verb with no row; a flag with no mapping; a tool input field the SDK lacks; a nested field that became required; a branch that dispatches outside the table; an adapter importing the delivery pipeline; a descriptor with two calls; a changed capability under a baseline entry; a stub answering `unsupported` on a row with no baseline entry. Each must fail with a message that names the SDK call, the field or the import to fix.
+The checks are themselves tested. Fixtures add, one at a time, in each edition where the case exists: a verb with no row; a Commander command, alias or option with no descriptor; a flag with no mapping; a tool input field the SDK lacks; a nested field that became required; a branch that dispatches outside the dispatch function, in an entry file and in a delegated module; an adapter importing the delivery pipeline; a descriptor whose call invokes a different member than its row; a behaviour change in a parser with the descriptor untouched; a changed capability with an unresolved entry; an entry added to `unresolved.json` that the original lacks; a stub answering `not_implemented` on a row counted as built; a row whose only scenario is a refusal. Each must fail with a message that names the SDK call, the field or the import to fix.
 
 ### 7.7 The real-surface proof
 
@@ -504,56 +578,73 @@ Section 9. It is the only check that needs real devices, so it runs last and onl
 
 ## 8. Migration slices
 
-Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`, sized to be reviewed as one unit. An existing call keeps working until its replacement has its scenario and its proof.
+Each slice is one issue under #14943 and one pull request with `Fixes #<slice>`, sized to be reviewed as one unit. An existing call keeps working until its replacement has its scenarios and its proof. Every row of section 6 names the slice that builds it.
 
 | Slice | What it does | Issue | Merges after |
 |---|---|---|---|
-| S0 | Security design, no code: the principal-by-capability matrix of 4.3 and the custody contract of 4.5, approved by a security design review | new | none |
-| P0 | Descriptors for today's routes, the registry rows, the frozen baseline, the import and shape rules with their offender lists, the negative controls. No behaviour change | new | none |
-| P1a | Typed contracts only: the root's type with every namespace and input schema of section 6, the code registry, the scenario ids. No implementation | new | P0 |
-| P1b | The root and the three facades over it, the failure conversion, the surface-keyed exit projection, `omo-ai/sdk`, `omo sdk root`, principals wired per the matrix, the non-disclosure scan | new | P1a, S0, #14881, #14890 |
-| T1a | The resolution contract of section 5 and the two locators over it; the ended-session rule (#13016 MSG-07, CLI-06, CTL-26, CLI-09) | #13016 | P1b; #14937 merged with its SDK-first fix |
-| T1b | `threads.setReasoning`, `archive`, `get`, `wait`, `receipt`, `entries`, `messages`, `unload`; `read` and `interrupt` inputs | new | T1a |
-| T1c | `threads.handoff`, `follow`, `attach`, `aliases`, `adopt`'s launch plan | new | T1a |
-| T1d | Every verb on the caller's own device | #14931 | T1a, #14890 |
-| D1 | Truthful delivery: `held` with `engineTurnCap` mapped to a parked kind; a repeated key reports the current kind | #14941 | T1a (same files: serialized, not parallel), the engine pin |
-| T2 | The thread tools become adapters; `*-ops.ts` bodies move under the core | new | T1b, T1c |
-| T3 | One CLI verb table (step 1 of the 2026-11-10 ruling); the `omo thread` verbs planned in section 6; `omo remote` session verbs as aliases | #14202, #13016 | T1b, T1c |
+| S0 | Security design, no code (#14945): threat model; the principal-by-capability matrix for every present caller and surface in both editions; custody of the eight credential groups; the `endpoint` selector, launch options, extension session operations, attach and answering; caller provenance; revocation; audit; rollout and rollback. Its approval is recorded on its issue | #14945 | none |
+| P0 | Descriptors for today's routes in both editions, the registry rows, the two baseline files, the goldens, the import rule with its offender list, the negative controls. No behaviour change | new | none |
+| P1a | Typed contracts that carry no principal, credential, endpoint or launch option: the root's type, the code registry, the scenario ids, and the input schemas of the rows not marked S0 | new | P0 |
+| P1a-s | The security-sensitive contracts: `principal`, `endpoint`, the credential-bearing calls, `LaunchOptions`, the extension session operations, attach and answer | new | P1a, S0 approved |
+| P1b | The root and the facades over it, the failure conversion, the surface-keyed exit projection, `omo-ai/sdk`, `omo sdk root`, principals wired per the matrix, the non-disclosure scan, `threads.extensions.register` and `.call` on the root | new | P1a-s, #14881, #14890 |
+| T1a | The resolution contract of section 5 with the locator's policy, `threads.resolve`, `devices.resolve`, the ended-session rule (#13016 MSG-07, CLI-06, CTL-26, CLI-09). Owns `T/address/`, the locators and `T/sdk.ts`'s send path | #13016 | P1b; #14937 merged with its SDK-first fix |
+| T1b | `threads.list` filters, `read` inputs, `readAfterWait`, `receipt`, `entries`, `messages`, `get`, `wait`, the extended `send` and `create` inputs, `interrupt`, `close`, `setModel`, `setReasoning`, `archive`, `unload`, with the key honoured on every control call. Owns `T/control/` and the read bodies | new | T1a |
+| T1c | `threads.handoff`, `follow`, `sendAndFollow`, `attach`, `aliases`, `release`, `adopt`. Owns the delivery composition and the attach path | new | T1b; the telemetry milestone for attach |
+| D1 | Truthful delivery: `held` with `engineTurnCap` mapped to a parked kind; a repeated key reports the current kind. Owns `T/gateway/` delivery handling | #14941 | T1c; the engine pin |
+| T1d | Every verb on the caller's own device | #14931 | D1, #14890 |
+| T1e | `threads.extensions.sessionOps` and `sessionCall` | new | T1d, S0 approved |
+| T2 | The thread tools and the extension tools become adapters; `*-ops.ts` bodies move under the core | new | T1e |
+| T3 | One CLI verb table (step 1 of the 2026-11-10 ruling); the `omo thread` verbs planned in section 6; `omo remote` session verbs as aliases. Owns `N/remote-cli.ts` and its dispatch until it merges | #14202, #13016 | T1e |
 | A1a | The account core moves out of `cli/`; no behaviour change | #14364 | P1b |
-| A1b | `account.signOut`, `show`, `forget`, `store.*`, `signIn` without a child process, the origin options | #14364 | A1a |
-| A1c | `devices.revoke`, `devices.rename` bounds, the other findings of #14523 | #14523 | A1a |
-| A1d | `account.adopt`, `account.credentials.handOver` | new | A1b, S0 |
-| A2a | `deviceService.*` and the `omo remote` switch verbs as adapters | new | T3 (both edit `N/remote-cli.ts` and its dispatch) |
-| A2b | `sync.status`, `enable`, `disable`, `approve`, `retirePin` | new | A1b (shares account and sync state transitions), S0 for the phrase |
-| A2c | `sync.recover` | #14464, #14891 (the memory-sync lane's own pull requests carry it) | P1a, S0 |
+| A1b | `account.signOut`, `show`, `forget`, `store.*`, `signIn` without a child process, `signInCheck`, the origin options. Owns `N/account-cli.ts` until it merges | #14364 | A1a |
+| A1c | `devices.revoke`, `devices.rename` bounds, the other findings of #14523 | #14523 | A1b |
+| A1d | `account.adopt`, `account.credentials.handOver` | new | A1c |
+| A2a | `deviceService.*` and the `omo remote` switch verbs as adapters | new | T3 |
+| A2b | `sync.status`, `enable`, `disable`, `approve`, `retirePin` | new | A1d |
+| A2c | `sync.recover` | #14464, #14891 (the memory-sync lane's own pull requests carry it) | P1a-s |
 | C1a | `daemon.*` | new | P1b |
 | C1b | `diagnostics.*` | new | P1b |
 | C1c | `install.*` | new | P1b |
-| E1a | Engine: a typed function and exported metadata per leaf of 6.8 and 6.9, by group (packages, settings, schedules, queries, launch options; provider credentials after S0) | new, on the engine | none |
-| E1b | Engine release and the omo pin | release train | E1a |
-| E1c | `engine.*` on the root, generated descriptors, and the engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
-| OC1 | The OpenCode-edition CLI becomes an adapter for its shared-domain verbs (6.11): `install.plugin`, the session-host port for `run`, `diagnostics`, `install.version` and `localVersion`, `config.migrate`, `config.modelCapabilities.refresh`; `mcp.oauth.*` and `account.keys.*` after S0 | new | P1b, C1b, C1c, T1c, and after the native slices |
-| OC2 | The OpenCode-edition-only verbs get their SDK calls: `boulder.status`, `worktrees.sweep`, `install.cleanup` | new | OC1 |
-| X1a | The thread proof of section 9, recorded on #14943 | new | T1d, T2, T3 |
-| X1b | Closure: the zero-gap gate, the non-thread acceptance rows, `docs/reference/omo-sdk.md`, the skills re-pointed at the SDK (#13415, #14932) | new | every slice above |
+| TEL | The per-caller telemetry consent contract, merged in the engine (its #7446) and pinned in omo | the engine's #7446 | none |
+| E1a | Engine: a typed function and exported metadata per leaf of 6.8 that carries no credential: packages, resources, schedules, models, queries | new, on the engine | none |
+| E1a-s | Engine: `LaunchOptions` and the launch operations of 6.9, the endpoint options, the provider-credential functions | new, on the engine | S0 approved, TEL |
+| E1b | Engine release and the omo pin | release train | E1a, E1a-s |
+| E1c | `engine.*` on the root including `engine.launch.*`, generated descriptors, and the engine-and-omo compatibility test, owned by this program | new | E1b, P1b |
+| X1a | The native thread proof of section 9 | new | T2, T3 |
+| OC1a | OpenCode edition: `install.plugin`, `diagnostics.run`, `install.version`, `localVersion`, `config.migrate`, `config.modelCapabilities.refresh` | new | C1b, C1c |
+| OC1b | OpenCode edition: `threads.runToCompletion` over a session-host port for that edition's server | new | T3, X1a |
+| OC1c | OpenCode edition: `mcp.oauth.*`, `account.keys.*`, and that edition's `login`, `logout`, `whoami` descriptors | new | A1d |
+| OC2 | OpenCode edition: the loop's operations, `boulder.status`, `worktrees.sweep`, `install.cleanup` | new | OC1a |
+| X1c | The OpenCode-edition proof of section 9 | new | OC1a, OC1b, OC1c, OC2 |
+| X1b | Closure: the zero-gap gate for both editions, the non-thread acceptance rows, `docs/reference/omo-sdk.md`, the skills re-pointed at the SDK (#13415, #14932) | new | every slice above |
 | X2 | The omo-harness skill: the steps omo-harness-skill#23 left on the CLI move to the SDK | new, on that repository | the release that carries the calls it needs |
 
-Shared state between slices that run at the same time, and who owns it:
+Order:
 
-- **The root's namespace wiring.** Each namespace is its own module, registered in one array that P1b creates; a slice adds its module and one line. P1b's owner reviews every later edit to the root.
-- **The code registry and the exit projection.** Per-domain files, appended to by each slice; a change to an existing code's meaning goes through P1b's owner.
-- **The parity rows and the baseline.** Rows are per-domain files; the baseline is only ever shortened, and two slices never own the same entry.
-- **Generated bundles** (`service-auth.generated.js`, the thread client and SDK bundles, the bundle inputs). Every slice regenerates them, so they merge through the repository's bundle train.
-- **`N/remote-cli.ts` and remote dispatch**: T3 first, then A2a. **Account and sync state transitions** (`retire-sync`, the sign-in's device-service setup): A1b first, then A2b.
-- **Delivery handling**: T1a, then D1; the delivery contract is pinned by a shared test before either edits it.
+```
+S0 ────────────────┐
+P0 ── P1a ── P1a-s ┴─ P1b ─┬─ T1a ── T1b ── T1c ── D1 ── T1d ── T1e ─┬─ T2 ─┐
+#14881, #14890 ────────────┘                                          └─ T3 ─┼─ X1a ── OC1b ─┐
+                           ├─ A1a ── A1b ── A1c ── A1d ─┬─ A2b               │               │
+                           │                            └─ OC1c ─────────────┼───────────────┤
+                           ├─ C1a                 T3 ── A2a                  │               │
+                           ├─ C1b ─┬─ OC1a ── OC2 ───────────────────────────┼───────────────┼─ X1c ── X1b
+                           └─ C1c ─┘                                         │               │
+TEL ── E1a-s ─┐                                                              │               │
+E1a ──────────┴─ E1b ── E1c ─────────────────────────────────────────────────┴───────────────┘
+```
 
-Work already in review is the base, not redone: #14878, #14881 and #14890 (the remote module train) under P1b; #14937 under T1a; the engine fix for #7138 under D1; #14464 and #14891 for recovery.
+- **The thread chain is serial.** T1a, T1b, T1c, D1, T1d and T1e all edit the thread facade, the control and delivery bodies or the address policy, so each merges after the one before it. T2 and T3 start only after T1e: neither turns a capability into an adapter, or dispatches an alias to it, before its own-device behaviour and its truthful-delivery behaviour exist. They touch different files and run in parallel with each other.
+- **The account chain is serial** (A1a to A1d): each step edits the account core and `N/account-cli.ts`.
+- **What runs in parallel**: the thread chain, the account chain, C1a, C1b, C1c, and on the engine E1a and TEL. They share no source file. E1a-s waits for S0.
+- **Shared state, with owners.** The root's namespace registration is one array created by P1b; a slice adds its module and one line, and P1b's owner reviews every later edit to the root. The code registry and the exit projection are per-domain files that each slice appends to; a change to an existing code's meaning goes through P1b's owner. Parity rows are per-domain files, and two slices never own the same unresolved entry. The generated bundles (`service-auth.generated.js`, the thread client and SDK bundles, the bundle inputs) are regenerated by every slice and merge through the repository's bundle train. `N/remote-cli.ts` belongs to T3, then A2a. The sync state transitions in `N/account-cli.ts` (`retire-sync`, the sign-in's device-service setup) belong to A1b, then A2b.
+- **Work already in review is the base, not redone**: #14878, #14881 and #14890 (the remote module train) under P1b; #14937 under T1a; the engine fix for its #7138 under D1; #14464 and #14891 for recovery.
 
 ## 9. The proof
 
-A pass through the CLI alone proves nothing about the other two surfaces. Each matrix row is run three times, each run on its own: (a) a plain bun script importing `omo-ai/sdk`, with no agent session and no `omo` child process; (b) an agent session calling the thread tools in eval cells; (c) `omo thread ... --json`.
+A pass through the CLI alone proves nothing about the other two surfaces. Each matrix row is run on each surface that has the capability, each run on its own: (a) a plain bun script importing `omo-ai/sdk`, with no agent session and no `omo` child process; (b) an agent session calling the thread tools in eval cells; (c) the CLI with `--json`.
 
-Thread matrix, with B another signed-in device and A the caller, and again with A as its own target:
+Native thread matrix (X1a), with B another signed-in device and A the caller, and again with A as its own target:
 
 1. Create a thread with a first prompt; read it back: the prompt and its answer are in the transcript of the intended thread.
 2. Send a follow-up; wait for the turn to end; read the answer.
@@ -562,24 +653,29 @@ Thread matrix, with B another signed-in device and A the caller, and again with 
 5. Set the model and the reasoning level; `get` shows both.
 6. Rename it and give it an alias; address it by the alias from the other surface.
 7. Read the receipt of one earlier delivery.
-8. Open a sibling thread; close the first; the listing shows it closed and the sibling still live.
+8. Archive and unarchive it; hand a task off to it by exact name.
+9. Open a sibling thread; close the first; the listing shows it closed and the sibling still live.
 
-Acceptance rows outside threads, run through the SDK and the CLI on the caller's device: `devices.list`, `account.whoami`, `deviceService.status`, `sync.status`, `daemon.status`, `diagnostics.run`, `install.version`, and one engine row from each group of 6.8.
+Attach, follow, entries, unload and adopt have no tool, so they are run through the SDK and the CLI only, as a tenth step: attach to the sibling, read its snapshot, detach, and confirm the served endpoint is gone.
 
-Evidence on #14943 for each run: the script or commands, each call's typed result, the transcript read that shows the prompt and the answer on the intended thread (a tool result or an exit code alone does not prove delivery), the final listing, and the build under test. Loss and refusal cases (a dropped acknowledgement, a timeout, an authorization refusal, a cancelled stream) are proven in the conformance test of 7.3, since a real relay cannot be asked to lose a reply.
+Acceptance rows outside threads, run through the SDK and the CLI on the caller's device: `devices.list`, `account.whoami`, `deviceService.status`, `sync.status`, `daemon.status`, `diagnostics.run`, `install.version`, and one engine row from each group of 6.8 and 6.9.
+
+OpenCode-edition matrix (X1c), through the SDK and that edition's CLI: `install.plugin` into a scratch home, `diagnostics.run`, `install.localVersion`, `config.migrate` as a dry run, `threads.runToCompletion` against a scratch server with a scripted model, `boulder.status`, `worktrees.sweep` as a plan, `install.cleanup` on the scratch home.
+
+Evidence on #14943 for each run: the script or commands, each call's typed result, the transcript read that shows the prompt and the answer on the intended thread (a tool result or an exit code alone does not prove delivery), the final listing, and the build under test. The real runs are representative: per-input coverage is the conformance test's (7.3), and loss and refusal cases (a dropped acknowledgement, a timeout, an authorization refusal, a cancelled stream) are proven there, since a real relay cannot be asked to lose a reply.
 
 The runs use a sanctioned test account and a scripted or low-cost model. They make no call on a personal subscription.
 
-## 10. Decisions, after the first review
+## 10. Decisions, after two reviews
 
-| # | Decision | Review verdict | Where it stands |
-|---|---|---|---|
-| 1 | Two ok shapes on the root: the flat thread contract, and `value` elsewhere | Accept conditionally | Kept. The three shipped entry contracts are preserved by explicit facades (4.1), and the document no longer claims one universal result or one exit table (4.4) |
-| 2 | Secrets leave through a sink, never a result | Revise | The sink is a proposal only. Custody is a security design, slice S0, approved before any credential-bearing call is written (4.5) |
-| 3 | The principal is fixed at construction | Revise | The principal selects a leg; authority is checked in the core against a principal-by-capability matrix, approved in S0 before principals are wired (4.3) |
-| 4 | Engine commands get real SDK calls through engine exports | Accept conditionally | Each leaf and flag is a row now (6.8, 6.9); the typed functions are settled in the engine first, with an explicit export, release and pin sequence and a compatibility test this program owns (E1a to E1c) |
-| 5 | `omo remote` session verbs become aliases | Accept conditionally | Both historical projections (flags, wait default, JSON, exit codes) are pinned by tests before the implementations converge; an alias is removed only after one release and only when its descriptor's tests show no caller-visible difference; sender admission is not widened |
-| 6 | The OpenCode-edition binary | Scope decision required | Decided on #14943: both editions. Shared-domain verbs go through the same core and SDK call (OC1), the three edition-only verbs get SDK calls of their own (OC2), and the issue closes at zero gaps in both (6.11) |
+| # | Decision | Where it stands |
+|---|---|---|
+| 1 | Two ok shapes on the root: the flat thread contract, and `value` elsewhere | Kept. The entry contracts are preserved by explicit facades with a field-by-field projection (4.1); the document claims neither one universal result nor one exit table (4.4) |
+| 2 | How a secret moves | Not decided here. Custody is the security design's (S0, #14945); this document claims no approval for any carrier (4.5) |
+| 3 | The principal | It selects a leg; authority is checked in the core against the security design's matrix, approved before the sensitive contracts are fixed (4.3, P1a-s) |
+| 4 | Engine commands get real SDK calls through engine exports | Each leaf and flag is a row (6.8, 6.9); the launch is its own set of operations; the typed functions are settled in the engine first, with an export, release and pin sequence and a compatibility test this program owns (E1a to E1c) |
+| 5 | `omo remote` session verbs become aliases | Both historical projections (flags, wait default, JSON, exit codes) are pinned by goldens before the implementations converge; an alias is removed only after one release and only when its goldens show no caller-visible difference; sender admission is not widened |
+| 6 | The OpenCode-edition binary | Decided on #14943: both editions, every verb, zero gaps in both (6.11, OC1a to OC2, X1c) |
 
 ## 11. Not in this program
 
