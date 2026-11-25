@@ -1,11 +1,10 @@
 import { formatAddress, THREAD_ID_SHAPE } from "@oh-my-opencode/thread-address-core"
 import { remoteMonitorTarget } from "../../../extension/senpi-seams"
 import type { RpcRemoteHandlers, RpcRemoteRow, RpcRemoteSource, RpcRemoteState } from "../../../extension/types"
-import { asFailure, resolveAddress, resolveTypedDevice, type Resolved, type ThreadRefusal } from "../address"
+import { asFailure, resolve, resolveTypedDevice, type ResolveOk, type ThreadRefusal } from "../address"
 import { accountDevices } from "../address/account"
 import { resolveAccountDevice } from "../address/device"
 import type { MonitorTargetResolution } from "../tools/monitor-target"
-import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteSessionRow, RemoteSessionState, RemoteThreadSurface } from "./ports"
 import { remoteAvailable } from "./remote-ops"
 
@@ -53,14 +52,14 @@ const PATH_LIKE = /[/\\]|\.jsonl$/i
 
 /**
  * What `monitor({type: "rpc", target})` arms (#14294): the target read by `resolve`, the module's resolver as every thread
- * tool asks it (`resolveAddress` with the device needed online): a bare thread id, alias, unique name or 8+ character id
+ * tool asks it (`resolve` with the device needed online): a bare thread id, alias, unique name or 8+ character id
  * prefix on any device, or `<device>/<thread>` with the device by id, `here`, name or id prefix and the thread among that
  * device's threads. `<device>/*` names a device only. A thread on another device is armed as `<device id>/<thread>`.
  */
 export async function resolveMonitorTarget(
   remote: RemoteThreadSurface | undefined,
   target: string,
-  resolve: (address: string) => Promise<Resolved | ThreadRefusal>,
+  resolveTarget: (address: string) => Promise<ResolveOk | ThreadRefusal>,
 ): Promise<MonitorTargetResolution> {
   const text = target.trim()
   if (text === "" || SENPI_LOCAL_TARGET.test(text)) return KEEP
@@ -74,9 +73,9 @@ export async function resolveMonitorTarget(
     if (device.kind === "error") return { kind: "refused", failure: device.error }
     armed = `${device.device}/*`
   } else {
-    const resolved = await resolve(text)
+    const resolved = await resolveTarget(text)
     if (resolved.kind === "error") return { kind: "refused", failure: asFailure(resolved) }
-    armed = resolved.where.kind === "device" ? resolved.address : resolved.thread
+    armed = resolved.holder.kind === "device" ? resolved.thread : resolved.id
   }
   return armed === text ? KEEP : { kind: "target", target: armed }
 }
@@ -118,11 +117,12 @@ async function sessionOn(
   const roster = await rosterOnce(remote)
   const here = roster?.here ?? null
   if (here !== null && storedDevice(roster, device) === here) return await storedSession(remote, here, thread)
-  const resolved = await resolveAddress(
-    { remote, callerWorkspaceRoot: "", local: [], callerId: UNKNOWN_CALLER },
-    formatAddress(device, thread),
-    { all_scope: true, need: "online" },
-  )
+  const resolved = await resolve({ remote, workspace: "", book: () => [] }, formatAddress(device, thread), {
+    operation: "read",
+    principal: { kind: "script" },
+    scope: { all_scope: true },
+    need: "online",
+  })
   if (resolved.kind === "error") {
     if (!TRANSIENT.has(resolved.code)) throw new Error(`${resolved.code}: ${resolved.message}`)
     const stored = await storedSession(remote, storedDevice(roster, device), thread)
@@ -131,9 +131,9 @@ async function sessionOn(
     if (!stored.listed && !THREAD_ID_SHAPE.test(thread)) throw new Error(`${resolved.code}: ${resolved.message}`)
     return stored
   }
-  if (resolved.where.kind !== "device")
+  if (resolved.holder.kind !== "device")
     throw new Error(`not_found: ${thread} is a session on this device, which a remote watch does not follow.`)
-  return { device: resolved.where.row.device, session: resolved.where.row.session_id }
+  return { device: resolved.holder.row.device, session: resolved.holder.row.session_id }
 }
 
 async function openSession(

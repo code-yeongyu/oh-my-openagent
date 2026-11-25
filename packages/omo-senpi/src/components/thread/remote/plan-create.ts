@@ -55,7 +55,7 @@ export type LocalPlacement = {
    */
   readonly callerCwd?: string
   /** Decision 0027: the ONE resolver (local + relay address books) for an existing thread or a fork source; omitted = local only. */
-  readonly locate: (address: string) => Promise<CrossTarget>
+  readonly locate: (address: string, operation: "open_existing" | "fork_source") => Promise<CrossTarget>
   readonly existing: (address: string) => Promise<LocalExisting>
 }
 
@@ -182,7 +182,8 @@ export async function planCreate(
   let localAlias: LocalAliasReason | undefined
   // The thread an open names, located once: the alias check below and the open both need it.
   let located: CrossTarget | undefined
-  const locateThread = async (thread: string): Promise<CrossTarget> => (located ??= await local.locate(thread))
+  const locateThread = async (thread: string): Promise<CrossTarget> =>
+    (located ??= await local.locate(thread, "open_existing"))
   // The holder is a session on ONE device (#14175 review L1): a copy of its session file on another device carries the
   // same durable id but is not the holder, so the device is compared too. When this device's id cannot be read the
   // open goes on and the alias claim after it still refuses a thread that is not the holder.
@@ -263,7 +264,7 @@ export async function planCreate(
     }
   }
   if (value.fork_from !== undefined) {
-    const source = await local.locate(value.fork_from)
+    const source = await local.locate(value.fork_from, "fork_source")
     if (source.kind === "error") return { kind: "done", result: source.result }
     if (value.device !== undefined) {
       const wanted = await targetDevice(remote, value.device)

@@ -18,7 +18,8 @@ import type { LocalExisting } from "../remote/cross-device"
 import { claimCreatedAlias, planCreate, withAlias } from "../remote/lazy-ops"
 import { threadLink } from "../thread-link"
 import { recordThreadCreator } from "../tools/extension-tools"
-import { resolveAddress } from "../address/lazy"
+import { principalOf } from "../address/principal"
+import { resolve } from "../address/lazy"
 import {
   addressBook,
   failure,
@@ -133,22 +134,23 @@ export async function createThread(
       host: createLocalSessionHost(options.host, entries),
       ...(callerCwd.trim() === "" ? {} : { callerCwd }),
       // Decision 0027: an existing thread or a fork source is found by the same resolver every send uses, not by a second ladder.
-      locate: async (address) => {
+      locate: async (address, operation) => {
         // #14049: an existing thread whose process exited is still this device's when its session file is here, so
         // the ladder sees the files an id or name names (the send address book), and an id nothing lists is looked
         // up once on every online device of the account (A4.3.3), as a send to that id is.
         const localFor = sendBookFor(options, current)
-        const found = await resolveAddress(
-          { remote: options.remote, callerWorkspaceRoot: callerCwd, local: localFor(address), localFor, callerId },
-          address,
-          { all_scope: true, probe: true },
-        )
+        const found = await resolve({ remote: options.remote, workspace: callerCwd, book: localFor }, address, {
+          operation,
+          principal: principalOf(callerId),
+          scope: { all_scope: true },
+          probe: true,
+        })
         if (found.kind === "error") return { kind: "error", result: { kind: "error", error: found } }
         // A row with no file path (a probe's ended row, a snapshot, a session listed before its file existed) has its
         // file found on its device by placement, whatever its state (#14170); it is never opened by an empty path.
-        return found.where.kind === "device"
-          ? { kind: "remote", row: found.where.row }
-          : { kind: "local", address: found.thread, accountWide: true }
+        return found.holder.kind === "device"
+          ? { kind: "remote", row: found.holder.row }
+          : { kind: "local", address: found.id, accountWide: true }
       },
       existing: (address) => existingHere(options, current, address, callerId),
     })
@@ -481,23 +483,21 @@ async function existingHere(
   callerId: string,
 ): Promise<LocalExisting> {
   const localFor = sendBookFor(options, current)
-  const resolved = await resolveAddress(
-    {
-      remote: undefined,
-      callerWorkspaceRoot: options.callerWorkspaceRoot(),
-      local: localFor(address),
-      localFor,
-      callerId,
-    },
+  const resolved = await resolve(
+    { remote: undefined, workspace: options.callerWorkspaceRoot(), book: localFor },
     address,
-    { all_scope: true },
+    {
+      operation: "open_existing",
+      principal: principalOf(callerId),
+      scope: { all_scope: true },
+    },
   )
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
-  const live = targetSession(current, resolved.thread)
+  const live = targetSession(current, resolved.id)
   if (live !== undefined) return { kind: "live", thread: summary(live) }
   // The book as the resolved thread names it, so a session file found by its thread part carries its path.
-  const entry = sendAddressBook(options, current, resolved.thread, true).find(
-    (candidate) => candidate.thread_id === resolved.thread,
+  const entry = sendAddressBook(options, current, resolved.id, true).find(
+    (candidate) => candidate.thread_id === resolved.id,
   )
   if (entry?.session_path === undefined || entry.session_path === null)
     return {

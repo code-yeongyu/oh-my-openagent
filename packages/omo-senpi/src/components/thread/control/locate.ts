@@ -1,7 +1,8 @@
 import type { ThreadToolResult } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { workspaceEntries } from "../addressing"
-import { resolveAddress } from "../address/lazy"
+import { principalOf } from "../address/principal"
+import { resolve } from "../address/lazy"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
 import type { RemoteSessionRow } from "../remote/ports"
@@ -41,33 +42,39 @@ export async function locateControl(
   // session another device holds but runs nowhere is its ended row, so it answers not_live there as here.
   const localFor = sendBookFor(options, current)
   const entries = localFor(address)
-  const resolved = await resolveAddress(
-    { remote: options.remote, callerWorkspaceRoot: options.callerWorkspaceRoot(), local: entries, localFor, callerId },
+  const resolved = await resolve(
+    { remote: options.remote, workspace: options.callerWorkspaceRoot(), book: localFor },
     address,
-    { all_scope: allScope, probe: true, need: "online" },
+    {
+      operation: "control",
+      principal: principalOf(callerId),
+      scope: { all_scope: allScope },
+      probe: true,
+      need: "online",
+    },
   )
   if (resolved.kind === "error") return { kind: "error", result: { kind: "error", error: resolved } }
-  if (resolved.where.kind === "device" && options.remote !== undefined) {
-    const row = resolved.where.row
+  if (resolved.holder.kind === "device" && options.remote !== undefined) {
+    const row = resolved.holder.row
     if (row.state === "ended")
       return { kind: "not_live", thread_id: rowKey(row), title: escapeForDisplay(row.title), device: row.device, row }
     return { kind: "control", control: createRelayControl(options.remote, row) }
   }
-  const session = targetSession(current, resolved.thread)
-  if (session === undefined) return { kind: "not_live", thread_id: resolved.thread, title: resolved.entry.name }
+  const session = targetSession(current, resolved.id)
+  if (session === undefined) return { kind: "not_live", thread_id: resolved.id, title: resolved.entry.name }
   if (session.status === "opening")
     return {
       kind: "error",
       result: failure(
         "host_unavailable",
-        `Thread ${resolved.thread} is opening on its host and cannot accept controls yet.`,
+        `Thread ${resolved.id} is opening on its host and cannot accept controls yet.`,
         "Retry once the thread is open.",
-        { thread: resolved.thread, reason: "session_opening" },
+        { thread: resolved.id, reason: "session_opening" },
       ),
     }
   return {
     kind: "control",
-    control: createLocalControl(options, session, resolved.thread, resolved.entry.name, () =>
+    control: createLocalControl(options, session, resolved.id, resolved.entry.name, () =>
       allScope === true ? entries : workspaceEntries(entries, options.callerWorkspaceRoot()),
     ),
   }

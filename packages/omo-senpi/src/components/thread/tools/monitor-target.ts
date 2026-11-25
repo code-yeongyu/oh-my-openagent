@@ -1,5 +1,6 @@
 import { monitorRpcOpen, remoteWakeUnavailable } from "../../../extension/senpi-seams"
-import { resolveAddress } from "../address/lazy"
+import { resolve } from "../address/lazy"
+import { principalOf } from "../address/principal"
 import type { ThreadToolFailure } from "../errors"
 import { resolveMonitorTarget } from "../remote/lazy-ops"
 import type { ExtensionToolHost } from "./extension-tools"
@@ -20,7 +21,7 @@ export type MonitorTargetResolver = (target: string, callerId: string) => Promis
 
 /**
  * The monitor's target reading (`remote/monitor-source.ts` `resolveMonitorTarget`, in the thread client sidecar) over this
- * surface's address book and the account, through the one resolver every thread tool uses (`resolveAddress`): every
+ * surface's address book and the account, through the one resolver every thread tool uses (`resolve`): every
  * workspace and the device needed online. Only a thread-id-shaped target that nothing lists is probed (once per online
  * device, bounded by the device service): a name, alias or prefix never waits on a probe in this preflight.
  */
@@ -29,16 +30,16 @@ export function createMonitorTargetResolver(options: ThreadToolSurfaceOptions): 
     await resolveMonitorTarget(options.remote, target, async (address) => {
       await options.ensureHost?.()
       const localFor = sendBookFor(options, await hostView(options, { offline: true }))
-      return await resolveAddress(
-        {
-          remote: options.remote,
-          callerWorkspaceRoot: options.callerWorkspaceRoot(),
-          local: localFor(address),
-          localFor,
-          callerId,
-        },
+      return await resolve(
+        { remote: options.remote, workspace: options.callerWorkspaceRoot(), book: localFor },
         address,
-        { all_scope: true, probe: true, need: "online" },
+        {
+          operation: "read",
+          principal: principalOf(callerId),
+          scope: { all_scope: true },
+          probe: true,
+          need: "online",
+        },
       )
     })
 }
