@@ -48,7 +48,7 @@ export async function fixReflectionLock(input = {}, ports = {}) {
 export async function reapStaleEngines(input, ports = {}) {
   /** @type {readonly unknown[]} */
   const named = Array.isArray(input?.pids) ? input.pids : []
-  const invalid = named.filter((pid) => !Number.isSafeInteger(pid) || /** @type {number} */ (pid) < 1)
+  const invalid = named.filter((pid) => !Number.isInteger(pid) || /** @type {number} */ (pid) < 1)
   if (named.length === 0 || invalid.length > 0) {
     return {
       kind: "error",

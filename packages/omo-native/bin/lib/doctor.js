@@ -31,8 +31,8 @@ function reapLine(engine) {
   }
 }
 
-// `omo doctor --reap <pid>...` as lines. The argv words that are not pids are refused here, before
-// the process table is read; the named pids go to the one reap body.
+// `omo doctor --reap <pid>...` as lines, in request order. A word that is not a pid is the command's own argv refusal; the
+// named pids go to the one reap body, and its typed answer renders: each engine's outcome, or a request-level refusal.
 export async function reapStaleEngines(args, options = {}) {
   if (args.length === 0) return { lines: [REAP_USAGE], failed: true, reaped: [] }
   const lines = []
@@ -44,11 +44,12 @@ export async function reapStaleEngines(args, options = {}) {
   if (pids.length === 0) return { lines, failed: true, reaped: [] }
   const argvRefused = lines.length > 0
   const result = await reap({ pids }, options)
-  const engines = result.kind === "ok" ? result.value.engines : result.error.details.engines
+  const engines = result.kind === "ok" ? result.value.engines : (result.error.details?.engines ?? [])
+  if (result.kind === "error" && result.error.details?.engines === undefined) lines.push(`FAIL ${result.error.message}`)
   lines.push(...engines.map(reapLine))
   return {
     lines,
-    // An argv word that is not a pid is the command's own usage refusal; every other exit is the SDK answer's.
+    // Every exit past the command's own argv refusals is the SDK answer's (REAP_EXIT_SURFACE).
     failed: argvRefused || exitOf(REAP_EXIT_SURFACE, result) !== 0,
     reaped: engines.filter((engine) => engine.outcome === "reaped").map((engine) => engine.pid),
   }

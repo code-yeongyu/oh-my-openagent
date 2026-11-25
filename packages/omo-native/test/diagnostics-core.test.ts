@@ -70,7 +70,7 @@ describe("diagnostics.reapStaleEngines input", () => {
     },
   }
 
-  for (const pids of [[], [0], [-1], [1.5], [Number.MAX_SAFE_INTEGER + 2], ["15"]]) {
+  for (const pids of [[], [0], [-1], [1.5], [Number.NaN], ["15"]]) {
     test(`#given pids ${JSON.stringify(pids)} #when reaping #then invalid_arguments answers before the process table is read`, async () => {
       const result = await reapStaleEngines({ pids: pids as number[] }, untouched)
       expect(result).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })

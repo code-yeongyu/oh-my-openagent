@@ -47,7 +47,7 @@ export function findingsFromLines(check, lines) {
   })
 }
 
-/** @param {readonly DiagnosticFinding[]} findings */
+/** @param {readonly Pick<DiagnosticFinding, "level" | "message">[]} findings */
 export function renderFindings(findings) {
   return findings.map((entry) => `${LEVEL_PREFIX[entry.level]} ${entry.message}`)
 }

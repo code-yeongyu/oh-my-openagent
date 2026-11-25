@@ -11,6 +11,7 @@ import { runDaemonCommand } from "./daemon.js"
 import { runThreadCommand } from "./thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./host-status.js"
 import { printDoctorFix, printDoctorReap, printDoctorReport } from "./doctor.js"
+import { engineHostCall, preparedSenpi } from "./engine-host-call.js"
 import { ensureEnginePrepared, preparePluginLaunchSpec } from "./engine-prepare.js"
 import { migrateLegacyBunGlobalManifest } from "./legacy-bun-global-migration.js"
 import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
@@ -31,17 +32,6 @@ function engineVersion() {
   } catch {
     return "unknown"
   }
-}
-
-function preparedSenpi() {
-  preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
-  const senpi = resolveSenpi()
-  ensureEnginePrepared({
-    senpiRoot: senpi.packageRoot,
-    omoVersion: packageManifest().version,
-    reinstallCommand: updateTarget().command,
-  })
-  return senpi
 }
 
 // A memory-sync launch reaches the engine through this entry, which claims before senpi's CLI loads (#11997).
@@ -130,21 +120,6 @@ function setupSuggestionForLaunch() {
   return cached.suggestion === true
 }
 
-/**
- * One call into the engine's host CLI. It prints a single JSON line and exits, so the output is
- * captured rather than inherited - `omo daemon` has to read the engine's answer to turn it into
- * an exit code, and `spawnSync` is honest about a call that is expected to be this short.
- */
-export function engineHostCall(engineArgs, options) {
-  const senpi = preparedSenpi()
-  const result = spawnSync(process.execPath, [senpi.cliPath, ...engineArgs], {
-    encoding: "utf8",
-    env: senpiEnvironment(senpi.packageRoot, options.env),
-    windowsHide: true,
-  })
-  return { exitCode: result.status ?? 1, stdout: result.stdout ?? "", stderr: result.stderr ?? "" }
-}
-
 export function rollbackMigrateCall(request) {
   const runtime = join(packageRoot, "plugin", "runtime", "rollback-migrate.js")
   const result = spawnSync(process.execPath, [runtime], {
@@ -218,7 +193,7 @@ export async function runLauncher(args = process.argv.slice(2)) {
     }
     if (args[1] === "--fix") process.exitCode = await printDoctorFix(args.slice(2))
     else if (args[1] === "--reap") process.exitCode = await printDoctorReap(args.slice(2))
-    else process.exitCode = await printDoctorReport({ daemonEngine: { run: engineHostCall } })
+    else process.exitCode = await printDoctorReport()
     return
   }
   if (command === "setup") {

@@ -32,6 +32,7 @@ import { memoryIdentityFindings } from "./memory-identities.js"
 import { packageRoot, updateTarget } from "./package-paths.js"
 import { listProcesses } from "./process-list.js"
 import { detectHarnesses, needsSetupSuggestion } from "./setup-detect.js"
+import { engineHostCall } from "./engine-host-call.js"
 
 /** @typedef {import("./diagnostics-contract").DiagnosticFinding} DiagnosticFinding */
 /** @typedef {import("./diagnostics-contract").DiagnosticCheck} DiagnosticCheck */
@@ -86,14 +87,18 @@ function processFindings(ports) {
 function daemonSection(ports, pluginRoot) {
   if (ports.daemon !== undefined) return ports.daemon()
   if (ports.daemonEngine === undefined) return []
+  const env = ports.env ?? process.env
   return daemonFindings({
     engine: ports.daemonEngine,
     pluginRoot,
-    agentDir: canonicalAgentDir(),
-    env: process.env,
+    agentDir: canonicalAgentDir(env),
+    env,
     platform: process.platform,
   })
 }
+
+/** The npm install reaches its engine's host CLI by default; the compiled entry passes itself as the engine. */
+const NPM_DAEMON_ENGINE = { run: engineHostCall }
 
 /** @param {Inventory} inventory */
 function setupFindings(inventory) {
@@ -133,7 +138,7 @@ async function npmFindings(ports) {
     ...memoryRuntime,
     ...launchSpecFindings(ports.pluginRoot ?? pluginRoot, ports.launchSpecIo),
     ...(ports.keychainHelper ?? (() => keychainHelperFindings({ packageRoot })))(),
-    ...daemonSection(ports, pluginRoot),
+    ...daemonSection({ daemonEngine: NPM_DAEMON_ENGINE, ...ports }, pluginRoot),
     ...computerUse,
     ...coverage,
     ...setupFindings(inventory),

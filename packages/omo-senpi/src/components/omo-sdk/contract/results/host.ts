@@ -50,8 +50,11 @@ export type Finding = {
   readonly level: "ok" | "notice" | "warn" | "fail"
   readonly check: string
   readonly message: string
+  /** What the check found, as fields (paths, states, codes, counts); the command renders the message only. */
+  readonly details?: Readonly<Record<string, unknown>>
 }
-export type Diagnostics = { readonly findings: readonly Finding[] }
+/** `failed` is the exit rule `omo doctor` applies: only an artifact, engine, launch-spec or computer-use failure. */
+export type Diagnostics = { readonly findings: readonly Finding[]; readonly failed: boolean }
 /** `omo doctor --models --json`'s view: the spawn resolvers' chains and the main session's lane, in their own types. */
 export type ModelChains = ModelChainsReport & { readonly configProfile?: string; readonly modelProfile: ModelProfileView }
 /** One line of the sweep in print order: memory-core's own text verbatim, or a finding about the sweep. */
