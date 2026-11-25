@@ -106,6 +106,27 @@ describe("a keyed read is bound to its caller's principal", () => {
   })
 })
 
+describe("a keyed read is bound to its caller's workspace", () => {
+  test("#given one principal in two workspaces #when each lists under one key with the same arguments #then each gets its own answer, never the other's replay", async () => {
+    const { a, s } = rootOn()
+    const rootIn = (cwd: string) =>
+      assembleOmoSdk(
+        { agentDir: s.agentDir, cwd, uid: 501, user: "qa", ports: { host: s.host, store: s.store, remote: a.remote } },
+        {},
+      )
+    const here = (await rootIn(process.cwd()).threads.list({ idempotency_key: "k-ws" })) as unknown as {
+      threads: unknown[]
+    }
+    const elsewhere = (await rootIn("/nowhere/else").threads.list({ idempotency_key: "k-ws" })) as unknown as {
+      kind: string
+      threads: unknown[]
+    }
+    expect(threads(here)).toContain("dur-local")
+    expect(elsewhere.kind).toBe("ok")
+    expect(threads(elsewhere)).not.toContain("dur-local")
+  })
+})
+
 describe("threads.read inputs", () => {
   test("#given a thread with several transcript items #when the root reads with limit 1 #then the one newest item of the unlimited read", async () => {
     const { root } = rootOn()
