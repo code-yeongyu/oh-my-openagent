@@ -217,9 +217,11 @@ async function rollBack(
       if (!sameModel(current.model, selected)) return { rollbackCause: "active_model_changed" }
       await control.setModel(previous.model.provider, previous.model.id)
     }
+    // The level is written back only onto the previous model, confirmed in effect: never onto the selected one.
     const restored = await control.getModelState()
-    if (restored !== undefined && restored.thinkingLevel !== previous.thinkingLevel)
-      await control.setThinkingLevel(previous.thinkingLevel)
+    if (restored === undefined) return { rollbackCause: "model_state_unavailable" }
+    if (!sameModel(restored.model, previous.model)) return { rollbackCause: "restore_unconfirmed" }
+    if (restored.thinkingLevel !== previous.thinkingLevel) await control.setThinkingLevel(previous.thinkingLevel)
     return {}
   } catch (error) {
     return { rollbackCause: error }
@@ -229,12 +231,13 @@ async function rollBack(
 type SwitchPart = "model" | "thinking_level"
 
 /**
- * #14939 review: the outcome of a switch, from the state observed after it settled. Each part the call asked to change
- * (the model; the level with a suffix) is compared with its value before the call and the value asked for: every
- * changing part at the asked value is `applied`; the asked model held for compaction is `after_compaction`; some parts
- * at the asked value and some not is `partial_commit`, listing only the parts observed at the asked value; none at the
- * asked value is `not_applied`, `unchanged` when every part still has its value from before the call and no other switch
- * is held, `changed_elsewhere` otherwise. A part asked at the value it already had is listed in neither list.
+ * #14939 review: the outcome of a switch, from the state observed after it settled. Each asked part (the model; the level
+ * with a suffix) is compared with its value before the call and the value asked for: every asked part at its asked value
+ * is `applied`; the asked model held for compaction is `after_compaction`; a part this call changed at its asked value
+ * while another asked part is not is `partial_commit`, `applied` listing only the changed parts observed at the asked
+ * value and `not_applied` every asked part that is not (one asked at the value it already had and moved away by someone
+ * else included); no changed part at the asked value is `not_applied`, `unchanged` when every part still has its value
+ * from before the call and no other switch is held, `changed_elsewhere` otherwise.
  */
 function classifySwitch(
   control: SessionControl,
@@ -269,10 +272,11 @@ function classifySwitch(
           },
         ]),
   ]
-  const changing = parts.filter((part) => part.changing)
-  const applied = changing.filter((part) => part.asked)
-  if (changing.length === 0 ? parts.every((part) => part.asked) : applied.length === changing.length)
-    return switchApplied(control, selected, final)
+  // Success needs every asked part observed at its asked value, the ones it already had included: a part someone else
+  // moved meanwhile makes the request not fully in effect.
+  if (parts.every((part) => part.asked)) return switchApplied(control, selected, final)
+  const applied = parts.filter((part) => part.changing && part.asked)
+  const notInEffect = parts.filter((part) => !part.asked)
   const heldSelected = final.pendingModel !== undefined && sameModel(final.pendingModel, selected)
   if (heldSelected && !parts[0]?.asked && parts.every((part) => part.before !== false))
     return {
@@ -298,8 +302,13 @@ function classifySwitch(
       level,
       final,
       applied: applied.map((part) => part.part),
-      notApplied: changing.filter((part) => !part.asked).map((part) => part.part),
-      reason: facts.rolledBack === true ? "rollback_incomplete" : "thinking_level_unconfirmed",
+      notApplied: notInEffect.map((part) => part.part),
+      reason:
+        facts.rolledBack === true
+          ? "rollback_incomplete"
+          : notInEffect.some((part) => !part.changing)
+            ? "changed_elsewhere"
+            : "thinking_level_unconfirmed",
       cause,
     })
   const unchanged = parts.every((part) => part.before === true) && final.pendingModel === undefined
@@ -446,7 +455,7 @@ function partialModelSwitch(
     readonly final: SessionModelState
     readonly applied: readonly SwitchPart[]
     readonly notApplied: readonly SwitchPart[]
-    readonly reason: "rollback_incomplete" | "thinking_level_unconfirmed"
+    readonly reason: "rollback_incomplete" | "changed_elsewhere" | "thinking_level_unconfirmed"
     readonly cause?: unknown
   },
 ): ThreadToolResult {

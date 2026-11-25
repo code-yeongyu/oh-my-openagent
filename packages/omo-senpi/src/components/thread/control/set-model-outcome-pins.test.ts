@@ -34,6 +34,10 @@ function scriptedHolder(
     readonly levelReplyLost?: boolean
     readonly restoreLevelFails?: boolean
     readonly stateLostFrom?: number
+    /** Another client sets the level to `high` just before this state read (1-based) answers. */
+    readonly driftLevelOnRead?: number
+    /** A switch back to the previous model is acknowledged and not applied. */
+    readonly restoreIgnored?: boolean
   } = {},
 ) {
   let reads = 0
@@ -57,6 +61,7 @@ function scriptedHolder(
       if (options.stateLostAfterSwitch === true && calls.length > 0) throw new Error("the holder's state read was lost")
       if (options.stateLostFrom !== undefined && reads >= options.stateLostFrom)
         throw new Error("the holder's state read was lost")
+      if (options.driftLevelOnRead === reads) state.thinkingLevel = "high"
       return {
         isStreaming: false,
         model: { ...state.model, name: state.model.id },
@@ -77,6 +82,8 @@ function scriptedHolder(
       }
       if (effectId !== undefined) effects.add(effectId)
       calls.push(`set_model ${provider}/${id}`)
+      if (options.restoreIgnored === true && provider === PREVIOUS.provider && id === PREVIOUS.id)
+        return { provider, id }
       if (options.restoreFails === true && provider === PREVIOUS.provider && id === PREVIOUS.id)
         throw new Error("Previous model is no longer available")
       if (mode === "apply") {
@@ -393,6 +400,40 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
           error: { code: "not_applied", details: { ...identity[leg], reason: "changed_elsewhere", ...observed } },
         })
       })
+
+    test(`#given a ${leg} holder whose level, asked at the value it had, is moved by another client while the model applies #when switched #then partial_commit changed_elsewhere, never applied`, async () => {
+      const { result } = await switchOn(
+        leg,
+        scriptedHolder("apply", { driftLevelOnRead: 3 }),
+        "anthropic/claude-small:low",
+      )
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "partial_commit",
+          details: {
+            ...identity[leg],
+            reason: "changed_elsewhere",
+            partial: {
+              applied: ["model"],
+              not_applied: ["thinking_level"],
+              in_effect: { model: SELECTED, thinking_level: "high" },
+            },
+          },
+        },
+      })
+    })
+
+    test(`#given a ${leg} holder that acknowledges the switch back to the previous model without applying it #when a rollback runs #then the previous level is never written onto the selected model`, async () => {
+      const holder = scriptedHolder("apply", { levelReplyLost: true, restoreIgnored: true })
+      const { result, calls } = await switchOn(leg, holder, "anthropic/claude-small:high")
+      expect(calls).toEqual(["set_model anthropic/claude-small", "set_thinking_level high", "set_model openai/gpt-x"])
+      expect(result).toMatchObject({
+        kind: "ok",
+        model_switch: "applied",
+        in_effect: { model: SELECTED, thinking_level: "high" },
+      })
+    })
 
     test(`#given a ${leg} holder that parked a switch under an effect id #when the same switch repeats under it #then the repeat answers the same pending outcome and parks nothing more`, async () => {
       const holder = scriptedHolder("park")
