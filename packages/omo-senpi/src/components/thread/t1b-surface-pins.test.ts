@@ -2100,6 +2100,77 @@ describe("T1b pins: the idempotency key on a control call", () => {
   })
 })
 
+describe("T1b pins: an interrupt naming a turn that is not the running one (#15013)", () => {
+  test("here and on b, through the tool and the SDK: the answer, and how many interrupts reach the engine", async () => {
+    const pins: Record<string, unknown> = {}
+    for (const [leg, thread] of Object.entries(LEGS)) {
+      const { a, s, sdk, tool } = fresh()
+      const before = {
+        here: s.interrupts.length,
+        b: a.sent.filter((sent) => sent.rpc?.["type"] === "interrupt").length,
+      }
+      pins[leg] = {
+        tool: await tool("thread_interrupt", { thread, turn_id: "turn-not-running" }),
+        sdk: stable(await sdk.interrupt({ thread, turn_id: "turn-not-running" })),
+        reached: {
+          here: s.interrupts.length - before.here,
+          b: a.sent.filter((sent) => sent.rpc?.["type"] === "interrupt").length - before.b,
+        },
+      }
+    }
+    expect(pins).toMatchInlineSnapshot(`
+      {
+        "b": {
+          "reached": {
+            "b": 2,
+            "here": 0,
+          },
+          "sdk": {
+            "background": {
+              "status": "not_supported",
+            },
+            "device": "b",
+            "interrupted": false,
+            "kind": "ok",
+            "thread": "dur-on-b",
+          },
+          "tool": {
+            "background": {
+              "status": "not_supported",
+            },
+            "device": "b",
+            "interrupted": false,
+            "kind": "ok",
+            "thread": "dur-on-b",
+          },
+        },
+        "here": {
+          "reached": {
+            "b": 0,
+            "here": 2,
+          },
+          "sdk": {
+            "background": {
+              "status": "not_supported",
+            },
+            "interrupted": false,
+            "kind": "ok",
+            "thread": "dur-local",
+          },
+          "tool": {
+            "background": {
+              "status": "not_supported",
+            },
+            "interrupted": false,
+            "kind": "ok",
+            "thread": "dur-local",
+          },
+        },
+      }
+    `)
+  })
+})
+
 describe("T1b pins: B8, an unexpected exception", () => {
   const CANARY = "canary-7f3a secret=sk-live-do-not-print"
   test("a host whose listing throws, through the tool and the SDK, on list and on close", async () => {
