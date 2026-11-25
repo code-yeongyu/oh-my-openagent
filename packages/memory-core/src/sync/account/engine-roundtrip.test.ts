@@ -74,7 +74,7 @@ async function twoMembers(name: string) {
     cleanup.push(() => sync.close())
     return { repo, sync }
   }
-  return [await device("a", world.owner), await device("b", second)] as const
+  return [await device("a", world.owner), await device("b", second), server] as const
 }
 
 test(
@@ -160,3 +160,18 @@ test(
   },
   GIT_TEST_TIMEOUT * 3,
 )
+
+// #14476: a device's next push seals on its own previous append; the chain takes that batch when the service appends it,
+// so the seal does not read it back from `GET /v1/sync/entries` (one request less on every consecutive push).
+test("a second push on the device's own previous append makes no chain read, and the other member still verifies both", async () => {
+  const [a, b, server] = await twoMembers("acct-own-append")
+  const head = "---\ndescription: synced\n---\n"
+  await writeFile(join(a.repo, "note.md"), `${head}first\n`)
+  await a.sync.engine.runCycle()
+  const before = server.syncHeaders.length
+  await writeFile(join(a.repo, "note.md"), `${head}first\nsecond\n`)
+  await a.sync.engine.runCycle()
+  const reads = server.syncHeaders.slice(before).filter((h) => h.path.startsWith("/v1/sync/entries")).length
+  await b.sync.engine.runCycle()
+  expect([reads, await readFile(join(b.repo, "note.md"), "utf8")]).toEqual([0, `${head}first\nsecond\n`])
+})

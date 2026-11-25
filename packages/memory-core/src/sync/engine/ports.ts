@@ -181,6 +181,15 @@ export interface Sealer {
     readonly link: string
     readonly recordSig: string
   }): Promise<boolean>
+  /** The service appended this session's own sealed batch at `seq`: the chain may take it without reading it back. */
+  appended?(own: {
+    readonly seq: number
+    readonly baseSeq: number
+    readonly digest: string
+    readonly epoch: number
+    readonly link: string
+    readonly recordSig: string
+  }): Promise<void>
 }
 
 /** The item model (#10203 device API) as the engine uses it. */
