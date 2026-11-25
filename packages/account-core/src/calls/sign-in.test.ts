@@ -87,6 +87,12 @@ const bounded = <T>(answer: Promise<T>) =>
 
 const signedInNotOn = { kind: "ok", value: { device: { id: grant.device.id }, deviceService: "not_on" } }
 
+test("#given a sign-in that completes #then its custody record closes ok", async () => {
+  const w = await world()
+  expect(await run(w, { setUp: async () => "on" })).toMatchObject({ kind: "ok", value: { deviceService: "on" } })
+  expect(w.records).toEqual(["ok"])
+})
+
 describe("account.signIn cancelled before the commit point: nothing stored", () => {
   test("#given a signal already aborted #then it answers cancelled before any request", async () => {
     const w = await world()

@@ -191,6 +191,7 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           ...dependencies,
           session: sessionOf(dependencies),
           setUpDeviceService: dependencies.setUpDeviceService ?? (async () => "not_on"),
+          custody: processCustodyLog(),
         },
         flags,
       )

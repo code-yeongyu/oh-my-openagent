@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { CredentialStore } from "../account-core/src/keystore"
 import type { DeviceServiceHandoff, Session } from "../account-core/src/session"
 import { serviceAccountsOpen } from "../account-core/src/accounts-gate"
+import type { CustodyLog } from "../account-core/src/calls/custody-log"
 import { accountSignIn } from "../account-core/src/calls/sign-in"
 import type { SignInRefusalCode } from "../account-core/src/calls/sign-in-refusal"
 import { accountSignInCheck } from "../account-core/src/calls/sign-out"
@@ -53,13 +54,21 @@ export interface SignInVerbDependencies {
   readonly now?: () => number
   readonly sleep?: (ms: number) => Promise<void>
   readonly machineDigest?: () => Promise<string | undefined>
+  /** The custody log this run writes (security design 8.2), unless the program that started it records the call. */
+  readonly custody?: CustodyLog
 }
 
 const USAGE =
   'omo account sign-in: use sign-in, or sign-in --stdin with one JSON line {"deviceName"?: string, "replace"?: boolean}'
 
 const optionsSchema = z
-  .object({ deviceName: z.string().trim().min(1).max(128).optional(), replace: z.boolean().optional() })
+  .object({
+    deviceName: z.string().trim().min(1).max(128).optional(),
+    replace: z.boolean().optional(),
+    // Set by the omo SDK root that started this verb and writes the call's custody records itself, so one sign-in is
+    // recorded once. A program of the same user could set it; it could equally write the owner-only log itself.
+    custodyRecordedByCaller: z.literal(true).optional(),
+  })
   .strict()
 
 // The options arrive as one JSON line on stdin, never on the command line: a device name is the caller's text, and
@@ -67,7 +76,7 @@ const optionsSchema = z
 async function readOptions(
   flags: readonly string[],
   readStdin: () => Promise<string>,
-): Promise<{ readonly replace: boolean; readonly name?: string } | undefined> {
+): Promise<{ readonly replace: boolean; readonly name?: string; readonly custodyRecordedByCaller?: true } | undefined> {
   if (flags.length === 0) return { replace: false }
   if (flags.length !== 1 || flags[0] !== "--stdin") return undefined
   const line = (await readStdin()).trim()
@@ -80,9 +89,12 @@ async function readOptions(
   }
   const parsed = optionsSchema.safeParse(raw)
   if (!parsed.success) return undefined
-  return parsed.data.deviceName === undefined
-    ? { replace: parsed.data.replace === true }
-    : { replace: parsed.data.replace === true, name: parsed.data.deviceName }
+  const { deviceName, replace, custodyRecordedByCaller } = parsed.data
+  return {
+    replace: replace === true,
+    ...(deviceName === undefined ? {} : { name: deviceName }),
+    ...(custodyRecordedByCaller === undefined ? {} : { custodyRecordedByCaller }),
+  }
 }
 
 export async function runSignInVerb(dependencies: SignInVerbDependencies, flags: readonly string[]): Promise<number> {
@@ -114,6 +126,9 @@ export async function runSignInVerb(dependencies: SignInVerbDependencies, flags:
       ...(dependencies.machineDigest === undefined ? {} : { machineDigest: dependencies.machineDigest }),
       ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
       ...(dependencies.sleep === undefined ? {} : { sleep: dependencies.sleep }),
+      ...(dependencies.custody === undefined || parsed.custodyRecordedByCaller === true
+        ? {}
+        : { custody: dependencies.custody }),
     },
     {
       method: "device_code",
