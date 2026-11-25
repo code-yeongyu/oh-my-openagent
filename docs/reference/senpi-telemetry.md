@@ -4,6 +4,8 @@
 
 OmO Native, the standalone edition, ships an anonymous product analytics pipeline. It is enabled by default and uses an opt-out model: every switch in the opt-out matrix below turns it fully off. Telemetry goes to two destinations: the PostHog project configured in the packaged default (`https://us.i.posthog.com`; setting `POSTHOG_API_KEY` overrides that project key), and, in addition, every event is dual-sent to OmO's own OTLP collector at `https://t.omo.dev` (`/v1/register` records the install hash once before the first send, `/v1/logs` carries the events).
 
+Since the first-run consent question (#14920), a fresh install also records an explicit answer before anything is sent: an interactive session is asked once and the answer is persisted (`consent-answer` marker in the state directory); runs with no dialog (headless, print, RPC) never write one and count as not consented.
+
 The payloads carry only booleans, buckets, counters, and allowlisted enum values. No free-form text ever leaves your machine. The exact schema is machine-generated below; if the generator and this document ever disagree, a drift test fails in CI.
 
 The curated plan agents were renamed to `plan-consultant` and `plan-reviewer`; `delegation_started.name` and `delegation_completed.agent_type` carry the new ids, and this is a breaking value change for anyone querying the old ones. Events emitted before the rename carry metis/momus. <!-- retired-name-allowed -->
