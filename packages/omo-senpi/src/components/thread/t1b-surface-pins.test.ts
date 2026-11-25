@@ -1905,6 +1905,7 @@ describe("T1b pins: controls", () => {
           "sdk": {
             "error": {
               "code": "caller_context_missing",
+              "kind": "error",
               "message": "The caller's durable session id is not in the thread address book.",
               "next_action": "Call thread_list (tool.thread_list() in an eval cell) and pass an explicit thread, or retry from a session with caller context.",
             },
