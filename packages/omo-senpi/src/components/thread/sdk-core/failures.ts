@@ -22,7 +22,7 @@ export type ThrownWording = {
 }
 
 /** The thread SDK's and the root's wording. */
-export const SDK_WORDING: ThrownWording = {
+const SDK_WORDING: ThrownWording = {
   hostUnavailable: "Retry when a host or terminal session is running.",
   unsupported: (command) => `The target's endpoint does not accept ${command}.`,
   unsupportedNext: "Use thread read to follow the session.",
@@ -57,13 +57,13 @@ export function thrown(error: unknown, onUnexpected?: UnexpectedPort, wording: T
 }
 
 /** The one fixed text every thread surface answers for an unexpected exception (security ruling B8). */
-export const UNEXPECTED_FAILURE_MESSAGE = "The thread operation failed unexpectedly."
+const UNEXPECTED_FAILURE_MESSAGE = "The thread operation failed unexpectedly."
 
 /**
  * An exception no rule expected: its message and stack go to `onUnexpected` alone, never into the answer (B8: a thrown
  * message can carry a path, a token or another user's text). The tools, the SDK and `omo thread` all answer this.
  */
-export function unexpectedFailure(
+function unexpectedFailure(
   error: unknown,
   onUnexpected?: UnexpectedPort,
   next = "Run omo thread list and retry after checking the target.",

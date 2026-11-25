@@ -1515,7 +1515,8 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
       unstamped(JSON.stringify(await run(operation, { ...args, idempotency_key: `${operation}-now` }, "caller")))
 
     // then
-    const rereads = (operation: ThreadToolName | undefined) => operation === "thread_list" || operation === "thread_read"
+    const rereads = (operation: ThreadToolName | undefined) =>
+      operation === "thread_list" || operation === "thread_read"
     expect(replayed.map((answer, index) => (rereads(receipts[index]?.operation) ? unstamped(answer) : answer))).toEqual(
       await Promise.all(
         receipts.map(async ({ operation, args, result }) =>

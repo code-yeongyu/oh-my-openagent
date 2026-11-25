@@ -199,8 +199,9 @@ describe("the fake store's receipt book reaches the root's answer (T1b)", () => 
   test("#given a keyed rename #when the key is repeated with other arguments, then with the same #then the root answers idempotency_conflict, then the first answer, and the host renamed once", async () => {
     const scenario = scenarioOf("threads.rename/name")
     const setup = scenarioSetup(scenario)
+    const root = setup.root as { readonly threads: { readonly rename: (input: unknown) => Promise<unknown> } }
     const rename = (name: string) =>
-      (setup.root.threads.rename as (input: unknown) => Promise<unknown>)({
+      root.threads.rename({
         thread: "t-1",
         name,
         idempotency_key: "k-book",

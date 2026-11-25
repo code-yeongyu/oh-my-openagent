@@ -51,14 +51,9 @@ export function failureResult(error: ThreadToolFailure): ThreadToolResult {
 }
 
 /**
- * The receipt note of a thread_create left uncertain (#14569): its first uncertain answer's message and details (the
- * reason, a worktree it kept, a cleanup), so a retry answers that cause and can finish what the first run made.
+ * A receipt note of a thread_create left uncertain (#14569), as the receipt book writes it (`control/receipt-record.ts`
+ * `encodeNote`: its closed code and identifier details, such as a worktree it kept); any other note is its own message.
  */
-export function uncertainNote(error: { readonly message: string; readonly details?: unknown }): string {
-  return JSON.stringify({ message: error.message, ...(error.details === undefined ? {} : { details: error.details }) })
-}
-
-/** A receipt note as `uncertainNote` wrote it; any other note is its own message, with no details. */
 export function noteCause(note: string): {
   readonly message: string
   readonly details?: Readonly<Record<string, unknown>>

@@ -148,28 +148,39 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
   ok: {
     script: [
       "threads.read",
+      "threads.receipt",
+      "threads.messages",
       "threads.locate",
       "threads.send",
       "threads.interrupt",
       "threads.close",
       "threads.release",
       "threads.setModel",
+      "threads.setReasoning",
       "threads.rename",
+      "threads.archive",
       "threads.extensions.call",
     ],
     person: [
       "threads.read",
+      "threads.receipt",
+      "threads.messages",
       "threads.locate",
       "threads.send",
       "threads.interrupt",
       "threads.close",
       "threads.release",
       "threads.setModel",
+      "threads.setReasoning",
       "threads.rename",
+      "threads.archive",
       "threads.extensions.call",
     ],
   },
-  fault: { script: ["threads.extensions.call"], person: ["threads.extensions.call"] },
+  fault: {
+    script: ["threads.receipt", "threads.extensions.call"],
+    person: ["threads.receipt", "threads.extensions.call"],
+  },
 }
 
 describe("the non-disclosure scan over the whole root", () => {
