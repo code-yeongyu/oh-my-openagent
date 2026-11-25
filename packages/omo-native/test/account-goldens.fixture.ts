@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { appendFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 // Preloaded into a child running one account verb for the account goldens (account-goldens.test.ts). Nothing here
@@ -14,6 +14,41 @@ const home = process.env.HOME
 const storeFile = process.env.GOLDEN_STORE_FILE
 if (home === undefined || storeFile === undefined || !storeFile.startsWith(home))
   throw new Error("the account goldens need a temporary HOME and a store file under it")
+
+// Fail closed on the network: a request to anything but the loopback address (where the test's fake service and the
+// sign-in callback listen) is refused before it leaves, and recorded in .golden-refused under HOME, which the test
+// requires to stay absent. Covers fetch, node:http and node:https, the clients the account code uses.
+const refusedFile = join(home, ".golden-refused")
+const requireLoopback = (target: string | URL): void => {
+  const url = new URL(String(target))
+  if (url.hostname === "127.0.0.1") return
+  appendFileSync(refusedFile, `${url.protocol}//${url.host}\n`)
+  throw new Error("account goldens: only the loopback address is reachable")
+}
+const realFetch = globalThis.fetch
+globalThis.fetch = Object.assign(
+  async (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    requireLoopback(input instanceof Request ? input.url : String(input))
+    return realFetch(input, init)
+  },
+  { preconnect: realFetch.preconnect },
+)
+for (const name of ["node:http", "node:https"] as const) {
+  const client = require(name) as typeof import("node:http")
+  const scheme = name === "node:http" ? "http:" : "https:"
+  for (const method of ["request", "get"] as const) {
+    const real = client[method] as (...args: unknown[]) => unknown
+    client[method] = ((...args: unknown[]) => {
+      const [first] = args
+      if (typeof first === "string" || first instanceof URL) requireLoopback(first)
+      else {
+        const options = (first ?? {}) as { host?: string; hostname?: string; port?: number }
+        requireLoopback(`${scheme}//${options.hostname ?? options.host ?? "localhost"}`)
+      }
+      return real(...args)
+    }) as typeof client.request
+  }
+}
 
 type Slots = Record<string, string>
 const readSlots = (): Slots => JSON.parse(readFileSync(storeFile, "utf8")) as Slots
@@ -128,6 +163,11 @@ childProcess.execFile = ((file: string, args: readonly string[], options: unknow
   if (!OPENERS.has(file)) return (realExecFile as (...rest: unknown[]) => unknown)(file, args, options, callback)
   const page = new URL(String(args[args.length - 1]))
   const redirect = new URL(page.searchParams.get("redirect_uri") ?? "")
+  if (redirect.hostname !== "127.0.0.1") {
+    appendFileSync(refusedFile, `${redirect.protocol}//${redirect.host}\n`)
+    ;(callback as (error: Error | null) => void)(new Error("account goldens: the callback is not a loopback address"))
+    return undefined
+  }
   redirect.search = new URLSearchParams({
     code: "golden-browser-code",
     state: page.searchParams.get("state") ?? "",

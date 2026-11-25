@@ -1,4 +1,4 @@
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { buildServiceAuth } from "../../../script/build-service-auth"
@@ -73,11 +73,14 @@ export async function cleanUp(): Promise<void> {
 }
 
 /** Runs every case, a few at a time: each owns its HOME, its store file and its service, so none shares state. */
-export async function runAll(
-  cases: readonly GoldenCase[],
-  width = 4,
-): Promise<ReadonlyMap<string, readonly Observed[]>> {
-  const results = new Map<string, readonly Observed[]>()
+export type CaseRun = {
+  readonly steps: readonly Observed[]
+  /** Every non-loopback destination the case tried to reach; the fixture refused each one before it left. */
+  readonly refused: readonly string[]
+}
+
+export async function runAll(cases: readonly GoldenCase[], width = 4): Promise<ReadonlyMap<string, CaseRun>> {
+  const results = new Map<string, CaseRun>()
   const queue = [...cases]
   const worker = async (): Promise<void> => {
     for (let next = queue.shift(); next !== undefined; next = queue.shift()) results.set(next.id, await runCase(next))
@@ -165,7 +168,7 @@ function normalize(text: string, api: string, home: string): string {
     .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<port>")
 }
 
-async function runCase(golden: GoldenCase): Promise<readonly Observed[]> {
+async function runCase(golden: GoldenCase): Promise<CaseRun> {
   const home = mkdtempSync(join(tmpdir(), "omo-golden-home-"))
   onFinished(() => rmSync(home, { recursive: true, force: true }))
   const runtimeDir = join(home, "xdg-run")
@@ -224,5 +227,7 @@ async function runCase(golden: GoldenCase): Promise<readonly Observed[]> {
       storedDevices: storedDevices(storeFile),
     })
   }
-  return observed
+  const refusedFile = join(home, ".golden-refused")
+  const refused = existsSync(refusedFile) ? readFileSync(refusedFile, "utf8").split("\n").filter(Boolean) : []
+  return { steps: observed, refused }
 }
