@@ -16,6 +16,12 @@ export type PendingCell = {
 export const PENDING_CELLS: readonly PendingCell[] = [
   {
     call: "threads.resolve",
+    principal: "person",
+    served_by: "the same OS user (security design 3): remote module factories sessions.resolve (remote/client.ts:460)",
+    owner: "T1a",
+  },
+  {
+    call: "threads.resolve",
     principal: "script",
     served_by: "remote module factories sessions.resolve (remote/client.ts:460)",
     owner: "T1a",
@@ -35,9 +41,21 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   { call: "threads.messages", principal: "script", served_by: "omo host session read --messages --json", owner: "T1b" },
   {
     call: "threads.locate",
+    principal: "person",
+    served_by: "the same OS user (security design 3): createThreadSdk.locate (thread/sdk.ts:404)",
+    owner: "T1a",
+  },
+  {
+    call: "threads.locate",
     principal: "script",
     served_by: "createThreadSdk.locate (thread/sdk.ts:404)",
     owner: "T1a",
+  },
+  {
+    call: "threads.release",
+    principal: "person",
+    served_by: "the same OS user (security design 3): createThreadSdk.release (thread/sdk.ts:508)",
+    owner: "T1c",
   },
   {
     call: "threads.release",
@@ -59,8 +77,20 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "threads.aliases.resolve",
+    principal: "person",
+    served_by: "the same OS user (security design 3): remote module factories aliases.resolve (remote/aliases.ts:148)",
+    owner: "T1c",
+  },
+  {
+    call: "threads.aliases.resolve",
     principal: "script",
     served_by: "remote module factories aliases.resolve (remote/aliases.ts:148)",
+    owner: "T1c",
+  },
+  {
+    call: "threads.aliases.set",
+    principal: "person",
+    served_by: "the same OS user (security design 3): remote module factories aliases.set (remote/aliases.ts:164)",
     owner: "T1c",
   },
   {
@@ -73,6 +103,12 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "threads.aliases.set",
     principal: "session",
     served_by: "thread_rename and thread_create with alias (thread/tools.ts:506, :404)",
+    owner: "T1c",
+  },
+  {
+    call: "threads.aliases.clear",
+    principal: "person",
+    served_by: "the same OS user (security design 3): remote module factories aliases.clear (remote/aliases.ts:189)",
     owner: "T1c",
   },
   {
@@ -102,12 +138,24 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "devices.resolve",
+    principal: "person",
+    served_by: "the same OS user (security design 3): remote module factories devices.resolve (remote/client.ts:436)",
+    owner: "T1a",
+  },
+  {
+    call: "devices.resolve",
     principal: "script",
     served_by: "remote module factories devices.resolve (remote/client.ts:436)",
     owner: "T1a",
   },
   { call: "daemon.run", principal: "person", served_by: "omo daemon run (bin/lib/daemon.js:76)", owner: "C1a" },
   { call: "daemon.run", principal: "script", served_by: "omo daemon run --json (bin/lib/daemon.js:273)", owner: "C1a" },
+  {
+    call: "daemon.warm",
+    principal: "person",
+    served_by: "the same OS user (security design 3): createThreadSdk.warmDaemon (thread/sdk.ts:519)",
+    owner: "C1a",
+  },
   {
     call: "daemon.warm",
     principal: "script",
@@ -157,9 +205,21 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     owner: "E1c",
   },
   {
+    call: "engine.config.resources",
+    principal: "script",
+    served_by: "the same OS user (security design 3): omo config (engine config-selector)",
+    owner: "E1c",
+  },
+  {
     call: "engine.models.update",
     principal: "person",
     served_by: "omo update --models (engine package-manager-cli)",
+    owner: "E1c",
+  },
+  {
+    call: "engine.models.update",
+    principal: "script",
+    served_by: "the same OS user (security design 3): omo update --models (engine package-manager-cli)",
     owner: "E1c",
   },
   {
@@ -200,9 +260,22 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     owner: "E1c",
   },
   {
+    call: "engine.sessions.exportHtml",
+    principal: "script",
+    served_by: "the same OS user (security design 3): omo --export (engine cli args)",
+    owner: "E1c",
+  },
+  {
     call: "toolkit.help",
     principal: "person",
     served_by: "oh-my-opencode ulw-loop help (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.help",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop help (omo-opencode/src/cli/runtime-commands.ts:100)",
     owner: "OC2",
   },
   {
@@ -219,6 +292,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "toolkit.addGoal",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop add-goal (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.addGoal",
     principal: "session",
     served_by: "agentToolkit.addGoal (ulw-loop/sdk/session-toolkit.ts:132)",
     owner: "OC2",
@@ -227,6 +307,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "toolkit.checkpoint",
     principal: "person",
     served_by: "oh-my-opencode ulw-loop checkpoint (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.checkpoint",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop checkpoint (omo-opencode/src/cli/runtime-commands.ts:100)",
     owner: "OC2",
   },
   {
@@ -243,6 +330,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "toolkit.completeGoals",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop complete-goals (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.completeGoals",
     principal: "session",
     served_by: "agentToolkit.completeGoals (ulw-loop/sdk/session-toolkit.ts:129)",
     owner: "OC2",
@@ -251,6 +345,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "toolkit.createGoals",
     principal: "person",
     served_by: "oh-my-opencode ulw-loop create-goals (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.createGoals",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop create-goals (omo-opencode/src/cli/runtime-commands.ts:100)",
     owner: "OC2",
   },
   {
@@ -267,6 +368,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "toolkit.criteria",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop criteria (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.criteria",
     principal: "session",
     served_by: "agentToolkit.criteria (ulw-loop/sdk/session-toolkit.ts:130)",
     owner: "OC2",
@@ -275,6 +383,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "toolkit.recordEvidence",
     principal: "person",
     served_by: "oh-my-opencode ulw-loop record-evidence (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.recordEvidence",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop record-evidence (omo-opencode/src/cli/runtime-commands.ts:100)",
     owner: "OC2",
   },
   {
@@ -291,6 +406,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "toolkit.recordReviewBlockers",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop record-review-blockers (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.recordReviewBlockers",
     principal: "session",
     served_by: "agentToolkit.recordReviewBlockers (ulw-loop/sdk/session-toolkit.ts:140)",
     owner: "OC2",
@@ -303,6 +425,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
   },
   {
     call: "toolkit.status",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop status (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.status",
     principal: "session",
     served_by: "agentToolkit.status (ulw-loop/sdk/session-toolkit.ts:121)",
     owner: "OC2",
@@ -311,6 +440,13 @@ export const PENDING_CELLS: readonly PendingCell[] = [
     call: "toolkit.steer",
     principal: "person",
     served_by: "oh-my-opencode ulw-loop steer (omo-opencode/src/cli/runtime-commands.ts:100)",
+    owner: "OC2",
+  },
+  {
+    call: "toolkit.steer",
+    principal: "script",
+    served_by:
+      "the same OS user (security design 3): oh-my-opencode ulw-loop steer (omo-opencode/src/cli/runtime-commands.ts:100)",
     owner: "OC2",
   },
   {
