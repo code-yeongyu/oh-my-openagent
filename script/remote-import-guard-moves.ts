@@ -1,11 +1,8 @@
-import { relative, sep } from "node:path"
-
 import { offenderGrowth } from "./remote-import-guard-adapter"
 import moves from "./remote-import-guard-account-moves.json"
+import { type GitReader, gitTrees, type Trees } from "./remote-import-guard-git-trees"
 import { blankModuleSpecifiers, specifierIdentity } from "./remote-import-guard-move-identity"
-import { createResolver, type Resolver, type ResolverFiles } from "./remote-import-guard-resolve"
 import { ADAPTER_RULES } from "./remote-import-guard-rules"
-import { type FileFacts, scanRepository } from "./remote-import-guard-scan"
 
 // A layer whose code moved keeps its offenders, file by file (#14364, the LEAD's ruling on review 6065350035 and the
 // design lane's on the next round). The moved files are git's own renames at the move commit, pinned by its full sha and
@@ -18,73 +15,17 @@ import { type FileFacts, scanRepository } from "./remote-import-guard-scan"
 export type MoveSet = { readonly commit: string; readonly pairs: Readonly<Record<string, string>> }
 export const ACCOUNT_CORE_MOVES: MoveSet = moves
 
-/** Runs git in the repository; undefined when git fails (an object this checkout does not have). */
-export type GitReader = (args: readonly string[]) => string | undefined
-
-export type Trees = {
-  readonly base: string
-  /** A file at a revision (`HEAD` or the merge base); undefined when that tree has no such file. */
-  readonly read: (ref: string, path: string) => string | undefined
-  readonly list: (ref: string, directory: string) => readonly string[]
-  readonly resolver: (ref: string) => Resolver
-  /** The files some non-test source file imports at the head, by any edge form. */
-  readonly imported: () => ReadonlySet<string>
-}
-
 const CODE = /\.[cm]?[jt]sx?$/
-const toPosix = (path: string): string => path.split(sep).join("/")
 const lines = (text: string | undefined): string[] => (text ?? "").split("\n").filter(Boolean)
 
-export function importedFiles(facts: readonly FileFacts[], resolve: Resolver): ReadonlySet<string> {
-  const imported = new Set<string>()
-  for (const fact of facts) {
-    if (ADAPTER_RULES.testFile(fact.file)) continue
-    for (const edge of fact.edges) {
-      const target = resolve(fact.file, edge.specifier)
-      if (target !== undefined) imported.add(target)
-    }
-  }
-  return imported
-}
-
-function gitTreeFiles(git: GitReader, ref: string, repoRoot: string): ResolverFiles {
-  const files = new Set(lines(git(["ls-tree", "-r", "--name-only", ref])))
-  const children = new Map<string, Set<string>>()
-  for (const file of files) {
-    const parts = file.split("/")
-    for (let depth = 1; depth < parts.length; depth++) {
-      const parent = parts.slice(0, depth - 1).join("/")
-      const set = children.get(parent) ?? new Set<string>()
-      set.add(parts[depth - 1] ?? "")
-      children.set(parent, set)
-    }
-  }
-  const inRepo = (path: string): string => toPosix(relative(repoRoot, path))
-  return {
-    isFile: (path) => files.has(inRepo(path)),
-    readText: (path) => git(["show", `${ref}:${inRepo(path)}`]) ?? "",
-    directories: (path) => [...(children.get(inRepo(path)) ?? [])],
-  }
-}
-
-/** Both homes read both sides from git at their exact revisions, and resolve the head's imports from the disk once. */
-export function gitTrees(git: GitReader, base: string, repoRoot: string): Trees {
-  const resolvers = new Map<string, Resolver>()
-  let imported: ReadonlySet<string> | undefined
-  return {
-    base,
-    read: (ref, path) => git(["show", `${ref}:${path}`]),
-    list: (ref, directory) => lines(git(["ls-tree", "-r", "--name-only", ref, "--", directory])),
-    resolver: (ref) => {
-      const resolve = resolvers.get(ref) ?? createResolver(repoRoot, gitTreeFiles(git, ref, repoRoot))
-      resolvers.set(ref, resolve)
-      return resolve
-    },
-    imported: () => {
-      imported ??= importedFiles(scanRepository(repoRoot), createResolver(repoRoot))
-      return imported
-    },
-  }
+/** The trees for the moved-file check, prefetching every manifest, both ends of every pair and the moved-to layers. */
+export function moveTrees(git: GitReader, base: string, repoRoot: string, set: MoveSet = ACCOUNT_CORE_MOVES): Trees {
+  const layers = [...new Set(Object.values(movedLayerRenames(set)))]
+  const ends = [...Object.keys(set.pairs), ...Object.values(set.pairs)]
+  return gitTrees(git, base, repoRoot, (files) => [
+    ...ends,
+    ...[...files].filter((file) => file.endsWith("package.json") || layers.some((layer) => file.startsWith(layer))),
+  ])
 }
 
 /** The committed pairs against every rename git reports at the pinned commit; an absent commit fails. */
@@ -140,7 +81,7 @@ export function movedFileReport(set: MoveSet, trees: Trees): MovedFileReport {
       if (trees.read(trees.base, file) !== undefined) continue
       const from = origin.get(file)
       if (from === undefined) {
-        const reachable = (CODE.test(file) && !ADAPTER_RULES.testFile(file)) || trees.imported().has(file)
+        const reachable = (CODE.test(file) && !ADAPTER_RULES.testFile(file)) || trees.isImported(file)
         if (reachable)
           problems.push(`${file} is new in ${layer} and is not one of the files moved by ${set.commit.slice(0, 10)}`)
         else exempt.push(file)
@@ -164,7 +105,8 @@ export function movedFileReport(set: MoveSet, trees: Trees): MovedFileReport {
       }
     }
   }
-  return { problems, hops, exempt }
+  const missing = trees.missing()
+  return missing.length > 0 ? { problems: [...missing, ...problems], hops, exempt } : { problems, hops, exempt }
 }
 
 /**

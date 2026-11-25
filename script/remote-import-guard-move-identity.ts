@@ -45,10 +45,10 @@ function requestedNames(text: string, use: SpecifierUse): readonly string[] | un
     .map((entry) => entry.split(/\s+as\s+/)[0] ?? entry)
 }
 
-export type PureReexport = { readonly specifier: string; readonly star: boolean; readonly names: ReadonlySet<string> }
+type PureReexport = { readonly specifier: string; readonly star: boolean; readonly names: ReadonlySet<string> }
 
 /** The one module a file re-exports when export-from of that module is all it holds; undefined otherwise. */
-export function pureReexport(text: string): PureReexport | undefined {
+function pureReexport(text: string): PureReexport | undefined {
   const code = text.replace(COMMENTS, "")
   const statements = [...code.matchAll(REEXPORT)]
   if (statements.length === 0 || code.replace(REEXPORT, "").trim() !== "") return undefined

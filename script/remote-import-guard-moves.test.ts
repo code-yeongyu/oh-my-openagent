@@ -1,13 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
+import type { GitReader, Trees } from "./remote-import-guard-git-trees"
 import {
   ACCOUNT_CORE_MOVES,
-  type GitReader,
-  gitTrees,
   type MoveSet,
   movedFileReport,
   moveListProblems,
-  type Trees,
+  moveTrees,
 } from "./remote-import-guard-moves"
 import { probeBase, repoGit } from "./sdk-parity/base-probe"
 import { REPO_ROOT } from "./sdk-parity/registry"
@@ -72,7 +71,8 @@ describe("movedFileReport", () => {
     read: (at, path) => (at === "BASE" ? base : head)[path],
     list: (at, directory) => Object.keys(at === "BASE" ? base : head).filter((file) => file.startsWith(directory)),
     resolver: () => () => "packages/x.ts",
-    imported: () => new Set(imported),
+    isImported: (file) => imported.includes(file),
+    missing: () => [],
   })
 
   test("#given a moved file whose only change is a specifier naming the same module #then nothing is reported", () => {
@@ -115,7 +115,7 @@ describe("the account core move on this repository (runs while the merge base pr
   test.skipIf(!moveIsNew)(
     `#given the merge base #then every moved file passes, and the re-export hops and the exempt file are exactly as recorded${moveIsNew ? "" : unverified(BASE.readable ? "the move is already in the merge base" : BASE.reason)}`,
     () => {
-      const report = movedFileReport(ACCOUNT_CORE_MOVES, gitTrees(reader, BASE.readable ? BASE.base : "", REPO_ROOT))
+      const report = movedFileReport(ACCOUNT_CORE_MOVES, moveTrees(reader, BASE.readable ? BASE.base : "", REPO_ROOT))
       const helper = "packages/account-core/src/keychain-helper"
       const hop = (file: string, shim: string): string =>
         `${helper}/${file}: "../../../shared/${shim}" -> "@oh-my-opencode/utils/runtime" through packages/omo-opencode/src/shared/${shim}.ts`
