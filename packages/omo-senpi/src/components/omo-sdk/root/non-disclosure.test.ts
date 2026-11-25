@@ -111,18 +111,6 @@ const PRINCIPALS = [
 
 type Captured = { readonly key: RootCallKey; readonly answer: unknown }
 
-// The ONE named, counted exception (B8, carried by slice T1b's PR 15000): the thread core's thrown() (thread/sdk-core/
-// failures.ts) answers internal_error with the unexpected exception's message in its own message, as every shipped thread
-// surface does today. It is admitted only there; once B8 removes the echo the count is 0 and this test fails, so T1b's
-// change deletes the entry and the scan is fully strict.
-const B8_ECHO = { code: "internal_error", prefix: "Thread operation failed: " } as const
-
-function isB8Echo(entry: Captured): boolean {
-  if (!entry.key.startsWith("threads.")) return false
-  const error = (entry.answer as { readonly error?: { readonly code?: unknown; readonly message?: unknown } }).error
-  return error?.code === B8_ECHO.code && typeof error.message === "string" && error.message.startsWith(B8_ECHO.prefix)
-}
-
 async function drive(key: RootCallKey, member: unknown, captured: Captured[]): Promise<void> {
   try {
     const answer = (member as (input: unknown, options: unknown) => unknown)(
@@ -137,12 +125,6 @@ async function drive(key: RootCallKey, member: unknown, captured: Captured[]): P
   } catch (error) {
     captured.push({ key, answer: error })
   }
-}
-
-// Where the B8 echo is expected today: the thread calls that reach a faulting host for a principal the root serves.
-const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
-  ok: {},
-  fault: { script: ["threads.release"], person: ["threads.release"] },
 }
 
 describe("the non-disclosure scan over the whole root", () => {
@@ -190,15 +172,10 @@ describe("the non-disclosure scan over the whole root", () => {
           for (const undo of restore) undo()
         }
         const written = filesUnder(home).map((path) => ({ path, text: readFileSync(path, "latin1") }))
-        const echoed = captured.filter((entry) => isB8Echo(entry) && canariesIn(entry.answer).length > 0)
-        const strict = captured.filter((entry) => !echoed.includes(entry))
-        expect({ answers: canariesIn(strict), console: canariesIn(logged), files: canariesIn(written) }).toEqual({
+        expect({ answers: canariesIn(captured), console: canariesIn(logged), files: canariesIn(written) }).toEqual({
           answers: [],
           console: [],
           files: [],
         })
-        expect(echoed.map((entry): string => entry.key)).toEqual([
-          ...(EXPECTED_B8_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? []),
-        ])
       })
 })
