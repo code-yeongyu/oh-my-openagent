@@ -24,7 +24,7 @@ import {
   type Scratch,
 } from "../../../../packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs"
 import type { ToolSession } from "../drivers/tools.ts"
-import { PARK_TO, SWITCH_TO } from "../scenario.ts"
+import { METER_MODEL, PARK_TO, parkModelId, SWITCH_TO } from "../scenario.ts"
 import { enginePort } from "./engine-port.ts"
 import { type Device, type FakeRelay, startFakeRelay } from "./fake-relay.ts"
 import { type Observer, observeB } from "./observe.ts"
@@ -137,14 +137,18 @@ const addThinkingModel = (agentDir: string): void => {
   const models = JSON.parse(readFileSync(path, "utf8"))
   const mock = models.providers.mock
   mock.models.push({ ...mock.models[0], id: SWITCH_TO.id, reasoning: true })
-  mock.models.push({ ...mock.models[0], id: PARK_TO.id, reasoning: true, contextWindow: PARK_TO.contextWindow })
+  for (let window = PARK_TO.windows.from; window <= PARK_TO.windows.to; window += PARK_TO.windows.step)
+    mock.models.push({ ...mock.models[0], id: parkModelId(window), reasoning: true, contextWindow: window })
+  mock.models.push({ ...mock.models[0], id: METER_MODEL, contextWindow: 256 })
   writeFileSync(path, `${JSON.stringify(models, null, 2)}\n`)
 }
 
 export async function startWorld(trace: (line: string) => void): Promise<World> {
   installCleanupHooks()
   const install = await buildOmoInstall("x1a-proof")
-  const fake = await startFakeModel()
+  // The model reports usage the way a real provider does (about four characters a token over the whole request), so B's
+  // context estimate follows the thread and a switch can need a compaction (the parked step, #14939).
+  const fake = await startFakeModel({ promptTokens: (body) => Math.ceil(JSON.stringify(body).length / 4) })
   const a = makeScratch("x1a-a", fake)
   const b = makeScratch("x1a-b", fake)
   addThinkingModel(b.agentDir)

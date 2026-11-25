@@ -533,9 +533,10 @@ function contentText(message) {
  *   (registered by `fake.script`) or `QA:CALL <tool> <b64>` lines -> those tool calls; with `QA:HOLD <tag>` -> a stream held open until `release(tag)`
  *   (with tool calls too, the calls arrive on release, so input the user steers in while it is held enters the run at that tool boundary);
  *   otherwise -> `QA-ACK <every QA-TOKEN-* in it>`.
- * Every request is recorded with the directive it answered.
+ * Every request is recorded with the directive it answered. Usage reports one prompt token unless `promptTokens(body)`
+ * says otherwise (a world that needs the engine's context estimate to follow the request size passes one).
  */
-export async function startFakeModel() {
+export async function startFakeModel({ promptTokens } = {}) {
   const requests = []
   const holds = new Map()
   const scripts = new Map()
@@ -612,7 +613,7 @@ export async function startFakeModel() {
           turn = { text: `QA-ACK ${tokens.length === 0 ? "none" : tokens.join(" ")}` }
         }
       }
-      writeSse(res, turn, body.model ?? "mock-model", holds)
+      writeSse(res, turn, body.model ?? "mock-model", holds, promptTokens?.(body) ?? 1)
       tick("model")
     })
   })
@@ -650,14 +651,14 @@ export async function startFakeModel() {
   }
 }
 
-function writeSse(res, turn, model, holds) {
+function writeSse(res, turn, model, holds, promptTokens) {
   res.writeHead(200, { "content-type": "text/event-stream", "cache-control": "no-cache" })
   const base = { id: "chatcmpl-qa", object: "chat.completion.chunk", created: 0, model }
   const send = (delta, finish = null) =>
     res.write(`data: ${JSON.stringify({ ...base, choices: [{ index: 0, delta, finish_reason: finish }] })}\n\n`)
   const complete = () => {
     res.write(
-      `data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } })}\n\n`,
+      `data: ${JSON.stringify({ ...base, choices: [], usage: { prompt_tokens: promptTokens, completion_tokens: 1, total_tokens: promptTokens + 1 } })}\n\n`,
     )
     res.write("data: [DONE]\n\n")
     res.end()

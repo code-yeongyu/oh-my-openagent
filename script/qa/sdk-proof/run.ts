@@ -14,7 +14,7 @@ import { cellOf, turnOf } from "./cell.ts"
 import type { Answer, Driver } from "./drivers/driver.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
 import { type Cell, redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
-import { fill, SCENARIO } from "./scenario.ts"
+import { fill, parkModelId, parkWindowFor, SCENARIO } from "./scenario.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
 import { CANARY, DEVICE_A, DEVICE_B, type Isolation, startWorld, type World } from "./world/world.ts"
 import { outsideWriteRoots } from "./world/write-roots.ts"
@@ -107,10 +107,19 @@ async function runSteps(surface: Surface, world: World, driver: Driver): Promise
       continue
     }
     const before = step.op === "create" ? await world.observer.keys() : new Set<string>()
-    const setup = step.before === "fill-context" ? await world.observer.fill(key) : undefined
-    if (setup !== undefined) {
-      skipped(`world setup failed, not a product result: ${setup}`, "not reached", step.owner.slice)
-      continue
+    if (step.before === "fill-context") {
+      const filled = await world.observer.fill(key)
+      const window = "requirement" in filled ? parkWindowFor(filled.requirement) : undefined
+      if (!("requirement" in filled) || window === undefined) {
+        const why = "failed" in filled ? filled.failed : `no ladder window below the requirement ${filled.requirement}`
+        skipped(`world setup failed, not a product result: ${why}`, "not reached", step.owner.slice)
+        continue
+      }
+      values["park"] = parkModelId(window)
+      Object.assign(
+        input,
+        Object.fromEntries(Object.entries(step.input).map(([name, text]) => [name, fill(text, values)])),
+      )
     }
     const answer = await withinStep(
       (signal) =>

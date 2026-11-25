@@ -45,7 +45,9 @@ export function waitFor<T>(
 ): Promise<NonNullable<T>>
 export function buildOmoInstall(name: string, patchNames?: readonly string[]): Promise<OmoInstall>
 export function makeScratch(label: string, fake: FakeModel): Scratch
-export function startFakeModel(): Promise<FakeModel>
+export function startFakeModel(options?: {
+  readonly promptTokens?: (body: Readonly<Record<string, unknown>>) => number
+}): Promise<FakeModel>
 export function omo(
   scratch: Scratch,
   install: OmoInstall,

@@ -22,6 +22,13 @@ export type Expect =
   | { readonly kind: "interrupted"; readonly tag: string }
   | { readonly kind: "model"; readonly provider: string; readonly id: string; readonly thinking: string }
   | { readonly kind: "parked"; readonly provider: string; readonly id: string; readonly thinking: string }
+  | {
+      readonly kind: "applied"
+      readonly token: string
+      readonly provider: string
+      readonly id: string
+      readonly thinking: string
+    }
   | { readonly kind: "closed" }
 
 export type Step = {
@@ -47,8 +54,24 @@ export type Step = {
 /** The model the set-model step switches to on B, with a thinking suffix (#14939); world/world.ts lists it on B. */
 export const SWITCH_TO = { provider: "mock", id: "mock-think", thinking: "high" } as const
 
-/** The model whose window B's filled thread fits only after a compaction: a switch to it parks (#14939). */
-export const PARK_TO = { provider: "mock", id: "mock-park", thinking: "high", contextWindow: 80_000 } as const
+/**
+ * The switch that parks (#14939): B's catalog lists a ladder of models (one per window size); after filling the thread
+ * the world reads B's switch requirement and names the largest window below it, which fits only after a compaction.
+ */
+export const PARK_TO = {
+  provider: "mock",
+  thinking: "high",
+  windows: { from: 40_000, to: 160_000, step: 2_000 },
+} as const
+export const parkModelId = (window: number): string => `mock-park-${window}`
+/** A model too small for any thread: a switch to it is refused with the thread's switch requirement, and changes nothing. */
+export const METER_MODEL = "mock-meter"
+/** The ladder model a filled thread with this switch requirement parks a switch to: the largest window below it. */
+export const parkWindowFor = (requirement: number): number | undefined => {
+  const { from, to, step } = PARK_TO.windows
+  const below = Math.floor((Math.min(requirement - 1_000, to) - from) / step)
+  return below < 0 ? undefined : from + below * step
+}
 
 export const ackOf = (token: string): string => `QA-ACK ${token}`
 
@@ -56,6 +79,7 @@ const OPEN = "QA-TOKEN-x1a-open-{{run}}"
 const FOLLOW = "QA-TOKEN-x1a-follow-{{run}}"
 const STEER = "QA-TOKEN-x1a-steer-{{run}}"
 const STEER_UNNAMED = "QA-TOKEN-x1a-steer-unnamed-{{run}}"
+const AFTER = "QA-TOKEN-x1a-after-compaction-{{run}}"
 
 export const SCENARIO: readonly Step[] = [
   {
@@ -111,14 +135,6 @@ export const SCENARIO: readonly Step[] = [
     owner: { row: "threads.send (delivery steer, no expected_turn_id)", slice: "T1a (core send rule)" },
   },
   {
-    id: "set-model-parked",
-    op: "setModel",
-    input: { thread: "{{thread}}", model: `${PARK_TO.provider}/${PARK_TO.id}:${PARK_TO.thinking}` },
-    before: "fill-context",
-    expect: { kind: "parked", provider: PARK_TO.provider, id: PARK_TO.id, thinking: PARK_TO.thinking },
-    owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
-  },
-  {
     id: "send-long-2",
     op: "send",
     input: { thread: "{{thread}}", message: "x1a long two QA:HOLD {{run}}-interrupt", delivery: "follow_up" },
@@ -140,6 +156,21 @@ export const SCENARIO: readonly Step[] = [
     owner: { row: "threads.setModel (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
   },
   {
+    id: "set-model-parked",
+    op: "setModel",
+    input: { thread: "{{thread}}", model: `${PARK_TO.provider}/{{park}}:${PARK_TO.thinking}` },
+    before: "fill-context",
+    expect: { kind: "parked", provider: PARK_TO.provider, id: "{{park}}", thinking: PARK_TO.thinking },
+    owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
+  },
+  {
+    id: "after-compaction",
+    op: "send",
+    input: { thread: "{{thread}}", message: `x1a after compaction ${AFTER}`, delivery: "follow_up" },
+    expect: { kind: "applied", token: AFTER, provider: PARK_TO.provider, id: "{{park}}", thinking: PARK_TO.thinking },
+    owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
+  },
+  {
     id: "close",
     op: "close",
     input: { thread: "{{thread}}" },
@@ -151,8 +182,8 @@ export const SCENARIO: readonly Step[] = [
 /** The issue filed for a cell's finding, by `<surface>:<step id>`, shown beside the cell while it fails. */
 export const ISSUES: Readonly<Record<string, string>> = {
   "sdk:open": "#15006",
-  "tools:steer": "#15007",
-  "sdk:steer": "#15007",
+  "tools:steer": "#15013",
+  "cli:close": "#15012",
 }
 
 export const OPS: readonly Op[] = ["create", "send", "read", "interrupt", "setModel", "close"]

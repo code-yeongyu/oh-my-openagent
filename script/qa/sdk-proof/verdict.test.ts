@@ -45,6 +45,12 @@ const passing: readonly Case[] = [
     { kind: "ok", model_switch: "after_compaction" },
   ],
   ["closed", { kind: "closed" }, idle([], { listed: false }), {}],
+  [
+    "applied after compaction",
+    { kind: "applied", token: TOKEN, provider: "p", id: "m", thinking: "high" },
+    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/m", thinking: "high" }),
+    {},
+  ],
 ]
 const failing: readonly Case[] = [
   ["exchange without the answer", { kind: "exchange", token: TOKEN }, idle([user(TOKEN)]), {}],
@@ -82,6 +88,12 @@ const failing: readonly Case[] = [
     { model_switch: "after_compaction" },
   ],
   ["closed but still listed", { kind: "closed" }, idle([]), {}],
+  [
+    "applied at another thinking level",
+    { kind: "applied", token: TOKEN, provider: "p", id: "m", thinking: "high" },
+    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/m", thinking: "medium" }),
+    {},
+  ],
 ]
 
 describe("a step's verdict on device B", () => {
