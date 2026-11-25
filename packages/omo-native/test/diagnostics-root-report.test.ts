@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, rmSync } from "node:fs"
+import { copyFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
@@ -8,7 +8,7 @@ import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 import type { DaemonEngine, RunPorts } from "../bin/lib/diagnostics-contract"
 import { printDoctorReport, runDoctor } from "../bin/lib/doctor.js"
 import { createDiagnosticsLoader } from "../diagnostics-loader"
-import { capture, normalize } from "./doctor-golden.test-support"
+import { asInstall, capture, createInstall, importInstalled, normalize } from "./doctor-golden.test-support"
 
 const roots: string[] = []
 afterEach(() => {
@@ -88,5 +88,42 @@ describe("diagnostics.run through the SDK root against omo doctor", () => {
       exitCode: 1,
     })
     expect(signalled).toEqual([11])
+  })
+
+  test("#given an installed engine whose host CLI reports a running daemon and neither caller passes an engine #when the root answers run and the command prints its report #then both carry the daemon and host findings from that CLI", async () => {
+    const install = createInstall(roots)
+    const engineCli = join(install.packageRoot, "node_modules", "@code-yeongyu", "senpi", "dist", "cli.js")
+    writeFileSync(engineCli, `process.stdout.write(${JSON.stringify(`${HOSTS}\n`)})\n`)
+    copyFileSync(
+      join(import.meta.dir, "..", "diagnostics-loader.ts"),
+      join(install.packageRoot, "diagnostics-loader.ts"),
+    )
+    const { createDiagnosticsLoader: installedLoader } = await importInstalled<{
+      createDiagnosticsLoader: typeof createDiagnosticsLoader
+    }>(install, "diagnostics-loader.ts")
+    const { printDoctorReport: installedReport } = await importInstalled<{
+      printDoctorReport: typeof printDoctorReport
+    }>(install, "bin/lib/doctor.js")
+    const { daemonEngine: _none, ...withoutEngine } = ports(install.home)
+    const env = { ...withoutEngine.env, OMO_CODING_AGENT_DIR: install.agentDir }
+    const given = { ...withoutEngine, env }
+    const root = assembleOmoSdk(
+      { env, cwd: install.root, home: install.home },
+      { cores: { diagnostics: installedLoader(given) } },
+    )
+    const answer = await asInstall(install, () => root.diagnostics.run({}))
+    if (answer.kind !== "ok") throw new Error(`run answered ${JSON.stringify(answer)}`)
+    const daemon = answer.value.findings
+      .filter((finding) => finding.check === "daemon")
+      .map((finding) => finding.message)
+    expect(daemon).toContain(
+      "Hosts: 1 live (0 shards, 0 threads) · 2 session(s) · rss 0 MB (host 0 MB) · crashes 0 (recorded, newest 50 per endpoint)",
+    )
+    const printed = await asInstall(install, () =>
+      capture(install.root, async () => {
+        process.exitCode = await installedReport(given)
+      }),
+    )
+    expect(normalize(renderFindings(answer.value.findings).join("\n"), install.root)).toBe(printed.stdout)
   })
 })
