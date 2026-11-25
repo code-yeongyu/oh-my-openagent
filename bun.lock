@@ -13,6 +13,7 @@
         "@clack/prompts": "^1.8.1",
         "@code-yeongyu/senpi": "2026.11.23",
         "@modelcontextprotocol/sdk": "^1.30.0",
+        "@oh-my-opencode/account-core": "workspace:*",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
@@ -97,6 +98,17 @@
         "oh-my-opencode-windows-arm64": "5.1.83",
         "oh-my-opencode-windows-x64": "5.1.83",
         "oh-my-opencode-windows-x64-baseline": "5.1.83",
+      },
+    },
+    "packages/account-core": {
+      "name": "@oh-my-opencode/account-core",
+      "version": "0.1.0",
+      "dependencies": {
+        "@oh-my-opencode/device-service-core": "workspace:*",
+        "@oh-my-opencode/memory-core": "workspace:*",
+        "@oh-my-opencode/team-core": "workspace:*",
+        "@oh-my-opencode/utils": "workspace:*",
+        "zod": "^4.6.6",
       },
     },
     "packages/agents-md-core": {
@@ -338,6 +350,7 @@
         "@code-yeongyu/senpi": "2026.11.23",
         "@earendil-works/pi-ai": "npm:@code-yeongyu/senpi-ai@2026.11.23",
         "@modelcontextprotocol/sdk": "^1.30.0",
+        "@oh-my-opencode/account-core": "workspace:*",
         "@oh-my-opencode/agents-md-core": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/claude-code-compat-core": "workspace:*",
@@ -373,6 +386,7 @@
       "dependencies": {
         "@code-yeongyu/lsp-daemon": "file:../lsp-daemon",
         "@earendil-works/pi-tui": "npm:@code-yeongyu/senpi-tui@2026.11.23",
+        "@oh-my-opencode/account-core": "workspace:*",
         "@oh-my-opencode/ast-grep-mcp": "workspace:*",
         "@oh-my-opencode/boulder-state": "workspace:*",
         "@oh-my-opencode/comment-checker-core": "workspace:*",
@@ -920,6 +934,8 @@
     "@npmcli/redact": ["@npmcli/redact@4.0.0", "", {}, "sha512-gOBg5YHMfZy+TfHArfVogwgfBeQnKbbGo3pSUyK/gSI0AVu+pEiDVcKlQb0D8Mg1LNRZILZ6XG8I5dJ4KuAd9Q=="],
 
     "@npmcli/run-script": ["@npmcli/run-script@10.0.4", "", { "dependencies": { "@npmcli/node-gyp": "^5.0.0", "@npmcli/package-json": "^7.0.0", "@npmcli/promise-spawn": "^9.0.0", "node-gyp": "^12.1.0", "proc-log": "^6.0.0" } }, "sha512-mGUWr1uMnf0le2TwfOZY4SFxZGXGfm4Jtay/nwAa2FLNAKXUoUwaGwBMNH36UHPtinWfTSJ3nqFQr0091CxVGg=="],
+
+    "@oh-my-opencode/account-core": ["@oh-my-opencode/account-core@workspace:packages/account-core"],
 
     "@oh-my-opencode/agents-md-core": ["@oh-my-opencode/agents-md-core@workspace:packages/agents-md-core"],
 

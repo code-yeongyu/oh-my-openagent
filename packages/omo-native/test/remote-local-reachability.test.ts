@@ -47,8 +47,6 @@ const SPAWN_IMPORTERS = [
   "packages/account-core/src/keychain-helper/owner-marker.ts",
   "packages/account-core/src/keychain-helper/signature.ts",
   "packages/account-core/src/secret-service-lock.ts",
-  "packages/omo-opencode/src/shared/bun-file-shim.ts",
-  "packages/omo-opencode/src/shared/bun-spawn-shim.ts",
   "packages/omo-senpi/src/components/thread/addressing.ts",
   "packages/omo-senpi/src/components/thread/gateway/process-identity.ts",
   "packages/omo-senpi/src/components/thread/gateway/provenance-resolver.ts",

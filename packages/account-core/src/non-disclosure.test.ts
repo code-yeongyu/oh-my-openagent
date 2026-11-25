@@ -61,19 +61,33 @@ async function signedIn(api: string, expiresAt: string, logs: string[]) {
   const store = secrets.store(api)
   const home = await temporaryHome()
   await store.write(storedCredential(expiresAt))
-  const session = createSession({ api, store, home, beforeKeysDiscarded: async () => {}, log: (line) => logs.push(line) })
+  const session = createSession({
+    api,
+    store,
+    home,
+    beforeKeysDiscarded: async () => {},
+    log: (line) => logs.push(line),
+  })
   return { session, store }
 }
 
 describe("the account core discloses no planted secret (#14945 section 6, #14364)", () => {
   test("#given a device-code sign-in that succeeds #then the codes reach only the show callback", async () => {
     const api = fakeApi(async (request) =>
-      request.url.endsWith("/code") ? Response.json({ ...minted, deviceCode: CANARIES.deviceCode }) : Response.json(canaryGrant),
+      request.url.endsWith("/code")
+        ? Response.json({ ...minted, deviceCode: CANARIES.deviceCode })
+        : Response.json(canaryGrant),
     )
     const logs: string[] = []
     const shown: unknown[] = []
     const home = await temporaryHome()
-    const session = createSession({ api, store: memorySecrets().store(api), home, beforeKeysDiscarded: async () => {}, log: (line) => logs.push(line) })
+    const session = createSession({
+      api,
+      store: memorySecrets().store(api),
+      home,
+      beforeKeysDiscarded: async () => {},
+      log: (line) => logs.push(line),
+    })
     const result = await loginDevice(session, {
       name: "Canary CLI",
       platform: "linux",
@@ -99,14 +113,20 @@ describe("the account core discloses no planted secret (#14945 section 6, #14364
     ["a refresh whose service is unreachable", "unreachable"],
     ["a session whose caller cancelled", "cancelled"],
   ] as const)("#given %s #then the failure holds no stored secret", async (_name, fault) => {
-    const api =
-      fault === "unreachable" ? "http://127.0.0.1:9" : fakeApi(() => refusal("invalid_grant", undefined, 401))
+    const api = fault === "unreachable" ? "http://127.0.0.1:9" : fakeApi(() => refusal("invalid_grant", undefined, 401))
     const logs: string[] = []
     const { store } = await signedIn(api, "2000-01-01T00:00:00.000Z", logs)
     const controller = new AbortController()
     if (fault === "cancelled") controller.abort(new Error("cancelled by the caller"))
     const home = await temporaryHome()
-    const session = createSession({ api, store, home, signal: controller.signal, beforeKeysDiscarded: async () => {}, log: (line) => logs.push(line) })
+    const session = createSession({
+      api,
+      store,
+      home,
+      signal: controller.signal,
+      beforeKeysDiscarded: async () => {},
+      log: (line) => logs.push(line),
+    })
     const failure = await outcome(() => session.accessToken())
     expect(failure).toBeInstanceOf(Error)
     expect(leaked([failure, logs])).toEqual([])
