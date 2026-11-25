@@ -28,6 +28,9 @@ const OFFENDERS: readonly string[] = [
   "remote-session-args.ts -> ../omo-senpi/src/components/thread/contracts/fields",
   // The bootstrap body the internal entry hands the service client (service.bootstrap runs it; design B4).
   "remote-bootstrap.ts -> ./package.json",
+  // omo#15032 moves these onto the omo SDK's deviceService.* (remote/admin.ts would only re-export the same dependency).
+  "remote-bootstrap.ts -> ../device-service-core/src/index.ts",
+  "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
 ]
 
 const allowed = (specifier: string): boolean =>
