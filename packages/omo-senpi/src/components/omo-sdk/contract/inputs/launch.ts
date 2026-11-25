@@ -14,7 +14,7 @@ const Optional = Type.Optional
 
 export type LaunchKeyHandle = Readable | ReadableStream<Uint8Array>
 
-export const LaunchSession = Optional(
+const LaunchSession = Optional(
   Type.Object(
     {
       continue: Optional(Type.Literal(true)),

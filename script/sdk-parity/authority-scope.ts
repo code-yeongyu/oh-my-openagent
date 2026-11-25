@@ -29,7 +29,7 @@ export const files = loadScenarioTable()
 export const securityDesign = readFileSync(join(REPO_ROOT, "docs/reference/omo-sdk-authority-and-custody.md"), "utf8")
 
 /** P1a's rows that carry a field this slice typed, with those fields. */
-export const SHARED: Readonly<Record<string, readonly string[]>> = {
+const SHARED: Readonly<Record<string, readonly string[]>> = {
   "threads.send": ["author"],
   "threads.sendAndFollow": ["author"],
   "threads.create": ["launch_spec", "prompt"],
@@ -40,7 +40,7 @@ export const SHARED: Readonly<Record<string, readonly string[]>> = {
   "engine.models.list": ["setup"],
   "engine.promptSizes": ["setup"],
 }
-export const SLICE = new Set([...Object.keys(AUTHORITY_CALLS), ...Object.keys(SHARED)])
+const SLICE = new Set([...Object.keys(AUTHORITY_CALLS), ...Object.keys(SHARED)])
 export const sliceRows = rows.filter((row) => SLICE.has(row.id))
 
 const pick = (key: string, input: CallInput): CallInput => {

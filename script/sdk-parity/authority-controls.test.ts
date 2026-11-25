@@ -5,6 +5,7 @@ import {
   type BehaviourChange,
   AUTH_CHECK_FREE_FIELDS,
   CUSTODY_RESULTS,
+  SESSION_RESULTS,
   GATED,
   type MatrixLine,
   PRINCIPAL_MATRIX,
@@ -21,7 +22,7 @@ import {
 import { CALL_ALIASES, CUSTODY_FIELDS, HELD } from "./authority-expected"
 import { calls, files, isTyped, json, rows, securityDesign } from "./authority-scope"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
-import { freeFieldMappingProblems, loadSnapshot } from "./engine-snapshot-check"
+import { freeFieldMappingProblems, loadSnapshot, sessionShapeProblems } from "./engine-snapshot-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
 
 // Negative controls of slice P1a-s's checks (#14949): each breaks one thing the real tree holds and expects the check to
@@ -180,5 +181,17 @@ describe("negative controls of custody and the held table (#14949)", () => {
     expect(freeFieldMappingProblems(snapshot.free_fields, relabelled).join("\n")).toContain(
       "omo accounts[].email is configuration",
     )
+  })
+
+  test("#given a required field of the session answer dropped on either side #then the shape check names it", () => {
+    const snapshot = loadSnapshot()
+    const session = json(SESSION_RESULTS["engine.auth.check"])
+    const looser = { ...session, required: (session.required ?? []).filter((field) => field !== "accounts") }
+    expect(sessionShapeProblems(snapshot, looser).join("\n")).toContain("session required fields")
+    const engineLooser = {
+      ...snapshot,
+      session_required: snapshot.session_required.filter((field) => field !== "provider"),
+    }
+    expect(sessionShapeProblems(engineLooser, session).join("\n")).toContain("session required fields")
   })
 })

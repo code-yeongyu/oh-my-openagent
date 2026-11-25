@@ -1,10 +1,10 @@
 import type { Row } from "./schema"
 
 // The rows that may declare addressScope "this_device" (design 7.3 ruling): the design does not make them cross-device.
-export const HOST_LOCAL_ROWS = ["threads.adopt", "threads.release", "threads.unload"] as const
+const HOST_LOCAL_ROWS = ["threads.adopt", "threads.release", "threads.unload"] as const
 
 // The rows that may declare pure (design lane ruling on 7.3): a probe and a usage text, each touching nothing.
-export const PURE_ROWS = ["account.signInCheck", "toolkit.help"] as const
+const PURE_ROWS = ["account.signInCheck", "toolkit.help"] as const
 
 // The two closed exemption lists of design 7.3: a row declares host-local or pure only if it is named here, with a reason.
 export function scopeProblems(row: Row): string[] {

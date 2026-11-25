@@ -27,7 +27,7 @@ export function takesValue(entry: CliEntry, flag: string): boolean {
   return target !== undefined && isInputTarget(target) && !target.includes("=")
 }
 
-export function positionalsOf(row: Row, entry: CliEntry, rest: readonly string[]): string[] {
+function positionalsOf(row: Row, entry: CliEntry, rest: readonly string[]): string[] {
   const out: string[] = []
   for (let index = 0; index < rest.length; index++) {
     const word = rest[index] ?? ""
@@ -85,7 +85,7 @@ function setPath(input: Record<string, unknown>, path: string, value: unknown): 
   node[segments.at(-1) ?? ""] = value
 }
 
-export function buildInput(row: Row, entry: CliEntry, rest: readonly string[]): Record<string, unknown> {
+function buildInput(row: Row, entry: CliEntry, rest: readonly string[]): Record<string, unknown> {
   const input: Record<string, unknown> = {}
   for (const [flag, target] of Object.entries(entry.flags)) {
     const at = rest.indexOf(flag)
