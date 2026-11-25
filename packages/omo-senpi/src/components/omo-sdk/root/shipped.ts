@@ -8,6 +8,7 @@ import { createDevicesApi } from "../devices"
 import type { OmoPrincipal } from "../contract"
 import { accountSignIn, type InProcessSignIn } from "./account-sign-in"
 import type { NamespaceServing } from "./members"
+import type { CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 
 type Env = Readonly<Record<string, string | undefined>>
 
@@ -40,6 +41,7 @@ export function shippedNamespaces(options: {
   readonly deviceServiceStatus?: DeviceServiceStatusPort
   readonly principal: OmoPrincipal
   readonly signIn?: InProcessSignIn
+  readonly custody: CustodyLog
 }): NamespaceServing {
   const account = createAccountApi(options.access, {
     process: options.signInProcess ?? launcherSignInProcess(options.env["OMO_BIN"]),
@@ -58,6 +60,7 @@ export function shippedNamespaces(options: {
       "account.signIn": accountSignIn(account, {
         access: options.access,
         principal: options.principal,
+        custody: options.custody,
         ...(options.signIn === undefined ? {} : { inProcess: options.signIn }),
       }),
       "devices.list": devices.list,

@@ -51,6 +51,7 @@ export async function accountForget(
   deps: ForgetDependencies,
   input: { readonly device?: string },
 ): Promise<CallOutcome<Forgotten, ForgetRefusal>> {
-  if (input.device === "") return refusedWith({ code: "empty_device" })
-  return audited(deps.custody, "account.forget", input.device, () => forget(deps, input.device))
+  return audited(deps.custody, "account.forget", async () =>
+    input.device === "" ? refusedWith({ code: "empty_device" as const }) : forget(deps, input.device),
+  )
 }

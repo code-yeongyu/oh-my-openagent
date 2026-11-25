@@ -15,7 +15,7 @@ import {
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
-import { processCustodyLog } from "../account-core/src/calls/custody-log"
+import { AUDIT_UNAVAILABLE_NOTE, type CustodyLog, processCustodyLog } from "../account-core/src/calls/custody-log"
 import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
@@ -163,11 +163,14 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           session: sessionOf(dependencies),
           store: dependencies.store,
           ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
-          custody: processCustodyLog("person"),
+          custody: processCustodyLog(),
         },
         flags.length === 0 ? {} : { device: flags[1] },
       )
-      if (forgotten.kind === "ok") return reply(dependencies, { forgotten: true })
+      if (forgotten.kind === "ok") {
+        if (forgotten.value.auditUnavailable === true) dependencies.error(AUDIT_UNAVAILABLE_NOTE)
+        return reply(dependencies, { forgotten: true })
+      }
       if (forgotten.code === "unreadable_credential") {
         dependencies.error(forgotten.message)
         return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
@@ -268,7 +271,7 @@ const silent = (): void => undefined
  * with exactly the dependencies `omo account sign-in` uses. Nothing is printed: the caller hears the codes through
  * onUserCode and the outcome through the answer.
  */
-export function signInInLauncher(api: string, request: SignInRequest) {
+export function signInInLauncher(api: string, request: SignInRequest, custody?: CustodyLog) {
   const deps = launcherAccountDependencies(api, {
     log: silent,
     output: silent,
@@ -278,7 +281,15 @@ export function signInInLauncher(api: string, request: SignInRequest) {
   const { store, deviceService, setUpDeviceService } = deps
   const session = sessionOf(deps, request.signal)
   return accountSignIn(
-    { api, session, store, deviceService, accountsOpen: serviceAccountsOpen(), setUpDeviceService },
+    {
+      api,
+      session,
+      store,
+      deviceService,
+      accountsOpen: serviceAccountsOpen(),
+      setUpDeviceService,
+      ...(custody === undefined ? {} : { custody }),
+    },
     request,
   )
 }

@@ -1,6 +1,6 @@
 import { Command } from "commander"
 import { accountSignIn, DEFAULT_ACCOUNTS_ORIGIN } from "@oh-my-opencode/account-core/calls/sign-in"
-import { processCustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
+import { AUDIT_UNAVAILABLE_NOTE, processCustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import { accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { accountWhoami, notSignedInMessage } from "@oh-my-opencode/account-core/calls/whoami"
 import { isCancel, select, confirm } from "@clack/prompts"
@@ -90,8 +90,9 @@ async function run(
       }),
     })
     if (action === "logout") {
-      const { revoked } = await accountSignOut({ session, custody: processCustodyLog("person") })
+      const { revoked, auditUnavailable } = await accountSignOut({ session, custody: processCustodyLog() })
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
+      if (auditUnavailable === true) console.error(AUDIT_UNAVAILABLE_NOTE)
       if (!revoked)
         console.error(
           "Server device revocation could not be confirmed. Remove this device from the Devices page of your OmO account when connected.",
@@ -122,6 +123,7 @@ async function run(
         store,
         ...(deviceService === undefined ? {} : { deviceService }),
         accountsOpen: serviceAccountsOpen(),
+        custody: processCustodyLog(),
       },
       {
         method: options.device ? "device_code" : "browser",
@@ -150,7 +152,8 @@ async function run(
         : signedIn.code === "cancelled"
           ? new SignInError("Sign-in cancelled.")
           : (signedIn.cause ?? new Error(signedIn.message))
-    const { replacedDeviceId } = signedIn.value
+    const { replacedDeviceId, auditUnavailable } = signedIn.value
+    if (auditUnavailable === true) console.error(AUDIT_UNAVAILABLE_NOTE)
     if (replacedDeviceId !== undefined)
       console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
     const email = await session.accountEmail().catch(() => undefined)

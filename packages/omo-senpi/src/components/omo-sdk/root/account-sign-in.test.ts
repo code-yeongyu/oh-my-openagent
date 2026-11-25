@@ -205,9 +205,9 @@ describe("account.signIn on the root", () => {
     let reached = false
     const { sdk, touched } = rootWith({
       principal: { kind: "connector", binding: "slack:T1/C1" },
-      inProcess: async (api, request) => {
+      inProcess: async (api, request, custody) => {
         reached = true
-        return signedIn("on")(api, request)
+        return signedIn("on")(api, request, custody)
       },
     })
     expect((await sdk.account.signIn({ method: "device_code", onUserCode: () => undefined })) as unknown).toMatchObject(
@@ -223,9 +223,9 @@ describe("account.signIn on the root", () => {
     let reached = false
     const { sdk, touched } = rootWith({
       desktop: true,
-      inProcess: async (api, request) => {
+      inProcess: async (api, request, custody) => {
         reached = true
-        return signedIn("on")(api, request)
+        return signedIn("on")(api, request, custody)
       },
     })
     expect((await sdk.account.signIn({ method: "device_code", onUserCode: () => undefined })) as unknown).toMatchObject(

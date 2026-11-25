@@ -8,6 +8,7 @@ import {
   storeSwitch,
 } from "../keychain-helper/dedicated-switch"
 import { credentialId } from "../keystore"
+import { type Audited, audited, type CustodyLog } from "./custody-log"
 import { type CallOutcome, ok, refusedWith } from "./outcome"
 
 // account.store.status, enable and disable (#13116, first-party design 6.4): OmO's own keychain for a Mac whose login
@@ -102,15 +103,24 @@ async function ready(
 
 export const storeStatus = (port: StorePort): StoreStatus => port.status()
 
-export async function storeEnable(port: StorePort): Promise<CallOutcome<StoreEnabled, StoreRefusal>> {
-  const refusal = await ready(port)
-  return refusal === undefined ? port.enable() : refusedWith(refusal)
+// Each switch moves the stored credential between keychains, so it writes custody records (security design 8.2).
+export function storeEnable(
+  port: StorePort,
+  custody?: CustodyLog,
+): Promise<CallOutcome<Audited<StoreEnabled>, StoreRefusal>> {
+  return audited(custody, "account.store.enable", async () => {
+    const refusal = await ready(port)
+    return refusal === undefined ? port.enable() : refusedWith(refusal)
+  })
 }
 
-export async function storeDisable(
+export function storeDisable(
   port: StorePort,
   input: { readonly discard?: boolean },
-): Promise<CallOutcome<StoreDisabled, StoreRefusal>> {
-  const refusal = await ready(port)
-  return refusal === undefined ? port.disable({ discard: input.discard === true }) : refusedWith(refusal)
+  custody?: CustodyLog,
+): Promise<CallOutcome<Audited<StoreDisabled>, StoreRefusal>> {
+  return audited(custody, "account.store.disable", async () => {
+    const refusal = await ready(port)
+    return refusal === undefined ? port.disable({ discard: input.discard === true }) : refusedWith(refusal)
+  })
 }

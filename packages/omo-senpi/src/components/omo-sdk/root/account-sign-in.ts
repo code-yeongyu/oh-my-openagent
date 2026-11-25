@@ -1,5 +1,6 @@
 import type { SignedIn as CoreSignedIn, SignInFailure, SignInRequest } from "@oh-my-opencode/account-core/calls/sign-in"
 import type { CallOutcome } from "@oh-my-opencode/account-core/calls/outcome"
+import type { CustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import type { AccountAccess } from "../access"
 import type { AccountApi, SignedIn, SignInOptions } from "../account"
 import {
@@ -12,6 +13,7 @@ import {
 } from "../contract"
 import type { OmoResult } from "../result"
 import { assertedExpectation, BEHAVIOUR_CHANGES } from "../contract/behaviour-changes"
+import { launchBlocked } from "./account"
 import type { MemberOf } from "./members"
 
 type RootSignedIn =
@@ -23,7 +25,11 @@ type SignIn = AccountApi["signIn"] & MemberOf<"account.signIn">
  * The sign-in run in this process (security design 5.4), supplied by an entry that can import the launcher's own
  * sign-in dependencies (the omo-ai/sdk entry); an entry without it keeps the shipped launcher child.
  */
-export type InProcessSignIn = (api: string, request: SignInRequest) => Promise<CallOutcome<CoreSignedIn, SignInFailure>>
+export type InProcessSignIn = (
+  api: string,
+  request: SignInRequest,
+  custody: CustodyLog,
+) => Promise<CallOutcome<CoreSignedIn, SignInFailure>>
 
 // B4 (security design 10): replace from a session is refused once the change's evidence exists; until then today's
 // behaviour holds. The behaviour-change table decides, so the root and its scenario never disagree.
@@ -75,11 +81,12 @@ export function accountSignIn(
     readonly access: AccountAccess
     readonly principal: OmoPrincipal
     readonly inProcess?: InProcessSignIn
+    readonly custody: CustodyLog
   },
 ): SignIn {
   // A session's sign-in runs only through the shipped launcher child until slice A2a moves the device-service setup
   // into a core the engine imports (script/sdk-parity/child-backed-members.json), whatever the entry supplies.
-  const { access } = options
+  const { access, custody } = options
   const inProcess = options.principal.kind === "session" ? undefined : options.inProcess
   const origin = access.origin
   function signIn(options: SignInOptions): Promise<OmoResult<SignedIn>>
@@ -88,22 +95,28 @@ export function accountSignIn(
     input: SignInOptions | RootInput,
     callOptions?: CallOptions,
   ): Promise<OmoResult<SignedIn> | OmoValue<RootSignedIn>> {
-    if (input.replace === true && principalIsSession() && REPLACE_FROM_SESSION.outcome === "refuse")
+    if (input.replace === true && principalIsSession() && REPLACE_FROM_SESSION.outcome === "refuse") {
+      await custody.refused("account.signIn", "sender_not_allowed").catch(() => false)
       return failed("sender_not_allowed", "A session cannot replace this machine's earlier device.", {
         principal: "session",
         change: "B4",
       })
-    const blocked = access.blockedReason()
+    }
+    const blocked = await launchBlocked(access, custody, "account.signIn")
     if (blocked !== undefined) return blocked
     if (!isRootInput(input)) {
-      if (inProcess === undefined) return account.signIn(input)
-      const answer = await inProcess(origin, {
-        method: "device_code",
-        ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
-        onUserCode: input.onUserCode,
-        replaceDevice: async () => input.replace === true,
-        ...(input.signal === undefined ? {} : { signal: input.signal }),
-      })
+      if (inProcess === undefined) return childSignIn(() => account.signIn(input), input.signal)
+      const answer = await inProcess(
+        origin,
+        {
+          method: "device_code",
+          ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
+          onUserCode: input.onUserCode,
+          replaceDevice: async () => input.replace === true,
+          ...(input.signal === undefined ? {} : { signal: input.signal }),
+        },
+        custody,
+      )
       if (answer.kind === "refused") return refusalOf(answer) as OmoResult<SignedIn>
       const { device, replacedDeviceId, deviceService } = answer.value
       return {
@@ -132,35 +145,61 @@ export function accountSignIn(
             reason: "child_backed_sign_in",
           },
         )
-      const answer = await account.signIn({
-        onUserCode: onUserCode,
-        ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
-        ...(input.replace === undefined ? {} : { replace: input.replace }),
-        ...(signal === undefined ? {} : { signal }),
-      })
+      const answer = await childSignIn(
+        () =>
+          account.signIn({
+            onUserCode: onUserCode,
+            ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
+            ...(input.replace === undefined ? {} : { replace: input.replace }),
+            ...(signal === undefined ? {} : { signal }),
+          }),
+        signal,
+      )
       if (answer.kind === "error") return answer
       const { device, replacedDeviceId, deviceService } = answer.value
       return rootValue({ device, replacedDeviceId, deviceService })
     }
     const { onOpenUrl } = input
-    const answer = await inProcess(origin, {
-      method: input.method,
-      ...(input.open_browser === undefined ? {} : { openBrowser: input.open_browser }),
-      ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
-      onUserCode,
-      ...(onOpenUrl === undefined
-        ? {}
-        : {
-            onOpenUrl: async (url: string) => {
-              await onOpenUrl(url)
-              return true
-            },
-          }),
-      replaceDevice: async () => input.replace === true,
-      ...(signal === undefined ? {} : { signal }),
-    })
+    const answer = await inProcess(
+      origin,
+      {
+        method: input.method,
+        ...(input.open_browser === undefined ? {} : { openBrowser: input.open_browser }),
+        ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
+        onUserCode,
+        ...(onOpenUrl === undefined
+          ? {}
+          : {
+              onOpenUrl: async (url: string) => {
+                await onOpenUrl(url)
+                return true
+              },
+            }),
+        replaceDevice: async () => input.replace === true,
+        ...(signal === undefined ? {} : { signal }),
+      },
+      custody,
+    )
     if (answer.kind === "refused") return refusalOf(answer)
     return rootValue(answer.value)
+  }
+  // The launcher child writes no custody record (the parent records the call it serves), so the root records it here.
+  async function childSignIn(
+    run: () => Promise<OmoResult<SignedIn>>,
+    signal: AbortSignal | undefined,
+  ): Promise<OmoResult<SignedIn>> {
+    const operation = await custody.begin("account.signIn")
+    let answer: OmoResult<SignedIn>
+    try {
+      answer = await run()
+    } catch (error) {
+      await operation.end("failed", "internal_error")
+      throw error
+    }
+    if (answer.kind === "ok") await operation.end("ok")
+    else if (signal?.aborted === true) await operation.end("cancelled", "cancelled")
+    else await operation.end("refused", answer.error.code)
+    return answer
   }
   function principalIsSession(): boolean {
     return options.principal.kind === "session"

@@ -8,6 +8,7 @@ import {
   storeStatus,
   storeSwitchPort,
 } from "../account-core/src/calls/store"
+import { AUDIT_UNAVAILABLE_NOTE, processCustodyLog } from "../account-core/src/calls/custody-log"
 import { desktopRuntimeCandidates } from "../account-core/src/keychain-helper/creator-handoff"
 import { helperAccess } from "../account-core/src/keychain-helper/darwin-backend"
 import { dedicatedStoreRoot, dedicatedStoreState } from "../account-core/src/keychain-helper/dedicated-store"
@@ -52,22 +53,26 @@ export async function runAccountStore(deps: AccountStoreDependencies, flags: rea
     return ACCOUNT_EXIT.ok
   }
   if (verb === "disable") {
-    const disabled = await storeDisable(port, { discard })
+    const disabled = await storeDisable(port, { discard }, processCustodyLog())
     if (disabled.kind === "refused") return refusal(deps, disabled)
-    if (disabled.value.damagedLeftInPlace === true)
+    const { auditUnavailable, ...value } = disabled.value
+    if (auditUnavailable === true) deps.error(AUDIT_UNAVAILABLE_NOTE)
+    if (value.damagedLeftInPlace === true)
       deps.error(
         `omo: OmO's own keychain was damaged, so it was turned off without being erased. Delete ${dedicatedStoreRoot()} yourself.`,
       )
-    deps.output(JSON.stringify(disabled.value))
+    deps.output(JSON.stringify(value))
     return ACCOUNT_EXIT.ok
   }
-  const enabled = await storeEnable(port)
+  const enabled = await storeEnable(port, processCustodyLog())
   if (enabled.kind === "refused") return refusal(deps, enabled)
+  const { auditUnavailable, ...value } = enabled.value
+  if (auditUnavailable === true) deps.error(AUDIT_UNAVAILABLE_NOTE)
   deps.error(TRADE_OFF)
   if (deps.desktopInstalled()) deps.error(DESKTOP_NOTE)
-  const note = MOVE_NOTES[enabled.value.moved]
+  const note = MOVE_NOTES[value.moved]
   if (note !== undefined) deps.error(note)
-  deps.output(JSON.stringify(enabled.value))
+  deps.output(JSON.stringify(value))
   return ACCOUNT_EXIT.ok
 }
 

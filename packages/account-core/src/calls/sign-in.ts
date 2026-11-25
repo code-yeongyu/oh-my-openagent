@@ -7,6 +7,7 @@ import { signInByRoute } from "../login-routes"
 import { advertisesMachineIdentity, readMachineDigest } from "../machine-digest"
 import type { ChooseDevice, ListedDevice, MachineDevice } from "../protocol"
 import type { DeviceServiceHandoff, Session } from "../session"
+import { type Audited, audited, type CustodyLog } from "./custody-log"
 import { type CallOutcome, ok, refusedWith } from "./outcome"
 import { type SignInRefusal, signInRefusal } from "./sign-in-refusal"
 
@@ -41,6 +42,8 @@ export type SignInDependencies = {
   readonly machineDigest?: () => Promise<string | undefined>
   readonly now?: () => number
   readonly sleep?: (ms: number) => Promise<void>
+  /** The custody log (security design 8.2); the sign-in never waits on it. */
+  readonly custody?: CustodyLog
 }
 
 export type SignInRequest = {
@@ -64,10 +67,14 @@ export type SignInRequest = {
 
 export type SignInFailure = SignInRefusal | { readonly code: "accounts_closed" } | { readonly code: "cancelled" }
 
-export async function accountSignIn(
+export function accountSignIn(
   deps: SignInDependencies,
   request: SignInRequest,
-): Promise<CallOutcome<SignedIn, SignInFailure>> {
+): Promise<CallOutcome<Audited<SignedIn>, SignInFailure>> {
+  return audited(deps.custody, "account.signIn", () => signIn(deps, request))
+}
+
+async function signIn(deps: SignInDependencies, request: SignInRequest): Promise<CallOutcome<SignedIn, SignInFailure>> {
   if (!deps.accountsOpen && request.method !== "device_code") return refusedWith({ code: "accounts_closed" })
   const cancelled = (): boolean => request.signal?.aborted === true
   if (cancelled()) return refusedWith({ code: "cancelled" })

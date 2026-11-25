@@ -2,7 +2,7 @@ import { userInfo } from "node:os"
 
 import { createAccountAccess } from "./access"
 import type { OmoSdk, OmoSdkOptions } from "./options"
-import { accountNamespace } from "./root/account"
+import { accountNamespace, rootCustodyLog } from "./root/account"
 import type { InProcessSignIn } from "./root/account-sign-in"
 import { assembleRoot } from "./root/assemble"
 import { boundaryRefusals } from "./root/authority"
@@ -61,8 +61,10 @@ function assembleWithInternals(
   assertLauncherCores(cores)
   const principal = options.principal ?? { kind: "script", uid: options.uid ?? processUid() }
   const access = createAccountAccess({ ...(options.api === undefined ? {} : { api: options.api }), env, cwd, ports })
+  const custody = ports.custody ?? rootCustodyLog(principal)
   const shipped = shippedNamespaces({
     access,
+    custody,
     env,
     cwd,
     ...(options.home === undefined ? {} : { home: options.home }),
@@ -73,8 +75,7 @@ function assembleWithInternals(
   })
   const account = accountNamespace({
     access,
-    principal,
-    ...(ports.custody === undefined ? {} : { custody: ports.custody }),
+    custody,
     env,
     cwd,
     ...(ports.accountStore === undefined ? {} : { store: ports.accountStore }),

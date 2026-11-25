@@ -64,8 +64,12 @@ const loadFailure = (namespace: string) => async () => ({
   },
 })
 
-function refusing(key: RootCallKey, error: OmoFailure["error"]): Call {
-  if (ROOT_CALLS[key].answer !== "stream") return async () => ({ kind: "error", error })
+function refusing(key: RootCallKey, error: OmoFailure["error"], servings: readonly NamespaceServing[]): Call {
+  if (ROOT_CALLS[key].answer !== "stream")
+    return async () => {
+      await Promise.all(servings.map((serving) => serving.recordRefusal?.(key, error.code)?.catch(() => undefined)))
+      return { kind: "error", error }
+    }
   return () => ({
     stop: () => undefined,
     async *[Symbol.asyncIterator]() {
@@ -105,7 +109,7 @@ export function assembleRoot(
   for (const key of Object.keys(ROOT_CALLS) as RootCallKey[]) {
     const refused = refusals.get(key)
     if (refused !== undefined) {
-      place(tree, key, refusing(key, refused))
+      place(tree, key, refusing(key, refused, servings))
       continue
     }
     const served = servings.find((serving) => serving.members[key] !== undefined)?.members[key]

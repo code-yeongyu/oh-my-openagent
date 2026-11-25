@@ -15,8 +15,8 @@ export async function accountSignOut(deps: {
   const outcome = await audited<{ readonly signedOut: true; readonly revoked: boolean }, never>(
     deps.custody,
     "account.signOut",
-    undefined,
     async () => ok({ signedOut: true, revoked: await deps.session.logout() }),
+    (value) => (value.revoked ? { outcome: "ok" } : { outcome: "partial", code: "revoke_unconfirmed" }),
   )
   return outcome.value
 }
