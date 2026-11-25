@@ -8,8 +8,9 @@ import { DEFAULT_THREAD_DELIVERY, type ThreadSendInput, type ThreadHandoffInput 
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import type { DeliveryPipeline } from "./gateway/pipeline"
 import type { DeliveryTarget, DeliveryOutcome } from "./gateway/transport"
+import { REFUSAL_CODES } from "./gateway/result"
 import type { DeliveryAuthority, GatewaySender } from "./gateway/types"
-import { addressBook, sendBookFor } from "./tools/internals"
+import { addressBook, hostView, sendBookFor } from "./tools/internals"
 import { UNKNOWN_CALLER, type ThreadHostView, type ThreadToolSurfaceOptions } from "./tools/ports"
 import { consumedSendersOf } from "./tools/reply-permission"
 
@@ -61,8 +62,45 @@ export async function sendThread(
 ) {
   const target = await locate(options, resolve, current, value.thread, value.all_scope, principal, match)
   if (target.kind === "error") return target
-  const sent = await sendToTarget(options, pipeline, target, value, key, principal, args)
+  const turned = await steerTurn(options, current, target, value, principal)
+  if (turned.kind === "error") return turned
+  const sent = await sendToTarget(options, pipeline, target, turned.value, key, principal, args)
   return { kind: "routed" as const, target, sent }
+}
+
+/**
+ * The steer rule by principal (design ruling of record on #14943, #15007): a session names the turn it steers (its
+ * transport refuses a steer without one); a person or script may omit it, and the running turn is read and steered,
+ * on every leg. Another device's transport reads it there; a session here is read here, through its endpoint.
+ */
+async function steerTurn(
+  options: ThreadToolSurfaceOptions,
+  current: ThreadHostView,
+  target: DeliveryTarget,
+  value: ThreadSendInput | ThreadHandoffInput,
+  principal: Principal,
+): Promise<{ readonly kind: "ok"; readonly value: ThreadSendInput | ThreadHandoffInput } | Failed> {
+  const unnamed =
+    principal.kind === "operator" &&
+    target.kind === "local" &&
+    (value.delivery ?? DEFAULT_THREAD_DELIVERY) === "steer" &&
+    value.expected_turn_id === undefined
+  if (!unnamed) return { kind: "ok", value }
+  const book =
+    current === PUBLISHED_SEND_VIEW ? addressBook(options, await hostView(options)) : addressBook(options, current)
+  const routing = book.find((entry) => entry.durable_id === target.thread_id)?.endpoint?.routing_id ?? null
+  const state = routing === null ? undefined : await options.host.getState(routing, target.thread_id)
+  const turn = state?.isStreaming === true ? state.activeTurnId : undefined
+  if (turn === undefined)
+    return {
+      kind: "error",
+      error: threadToolFailure(
+        REFUSAL_CODES.not_steerable.code,
+        `A steer to ${target.thread_id} was refused: not_steerable.`,
+        REFUSAL_CODES.not_steerable.next,
+      ),
+    }
+  return { kind: "ok", value: { ...value, expected_turn_id: turn } }
 }
 
 export async function sendToTarget(

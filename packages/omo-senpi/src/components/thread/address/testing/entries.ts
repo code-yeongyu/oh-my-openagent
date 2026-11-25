@@ -119,7 +119,7 @@ export function remoteClientOn(td: TwoDevices): ClientCore {
 }
 
 /** The thread SDK on this device's host (one rpc_host socket) and session files, over the same account. */
-export function sdkOn(td: TwoDevices, cleanups: Cleanups): ThreadSdk {
+export function sdkOn(td: TwoDevices, cleanups: Cleanups, here: { readonly runningTurn?: string } = {}): ThreadSdk {
   const agentDir = mkdtempSync(join(tmpdir(), "surfaces-sdk-"))
   const sessionsDir = join(agentDir, "sessions", "--fixture--")
   mkdirSync(sessionsDir, { recursive: true })
@@ -148,7 +148,8 @@ export function sdkOn(td: TwoDevices, cleanups: Cleanups): ThreadSdk {
     }),
     openSession: unused,
     getMessages: async () => [],
-    getState: async () => ({ isStreaming: false }),
+    getState: async () =>
+      here.runningTurn === undefined ? { isStreaming: false } : { isStreaming: true, activeTurnId: here.runningTurn },
     prompt: unused,
     interrupt: async () => ({ turnId: "turn-here" }),
     setSessionName: unused,

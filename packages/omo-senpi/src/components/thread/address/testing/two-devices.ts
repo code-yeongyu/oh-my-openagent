@@ -8,7 +8,7 @@ import type {
   RemoteSessionRow,
   RemoteThreadSurface,
 } from "../../remote/ports"
-import { createRemoteThreadFixture } from "../../thread-remote-fixture"
+import { createRemoteThreadFixture, ENGINE } from "../../thread-remote-fixture"
 import type { ThreadHostSession } from "../../tools"
 
 // Two devices of one account for the address module (#14305): this device (a hex id of its own, so the `here` keyword and
@@ -171,6 +171,8 @@ export type TwoDeviceOptions = {
   readonly replySenders?: readonly { readonly session_id: string; readonly name?: string; readonly device?: string }[]
   /** The caller's workspace root (default this process's cwd). */
   readonly callerWorkspaceRoot?: string
+  /** Device b's engine is running a turn (a steer to b has a turn to steer). */
+  readonly bRunning?: boolean
   /** Write this device's session files to disk, as a device has them (default: listed only, no transcript on disk). */
   readonly sessionFiles?: boolean
 }
@@ -206,6 +208,7 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.plan === undefined ? {} : { plan: options.plan }),
     ...(options.probe === true ? { wakeFeature: true, ended: { [B.id]: { [T.bProbe]: KEY.bProbe } } } : {}),
     ...(options.silent === undefined ? {} : { silent: options.silent }),
+    ...(options.bRunning === true ? { engine: { ...ENGINE, streaming: true, currentTurnId: "7" } } : {}),
   })
   const base: RemoteThreadSurface = {
     ...account.remote,
