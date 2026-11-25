@@ -1,7 +1,8 @@
 // `omo doctor`: parse the arguments, make one diagnostics call, render it. Every check, repair and
 // refusal is decided in the diagnostics core (diagnostics.js), the same body the SDK exposes.
-import { renderFindings, renderFixEntries } from "./diagnostics-findings.js"
-import { fixReflectionLock, reapStaleEngines as reap, run } from "./diagnostics.js"
+import { renderFindings } from "./diagnostics-findings.js"
+import { reapStaleEngines as reap, run } from "./diagnostics.js"
+import { reflectionLockFix } from "./doctor-reflection-lock.js"
 import { MANAGED_MODE_FLAG } from "./engine-processes.js"
 import { releaseChannel } from "./package-paths.js"
 
@@ -72,13 +73,9 @@ export async function printDoctorFix(args, ports = {}) {
     console.log(`FAIL unknown argument ${JSON.stringify(extra[0])}: omo doctor --fix [--dry-run]`)
     return 1
   }
-  const result = await fixReflectionLock({ dry_run: args.includes("--dry-run") }, ports)
-  if (result.kind === "error") {
-    console.log(`FAIL ${result.error.message}`)
-    return 1
-  }
-  console.log(renderFixEntries(result.value.entries).join("\n"))
-  return result.value.failed ? 1 : 0
+  const result = await reflectionLockFix({ ...ports, dryRun: args.includes("--dry-run") })
+  console.log(result.lines.join("\n"))
+  return result.failed ? 1 : 0
 }
 
 const given = (lines) => async () => lines ?? []

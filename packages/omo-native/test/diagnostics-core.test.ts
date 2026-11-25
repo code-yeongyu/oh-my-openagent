@@ -141,7 +141,15 @@ describe("diagnostics.fixReflectionLock", () => {
       kind: "ok",
       value: {
         dry_run: true,
-        entries: [{ kind: "finding", level: "notice", check: "memory.sweep", message: "nothing to fix" }],
+        entries: [
+          {
+            kind: "finding",
+            level: "notice",
+            check: "memory.sweep",
+            message: "nothing to fix",
+            details: { status: "swept" },
+          },
+        ],
         failed: false,
       },
     })

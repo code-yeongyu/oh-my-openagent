@@ -7,13 +7,9 @@
 /** @typedef {import("./diagnostics-contract").DiagnosticCheck} DiagnosticCheck */
 /** @typedef {import("./diagnostics-contract").DiagnosticLevel} DiagnosticLevel */
 /** @typedef {import("./diagnostics-contract").FixEntry} FixEntry */
-/** @typedef {import("./diagnostics-contract").RepairOutcome} RepairOutcome */
 
 /** @type {Readonly<Record<DiagnosticLevel, string>>} */
 const LEVEL_PREFIX = { ok: "PASS", notice: "INFO", warn: "WARN", fail: "FAIL" }
-
-/** @type {Readonly<Record<RepairOutcome, string>>} */
-const REPAIR_PREFIX = { fixed: "FIXED", would_fix: "WOULD FIX", kept: "KEPT" }
 
 /**
  * @template {string} K
@@ -56,33 +52,9 @@ export function renderFindings(findings) {
   return findings.map((entry) => `${LEVEL_PREFIX[entry.level]} ${entry.message}`)
 }
 
-/**
- * The sweep's lines as entries, in print order. A repair line names the identity it acted on first.
- * @param {readonly string[]} lines
- * @returns {FixEntry[]}
- */
-export function fixEntriesFromLines(lines) {
-  return lines.map((line) => {
-    const repair = Object.entries(REPAIR_PREFIX).find(([, prefix]) => line.startsWith(`${prefix} `))
-    if (repair === undefined) {
-      const [entry] = findingsFromLines("memory.sweep", [line])
-      return { kind: "finding", .../** @type {DiagnosticFinding} */ (entry) }
-    }
-    const message = line.slice(repair[1].length + 1)
-    return {
-      kind: "repair",
-      outcome: /** @type {RepairOutcome} */ (repair[0]),
-      identity: message.split(" ", 1)[0] ?? "",
-      message,
-    }
-  })
-}
-
 /** @param {readonly FixEntry[]} entries */
 export function renderFixEntries(entries) {
   return entries.map((entry) =>
-    entry.kind === "repair"
-      ? `${REPAIR_PREFIX[entry.outcome]} ${entry.message}`
-      : `${LEVEL_PREFIX[entry.level]} ${entry.message}`,
+    entry.kind === "sweep_text" ? entry.text : `${LEVEL_PREFIX[entry.level]} ${entry.message}`,
   )
 }

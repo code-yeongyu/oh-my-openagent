@@ -5,7 +5,8 @@ import { join } from "node:path"
 
 import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
 
-import { readGlobalMemorySettings, reflectionLockFix } from "../bin/lib/doctor-reflection-lock.js"
+import { reflectionLockFix } from "../bin/lib/doctor-reflection-lock.js"
+import { readGlobalMemorySettings } from "../bin/lib/reflection-lock-sweep.js"
 import * as taskConfigRuntime from "../task-config-entry"
 
 // The staged plugin/runtime/task-config bundle is built from task-config-entry.ts; tests load the source.

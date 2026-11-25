@@ -46,12 +46,9 @@ export type DiagnosticsReport = {
   readonly failed: boolean
 }
 
-export type RepairOutcome = "fixed" | "would_fix" | "kept"
-
-/** One line of the sweep, in print order: what a repair did to an identity, or a finding about the sweep. */
+/** One line of the sweep in print order: memory-core's own text verbatim, or a finding about the sweep. */
 export type FixEntry =
-  | { readonly kind: "repair"; readonly outcome: RepairOutcome; readonly identity: string; readonly message: string }
-  | ({ readonly kind: "finding" } & DiagnosticFinding)
+  { readonly kind: "sweep_text"; readonly text: string } | ({ readonly kind: "finding" } & DiagnosticFinding)
 
 export type FixReport = { readonly dry_run: boolean; readonly entries: readonly FixEntry[]; readonly failed: boolean }
 

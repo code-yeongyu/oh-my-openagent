@@ -1,17 +1,41 @@
 // @ts-check
-import { fixEntriesFromLines } from "./diagnostics-findings.js"
-import { reflectionLockFix } from "./doctor-reflection-lock.js"
+import { finding } from "./diagnostics-findings.js"
+import { reflectionLockSweep } from "./reflection-lock-sweep.js"
 import { isEngine, isInteractive } from "./engine-processes.js"
 import { listProcesses } from "./process-list.js"
 
 /** @typedef {import("./diagnostics-contract").DiagnosticsCalls} DiagnosticsCalls */
 /** @typedef {import("./diagnostics-contract").ReapedEngine} ReapedEngine */
+/** @typedef {import("./diagnostics-contract").FixEntry} FixEntry */
+
+/** @param {boolean} dryRun @param {{ status: "busy" | "swept", lines: string[] }} sweep @returns {FixEntry[]} */
+function fixEntries(dryRun, sweep) {
+  if (sweep.status === "busy")
+    return [
+      {
+        kind: "finding",
+        ...finding("memory.sweep", "notice", "another sweep is running on this host; try again when it finishes", {
+          status: "busy",
+        }),
+      },
+    ]
+  if (sweep.lines.length === 0)
+    return [
+      {
+        kind: "finding",
+        ...(dryRun
+          ? finding("memory.sweep", "notice", "nothing to fix", { status: "swept" })
+          : finding("memory.sweep", "ok", "no stale reflection locks", { status: "swept" })),
+      },
+    ]
+  return sweep.lines.map((text) => ({ kind: "sweep_text", text }))
+}
 
 /** @type {DiagnosticsCalls["fixReflectionLock"]} */
 export async function fixReflectionLock(input = {}, ports = {}) {
   const dryRun = input.dry_run === true
-  const result = await reflectionLockFix({ ...ports, dryRun })
-  return { kind: "ok", value: { dry_run: dryRun, entries: fixEntriesFromLines(result.lines), failed: result.failed } }
+  const sweep = await reflectionLockSweep({ ...ports, dryRun })
+  return { kind: "ok", value: { dry_run: dryRun, entries: fixEntries(dryRun, sweep), failed: sweep.failed } }
 }
 
 /**
