@@ -194,7 +194,7 @@ export const OWNERS: Readonly<Record<string, string>> = {
 /** A note shown beside a cell whatever its outcome, for a cell whose outcome is known to vary between runs. */
 export const NOTES: Readonly<Record<string, string>> = {
   "tools:interrupt":
-    "varies between runs: the engine defect of #15013 (senpi#7478) names the turn before the started one, so the interrupt hits the held turn only when the ids line up",
+    "varies between runs: the engine defect of #15013 (senpi#7478) names the turn before the started one, so this interrupt hits the held turn only when the turn ids line up; the cell is not stable until the pinned engine carries that fix",
 }
 
 /** The issue filed for a cell's finding, by `<surface>:<step id>`, shown beside the cell while it fails. */
