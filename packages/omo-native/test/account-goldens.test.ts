@@ -2,6 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { GOLDEN_CASES } from "./account-goldens.cases"
+import { leaked } from "../../omo-senpi/src/components/omo-sdk/root/account-canary-scan.test-support"
 import { CANARY, type CaseRun, cleanUp, type Observed, prepareLauncher, runAll } from "./account-goldens.test-support"
 
 // The account verbs of both editions, pinned on unmodified code before the account calls move into the core
@@ -39,8 +40,14 @@ test.each(GOLDEN_CASES.map((golden) => [golden.id] as const))(
     const run = observed.get(id)
     expect(run?.refused).toEqual([])
     const steps = run?.steps ?? []
-    for (const step of steps)
-      for (const secret of Object.values(CANARY)) expect(`${step.stdout}\n${step.stderr}`).not.toContain(secret)
+    // Security design section 6 on both editions' terminal output, with the scanner the SDK's scan uses (encoded forms
+    // and prefixes included).
+    expect(
+      leaked(
+        steps.map((step) => [step.stdout, step.stderr]),
+        CANARY,
+      ),
+    ).toEqual([])
     if (recording) return
     expect(steps).toEqual(goldens[id]?.all ?? goldens[id]?.[family] ?? [])
   },

@@ -94,12 +94,10 @@ function faulty(store: CredentialStore, fault: Fault): CredentialStore {
           ? () => new InvalidCredentialState(`cannot parse ${CANARIES.offlineGrant}`)
           : undefined
   if (thrown === undefined) return store
-  return {
-    ...store,
-    read: async () => {
-      throw thrown()
-    },
+  const fail = async (): Promise<never> => {
+    throw thrown()
   }
+  return { ...store, read: fail, readAuthoritative: fail, write: fail, clear: fail }
 }
 
 const helperRefusing = (
@@ -123,9 +121,9 @@ export async function canaryRoot(fault: Fault = "none", principal: OmoPrincipal 
   await stored.write({ ...grant("canary-device"), ...pickKeys() })
   const signedIn = faulty(stored, fault)
   const session = createSession({ api, store: signedIn, home, beforeKeysDiscarded: async () => undefined, log })
-  const empty = memorySecrets().store(api)
+  const empty = faulty(memorySecrets().store(api), fault)
   const fresh = createSession({ api, store: empty, home, beforeKeysDiscarded: async () => undefined, log })
-  const keychain = dedicatedFake()
+  const keychain = dedicatedFake({ loginLocked: fault === "store_locked" })
   keychain.login.put(credentialId(api), CANARIES.keychainValue, "helper")
   const access = fault === "helper_refuses" ? helperRefusing(keychain.access) : keychain.access
   const sdk = assembleOmoSdk(

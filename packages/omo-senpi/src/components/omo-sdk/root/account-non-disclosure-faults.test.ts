@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { CANARIES, canaryRoot, FAULTS, USER_CODE } from "./account-canaries.test-support"
+import { CANARIES, canaryRoot, FAULTS, type Fault, USER_CODE } from "./account-canaries.test-support"
 import { leaked } from "./account-canary-scan.test-support"
 import { RUNS } from "./account-non-disclosure.runs.test-support"
 
@@ -19,6 +19,29 @@ describe("the account calls on the root disclose no planted secret under an inje
         expect(leaked([answer, logs, records])).toEqual([])
         expect(leaked([answer, logs, records], { userCode: USER_CODE })).toEqual([])
       })
+
+  // A fault the scan injects must reach the call it is run under, or the run proves nothing about that call. These are
+  // the runs a store fault cannot reach, each for its own reason: signInCheck touches no store; an empty account is
+  // refused before any read; store status reads only the dedicated store's state; the store switch reads the sign-in
+  // through the keychain helper, which helper_refuses and the locked login keychain (store_locked) cover.
+  const BEHIND_THE_HELPER = ["store enable", "store disable after enable", "store disable with discard"]
+  const NO_STORE_READ = ["show, an empty account", "signInCheck", "store status"]
+  const UNREACHED: Readonly<Record<string, readonly string[]>> = {
+    store_locked: NO_STORE_READ,
+    store_unavailable: [...NO_STORE_READ, ...BEHIND_THE_HELPER],
+    store_unreadable: [...NO_STORE_READ, ...BEHIND_THE_HELPER],
+  }
+  const comparable = (value: unknown) => JSON.stringify(value, (key, field) => (key === "api" ? "" : field))
+  for (const [fault, unreached] of Object.entries(UNREACHED))
+    test(`#given ${fault} #then it changes the answer of every run but those it cannot reach`, async () => {
+      const same: string[] = []
+      for (const run of RUNS) {
+        const clean = await run.call((await canaryRoot("none")).sdk).catch((error: unknown) => String(error))
+        const faulted = await run.call((await canaryRoot(fault as Fault)).sdk).catch((error: unknown) => String(error))
+        if (comparable(clean) === comparable(faulted)) same.push(run.name)
+      }
+      expect(same).toEqual([...unreached])
+    })
 
   test("#given the keychain helper refusing #then the store switch answers its own words with the store named", async () => {
     const { sdk } = await canaryRoot("helper_refuses")
