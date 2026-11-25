@@ -38,8 +38,8 @@ export type EffectEvidence = {
   /** The scenario's callbacks: their stated entries and each call the call under test made, in order. */
   readonly callbacks?: Readonly<Record<string, readonly CallbackEntry[]>>
   readonly callbackCalls?: readonly CallbackCall[]
-  /** The before-calls: the run's setup, kept and visible, outside the expected trace. */
-  readonly setup?: readonly SetupCall[]
+  /** The before-calls as they ran: kept and visible, outside the expected trace. */
+  readonly beforeCalls?: readonly SetupCall[]
   /** A \`$answer:<n>\` the call used whose before-call did not answer a success. */
   readonly failedMarkers?: readonly string[]
 }
@@ -135,7 +135,7 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
   problems.push(...callbackCallProblems(where, record, context))
   for (const marker of record.failedMarkers ?? [])
     problems.push(`${where}: ${marker} names a before-call that did not answer a success`)
-  for (const [index, call] of (record.setup ?? []).entries())
+  for (const [index, call] of (record.beforeCalls ?? []).entries())
     for (const observed of call.observed)
       if ((context.effects[observed.port] ?? []).includes(observed.op) && !call.allowEffects)
         problems.push(

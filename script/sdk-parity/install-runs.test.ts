@@ -59,8 +59,11 @@ describe("C1c scenario drivers over the real omo SDK root", () => {
     )
   })
 
-  test("#given every run's record #then each install row conforms", () => {
-    expect(conformanceProblems(rows, new Set(), evidence, CONTEXT)).toEqual([])
+  // install.sdkRoot is slice P1b's row, refused by default at the root until its authority cell lands: its scenario runs
+  // here (one runs module per namespace) and is judged by P1b's clearing, not by this slice.
+  test("#given every run's record #then each of C1c's install rows conforms", () => {
+    const judged = rows.filter((row) => row.id !== "install.sdkRoot")
+    expect(conformanceProblems(judged, new Set(), evidence, CONTEXT)).toEqual([])
   })
 
   test("#given every run's record #then OpenCode's fixture key is in none", () => {

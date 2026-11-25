@@ -255,7 +255,7 @@ export async function runEffectScenarios(
         ...(step.answer === undefined ? {} : { answer: step.answer }),
         ...(step.refusal_details === undefined ? {} : { refusalDetails: step.refusal_details }),
         ...(callbacks === undefined ? {} : { callbacks, callbackCalls }),
-        ...(index === 0 && setupCalls.length > 0 ? { setup: setupCalls } : {}),
+        ...(index === 0 && setupCalls.length > 0 ? { beforeCalls: setupCalls } : {}),
         ...(failedMarkers.length > 0 ? { failedMarkers } : {}),
         ...result,
       })
