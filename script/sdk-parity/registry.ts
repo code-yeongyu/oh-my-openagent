@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url"
 
 import type { DomainFile, Row } from "./schema"
 
-export const PARITY_DIR = dirname(fileURLToPath(import.meta.url))
+const PARITY_DIR = dirname(fileURLToPath(import.meta.url))
 export const REPO_ROOT = join(PARITY_DIR, "../..")
 export const ROWS_DIR = join(PARITY_DIR, "rows")
 export const TEMPLATE_PATH = join(PARITY_DIR, "section6.template.md")

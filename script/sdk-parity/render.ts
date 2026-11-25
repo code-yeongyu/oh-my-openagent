@@ -5,8 +5,8 @@ import type { DomainFile, TableEntry } from "./schema"
 
 const PLACEHOLDER = /^\{\{rows ([0-9a-z.-]+)\}\}$/
 
-export const SECTION_START = "## 6. Parity table"
-export const SECTION_END = "## 7. "
+const SECTION_START = "## 6. Parity table"
+const SECTION_END = "## 7. "
 
 export function section6Of(doc: string): string {
   const start = doc.indexOf(`\n${SECTION_START}`)

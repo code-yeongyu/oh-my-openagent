@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// omo-codex-install:044bebd2ed06b2346c54be2ab1cf506cf728504aa9bc13b5fe37209c9f435aa4:3ad1d478f346724d6693dfc0efb4983041585ae655cd5420a8c9fc372e39c30b
+// omo-codex-install:d9d812ac9e12c511a330a92f5c1e901f4891e1b35e21222c632b66fb924dd4ff:0e4808a40a0c199cc8774634bea47517bd0eb227242f6fd1182a279d56c278d5
 var __esm = (fn, res, err) => () => {
   if (fn)
     try {
@@ -7241,7 +7241,7 @@ var init_config = __esm(() => {
 
 // packages/omo-config-core/src/schema/legacy-category-names.ts
 function canonicalCategoryName(name) {
-  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] : name;
+  return Object.hasOwn(LEGACY_CATEGORY_NAME_ALIASES, name) ? LEGACY_CATEGORY_NAME_ALIASES[name] ?? name : name;
 }
 function isRecord7(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -7300,7 +7300,7 @@ var init_legacy_category_names = __esm(() => {
 
 // packages/omo-config-core/src/schema/legacy-harness-names.ts
 function canonicalHarnessName(name) {
-  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] : name;
+  return Object.hasOwn(OMO_CONFIG_LEGACY_HARNESS_ALIASES, name) ? OMO_CONFIG_LEGACY_HARNESS_ALIASES[name] ?? name : name;
 }
 function harnessBlockKey(harness) {
   return `[${harness}]`;

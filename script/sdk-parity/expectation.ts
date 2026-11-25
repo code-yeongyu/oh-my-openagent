@@ -14,7 +14,7 @@ export type Expectation = {
 // Design 4.6: one injected fault at a time, each meaningful on the ports listed here (a lost reply on the host socket,
 // the relay and the gateway store, where a committed reservation's reply is lost, a lock timeout on the store, unauthorized from the account session and the device service, a timeout read
 // from the clock, a refusal by the peer device). A fault on any other port is a scenario error.
-export const FAULT_PORTS = {
+const FAULT_PORTS = {
   lost_reply: ["host", "remote", "store"],
   lock_timeout: ["store"],
   unauthorized: ["session", "deviceService"],
