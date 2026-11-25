@@ -32,7 +32,7 @@ export type CodexOmoConfig = OmoConfig & {
 
 function resolveHomeDir(options: CodexOmoConfigOptions): string {
   const env = options.env ?? process.env
-  return options.homeDir ?? env.HOME ?? env.USERPROFILE ?? homedir()
+  return options.homeDir ?? env["HOME"] ?? env["USERPROFILE"] ?? homedir()
 }
 
 function environmentWithHome(env: OmoConfigEnv, homeDir: string): OmoConfigEnv {
