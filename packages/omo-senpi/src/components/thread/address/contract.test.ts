@@ -36,6 +36,13 @@ const ROWS: readonly Row[] = [
     want: "local HERE/hereLive",
   },
   {
+    rule: "fuzzy: an exact ambiguous_target answers as is, never swallowed into not_found",
+    address: T.bLive.slice(0, 8),
+    request: { ...DELIVER, match: "fuzzy" },
+    setup: { prefixTwin: true },
+    want: "ambiguous_target",
+  },
+  {
     rule: "a reply resolves to the sender it answers, by id",
     address: T.hereSlash,
     request: { ...DELIVER, reply: [{ session_id: T.hereSlash }] },

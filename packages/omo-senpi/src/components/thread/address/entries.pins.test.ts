@@ -303,7 +303,7 @@ const ROWS: readonly Row[] = [
     setup: { prefixTwin: true },
     answers: {
       thread_send: "ambiguous_target(thread)",
-      thread_handoff_fuzzy: "not_found(thread)",
+      thread_handoff_fuzzy: "ambiguous_target(thread)",
       thread_interrupt: "ambiguous_target(thread)",
       thread_read: "ambiguous_target(thread)",
       thread_create_existing: "ambiguous_target(thread)",

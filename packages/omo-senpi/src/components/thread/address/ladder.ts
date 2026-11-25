@@ -71,6 +71,8 @@ export function ladder(
   const exact = exactLadder(ctx, entries, text, opts)
   if (opts.match !== "fuzzy") return exact
   if (exact.kind === "ok" && exact.entry.thread_id !== ctx.callerId) return exact
+  // An exact refusal that names its candidates answers as is: fuzzy ranks only after an exact miss (T1a finding 8).
+  if (exact.kind === "error" && exact.code === "ambiguous_target") return exact
   const visible =
     opts.all_scope === true
       ? ranked
