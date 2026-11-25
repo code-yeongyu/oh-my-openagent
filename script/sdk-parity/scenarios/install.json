@@ -12,7 +12,7 @@
           "port": "fs",
           "op": "read",
           "args": {
-            "path": "~/.config/opencode/opencode.json"
+            "path": "~/.local/share/opencode/auth.json"
           }
         },
         {
@@ -71,7 +71,7 @@
           "port": "fs",
           "op": "write",
           "args": {
-            "path": "<agent-dir>/auth.json"
+            "path": "/agent/auth.json"
           }
         }
       ]
@@ -169,7 +169,7 @@
           "port": "fs",
           "op": "write",
           "args": {
-            "path": "<agent-dir>/auth.json"
+            "path": "/agent/auth.json"
           }
         }
       ]

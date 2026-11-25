@@ -498,7 +498,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Reads through the setup file port are OpenCode's auth.json (detect) and its config files (the asset scan); the expected trace says these reads happen, never that only these reads happen: every other setup read is still direct (#15018). It writes nothing: a guard test makes every write through the port throw."
     },
     {
       "id": "install.setup.plan",
@@ -536,7 +537,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Reads through the setup file port are OpenCode's auth.json (detect) and its config files (the asset scan); the expected trace says these reads happen, never that only these reads happen: every other setup read is still direct (#15018). It writes nothing: a guard test makes every write through the port throw."
     },
     {
       "id": "install.update",
