@@ -106,15 +106,15 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
         readonly deliverAs: "steer" | "followUp"
         readonly expected_turn_id?: number
         readonly joinsStart?: true
+        readonly startsUnlessBusy?: true
       },
     ): Promise<"next" | "stop"> => {
       // A row taken in from another device is admitted under the engine's ledger key with the sender's text as written,
       // so the engine's own dedupe also covers the same delivery arriving live (#13037, design 5.5).
       const ledgerId = claimedRow.ledger_id ?? null
       const engineId = ledgerId ?? row.delivery_id
-      let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
-      try {
-        result = runtime.admitExternalMessage({
+      const admitAs = (as: typeof delivery) =>
+        runtime.admitExternalMessage({
           delivery_id: engineId,
           text: ledgerId === null ? renderDeliveryText(claimedRow) : (claimedRow.verbatim_text ?? claimedRow.body),
           sender: deliverySender(claimedRow),
@@ -122,10 +122,27 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
             ledgerId === null
               ? renderDeliveryDisplayText(claimedRow)
               : (claimedRow.verbatim_display_text ?? claimedRow.body),
-          deliverAs: delivery.deliverAs,
-          ...(delivery.expected_turn_id === undefined ? {} : { expected_turn_id: delivery.expected_turn_id }),
-          ...(delivery.joinsStart === true ? { whenIdle: "queue" as const } : {}),
+          deliverAs: as.deliverAs,
+          ...(as.expected_turn_id === undefined ? {} : { expected_turn_id: as.expected_turn_id }),
+          ...(as.joinsStart === true ? { whenIdle: "queue" as const } : {}),
+          // A start that finds a run already going (it began after the idle read) is steered into it by the engine,
+          // which owns the run state, never left as a follow-up for a second run.
+          ...(as.startsUnlessBusy === true ? { whenBusy: "steer" as const } : {}),
         })
+      let result: ReturnType<SessionRuntimePort["admitExternalMessage"]>
+      try {
+        result = admitAs(delivery)
+        // An auto delivery names no turn of its own: a turn that moved between the decision and the admission is decided
+        // again against the live turn, never refused (the sender asked for the message to arrive, not for a turn).
+        for (let again = 0; result.kind === "turn_conflict" && row.mode_requested === "auto" && again < 3; again++) {
+          const redo = decideDelivery(runtime.phase(), "auto", null, runtime.admissionGate().turn_epoch)
+          if (redo.kind !== "admit") break
+          result = admitAs({
+            deliverAs: redo.deliverAs,
+            ...(redo.expected_turn_id === undefined ? {} : { expected_turn_id: redo.expected_turn_id }),
+            ...(redo.expect === "started" ? { startsUnlessBusy: true as const } : {}),
+          })
+        }
       } catch (error) {
         await options.store.recordOutcome({
           now: now(),
@@ -154,6 +171,16 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
       // A row queued to join the start runs in that start's turn, which is what a steered row tells its sender.
       const kind = delivery.joinsStart === true && result.kind === "queued" ? "steered" : result.kind
       if (kind === "queued") noticeQueued(claimedRow)
+      if (result.kind === "turn_conflict" && row.mode_requested === "auto") {
+        // Still racing turn boundaries after the retries: it waits for the next pass, within its own lifetime.
+        await options.store.recordOutcome({
+          now: now(),
+          delivery_id: row.delivery_id,
+          self,
+          outcome: { kind: "requeue" },
+        })
+        return "next"
+      }
       if (result.kind === "turn_conflict") {
         await options.store.recordOutcome({
           now: now(),
@@ -236,12 +263,13 @@ export function createInboxDrain(options: InboxDrainOptions): InboxDrain {
           : {
               deliverAs: decision.deliverAs,
               ...(decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
+              ...(starts ? { startsUnlessBusy: true as const } : {}),
             },
       )
       if (step === "stop") break
     }
     if (heldStart !== undefined)
-      await admitClaimed(heldStart.row, heldStart.claimed, { deliverAs: heldStart.deliverAs })
+      await admitClaimed(heldStart.row, heldStart.claimed, { deliverAs: heldStart.deliverAs, startsUnlessBusy: true })
     const order = new Map(reconciled.queued.map((row, index) => [row.delivery_id, index]))
     admitted.sort((a, b) => (order.get(a.delivery_id) ?? 0) - (order.get(b.delivery_id) ?? 0))
     return { admitted }
