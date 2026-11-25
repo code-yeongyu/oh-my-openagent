@@ -52,7 +52,9 @@ function outcome(result: ReturnType<typeof spawnSync>, root: string): Outcome {
   const clean = (text: unknown) =>
     String(text)
       .replaceAll("\r\n", "\n")
+      .replaceAll("\r", "")
       .replaceAll(/\x1B\[[0-9;]*[A-Za-z]/g, "")
+      .replaceAll(/(\[(?:y\/N|Y\/n)\])(?:[ \t]*[yn]?[ \t]*\n)+/g, "$1 <answered>\n")
       .replaceAll(root, "<ROOT>")
   return { status: result.status, stdout: clean(result.stdout), stderr: clean(result.stderr) }
 }
@@ -1329,8 +1331,7 @@ describe("C1c pins: omo setup", () => {
         The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
         Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
         Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
-        Import all of the above into <ROOT>/senpi-agent? [Y/n] y
-         y
+        Import all of the above into <ROOT>/senpi-agent? [Y/n] <answered>
         imported: 1
         skipped-existing: 0
         skipped-oauth: 0
@@ -1356,8 +1357,7 @@ describe("C1c pins: omo setup", () => {
         The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
         Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
         Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
-        Import all of the above into <ROOT>/senpi-agent? [Y/n] n
-         n
+        Import all of the above into <ROOT>/senpi-agent? [Y/n] <answered>
         Import cancelled
         "
         ,
@@ -1382,8 +1382,7 @@ describe("C1c pins: omo setup", () => {
         The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
         Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
         Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
-        Import API credentials for google into <ROOT>/senpi-agent/auth.json? [y/N] y
-         y
+        Import API credentials for google into <ROOT>/senpi-agent/auth.json? [y/N] <answered>
         imported: 1
         skipped-existing: 0
         skipped-oauth: 0
@@ -1409,8 +1408,7 @@ describe("C1c pins: omo setup", () => {
         The data goes to PostHog in the United States (https://us.i.posthog.com) and the OmO telemetry collector (https://t.omo.dev).
         Turn it off with DO_NOT_TRACK=1 (or OMO_DISABLE_TELEMETRY=1).
         Details: https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md
-        Import API credentials for google into <ROOT>/senpi-agent/auth.json? [y/N] n
-         n
+        Import API credentials for google into <ROOT>/senpi-agent/auth.json? [y/N] <answered>
         Import cancelled
         "
         ,
