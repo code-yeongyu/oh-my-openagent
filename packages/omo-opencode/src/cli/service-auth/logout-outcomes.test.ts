@@ -2,7 +2,14 @@ import { expect, onTestFinished, spyOn, test } from "bun:test"
 import { join, resolve } from "node:path"
 import { credentialSchema, type Credentials } from "@oh-my-opencode/account-core/protocol"
 import { createSession } from "@oh-my-opencode/account-core/session"
-import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "@oh-my-opencode/account-core/test-support"
+import {
+  fakeApi,
+  grant,
+  memorySecrets,
+  privateKeys,
+  refusal,
+  temporaryHome,
+} from "@oh-my-opencode/account-core/test-support"
 import { tlsTestCertificate } from "@oh-my-opencode/account-core/tls-test-certificate"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }

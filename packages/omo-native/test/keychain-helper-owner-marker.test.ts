@@ -1,10 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
-import {
-  createHarness,
-  type Harness,
-  isDarwin,
-  userSearchList,
-} from "./keychain-helper.test-support"
+import { createHarness, type Harness, isDarwin, userSearchList } from "./keychain-helper.test-support"
 import { probeOwnerMarker } from "../../account-core/src/keychain-helper/owner-marker"
 
 const OWNED = "e".repeat(64)

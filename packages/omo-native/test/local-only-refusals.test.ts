@@ -14,13 +14,7 @@ import type { CredentialStore } from "../../account-core/src/keystore"
 import type { Credentials } from "../../account-core/src/protocol"
 import { requestApi } from "../../account-core/src/protocol-request"
 import { createSession } from "../../account-core/src/session"
-import {
-  fakeApi,
-  grant,
-  noOwnDevice,
-  privateKeys,
-  temporaryHome,
-} from "../../account-core/src/test-support"
+import { fakeApi, grant, noOwnDevice, privateKeys, temporaryHome } from "../../account-core/src/test-support"
 import { cliDeviceServiceHandoff } from "../device-service-handoff"
 
 const dirs: string[] = []

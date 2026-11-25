@@ -1,13 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { join } from "node:path"
-import {
-  fakeApi,
-  grant,
-  memorySecrets,
-  privateKeys,
-  refusal,
-  temporaryHome,
-} from "../../account-core/src/test-support"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 type Row = { id: string; name: string; current: boolean; revokedAt: string | null; lastSeenAt: string }

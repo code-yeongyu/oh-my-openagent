@@ -12,11 +12,7 @@ import { syncRequestHeaders } from "../memory-core/src/sync/contract-version"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
 
 import { signInHint } from "../account-core/src/accounts-gate"
-import {
-  type CredentialStore,
-  createCredentialStore,
-  INTERACTIVE_READ_WAIT,
-} from "../account-core/src/keystore"
+import { type CredentialStore, createCredentialStore, INTERACTIVE_READ_WAIT } from "../account-core/src/keystore"
 import { type LiveDevice, listLiveDevices } from "../account-core/src/devices"
 import { ApiRefusal, type Credentials, serviceOrigin, SignInError } from "../account-core/src/protocol"
 import { createSession } from "../account-core/src/session"

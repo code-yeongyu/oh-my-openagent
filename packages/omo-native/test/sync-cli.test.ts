@@ -15,14 +15,7 @@ import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-
 import { Command } from "commander"
 
 import { ApiRefusal, refusalGuidance, SignInError } from "../../account-core/src/protocol"
-import {
-  fakeApi,
-  grant,
-  memorySecrets,
-  privateKeys,
-  refusal,
-  temporaryHome,
-} from "../../account-core/src/test-support"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../account-core/src/test-support"
 import { withGenesisLock } from "../../memory-core/src/sync/genesis/intent-store"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import { signedInSyncContext, type SyncContext } from "../sync-context"

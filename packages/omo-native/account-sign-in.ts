@@ -1,16 +1,9 @@
 import { z } from "zod"
 import { DeviceSignInRefused, loginDevice } from "../account-core/src/device-flow"
 import { deviceName, devicePlatform } from "../account-core/src/device-name"
-import {
-  CredentialStoreError,
-  KeychainLockedError,
-  type CredentialStore,
-} from "../account-core/src/keystore"
+import { CredentialStoreError, KeychainLockedError, type CredentialStore } from "../account-core/src/keystore"
 import { AccountsUnreachable, beginLogin } from "../account-core/src/login-prelude"
-import {
-  MachineAlreadySignedIn,
-  MachineCredentialUnreadable,
-} from "../account-core/src/machine-device"
+import { MachineAlreadySignedIn, MachineCredentialUnreadable } from "../account-core/src/machine-device"
 import { advertisesMachineIdentity, readMachineDigest } from "../account-core/src/machine-digest"
 import { ApiRefusal, type ListedDevice, RequestFailure } from "../account-core/src/protocol"
 import type { DeviceServiceHandoff, Session } from "../account-core/src/session"
