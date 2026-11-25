@@ -3537,6 +3537,35 @@
       "target": "this_device"
     },
     {
+      "id": "threads.setModel/not-applied",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.setModel/not-live",
       "row": "threads.setModel",
       "kind": "refusal",
