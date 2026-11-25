@@ -2100,6 +2100,95 @@ describe("T1b pins: the idempotency key on a control call", () => {
   })
 })
 
+describe("T1b pins: B8, an unexpected exception", () => {
+  const CANARY = "canary-7f3a secret=sk-live-do-not-print"
+  test("a host whose listing throws, through the tool and the SDK, on list and on close", async () => {
+    const { s, sdk, tool } = fresh()
+    const fault = async () => {
+      throw new Error(CANARY)
+    }
+    Object.assign(s.host, { listView: fault, listSessions: fault })
+    expect({
+      list: { tool: await tool("thread_list", {}), sdk: stable(await sdk.list({})) },
+      close: {
+        tool: await tool("thread_close", { thread: "dur-local" }),
+        sdk: stable(await sdk.close({ thread: "dur-local" })),
+      },
+    }).toMatchInlineSnapshot(`
+      {
+        "close": {
+          "sdk": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Run omo thread list and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+          "tool": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+        },
+        "list": {
+          "sdk": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Run omo thread list and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+          "tool": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Call thread_list (tool.thread_list() in an eval cell) and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+        },
+      }
+    `)
+  })
+})
+
+describe("T1b pins: B8, a store that throws", () => {
+  test("a gateway store whose receipt admission throws, through the tool and the SDK, on a keyed close", async () => {
+    const { s, sdk, tool } = fresh()
+    Object.assign(s.store, {
+      toolReceiptBegin: async () => {
+        throw new Error("canary-store-9c1d token=ghp_do-not-print")
+      },
+    })
+    const args = { thread: "dur-local", idempotency_key: "k-b8" }
+    expect({ tool: await tool("thread_close", args), sdk: stable(await sdk.close(args)) }).toMatchInlineSnapshot(`
+      {
+        "sdk": {
+          "error": {
+            "code": "internal_error",
+            "message": "The gateway store could not record the call; nothing ran: canary-store-9c1d token=ghp_do-not-print",
+            "next_action": "Retry the call; if it keeps failing, check the gateway store.",
+          },
+          "kind": "error",
+        },
+        "tool": {
+          "error": {
+            "code": "internal_error",
+            "message": "The gateway store could not record the call; nothing ran: canary-store-9c1d token=ghp_do-not-print",
+            "next_action": "Retry the call; if it keeps failing, check the gateway store.",
+          },
+          "kind": "error",
+        },
+      }
+    `)
+  })
+})
+
 describe("T1b pins: the X1a findings", () => {
   test("create with a first prompt, here and on b, through the tool and the SDK", async () => {
     const pins: Record<string, unknown> = {}

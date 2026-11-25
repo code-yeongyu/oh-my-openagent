@@ -49,6 +49,42 @@ function cli() {
   return { a, s, run }
 }
 
+describe("omo thread pins: B8, an unexpected exception", () => {
+  test("a host whose listing throws: what omo thread list and close print and exit with", async () => {
+    const { s, run } = cli()
+    const fault = async () => {
+      throw new Error("canary-7f3a secret=sk-live-do-not-print")
+    }
+    Object.assign(s.host, { listView: fault, listSessions: fault })
+    expect({ list: await run(["list"]), close: await run(["close", "dur-local"]) }).toMatchInlineSnapshot(`
+      {
+        "close": {
+          "exit": 5,
+          "json": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Run omo thread list and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+        },
+        "list": {
+          "exit": 5,
+          "json": {
+            "error": {
+              "code": "internal_error",
+              "message": "Thread operation failed: canary-7f3a secret=sk-live-do-not-print",
+              "next_action": "Run omo thread list and retry after checking the target.",
+            },
+            "kind": "error",
+          },
+        },
+      }
+    `)
+  })
+})
+
 describe("omo thread pins", () => {
   test("list, read (plain and --limit 1), send, close on each leg", async () => {
     const pins: Record<string, unknown> = {}
