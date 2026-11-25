@@ -4,9 +4,13 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { checkAdapterImports, offenderGrowth } from "./remote-import-guard-adapter"
+import { offenderBaseProblems, probeBase, repoGit } from "./sdk-parity/base-probe"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
+  ADAPTER_OFFENDERS,
+  ADAPTER_RULES,
   NON_LITERAL_IMPORT_OFFENDERS,
   REMOTE_IMPORT_RULES,
   S1_OFFENDERS,
@@ -28,8 +32,12 @@ const asRecord = (map: ReadonlyMap<string, readonly string[]>): Record<string, r
 const usesOf = (offenders: Readonly<Record<string, { readonly uses: readonly string[] }>>) =>
   Object.fromEntries(Object.entries(offenders).map(([file, offender]) => [file, offender.uses.toSorted()]))
 
+// One scan of the repository serves G1 and family A.
+const REPO_ROOT = join(import.meta.dir, "..")
+const repoFacts = scanRepository(REPO_ROOT)
+
 describe("remote import guard G1 over packages/**", () => {
-  const repo = findings(join(import.meta.dir, ".."))
+  const repo = checkImports(repoFacts, createResolver(REPO_ROOT), REMOTE_IMPORT_RULES)
 
   test("#given S1 #then the vendored local-API client and bunshin relay transport are imported only where allowed", () => {
     // A new importer fails here; a removed one must leave S1_OFFENDERS in the same PR (the list only shrinks).
@@ -49,6 +57,99 @@ describe("remote import guard G1 over packages/**", () => {
   test("#given non-literal import() outside tests #then no file gains one", () => {
     const outsideTests = [...repo.nonLiteralImports].filter(([file]) => !REMOTE_IMPORT_RULES.testFile(file))
     expect(Object.fromEntries(outsideTests)).toEqual(NON_LITERAL_IMPORT_OFFENDERS)
+  })
+})
+
+// omo#13413: the omo SDK's devices.list is the remote module's devices.list, so a script has one device-service listing.
+// The account service's own listing is the SDK's account view (account.devices, the fields only the account holds) and
+// nothing else: devices.list reaching it, or a remote client built past the barrel, fails here.
+describe("the omo SDK's one device listing", () => {
+  const root = join(import.meta.dir, "..")
+  const resolve = createResolver(root)
+  const sdkFiles = scanRepository(root).filter(
+    (fact) =>
+      (fact.file.startsWith("packages/omo-senpi/src/components/omo-sdk/") ||
+        fact.file === "packages/omo-senpi/src/extension/omo-sdk.ts") &&
+      !REMOTE_IMPORT_RULES.testFile(fact.file),
+  )
+
+  test("#given the omo SDK's sources #then only the account view imports the account service's device listing", () => {
+    const listings = sdkFiles.flatMap((fact) =>
+      fact.edges
+        .filter(
+          (edge) =>
+            edge.names.some((named) => named.name === "listLiveDevices") ||
+            (edge.whole && edge.specifier.includes("service-auth")),
+        )
+        .map((edge) => `${fact.file} <- ${edge.specifier}`),
+    )
+    expect(listings).toEqual([
+      "packages/omo-senpi/src/components/omo-sdk/account/index.ts <- @oh-my-opencode/omo-opencode/service-auth",
+    ])
+  })
+
+  test("#given the omo SDK's sources #then devices.list reaches the remote module only through its barrel's session factory", () => {
+    const reaches = sdkFiles.flatMap((fact) =>
+      fact.edges
+        .filter((edge) => resolve(fact.file, edge.specifier)?.startsWith("packages/omo-senpi/src/components/remote/"))
+        .map((edge) => ({
+          file: fact.file,
+          target: resolve(fact.file, edge.specifier),
+          values: edge.names.filter((named) => !named.typeOnly && !edge.typeOnly).map((named) => named.name),
+        })),
+    )
+    expect(reaches).toEqual([
+      {
+        file: "packages/omo-senpi/src/components/omo-sdk/devices/index.ts",
+        target: "packages/omo-senpi/src/components/remote/index.ts",
+        values: ["remoteClientForSession"],
+      },
+    ])
+  })
+})
+
+describe("adapter import family A (#14943 design 7.5)", () => {
+  test("#given every adapter of both editions #then the layers it reaches are exactly its offender row (the list only shrinks)", () => {
+    // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
+    const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ADAPTER_RULES)
+    expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
+  })
+
+  test("#given a record that drops a reach #then it passes; one that adds a file or a layer #then each is named", () => {
+    const base = { "a.ts": { uses: ["L1", "L2"] }, "b.ts": { uses: ["L1"] } }
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1"] } })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1", "L3"] }, "c.ts": { uses: ["L1"] } })).toEqual([
+      "a.ts gained L3, which the merge base's record does not list; route it through the SDK",
+      "c.ts is a new adapter offender (L1); route it through the SDK instead",
+    ])
+  })
+
+  test("#given an adapter that imports the delivery pipeline, directly or through a helper #then the reach is named, and the walk stops at the SDK entry", () => {
+    const root = mkdtempSync(join(tmpdir(), "adapter-guard-"))
+    try {
+      const thread = "packages/omo-senpi/src/components/thread"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${thread}/gateway/pipeline.ts`, "export const deliver = () => 1\n")
+      put(`${thread}/sdk.ts`, 'import { deliver } from "./gateway/pipeline.ts"\nexport const sdk = { deliver }\n')
+      put(`${thread}/helper.ts`, 'export { deliver } from "./gateway/pipeline.ts"\n')
+      put(
+        `${thread}/tools.ts`,
+        'import { deliver } from "./helper.ts"\nimport { sdk } from "./sdk.ts"\nimport "node:net"\n',
+      )
+      put(`${thread}/tools/extension-tools.ts`, 'import { sdk } from "../sdk.ts"\n')
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkAdapterImports(scanRepository(root), createResolver(root), ADAPTER_RULES)
+      expect(Object.fromEntries(found)).toEqual({
+        [`${thread}/tools.ts`]: ["node:net", "packages/omo-senpi/src/components/thread/gateway/"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })
 
@@ -126,6 +227,15 @@ describe("remote import guard G1 matcher", () => {
     'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
   )
   write("packages/omo-native/other.ts", 'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n')
+  // The SDK's declaration surface may name the module's types directly, type-only; any value, or another layer, is a reach.
+  write(
+    "packages/omo-native/remote-sdk-api.ts",
+    'import type { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\nimport type { DeviceService } from "@oh-my-opencode/device-service-core"\n',
+  )
+  write(
+    "packages/omo-native/remote-sdk.ts",
+    'import { sessions } from "../omo-senpi/src/components/remote/sessions.ts"\n',
+  )
   write(
     `${senpi}/src/components/remote/tui/command.ts`,
     'import { sessions } from "../sessions.ts"\nimport { run } from "./run.ts"\n',
@@ -165,8 +275,21 @@ describe("remote import guard G1 matcher", () => {
       [`${senpi}/src/components/thread/tool-member.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/thread/tool-port.ts`]: ["packages/omo-senpi/src/components/remote/"],
       "packages/omo-native/remote-verb.ts": ["packages/omo-senpi/src/components/remote/"],
+      "packages/omo-native/remote-sdk-api.ts": ["packages/device-service-core/src/"],
+      "packages/omo-native/remote-sdk.ts": ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/command.ts`]: ["packages/omo-senpi/src/components/remote/"],
       [`${senpi}/src/components/remote/tui/run.ts`]: ["packages/device-service-core/src/"],
     })
   })
+})
+
+// Home two of the offender-record check (home one is gate-cli.ts in the SDK Parity job); see sdk-parity/base-probe.ts.
+const BASE = probeBase(repoGit)
+describe("adapter offender record against the merge base (runs whenever the merge base is readable)", () => {
+  test.skipIf(!BASE.readable)(
+    `#given the merge base's offender record #then this head's record only shrinks against it${BASE.readable ? "" : ` [skipped: ${BASE.reason}]`}`,
+    () => {
+      expect(offenderBaseProblems(repoGit, ADAPTER_OFFENDERS)).toEqual({ problems: [] })
+    },
+  )
 })
