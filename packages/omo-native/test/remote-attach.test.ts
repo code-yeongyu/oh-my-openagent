@@ -254,10 +254,14 @@ describe("serveLines", () => {
     const accepted = new Promise<Socket>((resolve) => {
       const server = createServer((socket) => {
         serverSocket = socket
-        serveLines(socket, (line) => {
-          lines.push(line)
-          lineArrived()
-        }, maxLineChars)
+        serveLines(
+          socket,
+          (line) => {
+            lines.push(line)
+            lineArrived()
+          },
+          maxLineChars,
+        )
         resolve(socket)
       })
       server.listen(0, "127.0.0.1", () => {
