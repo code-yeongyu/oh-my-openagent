@@ -9,7 +9,7 @@ import type { Row } from "./schema"
 // another still runs its own function. So an entry names its evidence as data (the edition's entry module, the module
 // holding the function it runs instead, and that function), and goes stale when that entry no longer reaches it.
 
-export const EDITIONS = ["npm", "compiled"] as const
+const EDITIONS = ["npm", "compiled"] as const
 
 export type EditionGap = {
   readonly row: string

@@ -93,6 +93,10 @@
     "packages/omo-native/bin/lib/setup-opencode-providers.js": ["API_BY_NPM"],
     // pre-existing at origin dev 4686e425b5: unused export(s) SETUP_SOURCES, canonicalAgentDir, scanSetup, collectSetupPlans, SetupStaleError, staleSetupTargets, authWritesPending, applySetupStages
     // setupEntryText, setupStages, setupApplyFault: declared for install-calls.js (#14960), which imports them through the .js module
+    // sdk-install.d.ts, setup-fs.d.ts: hand-written declarations of .js modules (#14960); their importers (sdk.ts, the SDK
+    // scenario drivers and tests) reach them through the .js path, which knip does not credit to the .d.ts
+    "packages/omo-native/bin/lib/sdk-install.d.ts": ["installCore", "sdkRoot"],
+    "packages/omo-native/bin/lib/setup-fs.d.ts": ["REAL_SETUP_FS"],
     "packages/omo-native/bin/lib/setup-stream.d.ts": ["SETUP_SOURCES", "canonicalAgentDir", "scanSetup", "collectSetupPlans", "SetupStaleError", "staleSetupTargets", "authWritesPending", "applySetupStages", "setupEntryText", "setupStages", "setupApplyFault"],
     // pre-existing at origin dev 4686e425b5: unused export(s) threadExitCode
     "packages/omo-native/bin/lib/thread.js": ["threadExitCode"],

@@ -41,19 +41,23 @@ export async function sdkRoot(
 
 /**
  * The install namespace's calls, keyed as the root names them after `install.`. They run on the root's own environment
- * and home; the root's call options are not ports.
+ * and home; the root's call options are not ports. `overrides` replaces ports per call (the SDK's scenario drivers pass
+ * their fakes); the `omo-ai/sdk` entry passes none.
  * @param {import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").CoreContext} context
+ * @param {{ update?: Record<string, unknown>, setup?: Record<string, unknown>, version?: Record<string, unknown> }} [overrides]
  * @returns {Promise<import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").NamespaceCore<"install">>}
  */
-export async function installCore(context) {
-  const ports = { env: { ...context.env }, ...(context.home === undefined ? {} : { home: context.home }) }
+export async function installCore(context, overrides = {}) {
+  const base = { env: { ...context.env }, ...(context.home === undefined ? {} : { home: context.home }) }
+  const updatePorts = { ...base, ...overrides.update }
+  const ports = { ...base, ...overrides.setup }
   const calls = await import("./install-calls.js")
   // This root's own setup calls: a plan its plan call answered is applied only through its apply.
   const setup = calls.createSetup()
   return {
     sdkRoot: (input) => sdkRoot(input),
-    version: async (input) => calls.version(input),
-    update: (input) => calls.update(input, ports),
+    version: async (input) => calls.version(input, overrides.version),
+    update: (input) => calls.update(input, updatePorts),
     "setup.detect": (input) => setup.detect(input, ports),
     "setup.plan": (input) => setup.plan(input, ports),
     "setup.apply": (input) => setup.apply(input, ports),

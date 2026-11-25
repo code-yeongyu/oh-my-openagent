@@ -202,7 +202,8 @@
           "op": "read",
           "args": {
             "path": "<package>/package.json"
-          }
+          },
+          "count": 2
         },
         {
           "port": "process",
@@ -283,6 +284,15 @@
             "command": "npm"
           },
           "count": 0
+        }
+      ],
+      "given": [
+        {
+          "port": "fs",
+          "state": {
+            "layout": "versioned",
+            "installed": "1.0.0"
+          }
         }
       ]
     },
@@ -1858,9 +1868,9 @@
       "refusal": "internal_error",
       "given": [
         {
-          "port": "fs",
+          "port": "engine",
           "state": {
-            "fault": "scan_throws"
+            "coverage": "malformed"
           }
         }
       ],
@@ -2043,7 +2053,8 @@
           "op": "read",
           "args": {
             "path": "<package>/package.json"
-          }
+          },
+          "count": 2
         },
         {
           "port": "process",
@@ -2089,7 +2100,8 @@
           "op": "read",
           "args": {
             "path": "<package>/package.json"
-          }
+          },
+          "count": 2
         },
         {
           "port": "process",
