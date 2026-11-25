@@ -119,7 +119,9 @@ export function createControls(context: ThreadCoreContext) {
           found.control,
           value.model,
           value.provider,
-          value.idempotency_key === undefined ? {} : { effectId: modelSwitchEffectId(principal, value.idempotency_key) },
+          value.idempotency_key === undefined
+            ? {}
+            : { effectId: modelSwitchEffectId(principal, value.idempotency_key) },
         )
       }),
   }
