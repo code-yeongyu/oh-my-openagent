@@ -64,6 +64,8 @@
         "script/qa/omo-native-eval-smoke.mjs",
         "script/qa/omo-native-parity-smoke.mjs",
         "script/qa/python-kernel-warmup.mjs",
+        "script/qa/sdk-proof/drivers/sdk.ts",
+        "script/qa/sdk-proof/run.ts",
         "script/release-announce.ts",
         "script/release-desktop-engine-target.ts",
         "script/release-latest-flag.ts",
