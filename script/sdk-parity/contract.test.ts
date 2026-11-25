@@ -36,6 +36,7 @@ import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { portProblems } from "./expectation"
 import { loadScenarioTable } from "./scenario-table"
+import * as scenarioRules from "./scenario-rules"
 import { tableProblems } from "./scenario-rules"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
@@ -233,12 +234,24 @@ describe("the table under P0's shared scenario rules", () => {
     ).toEqual([])
   })
 
+  // Bridge until P0's schema lists the pure rows the design lane ruled (account.signInCheck, toolkit.help: built by an
+  // answer with an empty observed trace). The next test fails as soon as scenario-rules.ts exports that list, so the
+  // bridge is deleted in the merge that brings it.
+  const PURE_ROWS_PENDING_P0 = ["account.signInCheck", "toolkit.help"]
+  const pendingPure = (problem: string): boolean =>
+    PURE_ROWS_PENDING_P0.some((row) => problem.startsWith(`scenario ${row}/`)) &&
+    problem.endsWith("an effect scenario states a port effect; an answer alone builds nothing")
+
   test("#given every scenario file #then each row with a thread input has an effect scenario on each target", () => {
-    expect(
-      tableProblems(
-        rows,
-        scenarios.flatMap((file) => file.scenarios),
-      ),
-    ).toEqual([])
+    const problems = tableProblems(
+      rows,
+      scenarios.flatMap((file) => file.scenarios),
+    )
+    expect(problems.filter((problem) => !pendingPure(problem))).toEqual([])
+    expect(problems.filter(pendingPure)).toHaveLength(PURE_ROWS_PENDING_P0.length)
+  })
+
+  test("#given P0's scenario rules #then they do not yet list pure rows, so the local bridge above is still needed", () => {
+    expect(Object.keys(scenarioRules).filter((name) => /pure/i.test(name))).toEqual([])
   })
 })
