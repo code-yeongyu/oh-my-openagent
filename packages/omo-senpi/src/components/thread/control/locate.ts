@@ -5,7 +5,8 @@ import { resolveAddress } from "../address/lazy"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { createRelayControl } from "../remote/lazy-ops"
 import type { RemoteSessionRow } from "../remote/ports"
-import { failure, sendBookFor, targetSession } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failureResult, sendBookFor, targetSession } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { createLocalControl } from "./local-control"
 import type { SessionControl } from "./port"
@@ -58,11 +59,12 @@ export async function locateControl(
   if (session.status === "opening")
     return {
       kind: "error",
-      result: failure(
-        "host_unavailable",
-        `Thread ${resolved.thread} is opening on its host and cannot accept controls yet.`,
-        "Retry once the thread is open.",
-        { thread: resolved.thread, reason: "session_opening" },
+      result: failureResult(
+        refusal(
+          "control.thread_opening",
+          { thread: resolved.thread },
+          { thread: resolved.thread, reason: "session_opening" },
+        ),
       ),
     }
   return {

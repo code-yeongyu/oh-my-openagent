@@ -5,7 +5,8 @@ import { threadState } from "../tools/thread-state"
 import type { ThreadHostSession, ThreadToolSurfaceOptions } from "../tools/ports"
 import type { ThreadSummary } from "../contracts"
 import { interruptOver } from "./interrupt"
-import { refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { refusal } from "../refusal-texts"
+import { refuse, refuseWith, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 
 const THINKING_LEVEL_UNSUPPORTED = "thinking_level_unsupported:"
@@ -30,19 +31,15 @@ export function createLocalControl(
     close: async (closeOptions) => {
       // A terminal closes its own session only gracefully, and then exits by itself (omo#14313).
       if (session.endpoint_kind === "tui" && closeOptions?.graceful !== true)
-        throw refuse(
-          "unsupported",
-          `Thread ${threadId} belongs to an interactive terminal, which closes only gracefully.`,
-          "Close it with graceful: true (the terminal exits once its turn ends), or use thread_interrupt (tool.thread_interrupt() in an eval cell) to stop its turn.",
-          { command: "close_session", retry_with: { graceful: true } },
+        throw refuseWith(
+          refusal(
+            "control.close_terminal_graceful_only",
+            { thread: threadId },
+            { command: "close_session", retry_with: { graceful: true } },
+          ),
         )
       if (port.closeSession === undefined)
-        throw refuse(
-          "unsupported",
-          `The host holding thread ${threadId} does not accept close requests.`,
-          "Update omo on this device and restart its host.",
-          { command: "close_session" },
-        )
+        throw refuseWith(refusal("control.close_not_accepted", { thread: threadId }, { command: "close_session" }))
       return await port.closeSession(routing, threadId, closeOptions)
     },
     setName: (name) => port.setSessionName(routing, name, threadId),
@@ -70,20 +67,12 @@ export function createLocalControl(
     waitSettled: async (timeoutMs, signal) => {
       const { watchSession } = port
       if (watchSession === undefined)
-        throw refuse(
-          "unsupported",
-          `The host holding thread ${threadId} cannot report when its turn ends.`,
-          "Update omo on this device and restart its host.",
-          { command: "subscribe_sessions" },
-        )
+        throw refuseWith(refusal("control.wait_unsupported", { thread: threadId }, { command: "subscribe_sessions" }))
       return await waitForTurnEnd(
         (handlers) => watchSession(routing, handlers, threadId),
         (reason) =>
-          refuse(
-            "unsupported",
-            `The endpoint holding thread ${threadId} refused to report its status (${reason}).`,
-            "Update omo on this device and restart its host.",
-            { command: "subscribe_sessions", reason },
+          refuseWith(
+            refusal("control.status_refused", { thread: threadId, reason }, { command: "subscribe_sessions", reason }),
           ),
         timeoutMs,
         signal,
@@ -95,12 +84,7 @@ export function createLocalControl(
       (await port.getState(routing)).isStreaming === true,
     setArchived: async (archived) => {
       const unsupported = () =>
-        refuse(
-          "unsupported",
-          `The engine holding thread ${threadId} does not know set_session_archived: it runs a senpi from before archived threads.`,
-          "Update omo on this device and restart the session's host or terminal, then retry.",
-          { command: "set_session_archived" },
-        )
+        refuseWith(refusal("control.archive_unsupported", { thread: threadId }, { command: "set_session_archived" }))
       if (port.setSessionArchived === undefined) throw unsupported()
       try {
         await port.setSessionArchived(routing, archived, threadId)

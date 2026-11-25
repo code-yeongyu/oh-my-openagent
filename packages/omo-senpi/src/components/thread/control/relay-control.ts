@@ -12,7 +12,15 @@ import type { ModelChoice } from "../tools/model-match"
 import { REMOTE_GRACEFUL_MAX_WAIT_MS } from "../contracts/fields"
 import { closeLadder, SESSION_GONE, type RecordAnswer } from "./close-ladder"
 import { interruptOver } from "./interrupt"
-import { ControlRefusal, refuse, sessionModelState, SESSION_ONLY_THINKING_SCOPE, type SessionControl } from "./port"
+import { refusal } from "../refusal-texts"
+import {
+  ControlRefusal,
+  refuse,
+  refuseWith,
+  sessionModelState,
+  SESSION_ONLY_THINKING_SCOPE,
+  type SessionControl,
+} from "./port"
 import { waitForTurnEnd } from "./wait-settled"
 import { displayedThread } from "./relay-session-host"
 import { threadRow } from "../tools/thread-row"
@@ -139,12 +147,7 @@ export function createRelayControl(
         scope: SESSION_ONLY_THINKING_SCOPE,
       })
       if (outcome.kind === "refused" && THINKING_LEVEL_UNSUPPORTED.test(outcome.reason))
-        throw refuse(
-          "thinking_level_unsupported",
-          `Thinking level ${level} is not supported by the active model.`,
-          "Choose a level from the supported list and retry.",
-          { device, level },
-        )
+        throw refuseWith(refusal("control.thinking_level_unsupported_on_device", { level }, { device, level }))
       if (outcome.kind !== "ok") throw new ControlRefusal(outcomeFailure(outcome, device).error)
     },
     getMessages: async () => {

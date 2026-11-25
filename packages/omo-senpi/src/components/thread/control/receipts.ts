@@ -5,7 +5,8 @@ import { hashArgs } from "../gateway/hash-args"
 import { isLockWaitExceeded } from "../gateway/lock-wait"
 import type { GatewayStore } from "../gateway/store"
 import { reportUnexpected, thrown } from "../sdk-core/failures"
-import { failure, uncertainFailure } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failure, failureResult, uncertainFailure } from "../tools/internals"
 import { decodeNote, decodeResult, encodeNote, encodeResult, RERUN_ON_REPEAT, storedKey } from "./receipt-record"
 import { currentResult } from "../tools/thread-row"
 
@@ -128,11 +129,12 @@ export function createReceipts(
     if (!recoverable(key, at) && !admitting.has(key) && recoveryFull(at))
       return {
         kind: "answer",
-        result: failure(
-          "overloaded",
-          `${RECEIPT_RECOVERY_MAX_KEYS} earlier calls on this surface failed before the gateway store answered and may still need recovering; nothing ran.`,
-          "Retry those calls under their own idempotency keys, then retry this one.",
-          { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS },
+        result: failureResult(
+          refusal(
+            "control.receipt_recovery_full",
+            { max_keys: String(RECEIPT_RECOVERY_MAX_KEYS) },
+            { budget: "receipt_recovery", max_keys: RECEIPT_RECOVERY_MAX_KEYS },
+          ),
         ),
       }
     let admission: Awaited<ReturnType<typeof store.toolReceiptBegin>>

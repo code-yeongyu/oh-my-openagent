@@ -2,7 +2,8 @@ import { normalizeThreadName } from "../addressing"
 import type { ThreadRenameInput, ThreadToolResult } from "../contracts"
 import type { LocalAliasReason } from "../remote/cross-device"
 import { renameAlias } from "../remote/lazy-ops"
-import { failure } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failure, failureResult } from "../tools/internals"
 import type { ThreadHostView, ThreadToolSurfaceOptions } from "../tools/ports"
 import { locateControl } from "./locate"
 import { NOT_LIVE } from "./operations"
@@ -38,11 +39,7 @@ export async function renameThread(
     )
     return existing === undefined
       ? undefined
-      : failure(
-          "name_conflict",
-          `A thread named "${existing.name}" already exists.`,
-          "Call thread_list (tool.thread_list() in an eval cell) and choose another name.",
-        )
+      : failureResult(refusal("control.rename_conflict", { name: existing.name }))
   }
   let name = value.name?.trim()
   const refusedName = name === undefined ? undefined : await nameRefusal(name)

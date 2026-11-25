@@ -19,7 +19,7 @@ import type {
   ThreadToolResult,
   ThreadTranscriptItem,
 } from "../contracts"
-import { threadToolFailure, type ThreadErrorCode } from "../errors"
+import { threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
 import { THREAD_TOOL_EXPOSURE, THREAD_TOOL_METADATA } from "../metadata"
 import { readSessionFacts, threadTitle } from "../session-facts"
 import { threadLink } from "../thread-link"
@@ -43,6 +43,11 @@ export function failure(
   details?: Readonly<Record<string, unknown>>,
 ): ThreadToolResult {
   return { kind: "error", error: threadToolFailure(code, message, next, details) }
+}
+
+/** The error result of a failure refusal() made, the same object, so its template provenance reaches the receipt. */
+export function failureResult(error: ThreadToolFailure): ThreadToolResult {
+  return { kind: "error", error }
 }
 
 /**

@@ -109,6 +109,11 @@ export function refuse(
   return new ControlRefusal(threadToolFailure(code, message, next, details))
 }
 
+/** A control's typed refusal carrying a failure refusal() made, as it is, so its template provenance reaches the receipt. */
+export function refuseWith(failure: ThreadToolFailure): ControlRefusal {
+  return new ControlRefusal(failure)
+}
+
 export function controlRefusalOf(error: unknown): ThreadToolFailure | undefined {
   return typeof error === "object" && error !== null && (error as { readonly [REFUSAL]?: unknown })[REFUSAL] === true
     ? (error as ControlRefusal).failure

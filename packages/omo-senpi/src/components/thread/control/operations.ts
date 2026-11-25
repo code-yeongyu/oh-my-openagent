@@ -1,5 +1,6 @@
 import type { ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
-import { failure } from "../tools/internals"
+import { refusal } from "../refusal-texts"
+import { failure, failureResult } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
 import type { ThreadCloseOptions } from "../tools/ports"
 import { controlIdentity, controlRefusalOf, refuse, type SessionControl, type SessionModelState } from "./port"
@@ -69,11 +70,12 @@ export async function closeThread(
     )
   const { outcome, dropped_deliveries, graceful } = await control.close(options)
   if (outcome === "held_elsewhere")
-    return failure(
-      "foreign_live_owner",
-      `Thread ${control.thread_id} has no session file yet and another client still holds it, so only this tool's hold was released.`,
-      "Close it from the client that holds it, or send it a message first so it can be closed for every holder.",
-      control.device === undefined ? undefined : { device: control.device },
+    return failureResult(
+      refusal(
+        "control.close_held_elsewhere",
+        { thread: control.thread_id },
+        control.device === undefined ? undefined : { device: control.device },
+      ),
     )
   const closed = outcome === "closed"
   return {
@@ -259,11 +261,6 @@ async function applyThinkingLevel(control: SessionControl, level: string): Promi
   } catch (error) {
     if (controlRefusalOf(error)?.code !== "thinking_level_unsupported") throw error
     const supported = await control.getAvailableThinkingLevels()
-    return failure(
-      "thinking_level_unsupported",
-      `Thinking level "${level}" is not supported by the active model.`,
-      "Choose a level from the supported list and retry.",
-      { supported },
-    )
+    return failureResult(refusal("control.thinking_level_unsupported", { level }, { supported }))
   }
 }

@@ -3,7 +3,8 @@ import { randomUUID } from "node:crypto"
 import type { JsonObject } from "../remote/ports"
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadCloseAnswer, ThreadCloseGraceful, ThreadCloseOptions, ThreadCloseOutcome } from "../tools/ports"
-import { refuse } from "./port"
+import { refusal } from "../refusal-texts"
+import { refuseWith } from "./port"
 
 /**
  * How a leg answers one engine record for the ladder: the engine's reply data, or `gone` when the engine no longer
@@ -104,18 +105,17 @@ export async function closeLadder(
   if (options.force !== true && (refused["reason"] === "turn_active" || refused["reason"] === "work_pending")) {
     const pending = deliveriesOf(refused["pending"])
     if (pending === undefined && !(await advertises(sessionId, send, UNLOAD_REFUSE_DELIVERIES)))
-      throw refuse(
-        "turn_active",
-        refused["reason"] === "turn_active"
-          ? `Thread ${sessionId} is still working (${describe(refused)}), and its host's engine cannot name the messages a forced close would drop.`
-          : `Thread ${sessionId} holds messages it has not read (${describe(refused)}), and its host's engine cannot name them.`,
-        "Wait for it to read them, or close it with force: true (anything it has not read is dropped); an engine that names them comes with a newer senpi on that device.",
-        {
-          command: "unload_session",
-          reason: refused["reason"],
-          detail: refused["detail"],
-          pending_deliveries: "unavailable",
-        },
+      throw refuseWith(
+        refusal(
+          refused["reason"] === "turn_active" ? "control.close_working_unnamed" : "control.close_unread_unnamed",
+          { thread: sessionId, state: describe(refused) },
+          {
+            command: "unload_session",
+            reason: refused["reason"],
+            detail: refused["detail"],
+            pending_deliveries: "unavailable",
+          },
+        ),
       )
     const second = await unload({ interrupt: true, deliveries: "refuse" })
     if ("done" in second) return second.done
@@ -123,16 +123,17 @@ export async function closeLadder(
     const unread = deliveriesOf(refused["pending"])
     // Any refusal that names unread deliveries is answered by them, whichever blocker the engine named first.
     if (unread !== undefined && unread.length > 0)
-      throw refuse(
-        "turn_active",
-        `Thread ${sessionId} has ${unread.length} message(s) it has not read yet (${unread.join(", ")}); closing it now would drop them.`,
-        "Let it read them and retry, or close it with force: true to drop them (the result lists dropped_deliveries).",
-        {
-          command: "unload_session",
-          reason: refused["reason"],
-          pending_deliveries: unread,
-          retry_with: { force: true },
-        },
+      throw refuseWith(
+        refusal(
+          "control.close_unread",
+          { thread: sessionId, count: String(unread.length), deliveries: unread.join(", ") },
+          {
+            command: "unload_session",
+            reason: refused["reason"],
+            pending_deliveries: unread,
+            retry_with: { force: true },
+          },
+        ),
       )
   }
   return await refusedUnload(sessionId, refused, send)
@@ -156,11 +157,12 @@ async function gracefulClose(
   legMaxWaitMs: number | undefined,
 ): Promise<ThreadCloseAnswer> {
   if (!(await advertises(sessionId, send, UNLOAD_GRACEFUL)))
-    throw refuse(
-      "unsupported",
-      `The engine holding thread ${sessionId} cannot close it gracefully: it runs a senpi from before graceful close.`,
-      "Update omo on that device and restart its host, or close the thread with force: true (its running turn is stopped).",
-      { command: "unload_session", capability: UNLOAD_GRACEFUL },
+    throw refuseWith(
+      refusal(
+        "control.close_not_graceful",
+        { thread: sessionId },
+        { command: "unload_session", capability: UNLOAD_GRACEFUL },
+      ),
     )
   const requested = waitMs ?? GRACEFUL_WAIT_MS
   const legCut = legMaxWaitMs !== undefined && requested > legMaxWaitMs ? legMaxWaitMs : undefined
@@ -168,12 +170,7 @@ async function gracefulClose(
   // Only a drain the leg's cap bounded names the cap: when the call budget cut it shorter, the cap did not limit it.
   const capped = legCut !== undefined && wait === legCut ? legCut : undefined
   if (wait <= 0)
-    throw refuse(
-      "unsupported",
-      `This call has no time left to wait for thread ${sessionId}'s turn.`,
-      "Close it again in a new call.",
-      { command: "unload_session" },
-    )
+    throw refuseWith(refusal("control.close_no_time", { thread: sessionId }, { command: "unload_session" }))
   const answered = await send(
     { ...UNLOAD, sessionId, effectId: closeEffectId(), graceful: true, waitMs: wait },
     { waitMs: wait },
@@ -185,30 +182,36 @@ async function gracefulClose(
     return { outcome: "closed", dropped_deliveries: dropped, graceful: gracefulOf(data) }
   if (data["reason"] === "session_closing") return { outcome: "not_live", dropped_deliveries: dropped }
   if (data["timed_out"] === true)
-    throw refuse(
-      "turn_active",
-      `Thread ${sessionId} is still working on turn ${String(data["turn"])} after ${String(data["waited_ms"])} ms${capped === undefined ? "" : ` (the most a thread on another device can wait, not the ${String(requested)} ms asked for)`}. It stays open and takes messages again; the ${dropped.length} unread message(s) taken out of its queue are queued for it again.`,
-      capped === undefined
-        ? "Close it again with a longer wait_ms once its turn is nearly done, or with force: true to stop the turn."
-        : "Close it again once its turn is nearly done, or with force: true to stop the turn.",
-      {
-        ...(capped === undefined ? {} : { wait_capped: { requested_ms: requested, max_ms: capped } }),
-        command: "unload_session",
-        reason: "turn_active",
-        still_running: true,
-        open: true,
-        turn: data["turn"],
-        waited_ms: data["waited_ms"],
-        returned_deliveries: dropped,
-        retry_with: { force: true },
-      },
+    throw refuseWith(
+      refusal(
+        capped === undefined ? "control.close_still_working" : "control.close_still_working_capped",
+        {
+          thread: sessionId,
+          turn: String(data["turn"]),
+          waited_ms: String(data["waited_ms"]),
+          returned: String(dropped.length),
+          ...(capped === undefined ? {} : { requested_ms: String(requested) }),
+        },
+        {
+          ...(capped === undefined ? {} : { wait_capped: { requested_ms: requested, max_ms: capped } }),
+          command: "unload_session",
+          reason: "turn_active",
+          still_running: true,
+          open: true,
+          turn: data["turn"],
+          waited_ms: data["waited_ms"],
+          returned_deliveries: dropped,
+          retry_with: { force: true },
+        },
+      ),
     )
   if (data["reason"] === "composer_draft")
-    throw refuse(
-      "unsupported",
-      `Thread ${sessionId}'s terminal has unsent text in its composer, and a close would discard it.`,
-      "Ask the person at that terminal to send or clear it, then close the thread again.",
-      { command: "unload_session", reason: "composer_draft" },
+    throw refuseWith(
+      refusal(
+        "control.close_composer_draft",
+        { thread: sessionId },
+        { command: "unload_session", reason: "composer_draft" },
+      ),
     )
   return await refusedUnload(sessionId, data, send)
 }
@@ -243,28 +246,26 @@ async function advertises(sessionId: string, send: LadderSend, capability: strin
 async function refusedUnload(sessionId: string, refused: JsonObject, send: LadderSend): Promise<ThreadCloseAnswer> {
   const reason = refused["reason"]
   if (reason === "host_draining")
-    throw refuse(
-      "host_unavailable",
-      `The host holding thread ${sessionId} is shutting down and refused to close it.`,
-      "Retry once that host has restarted.",
-      { command: "unload_session", reason },
+    throw refuseWith(
+      refusal("control.close_host_draining", { thread: sessionId }, { command: "unload_session", reason }),
     )
   if (reason !== "unsupported") {
     // The engine's detail names which blocker held the session (#14169): without it a caller cannot tell a turn, a
     // bash command or an unwritten delivery apart.
-    const detail = typeof refused["detail"] === "string" ? `: ${refused["detail"]}` : ""
+    const detail = refused["detail"]
     // Deliveries an interrupt handed back before a later blocker refused the unload are gone from the session either way.
     const dropped = deliveriesOf(refused["dropped"])
-    throw refuse(
-      "unsupported",
-      `The host holding thread ${sessionId} refused to close it (${String(reason)}${detail}).`,
-      "Read the thread and retry once its work settles.",
-      {
-        command: "unload_session",
-        reason,
-        detail: refused["detail"],
-        ...(dropped === undefined || dropped.length === 0 ? {} : { dropped_deliveries: dropped }),
-      },
+    throw refuseWith(
+      refusal(
+        typeof detail === "string" ? "control.close_refused_detail" : "control.close_refused",
+        { thread: sessionId, reason: String(reason), ...(typeof detail === "string" ? { detail } : {}) },
+        {
+          command: "unload_session",
+          reason,
+          detail,
+          ...(dropped === undefined || dropped.length === 0 ? {} : { dropped_deliveries: dropped }),
+        },
+      ),
     )
   }
   const close = await send({ type: "close_session", sessionId })

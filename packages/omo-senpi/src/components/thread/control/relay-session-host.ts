@@ -2,7 +2,8 @@ import type { ThreadSummary } from "../contracts"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowKey, rowName } from "@oh-my-opencode/thread-address-core"
 import { rowCreatedAt, rowFolder, rowStatus } from "../remote/ports"
-import { threadToolFailure, type ThreadToolFailure } from "../errors"
+import type { ThreadToolFailure } from "../errors"
+import { refusal } from "../refusal-texts"
 import { INITIAL_SKILLS_CONTEXT_KEY } from "../initial-skills"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "../remote/ports"
 import { notSignedInFailure, outcomeFailure } from "../remote/outcome"
@@ -83,12 +84,7 @@ export function createRelaySessionHost(
   device: string,
   listed?: RemoteSessionRow,
 ): SessionHost {
-  const fail = (
-    code: Parameters<typeof threadToolFailure>[0],
-    message: string,
-    next: string,
-    details?: Readonly<Record<string, unknown>>,
-  ): SessionOpenOutcome => ({ kind: "error", error: threadToolFailure(code, message, next, details) })
+  const refused = (error: ThreadToolFailure): SessionOpenOutcome => ({ kind: "error", error })
   /**
    * A create whose new session b's route does not reach (#14394): end it on b through the endpoint that opened it, so
    * nothing is left behind, and refuse typed. `created` says whether a thread still exists there (the end failed).
@@ -115,30 +111,30 @@ export function createRelaySessionHost(
     // refused, timed-out or unknown unload the folder stays (the session may still run in it) and is named.
     const left = worktree === undefined || created ? undefined : await removeRemoteWorktree(remote, device, worktree)
     const shown = escapeForDisplay(reason)
-    const session = created
-      ? routingId === undefined
-        ? `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and its open named no routing id to end it by: it is left with no live owner.`
-        : `Device ${device} made thread ${thread}, but its route does not reach it (${shown}), and ending it there failed: it is left with no live owner.`
-      : `Device ${device} took the open, but its route does not reach the session it made (${shown}): no thread host there that this account reaches takes new threads.`
     const kept = worktree !== undefined && (created || left !== undefined)
-    const remains =
-      kept && worktree !== undefined
-        ? ` The worktree ${worktree.path} made for it is still on that device.`
-        : created
-          ? ""
-          : " Nothing was left behind."
-    return fail(
-      "host_unavailable",
-      `${session}${remains}`,
-      "Start omo on that device (an omo session, or omo daemon run), or create the thread on another device.",
-      {
-        device,
-        reason: shown,
-        created,
-        ...(created ? { thread } : {}),
-        ...(created && routingId === undefined ? { unload: "no_routing_id" } : {}),
-        ...(kept ? { worktree, ...(left === undefined ? {} : { cleanup: left.error }) } : {}),
-      },
+    const [sentence, withWorktree] = created
+      ? routingId === undefined
+        ? (["control.relay_made_unowned", "control.relay_made_unowned_worktree"] as const)
+        : (["control.relay_made_end_failed", "control.relay_made_end_failed_worktree"] as const)
+      : (["control.relay_open_unreachable", "control.relay_open_unreachable_worktree"] as const)
+    return refused(
+      refusal(
+        kept ? withWorktree : sentence,
+        {
+          device,
+          reason: shown,
+          ...(created ? { thread } : {}),
+          ...(kept && worktree !== undefined ? { worktree: worktree.path } : {}),
+        },
+        {
+          device,
+          reason: shown,
+          created,
+          ...(created ? { thread } : {}),
+          ...(created && routingId === undefined ? { unload: "no_routing_id" } : {}),
+          ...(kept ? { worktree, ...(left === undefined ? {} : { cleanup: left.error }) } : {}),
+        },
+      ),
     )
   }
   /**
@@ -179,23 +175,18 @@ export function createRelaySessionHost(
           ? ({ kind: "refused", reason: "unnamed_session" } as const)
           : await remote.sessions.locate(device, engineId, step.located)
       if (located.kind !== "ok")
-        return fail(
-          "not_resumable",
-          `Device ${device} opened the thread's file, but the reopened session cannot be reached there (${escapeForDisplay(located.reason)}).`,
-          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell), then open the thread by the id it lists.",
-          { device, reason: escapeForDisplay(located.reason) },
+        return refused(
+          refusal(
+            "control.relay_reopen_unreachable",
+            { device, reason: escapeForDisplay(located.reason) },
+            { device, reason: escapeForDisplay(located.reason) },
+          ),
         )
       threadId = located.sessionId
       if (listed !== undefined) remote.sessions.reopened?.(listed, located.sessionId)
     } else {
       const engineId = openedEngineId(data, state)
-      if (engineId === undefined)
-        return fail(
-          "internal_error",
-          `Device ${device} opened a session but did not name it.`,
-          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to find the new thread.",
-          { device },
-        )
+      if (engineId === undefined) return refused(refusal("control.relay_open_unnamed", { device }, { device }))
       // The session exists on b from here on: a later step that fails is a warning on the created thread, never an
       // error, so a retry under the same key replays the thread and a new key cannot make a second session.
       const located = await remote.sessions.locate(device, engineId, step.located)
@@ -203,10 +194,9 @@ export function createRelaySessionHost(
       if (located.kind !== "ok")
         warnings.push(
           notSignedInFailure(located.reason, device)?.error ??
-            threadToolFailure(
-              "unsupported",
-              `Device ${device} created the thread but did not name its relay key (${escapeForDisplay(located.reason)}).`,
-              "Address it by its thread value once thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) lists it, or update omo on that device.",
+            refusal(
+              "control.relay_key_unnamed",
+              { device, reason: escapeForDisplay(located.reason) },
               { device, reason: escapeForDisplay(located.reason) },
             ),
         )
@@ -363,13 +353,7 @@ export function createRelaySessionHost(
       const resolved = await resolveTypedDevice(remote.client, device)
       if (resolved.kind === "error") return resolved
       // The host is for the device with this id: a name or id prefix that matched another device names no device here.
-      if (resolved.device !== device)
-        return fail(
-          "not_found",
-          `No device named ${device} is signed in to this account.`,
-          "Call thread_list with all_scope (tool.thread_list({ all_scope: true }) in an eval cell) to see the account's devices and threads.",
-          { device },
-        )
+      if (resolved.device !== device) return refused(refusal("control.relay_no_device", { device }, { device }))
       const { name, initialSkills, permissionPreset, worktree, ...asked } = request
       const made =
         worktree === undefined ? undefined : await prepareRemoteWorktree(remote, device, asked.cwd ?? "", worktree)
