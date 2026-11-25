@@ -43,7 +43,7 @@ const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
 // cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
 // value, surfaces, projection and modules. Any change there under an unresolved entry fails. Everything else (a named
 // field's type, enum, nested schema, scenario ids, notes) is CONTRACT ANNOTATION: its change alone makes a candidate.
-export function descriptorOf(row: Row): string {
+function descriptorOf(row: Row): string {
   const shape = [
     ...Object.keys(row.input.properties).map((name) => `field ${name}`),
     ...row.input.required.map((name) => `required ${name}`),
@@ -174,7 +174,7 @@ export function goldenProblems(
 }
 
 // The ids a reviewer's line covers: the candidates and the built rows marked for the live-schema check.
-export const reviewed = (report: GateReport): string[] => [
+const reviewed = (report: GateReport): string[] => [
   ...report.candidates,
   ...report.liveSchema.map((id) => `${id}#live-schema`),
 ]

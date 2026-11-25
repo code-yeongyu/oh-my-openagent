@@ -6,7 +6,7 @@ import { REPO_ROOT } from "./registry"
 // The merge base's parity record, read from git: the gate and the recurring registry test both judge the head against
 // the base the pull request merges into (review 6061267823 H1), never against an assumed initial state.
 
-export const BASE_REF = process.env.SDK_PARITY_BASE ?? "origin/dev"
+const BASE_REF = process.env.SDK_PARITY_BASE ?? "origin/dev"
 
 const git = (...args: string[]): string =>
   execFileSync("git", args, {
@@ -18,7 +18,7 @@ const git = (...args: string[]): string =>
 
 export const mergeBase = (ref: string = BASE_REF): string => git("merge-base", ref, "HEAD").trim()
 
-export function showAt(ref: string, path: string): string | undefined {
+function showAt(ref: string, path: string): string | undefined {
   try {
     return git("show", `${ref}:${path}`)
   } catch {
