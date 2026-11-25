@@ -53,5 +53,4 @@ test.skipIf(process.platform === "win32")(
     expect(await b.engine.runCycle()).toMatchObject({ applied: 1 })
     expect(await b.read("after.md")).toBe("after\n")
   },
-  GIT_TEST_TIMEOUT,
 )

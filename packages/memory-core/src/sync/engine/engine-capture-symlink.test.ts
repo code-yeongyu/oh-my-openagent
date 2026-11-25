@@ -86,5 +86,4 @@ test.skipIf(process.platform === "win32")(
       )
     }
   },
-  GIT_TEST_TIMEOUT,
 )
