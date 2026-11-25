@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 
+import { ADAPTER_LAYER_RENAMES } from "../remote-import-guard-rules"
 import { type GitPort, offenderBaseProblems, probeBase, registryBaseProblems } from "./base-probe"
 import { type Baseline, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
@@ -80,6 +81,17 @@ describe("the merge-base probe and the checks it gates", () => {
     )
     expect(check).toEqual({
       problems: ["a.ts gained L2, which the merge base's record does not list; route it through the SDK"],
+    })
+  })
+
+  test("#given a base row naming a layer whose code moved #then the moved-to layer is admitted and any other new layer still fails", () => {
+    const [movedFrom, movedTo] = Object.entries(ADAPTER_LAYER_RENAMES)[0] ?? ["", ""]
+    const git = readable({
+      "script/remote-import-guard-adapter-offenders.json": JSON.stringify({ "a.ts": { uses: [movedFrom] } }),
+    })
+    expect(offenderBaseProblems(git, { "a.ts": { uses: [movedTo] } }, "origin/dev")).toEqual({ problems: [] })
+    expect(offenderBaseProblems(git, { "a.ts": { uses: [movedTo, "L9"] } }, "origin/dev")).toEqual({
+      problems: ["a.ts gained L9, which the merge base's record does not list; route it through the SDK"],
     })
   })
 })
