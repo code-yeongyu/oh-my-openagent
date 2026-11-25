@@ -123,7 +123,7 @@ const NEXT_ACTION: Partial<Record<RemoteCode, string>> = {
   delivered_unconfirmed:
     "The relay accepted it for the device, so it may have run or may still run; read the session's current state before resending.",
   invalid_arguments: "Fix the arguments and call it again.",
-  not_applied: "Nothing changed; it is safe to repeat the call, or pick another model.",
+  not_applied: "The request is not in effect; it is safe to repeat the call, or pick another model.",
 }
 
 export const nextActionFor = (code: RemoteCode): string => NEXT_ACTION[code] ?? "Retry the call."

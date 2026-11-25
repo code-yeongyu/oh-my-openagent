@@ -43,7 +43,7 @@ effect (`model_switch: "applied"`, exit 0). Held until the session's next compac
 new model only after one: it keeps running on the old model, which the answer names (`model_switch:
 "after_compaction"`, `in_effect`, `pending`, exit 0); nothing more needs doing, and a thinking level asked with it
 (`provider/id:high`) was not sent, so set it with the thread's reasoning control once the switch lands. Not applied:
-the session answered and nothing changed (`not_applied`, exit 1; repeating is safe). A state that cannot be read
+the session answered and the switch is not in effect (`not_applied`, exit 1; repeating is safe). A state that cannot be read
 back is `idempotency_uncertain` (exit 1): read the session's model before repeating.
 
 `open` runs the new session in `MODE` (default: this device's own setting, else full-access), on the

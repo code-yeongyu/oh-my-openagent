@@ -355,7 +355,7 @@ again; the SDK keeps no tool receipt, so any other repeated call runs again.
 holds the switch until its next compaction: `in_effect` names the model and level it still runs on, `pending` the
 model it will switch to, and a thinking level asked with it (`provider/id:high`) is listed there with
 `thinking_level_sent: false`: set it with `thread_set_reasoning` once the switch lands. A session that answered and
-shows nothing changed is `not_applied` (safe to repeat); one whose state cannot be read back is
+shows the switch not in effect is `not_applied` (safe to repeat); one whose state cannot be read back is
 `idempotency_uncertain` with `uncertain: true`.
 
 ```js

@@ -16,16 +16,28 @@ type Model = { readonly provider: string; readonly id: string }
 
 const PREVIOUS: Model = { provider: "openai", id: "gpt-x" }
 const SELECTED: Model = { provider: "anthropic", id: "claude-small" }
+/** A model no call in these cases asks for: another client's switch. */
+const ELSEWHERE: Model = { provider: "google", id: "gemini-other" }
 const LEVELS = ["off", "low", "high"]
 
+/**
+ * `drift`: another client switched the model meanwhile; `foreignPark`: the holder keeps a switch to another model.
+ * `levelReplyLost`: the first level change applies and its reply is lost; `restoreLevelFails`: setting the level back
+ * fails before it applies; `stateLostFrom`: every state read from that one (1-based) on fails.
+ */
 function scriptedHolder(
-  mode: "apply" | "park" | "ignore",
+  mode: "apply" | "park" | "ignore" | "drift" | "foreignPark",
   options: {
     readonly restoreFails?: boolean
     readonly stateLostAfterSwitch?: boolean
     readonly loseFirstSwitchReply?: boolean
+    readonly levelReplyLost?: boolean
+    readonly restoreLevelFails?: boolean
+    readonly stateLostFrom?: number
   } = {},
 ) {
+  let reads = 0
+  let levelRepliesToLose = options.levelReplyLost === true ? 1 : 0
   // The engine's effect ledger (senpi `runSetModel`): a repeated effect id replays its first answer and switches nothing.
   const effects = new Set<string>()
   let parks = 0
@@ -41,7 +53,10 @@ function scriptedHolder(
     calls,
     models: [PREVIOUS, SELECTED],
     getState: (): JsonObject => {
+      reads += 1
       if (options.stateLostAfterSwitch === true && calls.length > 0) throw new Error("the holder's state read was lost")
+      if (options.stateLostFrom !== undefined && reads >= options.stateLostFrom)
+        throw new Error("the holder's state read was lost")
       return {
         isStreaming: false,
         model: { ...state.model, name: state.model.id },
@@ -70,13 +85,19 @@ function scriptedHolder(
       } else if (mode === "park") {
         state.pending = { provider, id }
         parks += 1
-      }
+      } else if (mode === "drift") state.model = ELSEWHERE
+      else if (mode === "foreignPark") state.pending = ELSEWHERE
       return { provider, id }
     },
     setThinkingLevel: (level: string) => {
       calls.push(`set_thinking_level ${level}`)
       if (!LEVELS.includes(level)) throw new Error(`Thinking level ${level} is not supported by the active model.`)
+      if (options.restoreLevelFails === true && level === "low") throw new Error("the level could not be set back")
       state.thinkingLevel = level
+      if (levelRepliesToLose > 0) {
+        levelRepliesToLose -= 1
+        throw new Error("the reply to set_thinking_level was lost")
+      }
     },
   }
 }
@@ -106,7 +127,9 @@ function localControl(holder: Holder): SessionControl {
       try {
         holder.setThinkingLevel(level)
       } catch (error) {
-        throw new Error(`thinking_level_unsupported:${(error as Error).message}`)
+        // The live surface rethrows only the engine's unsupported-level text this way; any other failure stays itself.
+        const { message } = error as Error
+        throw new Error(message.includes("is not supported") ? `thinking_level_unsupported:${message}` : message)
       }
     },
     getAvailableThinkingLevels: async () => LEVELS,
@@ -235,8 +258,12 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
       })
     })
 
-    for (const model of ["anthropic/claude-small", "anthropic/claude-small:high"])
-      test(`#given a ${leg} holder whose state names neither model #when switched to ${model} #then not_applied names what is in effect, never a partial commit`, async () => {
+    // A plain switch reads no state before it, so it cannot say whether anything else moved (not_compared).
+    for (const [model, reason] of [
+      ["anthropic/claude-small", "not_compared"],
+      ["anthropic/claude-small:high", "unchanged"],
+    ] as const)
+      test(`#given a ${leg} holder whose state names neither model #when switched to ${model} #then not_applied ${reason} names what is in effect, never a partial commit`, async () => {
         const { result, holder, calls } = await switchOn(leg, scriptedHolder("ignore"), model)
         expect(result).toMatchObject({
           kind: "error",
@@ -244,7 +271,7 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
             code: "not_applied",
             details: {
               ...identity[leg],
-              reason: "model_switch_not_applied",
+              reason,
               selected_model: SELECTED,
               in_effect: { model: PREVIOUS, thinking_level: "low" },
             },
@@ -283,7 +310,7 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
           code: "partial_commit",
           details: {
             ...identity[leg],
-            reason: "model_restore_failed",
+            reason: "rollback_incomplete",
             partial: {
               applied: ["model"],
               not_applied: ["thinking_level"],
@@ -296,6 +323,76 @@ describe("#14939 set_model outcomes: applied, after the next compaction, partly 
       })
       expect(holder).toEqual({ model: SELECTED, thinkingLevel: "low", pending: undefined })
     })
+
+    test(`#given a ${leg} holder whose level reply is lost and whose rollback restores the model but not the level #when switched with a suffix #then partial_commit lists only the level as applied`, async () => {
+      const holder = scriptedHolder("apply", { levelReplyLost: true, restoreLevelFails: true })
+      const { result } = await switchOn(leg, holder, "anthropic/claude-small:high")
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "partial_commit",
+          details: {
+            ...identity[leg],
+            reason: "rollback_incomplete",
+            partial: {
+              applied: ["thinking_level"],
+              not_applied: ["model"],
+              in_effect: { model: PREVIOUS, thinking_level: "high" },
+            },
+          },
+        },
+      })
+      expect(holder.state).toEqual({ model: PREVIOUS, thinkingLevel: "high", pending: undefined })
+    })
+
+    test(`#given a ${leg} holder whose level reply is lost and whose rollback restores both parts #when switched with a suffix #then not_applied unchanged`, async () => {
+      const holder = scriptedHolder("apply", { levelReplyLost: true })
+      const { result } = await switchOn(leg, holder, "anthropic/claude-small:high")
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "not_applied",
+          details: { ...identity[leg], reason: "unchanged", in_effect: { model: PREVIOUS, thinking_level: "low" } },
+        },
+      })
+      expect(result).not.toMatchObject({ error: { uncertain: true } })
+      expect(holder.state).toEqual({ model: PREVIOUS, thinkingLevel: "low", pending: undefined })
+    })
+
+    test(`#given a ${leg} holder whose state cannot be read once its rollback ran #when switched with a suffix #then the outcome is uncertain, never a partial`, async () => {
+      const holder = scriptedHolder("apply", { levelReplyLost: true, stateLostFrom: 5 })
+      const { result } = await switchOn(leg, holder, "anthropic/claude-small:high")
+      expect(result).toMatchObject({
+        kind: "error",
+        error: { code: "idempotency_uncertain", uncertain: true, details: { reason: "model_switch_unconfirmed" } },
+      })
+    })
+
+    test(`#given a ${leg} holder already on the asked model #when its suffix is refused #then thinking_level_unsupported names what is in effect and nothing changed`, async () => {
+      const holder = scriptedHolder("apply")
+      const { result, calls } = await switchOn(leg, holder, "openai/gpt-x:max")
+      expect(result).toMatchObject({
+        kind: "error",
+        error: {
+          code: "thinking_level_unsupported",
+          details: { supported: LEVELS, in_effect: { model: PREVIOUS, thinking_level: "low" } },
+        },
+      })
+      expect(holder.state).toEqual({ model: PREVIOUS, thinkingLevel: "low", pending: undefined })
+      expect(calls).toEqual(["set_model openai/gpt-x", "set_thinking_level max"])
+    })
+
+    for (const [mode, observed] of [
+      ["drift", { in_effect: { model: ELSEWHERE, thinking_level: "low" } }],
+      ["foreignPark", { in_effect: { model: PREVIOUS, thinking_level: "low" }, pending: { model: ELSEWHERE } }],
+    ] as const)
+      test(`#given a ${leg} holder whose state moved in a way this call did not ask for (${mode}) #when switched with a suffix #then not_applied changed_elsewhere carries what was observed`, async () => {
+        const { result } = await switchOn(leg, scriptedHolder(mode), "anthropic/claude-small:high")
+        expect(result).toMatchObject({
+          kind: "error",
+          error: { code: "not_applied", details: { ...identity[leg], reason: "changed_elsewhere", ...observed } },
+        })
+      })
 
     test(`#given a ${leg} holder that parked a switch under an effect id #when the same switch repeats under it #then the repeat answers the same pending outcome and parks nothing more`, async () => {
       const holder = scriptedHolder("park")

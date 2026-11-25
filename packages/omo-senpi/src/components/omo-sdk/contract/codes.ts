@@ -175,10 +175,10 @@ export const OMO_CODE_REGISTRY = {
     namespaces: ["boulder", "daemon", "devices", "diagnostics", "engine", "sync", "threads", "worktrees"],
     next_action: "Call threads.list or devices.list for the current ids, then call it again.",
   },
-  // #14939: the holder acknowledged a control and its state, read after it, shows nothing changed; definite, not uncertain.
+  // #14939: the holder acknowledged a control and its state, read after it, shows the request not in effect; definite.
   not_applied: {
     namespaces: ["threads"],
-    next_action: "Nothing changed; it is safe to repeat the call, or pick another model.",
+    next_action: "The request is not in effect; it is safe to repeat the call, or pick another model.",
   },
   not_resumable: {
     namespaces: ["threads"],

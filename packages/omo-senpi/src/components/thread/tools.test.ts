@@ -515,7 +515,7 @@ describe("thread session controls", () => {
       error: {
         code: "not_applied",
         details: {
-          reason: "model_switch_not_applied",
+          reason: "unchanged",
           in_effect: { model: { provider: "openai", id: "gpt-previous" }, thinking_level: "off" },
         },
       },
