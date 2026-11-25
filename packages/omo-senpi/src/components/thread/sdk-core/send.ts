@@ -34,7 +34,7 @@ export type CoreSendResult =
     })
   | Failure
 
-export const SEND_KEYS = [
+const SEND_KEYS = [
   "thread",
   "message",
   "delivery",

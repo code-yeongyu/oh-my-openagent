@@ -29,9 +29,9 @@ export type CoreReadRequest = Scoped & {
 }
 export type CoreLocateResult = { readonly kind: "ok"; readonly thread: LocatedThread } | Failure
 
-export const LIST_KEYS = ["all_scope", "state"] as const
-export const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
-export const LOCATE_KEYS = ["thread", "all_scope"] as const
+const LIST_KEYS = ["all_scope", "state"] as const
+const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
+const LOCATE_KEYS = ["thread", "all_scope"] as const
 
 export function createReads(context: ThreadCoreContext) {
   const { options, surface, view, resolveContext } = context
