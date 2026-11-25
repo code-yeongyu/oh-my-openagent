@@ -97,37 +97,29 @@ describe("custody of slice P1a-s (#14949)", () => {
     for (const path of MAY_EMBED["engine.auth.check"]) expect(SESSION_FIELDS["engine.auth.check"]).not.toContain(path)
   })
 
-  test("#given a canary in each provider field in turn, a key-shaped address among them #then no session answer field holds it", () => {
+  test("#given a canary in every string field the person's answer has #then no field of a session's answer holds it", () => {
     // Security design 4.3 at 137d6b9879, the owner's named RED test at the contract's layer; the engine half is E1a-s's.
+    // The inventory is the person's answer schema itself (every string leaf of AuthStatus, a key-shaped address in the
+    // email among them), so a field added to what the engine prints is planted without editing this test.
     const KEY = "sk-ant-api03-omo-canary-0000"
     const ADDRESS = "sk-ant-api03-omo-canary-0000@leak.test"
+    const inventory = stringLeaves(json(CUSTODY_RESULTS["engine.auth.check"]))
+    expect(inventory).toEqual(
+      expect.arrayContaining(["accounts[].email", "accounts[].orgName", "accounts[].check.message", "provider"]),
+    )
     const account = { signedIn: true, source: "login", blocked: false }
-    const planted: Readonly<Record<string, (canary: string) => Record<string, unknown>>> = {
-      "check.message": (canary) => ({ ...account, check: { outcome: "failed", message: canary } }),
-      "check.reason": (canary) => ({ ...account, check: { outcome: "failed", reason: canary } }),
-      "check.code": (canary) => ({ ...account, check: { outcome: "failed", code: canary } }),
-      name: (canary) => ({ ...account, name: canary }),
-      displayName: (canary) => ({ ...account, displayName: canary }),
-      email: (canary) => ({ ...account, email: canary }),
-      orgName: (canary) => ({ ...account, orgName: canary }),
-      subscriptionType: (canary) => ({ ...account, subscriptionType: canary }),
-      usageUrl: (canary) => ({ ...account, usageUrl: canary }),
-      blockedReason: (canary) => ({ ...account, blocked: true, blockedReason: canary }),
+    const valid = {
+      status: "ready",
+      provider: "p",
+      accounts: [{ ...account, check: { outcome: "failed", code: "auth_error" } }],
     }
-    const answer = (accounts: readonly Record<string, unknown>[]) => ({ status: "ready", provider: "p", accounts })
-    expect(
-      sessionAnswerAccepts(
-        "engine.auth.check",
-        answer([{ ...account, check: { outcome: "failed", code: "auth_error" } }]),
-      ),
-    ).toBe(true)
-    const carriers = Object.entries(planted).flatMap(([field, plant]) =>
-      [KEY, ADDRESS].some((canary) => sessionAnswerAccepts("engine.auth.check", answer([plant(canary)])))
-        ? [field]
-        : [],
+    expect(sessionAnswerAccepts("engine.auth.check", valid)).toBe(true)
+    const carriers = inventory.filter(
+      (path) =>
+        path !== "provider" &&
+        [KEY, ADDRESS].some((canary) => sessionAnswerAccepts("engine.auth.check", plantAt(valid, path, canary))),
     )
     expect(carriers).toEqual([])
-    expect(sessionAnswerAccepts("engine.auth.check", { ...answer([]), reason: KEY })).toBe(false)
   })
 
   test("#given a secret offered as text #then no input takes it, and a hand-over with no destination is refused", () => {
@@ -171,3 +163,32 @@ describe("the table P1a held, slice P1a-s (#14949)", () => {
         )
   })
 })
+
+// Every string-typed leaf of a JSON schema, as a path ("accounts[].check.message"); enums and literals are not free text.
+function stringLeaves(node: Record<string, unknown>, path = ""): string[] {
+  const out: string[] = []
+  if (node.type === "string" && node.enum === undefined && node.const === undefined) out.push(path)
+  for (const [name, child] of Object.entries((node.properties ?? {}) as Record<string, Record<string, unknown>>))
+    out.push(...stringLeaves(child, path === "" ? name : `${path}.${name}`))
+  if (node.items !== undefined) out.push(...stringLeaves(node.items as Record<string, unknown>, `${path}[]`))
+  for (const variant of (node.anyOf ?? []) as Record<string, unknown>[]) out.push(...stringLeaves(variant, path))
+  return [...new Set(out)]
+}
+
+// A copy of `answer` with `value` set at `path`, creating the objects on the way; "[]" addresses the first element.
+function plantAt(answer: Record<string, unknown>, path: string, value: string): Record<string, unknown> {
+  const copy = structuredClone(answer)
+  let cursor: Record<string, unknown> = copy
+  const steps = path.split(".")
+  for (const [index, raw] of steps.entries()) {
+    const name = raw.replace(/\[\]$/, "")
+    const last = index === steps.length - 1
+    if (raw.endsWith("[]")) {
+      const list = (cursor[name] as Record<string, unknown>[] | undefined) ?? [{}]
+      cursor[name] = list
+      cursor = list[0] ?? {}
+    } else if (last) cursor[name] = value
+    else cursor = (cursor[name] ??= {}) as Record<string, unknown>
+  }
+  return copy
+}
