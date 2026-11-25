@@ -39,7 +39,10 @@ const host: ThreadHost = {
   getAvailableThinkingLevels: unused,
 }
 
-function build(options: { readonly store?: (agentDir: string) => GatewayStore; readonly remote?: RemoteThreadSurface }) {
+function build(options: {
+  readonly store?: (agentDir: string) => GatewayStore
+  readonly remote?: RemoteThreadSurface
+}) {
   const agentDir = mkdtempSync(join(tmpdir(), "thread-sdk-facade-"))
   directories.push(agentDir)
   const sdk = createThreadSdk({

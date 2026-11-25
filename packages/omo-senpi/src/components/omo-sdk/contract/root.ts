@@ -24,11 +24,11 @@ type Answer<Spec> =
 
 type Member<Spec> =
   Spec extends CallSpec<infer Input, unknown, infer _Shape, false>
-    ? {} extends Static<Input>
+    ? Partial<Static<Input>> extends Static<Input>
       ? (input?: Static<Input>) => Answer<Spec>
       : (input: Static<Input>) => Answer<Spec>
     : Spec extends CallSpec<infer Input, unknown, infer _Shape, true>
-      ? {} extends Static<Input>
+      ? Partial<Static<Input>> extends Static<Input>
         ? (input?: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
         : (input: Static<Input>, options?: OptionsFor<Static<Input>>) => Answer<Spec>
       : never

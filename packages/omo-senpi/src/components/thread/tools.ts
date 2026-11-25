@@ -32,6 +32,7 @@ import {
 import { THREAD_FAMILY_PROMPT_GUIDELINES } from "./metadata"
 import { withClosedRows } from "./remote/closed-rows"
 import { threadLink } from "./thread-link"
+import { sentThreadLink } from "./tools/send-link"
 export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
@@ -763,12 +764,11 @@ async function deliverThrough(
     }
     const row = target.kind === "remote" ? target.row : undefined
     // #13304: another device's title and project are printed escaped.
-    const title = row === undefined ? undefined : escapeForDisplay(row.title)
     if (resolvedBy === undefined || row === undefined)
       return {
         kind: "ok",
         thread: sent.thread_id,
-        link: threadLink(sent.thread_id, title),
+        link: sentThreadLink(sent.thread_id, undefined, target),
         delivery: sent.delivery,
         deduplicated: sent.deduplicated,
         ...facts,
@@ -802,11 +802,10 @@ async function deliverThrough(
     ...(sent.collapsed === true ? { collapsed: true as const } : {}),
   }
   if (resolvedBy === undefined) {
-    const title = current.sessions.find((session) => (session.durableSessionId ?? session.sessionId) === threadId)?.name
     return {
       kind: "ok",
       thread: threadId,
-      link: threadLink(threadId, title),
+      link: sentThreadLink(threadId, current, target),
       delivery: sent.delivery,
       message_seq: sent.message_seq,
       deduplicated: sent.deduplicated,
