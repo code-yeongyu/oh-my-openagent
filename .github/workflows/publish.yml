@@ -770,6 +770,10 @@ jobs:
           # The committed service-auth bundle inlines packages/omo-native/package.json's version;
           # rebuild it too or script/build-service-auth.test.ts rejects the release commit as stale (#12046).
           bun script/build-service-auth.ts
+          # The committed omo-ai/remote bundle (omo#13413) inlines the same package.json version; rebuild it too or
+          # script/build-remote-sdk.test.ts rejects the release commit as stale. `git add -u packages/omo-native/bin/lib`
+          # stages it. Guarded on its build script, which lands with that bundle, so a tree without it skips the step.
+          if [ -f script/build-remote-sdk.ts ]; then bun script/build-remote-sdk.ts; fi
 
           git config --global user.email "code.yeon.gyu@gmail.com"
           git config --global user.name "YeonGyu-Kim"

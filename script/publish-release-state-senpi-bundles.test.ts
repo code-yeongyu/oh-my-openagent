@@ -2,7 +2,7 @@
 
 import { describe, expect, test } from "bun:test"
 import { spawnSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, relative, sep } from "node:path"
 import { pathToFileURL } from "node:url"
@@ -98,6 +98,34 @@ describe("release-state staging of the committed Senpi bundles", () => {
 
       expect(result.status, result.stderr).toBe(0)
       expect(git(root, "diff", "--cached", "--name-only").trim()).toBe(bundle)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  // Release contract (omo#13413): the omo-ai/remote bundle inlines the same package.json version, so the release commit
+  // rebuilds it after the bump. The step is guarded on its build script: a tree that does not carry it yet (the build
+  // script lands with the bundle) skips the step, and a tree that does rebuilds it; the bin/lib staging above stages it.
+  test("rebuilds the omo-ai/remote bundle after the version bump only where its build script exists", () => {
+    const lines = prepareStep.split("\n")
+    const bump = lines.findIndex((line) => line.includes("packages/omo-native/package.json > tmp.json"))
+    const build = lines.findIndex((line) => line.includes("bun script/build-remote-sdk.ts"))
+    expect(bump).toBeGreaterThanOrEqual(0)
+    expect(build).toBeGreaterThan(bump)
+    const step = lines[build] ?? ""
+    const env = { ...process.env, PATH: `${dirname(process.execPath)}:${process.env.PATH ?? ""}` }
+
+    const root = mkdtempSync(join(tmpdir(), "omo-release-remote-sdk-"))
+    try {
+      const absent = spawnSync("bash", ["-e", "-c", step], { cwd: root, encoding: "utf8", env })
+      expect(absent.status, absent.stderr).toBe(0)
+      expect(existsSync(join(root, "rebuilt"))).toBe(false)
+
+      mkdirSync(join(root, "script"), { recursive: true })
+      writeFileSync(join(root, "script", "build-remote-sdk.ts"), 'await Bun.write("rebuilt", "yes")\n')
+      const present = spawnSync("bash", ["-e", "-c", step], { cwd: root, encoding: "utf8", env })
+      expect(present.status, present.stderr).toBe(0)
+      expect(readFileSync(join(root, "rebuilt"), "utf8")).toBe("yes")
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
