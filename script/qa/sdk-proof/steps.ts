@@ -11,7 +11,45 @@ export type StepWorld = Pick<World, "account" | "observer" | "release">
 
 // One step's bound: a surface that has not answered by then failed the step; its call is aborted (a driver that started
 // a process stops it), and the surface's later cells are not reached, so no step runs beside a stalled one.
-const STEP_DEADLINE_MS = 180_000
+export const STEP_DEADLINE_MS = 180_000
+/** A preparatory call (a surface's driver, a world's start) under the same deadline as a step: undefined when it stalled. */
+export const prepared = async <T>(
+  prepare: Promise<T>,
+  deadlineMs: number,
+  onLate: (late: T) => void,
+): Promise<T | undefined> => {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let expired = false
+  const deadline = new Promise<undefined>((resolve) => {
+    timer = setTimeout(() => {
+      expired = true
+      resolve(undefined)
+    }, deadlineMs)
+  })
+  // A preparation that lands after its deadline is handed to onLate (closed), never used.
+  void prepare.then(
+    (value) => {
+      if (expired) onLate(value)
+    },
+    () => undefined,
+  )
+  return await Promise.race([prepare, deadline]).finally(() => clearTimeout(timer))
+}
+
+/** Every cell of a surface whose preparation stalled: not reached, attributed to the harness. */
+export const unprepared = (surface: Surface, what: string): StepRecord[] =>
+  SCENARIO.map((step) => ({
+    step: step.id,
+    op: step.op,
+    input: {},
+    call: "-",
+    raw: null,
+    observed: null,
+    cell: "not reached" as const,
+    why: `${what} did not finish within the step deadline (the harness: no answer to attribute)`,
+    slice: "the harness (no answer to attribute; not a product finding)",
+  }))
+
 export const withinStep = (
   run: (signal: AbortSignal) => Promise<Answer>,
   call: string,

@@ -155,6 +155,9 @@ const addThinkingModel = (agentDir: string): void => {
   writeFileSync(path, `${JSON.stringify(models, null, 2)}\n`)
 }
 
+/** Stops every child the kit started (the world's start did not finish, so no World exists to close). */
+export const stopWorldChildren = (): Promise<void> => cleanupAll()
+
 export async function startWorld(trace: (line: string) => void): Promise<World> {
   installCleanupHooks()
   // The model reports usage the way a real provider does (about four characters a token over the whole request), so B's

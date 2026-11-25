@@ -15,10 +15,13 @@ import { createToolsDriver } from "./drivers/tools.ts"
 import { redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
 import { type KeyedRecord, keyedTable, openKeyedThread, runKeyedPairs } from "./keyed.ts"
 import { SCENARIO } from "./scenario.ts"
-import { runSteps } from "./steps.ts"
+import { prepared, runSteps, STEP_DEADLINE_MS, unprepared } from "./steps.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
 import { DEVICE_A, DEVICE_B } from "./world/devices.ts"
-import { CANARY, type Isolation, startWorld, type World } from "./world/world.ts"
+import { CANARY, type Isolation, startWorld, stopWorldChildren, type World } from "./world/world.ts"
+
+// Building the install and starting both engine hosts takes minutes on a loaded host.
+const WORLD_DEADLINE_MS = 900_000
 
 const REPO = resolve(import.meta.dir, "..", "..")
 const arg = (name: string): string | undefined => {
@@ -47,7 +50,9 @@ const driverFor = async (surface: Surface, world: World): Promise<Driver> => {
 }
 
 async function runSurface(surface: Surface, world: World): Promise<StepRecord[]> {
-  const driver = await driverFor(surface, world)
+  // The surface's preparation (its driver; for the tools a session on A) is bounded like a step.
+  const driver = await prepared(driverFor(surface, world), STEP_DEADLINE_MS, (late) => void late.close())
+  if (driver === undefined) return unprepared(surface, `the ${surface} surface's preparation`)
   try {
     return await runSteps(surface, world, driver)
   } finally {
@@ -56,10 +61,30 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
 }
 
 // The keyed pairs share one thread on B, opened through the CLI (the surface whose open delivers its first prompt today).
+// Stands in for a driver that never became ready: no pair runs, so it is never called.
+const STALLED: Driver = {
+  mapping: {} as Driver["mapping"],
+  run: async () => ({ call: "-", raw: null, answered: false }),
+  close: async () => {},
+}
+
 async function runKeyed(world: World): Promise<KeyedRecord[]> {
-  const drivers = Object.fromEntries(
-    await Promise.all(SURFACES.map(async (surface) => [surface, await driverFor(surface, world)] as const)),
-  ) as Record<Surface, Driver>
+  const all = Promise.all(SURFACES.map(async (surface) => [surface, await driverFor(surface, world)] as const))
+  const ready = await prepared(
+    all,
+    STEP_DEADLINE_MS,
+    (late) => void Promise.all(late.map(([, driver]) => driver.close())),
+  )
+  if (ready === undefined)
+    return runKeyedPairs(
+      { sdk: STALLED, tools: STALLED, cli: STALLED },
+      undefined,
+      undefined,
+      world.observer,
+      undefined,
+      "the keyed pairs' drivers were not ready within the step deadline (the harness: no answer to attribute)",
+    )
+  const drivers = Object.fromEntries(ready) as Record<Surface, Driver>
   try {
     const opened = await openKeyedThread(drivers.cli, DEVICE_B.id, world.observer)
     return await runKeyedPairs(
@@ -86,7 +111,16 @@ async function main(): Promise<void> {
       join(REPO, ".omo", "evidence", `${new Date().toISOString().slice(0, 10).replaceAll("-", "")}-sdk-proof-x1a`),
   )
   mkdirSync(evidence, { recursive: true })
-  const world = await startWorld((line) => appendFileSync(join(evidence, "relay-trace.jsonl"), `${line}\n`))
+  // The world's start (install, engine hosts, A's daemon) is bounded too: a stall ends the run, its children stopped.
+  const world = await prepared(
+    startWorld((line) => appendFileSync(join(evidence, "relay-trace.jsonl"), `${line}\n`)),
+    WORLD_DEADLINE_MS,
+    (late) => void late.close(),
+  )
+  if (world === undefined) {
+    await stopWorldChildren()
+    throw new Error(`x1a world: the two-device world did not start within ${WORLD_DEADLINE_MS} ms (the harness)`)
+  }
   const sdkEntry = join(world.install.plugin, "runtime", "thread-sdk", "sdk.js")
   const build = `senpi ${world.engine}; thread SDK entry sha256 ${createHash("sha256").update(readFileSync(sdkEntry)).digest("hex").slice(0, 16)}`
   const redaction = { roots: world.roots, devices: { [DEVICE_A.id]: "<device-a>", [DEVICE_B.id]: "<device-b>" } }

@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Driver } from "./drivers/driver.ts"
 import { OPS } from "./scenario.ts"
-import { runSteps, type StepWorld } from "./steps.ts"
+import { prepared, runSteps, type StepWorld, unprepared } from "./steps.ts"
 import type { Observer } from "./world/observe.ts"
 
 // The runner's own contract on a stall, with a stand-in world: the stalled call is aborted, its cell fails on the
@@ -51,5 +51,33 @@ describe("the runner on a stalled surface", () => {
     )
     expect(signals.map((signal) => signal.aborted)).toEqual([true])
     expect(judged).toEqual([])
+  })
+})
+
+describe("a surface's preparation", () => {
+  test("#given a preparation that never finishes #when bounded #then it is not used and every cell is not reached", async () => {
+    // given
+    let release: (driver: string) => void = () => {}
+    const late: string[] = []
+    const preparation = new Promise<string>((resolve) => {
+      release = resolve
+    })
+
+    // when
+    const ready = await prepared(preparation, 20, (value) => late.push(value))
+    release("a driver that came too late")
+    await preparation
+
+    // then
+    expect(ready).toBeUndefined()
+    expect(late).toEqual(["a driver that came too late"])
+    const cells = unprepared("tools", "the tools surface's preparation")
+    expect(cells.every((cell) => cell.cell === "not reached" && cell.slice.startsWith("the harness"))).toBe(true)
+  })
+
+  test("#given a preparation that finishes in time #when bounded #then it is used and nothing is handed back", async () => {
+    const late: string[] = []
+    expect(await prepared(Promise.resolve("driver"), 1_000, (value) => late.push(value))).toBe("driver")
+    expect(late).toEqual([])
   })
 })
