@@ -79,11 +79,10 @@ describe("sequences: a retry after a lost acknowledgement (H1)", () => {
 
 describe("the success discriminator and step shapes (review 6062344773)", () => {
   test("#given an effect call that returns something other than a kind ok result #then it is not a success", async () => {
-    const bare = run(
-      scenario("by-id", undefined),
-      undefined,
-      (calls) => (calls.push(host("listSessions", { allScope: false })), { thread: "t1" }),
-    )
+    const bare = run(scenario("by-id", undefined), undefined, (calls) => {
+      calls.push(host("listSessions", { allScope: false }))
+      return { thread: "t1" }
+    })
     expect(await problems([bare, ...pair.slice(1)], withLocate({}))).toContainEqual(
       'row threads.locate: scenario threads.locate/by-id answered {"thread":"t1"}, not a successful result (kind "ok")',
     )
@@ -118,11 +117,10 @@ describe("streams: exactly one well-formed terminal event, last (M2)", () => {
     },
   })
   const streamed = (events: readonly unknown[]) =>
-    run(
-      scenario("by-id", undefined),
-      undefined,
-      (calls) => (calls.push(host("listSessions", { allScope: false })), stream(events)),
-    )
+    run(scenario("by-id", undefined), undefined, (calls) => {
+      calls.push(host("listSessions", { allScope: false }))
+      return stream(events)
+    })
   const named = async (events: readonly unknown[]) =>
     (await problems([streamed(events), ...pair.slice(1)], withLocate({})))[0]
 
@@ -160,11 +158,10 @@ describe("coverage compares effects with the matcher's semantics (M3)", () => {
       target: "this_device" | "other_device" = "this_device",
     ) => {
       const table: TableScenario = { ...scenario(id, scopeAll, target), expect: expectations }
-      return run(
-        table,
-        undefined,
-        (calls) => (calls.push(host("listSessions", { a: 1, b: 2 }), host("kill", {})), { kind: "ok" }),
-      )
+      return run(table, undefined, (calls) => {
+        calls.push(host("listSessions", { a: 1, b: 2 }), host("kill", {}))
+        return { kind: "ok" }
+      })
     }
     const runs = [
       effect("by-id", false, [
@@ -208,7 +205,10 @@ describe("pure rows (design lane ruling on 7.3)", () => {
     },
     setup: () => {
       const calls: ObservedCall[] = []
-      const help = () => (calls.push(...touches), { kind: "ok", value: { usage: "u" } })
+      const help = () => {
+        calls.push(...touches)
+        return { kind: "ok", value: { usage: "u" } }
+      }
       return { root: { toolkit: { help } }, calls: () => calls }
     },
   })
