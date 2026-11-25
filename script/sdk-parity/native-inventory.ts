@@ -36,7 +36,7 @@ export type ArgvFinding = {
 
 const FLAG = /^--?[A-Za-z][A-Za-z0-9-]*=?$/
 const WORD = /^[a-z_][a-z0-9_-]*$/
-const VERB_TABLE = /(VERB|COMMAND|SUBCOMMAND|TARGET|ROUTE)S?$/i
+const VERB_TABLE = /(VERB|COMMAND|SUBCOMMAND|TARGET|ROUTE|VALUE)S?$/i
 const SHARED_TABLE = /^(COMMON|SHARED|GLOBAL)/i
 const ARGV_NAME = /^(?:args?|argv|rest|tail|params|flags)$/i
 

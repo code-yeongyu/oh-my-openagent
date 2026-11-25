@@ -344,6 +344,9 @@
       ],
       "input": {
         "properties": {
+          "plan": {
+            "type": "object"
+          },
           "consent": {
             "anyOf": [
               {
@@ -386,7 +389,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "With neither flag the command asks once and, when accepted, applies every stage: that is consent all, the prompt being the adapter's rendering; --yes is the same call with the prompt answered. A declined prompt makes no call."
     },
     {
       "id": "install.setup.detect",
@@ -400,22 +404,12 @@
         "properties": {},
         "required": []
       },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "launcher",
-          "route": [
-            "setup"
-          ],
-          "flags": {},
-          "positionals": {},
-          "values": []
-        }
-      ],
+      "cli": [],
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Tool omitted: plan, consent, write is a person's flow"
+        "tool": "Tool omitted: plan, consent, write is a person's flow",
+        "cli": "CLI omitted: omo setup detects before it plans and applies, through install.setup.apply"
       },
       "projection": {},
       "scenarios": {
@@ -640,7 +634,7 @@
         "install.setup.apply"
       ],
       "cells": [
-        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent })` (asked once, or per stage as `--ask-each` does)",
+        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: \"all\" \\| \"each\" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each`",
         "`omo setup [--yes] [--ask-each] [--dry-run]`",
         "none",
         "**no**",

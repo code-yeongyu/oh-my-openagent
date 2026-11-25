@@ -202,8 +202,14 @@
         "A2a"
       ],
       "input": {
-        "properties": {},
-        "required": []
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "on"
+        ]
       },
       "cli": [
         {
@@ -216,8 +222,13 @@
           "flags": {
             "--json": "render"
           },
-          "positionals": {},
-          "values": []
+          "positionals": {
+            "state": "on"
+          },
+          "values": [
+            "on",
+            "off"
+          ]
         }
       ],
       "tool": [],
@@ -230,7 +241,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The positional state fills on: on is true, off is false."
     },
     {
       "id": "deviceService.setWake",
@@ -241,8 +253,21 @@
         "A2a"
       ],
       "input": {
-        "properties": {},
-        "required": []
+        "properties": {
+          "on": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "on"
+        ]
       },
       "cli": [
         {
@@ -255,8 +280,14 @@
           "flags": {
             "--json": "render"
           },
-          "positionals": {},
-          "values": []
+          "positionals": {
+            "state": "on"
+          },
+          "values": [
+            "on",
+            "off",
+            "default"
+          ]
         }
       ],
       "tool": [],
@@ -269,7 +300,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The positional state fills on: on is true, off is false, default is null (the stored value is removed)."
     },
     {
       "id": "deviceService.status",

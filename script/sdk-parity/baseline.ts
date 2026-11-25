@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto"
 
+import { type EffectEvidence, isBuilt } from "./conformance"
 import type { Row } from "./schema"
 
 // Design section 7.4. baseline.original.json records the defects that existed when the gate was introduced and never
@@ -24,11 +25,6 @@ export const UNRESOLVED_PATH = "script/sdk-parity/unresolved.json"
 
 export const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex")
 
-// A row counts as built only with an SDK call today and effect scenarios that have a run record at the head (7.2): a
-// scenario named in the row but never run, or run and answered `not_implemented`, does not build it.
-export const isBuilt = (row: Row, ranAtHead: ReadonlySet<string>): boolean =>
-  row.today === "yes" && row.scenarios.effect.length > 0 && row.scenarios.effect.every((id) => ranAtHead.has(id))
-
 export const countsTowardClosure = (row: Row): boolean => row.kind === "capability"
 
 export type BaselineState = {
@@ -36,7 +32,7 @@ export type BaselineState = {
   readonly originalText: string | undefined
   readonly pinText: string | undefined
   readonly unresolved: Baseline | undefined
-  readonly ranAtHead: ReadonlySet<string>
+  readonly evidence: readonly EffectEvidence[]
   readonly atBase: {
     readonly originalText: string | undefined
     readonly pinText: string | undefined
@@ -79,11 +75,11 @@ export function baselineProblems(state: BaselineState): string[] {
   const unresolved = ids(state.unresolved)
   for (const row of state.rows) {
     if (!countsTowardClosure(row)) continue
-    if (!isBuilt(row, state.ranAtHead) && !unresolved.has(row.id))
+    if (!isBuilt(row, state.evidence) && !unresolved.has(row.id))
       problems.push(
         `row ${row.id} is not built and has no ${UNRESOLVED_PATH} entry; add the SDK call ${row.sdk} and its scenarios`,
       )
-    if (isBuilt(row, state.ranAtHead) && unresolved.has(row.id))
+    if (isBuilt(row, state.evidence) && unresolved.has(row.id))
       problems.push(`row ${row.id} is built; remove its ${UNRESOLVED_PATH} entry`)
   }
   return problems

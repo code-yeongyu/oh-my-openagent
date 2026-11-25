@@ -1,5 +1,7 @@
 import { Type } from "typebox"
 
+import type { SetupPlan } from "../results/host"
+
 // The daemon, diagnostics, install and config calls of first-party design 6.7 and 6.11. The endpoint flags (socket,
 // key_root), launch_spec and mcp_presenter_enforcement are held for P1a-s (contract/gated.ts); every other host option
 // is typed here: a field in a type grants nothing.
@@ -95,6 +97,7 @@ export const DiagnosticsReapStaleEngines = Type.Object({ pids: Type.Array(Count,
 export const InstallSetupDetect = None
 export const InstallSetupPlan = None
 export const InstallSetupApply = Type.Object({
+  plan: Type.Optional(Type.Unsafe<SetupPlan>({ type: "object", description: "What install.setup.plan answered." })),
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),

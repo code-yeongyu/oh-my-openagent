@@ -1,36 +1,13 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
-
-import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, sha256, UNRESOLVED_PATH } from "./baseline"
-import { conformanceProblems } from "./conformance"
-import { candidateDigest, gateReport, goldenProblems, type GateInput, renderReport } from "./gate"
-import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
-import type { Scenario } from "./scenarios"
+import { type Baseline, baselineProblems, PIN_PATH, sha256 } from "./baseline"
+import { conformanceProblems, type EffectEvidence } from "./conformance"
+import { runEffectScenarios, type EffectScenario } from "./conformance-run"
+import { candidateDigest, gateReport, goldenProblems, renderReport } from "./gate"
+import { HEAD, input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
-import { verifyReview } from "./verify-review"
 
 // Negative controls of design 7.6 for the baseline, the changed-capability gate (with the two tiers of amendment 2),
 // the goldens and the conformance rule: each one breaks one thing and expects a message naming what to fix.
-
-const rows = allRows(loadDomainFiles())
-const text = (path: string): string => readFileSync(join(REPO_ROOT, path), "utf8")
-const original = text(ORIGINAL_PATH)
-const unresolved = JSON.parse(text(UNRESOLVED_PATH)) as Baseline
-const HEAD = "a".repeat(40)
-const EARLIER = "b".repeat(40)
-const scenario: Scenario = { id: "s1", capability: "threads.send", surface: "native", argv: ["thread", "send", "x"] }
-
-const input = (overrides: Partial<GateInput> = {}): GateInput => ({
-  base: { rows, tools: [], outcomes: { s1: { exit: 2 } }, unresolved: unresolved.entries },
-  head: { rows, tools: [], outcomes: { s1: { exit: 2 } }, unresolved: unresolved.entries },
-  scenarios: [scenario],
-  closures: new Map([["threads.send", new Set(["packages/omo-native/bin/lib/thread.js"])]]),
-  changedFiles: [],
-  body: "",
-  headSha: HEAD,
-  ...overrides,
-})
 
 describe("negative controls: the changed-capability gate (7.6)", () => {
   test("#given a parser that answers differently with its descriptor untouched #then the capability fails", () => {
@@ -87,45 +64,6 @@ describe("negative controls: the changed-capability gate (7.6)", () => {
   })
 })
 
-describe("negative controls: the candidate verifier (7.4, 7.6)", () => {
-  const output = renderReport(
-    gateReport(input({ changedFiles: ["packages/omo-native/bin/lib/thread.js"], body: "SDK-Parity-Unchanged: yes\n" })),
-  )
-  const digest = candidateDigest(HEAD, ["threads.send"])
-
-  test("#given a candidate and a verdict without the reviewed line #then the verifier withholds", () => {
-    expect(verifyReview(output, `CLEAR at ${HEAD}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict lacks SDK-Parity-Reviewed; the check printed 1 candidate(s), digest ${digest}`,
-    })
-  })
-
-  test("#given the same change with the matching line at that head #then the verifier accepts", () => {
-    expect(verifyReview(output, `CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${digest}\n`).decision).toBe("accepted")
-  })
-
-  test("#given a digest the check did not print #then the verifier withholds", () => {
-    const other = candidateDigest(HEAD, ["threads.close"])
-    expect(verifyReview(output, `CLEAR at ${HEAD}\nSDK-Parity-Reviewed: ${other}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict carries ${other}, a digest the check did not print at ${HEAD.slice(0, 10)} (${digest})`,
-    })
-  })
-
-  test("#given a verdict given at an earlier head #then the verifier withholds", () => {
-    const earlier = candidateDigest(EARLIER, ["threads.send"])
-    expect(verifyReview(output, `CLEAR at ${EARLIER}\nSDK-Parity-Reviewed: ${earlier}\n`)).toEqual({
-      decision: "withheld",
-      reason: `the verdict was not given at ${HEAD} (it names ${EARLIER})`,
-    })
-  })
-
-  test("#given equal outcomes and no verdict line at all #then the verifier withholds; with no candidate it accepts", () => {
-    expect(verifyReview(output, "").decision).toBe("withheld")
-    expect(verifyReview(renderReport(gateReport(input())), "").decision).toBe("accepted")
-  })
-})
-
 describe("negative controls: the baseline (7.6)", () => {
   const atBase = { originalText: original, pinText: text(PIN_PATH), unresolved }
   const state = (manifest: Baseline, originalText = original, pinText = text(PIN_PATH)) => ({
@@ -133,7 +71,7 @@ describe("negative controls: the baseline (7.6)", () => {
     originalText,
     pinText,
     unresolved: manifest,
-    ranAtHead: new Set<string>(),
+    evidence: [] as readonly EffectEvidence[],
     atBase,
   })
 
@@ -148,7 +86,7 @@ describe("negative controls: the baseline (7.6)", () => {
       ...state(cleared),
       rows: named,
       atBase: { ...atBase, unresolved },
-      ranAtHead: new Set<string>(),
+      evidence: [] as readonly EffectEvidence[],
     })
     expect(problems).toContainEqual(
       expect.stringContaining("row threads.locate is not built and has no script/sdk-parity/unresolved.json entry"),
@@ -181,32 +119,104 @@ describe("negative controls: the baseline (7.6)", () => {
   })
 })
 
-describe("negative controls: goldens and conformance (7.6)", () => {
+describe("negative controls: goldens, evidence and the first closure (7.6, review 6061267823 H1, H3)", () => {
   test("#given a stored golden edited with the behaviour unchanged #then it differs from the live outcome", () => {
     expect(goldenProblems({ s1: { exit: 3 } }, { s1: { exit: 2 } })).toEqual([
       "goldens.json s1 differs from the scenario's live outcome; regenerate with bun script/sdk-parity/scenario-run.ts --out script/sdk-parity/goldens.json",
     ])
   })
 
-  const built = (scenarios: Row["scenarios"]): Row[] =>
-    rows.map((row) => (row.id === "threads.locate" ? { ...row, today: "yes", scenarios } : row))
-  const open = new Set(unresolved.entries.map((entry) => entry.id).filter((id) => id !== "threads.locate"))
-
-  test("#given a stub answering not_implemented on a row counted as built #then it is named", () => {
-    const problems = conformanceProblems(built({ effect: ["locate-by-id"], refusal: [] }), open, [
-      { scenario: "locate-by-id", code: "not_implemented" },
+  test("#given a scenario with no outcome at the head #then the gate fails on it instead of skipping it", () => {
+    expect(gateReport(input({ head: { ...input().head, outcomes: {} } })).failures).toEqual([
+      "threads.send: scenario s1 has no outcome at the head; the runner did not run it",
     ])
-    expect(problems).toEqual([
+  })
+
+  const locate = rows.find((row) => row.id === "threads.locate")
+  if (locate === undefined) throw new Error("no threads.locate row")
+  const built: Row = { ...locate, today: "yes", scenarios: { effect: ["locate-by-id"], refusal: [] } }
+  const builtRows = rows.map((row) => (row.id === "threads.locate" ? built : row))
+  const open = new Set(unresolved.entries.map((entry) => entry.id).filter((id) => id !== "threads.locate"))
+  const fakeRoot = (answer: unknown): EffectScenario => {
+    const seen: unknown[] = []
+    return {
+      id: "locate-by-id",
+      capability: "threads.locate",
+      input: { thread: "t1" },
+      setup: () => ({
+        root: { threads: { locate: (input: unknown) => (seen.push(input), answer) } },
+        port: "host.listSessions",
+        observe: () => seen[0],
+      }),
+    }
+  }
+
+  test("#given a stub answering not_implemented on a row counted as built #then it is named", async () => {
+    const evidence = await runEffectScenarios(builtRows, [
+      fakeRoot({ kind: "error", error: { code: "not_implemented" } }),
+    ])
+    expect(conformanceProblems(builtRows, open, evidence)).toEqual([
       "row threads.locate: scenario locate-by-id answered not_implemented; threads.locate is a stub, build it",
     ])
   })
 
   test("#given a row whose only scenario is a refusal #then it is not counted as built", () => {
-    const problems = conformanceProblems(built({ effect: [], refusal: ["locate-missing"] }), open, [
-      { scenario: "locate-missing", code: "not_found" },
-    ])
-    expect(problems).toEqual([
+    const refusalOnly = builtRows.map((row) =>
+      row.id === "threads.locate" ? { ...built, scenarios: { effect: [], refusal: ["locate-missing"] } } : row,
+    )
+    expect(conformanceProblems(refusalOnly, open, [])).toEqual([
       "row threads.locate's only scenarios are refusals; add an effect scenario for each input of threads.locate",
     ])
+  })
+
+  test("#given a record whose member is not the row's call #then the evidence does not build the row", () => {
+    const wrong: EffectEvidence = {
+      scenario: "locate-by-id",
+      capability: "threads.locate",
+      member: "threads.list",
+      input: {},
+      status: "passed",
+      effect: { port: "p", observed: 1 },
+    }
+    expect(conformanceProblems(builtRows, open, [wrong])).toEqual([
+      "row threads.locate: scenario locate-by-id ran threads.list for threads.locate, not threads.locate",
+    ])
+  })
+
+  test("#given the first correct closure of a gap with its run evidence #then the baseline admits it (positive control)", async () => {
+    const evidence = await runEffectScenarios(builtRows, [fakeRoot({ kind: "ok", thread: "t1" })])
+    expect(evidence).toEqual([
+      {
+        scenario: "locate-by-id",
+        capability: "threads.locate",
+        member: "threads.locate",
+        input: { thread: "t1" },
+        status: "passed",
+        effect: { port: "host.listSessions", observed: { thread: "t1" } },
+      },
+    ])
+    const cleared = { ...unresolved, entries: unresolved.entries.filter((entry) => entry.id !== "threads.locate") }
+    const state = {
+      rows: builtRows,
+      originalText: original,
+      pinText: text(PIN_PATH),
+      unresolved: cleared,
+      evidence,
+      atBase: { originalText: original, pinText: text(PIN_PATH), unresolved },
+    }
+    expect(baselineProblems(state)).toEqual([])
+    expect(conformanceProblems(builtRows, open, evidence)).toEqual([])
+  })
+
+  test("#given the initializing pull request (the base has no record) #then the original, its pin and the manifest are admitted together", () => {
+    const state = {
+      rows,
+      originalText: original,
+      pinText: text(PIN_PATH),
+      unresolved,
+      evidence: [],
+      atBase: { originalText: undefined, pinText: undefined, unresolved: undefined },
+    }
+    expect(baselineProblems(state)).toEqual([])
   })
 })

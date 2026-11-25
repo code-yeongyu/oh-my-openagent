@@ -381,9 +381,11 @@
         "update"
       ],
       "flags": [
+        "--approve",
         "--extension",
         "--extensions",
-        "--models"
+        "--models",
+        "--no-approve"
       ]
     }
   ]
