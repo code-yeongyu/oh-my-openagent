@@ -5,7 +5,7 @@ import { isRecord } from "./drivers/driver.ts"
 
 // The failure a surface answered, as its code: the thread result's error code (inside --json for the CLI), else a
 // thrown error, a step that never answered, or the raw shape.
-export const failureOf = (raw: unknown): string => {
+const failureOf = (raw: unknown): string => {
   const body = isRecord(raw) && isRecord(raw["json"]) ? raw["json"] : raw
   if (isRecord(body) && isRecord(body["error"]) && typeof body["error"]["code"] === "string")
     return `error ${body["error"]["code"]}`
