@@ -31,7 +31,6 @@ import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gatew
 import { createdDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
-import { threadToolFailure } from "../omo-senpi/src/components/thread/errors"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
@@ -493,12 +492,12 @@ function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
   if (result.kind === "ok" && "closed" in result && result.closed === false)
     return {
       kind: "error",
-      error: threadToolFailure(
-        "not_found",
-        `${label} is not open on its device, so nothing was closed.`,
-        "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
-        { thread: label },
-      ),
+      error: {
+        code: "not_found",
+        message: `${label} is not open on its device, so nothing was closed.`,
+        next_action: "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
+        details: { thread: label },
+      },
     }
   if (result.kind !== "error" || result.error.details?.["pending_deliveries"] === undefined) return result
   const pending = result.error.details["pending_deliveries"]
