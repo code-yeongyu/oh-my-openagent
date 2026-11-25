@@ -3566,6 +3566,1142 @@
       "target": "this_device"
     },
     {
+      "id": "threads.setModel/applied-here",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "applied",
+        "in_effect": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "low"
+        }
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/after-compaction-here",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": "anthropic/m-1"
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "after_compaction",
+        "in_effect": {
+          "model": {
+            "provider": "openai",
+            "id": "m-0"
+          },
+          "thinking_level": "low"
+        },
+        "pending": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          }
+        }
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-not-compared-here",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/uncertain-here",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "fault": {
+        "port": "host",
+        "op": "get_state",
+        "fault": "lost_reply",
+        "occurrence": 1
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/applied-here-suffix",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "high"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "high",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "applied",
+        "in_effect": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "high"
+        }
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/after-compaction-here-suffix",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "after_compaction",
+        "in_effect": {
+          "model": {
+            "provider": "openai",
+            "id": "m-0"
+          },
+          "thinking_level": "low"
+        },
+        "pending": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "high",
+          "thinking_level_sent": false
+        }
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-unchanged-here-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/uncertain-here-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ],
+      "fault": {
+        "port": "host",
+        "op": "get_state",
+        "fault": "lost_reply",
+        "occurrence": 2
+      },
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/partial-here-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "partial_commit",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "high"
+          },
+          "result": {
+            "code": "thinking_level_unsupported"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-changed-elsewhere-here-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_state",
+          "result": {
+            "model": "google/m-2",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/applied-other-device",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "applied",
+        "in_effect": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "low"
+        }
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/after-compaction-other-device",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": "anthropic/m-1"
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "after_compaction",
+        "in_effect": {
+          "model": {
+            "provider": "openai",
+            "id": "m-0"
+          },
+          "thinking_level": "low"
+        },
+        "pending": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          }
+        }
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-not-compared-other-device",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/uncertain-other-device",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "fault": {
+        "port": "remote",
+        "op": "sessions.get",
+        "fault": "lost_reply",
+        "occurrence": 1
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/applied-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "args": {
+            "thread": "studio/t-2",
+            "level": "high"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "high",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "applied",
+        "in_effect": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "high"
+        }
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/after-compaction-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "kind": "ok",
+        "model_switch": "after_compaction",
+        "in_effect": {
+          "model": {
+            "provider": "openai",
+            "id": "m-0"
+          },
+          "thinking_level": "low"
+        },
+        "pending": {
+          "model": {
+            "provider": "anthropic",
+            "id": "m-1"
+          },
+          "thinking_level": "high",
+          "thinking_level_sent": false
+        }
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-unchanged-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/uncertain-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "idempotency_uncertain",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "fault": {
+        "port": "remote",
+        "op": "sessions.get",
+        "fault": "lost_reply",
+        "occurrence": 2
+      },
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/partial-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "partial_commit",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "anthropic/m-1",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "args": {
+            "thread": "studio/t-2",
+            "level": "high"
+          },
+          "result": {
+            "code": "thinking_level_unsupported"
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.setModel/not-applied-changed-elsewhere-other-device-suffix",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_applied",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1:high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "openai/m-0",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.get",
+          "result": {
+            "model": "google/m-2",
+            "thinkingLevel": "low",
+            "pendingModelSwitch": null
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ],
+      "target": "other_device"
+    },
+    {
       "id": "threads.setModel/not-live",
       "row": "threads.setModel",
       "kind": "refusal",
