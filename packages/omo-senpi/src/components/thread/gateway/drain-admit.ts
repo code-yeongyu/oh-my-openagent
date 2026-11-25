@@ -40,18 +40,21 @@ export function createClaimedAdmitter(deps: AdmitterDeps): ClaimedAdmitter {
     store.recordOutcome({ now: now(), delivery_id: row.delivery_id, self, outcome })
 
   return async (row, claimedRow, intent) => {
-    const phase = runtime.phase()
-    const joins = intent.joinsStart === true && phase === "idle"
-    const decision = joins
-      ? undefined
-      : decideDelivery(phase, row.mode_requested, row.expected_turn_id, runtime.admissionGate().turn_epoch)
-    if (decision !== undefined && decision.kind !== "admit") {
+    const decision = decideDelivery(
+      runtime.phase(),
+      row.mode_requested,
+      row.expected_turn_id,
+      runtime.admissionGate().turn_epoch,
+    )
+    if (decision.kind !== "admit") {
       const reason = decision.kind === "refuse" ? decision.reason : "turn_conflict"
       await record(row, { kind: "refused", reason })
       deps.admitted.push({ delivery_id: row.delivery_id, kind: reason })
       return "next"
     }
-    const lane: EffectiveLane = decision === undefined ? "steer" : effectiveLaneOf(decision)
+    // Only a row the live decision would start joins the held start: a turn-pinned steer or anything else keeps its own lane.
+    const joins = intent.joinsStart === true && decision.expect === "started"
+    const lane: EffectiveLane = joins ? "steer" : effectiveLaneOf(decision)
     // A row taken in from another device is admitted under the engine's ledger key with the sender's text as written,
     // so the engine's own dedupe also covers the same delivery arriving live (#13037, design 5.5).
     const ledgerId = claimedRow.ledger_id ?? null
@@ -65,8 +68,8 @@ export function createClaimedAdmitter(deps: AdmitterDeps): ClaimedAdmitter {
         sender: deliverySender(claimedRow),
         display_text:
           ledgerId === null ? renderDeliveryDisplayText(shown) : (claimedRow.verbatim_display_text ?? claimedRow.body),
-        deliverAs: decision === undefined ? "steer" : decision.deliverAs,
-        ...(decision?.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
+        deliverAs: joins ? "steer" : decision.deliverAs,
+        ...(joins || decision.expected_turn_id === undefined ? {} : { expected_turn_id: decision.expected_turn_id }),
         ...(joins ? { whenIdle: "queue" as const } : {}),
       })
     } catch (error) {
