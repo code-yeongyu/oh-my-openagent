@@ -1,4 +1,5 @@
-import type { ThreadModel, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import type { ThreadModel, ThreadModelInEffect, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import { threadToolFailure } from "../errors"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
 import type { ThreadCloseOptions } from "../tools/ports"
@@ -135,11 +136,125 @@ export async function setModelOn(
     selected = await control.setModel(rematched.model.provider, rematched.model.id)
     matched = rematched
   }
-  if (previous !== undefined && matched.thinkingLevel !== undefined) {
-    const refusal = await applyModelThinking(control, selected, previous, matched.thinkingLevel)
-    if (refusal !== undefined) return refusal
+  return await settleModelSwitch(
+    control,
+    { provider: selected.provider, id: selected.id },
+    previous,
+    matched.thinkingLevel,
+  )
+}
+
+/**
+ * #14939: a `set_model` reply acknowledges a switch the holder keeps until its next compaction exactly as one it applied,
+ * so only the holder's state read after the reply tells them apart. The level goes onto the selected model only once that
+ * model is in effect (never onto the old one), and the outcome is decided on the state read after both settled.
+ */
+async function settleModelSwitch(
+  control: SessionControl,
+  selected: ThreadModel,
+  previous: SessionModelState | undefined,
+  level: string | undefined,
+): Promise<ThreadToolResult> {
+  const after = await stateAfterSwitch(control)
+  if (!("model" in after)) return switchUncertain(control, selected, level, after.unread)
+  if (!sameModel(after.model, selected)) {
+    if (after.pendingModel !== undefined && sameModel(after.pendingModel, selected))
+      return {
+        kind: "ok",
+        ...controlIdentity(control),
+        model: selected,
+        model_switch: "after_compaction",
+        in_effect: inEffect(after),
+        pending: {
+          model: selected,
+          ...(level === undefined ? {} : { thinking_level: level, thinking_level_sent: false }),
+        },
+      }
+    return switchNotApplied(control, selected, level, after)
   }
-  return { kind: "ok", ...controlIdentity(control), model: { provider: selected.provider, id: selected.id } }
+  if (level === undefined || previous === undefined) return switchApplied(control, selected, after)
+  const refusal = await applyModelThinking(control, selected, previous, level, after)
+  if (refusal !== undefined) return refusal
+  const confirmed = await stateAfterSwitch(control)
+  if (!("model" in confirmed)) return switchUncertain(control, selected, level, confirmed.unread)
+  if (!sameModel(confirmed.model, selected)) return switchUncertain(control, selected, level, "active_model_changed")
+  if (confirmed.thinkingLevel !== level)
+    return partialModelSwitch(control, selected, previous, level, "thinking_level_unconfirmed", confirmed)
+  return switchApplied(control, selected, confirmed)
+}
+
+async function stateAfterSwitch(control: SessionControl): Promise<SessionModelState | { readonly unread: unknown }> {
+  try {
+    return (await control.getModelState()) ?? { unread: "model_state_unavailable" }
+  } catch (error) {
+    return { unread: error }
+  }
+}
+
+function inEffect(state: SessionModelState): ThreadModelInEffect {
+  return { model: state.model, thinking_level: state.thinkingLevel }
+}
+
+function switchApplied(control: SessionControl, selected: ThreadModel, state: SessionModelState): ThreadToolResult {
+  return {
+    kind: "ok",
+    ...controlIdentity(control),
+    model: selected,
+    model_switch: "applied",
+    in_effect: inEffect(state),
+  }
+}
+
+function failureDetail(error: unknown): string {
+  return controlRefusalOf(error)?.code ?? (error instanceof Error ? error.message : String(error))
+}
+
+/** The holder's state could not be read after `set_model`: the switch may or may not have happened. */
+function switchUncertain(
+  control: SessionControl,
+  selected: ThreadModel,
+  level: string | undefined,
+  cause: unknown,
+): ThreadToolResult {
+  return {
+    kind: "error",
+    error: {
+      ...threadToolFailure(
+        "idempotency_uncertain",
+        "The model switch was sent, but the target's model state could not be read back, so whether it took effect is unknown.",
+        "Read the target's current model and thinking level before repeating; repeating the same switch is safe.",
+        {
+          ...controlIdentity(control),
+          reason: "model_switch_unconfirmed",
+          selected_model: selected,
+          ...(level === undefined ? {} : { requested_thinking_level: level }),
+          detail: failureDetail(cause),
+        },
+      ),
+      uncertain: true,
+    },
+  }
+}
+
+/** The holder answered the switch and its state shows neither the selected model in effect nor a switch to it held. */
+function switchNotApplied(
+  control: SessionControl,
+  selected: ThreadModel,
+  level: string | undefined,
+  state: SessionModelState,
+): ThreadToolResult {
+  return failure(
+    "not_applied",
+    `The target answered the switch to ${selected.provider}/${selected.id}, but its state shows the model unchanged and no switch held.`,
+    "Nothing changed; it is safe to repeat the call, or pick another model.",
+    {
+      ...controlIdentity(control),
+      reason: "model_switch_not_applied",
+      selected_model: selected,
+      ...(level === undefined ? {} : { requested_thinking_level: level }),
+      in_effect: inEffect(state),
+    },
+  )
 }
 
 async function modelBeforeSwitch(
@@ -157,57 +272,55 @@ async function modelBeforeSwitch(
   )
 }
 
+/** The level onto the selected model, now in effect (`switched`); a refused level restores the previous state. */
 async function applyModelThinking(
   control: SessionControl,
   selected: ThreadModel,
   previous: SessionModelState,
   level: string,
+  switched: SessionModelState,
 ): Promise<ThreadToolResult | undefined> {
-  // A set_model receipt can acknowledge a switch held for compaction. Never apply the level to the old model.
-  try {
-    const active = await control.getModelState()
-    if (active === undefined || !sameModel(active.model, selected))
-      return partialModelSwitch(control, selected, previous, level, "model_switch_unconfirmed")
-  } catch (error) {
-    return partialModelSwitch(control, selected, previous, level, "model_switch_unconfirmed", error)
-  }
   let refusal: ThreadToolResult | undefined
   try {
     refusal = await applyThinkingLevel(control, level)
   } catch (error) {
-    const partial = await restoreModelState(control, selected, previous, level)
+    const partial = await restoreModelState(control, selected, previous, level, switched)
     if (partial !== undefined) return partial
     throw error
   }
-  if (refusal !== undefined) return (await restoreModelState(control, selected, previous, level)) ?? refusal
+  if (refusal !== undefined) return (await restoreModelState(control, selected, previous, level, switched)) ?? refusal
 }
 
 function sameModel(left: ThreadModel, right: ThreadModel): boolean {
   return left.provider === right.provider && left.id === right.id
 }
 
+/**
+ * The selected model took effect and the level did not: `details.partial` names which part was applied and the state
+ * last read (`lastSeen`). Only answered once the model was read in effect, so something really changed.
+ */
 function partialModelSwitch(
   control: SessionControl,
   selected: ThreadModel,
   previous: SessionModelState,
   level: string,
-  reason: "model_switch_unconfirmed" | "model_restore_failed",
+  reason: "model_restore_failed" | "thinking_level_unconfirmed",
+  lastSeen: SessionModelState,
   error?: unknown,
 ): ThreadToolResult {
   return failure(
     "partial_commit",
-    "The model and thinking change did not complete and the prior state could not be confirmed.",
-    "Read the target's current model and thinking level before retrying.",
+    `The switch to ${selected.provider}/${selected.id} took effect; thinking level ${level} did not.`,
+    "Read details.partial for what is in effect, then set the thinking level again with thread_set_reasoning.",
     {
       ...controlIdentity(control),
       reason,
+      partial: { applied: ["model"], not_applied: ["thinking_level"], in_effect: inEffect(lastSeen) },
       previous_model: previous.model,
       previous_thinking_level: previous.thinkingLevel,
       selected_model: selected,
       requested_thinking_level: level,
-      ...(error === undefined
-        ? {}
-        : { detail: controlRefusalOf(error)?.code ?? (error instanceof Error ? error.message : String(error)) }),
+      ...(error === undefined ? {} : { detail: failureDetail(error) }),
     },
   )
 }
@@ -217,17 +330,21 @@ async function restoreModelState(
   selected: ThreadModel,
   previous: SessionModelState,
   level: string,
+  switched: SessionModelState,
 ): Promise<ThreadToolResult | undefined> {
+  let lastSeen = switched
   const partial = (error: unknown) =>
-    partialModelSwitch(control, selected, previous, level, "model_restore_failed", error)
+    partialModelSwitch(control, selected, previous, level, "model_restore_failed", lastSeen, error)
   try {
     let current = await control.getModelState()
     if (current === undefined) return partial("model_state_unavailable")
+    lastSeen = current
     if (!sameModel(current.model, previous.model)) {
       if (!sameModel(current.model, selected)) return partial("active_model_changed")
       await control.setModel(previous.model.provider, previous.model.id)
       current = await control.getModelState()
       if (current === undefined || !sameModel(current.model, previous.model)) return partial("restore_unconfirmed")
+      lastSeen = current
     }
     if (current.thinkingLevel !== previous.thinkingLevel) {
       await control.setThinkingLevel(previous.thinkingLevel)

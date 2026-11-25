@@ -7,18 +7,24 @@ import type { ThreadCloseAnswer, ThreadCloseOptions } from "../tools/ports"
 import { threadModel } from "../tools/thread-state"
 import type { ThreadModel, ThreadResultSummary, ThreadSummary, ThreadWaitOutcome } from "../contracts"
 
+/** `pendingModel`: the switch the holder keeps until its next compaction (senpi `pendingModelSwitch`), when one is held. */
 export type SessionModelState = {
   readonly model: ThreadModel
   readonly thinkingLevel: string
+  readonly pendingModel?: ThreadModel
 }
 
 export function sessionModelState(state: {
   readonly model?: unknown
   readonly thinkingLevel?: unknown
+  readonly pendingModelSwitch?: unknown
 }): SessionModelState | undefined {
   const { thinkingLevel } = state
   const { model } = threadModel(state.model)
-  return model !== undefined && typeof thinkingLevel === "string" ? { model, thinkingLevel } : undefined
+  const { model: pendingModel } = threadModel(state.pendingModelSwitch)
+  return model !== undefined && typeof thinkingLevel === "string"
+    ? { model, thinkingLevel, ...(pendingModel === undefined ? {} : { pendingModel }) }
+    : undefined
 }
 
 /**

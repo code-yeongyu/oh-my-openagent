@@ -19,6 +19,8 @@ describe("thread_set_model on another device", () => {
       kind: "ok",
       thread: "dur-on-b",
       model: { provider: "anthropic", id: "claude-opus" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "anthropic", id: "claude-opus" }, thinking_level: "off" },
       device: "b",
     })
     expect(a.sent.map((entry) => [entry.via, entry.device, entry.session, entry.rpc])).toEqual([
@@ -29,6 +31,7 @@ describe("thread_set_model on another device", () => {
         "rk-on-b",
         { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus", scope: "session" },
       ],
+      ["session", "b", "rk-on-b", { type: "get_state", sessionId: "rk-on-b" }],
     ])
   })
 

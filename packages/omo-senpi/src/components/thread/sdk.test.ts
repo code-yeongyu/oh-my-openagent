@@ -665,6 +665,7 @@ describe("thread SDK: session controls (#13413)", () => {
 
   function controlled() {
     const calls: unknown[][] = []
+    let active = { provider: "openai", id: "gpt-6" }
     const opened: ThreadHostSession = {
       sessionId: "rpc-2",
       durableSessionId: "dur-new",
@@ -697,8 +698,10 @@ describe("thread SDK: session controls (#13413)", () => {
       ],
       setModel: async (...args) => {
         calls.push(["setModel", ...args])
-        return { provider: args[1], id: args[2] }
+        active = { provider: args[1], id: args[2] }
+        return active
       },
+      getState: async () => ({ isStreaming: false, model: active, thinkingLevel: "off", pendingModelSwitch: null }),
     }
     return { calls, controls, openSession }
   }
@@ -759,6 +762,8 @@ describe("thread SDK: session controls (#13413)", () => {
       kind: "ok",
       thread: "dur-host",
       model: { provider: "anthropic", id: "claude-opus" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "anthropic", id: "claude-opus" }, thinking_level: "off" },
     })
     expect(await sdk.set_model({ thread: "host lane", model: "no-such-model" })).toMatchObject({
       kind: "error",
@@ -860,6 +865,8 @@ describe("thread SDK: session controls (#13413)", () => {
       thread: "dur-on-b",
       device: "b",
       model: { provider: "openai", id: "gpt-6" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "openai", id: "gpt-6" }, thinking_level: "off" },
     })
     expect(await sdk.close({ thread: "lane-b2" })).toEqual({
       kind: "ok",

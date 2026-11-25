@@ -344,6 +344,8 @@ export function createRemoteThreadFixture() {
       admitThrows?: string
       /** Every get_state after b admitted a delivery is refused with this reason (the read after the admission fails). */
       stateRefusedAfterAdmit?: string
+      /** b's engine holds every model switch until its next compaction (senpi `pendingModelSwitch`, #14939). */
+      parksModelSwitch?: boolean
     } = {},
   ) {
     const engine = options.engine ?? ENGINE
@@ -367,6 +369,12 @@ export function createRemoteThreadFixture() {
     let heldDraft = options.heldDraft ?? 0
     // How b's next get_state calls end before its engine answers them (a lost reply, a restarted hand), one per call.
     const stateOutcomes = [...(options.stateOutcomes ?? [])]
+    // The model, level and held switch b's engine reports in every get_state, as senpi's rpc-session-state does.
+    const modelState: { model: JsonObject; thinkingLevel: string; pending: JsonObject | null } = {
+      model: { provider: "openai", id: "gpt-6" },
+      thinkingLevel: "off",
+      pending: null,
+    }
     // The session's records a prompt makes it write, held until the follower first reads after the answer: the
     // engine's turn records follow its reply out over the wire, and the CLI's read is the first observable hop after
     // its own bookkeeping for that reply.
@@ -591,6 +599,9 @@ export function createRemoteThreadFixture() {
           ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
           ...(engine.pendingQuestions === undefined ? {} : { pendingQuestions: [...engine.pendingQuestions] }),
           ...(engine.pendingDialogs === undefined ? {} : { pendingDialogs: [...engine.pendingDialogs] }),
+          model: { ...modelState.model },
+          thinkingLevel: modelState.thinkingLevel,
+          pendingModelSwitch: modelState.pending === null ? null : { ...modelState.pending },
           ...options.liveState,
         })
       if (rpc["type"] === "get_messages") return ok({ messages: [...engine.messages] })
@@ -642,7 +653,12 @@ export function createRemoteThreadFixture() {
             { provider: "openai", id: "gpt-6" },
           ],
         })
-      if (rpc["type"] === "set_model") return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
+      if (rpc["type"] === "set_model") {
+        const switched = { provider: String(rpc["provider"]), id: String(rpc["modelId"]) }
+        if (options.parksModelSwitch === true) modelState.pending = switched
+        else modelState.model = switched
+        return ok({ provider: rpc["provider"] ?? null, id: rpc["modelId"] ?? null })
+      }
       if (rpc["type"] === "get_available_thinking_levels") return ok({ levels: [...THINKING_LEVELS] })
       // The engine refuses a level the active model cannot run with its text as the error (device-service.ts: errorCode, else error).
       if (rpc["type"] === "set_thinking_level")

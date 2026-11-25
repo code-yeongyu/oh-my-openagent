@@ -54,14 +54,17 @@ function fixture() {
     sessions[index] = { ...sessions[index], name }
   })
   let model = { provider: "openai", id: "gpt-previous" }
-  const getState = async () => ({ isStreaming: false, model, thinkingLevel: "off" })
+  let thinkingLevel = "off"
+  const getState = async () => ({ isStreaming: false, model, thinkingLevel })
   const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => {
     model = { provider, id: modelId }
     return { ...model, name: "Selected model" }
   })
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(
-    async (_sessionId: string, _level: string, _scope?: "session" | "turn", _durableId?: string) => {},
+    async (_sessionId: string, level: string, _scope?: "session" | "turn", _durableId?: string) => {
+      thinkingLevel = level
+    },
   )
   const getAvailableThinkingLevels = mock(async (_sessionId: string) => ["off", "high"])
   const prompt = mock(async (_sessionId: string, _message: string) => ({ turnId: "turn-1" }))
@@ -413,6 +416,8 @@ describe("thread session controls", () => {
       kind: "ok",
       thread: "dur-peer",
       model: { provider: "openai", id: "gpt-x" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "openai", id: "gpt-x" }, thinking_level: "off" },
     })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
@@ -430,6 +435,8 @@ describe("thread session controls", () => {
       kind: "ok",
       thread: "dur-peer",
       model: { provider: "openai", id },
+      model_switch: "applied",
+      in_effect: { model: { provider: "openai", id }, thinking_level: level ?? "off" },
     })
     expect(f.setThinkingLevel.mock.calls).toEqual(
       level === undefined ? [] : [["route-peer", level, "turn", "dur-peer"]],
@@ -489,13 +496,19 @@ describe("thread session controls", () => {
     expect((await f.getState()).model).toEqual({ provider: "openai", id: "gpt-x" })
   })
 
-  test("#14445: set_model does not apply thinking to the old model when the switch is held", async () => {
+  test("#14445 #14939: set_model sends no level and answers not_applied when the target acknowledges a switch its state does not show", async () => {
     const f = fixture()
     f.setModel.mockResolvedValueOnce({ provider: "openai", id: "gpt-x", name: "Selected model" })
 
     expect(await runner(f)("thread_set_model", { thread: "peer", model: "openai/gpt-x:max" })).toMatchObject({
       kind: "error",
-      error: { code: "partial_commit", details: { reason: "model_switch_unconfirmed" } },
+      error: {
+        code: "not_applied",
+        details: {
+          reason: "model_switch_not_applied",
+          in_effect: { model: { provider: "openai", id: "gpt-previous" }, thinking_level: "off" },
+        },
+      },
     })
     expect(f.setThinkingLevel).not.toHaveBeenCalled()
   })
@@ -551,6 +564,8 @@ describe("thread session controls", () => {
       kind: "ok",
       thread: "dur-peer",
       model: { provider: "openai", id: "gpt-x" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "openai", id: "gpt-x" }, thinking_level: "off" },
     })
     expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
   })
@@ -562,6 +577,8 @@ describe("thread session controls", () => {
       kind: "ok",
       thread: "dur-peer",
       model: { provider: "other", id: "gpt-y" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "other", id: "gpt-y" }, thinking_level: "off" },
     })
     expect(f.setModel.mock.calls).toEqual([["route-peer", "other", "gpt-y", "dur-peer"]])
   })

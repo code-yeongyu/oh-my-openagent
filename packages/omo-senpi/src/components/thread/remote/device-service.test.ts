@@ -271,6 +271,15 @@ describe("device-service adapter of the thread tools' account surface", () => {
         { state: "engine_applied" },
         { type: "response", command: "set_model", success: true, data: { provider: "a", id: "m1" } },
       ),
+      state(
+        { state: "engine_applied" },
+        {
+          type: "response",
+          command: "get_state",
+          success: true,
+          data: { model: { provider: "a", id: "m1" }, thinkingLevel: "off", pendingModelSwitch: null },
+        },
+      ),
     ]
     const attach = {
       command: async () => {
@@ -322,7 +331,14 @@ describe("device-service adapter of the thread tools' account surface", () => {
         { model: "a/m1" },
       ),
       // A row whose device publishes no thread id is addressed as <device id>/<listing key> (#14305 U6), never "".
-    ).toEqual({ kind: "ok", thread: "b/s1", device: "b", model: { provider: "a", id: "m1" } })
+    ).toEqual({
+      kind: "ok",
+      thread: "b/s1",
+      device: "b",
+      model: { provider: "a", id: "m1" },
+      model_switch: "applied",
+      in_effect: { model: { provider: "a", id: "m1" }, thinking_level: "off" },
+    })
     expect(closed).toBe(false)
   })
 
