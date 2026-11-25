@@ -13,6 +13,7 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { callInputOf } from "./call-input"
 import { codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
+import { expectationProblems } from "./expectation"
 import { scenarioProblems } from "./scenario-check"
 import { allRows, loadDomainFiles } from "./registry"
 import type { Row } from "./schema"
@@ -331,5 +332,24 @@ describe("negative controls of the pair comparison's matcher semantics", () => {
     expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
       "row threads.setModel: input provider has no scenario pair that differs in provider alone",
     )
+  })
+})
+
+describe("negative controls of the recovery retry's complete trace (review 6062548108)", () => {
+  const step = scenarios
+    .flatMap((file) => file.scenarios)
+    .find((scenario) => scenario.id === "threads.create/recovery-admission-lost")?.then?.[0]
+  const listing = { port: "remote", op: "sessions.list", args: { device: "studio" } }
+  const send = { port: "remote", op: "sessions.send", args: { thread: "t-k8", message: "build it" } }
+
+  test("#given the retry admits the first prompt once #then its stated effects match", () => {
+    expect(expectationProblems(step?.expect ?? [], [listing, send])).toEqual([])
+  })
+
+  test("#given the retry admits the first prompt twice or not at all #then the stated effects refuse it", () => {
+    expect(expectationProblems(step?.expect ?? [], [listing, send, send]).join("\n")).toContain(
+      "expected 1 call(s), observed 2",
+    )
+    expect(expectationProblems(step?.expect ?? [], [listing]).join("\n")).toContain("expected 1 call(s), observed 0")
   })
 })
