@@ -3479,6 +3479,37 @@
       ]
     },
     {
+      "id": "threads.setModel/out-of-scope",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "scope_denied",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "list_sessions"
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        }
+      ],
+      "target": "this_device"
+    },
+    {
       "id": "threads.setModel/idempotent-repeat",
       "row": "threads.setModel",
       "kind": "effect",
