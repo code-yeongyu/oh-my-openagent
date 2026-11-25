@@ -11,7 +11,7 @@ const SOURCE = "omo-native-notice"
 const MARKER_FILE_NAME = "notice-shown"
 const PRIVACY_POLICY_URL = "https://github.com/code-yeongyu/oh-my-openagent/blob/dev/docs/legal/privacy-policy.md"
 const NOTICE =
-  "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States to improve the product. " +
+  "OmO Native sends anonymous usage telemetry (no prompts, code, file paths, or account data) to PostHog in the United States (https://us.i.posthog.com) and to the OmO telemetry collector (https://t.omo.dev) to improve the product. " +
   'Turn it off with DO_NOT_TRACK=1, or set "telemetry": { "enabled": false } in ~/.omo/omo.jsonc. ' +
   `Details: ${PRIVACY_POLICY_URL}`
 
