@@ -4,6 +4,7 @@ import { userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { accountHome } from "../account-home"
 import { CredentialStoreError, KeychainLockedError } from "../keystore"
+import { withCustodyLock } from "./custody-lock"
 import { recoverCustodyLog } from "./custody-recovery"
 import { type CallOutcome, ok } from "./outcome"
 
@@ -61,9 +62,12 @@ export function custodyLog(options: {
     try {
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       const line = `${JSON.stringify({ id: randomUUID(), at: new Date(now()).toISOString(), ...record })}\n`
-      await appendFile(path, line, { mode: 0o600 })
-      await chmod(path, 0o600)
-      return true
+      const written = await withCustodyLock(path, async () => {
+        await appendFile(path, line, { mode: 0o600 })
+        await chmod(path, 0o600)
+        return true
+      })
+      return written === true
     } catch {
       return false
     }
@@ -74,7 +78,7 @@ export function custodyLog(options: {
     capability,
     destination: "store" as const,
   })
-  const recover = () => recoverCustodyLog(path, now()).catch(() => undefined)
+  const recover = () => withCustodyLock(path, () => recoverCustodyLog(path, now())).catch(() => undefined)
   return {
     async begin(capability) {
       await recover()

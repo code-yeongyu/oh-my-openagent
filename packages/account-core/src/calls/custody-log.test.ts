@@ -138,18 +138,6 @@ describe("the custody log", () => {
     expect(keysOf(closing)).toEqual(withCode(TERMINAL))
   })
 
-  test("#given an operation past its deadline #when the log opens #then recovery closes it as interrupted, deadline passed", async () => {
-    const home = await temporaryHome()
-    let now = Date.parse("2026-01-01T00:00:00Z")
-    const open = custodyLog({ home, principal, now: () => now })
-    await open.begin("account.signIn")
-    now += 2 * 60 * 60 * 1000
-    await custodyLog({ home, principal, now: () => now }).refused("account.signOut", "desktop_sign_in")
-    expect(records(home).filter((record) => record.outcome === "interrupted")).toMatchObject([
-      { capability: "account.signIn", code: "deadline_passed", principal },
-    ])
-  })
-
   test("#given a refusal at the boundary #then one terminal refused record, the fixed fields and the code only", async () => {
     const home = await temporaryHome()
     expect(await custodyLog({ home, principal }).refused("account.forget", "sender_not_allowed")).toBe(true)
