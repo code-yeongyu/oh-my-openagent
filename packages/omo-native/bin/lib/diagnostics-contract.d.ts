@@ -66,7 +66,8 @@ export type ReapedEngine =
       readonly details?: Readonly<Record<string, unknown>>
     }
 
-export type ReapReport = { readonly engines: readonly ReapedEngine[] }
+/** `complete` is false when any named pid was refused: the fact `omo doctor --reap` reports by exiting 1. */
+export type ReapReport = { readonly engines: readonly ReapedEngine[]; readonly complete: boolean }
 
 /** The resolver's own view, as `omo doctor --models --json` prints it. */
 export type ModelChainView = import("../../category-coverage-entry").ModelChainsView

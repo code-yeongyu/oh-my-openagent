@@ -26,6 +26,6 @@ describe("doctor-migration import", () => {
     const module = await import(pathToFileURL(join(root, "bin", "lib", "doctor-migration.js")).href)
 
     // then
-    expect(typeof module.migrationFindings).toBe("function")
+    expect(typeof module.migrationReport).toBe("function")
   })
 })

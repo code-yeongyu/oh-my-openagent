@@ -69,6 +69,8 @@ export type ReapStaleEngines = {
     readonly outcome: "reaped" | "refused" | "not_found"
     readonly reason?: string
   }[]
+  /** False when any named pid was refused, decided once in the core: the fact `omo doctor --reap`'s exit 1 carries. */
+  readonly complete: boolean
 }
 
 export type { SetupInventory, SetupPlan } from "../inputs/host"

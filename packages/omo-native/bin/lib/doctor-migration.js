@@ -347,7 +347,7 @@ function omoInstallRemoval(entry, bunRoot) {
   return `npm uninstall -g omo-ai --prefix ${shellQuote(prefix)}`
 }
 
-export function migrationFindings({
+function migrationFindings({
   shadowing,
   nativeDirectory,
   legacyPackages,

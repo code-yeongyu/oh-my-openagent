@@ -34,6 +34,7 @@ describe("diagnostics.reapStaleEngines", () => {
           { pid: 15, outcome: "reaped", age: "09:00", tty: "pts/5" },
           { pid: 404, outcome: "not_found" },
         ],
+        complete: false,
       },
     })
     expect(signalled).toEqual([[15, "SIGTERM"]])

@@ -3,6 +3,7 @@
 import { findingsFromLines, renderFindings } from "./diagnostics-findings.js"
 import { reapStaleEngines as reap, run } from "./diagnostics.js"
 import { reflectionLockFix } from "./doctor-reflection-lock.js"
+import { exitOf, REAP_EXIT_SURFACE } from "./reap-exit.js"
 import { MANAGED_MODE_FLAG } from "./engine-processes.js"
 import { releaseChannel } from "./package-paths.js"
 
@@ -41,12 +42,14 @@ export async function reapStaleEngines(args, options = {}) {
     else lines.push(`FAIL refusing ${JSON.stringify(arg)}: --reap takes process ids`)
   }
   if (pids.length === 0) return { lines, failed: true, reaped: [] }
+  const argvRefused = lines.length > 0
   const result = await reap({ pids }, options)
   const engines = result.kind === "ok" ? result.value.engines : result.error.details.engines
   lines.push(...engines.map(reapLine))
   return {
     lines,
-    failed: lines.length > engines.length || engines.some((engine) => engine.outcome !== "reaped"),
+    // An argv word that is not a pid is the command's own usage refusal; every other exit is the SDK answer's.
+    failed: argvRefused || exitOf(REAP_EXIT_SURFACE, result) !== 0,
     reaped: engines.filter((engine) => engine.outcome === "reaped").map((engine) => engine.pid),
   }
 }

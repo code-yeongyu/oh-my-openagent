@@ -85,7 +85,8 @@ export async function reapStaleEngines(input, ports = {}) {
       }
     }
   }
-  if (engines.some((engine) => engine.outcome === "reaped")) return { kind: "ok", value: { engines } }
+  if (engines.some((engine) => engine.outcome === "reaped"))
+    return { kind: "ok", value: { engines, complete: engines.every((engine) => engine.outcome === "reaped") } }
   return nothingReaped(engines)
 }
 
