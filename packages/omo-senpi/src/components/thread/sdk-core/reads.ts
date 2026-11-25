@@ -1,6 +1,6 @@
 import { resolveAddress } from "../address"
 import { toThreadAddressEntries, type AddressEntry } from "../address-book"
-import type { ThreadState, ThreadToolResult } from "../contracts"
+import type { ThreadResultSummary, ThreadState, ThreadToolResult } from "../contracts"
 import { listAcross } from "../remote/cross-device"
 import { addressBook } from "../tools/internals"
 import { UNKNOWN_CALLER } from "../tools/ports"
@@ -26,16 +26,65 @@ export type LocatedThread = Pick<
   readonly address?: string
 }
 
-export type CoreListRequest = Scoped & { readonly state?: readonly ThreadState[] }
+export type CoreListRequest = Scoped & {
+  readonly state?: readonly ThreadState[]
+  /** List as a caller in this workspace root would; `all_scope` widens past it as before. */
+  readonly workspace?: string
+  /** A device id, its name (case-insensitive), or `here` for this device. */
+  readonly device?: string
+  /** A thread's working directory, exactly. */
+  readonly project?: string
+  /** A thread's real name, case-insensitive. */
+  readonly name?: string
+  /** true: archived threads only; false: none of them. */
+  readonly archived?: boolean
+  readonly idempotency_key?: string
+}
 export type CoreReadRequest = Scoped & {
   readonly thread: string
   readonly max_bytes?: number
   readonly cursor?: string
+  /** The newest `limit` items of the read page (`omo thread read --limit`). */
+  readonly limit?: number
+  readonly idempotency_key?: string
+}
+
+type ListedRow = { readonly state?: string; readonly device?: string; readonly machine?: string } & Record<
+  string,
+  unknown
+>
+
+const EVERY_STATE: readonly ThreadState[] = ["opening", "running", "idle", "inactive", "archived"]
+
+/** The filters the remote module's listing has (R/client.ts), over the thread listing's rows (#14951). */
+function filtered(result: ThreadToolResult, request: CoreListRequest): ThreadToolResult {
+  if (result.kind !== "ok" || !("threads" in result)) return result
+  const device = request.device?.toLowerCase()
+  const name = request.name?.toLowerCase()
+  const keep = (row: ThreadResultSummary) =>
+    (device === undefined ||
+      (device === "here"
+        ? row.device === undefined
+        : row.device?.toLowerCase() === device || row.machine?.toLowerCase() === device)) &&
+    (request.project === undefined || row.cwd === request.project) &&
+    // Only a real name is an address, so a name filter never matches a fallback (as the remote module's listing).
+    (name === undefined || (row.unnamed !== true && row.name.toLowerCase() === name)) &&
+    (request.archived === undefined || (row.state === "archived") === request.archived)
+  return { ...result, threads: result.threads.filter(keep) }
 }
 export type CoreLocateResult = { readonly kind: "ok"; readonly thread: LocatedThread } | Failure
 
-const LIST_KEYS = ["all_scope", "state"] as const
-const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope"] as const
+const LIST_KEYS = [
+  "all_scope",
+  "state",
+  "workspace",
+  "device",
+  "project",
+  "name",
+  "archived",
+  "idempotency_key",
+] as const
+const READ_KEYS = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"] as const
 const LOCATE_KEYS = ["thread", "all_scope"] as const
 const RECEIPT_KEYS = ["thread", "delivery_id", "all_scope"] as const
 const MESSAGES_KEYS = ["thread", "all_scope"] as const
@@ -51,36 +100,56 @@ export type CoreMessagesResult =
     }
   | Failure
 
+/** The newest `limit` items of a read page; the page's cursor and budget are the read's own. */
+function newest(result: ThreadToolResult, limit: number | undefined): ThreadToolResult {
+  if (limit === undefined || result.kind !== "ok" || !("items" in result)) return result
+  return { ...result, items: result.items.slice(Math.max(0, result.items.length - limit)) } as ThreadToolResult
+}
+
 export function createReads(context: ThreadCoreContext) {
   const { options, principal, store, surface, view, resolveContext, controls } = context
   const readOptions = () => ({ ...surface, ...(options.remote === undefined ? {} : { remote: options.remote }) })
   const list = (request: CoreListRequest = {}): Promise<ThreadToolResult> =>
-    context.guard(
-      async () =>
-        unknownKeys(request, LIST_KEYS) ??
-        listAcross(
-          options.remote,
-          await withBacklog(surface.store, listThreads(surface, await view(), request.all_scope, request.state)),
-          request.all_scope === true,
-          request.state,
+    context.guard(async () => {
+      const refused = unknownKeys(request, LIST_KEYS)
+      if (refused !== undefined) return refused
+      const { workspace } = request
+      const scoped = workspace === undefined ? surface : { ...surface, callerWorkspaceRoot: () => workspace }
+      // archived: true asks for rows the default states leave out; the filter then keeps only those.
+      const states = request.archived === true && request.state === undefined ? EVERY_STATE : request.state
+      return await context.keyed("thread_list", request, request.idempotency_key, async () =>
+        filtered(
+          await listAcross(
+            options.remote,
+            await withBacklog(surface.store, listThreads(scoped, await view(), request.all_scope, states)),
+            request.all_scope === true,
+            states,
+          ),
+          request,
         ),
-    )
+      )
+    })
   const read = (request: CoreReadRequest): Promise<ThreadToolResult> =>
-    context.guard(
-      async () =>
-        unknownKeys(request, READ_KEYS) ??
-        readThread(
-          readOptions(),
-          await view(),
-          {
-            thread: request.thread,
-            max_bytes: request.max_bytes,
-            cursor: request.cursor,
-            all_scope: request.all_scope,
-          },
-          UNKNOWN_CALLER,
+    context.guard(async () => {
+      const refused = unknownKeys(request, READ_KEYS)
+      if (refused !== undefined) return refused
+      return await context.keyed("thread_read", request, request.idempotency_key, async () =>
+        newest(
+          await readThread(
+            readOptions(),
+            await view(),
+            {
+              thread: request.thread,
+              max_bytes: request.max_bytes,
+              cursor: request.cursor,
+              all_scope: request.all_scope,
+            },
+            UNKNOWN_CALLER,
+          ),
+          request.limit,
         ),
-    )
+      )
+    })
   const locate = (request: Scoped & { readonly thread: string }): Promise<CoreLocateResult> =>
     context.guard(async () => {
       const refused = unknownKeys(request, LOCATE_KEYS)
@@ -144,22 +213,27 @@ export function createReads(context: ThreadCoreContext) {
     )
   // thread_read's wait branch: wait for the turn to end, then the same bounded read.
   const readAfterWait = (request: CoreReadAfterWaitRequest): Promise<ThreadToolResult> =>
-    context.guard(
-      async () =>
-        unknownKeys(request, [...READ_KEYS, "wait_ms"]) ??
-        readThread(
-          readOptions(),
-          await view(),
-          {
-            thread: request.thread,
-            max_bytes: request.max_bytes,
-            cursor: request.cursor,
-            all_scope: request.all_scope,
-            wait_ms: request.wait_ms,
-          },
-          UNKNOWN_CALLER,
+    context.guard(async () => {
+      const refused = unknownKeys(request, [...READ_KEYS, "wait_ms"])
+      if (refused !== undefined) return refused
+      return await context.keyed("thread_read", request, request.idempotency_key, async () =>
+        newest(
+          await readThread(
+            readOptions(),
+            await view(),
+            {
+              thread: request.thread,
+              max_bytes: request.max_bytes,
+              cursor: request.cursor,
+              all_scope: request.all_scope,
+              wait_ms: request.wait_ms,
+            },
+            UNKNOWN_CALLER,
+          ),
+          request.limit,
         ),
-    )
+      )
+    })
   // The engine's whole message list for a live thread, wherever it is held (no tool has it: a session reads the bounded
   // transcript); a thread no engine holds answers as every control does.
   const messages = (request: Scoped & { readonly thread: string }): Promise<CoreMessagesResult> =>

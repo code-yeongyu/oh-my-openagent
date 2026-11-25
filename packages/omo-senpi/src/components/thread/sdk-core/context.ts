@@ -9,6 +9,7 @@ import { createGatewayServices } from "../tools/gateway-services"
 import { hostView } from "../tools/internals"
 import { UNKNOWN_CALLER, type ThreadHost, type ThreadToolSurfaceOptions } from "../tools/ports"
 import { guarded, thrown } from "./failures"
+import { createKeyed } from "./keyed"
 
 export type ThreadCoreOptions = {
   readonly agentDir: string
@@ -96,6 +97,21 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
   })
   // Every operation's failure mapping, bound to this core's logger port (B8): an unexpected exception reaches it alone.
   const guard = <T>(body: () => Promise<T>) => guarded(body, options.onUnexpected)
+  const keyed = createKeyed(store, principal, now, options.onUnexpected)
   const fault = (error: unknown) => thrown(error, options.onUnexpected)
-  return { options, principal, env, host, store, surface, view, pipeline, controls, resolveContext, guard, fault }
+  return {
+    options,
+    principal,
+    env,
+    host,
+    store,
+    surface,
+    view,
+    pipeline,
+    controls,
+    resolveContext,
+    guard,
+    fault,
+    keyed,
+  }
 }

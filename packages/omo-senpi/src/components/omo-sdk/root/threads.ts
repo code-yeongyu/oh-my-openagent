@@ -55,8 +55,8 @@ function unbuilt(key: RootCallKey, input: unknown, acted: readonly string[]): Om
   }
 }
 
-const LIST = ["all_scope", "state"]
-const READ = ["thread", "max_bytes", "cursor", "all_scope"]
+const LIST = ["all_scope", "state", "workspace", "device", "project", "name", "archived", "idempotency_key"]
+const READ = ["thread", "max_bytes", "cursor", "all_scope", "limit", "idempotency_key"]
 const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
 const CREATE = Object.keys(threadToolParamSchemas.thread_create.properties)
 

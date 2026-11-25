@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto"
-
 import {
   parseThreadParams,
   threadToolParamSchemas,
@@ -12,15 +10,15 @@ import {
 } from "../contracts"
 import { createThread } from "../control/create"
 import { locateControl } from "../control/locate"
-import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
+import { closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
 import { controlIdentity } from "../control/port"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
-import { createReceipts, withReceiptExpiry } from "../control/receipts"
 import { renameThread } from "../control/rename"
 import { sendToTarget } from "../sdk-send"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadCoreContext } from "./context"
+import type { Retrying } from "./keyed"
 
 type ControlName = "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"
 
@@ -31,10 +29,8 @@ type ControlName = "thread_create" | "thread_interrupt" | "thread_close" | "thre
  */
 export function createControls(context: ThreadCoreContext) {
   const { options, principal, store, pipeline, controls, view } = context
-  // One session control as its tool runs it: the tool's parameter schema, the receipt protocol its key is honoured by
-  // (control/receipts.ts, the one the tools run), then its body; a control's typed refusal is data.
-  const receipts = createReceipts(store, context.surface.now ?? store.now, options.onUnexpected)
-  type Retrying = { readonly error_note: string | null } | undefined
+  // One session control as its tool runs it: the tool's parameter schema, the core's receipt book for its key
+  // (sdk-core/keyed.ts), then its body; a control's typed refusal is data.
   function control<I>(
     name: ControlName,
     request: I,
@@ -44,24 +40,7 @@ export function createControls(context: ThreadCoreContext) {
       const parsed = parseThreadParams(threadToolParamSchemas[name], request)
       if (parsed.kind === "error") return parsed as ThreadToolResult
       const value = parsed.value as I & { readonly idempotency_key?: string }
-      const key = value.idempotency_key?.trim()
-      const scope = {
-        principal,
-        operation: name,
-        idempotency_key: key !== undefined && key.length > 0 ? key : `call:${randomUUID()}`,
-      }
-      const named = key !== undefined && key.length > 0
-      const admission = await receipts.admit(scope, value, named)
-      if (admission.kind === "answer") return admission.result
-      let result: ThreadToolResult
-      try {
-        result = await answered(() => body(value, scope.idempotency_key, admission.retrying))
-      } catch (error) {
-        await receipts.fail(scope, error)
-        throw error
-      }
-      await receipts.settle(scope, result, admission.retrying)
-      return named ? withReceiptExpiry(result, admission.expires_at) : result
+      return await context.keyed(name, value, value.idempotency_key, (key, retrying) => body(value, key, retrying))
     })
   }
   async function located(address: string, allScope: boolean | undefined) {

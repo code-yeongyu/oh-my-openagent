@@ -25,6 +25,72 @@ function rootOn() {
   return { a, s, root }
 }
 
+describe("threads.list filters", () => {
+  const threads = (answer: unknown) =>
+    ((answer as { threads?: readonly { thread: string; state?: string; cwd?: string }[] }).threads ?? []).map(
+      (row) => row.thread,
+    )
+
+  test("#given threads here and on device b #when the root lists by device, name and project #then only the matching rows", async () => {
+    const { root } = rootOn()
+    expect(threads(await root.threads.list({ all_scope: true, device: "b" }))).toEqual(["dur-on-b"])
+    expect(threads(await root.threads.list({ all_scope: true, device: "here" }))).toEqual(["dur-local"])
+    expect(threads(await root.threads.list({ all_scope: true, name: "ON B" }))).toEqual(["dur-on-b"])
+    expect(threads(await root.threads.list({ all_scope: true, project: "/work/b" }))).toEqual(["dur-on-b"])
+  })
+
+  test("#given archived false #when the root lists #then no archived row; archived true lists archived rows only", async () => {
+    const { root } = rootOn()
+    const unarchived = (await root.threads.list({ all_scope: true, archived: false })) as {
+      threads: readonly { state?: string }[]
+    }
+    expect(unarchived.threads.every((row) => row.state !== "archived")).toBe(true)
+    const archived = (await root.threads.list({ all_scope: true, archived: true })) as {
+      kind: string
+      threads: readonly { state?: string }[]
+    }
+    expect(archived.kind).toBe("ok")
+    expect(archived.threads.every((row) => row.state === "archived")).toBe(true)
+  })
+
+  test("#given a workspace other than this one #when the root lists without all_scope #then this workspace's thread is not listed", async () => {
+    const { root } = rootOn()
+    expect(threads(await root.threads.list({}))).toContain("dur-local")
+    expect(threads(await root.threads.list({ workspace: "/nowhere/else" }))).not.toContain("dur-local")
+  })
+
+  test("#given a list under a key #when the key is reused with another filter #then idempotency_conflict", async () => {
+    const { root } = rootOn()
+    expect(await root.threads.list({ all_scope: true, idempotency_key: "k-list" })).toMatchObject({ kind: "ok" })
+    expect(await root.threads.list({ all_scope: true, device: "b", idempotency_key: "k-list" })).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_conflict" },
+    })
+  })
+})
+
+describe("threads.read inputs", () => {
+  test("#given a thread with several transcript items #when the root reads with limit 1 #then the one newest item of the unlimited read", async () => {
+    const { root } = rootOn()
+    const all = (await root.threads.read({ thread: "dur-local" })) as { kind: string; items: readonly unknown[] }
+    const one = (await root.threads.read({ thread: "dur-local", limit: 1 })) as {
+      kind: string
+      items: readonly unknown[]
+    }
+    expect(all.items.length).toBeGreaterThan(1)
+    expect(one.items).toEqual(all.items.slice(-1))
+  })
+
+  test("#given a read under a key #when it runs #then it answers the read, and the same key with another thread is idempotency_conflict", async () => {
+    const { root } = rootOn()
+    expect(await root.threads.read({ thread: "dur-local", idempotency_key: "k-read" })).toMatchObject({ kind: "ok" })
+    expect(await root.threads.read({ thread: "dur-on-b", idempotency_key: "k-read" })).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_conflict" },
+    })
+  })
+})
+
 describe("threads.receipt", () => {
   test("#given the root sent to a thread on this device #when it asks for that delivery's receipt #then it answers the delivery's outcome, as thread_read's receipt branch does for its caller", async () => {
     const { root } = rootOn()
