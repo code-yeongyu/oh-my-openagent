@@ -33,6 +33,7 @@ import { runDaemonCommand } from "./bin/lib/daemon.js"
 import { runThreadCommand } from "./bin/lib/thread.js"
 import { isHostStatusAll, runHostStatusAll, sessionActivityReader } from "./bin/lib/host-status.js"
 import { runDoctor } from "./bin/lib/doctor.js"
+import { version } from "./bin/lib/install-calls.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
 import { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { runSetup } from "./bin/lib/setup-import.js"
@@ -89,6 +90,30 @@ export function versionLine(
   return `omo ${packageJson.version} (engine: senpi ${enginePin}; scheme nodef)`
 }
 
+/** `omo --version` in the compiled edition: install.version's answer, with the stamps it carries, as `versionLine` renders it. */
+function compiledVersionText(
+  stamped: { version: string; omoBuild?: unknown; engineBuild?: unknown },
+  enginePin: string,
+): string {
+  const omoBuild = parseBuildInfo(stamped.omoBuild)
+  const engineBuild = parseEngineBuildStamp(stamped.engineBuild)
+  const { value } = version(
+    {},
+    {
+      read: () => ({
+        version: stamped.version,
+        engine: enginePin,
+        ...(omoBuild === undefined ? {} : { omo_build: omoBuild }),
+        ...(engineBuild === undefined ? {} : { engine_build: engineBuild }),
+      }),
+    },
+  )
+  return versionLine(
+    { version: value.version, omoBuild: value.omo_build, engineBuild: value.engine_build },
+    value.engine,
+  )
+}
+
 /**
  * A dev build is refreshed by rebuilding it. A release binary resolves its update in `main()` from the
  * embedded manifest (see compiled-update.ts); any other caller has no binary to replace.
@@ -130,12 +155,8 @@ export function answerCompiledFastPath(
 ): boolean {
   if ((args[0] === "--version" || args[0] === "-v") && args.length === 1) {
     console.log(
-      versionLine(
-        {
-          version: manifest.omoAiVersion,
-          omoBuild: manifest.buildInfo,
-          engineBuild: manifest.engineBuild,
-        },
+      compiledVersionText(
+        { version: manifest.omoAiVersion, omoBuild: manifest.buildInfo, engineBuild: manifest.engineBuild },
         manifest.enginePin,
       ),
     )
@@ -311,7 +332,7 @@ export async function runCompiledLauncher(
     return true
   }
   if ((command === "--version" || command === "-v") && args.length === 1) {
-    console.log(versionLine(packageJson, enginePin ?? "unknown"))
+    console.log(compiledVersionText(packageJson, enginePin ?? "unknown"))
     return true
   }
   if (isSelfUpdate(args)) {

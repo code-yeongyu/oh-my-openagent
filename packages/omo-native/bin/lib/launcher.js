@@ -26,20 +26,13 @@ import { removeLegacyServiceCredentials } from "./legacy-service-credentials.js"
 import { adoptLegacyFlatState, canonicalAgentDir } from "./agent-dir.js"
 import { senpiEnvironment } from "./engine-environment.js"
 import { withHerdrAgentHint } from "./herdr-agent-hint.js"
-import { packageManifest, packageRoot, readJson, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
+import { version } from "./install-calls.js"
+import { packageManifest, packageRoot, releaseBanner, resolveSenpi, updateTarget } from "./package-paths.js"
 import { runSelfUpdate } from "./self-update.js"
 import { isSelfUpdate } from "./update-args.js"
 import { detectHarnesses } from "./setup-detect.js"
 import { readSetupSuggestionCache, spawnSetupSuggestionRefresh } from "./setup-detect-cache.js"
 import { refuseRetiredCommand } from "./retired-command.js"
-
-function engineVersion() {
-  try {
-    return readJson(join(resolveSenpi().packageRoot, "package.json")).version
-  } catch {
-    return "unknown"
-  }
-}
 
 function preparedSenpi() {
   preparePluginLaunchSpec({ pluginRoot: join(packageRoot, "plugin") })
@@ -265,7 +258,8 @@ export async function runLauncher(args = process.argv.slice(2)) {
     return
   }
   if ((command === "--version" || command === "-v") && args.length === 1) {
-    console.log(`omo ${packageManifest().version} (engine: senpi ${engineVersion()})`)
+    const answer = version()
+    if (answer.kind === "ok") console.log(`omo ${answer.value.version} (engine: senpi ${answer.value.engine})`)
     process.exitCode = 0
     return
   }
