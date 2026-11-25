@@ -124,8 +124,8 @@ function settledRun(session: Session, timeoutMs: number): Promise<void> {
   })
 }
 
-test("#given five deliveries queued for an idle session #when one drain pass admits them #then the first model request carries all five, in send order, and no second request follows", async () => {
-  // given
+/** A real engine session behind an offline gateway target `B`, whose provider calls `respond` per request. */
+async function steerAllWorld(respond: (index: number) => Promise<void> = async () => undefined) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "omo-steer-all-")))
   cleanups.push(() => rmSync(root, { recursive: true, force: true }))
   const requests: string[][] = []
@@ -134,6 +134,7 @@ test("#given five deliveries queued for an idle session #when one drain pass adm
     hostname: "127.0.0.1",
     fetch: async (request) => {
       requests.push(freshProbes((await request.json()) as Parameters<typeof freshProbes>[0]))
+      await respond(requests.length)
       return sse(`ack ${requests.length}`)
     },
   })
@@ -168,13 +169,22 @@ test("#given five deliveries queued for an idle session #when one drain pass adm
       () => root,
     ),
   })
-  const sent = ["STEER-ALL-PROBE-1", "STEER-ALL-PROBE-2", "STEER-ALL-PROBE-3", "STEER-ALL-PROBE-4", "STEER-ALL-PROBE-5"]
-  for (const text of sent) {
-    const result = await engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text })
-    expect(result.kind).toBe("ok")
+  const send = async (texts: readonly string[]) => {
+    for (const text of texts) {
+      const result = await engine.deliver({ sender: { kind: "session", durable_id: "A" }, target: "B", text })
+      expect(result.kind).toBe("ok")
+    }
   }
   const drain = createInboxDrain({ store, runtime: runtimeOf(session), durableId: "B", sessionPath: () => null })
   cleanups.push(() => drain.stop())
+  return { session, requests, send, drain }
+}
+
+test("#given five deliveries queued for an idle session #when one drain pass admits them #then the first model request carries all five, in send order, and no second request follows", async () => {
+  // given
+  const { session, requests, send, drain } = await steerAllWorld()
+  const sent = ["STEER-ALL-PROBE-1", "STEER-ALL-PROBE-2", "STEER-ALL-PROBE-3", "STEER-ALL-PROBE-4", "STEER-ALL-PROBE-5"]
+  await send(sent)
   const ended = settledRun(session, 20_000)
 
   // when
@@ -183,5 +193,37 @@ test("#given five deliveries queued for an idle session #when one drain pass adm
 
   // then
   expect(requests).toEqual([sent])
+  expect(session.externalAdmission.list().pending).toEqual([])
+})
+
+test("#given a turn that is running #when three deliveries arrive before it ends #then the next request carries all three together in send order, as one injection in the same run", async () => {
+  // given
+  const firstRequest = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const { session, requests, send, drain } = await steerAllWorld(async (index) => {
+    if (index !== 1) return
+    firstRequest.resolve()
+    await release.promise
+  })
+  let runs = 0
+  session.subscribe((event) => {
+    if (event.type === "agent_start") runs += 1
+  })
+  await send(["STEER-ALL-PROBE-0"])
+  const ended = settledRun(session, 20_000)
+  await drain.drain({ reason: "start" })
+  await firstRequest.promise
+
+  // when
+  const busy = ["STEER-ALL-PROBE-1", "STEER-ALL-PROBE-2", "STEER-ALL-PROBE-3"]
+  await send(busy)
+  const admitted = await drain.drain({ reason: "inbox" })
+  release.resolve()
+  await ended
+
+  // then
+  expect(admitted.admitted.map((entry) => entry.kind)).toEqual(["steered", "steered", "steered"])
+  expect(requests).toEqual([["STEER-ALL-PROBE-0"], busy])
+  expect(runs).toBe(1)
   expect(session.externalAdmission.list().pending).toEqual([])
 })
