@@ -108,6 +108,8 @@ export type AdmitExternalMessageInput = {
   readonly text: string
   readonly deliverAs: "steer" | "followUp"
   readonly expected_turn_id?: number
+  /** senpi `whenIdle`: `queue` puts a delivery to an idle session in its `deliverAs` queue without starting a turn. */
+  readonly whenIdle?: "start" | "queue"
   /** Ignored by a senpi from before delivery senders; the header in `text` still names the sender. */
   readonly sender?: DeliverySender
   readonly display_text?: string

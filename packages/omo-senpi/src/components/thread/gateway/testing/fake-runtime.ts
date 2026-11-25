@@ -72,12 +72,19 @@ export class FakeSessionRuntime implements SessionRuntimePort {
       this.pending.set(id, "followUp")
       return { kind: "held", turn_epoch: turnEpoch }
     }
-    if (!this.isBusy()) {
+    if (!this.isBusy() && input.whenIdle !== "queue") {
       this.pending.set(id, "start")
       this.enqueueCalls.push({ lane: "start", delivery_id: id })
       this.beginTurn()
       queueMicrotask(() => this.persist(id))
       return { kind: "started", turn_epoch: turnEpoch }
+    }
+    if (!this.isBusy()) {
+      const lane = input.deliverAs === "steer" ? "steer" : "followUp"
+      this.pending.set(id, lane)
+      ;(lane === "steer" ? this.steering : this.followUps).push(id)
+      this.enqueueCalls.push({ lane, delivery_id: id })
+      return { kind: "queued", turn_epoch: turnEpoch }
     }
     if (input.deliverAs === "steer") {
       if (input.expected_turn_id === undefined) return { kind: "turn_conflict", turn_epoch: turnEpoch }
