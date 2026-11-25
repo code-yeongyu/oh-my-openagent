@@ -50,6 +50,9 @@ export type TableScenario = {
   /** The input is outside the call's input schema on purpose; such a scenario is a refusal with `invalid_arguments`. */
   readonly invalid?: true
   readonly refusal?: string
+  /** Where the refusal code is read: the root failure (default) or the error field of the value the call answers, for a
+   * call whose value is the engine's own reply. */
+  readonly refusal_from?: "root" | "value"
   readonly expect: readonly Expectation[]
   /** Declarative state of a fake port before the call: sessions it lists, a stored idempotency record, a device's flag. */
   readonly given?: readonly { readonly port: string; readonly state: Readonly<Record<string, unknown>> }[]
@@ -59,6 +62,14 @@ export type TableScenario = {
   readonly target?: "this_device" | "other_device"
   /** Calls made after the first, in order, on the state the first left (a retry under the same key after a lost reply). */
   readonly then?: readonly ScenarioStep[]
+  /** The caller's signal fires this long after the call, on the virtual clock (design 4.4); the scenario must state with
+   * `count: 0` the effect that must not have happened. */
+  readonly abort?: { readonly after_ms: number }
+  /** The expected answered value, matched as a subset, for a call whose value is the engine's own reply. Checked in
+   * addition to `expect`, never instead of it. */
+  readonly answer?: { readonly value: unknown }
+  /** Today's answer, kept until the named slice makes the target contract pass (design 7.3). */
+  readonly retires_with?: string
 }
 
 export type ScenarioTableFile = {
@@ -82,6 +93,8 @@ const isSubset = (expected: unknown, observed: unknown): boolean => {
   if (typeof observed !== "object" || observed === null) return false
   return Object.entries(expected).every(([key, value]) => isSubset(value, Reflect.get(observed, key)))
 }
+
+export const isSubsetOf = (expected: unknown, observed: unknown): boolean => isSubset(expected, observed)
 
 export function expectationProblems(expect: readonly Expectation[], observed: readonly ObservedCall[]): string[] {
   const problems: string[] = []

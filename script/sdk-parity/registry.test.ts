@@ -16,7 +16,7 @@ import {
 } from "./arity-check"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
-import { runEffectScenarios } from "./conformance-run"
+import { P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { baseRecord, mergeBase } from "./git-base"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
@@ -112,9 +112,12 @@ describe("SDK parity registry (#14947)", () => {
       pinText: repoFile(PIN_PATH),
       unresolved,
       evidence,
+      context: P0_CONTEXT,
       atBase: baseRecord(mergeBase()),
     }
     expect(baselineProblems(state)).toEqual([])
-    expect(conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence)).toEqual([])
+    expect(
+      conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
+    ).toEqual([])
   })
 })
