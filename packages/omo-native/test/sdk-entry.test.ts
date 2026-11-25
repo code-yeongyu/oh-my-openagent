@@ -8,11 +8,11 @@ import { createOmoSdk } from "../sdk.ts"
 const env = { OMO_SERVICE_API_URL: "https://accounts.example.test" }
 
 describe("omo-ai/sdk", () => {
-  test("#given the entry #when install.sdkRoot runs #then it answers the directory of the built entry beside the launcher library", async () => {
+  test("#given the entry, whose manifest has no ./sdk export yet #when install.sdkRoot runs #then it answers not_implemented naming the entry", async () => {
     const sdk = createOmoSdk({ env, cwd: "/work" })
-    expect(await sdk.install.sdkRoot()).toEqual({
-      kind: "ok",
-      value: { path: join(import.meta.dir, "..", "bin", "lib", "sdk") },
+    expect(await sdk.install.sdkRoot()).toMatchObject({
+      kind: "error",
+      error: { code: "not_implemented", details: { entry: "omo-ai/sdk" } },
     })
   })
 

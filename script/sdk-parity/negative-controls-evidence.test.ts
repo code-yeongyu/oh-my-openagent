@@ -7,7 +7,6 @@ import { expectationProblems, type ObservedCall, portProblems, type TableScenari
 import { built, builtRows, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
 import { gateReport, goldenProblems } from "./gate"
 import { input, original, rows, text, unresolved } from "./gate-fixture"
-import type { Row } from "./schema"
 
 // Negative controls of design 7.2, 7.3 and 7.6 for what builds a row (reviews 6061267823 H1/H3, 6061624223 H1, amendment
 // 5): typed run evidence whose observed port calls match the scenario's expected effect, every optional input covered by
