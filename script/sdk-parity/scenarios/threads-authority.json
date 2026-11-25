@@ -19,6 +19,42 @@
       ]
     },
     {
+      "id": "threads.attach/authority-this-device",
+      "row": "threads.attach",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "args": {
+            "thread": "studio"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.attach/authority-other-device",
+      "row": "threads.attach",
+      "kind": "effect",
+      "target": "other_device",
+      "input": {
+        "thread": "laptop/studio"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.attach",
+          "args": {
+            "thread": "laptop/studio"
+          }
+        }
+      ]
+    },
+    {
       "id": "threads.attach/authority-thread",
       "row": "threads.attach",
       "kind": "effect",

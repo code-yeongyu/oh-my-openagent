@@ -239,7 +239,7 @@
             "--platform": "platform",
             "--codex-autonomous": "codex_autonomous=true",
             "--no-codex-autonomous": "codex_autonomous=false",
-            "--skip-auth": "skip_auth",
+            "--skip-auth": "skip_auth=true",
             "--claude": "claude",
             "--openai": "openai",
             "--gemini": "gemini",
@@ -267,7 +267,7 @@
             "--platform": "platform",
             "--codex-autonomous": "codex_autonomous=true",
             "--no-codex-autonomous": "codex_autonomous=false",
-            "--skip-auth": "skip_auth",
+            "--skip-auth": "skip_auth=true",
             "--claude": "claude",
             "--openai": "openai",
             "--gemini": "gemini",
@@ -562,8 +562,8 @@
             "update"
           ],
           "flags": {
-            "--dry-run": "dry_run",
-            "--print": "dry_run",
+            "--dry-run": "dry_run=true",
+            "--print": "dry_run=true",
             "--self": "when",
             "--help": "render",
             "-h": "render"

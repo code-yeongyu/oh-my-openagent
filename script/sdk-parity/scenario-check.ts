@@ -9,8 +9,10 @@ import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-t
 
 const ID = /^[a-z][A-Za-z0-9.]*\/[a-z0-9]+(-[a-z0-9]+)*$/
 
-const withoutResult = (expectations: readonly Expectation[]): readonly Omit<Expectation, "result">[] =>
-  expectations.map(({ result: _stimulus, ...rest }) => rest)
+// What the matcher compares: no result (the fake's stimulus), count defaulting to one, and the order of expectations
+// not significant, so two lists that differ only in those read as the same effect.
+const withoutResult = (expectations: readonly Expectation[]): readonly string[] =>
+  expectations.map(({ result: _stimulus, count, ...rest }) => canonical({ ...rest, count: count ?? 1 })).toSorted()
 
 const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, inner: unknown) =>
@@ -54,8 +56,8 @@ const without = (input: Readonly<Record<string, unknown>>, field: string): Recor
   Object.fromEntries(Object.entries(input).filter(([key]) => key !== field))
 
 // An optional input changes behaviour only if a scenario that passes it has a partner whose input is the same without
-// it (effect or refusal, so a field that makes a call admissible pairs with the refusal it lifts) and whose kind or
-// expectations differ. A required input, or one every form that has it requires, pairs with none.
+// it, either being an effect or a refusal (a field can lift a refusal or cause one), and whose kind or expectations
+// differ. A required input, or one every form that has it requires, pairs with none.
 function coverageProblems(
   row: Row,
   scenarios: readonly TableScenario[],
@@ -78,16 +80,18 @@ function coverageProblems(
     }
     if (reason !== undefined) problems.push(`row ${row.id}: input ${field} is listed inert and has an effect scenario`)
     if (call?.required.includes(field) === true || call?.formRequired?.includes(field) === true) continue
-    const paired = withField.some((scenario) => {
-      const rest = canonical(without(scenario.input, field))
-      return scenarios.some(
-        (partner) =>
-          !(field in partner.input) &&
-          canonical(partner.input) === rest &&
-          (partner.kind !== scenario.kind ||
-            canonical(withoutResult(partner.expect)) !== canonical(withoutResult(scenario.expect))),
-      )
-    })
+    const paired = scenarios
+      .filter((scenario) => field in scenario.input)
+      .some((scenario) => {
+        const rest = canonical(without(scenario.input, field))
+        return scenarios.some(
+          (partner) =>
+            !(field in partner.input) &&
+            canonical(partner.input) === rest &&
+            (partner.kind !== scenario.kind ||
+              canonical(withoutResult(partner.expect)) !== canonical(withoutResult(scenario.expect))),
+        )
+      })
     if (!paired) problems.push(`row ${row.id}: input ${field} has no scenario pair that differs in ${field} alone`)
   }
   problems.push(...enumProblems(row, scenarios, contract))
@@ -119,6 +123,35 @@ function enumProblems(row: Row, scenarios: readonly TableScenario[], contract: C
   return problems
 }
 
+// Design 7.3: every control verb on a live, an ended and an offline target, each declared as the fixture state of
+// the scenario (`given`), so the driver can set it up rather than read it from prose.
+const CONTROL_VERBS = [
+  "threads.send",
+  "threads.interrupt",
+  "threads.close",
+  "threads.setModel",
+  "threads.setReasoning",
+  "threads.rename",
+  "threads.archive",
+  "threads.handoff",
+]
+
+type Given = { readonly state?: { readonly session?: string; readonly online?: boolean } }
+const givenOf = (scenario: TableScenario): readonly Given[] =>
+  (scenario as { readonly given?: readonly Given[] }).given ?? []
+
+function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): string[] {
+  if (!CONTROL_VERBS.includes(row.id)) return []
+  const states: readonly [string, (given: Given) => boolean][] = [
+    ["a live session (given session: live)", (given) => given.state?.["session"] === "live"],
+    ["an ended session (given session: ended)", (given) => given.state?.["session"] === "ended"],
+    ["an offline device (given online: false)", (given) => given.state?.["online"] === false],
+  ]
+  return states.flatMap(([name, matches]) =>
+    scenarios.some((scenario) => givenOf(scenario).some(matches)) ? [] : [`row ${row.id}: no scenario on ${name}`],
+  )
+}
+
 export function scenarioProblems(
   rows: readonly Row[],
   contract: Contract,
@@ -145,6 +178,7 @@ export function scenarioProblems(
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
   for (const row of inScope.values()) {
     problems.push(...coverageProblems(row, byRow.get(row.id) ?? [], inert, contract))
+    problems.push(...targetStateProblems(row, byRow.get(row.id) ?? []))
     const named = [...row.scenarios.effect, ...row.scenarios.refusal]
     if (named.length > 0)
       problems.push(`row ${row.id}: scenarios stays empty in P1a; P1b fills it once its drivers ran`)

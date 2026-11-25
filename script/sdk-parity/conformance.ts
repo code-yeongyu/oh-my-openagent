@@ -1,10 +1,17 @@
-import { type Expectation, expectationProblems, type ObservedCall } from "./expectation"
+import {
+  type Expectation,
+  expectationProblems,
+  isSubsetOf,
+  type ObservedCall,
+  type PortOperations,
+} from "./expectation"
 import type { Row } from "./schema"
 
-// Design 7.2, "a row's call is real" (reviews 6061267823 H3, 6061624223 H1; amendment 5): a row is built only by typed
-// evidence from a run at the head. Each record ties one table scenario to its row, the SDK member the run actually
-// invoked, the input it passed and the calls the fake ports observed. A record passes only when those calls match the
-// scenario's expected effect, and every optional input has a passing pair of scenarios that differ in it alone.
+// Design 7.2, "a row's call is real" (reviews 6061267823 H3, 6061624223 H1, 6061874518 H1/H2; amendment 5): a row is built
+// only by typed evidence from a run at the head. A record passes when its kind is the one the row's split gives it, its
+// observed port calls match the stated expectations, no EFFECT operation happened that the scenario did not state, and
+// its answer (when stated) matches. Every optional input needs a pair of passing records that differ in it alone, and a
+// row that takes a thread address needs a passing effect on each target.
 
 export type EffectEvidence = {
   readonly scenario: string
@@ -13,27 +20,78 @@ export type EffectEvidence = {
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
   readonly expect: readonly Expectation[]
+  readonly target?: "this_device" | "other_device"
   readonly observed: readonly ObservedCall[]
   readonly refusal?: string
+  readonly refusalFrom?: "root" | "value"
   readonly code?: string
+  /** Where a refusal code was read: the root failure, or the error field of the value the call answered. */
+  readonly codeSource?: "root" | "value"
+  readonly answer?: { readonly value: unknown }
+  readonly answered?: unknown
   readonly threw?: string
 }
 
-export function recordProblems(row: Row, record: EffectEvidence): string[] {
+/** What the checks need beyond the rows: the effect operations per port (slice P1a's PORT_EFFECTS, every port named, an
+ * empty list for a port with no effects) and the table's inert fields. P0 ships no SDK call and no run, so it passes none. */
+export type ConformanceContext = {
+  readonly effects: PortOperations
+  readonly inert?: ReadonlySet<string>
+}
+
+// Design 7.3: the three host-local operations act on the session host of the calling device only (closed list in the
+// schema); on another device they answer a refusal, which is what their other_device scenario states.
+const isHostLocal = (row: Row): boolean => row.addressScope === "this_device"
+
+const stated = (record: EffectEvidence, call: ObservedCall): boolean =>
+  record.expect.some(
+    (expectation) =>
+      expectation.port === call.port &&
+      expectation.op === call.op &&
+      (expectation.args === undefined || isSubsetOf(expectation.args, call.args)),
+  )
+
+export function recordProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
   const where = `row ${row.id}: scenario ${record.scenario}`
+  const listed = row.scenarios.effect.includes(record.scenario) ? "effect" : "refusal"
+  if (record.kind !== listed) return [`${where} is a ${record.kind} scenario but the row lists it under ${listed}`]
   if (record.code === "not_implemented") return [`${where} answered not_implemented; ${row.sdk} is a stub, build it`]
   if (record.threw !== undefined) return [`${where} threw ${record.threw}`]
   if (record.row !== row.id || record.member !== row.sdk)
     return [`${where} ran ${record.member} for ${record.row}, not ${row.sdk}`]
   if (record.kind === "refusal" && record.code !== record.refusal)
     return [`${where} answered ${record.code ?? "success"}, not the refusal ${record.refusal ?? "(none named)"}`]
+  if (record.kind === "refusal" && record.codeSource !== (record.refusalFrom ?? "root"))
+    return [
+      `${where} read its refusal from the ${record.codeSource ?? "nowhere"}, not the ${record.refusalFrom ?? "root"} it states`,
+    ]
   if (record.kind === "effect" && record.code !== undefined)
     return [`${where} answered ${record.code} where an effect was expected`]
-  return expectationProblems(record.expect, record.observed).map((problem) => `${where}: ${problem}`)
+  if (record.kind === "effect" && record.expect.every((expectation) => (expectation.count ?? 1) === 0))
+    return [`${where} states no port effect; an answer alone does not build a row`]
+  const problems = expectationProblems(record.expect, record.observed).map((problem) => `${where}: ${problem}`)
+  for (const call of record.observed)
+    if (context.effects[call.port] === undefined)
+      problems.push(
+        `${where}: port ${call.port} has no effect classification; the effect table passed in must name every port`,
+      )
+    else if ((context.effects[call.port] ?? []).includes(call.op) && !stated(record, call))
+      problems.push(
+        `${where}: effect ${call.port}.${call.op} ${JSON.stringify(call.args)} happened but the scenario does not state it`,
+      )
+  if (record.answer !== undefined && !isSubsetOf(record.answer.value, record.answered))
+    problems.push(
+      `${where}: answered ${JSON.stringify(record.answered)}, not the expected ${JSON.stringify(record.answer.value)}`,
+    )
+  return problems
 }
 
+// The effect a scenario states, without the fakes' stimulus (`result`), which is no part of it.
+const effectOf = (record: EffectEvidence): string =>
+  JSON.stringify(record.expect.map(({ port, op, args, count }) => ({ port, op, args, count })))
+
 // Coverage is computed, never declared: an optional input is covered by two passing records of the row whose inputs
-// differ in that field alone and that differ in kind or expected effect. Required inputs and inert fields are exempt.
+// differ in that field alone and that differ in kind or stated effect. Required inputs and inert fields are exempt.
 function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: ReadonlySet<string>): string[] {
   const same = (a: EffectEvidence, b: EffectEvidence, field: string): boolean =>
     [...new Set([...Object.keys(a.input), ...Object.keys(b.input)])]
@@ -49,18 +107,32 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              (a.kind !== b.kind || JSON.stringify(a.expect) !== JSON.stringify(b.expect)),
+              (a.kind !== b.kind || effectOf(a) !== effectOf(b)),
           ),
         ),
     )
     .map((field) => `row ${row.id}: input ${field} has no pair of passing scenarios that differ in it alone; add one`)
 }
 
-export function evidenceProblems(
-  row: Row,
-  evidence: readonly EffectEvidence[],
-  inert: ReadonlySet<string> = new Set(),
-): string[] {
+function addressProblems(row: Row, passing: readonly EffectEvidence[]): string[] {
+  if (!Object.hasOwn(row.input.properties, "thread")) return []
+  const passes = (kind: EffectEvidence["kind"], target: "this_device" | "other_device"): boolean =>
+    passing.some((record) => record.kind === kind && record.target === target)
+  const needed: ReadonlyArray<readonly [EffectEvidence["kind"], "this_device" | "other_device"]> = isHostLocal(row)
+    ? [
+        ["effect", "this_device"],
+        ["refusal", "other_device"],
+      ]
+    : [
+        ["effect", "this_device"],
+        ["effect", "other_device"],
+      ]
+  return needed
+    .filter(([kind, target]) => !passes(kind, target))
+    .map(([kind, target]) => `row ${row.id}: no passing ${kind} scenario addresses a thread on ${target}; add one`)
+}
+
+export function evidenceProblems(row: Row, evidence: readonly EffectEvidence[], context: ConformanceContext): string[] {
   const problems: string[] = []
   if (row.scenarios.effect.length === 0)
     problems.push(
@@ -75,25 +147,28 @@ export function evidenceProblems(
       problems.push(`row ${row.id}: scenario ${id} has no run record at the head`)
       continue
     }
-    const found = recordProblems(row, record)
+    const found = recordProblems(row, record, context)
     problems.push(...found)
     if (found.length === 0) passing.push(record)
   }
-  if (row.scenarios.effect.length > 0) problems.push(...coverageProblems(row, passing, inert))
+  if (!passing.some((record) => record.kind === "effect") && row.scenarios.effect.length > 0)
+    problems.push(`row ${row.id} has no passing effect scenario`)
+  if (row.scenarios.effect.length > 0) problems.push(...coverageProblems(row, passing, context.inert ?? new Set()))
+  problems.push(...addressProblems(row, passing))
   return problems
 }
 
-export const isBuilt = (row: Row, evidence: readonly EffectEvidence[]): boolean =>
-  row.today === "yes" && evidenceProblems(row, evidence).length === 0
+export const isBuilt = (row: Row, evidence: readonly EffectEvidence[], context: ConformanceContext): boolean =>
+  row.today === "yes" && evidenceProblems(row, evidence, context).length === 0
 
 // Every capability row not in unresolved.json counts as built and must carry that evidence.
 export function conformanceProblems(
   rows: readonly Row[],
   unresolved: ReadonlySet<string>,
   evidence: readonly EffectEvidence[],
-  inert: ReadonlySet<string> = new Set(),
+  context: ConformanceContext,
 ): string[] {
   return rows
     .filter((row) => row.kind === "capability" && !unresolved.has(row.id))
-    .flatMap((row) => evidenceProblems(row, evidence, inert))
+    .flatMap((row) => evidenceProblems(row, evidence, context))
 }

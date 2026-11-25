@@ -31,7 +31,7 @@
             "adopt"
           ],
           "flags": {
-            "--replace": "replace"
+            "--replace": "replace=true"
           },
           "positionals": {},
           "values": []
@@ -113,8 +113,8 @@
           }
         },
         "required": [
-          "what",
-          "destination"
+          "destination",
+          "what"
         ]
       },
       "cli": [
@@ -369,7 +369,7 @@
           "flags": {
             "--device": "method=device_code",
             "--no-browser": "open_browser=false",
-            "--replace": "replace",
+            "--replace": "replace=true",
             "--api": "root.api",
             "--accounts": "root.accounts"
           },
@@ -398,7 +398,7 @@
           "flags": {
             "--device": "method=device_code",
             "--no-browser": "open_browser=false",
-            "--replace": "replace",
+            "--replace": "replace=true",
             "--api": "root.api",
             "--accounts": "root.accounts",
             "--help": "render"
@@ -535,7 +535,7 @@
             "disable"
           ],
           "flags": {
-            "--discard": "discard"
+            "--discard": "discard=true"
           },
           "positionals": {},
           "values": []

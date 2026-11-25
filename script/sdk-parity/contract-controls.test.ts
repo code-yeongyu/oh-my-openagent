@@ -275,16 +275,64 @@ describe("negative controls added with the design lane's ruling on release", () 
       row: "threads.release",
       kind: "refusal" as const,
       refusal: "engine_specific_error",
-      refusal_from: "value",
+      refusal_from: "value" as const,
       input: { thread: "t-1" },
       expect: [{ port: "host", op: "release_session", count: 0 }],
     }
     expect(codeProblems(rows, contract, withScenario(scenarios, fromValue)).join("\n")).not.toContain(
       "engine_specific_error",
     )
-    const fromRoot = { ...fromValue, id: "threads.release/root-refusal", refusal_from: undefined }
+    const fromRoot = { ...fromValue, id: "threads.release/root-refusal", refusal_from: "root" as const }
     expect(codeProblems(rows, contract, withScenario(scenarios, fromRoot)).join("\n")).toContain(
       "code engine_specific_error: returned by threads and missing from the code registry",
+    )
+  })
+})
+
+describe("negative controls added by the fourth review", () => {
+  test("#given a control verb with no scenario on an ended session #then the scenario check names the state", () => {
+    const files = scenarios.map((file) => ({
+      ...file,
+      scenarios: file.scenarios.filter((scenario) => {
+        const given = scenario.given ?? []
+        return !(scenario.row === "threads.setModel" && given.some((entry) => entry.state["session"] === "ended"))
+      }),
+    }))
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      "row threads.setModel: no scenario on an ended session (given session: ended)",
+    )
+  })
+})
+
+describe("negative controls of the pair comparison's matcher semantics", () => {
+  test("#given a pair whose expectations differ only in order and an explicit default count #then the input has no pair", () => {
+    const pair = (
+      id: string,
+      input: Record<string, unknown>,
+      expectations: TableScenario["expect"],
+    ): TableScenario => ({
+      id: `threads.setModel/${id}`,
+      row: "threads.setModel",
+      kind: "effect",
+      input,
+      expect: expectations,
+    })
+    const a = { port: "host", op: "set_model" }
+    const b = { port: "store", op: "idempotency_put" }
+    const files = scenarios.map((file) =>
+      file.domain !== "threads"
+        ? file
+        : {
+            ...file,
+            scenarios: [
+              ...file.scenarios.filter((scenario) => scenario.row !== "threads.setModel"),
+              pair("plain", { thread: "a", model: "m" }, [a, b]),
+              pair("provider", { thread: "a", model: "m", provider: "p" }, [{ ...b, count: 1 }, a]),
+            ],
+          },
+    )
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      "row threads.setModel: input provider has no scenario pair that differs in provider alone",
     )
   })
 })

@@ -165,7 +165,7 @@ const usedCodes = (
   for (const scenario of files.flatMap((file) => file.scenarios)) {
     const row = inScope.get(scenario.row)
     // A refusal read from the answered value (release's engine reply) is the engine's own error, not an OmoCode.
-    const fromValue = (scenario as { readonly refusal_from?: string }).refusal_from === "value"
+    const fromValue = scenario.refusal_from === "value"
     if (scenario.refusal === undefined || row === undefined || fromValue) continue
     used.set(scenario.refusal, (used.get(scenario.refusal) ?? new Set()).add(namespaceOf(row.sdk)))
   }

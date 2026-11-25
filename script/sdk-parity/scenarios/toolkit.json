@@ -13,7 +13,10 @@
           "op": "spawn",
           "count": 0
         }
-      ]
+      ],
+      "answer": {
+        "value": {}
+      }
     }
   ]
 }

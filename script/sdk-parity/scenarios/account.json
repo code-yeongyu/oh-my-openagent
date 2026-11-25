@@ -329,7 +329,12 @@
           "op": "spawn",
           "count": 0
         }
-      ]
+      ],
+      "answer": {
+        "value": {
+          "ready": true
+        }
+      }
     },
     {
       "id": "account.signOut/revokes-and-clears",

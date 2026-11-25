@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto"
 
-import { type EffectEvidence, isBuilt } from "./conformance"
+import { type ConformanceContext, type EffectEvidence, isBuilt } from "./conformance"
 import type { Row } from "./schema"
 
 // Design section 7.4. baseline.original.json records the defects that existed when the gate was introduced and never
@@ -33,6 +33,7 @@ export type BaselineState = {
   readonly pinText: string | undefined
   readonly unresolved: Baseline | undefined
   readonly evidence: readonly EffectEvidence[]
+  readonly context: ConformanceContext
   readonly atBase: {
     readonly originalText: string | undefined
     readonly pinText: string | undefined
@@ -75,11 +76,11 @@ export function baselineProblems(state: BaselineState): string[] {
   const unresolved = ids(state.unresolved)
   for (const row of state.rows) {
     if (!countsTowardClosure(row)) continue
-    if (!isBuilt(row, state.evidence) && !unresolved.has(row.id))
+    if (!isBuilt(row, state.evidence, state.context) && !unresolved.has(row.id))
       problems.push(
         `row ${row.id} is not built and has no ${UNRESOLVED_PATH} entry; add the SDK call ${row.sdk} and its scenarios`,
       )
-    if (isBuilt(row, state.evidence) && unresolved.has(row.id))
+    if (isBuilt(row, state.evidence, state.context) && unresolved.has(row.id))
       problems.push(`row ${row.id} is built; remove its ${UNRESOLVED_PATH} entry`)
   }
   return problems

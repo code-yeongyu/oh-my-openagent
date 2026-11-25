@@ -4,6 +4,7 @@ import type { EffectEvidence } from "./conformance"
 import { candidateDigest, gateReport, goldenProblems, renderReport } from "./gate"
 import { HEAD, input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
+import { verifyReview } from "./verify-review"
 
 // Negative controls of design 7.6 for the baseline, the changed-capability gate (with the two tiers of amendment 2),
 // the goldens and the conformance rule: each one breaks one thing and expects a message naming what to fix.
@@ -71,6 +72,7 @@ describe("negative controls: the baseline (7.6)", () => {
     pinText,
     unresolved: manifest,
     evidence: [] as readonly EffectEvidence[],
+    context: { effects: {} },
     atBase,
   })
 
@@ -86,6 +88,7 @@ describe("negative controls: the baseline (7.6)", () => {
       rows: named,
       atBase: { ...atBase, unresolved },
       evidence: [] as readonly EffectEvidence[],
+      context: { effects: {} },
     })
     expect(problems).toContainEqual(
       expect.stringContaining("row threads.locate is not built and has no script/sdk-parity/unresolved.json entry"),
@@ -173,5 +176,30 @@ describe("the descriptor and its contract annotation (design 7.4 amendment 5, re
     expect(result.failures).toContainEqual(
       expect.stringContaining("threads.read: its descriptor changed under an unresolved gap"),
     )
+  })
+})
+
+describe("a built call's nested schema change (design 7.4 amendment 5, review 6061874518)", () => {
+  test("#given a built row whose nested input shape changed with equal outcomes #then it is marked for the live-schema check and the verifier withholds without a review", () => {
+    const head = rows.map((row): Row =>
+      row.id === "threads.locate"
+        ? {
+            ...row,
+            input: { ...row.input, properties: { ...row.input.properties, thread: { type: "string", minLength: 1 } } },
+          }
+        : row,
+    )
+    const builtBase = {
+      ...input().base,
+      unresolved: unresolved.entries.filter((entry) => entry.id !== "threads.locate"),
+    }
+    const builtHead = { ...input().head, rows: head, unresolved: builtBase.unresolved }
+    const report = gateReport(input({ base: builtBase, head: builtHead }))
+    expect(report.failures).toEqual([])
+    expect(report.liveSchema).toEqual(["threads.locate"])
+    const output = renderReport(report)
+    expect(output).toContain("LIVE SCHEMA CHECK: threads.locate")
+    expect(output).toContain(`count=1 ids=threads.locate#live-schema`)
+    expect(verifyReview(output, "SDK-Parity-Unchanged: yes\n", "").decision).toBe("withheld")
   })
 })

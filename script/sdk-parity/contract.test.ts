@@ -34,7 +34,10 @@ import { join } from "node:path"
 
 import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
+import { portProblems } from "./expectation"
 import { loadScenarioTable } from "./scenario-table"
+import * as scenarioRules from "./scenario-rules"
+import { tableProblems } from "./scenario-rules"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
 // registry rows. Each check also runs once on a fixture that breaks it.
@@ -193,5 +196,62 @@ describe("wait options against their cores (design lane ruling on review 6061342
 
   test("#given the calls marked honoured #then each is a call that can wait", () => {
     expect(HONOURED_CALLS.filter((key) => !waiting.includes(key))).toEqual([])
+  })
+})
+
+describe("producers and sequences (review 6062113819)", () => {
+  test("#given internal_error #then the registry names threads, whose create answers it in a shipped test", () => {
+    // thread/control/thread-create-remote-lost-reply.test.ts:218-229: a remote create whose recovery admission reply is
+    // lost answers internal_error, so threads returns the code today.
+    expect(OMO_CODE_REGISTRY.internal_error.namespaces).toContain("threads")
+  })
+
+  test("#given the lost-acknowledgement create retry #then its last step answers the original thread and device", () => {
+    const retry = scenarios
+      .flatMap((file) => file.scenarios)
+      .find((scenario) => scenario.id === "threads.create/lost-ack-then-retry") as
+      | {
+          readonly then?: readonly {
+            readonly kind: string
+            readonly answer?: { readonly value?: Record<string, unknown> }
+          }[]
+        }
+      | undefined
+    const last = retry?.then?.at(-1)
+    expect(last?.kind).toBe("effect")
+    // A thread call's answer is the flat thread contract (design lane ruling on P0 review 6062172318).
+    expect(last?.answer).toMatchObject({ kind: "ok", thread: "t-k9", device: "studio" })
+  })
+})
+
+describe("the table under P0's shared scenario rules", () => {
+  test("#given every scenario file #then each port, operation and fault is one the port table and FAULT_PORTS allow", () => {
+    expect(
+      portProblems(
+        scenarios.flatMap((file) => file.scenarios),
+        PORT_OPERATIONS,
+      ),
+    ).toEqual([])
+  })
+
+  // Bridge until P0's schema lists the pure rows the design lane ruled (account.signInCheck, toolkit.help: built by an
+  // answer with an empty observed trace). The next test fails as soon as scenario-rules.ts exports that list, so the
+  // bridge is deleted in the merge that brings it.
+  const PURE_ROWS_PENDING_P0 = ["account.signInCheck", "toolkit.help"]
+  const pendingPure = (problem: string): boolean =>
+    PURE_ROWS_PENDING_P0.some((row) => problem.startsWith(`scenario ${row}/`)) &&
+    problem.endsWith("an effect scenario states a port effect; an answer alone builds nothing")
+
+  test("#given every scenario file #then each row with a thread input has an effect scenario on each target", () => {
+    const problems = tableProblems(
+      rows,
+      scenarios.flatMap((file) => file.scenarios),
+    )
+    expect(problems.filter((problem) => !pendingPure(problem))).toEqual([])
+    expect(problems.filter(pendingPure)).toHaveLength(PURE_ROWS_PENDING_P0.length)
+  })
+
+  test("#given P0's scenario rules #then they do not yet list pure rows, so the local bridge above is still needed", () => {
+    expect(Object.keys(scenarioRules).filter((name) => /pure/i.test(name))).toEqual([])
   })
 })

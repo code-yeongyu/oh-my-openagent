@@ -4,6 +4,7 @@ import { baselineProblems, PIN_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
 import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import { expectationProblems, type ObservedCall, portProblems, type TableScenario } from "./expectation"
+import { built, builtRows, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
 import { gateReport, goldenProblems } from "./gate"
 import { input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
@@ -25,50 +26,12 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     ])
   })
 
-  const locate = rows.find((row) => row.id === "threads.locate")
-  if (locate === undefined) throw new Error("no threads.locate row")
-  const built: Row = {
-    ...locate,
-    today: "yes",
-    scenarios: { effect: ["threads.locate/by-id", "threads.locate/all-scope"], refusal: [] },
-  }
-  const builtRows = rows.map((row) => (row.id === "threads.locate" ? built : row))
-  const open = new Set(unresolved.entries.map((entry) => entry.id).filter((id) => id !== "threads.locate"))
-
-  const scenario = (id: string, scopeAll: boolean | undefined): TableScenario => ({
-    id: `threads.locate/${id}`,
-    row: "threads.locate",
-    kind: "effect",
-    input: scopeAll === undefined ? { thread: "t1" } : { thread: "t1", all_scope: scopeAll },
-    expect: [{ port: "host", op: "listSessions", args: { allScope: scopeAll === true } }],
-  })
-  // A fake host whose listSessions call is observed; the SDK member under test forwards its input to it.
-  const run = (
-    table: TableScenario,
-    answer: unknown = { kind: "ok" },
-    member = (calls: ObservedCall[], input: unknown) => {
-      calls.push({
-        port: "host",
-        op: "listSessions",
-        args: { allScope: Reflect.get(Object(input), "all_scope") === true, limit: 50 },
-      })
-      return answer
-    },
-  ): ScenarioRun => ({
-    scenario: table,
-    setup: () => {
-      const calls: ObservedCall[] = []
-      return { root: { threads: { locate: (input: unknown) => member(calls, input) } }, calls: () => calls }
-    },
-  })
-  const pair = [run(scenario("by-id", undefined)), run(scenario("all-scope", true))]
-
   test("#given a stub answering not_implemented on a row counted as built #then it is named", async () => {
     const evidence = await runEffectScenarios(builtRows, [
       run(scenario("by-id", undefined), { kind: "error", error: { code: "not_implemented" } }),
       pair[1] as ScenarioRun,
     ])
-    expect(conformanceProblems(builtRows, open, evidence)).toContainEqual(
+    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toContainEqual(
       "row threads.locate: scenario threads.locate/by-id answered not_implemented; threads.locate is a stub, build it",
     )
   })
@@ -77,7 +40,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const refusalOnly = builtRows.map((row) =>
       row.id === "threads.locate" ? { ...built, scenarios: { effect: [], refusal: ["threads.locate/missing"] } } : row,
     )
-    expect(conformanceProblems(refusalOnly, open, [])).toContainEqual(
+    expect(conformanceProblems(refusalOnly, open, [], CONTEXT)).toContainEqual(
       "row threads.locate's only scenarios are refusals; add an effect scenario for each input of threads.locate",
     )
   })
@@ -86,15 +49,15 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const [first] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
     if (first === undefined) throw new Error("no record")
     const wrong: EffectEvidence = { ...first, member: "threads.list" }
-    expect(conformanceProblems(builtRows, open, [wrong])).toContainEqual(
+    expect(conformanceProblems(builtRows, open, [wrong], CONTEXT)).toContainEqual(
       "row threads.locate: scenario threads.locate/by-id ran threads.list for threads.locate, not threads.locate",
     )
   })
 
   test("#given a run whose port calls do not match the expected effect #then it does not build the row (review 6061624223 H1)", async () => {
     const silent = run(scenario("by-id", undefined), { kind: "ok" }, () => ({ kind: "ok" }))
-    const evidence = await runEffectScenarios(builtRows, [silent, pair[1] as ScenarioRun])
-    expect(conformanceProblems(builtRows, open, evidence)).toContainEqual(
+    const evidence = await runEffectScenarios(builtRows, [silent, ...pair.slice(1)])
+    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toContainEqual(
       'row threads.locate: scenario threads.locate/by-id: host.listSessions {"allScope":false} expected 1 call(s), observed 0',
     )
   })
@@ -104,8 +67,9 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       row.id === "threads.locate" ? { ...built, scenarios: { effect: ["threads.locate/by-id"], refusal: [] } } : row,
     )
     const evidence = await runEffectScenarios(onlyOne, [pair[0] as ScenarioRun])
-    expect(conformanceProblems(onlyOne, open, evidence)).toEqual([
+    expect(conformanceProblems(onlyOne, open, evidence, CONTEXT)).toEqual([
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",
+      "row threads.locate: no passing effect scenario addresses a thread on other_device; add one",
     ])
   })
 
@@ -122,13 +86,33 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     expect(portProblems([scenario("by-id", undefined)], { host: ["list"] })).toEqual([
       "scenario threads.locate/by-id expects host.listSessions, which is not a port operation",
     ])
+    const faulty: TableScenario = {
+      ...scenario("by-id", undefined),
+      given: [{ port: "vault", state: {} }],
+      fault: { port: "host", op: "kill", fault: "lost_reply" },
+      then: [
+        {
+          input: {},
+          kind: "effect",
+          expect: [{ port: "host", op: "spawn" }],
+          fault: { port: "store", op: "listSessions", fault: "lost_reply" },
+        },
+      ],
+    }
+    expect(portProblems([faulty], { host: ["listSessions"], store: ["listSessions"] })).toEqual([
+      "scenario threads.locate/by-id expects host.spawn, which is not a port operation",
+      "scenario threads.locate/by-id injects lost_reply on host.kill, which is not a port operation",
+      "scenario threads.locate/by-id step 2 injects lost_reply on store; it means something only on host, remote",
+      "scenario threads.locate/by-id gives state to vault, which is not a port",
+    ])
   })
 
   test("#given the first correct closure of a gap with evidence matching every scenario #then the baseline admits it (positive control)", async () => {
     const evidence = await runEffectScenarios(builtRows, pair)
-    expect(evidence.map((record) => record.observed)).toEqual([
-      [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }],
-      [{ port: "host", op: "listSessions", args: { allScope: true, limit: 50 } }],
+    expect(evidence.map((record) => [record.target, record.observed])).toEqual([
+      ["this_device", [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }]],
+      ["this_device", [{ port: "host", op: "listSessions", args: { allScope: true, limit: 50 } }]],
+      ["other_device", [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }]],
     ])
     const cleared = { ...unresolved, entries: unresolved.entries.filter((entry) => entry.id !== "threads.locate") }
     const state = {
@@ -137,10 +121,11 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       pinText: text(PIN_PATH),
       unresolved: cleared,
       evidence,
+      context: CONTEXT,
       atBase: { originalText: original, pinText: text(PIN_PATH), unresolved },
     }
     expect(baselineProblems(state)).toEqual([])
-    expect(conformanceProblems(builtRows, open, evidence)).toEqual([])
+    expect(conformanceProblems(builtRows, open, evidence, CONTEXT)).toEqual([])
   })
 
   test("#given the initializing pull request (the base has no record) #then the original, its pin and the manifest are admitted together", () => {
@@ -150,6 +135,7 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       pinText: text(PIN_PATH),
       unresolved,
       evidence: [],
+      context: CONTEXT,
       atBase: { originalText: undefined, pinText: undefined, unresolved: undefined },
     }
     expect(baselineProblems(state)).toEqual([])

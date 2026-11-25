@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { dispatch, isDescriptor, selectDescriptor, takesValue } from "./descriptor-dispatch"
+import { dispatch, isDescriptor, selectDescriptor } from "./descriptor-dispatch"
 import { recordCalls, recordInvocations } from "./recording-root"
 import { allRows, loadDomainFiles } from "./registry"
 import { type CliEntry, type Row, schemaAt } from "./schema"
@@ -30,11 +30,11 @@ function fullArgv(row: Row, entry: CliEntry): { readonly argv: string[]; readonl
     if (target === "when") continue
     const [path = "", fixed] = target.split("=")
     if (fixed !== undefined) expected[path] = fixed === "true" ? true : fixed === "false" ? false : fixed
-    else if (takesValue(row, entry, flag)) {
+    else {
       const value = sample(next++)
       argv.push(value)
       expected[path] = value
-    } else expected[path] = true
+    }
   }
   Object.values(entry.positionals).forEach((target, index) => {
     const value = index === 0 && entry.values.length > 0 ? (entry.values[0] ?? "x") : sample(next++)

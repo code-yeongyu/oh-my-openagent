@@ -34,8 +34,8 @@
             "adopt"
           ],
           "flags": {
-            "--interrupt": "interrupt",
-            "--force": "force",
+            "--interrupt": "interrupt=true",
+            "--force": "force=true",
             "--json": "render"
           },
           "positionals": {
@@ -54,7 +54,9 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "adopt ends in replacing a terminal process on this device through release, so on another device it answers unsupported (release_unsupported underneath; N/bin/lib/daemon-adopt.js:33-47)"
     },
     {
       "id": "threads.aliases.clear",
@@ -334,11 +336,11 @@
             "close"
           ],
           "flags": {
-            "--force": "force",
-            "--graceful": "graceful",
+            "--force": "force=true",
+            "--graceful": "graceful=true",
             "--wait-ms": "wait_ms",
             "--idempotency-key": "idempotency_key",
-            "--all-scope": "all_scope",
+            "--all-scope": "all_scope=true",
             "--json": "render"
           },
           "positionals": {
@@ -354,8 +356,8 @@
             "close"
           ],
           "flags": {
-            "--force": "force",
-            "--graceful": "graceful",
+            "--force": "force=true",
+            "--graceful": "graceful=true",
             "--wait-ms": "wait_ms",
             "--json": "render"
           },
@@ -679,7 +681,7 @@
             "--model": "model",
             "--thinking": "reasoning",
             "--permission-preset": "permission_preset",
-            "--worktree": "worktree",
+            "--worktree": "worktree=true",
             "--branch": "worktree.branch",
             "--base": "worktree.base",
             "--prompt": "prompt",
@@ -1436,7 +1438,7 @@
             "list"
           ],
           "flags": {
-            "--all-scope": "all_scope",
+            "--all-scope": "all_scope=true",
             "--state": "state",
             "--json": "render"
           },
@@ -1627,7 +1629,7 @@
             "--limit": "limit",
             "--max-bytes": "max_bytes",
             "--cursor": "cursor",
-            "--all-scope": "all_scope",
+            "--all-scope": "all_scope=true",
             "--json": "render"
           },
           "positionals": {
@@ -1858,7 +1860,9 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "release hands a session to a local process on this device. On another device it answers release_unsupported in the engine reply's value (T/sdk.ts:508-511)"
     },
     {
       "id": "threads.rename",
@@ -2223,7 +2227,7 @@
             "--expected-turn": "expected_turn_id",
             "--idempotency-key": "idempotency_key",
             "--collapse-key": "collapse_key",
-            "--all-scope": "all_scope",
+            "--all-scope": "all_scope=true",
             "--json": "render"
           },
           "positionals": {
@@ -2710,9 +2714,9 @@
             "unload"
           ],
           "flags": {
-            "--interrupt": "interrupt",
-            "--force": "force",
-            "--clear-queue": "clear_queue",
+            "--interrupt": "interrupt=true",
+            "--force": "force=true",
+            "--clear-queue": "clear_queue=true",
             "--children": "children"
           },
           "positionals": {
@@ -2731,7 +2735,9 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "addressScope": "this_device",
+      "addressReason": "the host command unloads a session of this device's session host only. On another device the host answers its generic unknown_session (not_found): the call cannot tell another device from a mistyped reference (engine dist/modes/rpc/session-registry.js:141,147)"
     },
     {
       "id": "threads.wait",

@@ -29,6 +29,7 @@ export type GateInput = {
 export type GateReport = {
   readonly failures: readonly string[]
   readonly candidates: readonly string[]
+  readonly liveSchema: readonly string[]
   readonly head: string
   readonly digest: string
   readonly unchangedLine: boolean
@@ -134,11 +135,23 @@ export function gateReport(input: GateInput): GateReport {
     .filter(([id, files]) => unresolved.has(id) && !flagged.has(id) && [...files].some((file) => changed.has(file)))
     .map(([id]) => id)
   const candidates = [...new Set([...closureMoved, ...annotated])].toSorted()
+  // Design 7.4 (amendment 5, from review 6061874518): on a row whose call is BUILT, a nested requiredness or shape change
+  // can change what callers may pass, so equal sampled outcomes cannot clear it. It is printed with its own mark; the
+  // reviewer checks the live schema and accepted-input compatibility, and the digest covers the marked ids too.
+  const liveSchema = input.head.rows
+    .filter((row) => !unresolved.has(row.id) && !initialization)
+    .filter((row) => {
+      const before = baseRows.get(row.id)
+      return before !== undefined && JSON.stringify(before.input) !== JSON.stringify(row.input)
+    })
+    .map((row) => row.id)
+    .toSorted()
   return {
     failures,
     candidates,
+    liveSchema,
     head: input.headSha,
-    digest: candidateDigest(input.headSha, candidates),
+    digest: candidateDigest(input.headSha, [...candidates, ...liveSchema.map((id) => `${id}#live-schema`)]),
     unchangedLine: UNCHANGED_LINE.test(input.body),
     initialization,
   }
@@ -160,6 +173,12 @@ export function goldenProblems(
     )
 }
 
+// The ids a reviewer's line covers: the candidates and the built rows marked for the live-schema check.
+export const reviewed = (report: GateReport): string[] => [
+  ...report.candidates,
+  ...report.liveSchema.map((id) => `${id}#live-schema`),
+]
+
 export function renderReport(report: GateReport): string {
   const lines = [
     `## SDK parity gate${report.initialization ? " (initialization: the merge base has no registry)" : ""}`,
@@ -169,9 +188,14 @@ export function renderReport(report: GateReport): string {
   else lines.push(`${report.failures.length} failure(s):`, "", ...report.failures.map((failure) => `- ${failure}`))
   lines.push("")
   lines.push(
-    `SDK-Parity-Candidates: head=${report.head} digest=${report.digest} count=${report.candidates.length} ids=${report.candidates.join(",")}`,
+    `SDK-Parity-Candidates: head=${report.head} digest=${report.digest} count=${reviewed(report).length} ids=${reviewed(report).join(",")}`,
     "",
   )
+  if (report.liveSchema.length > 0)
+    lines.push(
+      `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer checks the live schema and accepted-input compatibility before CLEAR.`,
+      "",
+    )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")
   else
     lines.push(
