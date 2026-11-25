@@ -2098,6 +2098,169 @@ describe("T1b pins: the idempotency key on a control call", () => {
   })
 })
 
+describe("T1b pins: the X1a findings", () => {
+  test("create with a first prompt, here and on b, through the tool and the SDK", async () => {
+    const pins: Record<string, unknown> = {}
+    for (const device of [undefined, "b"] as const) {
+      const toolSide = fresh()
+      const sdkSide = fresh()
+      const args = { prompt: "start here", ...(device === undefined ? {} : { device }) }
+      pins[device === undefined ? "here" : "b"] = {
+        tool: await toolSide.tool("thread_create", args),
+        sdk: stable(await sdkSide.sdk.create(args)),
+      }
+    }
+    expect(pins).toMatchInlineSnapshot(`
+      {
+        "b": {
+          "sdk": {
+            "created_at": "<time>",
+            "cwd": "",
+            "deduplicated": false,
+            "device": "b",
+            "kind": "ok",
+            "link": "[thread](omo-thread://v1/dur-new-on-b)",
+            "name": "",
+            "prompt": {
+              "error": {
+                "code": "unsupported",
+                "details": {
+                  "device": "b",
+                  "reason": "sender_not_allowed",
+                },
+                "message": "A command-line sender cannot reach a session on device b: the engine admits a command-line delivery only from its own machine.",
+                "next_action": "Use omo remote send b/dur-new-on-b instead.",
+              },
+            },
+            "state": "idle",
+            "status": "live",
+            "thread": "dur-new-on-b",
+            "updated_at": "<time>",
+          },
+          "tool": {
+            "created_at": "<time>",
+            "cwd": "",
+            "deduplicated": false,
+            "device": "b",
+            "kind": "ok",
+            "link": "[thread](omo-thread://v1/dur-new-on-b)",
+            "name": "",
+            "prompt": {
+              "deduplicated": false,
+              "delivery": {
+                "kind": "started",
+                "turn_id": "turn-b",
+              },
+              "delivery_id": "<uuid>",
+              "effective_mode": "start",
+            },
+            "state": "idle",
+            "status": "live",
+            "thread": "dur-new-on-b",
+            "updated_at": "<time>",
+          },
+        },
+        "here": {
+          "sdk": {
+            "created_at": "<time>",
+            "cwd": "<cwd>",
+            "deduplicated": false,
+            "kind": "ok",
+            "link": "[thread](omo-thread://v1/dur-created-here)",
+            "name": "",
+            "prompt": {
+              "deduplicated": false,
+              "delivery": {
+                "kind": "started",
+                "turn_id": "0",
+              },
+              "delivery_id": "<uuid>",
+              "effective_mode": "start",
+            },
+            "state": "idle",
+            "status": "live",
+            "thread": "dur-created-here",
+            "updated_at": "<time>",
+          },
+          "tool": {
+            "created_at": "<time>",
+            "cwd": "<cwd>",
+            "deduplicated": false,
+            "kind": "ok",
+            "link": "[thread](omo-thread://v1/dur-created-here)",
+            "name": "",
+            "prompt": {
+              "deduplicated": false,
+              "delivery": {
+                "kind": "started",
+                "turn_id": "0",
+              },
+              "delivery_id": "<uuid>",
+              "effective_mode": "start",
+            },
+            "state": "idle",
+            "status": "live",
+            "thread": "dur-created-here",
+            "updated_at": "<time>",
+          },
+        },
+      }
+    `)
+  })
+
+  test("a steer without expected_turn_id, here and on b, through the tool and the SDK", async () => {
+    const { sdk, tool } = fresh()
+    expect(
+      await table(["here", "b"], {
+        tool: (thread) => tool("thread_send", { thread, message: "steer it", delivery: "steer" }),
+        sdk: (thread) => sdk.send({ thread, text: "steer it", mode: "steer" }),
+      }),
+    ).toMatchInlineSnapshot(`
+      {
+        "sdk": {
+          "b": {
+            "error": {
+              "code": "not_steerable",
+              "details": {
+                "device": "b",
+              },
+              "message": "A steer to rk-on-b was refused: not_steerable.",
+              "next_action": "Send with delivery auto or follow_up; a steer needs a running turn.",
+            },
+            "kind": "error",
+          },
+          "here": {
+            "error": {
+              "code": "invalid_arguments",
+              "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+              "next_action": "Fix the arguments and send again.",
+            },
+            "kind": "error",
+          },
+        },
+        "tool": {
+          "b": {
+            "error": {
+              "code": "invalid_arguments",
+              "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+              "next_action": "Fix the arguments and send again.",
+            },
+            "kind": "error",
+          },
+          "here": {
+            "error": {
+              "code": "invalid_arguments",
+              "message": "A steer needs expected_turn_id (the target's current turn_epoch).",
+              "next_action": "Fix the arguments and send again.",
+            },
+            "kind": "error",
+          },
+        },
+      }
+    `)
+  })
+})
+
 describe("T1b pins: send and create inputs", () => {
   test("send: the tool's names (message, delivery, summary) against the SDK's (text, mode)", async () => {
     const { sdk, tool } = fresh()
