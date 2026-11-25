@@ -1,5 +1,6 @@
 import { homedir } from "node:os"
 import { refuseIfLocalOnly } from "@oh-my-opencode/device-service-core/local-only"
+import { notSignedInMessage } from "./calls/whoami"
 import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
 import { heldCredentialLease, withCredentialLock } from "./credential-lock"
 import { signInHint } from "./accounts-gate"
@@ -318,12 +319,12 @@ export function createSession(options: {
       return snapshot.accessToken
     const renewedCredentials = await renewed(async (view) => {
       const current = await store.readAuthoritative()
-      if (current === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+      if (current === null) throw new SignInError(notSignedInMessage())
       if (expect !== undefined && !expect(current)) throw new CredentialIdentityChanged()
       await view?.settle()
       return current
     })
-    if (renewedCredentials === null) throw new SignInError(`Not signed in. ${signInHint("first")}`)
+    if (renewedCredentials === null) throw new SignInError(notSignedInMessage())
     return renewedCredentials.accessToken
   }
   return {

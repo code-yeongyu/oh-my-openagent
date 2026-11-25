@@ -1,6 +1,7 @@
 import { Command } from "commander"
 import { accountSignIn, DEFAULT_ACCOUNTS_ORIGIN } from "@oh-my-opencode/account-core/calls/sign-in"
 import { accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
+import { accountWhoami, notSignedInMessage } from "@oh-my-opencode/account-core/calls/whoami"
 import { isCancel, select, confirm } from "@clack/prompts"
 import { serviceAccountsOpen } from "@oh-my-opencode/account-core/accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
@@ -97,14 +98,14 @@ async function run(
       return
     }
     if (action === "whoami") {
-      await session.accessToken()
-      const [saved, email] = await Promise.all([store.read(), session.accountEmail().catch(() => undefined)])
+      const read = await accountWhoami({ store, session })
+      if (read.kind === "refused") throw new SignInError(notSignedInMessage())
+      const { device, account } = read.value
+      const email = account.kind === "read" ? account.email : undefined
       console.log(
-        saved
-          ? email === undefined
-            ? `Signed in to ${api} as ${terminalText(saved.device.name)}.`
-            : `Signed in to ${api} as ${terminalText(email)} (${terminalText(saved.device.name)}).`
-          : "Not signed in.",
+        email === undefined
+          ? `Signed in to ${api} as ${terminalText(device.name)}.`
+          : `Signed in to ${api} as ${terminalText(email)} (${terminalText(device.name)}).`,
       )
       noteDedicatedStore()
       return

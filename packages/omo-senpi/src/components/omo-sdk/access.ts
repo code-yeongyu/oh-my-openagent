@@ -49,6 +49,7 @@ export type AccountAccess = {
   readonly signedIn: <T>(read: (signedIn: SignedIn) => Promise<T>) => Promise<OmoResult<T>>
   /** This device's credential store, the one every account call of this root reads. */
   readonly store: () => CredentialStorePort
+  readonly session: () => SessionPort
   readonly account: () => AccountSessionPort
   readonly close: () => void
 }
@@ -56,7 +57,7 @@ export type AccountAccess = {
 const resolveOrigin = (api: string | undefined, env: Env): string =>
   serviceOrigin(api ?? env["OMO_SERVICE_API_URL"] ?? DEFAULT_SERVICE_API)
 
-const SIGN_IN = "sign this device in to OmO, then retry"
+export const SIGN_IN = "sign this device in to OmO, then retry"
 
 // Every message here is the SDK's own text: a service or store message can carry a credential, so none is passed on.
 export function failure<T>(error: unknown): OmoResult<T> {
@@ -159,6 +160,7 @@ export function createAccountAccess(options: {
       }
     },
     store: openStore,
+    session: openSession,
     account: openAccount,
     close: () => lifetime.abort(),
   }

@@ -1,7 +1,6 @@
-import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"
-import { z } from "zod"
-import type { AccountAccess } from "../access"
-import { type OmoResult, refused } from "../result"
+import { accountWhoami } from "@oh-my-opencode/account-core/calls/whoami"
+import { type AccountAccess, failure, SIGN_IN } from "../access"
+import { ok, type OmoResult, refused } from "../result"
 import { runSignIn, type SignedIn, type SignInOptions } from "./sign-in"
 import type { SignInProcess } from "./sign-in-process"
 
@@ -21,17 +20,6 @@ export type AccountApi = {
   readonly signIn: (options: SignInOptions) => Promise<OmoResult<SignedIn>>
 }
 
-const meSchema = z.object({
-  user: z
-    .object({ email: z.string().min(1) })
-    .partial()
-    .optional(),
-  account: z
-    .object({ id: z.string().min(1) })
-    .partial()
-    .optional(),
-})
-
 export function createAccountApi(
   access: AccountAccess,
   signIn: { readonly process: SignInProcess | undefined; readonly env: Readonly<Record<string, string | undefined>> },
@@ -48,18 +36,23 @@ export function createAccountApi(
         )
       return runSignIn(signIn.process, { origin: access.origin, env: signIn.env }, options)
     },
-    whoami: () =>
-      access.signedIn(async ({ device, session }) => {
-        const body = await session.request("/v1/me", { headers: syncRequestHeaders(await session.accessToken()) })
-        const me = meSchema.safeParse(body)
-        const email = me.success ? me.data.user?.email : undefined
-        const accountId = me.success ? me.data.account?.id : undefined
-        return {
+    whoami: async () => {
+      const blocked = access.blockedReason()
+      if (blocked !== undefined) return blocked
+      try {
+        const read = await accountWhoami({ store: access.store(), session: access.session() })
+        if (read.kind === "refused") return refused("signed_out", "this device is not signed in", SIGN_IN)
+        const { device, account } = read.value
+        if (account.kind === "unread") return failure(account.error)
+        return ok({
           api: access.origin,
           device,
-          ...(email === undefined ? {} : { email }),
-          ...(accountId === undefined ? {} : { accountId }),
-        }
-      }),
+          ...(account.email === undefined ? {} : { email: account.email }),
+          ...(account.accountId === undefined ? {} : { accountId: account.accountId }),
+        })
+      } catch (error) {
+        return failure(error)
+      }
+    },
   }
 }
