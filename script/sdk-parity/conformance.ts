@@ -10,8 +10,9 @@ export type EffectEvidence = {
   readonly capability: string
   readonly member: string
   readonly input: unknown
+  readonly covers: readonly string[]
   readonly status: "passed" | "failed"
-  readonly effect?: { readonly port: string; readonly observed: unknown }
+  readonly effect?: { readonly port: string; readonly observed: unknown; readonly expected: unknown }
   readonly code?: string
 }
 
@@ -33,9 +34,32 @@ export function evidenceProblems(row: Row, evidence: readonly EffectEvidence[]):
       problems.push(`row ${row.id}: scenario ${id} ran ${record.member} for ${record.capability}, not ${row.sdk}`)
     else if (record.effect === undefined || record.effect.observed === undefined)
       problems.push(`row ${row.id}: scenario ${id} observed no effect on a fake port`)
+    else if (JSON.stringify(record.effect.observed) !== JSON.stringify(record.effect.expected))
+      problems.push(
+        `row ${row.id}: scenario ${id} observed ${JSON.stringify(record.effect.observed)} on ${record.effect.port}, not the expected ${JSON.stringify(record.effect.expected)}`,
+      )
+  }
+  // Per-input coverage (7.3): every input of the row's call is proven by a passing scenario that names it.
+  if (row.scenarios.effect.length > 0) {
+    const proven = new Set(
+      evidence
+        .filter((record) => row.scenarios.effect.includes(record.scenario) && evidenceOk(record, row))
+        .flatMap((record) => record.covers),
+    )
+    for (const field of Object.keys(row.input.properties))
+      if (!proven.has(field))
+        problems.push(`row ${row.id}: input ${field} has no passing effect scenario; add one that covers it`)
   }
   return problems
 }
+
+const evidenceOk = (record: EffectEvidence, row: Row): boolean =>
+  record.status === "passed" &&
+  record.code !== "not_implemented" &&
+  record.capability === row.id &&
+  record.member === row.sdk &&
+  record.effect !== undefined &&
+  JSON.stringify(record.effect.observed) === JSON.stringify(record.effect.expected)
 
 export const isBuilt = (row: Row, evidence: readonly EffectEvidence[]): boolean =>
   row.today === "yes" && evidenceProblems(row, evidence).length === 0

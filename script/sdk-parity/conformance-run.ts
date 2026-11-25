@@ -10,6 +10,10 @@ export type EffectScenario = {
   readonly id: string
   readonly capability: string
   readonly input: unknown
+  // The row inputs this scenario proves (each input that changes behaviour needs one), and the effect the fake port must
+  // observe; the record passes only when the observation equals it.
+  readonly covers: readonly string[]
+  readonly expected: unknown
   readonly setup: () => { readonly root: unknown; readonly port: string; readonly observe: () => unknown }
 }
 
@@ -53,7 +57,8 @@ export async function runEffectScenarios(
         member: invoked.join(","),
         input: scenario.input,
         status: Reflect.get(Object(answer), "kind") === "error" ? "failed" : "passed",
-        effect: { port, observed: observe() },
+        covers: scenario.covers,
+        effect: { port, observed: observe(), expected: scenario.expected },
         ...(code === undefined ? {} : { code }),
       })
     } catch (error) {
@@ -62,6 +67,7 @@ export async function runEffectScenarios(
         capability: scenario.capability,
         member: invoked.join(","),
         input: scenario.input,
+        covers: scenario.covers,
         status: "failed",
         code: error instanceof Error ? error.message : String(error),
       })

@@ -53,16 +53,32 @@ export function workspaceNames(root: string): string[] {
     .filter((name): name is string => typeof name === "string")
 }
 
+// Every node_modules the comparison resolves through (root and per package, as prepareBaseTree builds them): each
+// workspace package linked there must resolve inside the tree it serves.
+function nodeModulesDirs(root: string): string[] {
+  const out: string[] = []
+  const walk = (rel: string, depth: number): void => {
+    for (const entry of readdirSync(join(root, rel), { withFileTypes: true })) {
+      const child = rel === "" ? entry.name : `${rel}/${entry.name}`
+      if (entry.name === "node_modules") out.push(child)
+      else if (entry.isDirectory() && entry.name !== ".git" && depth < 5) walk(child, depth + 1)
+    }
+  }
+  walk("", 0)
+  return out
+}
+
 export function isolationProblems(root: string, names: readonly string[] = workspaceNames(root)): string[] {
   const problems: string[] = []
-  for (const name of names) {
-    const link = join(root, "node_modules", name)
-    if (lstatSync(link, { throwIfNoEntry: false }) === undefined) continue
-    const real = realpathSync(link)
-    if (!isInside(real, root))
-      problems.push(
-        `workspace package ${name} resolves to ${real}, outside the tree ${root}; the comparison would run the other tree's source`,
-      )
-  }
+  for (const dir of nodeModulesDirs(root))
+    for (const name of names) {
+      const link = join(root, dir, name)
+      if (lstatSync(link, { throwIfNoEntry: false }) === undefined) continue
+      const real = realpathSync(link)
+      if (!isInside(real, root))
+        problems.push(
+          `workspace package ${name} (${dir}) resolves to ${real}, outside the tree ${root}; the comparison would run the other tree's source`,
+        )
+    }
   return problems
 }

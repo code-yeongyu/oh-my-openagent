@@ -1,7 +1,7 @@
 import { type BaselineEntry, sha256 } from "./baseline"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
-import type { Row } from "./schema"
+import type { FieldSchema, Row } from "./schema"
 import { schemaDifferences, type DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
@@ -38,7 +38,42 @@ export type GateReport = {
 const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
 
-const descriptor = (row: Row): string => JSON.stringify(row)
+// Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
+// cli entry, each tool binding, which input fields exist at every depth and which are required, plus its kind, today
+// value, surfaces, projection and modules. Any change there under an unresolved entry fails. Everything else (a named
+// field's type, enum, nested schema, scenario ids, notes) is CONTRACT ANNOTATION: its change alone makes a candidate.
+function fieldShape(schema: FieldSchema, path: string, out: string[]): void {
+  for (const required of schema.required ?? []) out.push(`required ${path}.${required}`)
+  for (const [name, inner] of Object.entries(schema.properties ?? {})) {
+    out.push(`field ${path}.${name}`)
+    fieldShape(inner, `${path}.${name}`, out)
+  }
+  for (const variant of schema.anyOf ?? []) fieldShape(variant, path, out)
+  if (schema.items !== undefined) fieldShape(schema.items, `${path}[]`, out)
+}
+
+export function descriptorOf(row: Row): string {
+  const shape: string[] = row.input.required.map((name) => `required ${name}`)
+  for (const [name, schema] of Object.entries(row.input.properties)) {
+    shape.push(`field ${name}`)
+    fieldShape(schema, name, shape)
+  }
+  const { id, kind, sdk, today, slices, cli, tool, planned, omitted, projection, modules } = row
+  return JSON.stringify({
+    id,
+    kind,
+    sdk,
+    today,
+    slices,
+    cli,
+    tool,
+    planned,
+    omitted,
+    projection,
+    modules,
+    shape: [...new Set(shape)].toSorted(),
+  })
+}
 
 // Design 7.4 (amendment 3): the candidates' digest binds the head and the sorted ids, so a verdict from another head or
 // over another list cannot carry it. The reviewer copies it into `SDK-Parity-Reviewed: <digest>`; nobody types the ids.
@@ -58,7 +93,7 @@ export function gateReport(input: GateInput): GateReport {
   for (const row of input.head.rows) {
     if (!unresolved.has(row.id)) continue
     const before = baseRows.get(row.id)
-    if (!initialization && (before === undefined || descriptor(before) !== descriptor(row))) {
+    if (!initialization && (before === undefined || descriptorOf(before) !== descriptorOf(row))) {
       failures.push(
         `${row.id}: its descriptor changed under an unresolved gap; add the SDK call ${row.sdk} and its scenarios in this pull request`,
       )
@@ -102,10 +137,14 @@ export function gateReport(input: GateInput): GateReport {
         `${entry.id}: only slice ${entry.clearedOnlyBy} clears this gap; name it with an "SDK-Parity-Slice: ${entry.clearedOnlyBy}" line or keep the entry`,
       )
   const changed = new Set(input.changedFiles)
-  const candidates = [...input.closures]
+  const annotated = input.head.rows
+    .filter((row) => unresolved.has(row.id) && !flagged.has(row.id) && !initialization)
+    .filter((row) => JSON.stringify(baseRows.get(row.id)) !== JSON.stringify(row))
+    .map((row) => row.id)
+  const closureMoved = [...input.closures]
     .filter(([id, files]) => unresolved.has(id) && !flagged.has(id) && [...files].some((file) => changed.has(file)))
     .map(([id]) => id)
-    .toSorted()
+  const candidates = [...new Set([...closureMoved, ...annotated])].toSorted()
   return {
     failures,
     candidates,
@@ -147,7 +186,7 @@ export function renderReport(report: GateReport): string {
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")
   else
     lines.push(
-      `${report.candidates.length} candidate(s): unresolved capabilities whose closure moved with every outcome equal. A merge requirement: the body carries \`SDK-Parity-Unchanged: yes\` and the reviewer's verdict at this head carries \`SDK-Parity-Reviewed: ${report.digest}\`.`,
+      `${report.candidates.length} candidate(s): unresolved capabilities whose closure or contract annotation moved, with every descriptor and outcome equal. A merge requirement: the body carries \`SDK-Parity-Unchanged: yes\` and the reviewer's verdict at this head carries \`SDK-Parity-Reviewed: ${report.digest}\`.`,
       "",
       report.candidates.join(", "),
       "",
