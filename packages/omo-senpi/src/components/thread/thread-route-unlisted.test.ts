@@ -67,6 +67,20 @@ describe("a session command refused route_unlisted by the device holding the thr
     },
   )
 
+  // #15004: a starved host (its engine missed the RPC deadline) refuses route_unlisted for a session its engine still
+  // runs: find_session says an engine holds it open, yet locate finds no key. Nothing proves it stopped, so the send is a
+  // busy host to retry, never "not running".
+  test("#given b's engine holds the thread open but b's host routes neither the send nor the locate #when thread_send names it #then it is host_unavailable naming b and route_unlisted with a retry, not not_resumable (#15004)", async () => {
+    const a = account({ refuse: "route_unlisted", locateRefuse: "route_unlisted" })
+    const { run } = surface(a.remote)
+    const result = await run("thread_send", { thread: "dur-on-b", message: "hello" })
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { device: "b", reason: "route_unlisted" } },
+    })
+    expect(result.kind === "error" ? result.error.next_action : "").toContain("Retry")
+  })
+
   test("#given b's host lists no engine endpoint for the create, even on a fresh lookup #when thread_create opens on b #then it is host_unavailable naming b and route_unlisted, nothing opened, never an update-omo answer", async () => {
     const a = account({ openRefuse: "route_unlisted" })
     const { run } = surface(a.remote)
