@@ -107,7 +107,8 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.2",
-    capability: "`account.adopt`, `account.credentials.handOver`, `account.store.*`, `account.keys.*`",
+    capability:
+      "`account.adopt`, `account.credentials.handOver`, `account.store.*`, `account.keys.*` except `account.keys.status` (4.4: it reports state and no key material)",
     slug: "custody",
     rows: [
       "account.adopt",

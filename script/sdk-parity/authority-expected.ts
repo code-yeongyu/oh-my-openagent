@@ -142,9 +142,10 @@ export const CUSTODY_FIELDS: Readonly<Record<string, readonly string[]>> = {
   ],
 }
 
-const KEYS_ROW = "`account.adopt`, `account.credentials.handOver`, `account.store.*`, `account.keys.*`"
+const KEYS_ROW =
+  "`account.adopt`, `account.credentials.handOver`, `account.store.*`, `account.keys.*` except `account.keys.status` (4.4: it reports state and no key material)"
 
-/** Names in section 4 that are not a registry id: what each means, and why. */
+/** Names in section 4 that are not a registry id, or not the call a token would resolve to: what each means, and why. */
 export const CALL_ALIASES: readonly CallAlias[] = [
   {
     docRow: "`engine.auth.apiKey`, `bearerToken`, `check` with credentials; `mcp.oauth.login`, `logout`",
@@ -158,15 +159,22 @@ export const CALL_ALIASES: readonly CallAlias[] = [
     calls: ["deviceService.enable", "deviceService.disable"],
     why: "the registry's two rows for the one setEnabled switch (first-party design 6.5)",
   },
-]
-
-/** Where the matrix follows the security owner's ruling ahead of the document; each fails once the revision lands. */
-export const AWAITING_REVISION: readonly AwaitingRevision[] = [
   {
-    problem: `section 4.2 row "${KEYS_ROW}": names account.keys.status, which no line covers`,
-    why: "owner's ruling 2026-11-25: account.keys.status is a session read (4.4); 4.2 reads 'account.keys.* R except status' in the next revision",
+    docRow: KEYS_ROW,
+    token: "account.keys.*",
+    calls: ["account.keys.init"],
+    why: "the row excepts account.keys.status, which 4.4 lists as a read",
+  },
+  {
+    docRow: KEYS_ROW,
+    token: "account.keys.status",
+    calls: [],
+    why: "named as the row's exception, not as one of its calls",
   },
 ]
+
+/** Where the matrix follows a ruling ahead of the document; each fails as stale once the revision lands. None open. */
+export const AWAITING_REVISION: readonly AwaitingRevision[] = []
 
 /** The session's answer of engine.auth.check: the person's fields less what may embed provider text, plus the code. */
 export const SESSION_FIELDS: Readonly<Record<string, readonly string[]>> = {
