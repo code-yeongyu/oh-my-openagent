@@ -112,7 +112,7 @@ const ROWS: readonly Row[] = [
       sdk_send: "caller_context_missing",
       sdk_locate: "caller_context_missing",
       sdk_interrupt: "caller_context_missing",
-      remote_sessions_resolve: "not_found(session)",
+      remote_sessions_resolve: "caller_context_missing",
       omo_remote_control: "caller_context_missing",
       omo_remote_send: "caller_context_missing",
     },
