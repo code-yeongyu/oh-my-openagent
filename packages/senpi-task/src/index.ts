@@ -390,6 +390,7 @@ export {
   evaluateInvocationGuard,
   invocationConditionForAgent,
   loadAgents,
+  loadMarkdownAgents,
   mapOmoConfigAgents,
   registerAgent,
   resolveAgent,
