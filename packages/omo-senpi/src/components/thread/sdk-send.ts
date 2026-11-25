@@ -2,7 +2,7 @@ import { withinCallBudget } from "../call-budget/call-deadline"
 import { toThreadAddressEntries } from "./address-book"
 import type { ThreadAddressEntry } from "./addressing"
 import { accountDevices } from "./address/account"
-import { resolveAddress } from "./address/lazy"
+import type { resolveAddress } from "./address/resolve"
 import type { Failed } from "./address/refusals"
 import { DEFAULT_THREAD_DELIVERY, type ThreadSendInput, type ThreadHandoffInput } from "./contracts"
 import { threadToolFailure, type ThreadToolFailure } from "./errors"
@@ -38,6 +38,13 @@ export async function viewForSend(
   return current
 }
 
+/**
+ * The address resolver a send uses, chosen by its entry: the tools in omo.js load it from the thread client sidecar
+ * (`address/lazy.ts`, the entry's byte budget), the standalone thread SDK has it inlined (`address/`), so a send from
+ * the SDK needs no plugin import map.
+ */
+export type SendResolver = typeof resolveAddress
+
 type Principal =
   | { readonly kind: "session"; readonly id: string }
   | { readonly kind: "operator"; readonly uid: number; readonly user: string }
@@ -45,6 +52,7 @@ type Principal =
 export async function sendThread(
   options: ThreadToolSurfaceOptions,
   pipeline: DeliveryPipeline,
+  resolve: SendResolver,
   current: ThreadHostView,
   value: ThreadSendInput | ThreadHandoffInput,
   key: string,
@@ -54,6 +62,7 @@ export async function sendThread(
 ) {
   const target = await locate(
     options,
+    resolve,
     current,
     value.thread,
     value.all_scope,
@@ -125,6 +134,7 @@ function sessionSender(options: ThreadToolSurfaceOptions, id: string): GatewaySe
  */
 async function locate(
   options: ThreadToolSurfaceOptions,
+  resolve: SendResolver,
   current: ThreadHostView,
   address: string,
   allScope: boolean | undefined,
@@ -154,7 +164,7 @@ async function locate(
     callerId,
   })
   if (replyTo?.device !== undefined) {
-    const resolved = await resolveAddress(context([]), address, {
+    const resolved = await resolve(context([]), address, {
       pin: { device: replyTo.device, thread: replyTo.session_id },
     })
     if (resolved.kind === "error") return refuse(resolved)
@@ -188,25 +198,25 @@ async function locate(
   // targets its own caller, so an id prefix is resolved without it (UUIDv7 ids share 8 hex characters for ~65 s).
   let resolved =
     replyTo === undefined
-      ? await resolveAddress(context(entries), address, {
+      ? await resolve(context(entries), address, {
           all_scope: scope,
           match,
           probe: true,
           id_prefix: { exclude: callerId },
         })
-      : await resolveAddress(context(entries, false), address, { all_scope: scope, id_prefix: false })
+      : await resolve(context(entries, false), address, { all_scope: scope, id_prefix: false })
   // The reply grant: a consumed delivery's sender on this device is answered without all_scope even when it runs in
   // another workspace. Only a scoped refusal is widened, and the widened hit must still be that sender
   // (replyTargetMismatch below), so the grant reaches no other session and lasts as long as the reply allowance.
   let widened = replyHere && resolved.kind === "error" && resolved.code === "scope_denied"
-  if (widened) resolved = await resolveAddress(context(entries, false), address, { all_scope: true, id_prefix: false })
+  if (widened) resolved = await resolve(context(entries, false), address, { all_scope: true, id_prefix: false })
   // #14048: a delivery id without a device part (`rpc:local/<id>`, a bare row id) proves no device: another device's
   // delivery arrives that way when the connection that admitted it declared no remote origin. A sender this device does
   // not hold is then looked up account-wide (exact id or name only, never an id prefix), and the reply goes only to the
   // session its durable id names, on the one device that lists it: with no device to pin, a copy of that id on a second
   // device makes the sender ambiguous.
   if (replyTo !== undefined && resolved.kind === "error" && resolved.code === "not_found") {
-    resolved = await resolveAddress(context(entries), address, {
+    resolved = await resolve(context(entries), address, {
       all_scope: scope,
       match,
       probe: true,
@@ -222,7 +232,7 @@ async function locate(
   // file records no name) is answered through the sender's recorded id, so a reply by name reaches it as a reply by id
   // does. A name another session carries, here or on another device, resolved above and is refused there.
   if (replyHere && resolved.kind === "error" && resolved.code === "not_found" && address !== replyTo.session_id) {
-    const byId = await resolveAddress(context(localFor(replyTo.session_id), false), replyTo.session_id, {
+    const byId = await resolve(context(localFor(replyTo.session_id), false), replyTo.session_id, {
       all_scope: true,
       id_prefix: false,
     })

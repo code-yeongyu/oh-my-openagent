@@ -26,6 +26,7 @@ export type { ThreadTranscriptEntry } from "./reader"
 import { hashArgs } from "./gateway/hash-args"
 import { GATEWAY_RECEIPT_RETENTION_MS } from "./gateway/constants"
 import { isLockWaitExceeded } from "./gateway/lock-wait"
+import { resolveAddress } from "./address/lazy"
 import { sendThread, sendToTarget, viewForSend } from "./sdk-send"
 import type { DeliveryOutcome, DeliveryTarget } from "./gateway/transport"
 import { createGatewayServices } from "./tools/gateway-services"
@@ -547,6 +548,7 @@ function buildThreadTools(surface: ThreadToolSurfaceOptions): {
     const routed = await sendThread(
       options,
       pipeline,
+      resolveAddress,
       current,
       value,
       idempotencyKey,

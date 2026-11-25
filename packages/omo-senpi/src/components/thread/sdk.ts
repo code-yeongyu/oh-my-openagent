@@ -357,6 +357,7 @@ export function createThreadSdk(options: ThreadSdkOptions): ThreadSdk {
         const routed = await sendThread(
           controls,
           pipeline,
+          resolveAddress,
           current,
           {
             thread: request.thread,
