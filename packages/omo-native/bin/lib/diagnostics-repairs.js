@@ -22,6 +22,20 @@ export async function fixReflectionLock(input = {}, ports = {}) {
  * @type {DiagnosticsCalls["reapStaleEngines"]}
  */
 export async function reapStaleEngines(input, ports = {}) {
+  /** @type {readonly unknown[]} */
+  const named = Array.isArray(input?.pids) ? input.pids : []
+  const invalid = named.filter((pid) => !Number.isSafeInteger(pid) || /** @type {number} */ (pid) < 1)
+  if (named.length === 0 || invalid.length > 0) {
+    return {
+      kind: "error",
+      error: {
+        code: "invalid_arguments",
+        message: "pids must be one or more positive integers",
+        next_action: "name each stale engine by its pid, as diagnostics.run lists them, then call it again",
+        details: { invalid },
+      },
+    }
+  }
   const entries = (ports.list ?? listProcesses)()
   const kill = ports.kill ?? ((pid, signal) => process.kill(pid, signal))
   /** @type {ReapedEngine[]} */

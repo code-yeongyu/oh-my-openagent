@@ -59,6 +59,24 @@ describe("diagnostics.reapStaleEngines", () => {
   })
 })
 
+describe("diagnostics.reapStaleEngines input", () => {
+  const untouched = {
+    list: (): ProcessEntry[] => {
+      throw new Error("the process table must not be read")
+    },
+    kill: (pid: number) => {
+      throw new Error(`no pid may be signalled, got ${pid}`)
+    },
+  }
+
+  for (const pids of [[], [0], [-1], [1.5], [Number.MAX_SAFE_INTEGER + 2], ["15"]]) {
+    test(`#given pids ${JSON.stringify(pids)} #when reaping #then invalid_arguments answers before the process table is read`, async () => {
+      const result = await reapStaleEngines({ pids: pids as number[] }, untouched)
+      expect(result).toMatchObject({ kind: "error", error: { code: "invalid_arguments" } })
+    })
+  }
+})
+
 describe("diagnostics.reapStaleEngines when nothing is reaped", () => {
   const noSignal = (pid: number) => {
     throw new Error(`no pid may be signalled, got ${pid}`)
