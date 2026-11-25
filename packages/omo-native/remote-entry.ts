@@ -78,7 +78,8 @@ export async function setUpRemoteAfterSignIn(): Promise<"on" | "kept_off" | "not
   if ((globalThis as Record<symbol, unknown>)[testSkipKey] === true) return "not_on"
   const dependencies = {
     ...remoteDependencies(),
-    output: (line: string) => process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
+    // The sign-in setup's output can be JSON (remote-bootstrap --json): it passes through unchanged.
+    output: (line: string) => process.stderr.write(`${line}\n`),
   }
   return runLoginSetup(dependencies, dependencies.bootstrap, dependencies, backgroundRemote(omoBinaryPath()))
 }

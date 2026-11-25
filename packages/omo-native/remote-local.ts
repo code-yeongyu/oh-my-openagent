@@ -86,8 +86,9 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
     ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
-    output: (line) => process.stdout.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
-    write: (text) => process.stdout.write(escapeForDisplay(text, { keepLineFeeds: true })),
+    // Machine-readable output (--json) passes through unchanged; human lines are escaped where they are built.
+    output: (line) => process.stdout.write(`${line}\n`),
+    write: (text) => process.stdout.write(text),
     error,
   }
 }
