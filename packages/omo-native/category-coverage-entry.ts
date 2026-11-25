@@ -6,6 +6,7 @@
  */
 
 import { loadOmoConfig, type OmoConfigEnv } from "@oh-my-opencode/omo-config-core"
+import { loadMarkdownAgents } from "@oh-my-opencode/senpi-task/agent-loader"
 import { resolveCategoryCoverage, type CategoryCoverage } from "@oh-my-opencode/senpi-task/category-coverage"
 import { describeModelChains, type ModelChainsReport } from "@oh-my-opencode/senpi-task/model-chains"
 import { loadSenpiOmoConfig } from "../omo-senpi/src/components/config-resolution"
@@ -35,10 +36,19 @@ export type ModelChainsView = ModelChainsReport & {
 export function modelChains(input: CategoryCoverageInput): ModelChainsView {
   const { config, profile } = loadSenpiOmoConfig({ cwd: input.cwd, env: input.env })
   const models = input.models.map((model) => ({ provider: model.provider, id: model.id }))
-  const report = describeModelChains(config, {
-    getAvailable: () => models,
-    find: (provider, modelId) => models.find((model) => model.provider === provider && model.id === modelId),
+  const markdownAgents = loadMarkdownAgents({
+    env: input.env,
+    ...(input.env.HOME === undefined ? {} : { homeDir: input.env.HOME }),
+    projectDir: input.cwd,
   })
+  const report = describeModelChains(
+    config,
+    {
+      getAvailable: () => models,
+      find: (provider, modelId) => models.find((model) => model.provider === provider && model.id === modelId),
+    },
+    markdownAgents.agents,
+  )
   return {
     ...report,
     ...(profile === undefined ? {} : { configProfile: profile }),
