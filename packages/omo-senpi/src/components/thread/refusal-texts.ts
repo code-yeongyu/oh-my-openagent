@@ -47,10 +47,7 @@ export function refusal(
 
 // Each failure refusal() produced, with its template id and slots: out of band, so it never serialises into an answer, and
 // never recovered by parsing a sentence back (a slot value is caller input and can look like the template around it).
-const PROVENANCE = new WeakMap<
-  ThreadToolFailure,
-  { readonly id: RefusalId; readonly slots: Readonly<Record<string, string>> }
->()
+const PROVENANCE = new WeakMap<object, { readonly id: RefusalId; readonly slots: Readonly<Record<string, string>> }>()
 
 /** Where `failure` came from, when refusal() produced it; a failure built any other way has none. */
 export function provenanceOf(
