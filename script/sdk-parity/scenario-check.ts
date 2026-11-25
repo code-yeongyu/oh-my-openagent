@@ -9,8 +9,10 @@ import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-t
 
 const ID = /^[a-z][A-Za-z0-9.]*\/[a-z0-9]+(-[a-z0-9]+)*$/
 
-const withoutResult = (expectations: readonly Expectation[]): readonly Omit<Expectation, "result">[] =>
-  expectations.map(({ result: _stimulus, ...rest }) => rest)
+// What the matcher compares: no result (the fake's stimulus), count defaulting to one, and the order of expectations
+// not significant, so two lists that differ only in those read as the same effect.
+const withoutResult = (expectations: readonly Expectation[]): readonly string[] =>
+  expectations.map(({ result: _stimulus, count, ...rest }) => canonical({ ...rest, count: count ?? 1 })).toSorted()
 
 const canonical = (value: unknown): string =>
   JSON.stringify(value, (_key, inner: unknown) =>
@@ -54,8 +56,8 @@ const without = (input: Readonly<Record<string, unknown>>, field: string): Recor
   Object.fromEntries(Object.entries(input).filter(([key]) => key !== field))
 
 // An optional input changes behaviour only if a scenario that passes it has a partner whose input is the same without
-// it (effect or refusal, so a field that makes a call admissible pairs with the refusal it lifts) and whose kind or
-// expectations differ. A required input, or one every form that has it requires, pairs with none.
+// it, either being an effect or a refusal (a field can lift a refusal or cause one), and whose kind or expectations
+// differ. A required input, or one every form that has it requires, pairs with none.
 function coverageProblems(
   row: Row,
   scenarios: readonly TableScenario[],
@@ -78,16 +80,18 @@ function coverageProblems(
     }
     if (reason !== undefined) problems.push(`row ${row.id}: input ${field} is listed inert and has an effect scenario`)
     if (call?.required.includes(field) === true || call?.formRequired?.includes(field) === true) continue
-    const paired = withField.some((scenario) => {
-      const rest = canonical(without(scenario.input, field))
-      return scenarios.some(
-        (partner) =>
-          !(field in partner.input) &&
-          canonical(partner.input) === rest &&
-          (partner.kind !== scenario.kind ||
-            canonical(withoutResult(partner.expect)) !== canonical(withoutResult(scenario.expect))),
-      )
-    })
+    const paired = scenarios
+      .filter((scenario) => field in scenario.input)
+      .some((scenario) => {
+        const rest = canonical(without(scenario.input, field))
+        return scenarios.some(
+          (partner) =>
+            !(field in partner.input) &&
+            canonical(partner.input) === rest &&
+            (partner.kind !== scenario.kind ||
+              canonical(withoutResult(partner.expect)) !== canonical(withoutResult(scenario.expect))),
+        )
+      })
     if (!paired) problems.push(`row ${row.id}: input ${field} has no scenario pair that differs in ${field} alone`)
   }
   problems.push(...enumProblems(row, scenarios, contract))
@@ -139,9 +143,9 @@ const givenOf = (scenario: TableScenario): readonly Given[] =>
 function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): string[] {
   if (!CONTROL_VERBS.includes(row.id)) return []
   const states: readonly [string, (given: Given) => boolean][] = [
-    ["a live session (given session: live)", (given) => given.state?.session === "live"],
-    ["an ended session (given session: ended)", (given) => given.state?.session === "ended"],
-    ["an offline device (given online: false)", (given) => given.state?.online === false],
+    ["a live session (given session: live)", (given) => given.state?.["session"] === "live"],
+    ["an ended session (given session: ended)", (given) => given.state?.["session"] === "ended"],
+    ["an offline device (given online: false)", (given) => given.state?.["online"] === false],
   ]
   return states.flatMap(([name, matches]) =>
     scenarios.some((scenario) => givenOf(scenario).some(matches)) ? [] : [`row ${row.id}: no scenario on ${name}`],

@@ -5717,6 +5717,11 @@
           "args": {
             "thread": "t-1"
           }
+        },
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
         }
       ],
       "target": "this_device",
@@ -6054,15 +6059,13 @@
           "op": "open_session",
           "args": {
             "worktree": true
+          },
+          "result": {
+            "error": "refused"
           }
         }
       ],
-      "target": "this_device",
-      "fault": {
-        "port": "host",
-        "op": "open_session",
-        "fault": "refused"
-      }
+      "target": "this_device"
     },
     {
       "id": "threads.create/relay-plan",
@@ -6150,11 +6153,9 @@
             }
           ],
           "answer": {
-            "value": {
-              "kind": "ok",
-              "thread": "t-k9",
-              "device": "studio"
-            }
+            "kind": "ok",
+            "thread": "t-k9",
+            "device": "studio"
           }
         }
       ],
@@ -6299,11 +6300,9 @@
         }
       ],
       "answer": {
-        "value": {
-          "kind": "ok",
-          "delivery": {
-            "lane": "queued_offline"
-          }
+        "kind": "ok",
+        "delivery": {
+          "lane": "queued_offline"
         }
       }
     },
@@ -6466,16 +6465,24 @@
       "expect": [
         {
           "port": "host",
+          "op": "get_state",
+          "args": {
+            "thread": "t-1"
+          },
+          "result": {
+            "live": false
+          }
+        },
+        {
+          "port": "host",
           "op": "close_session",
           "count": 0
         }
       ],
       "answer": {
-        "value": {
-          "kind": "ok",
-          "closed": false,
-          "reason": "not_live"
-        }
+        "kind": "ok",
+        "closed": false,
+        "reason": "not_live"
       }
     },
     {
@@ -6969,8 +6976,8 @@
         }
       ],
       "fault": {
-        "port": "store",
-        "op": "idempotency_put",
+        "port": "remote",
+        "op": "sessions.send",
         "fault": "lost_reply"
       },
       "expect": [

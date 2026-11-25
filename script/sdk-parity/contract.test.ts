@@ -34,7 +34,9 @@ import { join } from "node:path"
 
 import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
+import { portProblems } from "./expectation"
 import { loadScenarioTable } from "./scenario-table"
+import { tableProblems } from "./scenario-rules"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
 // registry rows. Each check also runs once on a fixture that breaks it.
@@ -216,6 +218,27 @@ describe("producers and sequences (review 6062113819)", () => {
       | undefined
     const last = retry?.then?.at(-1)
     expect(last?.kind).toBe("effect")
-    expect(last?.answer?.value).toMatchObject({ kind: "ok", thread: "t-k9", device: "studio" })
+    // A thread call's answer is the flat thread contract (design lane ruling on P0 review 6062172318).
+    expect(last?.answer).toMatchObject({ kind: "ok", thread: "t-k9", device: "studio" })
+  })
+})
+
+describe("the table under P0's shared scenario rules", () => {
+  test("#given every scenario file #then each port, operation and fault is one the port table and FAULT_PORTS allow", () => {
+    expect(
+      portProblems(
+        scenarios.flatMap((file) => file.scenarios),
+        PORT_OPERATIONS,
+      ),
+    ).toEqual([])
+  })
+
+  test("#given every scenario file #then each row with a thread input has an effect scenario on each target", () => {
+    expect(
+      tableProblems(
+        rows,
+        scenarios.flatMap((file) => file.scenarios),
+      ),
+    ).toEqual([])
   })
 })
