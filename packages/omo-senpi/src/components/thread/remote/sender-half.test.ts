@@ -102,7 +102,8 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect(wakes(a).map((entry) => [entry.device, entry.session])).toEqual([["c", GONE]])
     })
 
-    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no open is sent: only the create asks c which file carries the id (find_session, a read; #14170), which c's engine predates", async () => {
+    // omo#14799: the read asks c too, since it reopens a parked session; c's engine predates the lookup, so it refuses.
+    test("#given such an alias #when thread_read, thread_interrupt and thread_create name it #then no open is sent: the read and the create ask c which file carries the id (find_session, a read; #14170), which c's engine predates", async () => {
       const a = account({ rows: [B_ROW], aliases: aliases(), ended: { c: { [GONE]: GONE } }, sessionFiles: "none" })
       const { run } = fixture.surface(a.remote)
       for (const [tool, args] of [
@@ -113,9 +114,9 @@ describe("#13037 the sender half reaches a session on another device that is not
         const result = await run(tool, args)
         expect({ tool, kind: result.kind }).toEqual({ tool, kind: "error" })
       }
-      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([
-        { via: "endpoint", device: "c", rpc: { type: "find_session", durableSessionId: GONE } },
-      ])
+      const lookup = { via: "endpoint" as const, device: "c", rpc: { type: "find_session", durableSessionId: GONE } }
+      // The read asks twice (who holds it, then which file), the create once; nothing else reaches c.
+      expect(a.sent.filter((entry) => entry.via !== "read")).toEqual([lookup, lookup, lookup])
     })
   })
 
@@ -213,16 +214,21 @@ describe("#13037 the sender half reaches a session on another device that is not
       expect([...perDevice.values()].every((count) => count === 1)).toBe(true)
     })
 
-    test("#13215 (decides A4.4): #given that id #when thread_read and thread_interrupt name it #then each runs the lookup, finds the ended row on c and answers not_resumable, sending c nothing", async () => {
+    // omo#14799: the read reopens the parked session on c and answers its transcript; a control still refuses it.
+    test("#13215 (decides A4.4): #given that id #when thread_interrupt and then thread_read name it #then each runs the lookup and finds the ended row on c; the interrupt answers not_resumable sending c nothing, the read reopens it there and answers its transcript", async () => {
       const a = account({ rows: [B_ROW, C_ROW], ended: { c: { [GONE]: "rk-c-gone" } } })
       const { run } = fixture.surface(a.remote)
-      for (const tool of ["thread_read", "thread_interrupt"] as const)
-        expect(await run(tool, { thread: GONE })).toMatchObject({ kind: "error", error: { code: "not_resumable" } })
+      expect(await run("thread_interrupt", { thread: GONE })).toMatchObject({
+        kind: "error",
+        error: { code: "not_resumable" },
+      })
+      expect(a.sent.filter((entry) => entry.device === "c")).toEqual([])
+      expect(await run("thread_read", { thread: GONE })).toMatchObject({ kind: "ok", device: "c" })
       expect(a.lookups.filter((entry) => entry.device === "c")).toEqual([
         { device: "c", durable_id: GONE },
         { device: "c", durable_id: GONE },
       ])
-      expect(a.sent.filter((entry) => entry.device === "c")).toEqual([])
+      expect(a.sent.filter((entry) => entry.device === "c" && entry.rpc?.["type"] === "open_session")).toHaveLength(1)
     })
   })
 

@@ -24,6 +24,7 @@ import { join } from "node:path"
 import { createGatewayStore } from "../gateway/store"
 import type { OutboundDelivery } from "../gateway/transport"
 import { createRelayTransport } from "./relay-transport"
+import { reconcileRemoteReceipt } from "./receipt"
 import { fakeRemoteClient } from "../thread-remote-fixture"
 
 // The account these adapter rows run in: this device and b, online, read through the remote client.
@@ -1578,6 +1579,58 @@ describe("device-service adapter: lost replies and connection lifecycle", () => 
     )
     expect(spent).toEqual({ kind: "refused", reason: "request_timeout" })
     expect(waits).toEqual([])
+  })
+
+  // #14623 review M2: the real port's typed transport refusals for a receipt query (the peer cannot be reached) leave a
+  // retained confirmed outcome standing; an authorization denial from the peer still wins over it.
+  const receiptService = (fail: () => CommandResult | Promise<CommandResult>) => () =>
+    ({
+      status: async () => ({ state: "connected" }),
+      carriesWakeMark: true,
+      wakeCommand: async () => await fail(),
+      closed: new Promise<void>(() => {}),
+      close: () => {},
+    }) as unknown as DeviceService
+  const confirmed = {
+    kind: "ok" as const,
+    device: "b",
+    thread_id: "dur-1",
+    delivery_id: "d-1",
+    outcome: { kind: "applied" as const },
+  } as unknown as Parameters<typeof reconcileRemoteReceipt>[4]
+  const retainedStore = { now: () => 0, reconcileRemoteReceipt: async () => ({ kind: "applied" as const }) }
+  test.each([
+    [
+      "the service cannot find the peer (peer_not_found)",
+      () => {
+        throw new LocalApiError("peer_not_found", "no such device")
+      },
+      undefined,
+    ],
+    ["the call's budget is spent (request_timeout)", () => state({ state: "engine_applied" }, {}), -1],
+  ] as const)(
+    "#given a confirmed retained receipt #when %s #then the retained outcome is answered, not an error",
+    async (_label, fail, left) => {
+      const port = sessionsPort({
+        version: "0.0.0-test",
+        connect: async () => ({ conn: receiptService(fail)(), owned: true }),
+      })
+      const run = () => reconcileRemoteReceipt(retainedStore, { sessions: port } as never, "caller", "k", confirmed)
+      const answer = await (left === undefined ? run() : withCallDeadline(Date.now() + left, run))
+      expect(answer).toMatchObject({ outcome: { kind: "applied" } })
+    },
+  )
+
+  test("#given a confirmed retained receipt #when the peer refuses this device (remote_control_off) #then the denial is answered", async () => {
+    const port = sessionsPort({
+      version: "0.0.0-test",
+      connect: async () => ({
+        conn: receiptService(() => state({ state: "engine_refused", reason: "remote_control_off" }))(),
+        owned: true,
+      }),
+    })
+    const answer = await reconcileRemoteReceipt(retainedStore, { sessions: port } as never, "caller", "k", confirmed)
+    expect(answer).toMatchObject({ kind: "error" })
   })
 
   // omo#14130 review L1: an attach that never settles cannot hold the call past its budget either.

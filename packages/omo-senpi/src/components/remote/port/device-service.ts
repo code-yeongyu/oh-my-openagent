@@ -1,4 +1,4 @@
-import { outcomeOf } from "../../thread/remote/outcome"
+import { attachRequired, outcomeOf } from "../../thread/remote/outcome"
 import {
   connectDeviceService,
   LocalApiError,
@@ -187,7 +187,12 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     )).then((dialed) => dialed.conn)
   const pool = createAttachPool(svc, attachAddressed, options.attachIdleMs, options.now)
   const endpoints = new Map<string, string>()
-  const sessionCommand: RemoteSessionsPort["sessionCommand"] = async (device, sessionId, rpc, commandOptions) => {
+  // #14358: a command the other device refused attach_required ran nothing there: this device's attach is dropped and
+  // made again, and the record is sent once more (`reattached`); a second refusal is the answer.
+  const sendOnce = async (
+    reattached: boolean,
+    ...[device, sessionId, rpc, commandOptions]: Parameters<RemoteSessionsPort["sessionCommand"]>
+  ): Promise<RemoteCommandOutcome> => {
     // Before the command goes out nothing can have run: an attach that fails (session_not_found, as unknown_session; peer_not_found,
     // host_not_answering, a lost connection) or a record that is not JSON is refused with its code, typed.
     let held: HeldAttach
@@ -201,7 +206,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
     // No connection means nothing was sent, as when the attach path cannot attach. A refusal before sending (the core
     // marks it NotSentError; a service older than #393 part B answers the `{session}` target `unsupported`) ran nothing,
     // so the record goes the attach way instead. Anything else may have run on the other device and is never resent.
-    if (commandOptions?.direct === true) {
+    // #14358 review M2: the retry goes the attach way only; a direct probe is never sent twice.
+    if (!reattached && commandOptions?.direct === true) {
       let connected: DeviceService
       try {
         connected = await svc()
@@ -212,7 +218,8 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       const waitMs = commandWaitMs(SEND_WAIT_MS)
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
-        return outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
+        const direct = outcomeOf(await connected.sessionCommand(device, sessionId, record, { waitMs }))
+        if (!attachRequired(direct)) return direct
       } catch (error) {
         if (!(error instanceof NotSentError)) return { kind: "uncertain", reason: "reply_lost" }
       }
@@ -255,6 +262,11 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       if (waitMs <= 0) return { kind: "refused", reason: "request_timeout" }
       try {
         const outcome = outcomeOf(await attached.command(record, { ...marked, waitMs }))
+        if (!reattached && attachRequired(outcome)) {
+          pool.evict(device, sessionId)
+          held.release()
+          return await sendOnce(true, device, sessionId, rpc, commandOptions)
+        }
         if (isHeld && outcome.kind === "ok") catalog.keep(key, outcome.response, sentAt)
         return readOnly && outcome.kind === "uncertain" ? { kind: "refused", reason: outcome.reason } : outcome
       } catch (error) {
@@ -274,6 +286,7 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       held.release()
     }
   }
+  const sessionCommand: RemoteSessionsPort["sessionCommand"] = (...args) => sendOnce(false, ...args)
   const listing = async (filter?: { readonly device?: string }): Promise<RemoteListing> => {
     const listed = await (await svc()).sessions(filter?.device === undefined ? undefined : { device: filter.device })
     return {
@@ -472,6 +485,14 @@ export function createDeviceServiceSessions(options: DeviceServiceSessionsOption
       }
     },
     canWake: async () => (await svc().catch(() => undefined))?.carriesWakeMark === true,
+    // wakeCommand names a durable routing key. The new record is negotiated as delivery-outcome:v1
+    // by the sender service and intercepted before any engine/cold-wake path at its receiver.
+    receipt: async (
+      device: string,
+      durableId: string,
+      deliveryId: string,
+    ): Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }> =>
+      await port.wake(device, durableId, { type: "get_delivery_outcome", deliveryId }),
     canLookup: async () => (await svc().catch(() => undefined))?.takesSingleLocate === true,
     wake: async (device, durableId, rpc) => {
       let record: WireRpc

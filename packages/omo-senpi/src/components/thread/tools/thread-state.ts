@@ -16,10 +16,12 @@ import type { RemoteSessionRow } from "../remote/ports"
 export function threadState(facts: {
   readonly archived?: unknown
   readonly held: boolean
+  readonly opening?: boolean
   readonly activity?: unknown
 }): ThreadState {
   if (facts.archived === true) return "archived"
   if (!facts.held) return "inactive"
+  if (facts.opening) return "opening"
   // A queued or approval-waiting thread is mid-turn: running. A failed turn has ended: idle (its detail says errored).
   return facts.activity === "running" || facts.activity === "queued" || facts.activity === "awaiting_approval"
     ? "running"

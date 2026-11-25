@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import type { PlatformFacts } from "@oh-my-opencode/omo-opencode/account-home"
 
-import { isDevBuildRuntime, isSharedAgentDir } from "./dev-build-runtime"
+import { isDevBuildRuntime, isSharedAgentDir, isUnlaunchedSourceRun } from "./dev-build-runtime"
 
 // Edge cases of the source-build guard (#14382, #14622 reviews M2-M4, M8): which agent dirs count as the account's shared
 // store, which runtimes count as a source build, and how the OS account home is read without trusting the environment.
@@ -140,6 +140,16 @@ test.each([
   }
 })
 
+test.each([
+  ["a .ts module with no OMO_PACKAGE_DIR", "file:///repo/src/store-ops.ts", {}, true],
+  ["a .ts module with a blank OMO_PACKAGE_DIR", "file:///repo/src/store-ops.ts", { OMO_PACKAGE_DIR: " " }, true],
+  ["a .ts module a launcher started", "file:///repo/src/store-ops.ts", { OMO_PACKAGE_DIR: "/payload" }, false],
+  ["a bundled .mjs worker with no OMO_PACKAGE_DIR", "file:///plugin/extensions/gateway-store-worker.mjs", {}, false],
+  ["a bundled .js extension with no OMO_PACKAGE_DIR", "file:///plugin/extensions/omo.js", {}, false],
+] as const)("#given %s #then isUnlaunchedSourceRun is %p", (_case, url, env, expected) => {
+  expect(isUnlaunchedSourceRun(url, env)).toBe(expected)
+})
+
 const facts = (passwd: () => string): PlatformFacts => ({
   platform: "linux",
   uid: 1000,
@@ -153,13 +163,17 @@ const facts = (passwd: () => string): PlatformFacts => ({
 
 test("#given HOME and USERPROFILE elsewhere #when the agent dir is the OS user record's store #then it is shared", () => {
   const saved = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE }
+  // A real directory as the record's home: a literal /home/<user> is the macOS auto_home trigger, where Bun's realpath of
+  // the missing path's parent never returns and the test file never ends (#14866).
+  const recordHome = temp("agent-home-record-")
   try {
     process.env.HOME = join("/", "alternate-home")
     delete process.env.USERPROFILE
-    const record = facts(() => "me:x:1000:1000::/home/me:/bin/sh\n")
-    expect(isSharedAgentDir(join("/", "home", "me", ".omo", "agent"), { facts: record })).toBe(true)
+    const record = facts(() => `me:x:1000:1000::${recordHome}:/bin/sh\n`)
+    expect(isSharedAgentDir(join(recordHome, ".omo", "agent"), { facts: record })).toBe(true)
     expect(isSharedAgentDir(join("/", "tmp", "isolated-agent"), { facts: record })).toBe(false)
   } finally {
+    rmSync(recordHome, { recursive: true, force: true })
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]
       else process.env[key] = value
