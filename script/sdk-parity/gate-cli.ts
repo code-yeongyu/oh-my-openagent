@@ -11,7 +11,7 @@ import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
-import { ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
+import { ADAPTER_LAYER_RENAMES, ADAPTER_OFFENDERS } from "../remote-import-guard-rules"
 import { conformanceProblems } from "./conformance"
 import { loadScenarioRuns, P0_CONTEXT, runEffectScenarios } from "./conformance-run"
 import { SCENARIOS } from "./scenarios"
@@ -131,7 +131,7 @@ try {
   const recorded = show(mergeBase, "script/remote-import-guard-adapter-offenders.json")
   const baseFailures = [
     ...conformanceProblems(rows, new Set(unresolved.entries.map((entry) => entry.id)), evidence, P0_CONTEXT),
-    ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS),
+    ...offenderGrowth(recorded === undefined ? undefined : JSON.parse(recorded), ADAPTER_OFFENDERS, ADAPTER_LAYER_RENAMES),
   ]
   const baselineFailures = baselineProblems({
     rows,
