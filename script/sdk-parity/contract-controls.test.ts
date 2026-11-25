@@ -138,6 +138,17 @@ describe("negative controls of the P1a checks", () => {
     expect(problems).toContain("row threads.setModel: scenarios stays empty in P1a")
   })
 
+  test("#given a field the table passes a callback #when its row leaves it untyped #then the check names it, and not when it is typed", () => {
+    const untyped = rows.map((row) =>
+      row.id === "account.signIn"
+        ? { ...row, input: { ...row.input, properties: { ...row.input.properties, onUserCode: {} } } }
+        : row,
+    )
+    const named = "onUserCode is passed a callback, but row account.signIn does not type it as one"
+    expect(scenarioProblems(untyped, contract, scenarios).join("\n")).toContain(named)
+    expect(scenarioProblems(rows, contract, scenarios).join("\n")).not.toContain(named)
+  })
+
   test("#given the owner-slice map #then a filled row it maps passes, a mapped row left empty fails, and a mapped id that is no row fails", () => {
     const filled = rows.map((row) =>
       row.id === "threads.setModel" ? { ...row, scenarios: { effect: ["threads.setModel/by-id"], refusal: [] } } : row,

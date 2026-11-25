@@ -186,6 +186,11 @@ export function scenarioProblems(
         continue
       }
       problems.push(...scenarioShapeProblems(scenario, row, file.domain, contract))
+      for (const [field, value] of Object.entries((scenario.input ?? {}) as Readonly<Record<string, unknown>>))
+        if (value === "$callback" && !Object.hasOwn(Object(row.input.properties[field]), "x-callback"))
+          problems.push(
+            `scenario ${scenario.id}: ${field} is passed a callback, but row ${row.id} does not type it as one; type it with the contract's callback helper (its argument and answer shapes)`,
+          )
       if (scenario.invalid !== true) byRow.set(row.id, [...(byRow.get(row.id) ?? []), scenario])
     }
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
