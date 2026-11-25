@@ -21,5 +21,12 @@ export {
   type Refusal,
   refusalScenarioId,
 } from "./principal-matrix"
-export { CUSTODY_RESULTS, MAY_EMBED, SESSION_CHECK_CODES, SESSION_RESULTS, type UserCode } from "./results/custody"
+export { CUSTODY_RESULTS, SESSION_RESULTS, type UserCode } from "./results/custody"
+export {
+  AUTH_ACCOUNT_CHECK_CODES,
+  AUTH_CHECK_FREE_FIELDS,
+  type AuthStatusAnswer,
+  type FreeField,
+  type FreeFieldOrigin,
+} from "./results/auth-check"
 export { type Endpoint, EndpointSelector, type RootAuthorityOptions } from "./root-options"

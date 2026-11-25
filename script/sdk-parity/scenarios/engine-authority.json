@@ -1170,15 +1170,11 @@
         "value": {
           "status": "ready",
           "provider": "p",
+          "auth_type": "oauth",
           "accounts": [
             {
-              "signedIn": true,
-              "source": "login",
-              "blocked": false,
-              "check": {
-                "outcome": "failed",
-                "code": "auth_error"
-              }
+              "signed_in": true,
+              "check": "unrecognized"
             }
           ]
         }

@@ -1,10 +1,14 @@
 import { describe, expect, test } from "bun:test"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
 
 import {
   BEHAVIOUR_CHANGES,
   CUSTODY_RESULTS,
   GATED,
-  MAY_EMBED,
+  AUTH_ACCOUNT_CHECK_CODES,
+  AUTH_CHECK_FREE_FIELDS,
+  type AuthStatusAnswer,
   sessionAnswerAccepts,
   SESSION_RESULTS,
   inputAccepts,
@@ -26,7 +30,21 @@ import {
   sectionFourRows,
   withoutAwaited,
 } from "./authority-check"
-import { AWAITING_REVISION, CALL_ALIASES, CUSTODY_FIELDS, HELD, SESSION_FIELDS } from "./authority-expected"
+import {
+  AWAITING_ENGINE_PIN,
+  AWAITING_REVISION,
+  CALL_ALIASES,
+  CUSTODY_FIELDS,
+  HELD,
+  SESSION_FIELDS,
+} from "./authority-expected"
+import {
+  freeFieldMappingProblems,
+  loadSnapshot,
+  pinnedEngineExportsContract,
+  sessionShapeProblems,
+} from "./engine-snapshot-check"
+import { REPO_ROOT } from "./registry"
 import {
   type AUTHORITY_ROOT_OPTIONS,
   calls,
@@ -48,6 +66,27 @@ import { scenarioProblems, scenarioShapeProblems } from "./scenario-check"
 // has a negative control in authority-controls.test.ts.
 type Equal<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
 type RequiredKeys<T> = { [K in keyof T]-?: object extends Pick<T, K> ? never : K }[keyof T]
+// Every free (non-literal) string path of an answer type, as "accounts[].check.message".
+type FreePaths<T, P extends string = ""> = T extends string
+  ? string extends T
+    ? P
+    : never
+  : T extends readonly (infer E)[]
+    ? FreePaths<E, `${P}[]`>
+    : T extends object
+      ? { [K in keyof T & string]-?: FreePaths<NonNullable<T[K]>, P extends "" ? K : `${P}.${K}`> }[keyof T & string]
+      : never
+type Listed = (typeof AUTH_CHECK_FREE_FIELDS)[number]["field"]
+type LeakyAnswer = Omit<AuthStatusAnswer, "accounts"> & {
+  readonly accounts: readonly (AuthStatusAnswer["accounts"][number] & { readonly leaked: string })[]
+}
+export const freeFieldTypeChecks: [true, true, true] = [
+  // The planted list is every free path of the person's answer, and nothing else (review 6062824873 M1).
+  true satisfies Equal<Exclude<FreePaths<AuthStatusAnswer>, Listed>, never>,
+  true satisfies Equal<Exclude<Listed, FreePaths<AuthStatusAnswer>>, never>,
+  // Control: an answer type with one added free field reports exactly that field as unplanted.
+  true satisfies Equal<Exclude<FreePaths<LeakyAnswer>, Listed>, "accounts[].leaked">,
+]
 export const authorityTypeChecks: [true, true, true] = [
   true satisfies Equal<keyof RootAuthorityOptions, (typeof AUTHORITY_ROOT_OPTIONS)[number]>,
   // A custody operation never picks where a secret goes because an argument was left out (security design 5.2).
@@ -91,43 +130,49 @@ describe("custody of slice P1a-s (#14949)", () => {
     expect(custodyResultProblems(results, CUSTODY_FIELDS)).toEqual([])
   })
 
-  test("#given a session's engine.auth.check #then its answer is signed-in state, the provider and closed codes only", () => {
+  test("#given a session's engine.auth.check #then its answer is the engine's option (c) shape and no free string but the provider", () => {
     const results = Object.fromEntries(Object.entries(SESSION_RESULTS).map(([key, schema]) => [key, json(schema)]))
     expect(custodyResultProblems(results, SESSION_FIELDS)).toEqual([])
-    for (const path of MAY_EMBED["engine.auth.check"]) expect(SESSION_FIELDS["engine.auth.check"]).not.toContain(path)
+    const session = json(SESSION_RESULTS["engine.auth.check"])
+    expect(stringLeaves(session)).toEqual(["provider"])
   })
 
-  test("#given a canary in each provider field in turn, a key-shaped address among them #then no session answer field holds it", () => {
+  test("#given a canary in every free field of the person's answer #then no field of a session's answer holds it", () => {
     // Security design 4.3 at 137d6b9879, the owner's named RED test at the contract's layer; the engine half is E1a-s's.
+    // The planted list is AUTH_CHECK_FREE_FIELDS, which a type check holds equal to every free path of the answer.
     const KEY = "sk-ant-api03-omo-canary-0000"
     const ADDRESS = "sk-ant-api03-omo-canary-0000@leak.test"
-    const account = { signedIn: true, source: "login", blocked: false }
-    const planted: Readonly<Record<string, (canary: string) => Record<string, unknown>>> = {
-      "check.message": (canary) => ({ ...account, check: { outcome: "failed", message: canary } }),
-      "check.reason": (canary) => ({ ...account, check: { outcome: "failed", reason: canary } }),
-      "check.code": (canary) => ({ ...account, check: { outcome: "failed", code: canary } }),
-      name: (canary) => ({ ...account, name: canary }),
-      displayName: (canary) => ({ ...account, displayName: canary }),
-      email: (canary) => ({ ...account, email: canary }),
-      orgName: (canary) => ({ ...account, orgName: canary }),
-      subscriptionType: (canary) => ({ ...account, subscriptionType: canary }),
-      usageUrl: (canary) => ({ ...account, usageUrl: canary }),
-      blockedReason: (canary) => ({ ...account, blocked: true, blockedReason: canary }),
-    }
-    const answer = (accounts: readonly Record<string, unknown>[]) => ({ status: "ready", provider: "p", accounts })
-    expect(
-      sessionAnswerAccepts(
-        "engine.auth.check",
-        answer([{ ...account, check: { outcome: "failed", code: "auth_error" } }]),
-      ),
-    ).toBe(true)
-    const carriers = Object.entries(planted).flatMap(([field, plant]) =>
-      [KEY, ADDRESS].some((canary) => sessionAnswerAccepts("engine.auth.check", answer([plant(canary)])))
-        ? [field]
-        : [],
+    const planted: string[] = AUTH_CHECK_FREE_FIELDS.map((entry) => entry.field)
+    expect(planted.toSorted()).toEqual(stringLeaves(json(CUSTODY_RESULTS["engine.auth.check"])).toSorted())
+    const valid = { status: "ready", provider: "p", accounts: [{ signed_in: true, check: "auth_error" }] }
+    expect(sessionAnswerAccepts("engine.auth.check", valid)).toBe(true)
+    const carriers = planted.filter(
+      (path) =>
+        path !== "provider" &&
+        [KEY, ADDRESS].some((canary) => sessionAnswerAccepts("engine.auth.check", plantAt(valid, path, canary))),
     )
     expect(carriers).toEqual([])
-    expect(sessionAnswerAccepts("engine.auth.check", { ...answer([]), reason: KEY })).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", plantAt(valid, "accounts[].check", ADDRESS))).toBe(false)
+  })
+
+  test("#given the engine's exports at 56cddc3b81 #then omo's table and session answer map to them in both directions", () => {
+    const snapshot = loadSnapshot()
+    expect(snapshot.source.commit).toBe("56cddc3b8137e0ff6f63975ed6e94fcf63c779e9")
+    expect(freeFieldMappingProblems(snapshot.free_fields, AUTH_CHECK_FREE_FIELDS)).toEqual([])
+    expect(sessionShapeProblems(snapshot, json(SESSION_RESULTS["engine.auth.check"]))).toEqual([])
+    expect<readonly string[]>([...AUTH_ACCOUNT_CHECK_CODES]).toEqual([...snapshot.check_codes])
+  })
+
+  test("#given omo's engine pin #then it does not export the contract yet, or the snapshot is stale and must be replaced", () => {
+    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "node_modules/@code-yeongyu/senpi/package.json"), "utf8"))
+    // The engine pin's pull request owns the swap: delete the snapshot and import the engine's contract.
+    expect({
+      exportsContract: pinnedEngineExportsContract(manifest.exports ?? {}),
+      why: AWAITING_ENGINE_PIN.why,
+    }).toEqual({
+      exportsContract: false,
+      why: AWAITING_ENGINE_PIN.why,
+    })
   })
 
   test("#given a secret offered as text #then no input takes it, and a hand-over with no destination is refused", () => {
@@ -171,3 +216,36 @@ describe("the table P1a held, slice P1a-s (#14949)", () => {
         )
   })
 })
+
+// Every string-typed leaf of a JSON schema, as a path ("accounts[].check.message"); enums and literals are not free text.
+function stringLeaves(node: Record<string, unknown>, path = ""): string[] {
+  const out: string[] = []
+  if (node.type === "string" && node.enum === undefined && node.const === undefined) out.push(path)
+  for (const [name, child] of Object.entries((node.properties ?? {}) as Record<string, Record<string, unknown>>))
+    out.push(...stringLeaves(child, path === "" ? name : `${path}.${name}`))
+  if (node.items !== undefined) out.push(...stringLeaves(node.items as Record<string, unknown>, `${path}[]`))
+  for (const variant of (node.anyOf ?? []) as Record<string, unknown>[]) out.push(...stringLeaves(variant, path))
+  return [...new Set(out)]
+}
+
+// A copy of `answer` with `value` set at `path`, creating the objects on the way; "[]" addresses the first element.
+function plantAt(answer: Record<string, unknown>, path: string, value: string): Record<string, unknown> {
+  const copy = structuredClone(answer)
+  let cursor: Record<string, unknown> = copy
+  const steps = path.split(".")
+  for (const [index, raw] of steps.entries()) {
+    const name = raw.replace(/\[\]$/, "")
+    const last = index === steps.length - 1
+    if (raw.endsWith("[]")) {
+      const list = (cursor[name] as Record<string, unknown>[] | undefined) ?? [{}]
+      cursor[name] = list
+      cursor = list[0] ?? {}
+    } else if (last) cursor[name] = value
+    else {
+      const next = cursor[name]
+      cursor[name] = typeof next === "object" && next !== null ? next : {}
+      cursor = cursor[name] as Record<string, unknown>
+    }
+  }
+  return copy
+}

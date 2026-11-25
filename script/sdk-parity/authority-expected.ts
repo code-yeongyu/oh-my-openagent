@@ -116,10 +116,13 @@ export const CUSTODY_FIELDS: Readonly<Record<string, readonly string[]>> = {
       ".check",
       ".check.model",
       ".check.outcome",
-      ".check.reason",
+      ".check.code",
       ".check.message",
       ".check.status",
       ".check.at",
+      ".check.provider_text",
+      ".check.provider_text.reason",
+      ".check.provider_text.message",
       ".signIn",
       ".active",
       ".paused",
@@ -176,21 +179,21 @@ export const CALL_ALIASES: readonly CallAlias[] = [
 /** Where the matrix follows a ruling ahead of the document; each fails as stale once the revision lands. None open. */
 export const AWAITING_REVISION: readonly AwaitingRevision[] = []
 
-/** The session's answer of engine.auth.check (option (c)): signed-in state, the provider and closed codes, no other string. */
+/** The session's answer of engine.auth.check (option (c), the engine's shape at 56cddc3b81). */
 export const SESSION_FIELDS: Readonly<Record<string, readonly string[]>> = {
   "engine.auth.check": [
     "status",
     "provider",
     "reason",
-    "authType",
+    "auth_type",
     "accounts",
     "accounts[]",
-    "accounts[].signedIn",
-    "accounts[].source",
-    "accounts[].blocked",
-    "accounts[].blockedReason",
+    "accounts[].signed_in",
     "accounts[].check",
-    "accounts[].check.outcome",
-    "accounts[].check.code",
   ],
 }
+
+/** The day omo's engine pin exports the engine's contract, delete the snapshot and import it (the engine pin's PR owns it). */
+export const AWAITING_ENGINE_PIN = {
+  why: "the engine exports AuthStatus, SessionAuthStatus and RESULT_FREE_FIELDS only at senpi#7463 (56cddc3b81), not at omo's pin",
+} as const

@@ -1,4 +1,5 @@
-import { type Namespace, type OmoSdkRoot, type OmoStream, ROOT_CALLS, type RootCallKey } from "../contract"
+import type { Namespace, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
+import { ROOT_CALLS } from "../contract/calls"
 import type { CoreContext, CoreLoaders, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
 
