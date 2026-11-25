@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { exitOf, INSTALL_UPDATE_EXITS, setup, update } from "../bin/lib/install-calls.js"
 import { runSelfUpdate } from "../bin/lib/self-update.js"
+import { opencodeConfigSources } from "../bin/lib/setup-opencode-assets.js"
 import { REAL_SETUP_FS } from "../bin/lib/setup-fs.js"
 import { setupEntryText } from "../bin/lib/setup-stream.js"
 import { summaryPhrase } from "../bin/lib/setup-summary.js"
@@ -139,6 +140,47 @@ describe("install.setup.apply after a stage's write throws", () => {
     expect(existsSync(fixture.authFile)).toBe(true)
     expect(JSON.stringify(answer)).not.toContain(CANARY)
   })
+})
+
+describe("install.setup.detect and .plan read only through the named port reads and write nothing", () => {
+  // The guard of the design lane's ruling: the port claims that the named reads happen, never that only they do, so
+  // a read through the port of any other path throws here, as does every effect: detect and plan must still answer.
+  const guarded = (named: ReadonlySet<string>, seen: string[]) => {
+    const refuse = (what: string) => () => {
+      throw new Error(`setup wrote through ${what}`)
+    }
+    return {
+      ...REAL_SETUP_FS,
+      read: (path: string) => {
+        if (!named.has(path)) throw new Error(`setup read ${path} through the port`)
+        seen.push(path)
+        return REAL_SETUP_FS.read(path)
+      },
+      mkdir: refuse("mkdir"),
+      writeFile: refuse("writeFile"),
+      copyFile: refuse("copyFile"),
+      copyTree: refuse("copyTree"),
+      rename: refuse("rename"),
+      remove: refuse("remove"),
+      chmod: refuse("chmod"),
+    }
+  }
+
+  for (const call of ["detect", "plan"] as const) {
+    test(`#given only the named reads and no writes allowed #then ${call} answers and reads OpenCode's config through the port`, async () => {
+      const { ports } = setupHome()
+      const config = join(ports.env.XDG_CONFIG_HOME as string, "opencode", "opencode.json")
+      mkdirSync(dirname(config), { recursive: true })
+      writeFileSync(config, JSON.stringify({ mcp: { docs: { type: "remote", url: "https://mcp.example.test" } } }))
+      const auth = join(ports.env.XDG_DATA_HOME as string, "opencode", "auth.json")
+      const named = new Set([auth, ...opencodeConfigSources(ports.home, ports.env).files])
+      const seen: string[] = []
+      const answer = await setup[call]({}, { ...ports, fs: guarded(named, seen) })
+      expect(answer.kind).toBe("ok")
+      expect(seen).toContain(auth)
+      if (call === "plan") expect(seen).toContain(config)
+    })
+  }
 })
 
 describe("install.setup.apply writes through the file port it is given", () => {
