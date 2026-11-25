@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
 import { integerOption, parseArgs, stateOption, THREAD_EXIT, THREAD_STATES } from "./thread-args.js"
+import { escapeForDisplay } from "./display-escape.js"
 import { humanLines } from "./thread-output.js"
 
 export { THREAD_EXIT } from "./thread-args.js"
@@ -114,7 +115,7 @@ function validate(name, parsed) {
 function refuse({ stdout, stderr }, json, code, line, nextAction) {
   if (json)
     stdout.write(`${JSON.stringify({ kind: "error", error: { code, message: line, next_action: nextAction } })}\n`)
-  stderr.write(`${line}\n`)
+  stderr.write(`${escapeForDisplay(line)}\n`)
 }
 
 /** `--json` among the options, before `--`: a usage error is still answered in JSON when the parse itself failed. */
@@ -296,7 +297,7 @@ export async function runThreadCommand(args, options) {
     if (result.kind !== "ok") {
       if (json) stdout.write(`${JSON.stringify(result)}\n`)
       stderr.write(
-        `omo thread ${name}: ${result.error.code}: ${result.error.message}\n  next: ${result.error.next_action}\n`,
+        `omo thread ${name}: ${escapeForDisplay(String(result.error.code))}: ${escapeForDisplay(String(result.error.message))}\n  next: ${escapeForDisplay(String(result.error.next_action))}\n`,
       )
       return exitCode
     }
