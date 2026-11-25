@@ -4,7 +4,7 @@ import { userInfo } from "node:os"
 import { dirname, join } from "node:path"
 import { accountHome } from "../account-home"
 import { CredentialStoreError, KeychainLockedError } from "../keystore"
-import { withCustodyLock } from "./custody-lock"
+import { LOCK_WAIT_MS, withCustodyLock } from "./custody-lock"
 import { recoverCustodyLog } from "./custody-recovery"
 import { type CallOutcome, ok } from "./outcome"
 
@@ -55,18 +55,25 @@ export function custodyLog(options: {
   readonly home: string
   readonly principal: CustodyPrincipal
   readonly now?: () => number
+  /** How long one record waits for the log's lock held by a live process (custody-lock.ts); then it is unwritten. */
+  readonly lockWaitMs?: number
 }): CustodyLog {
   const path = custodyLogPath(options.home)
   const now = options.now ?? Date.now
+  const deadline = () => Date.now() + (options.lockWaitMs ?? LOCK_WAIT_MS)
   const append = async (record: Omit<CustodyRecord, "id" | "at">): Promise<boolean> => {
     try {
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       const line = `${JSON.stringify({ id: randomUUID(), at: new Date(now()).toISOString(), ...record })}\n`
-      const written = await withCustodyLock(path, async () => {
-        await appendFile(path, line, { mode: 0o600 })
-        await chmod(path, 0o600)
-        return true
-      })
+      const written = await withCustodyLock(
+        path,
+        async () => {
+          await appendFile(path, line, { mode: 0o600 })
+          await chmod(path, 0o600)
+          return true
+        },
+        deadline(),
+      )
       return written === true
     } catch {
       return false
@@ -78,7 +85,7 @@ export function custodyLog(options: {
     capability,
     destination: "store" as const,
   })
-  const recover = () => withCustodyLock(path, () => recoverCustodyLog(path, now())).catch(() => undefined)
+  const recover = () => withCustodyLock(path, () => recoverCustodyLog(path, now()), deadline()).catch(() => undefined)
   return {
     async begin(capability) {
       await recover()
