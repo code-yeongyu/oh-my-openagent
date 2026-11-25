@@ -269,6 +269,21 @@ describe("thread_create on another device survives a lost open reply", () => {
     expect(await run("thread_create", args)).toMatchObject({ kind: "error", error: { code: "idempotency_uncertain" } })
     expect(opens(a.sent)).toHaveLength(1)
   })
+
+  // #15002: the uncertain answer of a keyed create tells the caller the same-key retry is safe (it adopts what the open
+  // made and never opens a second session), instead of sending it to read every listed thread first.
+  test("#given a keyed create whose open reply is lost and b lists nothing under the derived id #when thread_create answers #then idempotency_uncertain says a same-key retry is safe", async () => {
+    const a = account({ openLosesReply: 1, ignoresDurableSessionId: true })
+    const { run } = surface(a.remote)
+
+    const result = await run("thread_create", { device: "studio", name: "retry-hint", idempotency_key: "remote-lost-hint" })
+
+    expect(result).toMatchObject({
+      kind: "error",
+      error: { code: "idempotency_uncertain", details: { retry_same_key_safe: true, idempotency_key: "remote-lost-hint" } },
+    })
+    expect(result.kind === "error" ? result.error.next_action : "").toContain("same idempotency_key")
+  })
 })
 
 // #14569: a same-key recovery answers what the first create would have, keeps the first uncertain cause, and an
