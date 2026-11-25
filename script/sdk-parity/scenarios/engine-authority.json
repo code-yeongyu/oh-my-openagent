@@ -1123,6 +1123,68 @@
       ]
     },
     {
+      "id": "engine.auth.check/session-answer-withholds-provider-text",
+      "row": "engine.auth.check",
+      "kind": "effect",
+      "change": "B6",
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "input": {},
+      "expect": [
+        {
+          "port": "engine",
+          "op": "auth.check",
+          "args": {
+            "refresh": false
+          },
+          "result": {
+            "status": "ready",
+            "provider": "p",
+            "authType": "oauth",
+            "accounts": [
+              {
+                "name": "sk-ant-api03-omo-canary-0000",
+                "source": "login",
+                "blocked": false,
+                "pinned": false,
+                "email": "sk-ant-api03-omo-canary-0000@leak.test",
+                "orgName": "sk-ant-api03-omo-canary-0000",
+                "subscriptionType": "sk-ant-api03-omo-canary-0000",
+                "usageUrl": "https://leak.test/sk-ant-api03-omo-canary-0000",
+                "signIn": "signed_in",
+                "check": {
+                  "model": "m",
+                  "outcome": "failed",
+                  "at": 1,
+                  "reason": "sk-ant-api03-omo-canary-0000",
+                  "message": "invalid key sk-ant-api03-omo-canary-0000"
+                }
+              }
+            ]
+          }
+        }
+      ],
+      "answer": {
+        "value": {
+          "status": "ready",
+          "provider": "p",
+          "accounts": [
+            {
+              "signedIn": true,
+              "source": "login",
+              "blocked": false,
+              "check": {
+                "outcome": "failed",
+                "code": "auth_error"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
       "id": "engine.schedule.list/host-read-refuses-connector",
       "row": "engine.schedule.list",
       "input": {},

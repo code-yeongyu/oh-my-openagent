@@ -13,12 +13,20 @@ export function tableProblems(rows: readonly Row[], scenarios: readonly TableSce
   for (const scenario of scenarios) {
     const at = `scenario ${scenario.id}`
     if (!scenario.id.startsWith(`${scenario.row}/`)) problems.push(`${at}: its id must start with "${scenario.row}/"`)
-    if (scenario.kind === "refusal" && scenario.refusal === undefined)
-      problems.push(`${at}: a refusal scenario names its code`)
-    if (scenario.kind !== "refusal" && scenario.refusal_from !== undefined)
-      problems.push(`${at}: refusal_from belongs to a refusal`)
-    if (scenario.kind === "effect" && scenario.expect.every((expectation) => (expectation.count ?? 1) === 0))
-      problems.push(`${at}: an effect scenario states a port effect; an answer alone builds nothing`)
+    const pure = rows.find((row) => row.id === scenario.row)?.pure === true
+    // The first call and every `then` step share one contract (review 6062344773); a step's diagnostic names its number.
+    const calls = [scenario, ...(scenario.then ?? [])]
+    for (const [index, call] of calls.entries()) {
+      const where = index === 0 ? at : `${at} step ${index + 1}`
+      if (call.kind === "refusal" && call.refusal === undefined)
+        problems.push(`${where}: a refusal scenario names its code`)
+      if (call.kind !== "refusal" && call.refusal_from !== undefined)
+        problems.push(`${where}: refusal_from belongs to a refusal`)
+      if (pure && call.kind === "effect" && call.answer === undefined)
+        problems.push(`${where}: a pure call's effect scenario states its answer`)
+      if (!pure && call.kind === "effect" && call.expect.every((expectation) => (expectation.count ?? 1) === 0))
+        problems.push(`${where}: an effect scenario states a port effect; an answer alone builds nothing`)
+    }
     if (scenario.abort !== undefined && !scenario.expect.some((expectation) => expectation.count === 0))
       problems.push(`${at}: an aborting scenario states with count 0 the effect that must not have happened`)
   }

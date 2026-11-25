@@ -112,7 +112,10 @@ export const BEHAVIOUR_CHANGES: readonly BehaviourChange[] = [
     who: "a session calling engine.auth.check",
     exists: "new",
     why_new: "engine.auth.check has no SDK form today; a session reaches the verb only through its shell, as a script",
-    approved: { outcome: "allow", says: "status only, with the refresh off: the auth store is not written" },
+    approved: {
+      outcome: "allow",
+      says: "status only, with the refresh off: the auth store is not written; whether each account is signed in, the provider and closed status codes, and no text a provider returned",
+    },
     evidence_present: false,
   },
   {

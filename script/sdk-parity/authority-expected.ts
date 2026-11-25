@@ -176,12 +176,21 @@ export const CALL_ALIASES: readonly CallAlias[] = [
 /** Where the matrix follows a ruling ahead of the document; each fails as stale once the revision lands. None open. */
 export const AWAITING_REVISION: readonly AwaitingRevision[] = []
 
-/** The session's answer of engine.auth.check: the person's fields less what may embed provider text, plus the code. */
+/** The session's answer of engine.auth.check (option (c)): signed-in state, the provider and closed codes, no other string. */
 export const SESSION_FIELDS: Readonly<Record<string, readonly string[]>> = {
   "engine.auth.check": [
-    ...(CUSTODY_FIELDS["engine.auth.check"] ?? []).filter(
-      (field) => field !== "accounts[].check.reason" && field !== "accounts[].check.message",
-    ),
+    "status",
+    "provider",
+    "reason",
+    "authType",
+    "accounts",
+    "accounts[]",
+    "accounts[].signedIn",
+    "accounts[].source",
+    "accounts[].blocked",
+    "accounts[].blockedReason",
+    "accounts[].check",
+    "accounts[].check.outcome",
     "accounts[].check.code",
   ],
 }

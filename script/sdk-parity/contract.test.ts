@@ -36,7 +36,6 @@ import { UNRESOLVED_PATH } from "./baseline"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { portProblems } from "./expectation"
 import { loadScenarioTable } from "./scenario-table"
-import * as scenarioRules from "./scenario-rules"
 import { tableProblems } from "./scenario-rules"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
@@ -200,6 +199,20 @@ describe("wait options against their cores (design lane ruling on review 6061342
 })
 
 describe("producers and sequences (review 6062113819)", () => {
+  test("#given the recovery whose admission reply is lost #then the first prompt reaches b's session exactly once, on the retry", () => {
+    // thread-create-remote-lost-reply.test.ts:228: admit_external_message + prompt on b's session total exactly one.
+    const recovery = scenarios
+      .flatMap((file) => file.scenarios)
+      .find((scenario) => scenario.id === "threads.create/recovery-admission-lost")
+    const sends = (expect: readonly { port: string; op: string; count?: number }[] | undefined): number =>
+      (expect ?? [])
+        .filter((e) => e.port === "remote" && e.op === "sessions.send")
+        .reduce((sum, e) => sum + (e.count ?? 1), 0)
+    expect(sends(recovery?.expect)).toBe(0)
+    expect(recovery?.expect.some((e) => e.port === "remote" && e.op === "sessions.send" && e.count === 0)).toBe(true)
+    expect(sends(recovery?.then?.[0]?.expect)).toBe(1)
+  })
+
   test("#given internal_error #then the registry names threads, whose create answers it in a shipped test", () => {
     // thread/control/thread-create-remote-lost-reply.test.ts:218-229: a remote create whose recovery admission reply is
     // lost answers internal_error, so threads returns the code today.
@@ -234,24 +247,11 @@ describe("the table under P0's shared scenario rules", () => {
     ).toEqual([])
   })
 
-  // Bridge until P0's schema lists the pure rows the design lane ruled (account.signInCheck, toolkit.help: built by an
-  // answer with an empty observed trace). The next test fails as soon as scenario-rules.ts exports that list, so the
-  // bridge is deleted in the merge that brings it.
-  const PURE_ROWS_PENDING_P0 = ["account.signInCheck", "toolkit.help"]
-  const pendingPure = (problem: string): boolean =>
-    PURE_ROWS_PENDING_P0.some((row) => problem.startsWith(`scenario ${row}/`)) &&
-    problem.endsWith("an effect scenario states a port effect; an answer alone builds nothing")
-
   test("#given every scenario file #then each row with a thread input has an effect scenario on each target", () => {
     const problems = tableProblems(
       rows,
       scenarios.flatMap((file) => file.scenarios),
     )
-    expect(problems.filter((problem) => !pendingPure(problem))).toEqual([])
-    expect(problems.filter(pendingPure)).toHaveLength(PURE_ROWS_PENDING_P0.length)
-  })
-
-  test("#given P0's scenario rules #then they do not yet list pure rows, so the local bridge above is still needed", () => {
-    expect(Object.keys(scenarioRules).filter((name) => /pure/i.test(name))).toEqual([])
+    expect(problems).toEqual([])
   })
 })

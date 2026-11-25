@@ -41,23 +41,30 @@ const field = (value: unknown, key: string): unknown => Reflect.get(Object(value
 const isStream = (value: unknown): value is AsyncIterable<unknown> =>
   typeof value === "object" && value !== null && Symbol.asyncIterator in value
 
-type Settled = {
-  readonly answer: unknown
-  readonly terminal?: "outcome" | "failure" | "cancelled"
-  readonly missing?: true
-}
+type Settled = { readonly answer: unknown } | { readonly broken: string }
 
+// Design 4.4: a stream ends with exactly one terminal event, the last one, carrying exactly one of outcome, failure or
+// cancelled. Anything else (no end, an event after the end, two ends, an end with none or several of them) is broken.
 async function settle(answer: unknown): Promise<Settled> {
   if (!isStream(answer)) return { answer: await answer }
-  for await (const event of answer) {
-    if (field(event, "kind") !== "end") continue
-    if (field(event, "cancelled") === true)
-      return { answer: { kind: "error", error: { code: "cancelled" } }, terminal: "cancelled" }
-    const failure = field(event, "failure")
-    if (failure !== undefined) return { answer: { kind: "error", error: failure }, terminal: "failure" }
-    return { answer: { kind: "ok", value: field(event, "outcome") }, terminal: "outcome" }
-  }
-  return { answer: undefined, missing: true }
+  const events: unknown[] = []
+  for await (const event of answer) events.push(event)
+  const ends = events.filter((event) => field(event, "kind") === "end")
+  if (ends.length === 0) return { broken: "the stream ended with no terminal event" }
+  if (ends.length > 1) return { broken: `the stream sent ${ends.length} terminal events` }
+  const [end] = ends
+  if (events.at(-1) !== end) return { broken: "the stream sent an event after its terminal event" }
+  const parts = (["outcome", "failure", "cancelled"] as const).filter((key) => field(end, key) !== undefined)
+  if (parts.length !== 1)
+    return {
+      broken: `the terminal event carries ${parts.length === 0 ? "none" : parts.join(" and ")} of outcome, failure, cancelled`,
+    }
+  if (parts[0] === "cancelled")
+    return field(end, "cancelled") === true
+      ? { answer: { kind: "error", error: { code: "cancelled" } } }
+      : { broken: "cancelled must be true" }
+  if (parts[0] === "failure") return { answer: { kind: "error", error: field(end, "failure") } }
+  return { answer: { kind: "ok", value: field(end, "outcome") } }
 }
 
 // A refusal is read from the root failure, or (for a call whose value is the engine's own reply) the value's error field.
@@ -71,6 +78,40 @@ function refusalOf(answer: unknown): { readonly code?: string; readonly source?:
   return typeof code === "string" ? { code, source: "value" } : {}
 }
 
+type Call = {
+  readonly input: Readonly<Record<string, unknown>>
+  readonly refusal_from?: "root" | "value"
+  readonly kind: "effect" | "refusal"
+}
+
+async function invoke(
+  member: unknown,
+  call: Call,
+  signal: AbortSignal,
+): Promise<{
+  readonly code?: string
+  readonly codeSource?: "root" | "value"
+  readonly answered?: unknown
+  readonly threw?: string
+}> {
+  try {
+    const settled = await settle(
+      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [call.input, { signal }]),
+    )
+    if ("broken" in settled) return { threw: settled.broken }
+    const { code, source } = refusalOf(settled.answer)
+    const isRefusal = field(settled.answer, "kind") === "error" || call.refusal_from === "value"
+    return {
+      answered: settled.answer,
+      ...(code !== undefined && isRefusal ? { code, codeSource: source } : {}),
+    }
+  } catch (error) {
+    return { threw: error instanceof Error ? error.message : String(error) }
+  }
+}
+
+// Every call of a scenario runs on the same fixture, in order: the first, then each `then` step on the state the one
+// before it left. Each call's evidence carries only the port calls observed during that call.
 export async function runEffectScenarios(
   rows: readonly Row[],
   runs: readonly ScenarioRun[] = SCENARIO_RUNS,
@@ -80,54 +121,36 @@ export async function runEffectScenarios(
     const row = rows.find((candidate) => candidate.id === scenario.row)
     const { root, calls, after } = setup()
     const invoked: string[] = []
-    let member: unknown = forwarding(root, [], invoked)
-    for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
+    const memberOf = (): unknown => {
+      let member: unknown = forwarding(root, [], invoked)
+      for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
+      return member
+    }
     const controller = new AbortController()
     if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
-    const base = {
-      scenario: scenario.id,
-      row: scenario.row,
-      kind: scenario.kind,
-      input: scenario.input,
-      expect: scenario.expect,
-      ...(scenario.target === undefined ? {} : { target: scenario.target }),
-      ...(scenario.refusal === undefined ? {} : { refusal: scenario.refusal }),
-      ...(scenario.refusal_from === undefined ? {} : { refusalFrom: scenario.refusal_from }),
-      ...(scenario.answer === undefined ? {} : { answer: scenario.answer }),
-    }
-    try {
-      const settled = await settle(
-        Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [
-          scenario.input,
-          { signal: controller.signal },
-        ]),
-      )
-      if (settled.missing === true) {
-        evidence.push({
-          ...base,
-          member: invoked.join(","),
-          observed: calls(),
-          threw: "the stream ended with no terminal event",
-        })
-        continue
-      }
-      const { code, source } = refusalOf(settled.answer)
-      const isRefusal = field(settled.answer, "kind") === "error" || scenario.refusal_from === "value"
-      evidence.push({
-        ...base,
-        member: invoked.join(","),
-        observed: calls(),
-        answered: field(settled.answer, "value"),
-        ...(code !== undefined && isRefusal ? { code, codeSource: source } : {}),
-      })
-    } catch (error) {
-      evidence.push({
-        ...base,
-        member: invoked.join(","),
-        observed: calls(),
-        threw: error instanceof Error ? error.message : String(error),
+    const sequence = [scenario, ...(scenario.then ?? [])]
+    const records: EffectEvidence[] = []
+    for (const [index, step] of sequence.entries()) {
+      const seen = calls().length
+      const before = invoked.length
+      const result = await invoke(memberOf(), step, controller.signal)
+      records.push({
+        scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
+        row: scenario.row,
+        kind: step.kind,
+        member: invoked.slice(before).join(","),
+        input: step.input,
+        expect: step.expect,
+        observed: calls().slice(seen),
+        ...(scenario.target === undefined ? {} : { target: scenario.target }),
+        ...(step.refusal === undefined ? {} : { refusal: step.refusal }),
+        ...(step.refusal_from === undefined ? {} : { refusalFrom: step.refusal_from }),
+        ...(step.answer === undefined ? {} : { answer: step.answer }),
+        ...result,
       })
     }
+    const [first, ...steps] = records
+    if (first !== undefined) evidence.push(steps.length === 0 ? first : { ...first, steps })
   }
   return evidence
 }

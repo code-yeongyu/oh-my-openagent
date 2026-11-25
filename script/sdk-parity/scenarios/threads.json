@@ -6976,15 +6976,68 @@
         }
       ],
       "fault": {
-        "port": "remote",
-        "op": "sessions.send",
-        "fault": "lost_reply"
+        "port": "store",
+        "op": "idempotency_put",
+        "fault": "lost_reply",
+        "occurrence": 2
       },
       "expect": [
+        {
+          "port": "store",
+          "op": "idempotency_put",
+          "args": {
+            "key": "k8",
+            "phase": "recovery"
+          }
+        },
         {
           "port": "remote",
           "op": "sessions.open",
           "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "count": 0
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "device": "studio",
+            "name": "lost-admit",
+            "prompt": "build it",
+            "idempotency_key": "k8"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "remote",
+              "op": "sessions.open",
+              "count": 0
+            },
+            {
+              "port": "remote",
+              "op": "sessions.list",
+              "args": {
+                "device": "studio"
+              }
+            },
+            {
+              "port": "remote",
+              "op": "sessions.send",
+              "args": {
+                "thread": "t-k8",
+                "message": "build it"
+              },
+              "count": 1
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-k8",
+            "device": "b"
+          }
         }
       ]
     }

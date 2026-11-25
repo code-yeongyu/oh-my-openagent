@@ -87,10 +87,10 @@ describe("conformance: the row's split and the answer (H2)", () => {
   })
 
   test("#given a stated answer the call does not give #then it fails, in addition to the port expectations", async () => {
-    const answered: TableScenario = { ...scenario("by-id", undefined), answer: { value: { thread: "t1" } } }
-    const runs = [run(answered, { kind: "ok", value: { thread: "t9" } }), ...pair.slice(1)]
+    const answered: TableScenario = { ...scenario("by-id", undefined), answer: { thread: "t1" } }
+    const runs = [run(answered, { kind: "ok", thread: "t9" }), ...pair.slice(1)]
     expect(await problems(runs)).toContainEqual(
-      'row threads.locate: scenario threads.locate/by-id: answered {"thread":"t9"}, not the expected {"thread":"t1"}',
+      'row threads.locate: scenario threads.locate/by-id: answered {"kind":"ok","thread":"t9"}, not the expected {"thread":"t1"}',
     )
   })
 
