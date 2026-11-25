@@ -237,3 +237,68 @@ describe("account.signIn on the root", () => {
     expect({ reached, touched }).toEqual({ reached: false, touched: [] })
   })
 })
+
+describe("account.signIn: a session stays on the shipped child (review 6064989985)", () => {
+  for (const form of ["root call", "compatibility form"] as const)
+    test(`#given a session root built with an in-process sign-in #when it signs in by the ${form} #then the child runs and the in-process sign-in and its setup never do`, async () => {
+      let reached = false
+      const { sdk, touched } = rootWith({
+        principal: { kind: "session", session_id: "01-session" },
+        inProcess: async () => {
+          reached = true
+          return { kind: "refused", code: "cancelled" }
+        },
+      })
+      const answer =
+        form === "root call"
+          ? await sdk.account.signIn({ method: "device_code", onUserCode: () => undefined })
+          : await sdk.account.signIn({ onUserCode: () => undefined })
+      expect({ kind: answer.kind, reached, touched }).toEqual({ kind: "ok", reached: false, touched: ["process"] })
+    })
+})
+
+describe("account.signIn cancellation (review 6064989985)", () => {
+  const TODAY = {
+    kind: "error",
+    error: { code: "internal_error", message: "the sign-in was cancelled", next_action: "start a new sign-in" },
+  }
+  test("#given the shipped child and an aborted signal #then today's answer is the cancelled internal error", async () => {
+    const controller = new AbortController()
+    controller.abort()
+    const sdk = assembleOmoSdk(
+      {
+        principal: { kind: "session", session_id: "01-session" },
+        env: { OMO_SERVICE_API_URL: "https://api.example.test" },
+        cwd: "/work",
+        ports: { desktopLaunch: () => false, signInProcess: async () => ({ code: null }) },
+      },
+      {},
+    )
+    expect((await sdk.account.signIn({ onUserCode: () => undefined, signal: controller.signal })) as unknown).toEqual(
+      TODAY,
+    )
+  })
+  for (const form of ["root call", "compatibility form"] as const)
+    test(`#given an in-process sign-in #when the ${form}'s signal aborts #then the request carries it and the answer is today's`, async () => {
+      const controller = new AbortController()
+      const signals: (AbortSignal | undefined)[] = []
+      const { sdk } = rootWith({
+        inProcess: async (_api, request: SignInRequest) => {
+          signals.push(request.signal)
+          controller.abort()
+          return { kind: "refused", code: "cancelled" }
+        },
+      })
+      const answer =
+        form === "root call"
+          ? await sdk.account.signIn(
+              { method: "device_code", onUserCode: () => undefined },
+              { signal: controller.signal },
+            )
+          : await sdk.account.signIn({ onUserCode: () => undefined, signal: controller.signal })
+      expect({ answer: answer as unknown, carried: signals[0] === controller.signal }).toEqual({
+        answer: TODAY,
+        carried: true,
+      })
+    })
+})

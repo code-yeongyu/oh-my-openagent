@@ -58,15 +58,19 @@ export type SignInRequest = {
   readonly chooseDevice?: ChooseDevice
   /** Whether to replace this machine's earlier device when the service names one; absent, it is not replaced. */
   readonly replaceDevice?: (existing: MachineDevice) => Promise<boolean>
+  /** Cancels the sign-in; the answer is then the `cancelled` refusal and nothing is stored. */
+  readonly signal?: AbortSignal
 }
 
-export type SignInFailure = SignInRefusal | { readonly code: "accounts_closed" }
+export type SignInFailure = SignInRefusal | { readonly code: "accounts_closed" } | { readonly code: "cancelled" }
 
 export async function accountSignIn(
   deps: SignInDependencies,
   request: SignInRequest,
 ): Promise<CallOutcome<SignedIn, SignInFailure>> {
   if (!deps.accountsOpen && request.method !== "device_code") return refusedWith({ code: "accounts_closed" })
+  const cancelled = (): boolean => request.signal?.aborted === true
+  if (cancelled()) return refusedWith({ code: "cancelled" })
   let limitDevices: readonly ListedDevice[] | undefined
   let callback: Promise<void> = Promise.resolve()
   let replacedDeviceId: string | undefined
@@ -112,6 +116,7 @@ export async function accountSignIn(
     await callback
   } catch (error) {
     await callback.catch(() => undefined)
+    if (cancelled()) return refusedWith({ code: "cancelled" })
     return refusedWith(signInRefusal(error, limitDevices))
   }
   const stored = await deps.store.read()
@@ -124,6 +129,8 @@ export async function accountSignIn(
     })
   const deviceService: DeviceServiceOutcome =
     deps.setUpDeviceService === undefined ? "not_run" : await deps.setUpDeviceService().catch(() => "not_on" as const)
+  // An abort during the setup answers as the launcher child answered it: cancelled, with the approved sign-in stored.
+  if (cancelled()) return refusedWith({ code: "cancelled" })
   return ok({
     api: deps.api,
     device: { id: stored.device.id, name: stored.device.name },

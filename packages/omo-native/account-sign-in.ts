@@ -138,6 +138,15 @@ export async function runSignInVerb(dependencies: SignInVerbDependencies, flags:
     dependencies.error(USAGE)
     return ACCOUNT_EXIT.invalid
   }
+  if (signedIn.code === "cancelled") {
+    emit({
+      event: "refused",
+      code: "internal_error",
+      message: "the sign-in was cancelled",
+      next_action: "start a new sign-in",
+    })
+    return ACCOUNT_EXIT.failed
+  }
   const { code, message, next_action, details, cause } = signedIn
   if (code === "internal_error" && cause !== undefined)
     dependencies.error(cause instanceof Error ? cause.message : String(cause))

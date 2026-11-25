@@ -57,10 +57,11 @@ const reply = (dependencies: AccountCommandDependencies, value: unknown, code: n
 const retireHook = (dependencies: AccountCommandDependencies): BeforeKeysDiscarded =>
   dependencies.beforeKeysDiscarded ?? (async () => undefined)
 
-const sessionOf = (dependencies: AccountCommandDependencies): Session =>
+const sessionOf = (dependencies: AccountCommandDependencies, signal?: AbortSignal): Session =>
   createSession({
     api: dependencies.api,
     store: dependencies.store,
+    ...(signal === undefined ? {} : { signal }),
     beforeKeysDiscarded: retireHook(dependencies),
     ...(dependencies.home === undefined ? {} : { home: dependencies.home }),
     ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
@@ -275,7 +276,7 @@ export function signInInLauncher(api: string, request: SignInRequest) {
     readStdin: async () => "",
   })
   const { store, deviceService, setUpDeviceService } = deps
-  const session = sessionOf(deps)
+  const session = sessionOf(deps, request.signal)
   return accountSignIn(
     { api, session, store, deviceService, accountsOpen: serviceAccountsOpen(), setUpDeviceService },
     request,

@@ -147,7 +147,9 @@ async function run(
     if (signedIn.kind === "refused")
       throw signedIn.code === "accounts_closed"
         ? new SignInError(CLOSED_LOGIN_MESSAGE)
-        : (signedIn.cause ?? new Error(signedIn.message))
+        : signedIn.code === "cancelled"
+          ? new SignInError("Sign-in cancelled.")
+          : (signedIn.cause ?? new Error(signedIn.message))
     const { replacedDeviceId } = signedIn.value
     if (replacedDeviceId !== undefined)
       console.log(`This computer's earlier OmO device (id ${terminalText(replacedDeviceId)}) was signed out.`)
