@@ -23,6 +23,11 @@ export type NamespaceServing = {
   readonly close?: () => void
   /** Releases what the core holds (the gateway store, the remote sessions). */
   readonly dispose?: () => Promise<void>
+  /**
+   * Records a boundary refusal of one of its calls (refused, with the reason code, never the input), for a namespace
+   * whose calls bear custody (security owner's ruling): every refusal the root answers at its boundary reaches it.
+   */
+  readonly recordRefusal?: (key: RootCallKey, code: string) => Promise<void> | undefined
 }
 
 /** What a core loader is handed: the root's own fixed facts, never a per-call input. */

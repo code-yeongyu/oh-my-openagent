@@ -65,11 +65,20 @@ const loadFailure = (namespace: string) => async () => ({
   },
 })
 
-function refusing(key: RootCallKey, error: OmoFailure["error"]): Call {
-  if (ROOT_CALL_ANSWERS[key] !== "stream") return async () => ({ kind: "error", error })
+// Every boundary refusal (no line, a refused line, an invalid input) is handed to the namespaces that record refusals
+// (refused, with the reason code, never the input) before it is answered.
+function refusing(key: RootCallKey, error: OmoFailure["error"], servings: readonly NamespaceServing[]): Call {
+  const record = () =>
+    Promise.all(servings.map((serving) => serving.recordRefusal?.(key, error.code)?.catch(() => undefined)))
+  if (ROOT_CALL_ANSWERS[key] !== "stream")
+    return async () => {
+      await record()
+      return { kind: "error", error }
+    }
   return () => ({
     stop: () => undefined,
     async *[Symbol.asyncIterator]() {
+      await record()
       yield { kind: "end", failure: error }
     },
   })
@@ -104,8 +113,8 @@ async function accepts(key: RootCallKey, input: unknown): Promise<boolean> {
   return inputAccepts(key, await checkedInput(key, input))
 }
 
-function checked(key: RootCallKey, member: Call): Call {
-  const refuse = refusing(key, invalidInput(key))
+function checked(key: RootCallKey, member: Call, servings: readonly NamespaceServing[]): Call {
+  const refuse = refusing(key, invalidInput(key), servings)
   if (ROOT_CALL_ANSWERS[key] === "stream")
     return (...args) =>
       lazyStream(
@@ -145,15 +154,15 @@ export function assembleRoot(
   for (const key of Object.keys(ROOT_CALL_ANSWERS) as RootCallKey[]) {
     const refused = refusals.get(key)
     if (refused !== undefined) {
-      place(tree, key, refusing(key, refused))
+      place(tree, key, refusing(key, refused, servings))
       continue
     }
     const serving = servings.find((candidate) => candidate.members[key] !== undefined)
     const member = serving?.members[key] ?? loaded(key, loads)
     // The order of answers (design 4.4): the principal's line (placed above), then the input, then availability, then the
     // port; an unbuilt call checks its input before it answers not_implemented.
-    if (member === undefined) place(tree, key, checked(key, notImplemented(key)))
-    else place(tree, key, serving?.legacy?.includes(key) === true ? member : checked(key, member as Call))
+    if (member === undefined) place(tree, key, checked(key, notImplemented(key), servings))
+    else place(tree, key, serving?.legacy?.includes(key) === true ? member : checked(key, member as Call, servings))
   }
   const close = (): void => {
     for (const serving of servings) serving.close?.()
