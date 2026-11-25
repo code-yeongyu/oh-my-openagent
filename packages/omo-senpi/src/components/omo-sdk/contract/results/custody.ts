@@ -95,14 +95,24 @@ const ProviderFields = {
 }
 
 /**
- * The only provider-supplied strings a session receives (security design 4.3, the owner's decision at 169406bab8): the
- * account's email, syntactically an address of at most 254 characters, and its organisation name, at most 100 characters
- * with control and newline characters stripped. A value outside these bounds is not a session answer; the engine
- * (slice E1a-s) strips or omits it where it splits the code from the provider's text.
+ * The only provider-supplied strings a session's answer may carry (security design 4.3, the owner's decision at
+ * 169406bab8): the account's email, syntactically an address of at most 254 characters, and its organisation name, at
+ * most 100 characters with control and newline characters stripped. These bounds are an output contract, not the proof
+ * of non-disclosure (46e4d1407c): that proof is the canary test, which plants a canary in each provider field in turn.
+ * The engine (slice E1a-s) strips or omits a value outside them where it splits the code from the provider's text.
  */
 export const SESSION_EMAIL = Type.String({ minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" })
 export const SESSION_ORG_NAME = Type.String({ minLength: 1, maxLength: 100, pattern: "^[^\\u0000-\\u001f\\u007f]*$" })
-const SessionProviderFields = { email: Type.Optional(SESSION_EMAIL), orgName: Type.Optional(SESSION_ORG_NAME) }
+
+/**
+ * Whether an address-shaped secret in the email is a residual, dropped by a rule, or the email withheld from a session is
+ * the security owner's open decision. Withholding it is this one line: set it to "withheld".
+ */
+export const SESSION_EMAIL_POLICY: "address" | "withheld" = "address"
+const SessionProviderFields = {
+  ...(SESSION_EMAIL_POLICY === "address" ? { email: Type.Optional(SESSION_EMAIL) } : {}),
+  orgName: Type.Optional(SESSION_ORG_NAME),
+}
 const CheckCore = {
   model: Text,
   outcome: Type.Enum(["ok", "failed"]),
