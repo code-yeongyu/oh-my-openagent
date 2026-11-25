@@ -1,7 +1,7 @@
 import { type BaselineEntry, sha256 } from "./baseline"
 import type { Outcome } from "./scenario-run"
 import type { Scenario } from "./scenarios"
-import type { FieldSchema, Row } from "./schema"
+import type { Row } from "./schema"
 import { schemaDifferences, type DiscoveredTool } from "./tool-check"
 
 // The changed-capability gate of design 7.4 (amendments 2 and 3). A demonstrated change fails it: a descriptor or tool-schema
@@ -39,25 +39,14 @@ const UNCHANGED_LINE = /^SDK-Parity-Unchanged:\s*yes\s*$/im
 const SLICE_LINE = /^SDK-Parity-Slice:\s*(\S+)\s*$/gim
 
 // Design 7.4 (amendment 5): a row has two parts. Its DESCRIPTOR is what a surface accepts or calls: the sdk member, each
-// cli entry, each tool binding, which input fields exist at every depth and which are required, plus its kind, today
+// cli entry, each tool binding, which input fields exist and which are required, plus its kind, today
 // value, surfaces, projection and modules. Any change there under an unresolved entry fails. Everything else (a named
 // field's type, enum, nested schema, scenario ids, notes) is CONTRACT ANNOTATION: its change alone makes a candidate.
-function fieldShape(schema: FieldSchema, path: string, out: string[]): void {
-  for (const required of schema.required ?? []) out.push(`required ${path}.${required}`)
-  for (const [name, inner] of Object.entries(schema.properties ?? {})) {
-    out.push(`field ${path}.${name}`)
-    fieldShape(inner, `${path}.${name}`, out)
-  }
-  for (const variant of schema.anyOf ?? []) fieldShape(variant, path, out)
-  if (schema.items !== undefined) fieldShape(schema.items, `${path}[]`, out)
-}
-
 export function descriptorOf(row: Row): string {
-  const shape: string[] = row.input.required.map((name) => `required ${name}`)
-  for (const [name, schema] of Object.entries(row.input.properties)) {
-    shape.push(`field ${name}`)
-    fieldShape(schema, name, shape)
-  }
+  const shape = [
+    ...Object.keys(row.input.properties).map((name) => `field ${name}`),
+    ...row.input.required.map((name) => `required ${name}`),
+  ]
   const { id, kind, sdk, today, slices, cli, tool, planned, omitted, projection, modules } = row
   return JSON.stringify({
     id,

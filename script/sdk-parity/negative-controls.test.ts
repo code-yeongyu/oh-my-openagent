@@ -17,6 +17,8 @@ import { discoverOmoTools } from "./tool-registry"
 // #14970: each one breaks one thing and expects the check to fail with a message naming what to fix.
 
 const files = loadDomainFiles()
+// Scanned once for the file: the inventory walks every reachable native module.
+const NATIVE_FINDINGS = nativeArgvInventory(REPO_ROOT)
 const rows = allRows(files)
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const row = (id: string): Row => {
@@ -113,7 +115,7 @@ describe("negative controls: exact route correspondence and the published mappin
     const entry = attach.cli.find((cli) => cli.route.join(" ") === "remote attach")
     if (entry === undefined) throw new Error("no remote attach entry")
     Object.assign(entry.flags, { "--json": "render" })
-    expect(routeFlagProblems(nativeArgvInventory(REPO_ROOT), replaced(attach))).toEqual([
+    expect(routeFlagProblems(NATIVE_FINDINGS, replaced(attach))).toEqual([
       'row threads.attach maps --json on "remote attach", which its dispatcher does not accept for attach; remove the mapping',
     ])
   })

@@ -2,15 +2,17 @@ import { describe, expect, test } from "bun:test"
 
 import { baselineProblems, PIN_PATH } from "./baseline"
 import { conformanceProblems, type EffectEvidence } from "./conformance"
-import { type EffectScenario, runEffectScenarios } from "./conformance-run"
+import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
+import { expectationProblems, type ObservedCall, portProblems, type TableScenario } from "./expectation"
 import { gateReport, goldenProblems } from "./gate"
 import { input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"
 
-// Negative controls of design 7.2, 7.3 and 7.6 for what builds a row (reviews 6061267823 H1/H3, 6061624223 H1): typed run
-// evidence whose observed effect equals the scenario's expected one, every input covered, and the first gap closure.
+// Negative controls of design 7.2, 7.3 and 7.6 for what builds a row (reviews 6061267823 H1/H3, 6061624223 H1, amendment
+// 5): typed run evidence whose observed port calls match the scenario's expected effect, every optional input covered by
+// a pair of scenarios that differ in it alone, and the first gap closure.
 
-describe("negative controls: goldens, evidence and the first closure (7.6, review 6061267823 H1, H3)", () => {
+describe("negative controls: goldens, evidence and the first closure (7.6)", () => {
   test("#given a stored golden edited with the behaviour unchanged #then it differs from the live outcome", () => {
     expect(goldenProblems({ s1: { exit: 3 } }, { s1: { exit: 2 } })).toEqual([
       "goldens.json s1 differs from the scenario's live outcome; regenerate with bun script/sdk-parity/scenario-run.ts --out script/sdk-parity/goldens.json",
@@ -25,93 +27,108 @@ describe("negative controls: goldens, evidence and the first closure (7.6, revie
 
   const locate = rows.find((row) => row.id === "threads.locate")
   if (locate === undefined) throw new Error("no threads.locate row")
-  const built: Row = { ...locate, today: "yes", scenarios: { effect: ["locate-by-id"], refusal: [] } }
+  const built: Row = {
+    ...locate,
+    today: "yes",
+    scenarios: { effect: ["threads.locate/by-id", "threads.locate/all-scope"], refusal: [] },
+  }
   const builtRows = rows.map((row) => (row.id === "threads.locate" ? built : row))
   const open = new Set(unresolved.entries.map((entry) => entry.id).filter((id) => id !== "threads.locate"))
-  const fakeRoot = (answer: unknown, overrides: Partial<EffectScenario> = {}): EffectScenario => {
-    const seen: unknown[] = []
-    return {
-      id: "locate-by-id",
-      capability: "threads.locate",
-      input: { thread: "t1", all_scope: true },
-      covers: ["thread", "all_scope"],
-      expected: { thread: "t1", all_scope: true },
-      setup: () => ({
-        root: { threads: { locate: (input: unknown) => (seen.push(input), answer) } },
-        port: "host.listSessions",
-        observe: () => seen[0],
-      }),
-      ...overrides,
-    }
-  }
+
+  const scenario = (id: string, scopeAll: boolean | undefined): TableScenario => ({
+    id: `threads.locate/${id}`,
+    row: "threads.locate",
+    kind: "effect",
+    input: scopeAll === undefined ? { thread: "t1" } : { thread: "t1", all_scope: scopeAll },
+    expect: [{ port: "host", op: "listSessions", args: { allScope: scopeAll === true } }],
+  })
+  // A fake host whose listSessions call is observed; the SDK member under test forwards its input to it.
+  const run = (
+    table: TableScenario,
+    answer: unknown = { kind: "ok" },
+    member = (calls: ObservedCall[], input: unknown) => {
+      calls.push({
+        port: "host",
+        op: "listSessions",
+        args: { allScope: Reflect.get(Object(input), "all_scope") === true, limit: 50 },
+      })
+      return answer
+    },
+  ): ScenarioRun => ({
+    scenario: table,
+    setup: () => {
+      const calls: ObservedCall[] = []
+      return { root: { threads: { locate: (input: unknown) => member(calls, input) } }, calls: () => calls }
+    },
+  })
+  const pair = [run(scenario("by-id", undefined)), run(scenario("all-scope", true))]
 
   test("#given a stub answering not_implemented on a row counted as built #then it is named", async () => {
     const evidence = await runEffectScenarios(builtRows, [
-      fakeRoot({ kind: "error", error: { code: "not_implemented" } }),
+      run(scenario("by-id", undefined), { kind: "error", error: { code: "not_implemented" } }),
+      pair[1] as ScenarioRun,
     ])
     expect(conformanceProblems(builtRows, open, evidence)).toContainEqual(
-      "row threads.locate: scenario locate-by-id answered not_implemented; threads.locate is a stub, build it",
+      "row threads.locate: scenario threads.locate/by-id answered not_implemented; threads.locate is a stub, build it",
     )
   })
 
   test("#given a row whose only scenario is a refusal #then it is not counted as built", () => {
     const refusalOnly = builtRows.map((row) =>
-      row.id === "threads.locate" ? { ...built, scenarios: { effect: [], refusal: ["locate-missing"] } } : row,
+      row.id === "threads.locate" ? { ...built, scenarios: { effect: [], refusal: ["threads.locate/missing"] } } : row,
     )
-    expect(conformanceProblems(refusalOnly, open, [])).toEqual([
+    expect(conformanceProblems(refusalOnly, open, [])).toContainEqual(
       "row threads.locate's only scenarios are refusals; add an effect scenario for each input of threads.locate",
-    ])
+    )
   })
 
-  test("#given a record whose member is not the row's call #then the evidence does not build the row", () => {
-    const wrong: EffectEvidence = {
-      scenario: "locate-by-id",
-      capability: "threads.locate",
-      member: "threads.list",
-      input: {},
-      covers: ["thread", "all_scope"],
-      status: "passed",
-      effect: { port: "p", observed: 1, expected: 1 },
-    }
+  test("#given a record whose member is not the row's call #then the evidence does not build the row", async () => {
+    const [first] = await runEffectScenarios(builtRows, [pair[0] as ScenarioRun])
+    if (first === undefined) throw new Error("no record")
+    const wrong: EffectEvidence = { ...first, member: "threads.list" }
     expect(conformanceProblems(builtRows, open, [wrong])).toContainEqual(
-      "row threads.locate: scenario locate-by-id ran threads.list for threads.locate, not threads.locate",
+      "row threads.locate: scenario threads.locate/by-id ran threads.list for threads.locate, not threads.locate",
     )
   })
 
-  test("#given a run whose observed effect is not the scenario's expected one #then it does not build the row (review 6061624223 H1)", async () => {
-    const evidence = await runEffectScenarios(builtRows, [
-      fakeRoot({ kind: "ok" }, { expected: { thread: "t2", all_scope: true } }),
-    ])
+  test("#given a run whose port calls do not match the expected effect #then it does not build the row (review 6061624223 H1)", async () => {
+    const silent = run(scenario("by-id", undefined), { kind: "ok" }, () => ({ kind: "ok" }))
+    const evidence = await runEffectScenarios(builtRows, [silent, pair[1] as ScenarioRun])
     expect(conformanceProblems(builtRows, open, evidence)).toContainEqual(
-      'row threads.locate: scenario locate-by-id observed {"thread":"t1","all_scope":true} on host.listSessions, not the expected {"thread":"t2","all_scope":true}',
+      'row threads.locate: scenario threads.locate/by-id: host.listSessions {"allScope":false} expected 1 call(s), observed 0',
     )
   })
 
-  test("#given passing evidence that covers only some inputs #then each uncovered input is named", async () => {
-    const evidence = await runEffectScenarios(builtRows, [
-      fakeRoot({ kind: "ok" }, { input: { thread: "t1" }, covers: ["thread"], expected: { thread: "t1" } }),
-    ])
-    expect(conformanceProblems(builtRows, open, evidence)).toEqual([
-      "row threads.locate: input all_scope has no passing effect scenario; add one that covers it",
+  test("#given an optional input no pair of passing scenarios varies alone #then it is named", async () => {
+    const onlyOne = builtRows.map((row) =>
+      row.id === "threads.locate" ? { ...built, scenarios: { effect: ["threads.locate/by-id"], refusal: [] } } : row,
+    )
+    const evidence = await runEffectScenarios(onlyOne, [pair[0] as ScenarioRun])
+    expect(conformanceProblems(onlyOne, open, evidence)).toEqual([
+      "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",
     ])
   })
 
-  test("#given the first correct closure of a gap with evidence matching every input's expected effect #then the baseline admits it (positive control)", async () => {
-    const evidence = await runEffectScenarios(builtRows, [fakeRoot({ kind: "ok", thread: "t1" })])
-    expect(evidence).toEqual([
-      {
-        scenario: "locate-by-id",
-        capability: "threads.locate",
-        member: "threads.locate",
-        input: { thread: "t1", all_scope: true },
-        covers: ["thread", "all_scope"],
-        status: "passed",
-        effect: {
-          port: "host.listSessions",
-          observed: { thread: "t1", all_scope: true },
-          expected: { thread: "t1", all_scope: true },
-        },
-      },
+  test("#given the matching rules #then args are a subset, count 0 means never, result is never compared", () => {
+    const observed: ObservedCall[] = [{ port: "store", op: "read", args: { id: "a", extra: 1 } }]
+    expect(
+      expectationProblems([{ port: "store", op: "read", args: { id: "a" }, result: { anything: true } }], observed),
+    ).toEqual([])
+    expect(expectationProblems([{ port: "store", op: "write", count: 0 }], observed)).toEqual([])
+    expect(expectationProblems([{ port: "store", op: "read", count: 0 }], observed)).toEqual([
+      "store.read expected 0 call(s), observed 1",
+    ])
+    expect(portProblems([scenario("by-id", undefined)], { host: ["listSessions"] })).toEqual([])
+    expect(portProblems([scenario("by-id", undefined)], { host: ["list"] })).toEqual([
+      "scenario threads.locate/by-id expects host.listSessions, which is not a port operation",
+    ])
+  })
+
+  test("#given the first correct closure of a gap with evidence matching every scenario #then the baseline admits it (positive control)", async () => {
+    const evidence = await runEffectScenarios(builtRows, pair)
+    expect(evidence.map((record) => record.observed)).toEqual([
+      [{ port: "host", op: "listSessions", args: { allScope: false, limit: 50 } }],
+      [{ port: "host", op: "listSessions", args: { allScope: true, limit: 50 } }],
     ])
     const cleared = { ...unresolved, entries: unresolved.entries.filter((entry) => entry.id !== "threads.locate") }
     const state = {

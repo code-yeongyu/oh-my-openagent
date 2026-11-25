@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { type Baseline, baselineProblems, PIN_PATH, sha256 } from "./baseline"
-import { conformanceProblems, type EffectEvidence } from "./conformance"
-import { runEffectScenarios, type EffectScenario } from "./conformance-run"
+import type { EffectEvidence } from "./conformance"
 import { candidateDigest, gateReport, goldenProblems, renderReport } from "./gate"
 import { HEAD, input, original, rows, text, unresolved } from "./gate-fixture"
 import type { Row } from "./schema"

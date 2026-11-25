@@ -1,23 +1,18 @@
 import type { EffectEvidence } from "./conformance"
+import type { ObservedCall, TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
-// The effect-scenario runner of design 7.3 (review 6061267823 H3). Each scenario builds a root over fake ports, the runner
-// calls the row's SDK member through a forwarding proxy that records the member actually invoked, and the scenario reads
-// the effect its fake port observed. Its records are the only evidence that builds a row. P0 ships no SDK call, so the
-// table is empty; slice P1b and later add one entry per input that changes behaviour.
+// The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
+// the row's SDK member through a forwarding proxy that records the member actually invoked, and the fakes report every
+// port call they observed. Its records are the only evidence that builds a row. P0 ships no SDK call, so the list is
+// empty; slice P1b's drivers supply one run per table scenario.
 
-export type EffectScenario = {
-  readonly id: string
-  readonly capability: string
-  readonly input: unknown
-  // The row inputs this scenario proves (each input that changes behaviour needs one), and the effect the fake port must
-  // observe; the record passes only when the observation equals it.
-  readonly covers: readonly string[]
-  readonly expected: unknown
-  readonly setup: () => { readonly root: unknown; readonly port: string; readonly observe: () => unknown }
+export type ScenarioRun = {
+  readonly scenario: TableScenario
+  readonly setup: () => { readonly root: unknown; readonly calls: () => readonly ObservedCall[] }
 }
 
-export const EFFECT_SCENARIOS: readonly EffectScenario[] = []
+export const SCENARIO_RUNS: readonly ScenarioRun[] = []
 
 function forwarding(target: unknown, path: readonly string[], invoked: string[]): unknown {
   return new Proxy(() => undefined, {
@@ -31,45 +26,40 @@ function forwarding(target: unknown, path: readonly string[], invoked: string[])
 }
 
 const codeOf = (answer: unknown): string | undefined => {
-  const error = Reflect.get(Object(answer), "error")
-  const code = Reflect.get(Object(error), "code")
-  return typeof code === "string" ? code : undefined
+  if (Reflect.get(Object(answer), "kind") !== "error") return undefined
+  const code = Reflect.get(Object(Reflect.get(Object(answer), "error")), "code")
+  return typeof code === "string" ? code : "error"
 }
 
 export async function runEffectScenarios(
   rows: readonly Row[],
-  scenarios: readonly EffectScenario[] = EFFECT_SCENARIOS,
+  runs: readonly ScenarioRun[] = SCENARIO_RUNS,
 ): Promise<EffectEvidence[]> {
   const evidence: EffectEvidence[] = []
-  for (const scenario of scenarios) {
-    const row = rows.find((candidate) => candidate.id === scenario.capability)
-    const { root, port, observe } = scenario.setup()
+  for (const { scenario, setup } of runs) {
+    const row = rows.find((candidate) => candidate.id === scenario.row)
+    const { root, calls } = setup()
     const invoked: string[] = []
-    const proxy = forwarding(root, [], invoked)
-    let member: unknown = proxy
+    let member: unknown = forwarding(root, [], invoked)
     for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
+    const base = {
+      scenario: scenario.id,
+      row: scenario.row,
+      kind: scenario.kind,
+      input: scenario.input,
+      expect: scenario.expect,
+      ...(scenario.refusal === undefined ? {} : { refusal: scenario.refusal }),
+    }
     try {
       const answer: unknown = await Reflect.apply(member as (input: unknown) => unknown, undefined, [scenario.input])
       const code = codeOf(answer)
-      evidence.push({
-        scenario: scenario.id,
-        capability: scenario.capability,
-        member: invoked.join(","),
-        input: scenario.input,
-        status: Reflect.get(Object(answer), "kind") === "error" ? "failed" : "passed",
-        covers: scenario.covers,
-        effect: { port, observed: observe(), expected: scenario.expected },
-        ...(code === undefined ? {} : { code }),
-      })
+      evidence.push({ ...base, member: invoked.join(","), observed: calls(), ...(code === undefined ? {} : { code }) })
     } catch (error) {
       evidence.push({
-        scenario: scenario.id,
-        capability: scenario.capability,
+        ...base,
         member: invoked.join(","),
-        input: scenario.input,
-        covers: scenario.covers,
-        status: "failed",
-        code: error instanceof Error ? error.message : String(error),
+        observed: calls(),
+        threw: error instanceof Error ? error.message : String(error),
       })
     }
   }
