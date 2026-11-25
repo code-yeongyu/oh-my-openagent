@@ -165,6 +165,7 @@ export async function runEffectScenarios(
         kind: step.kind,
         member: invoked.slice(before).join(","),
         input: step.input,
+        ...(scenario.given === undefined ? {} : { given: scenario.given }),
         expect: step.expect,
         observed: calls().slice(seen),
         ...(scenario.target === undefined ? {} : { target: scenario.target }),

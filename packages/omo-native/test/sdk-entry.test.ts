@@ -1,16 +1,15 @@
 import { describe, expect, test } from "bun:test"
-import { join } from "node:path"
 
 import { createOmoSdk } from "../sdk.ts"
 
 const env = { OMO_SERVICE_API_URL: "https://accounts.example.test" }
 
 describe("omo-ai/sdk", () => {
-  test("#given the entry #when install.sdkRoot runs #then it answers the directory of the built entry beside the launcher library", async () => {
+  test("#given install.sdkRoot, a call no shipped entry serves and no matrix line names yet #when it runs #then the root refuses it by default, before its core", async () => {
     const sdk = createOmoSdk({ env, cwd: "/work" })
-    expect(await sdk.install.sdkRoot()).toEqual({
-      kind: "ok",
-      value: { path: join(import.meta.dir, "..", "bin", "lib", "sdk") },
+    expect(await sdk.install.sdkRoot()).toMatchObject({
+      kind: "error",
+      error: { code: "sender_not_allowed", details: { principal: "script", reason: "no_matrix_cell" } },
     })
   })
 

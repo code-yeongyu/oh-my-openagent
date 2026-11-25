@@ -7,7 +7,6 @@ import { expectationProblems, type ObservedCall, portProblems, type TableScenari
 import { built, builtRows, CONTEXT, open, pair, run, scenario } from "./conformance-fixture"
 import { gateReport, goldenProblems } from "./gate"
 import { input, original, rows, text, unresolved } from "./gate-fixture"
-import type { Row } from "./schema"
 
 // Negative controls of design 7.2, 7.3 and 7.6 for what builds a row (reviews 6061267823 H1/H3, 6061624223 H1, amendment
 // 5): typed run evidence whose observed port calls match the scenario's expected effect, every optional input covered by
@@ -71,6 +70,27 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
       "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one",
       "row threads.locate: no passing effect scenario addresses a thread on other_device; add one",
     ])
+  })
+
+  // Design lane ruling: a pair proves an input's effect by a different trace OR a different answer, from the same given.
+  test("#given a pair with the same trace #when their stated answers differ, are equal, or their given state differs #then only the different answers cover the input", async () => {
+    const evidence = await runEffectScenarios(builtRows, pair)
+    const [a, b] = evidence
+    if (a === undefined || b === undefined) throw new Error("no pair")
+    type Answer = Readonly<Record<string, unknown>>
+    const stated = (value: Answer) => ({ answer: { value }, answered: { kind: "ok", value } })
+    const sameTrace = (answerA: Answer, answerB: Answer, givenB: readonly unknown[] = []): EffectEvidence[] => [
+      { ...a, ...stated(answerA) },
+      { ...b, expect: a.expect, observed: a.observed, ...stated(answerB), given: givenB },
+    ]
+    const uncovered =
+      "row threads.locate: input all_scope has no pair of passing scenarios that differ in it alone; add one"
+    const problems = (records: EffectEvidence[]) => conformanceProblems(builtRows, open, records, CONTEXT)
+    expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }))).not.toContain(uncovered)
+    expect(problems(sameTrace({ thread: "t-1" }, { thread: "t-1" }))).toContain(uncovered)
+    expect(
+      problems(sameTrace({ thread: "t-1" }, { thread: "t-2" }, [{ port: "host", state: { moved: true } }])),
+    ).toContain(uncovered)
   })
 
   test("#given the matching rules #then args are a subset, count 0 means never, result is never compared", () => {
