@@ -44,6 +44,12 @@ const failed = (
 
 // A refusal's message and next action are the core's own words; the lower layer's error (`cause`) never leaves.
 function refusalOf(refused: SignInFailure): OmoFailure {
+  // Today's answer to an abort, the shipped launcher child's (account/sign-in.ts), at every stage.
+  if (refused.code === "cancelled")
+    return {
+      kind: "error",
+      error: { code: "internal_error", message: "the sign-in was cancelled", next_action: "start a new sign-in" },
+    }
   if (refused.code === "accounts_closed")
     return failed("unsupported", "Only the device-code sign-in runs while OmO accounts are closed.", {
       reason: "accounts_closed",
@@ -71,7 +77,10 @@ export function accountSignIn(
     readonly inProcess?: InProcessSignIn
   },
 ): SignIn {
-  const { access, inProcess } = options
+  // A session's sign-in runs only through the shipped launcher child until slice A2a moves the device-service setup
+  // into a core the engine imports (script/sdk-parity/child-backed-members.json), whatever the entry supplies.
+  const { access } = options
+  const inProcess = options.principal.kind === "session" ? undefined : options.inProcess
   const origin = access.origin
   function signIn(options: SignInOptions): Promise<OmoResult<SignedIn>>
   function signIn(input: RootInput, callOptions?: CallOptions): Promise<OmoValue<RootSignedIn>>
@@ -93,6 +102,7 @@ export function accountSignIn(
         ...(input.deviceName === undefined ? {} : { deviceName: input.deviceName }),
         onUserCode: input.onUserCode,
         replaceDevice: async () => input.replace === true,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       })
       if (answer.kind === "refused") return refusalOf(answer) as OmoResult<SignedIn>
       const { device, replacedDeviceId, deviceService } = answer.value
@@ -147,6 +157,7 @@ export function accountSignIn(
             },
           }),
       replaceDevice: async () => input.replace === true,
+      ...(signal === undefined ? {} : { signal }),
     })
     if (answer.kind === "refused") return refusalOf(answer)
     return rootValue(answer.value)

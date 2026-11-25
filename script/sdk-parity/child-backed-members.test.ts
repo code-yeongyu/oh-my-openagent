@@ -31,10 +31,19 @@ const INPUTS: Readonly<Record<string, unknown>> = {
   "account.signInCheck": {},
 }
 
-async function reachesChild(entry: Pick<Entry, "member" | "principal">): Promise<boolean> {
+// The entry configurations a root is built in: the session's provisioned entry (no in-process sign-in) and the
+// omo-ai/sdk entry (with one). A listed member must reach the child in both.
+const CONFIGURATIONS = ["provisioned", "omo-ai/sdk"] as const
+type Configuration = (typeof CONFIGURATIONS)[number]
+
+async function reachesChild(
+  entry: Pick<Entry, "member" | "principal">,
+  configuration: Configuration = "provisioned",
+): Promise<{ readonly child: boolean; readonly inProcess: boolean }> {
   let spawned = false
+  let inProcess = false
   const principal = PRINCIPALS[entry.principal]
-  if (principal === undefined) return false
+  if (principal === undefined) return { child: false, inProcess: false }
   const sdk = assembleOmoSdk(
     {
       principal,
@@ -48,16 +57,27 @@ async function reachesChild(entry: Pick<Entry, "member" | "principal">): Promise
         },
       },
     },
-    {},
+    configuration === "provisioned"
+      ? {}
+      : {
+          signIn: async () => {
+            inProcess = true
+            return { kind: "refused", code: "cancelled" }
+          },
+        },
   )
   const member = entry.member.split(".").reduce<unknown>((node, key) => Reflect.get(Object(node), key), sdk)
   await (member as (input: unknown) => Promise<unknown>)(INPUTS[entry.member] ?? {})
-  return spawned
+  return { child: spawned, inProcess }
 }
 
 const stale = async (entries: readonly Pick<Entry, "member" | "principal">[]): Promise<string[]> => {
   const found: string[] = []
-  for (const entry of entries) if (!(await reachesChild(entry))) found.push(`${entry.member} (${entry.principal})`)
+  for (const entry of entries)
+    for (const configuration of CONFIGURATIONS) {
+      const reached = await reachesChild(entry, configuration)
+      if (!reached.child || reached.inProcess) found.push(`${entry.member} (${entry.principal}, ${configuration})`)
+    }
   return found
 }
 
@@ -75,7 +95,15 @@ describe("child-backed root members", () => {
 
   test("#given an entry whose member does not start the child #then it is reported stale", async () => {
     expect(await stale([{ member: "account.signInCheck", principal: "session" }])).toEqual([
-      "account.signInCheck (session)",
+      "account.signInCheck (session, provisioned)",
+      "account.signInCheck (session, omo-ai/sdk)",
     ])
+  })
+
+  test("#given the omo-ai/sdk entry #when a script signs in #then it runs in process and never starts the child", async () => {
+    expect(await reachesChild({ member: "account.signIn", principal: "script" }, "omo-ai/sdk")).toEqual({
+      child: false,
+      inProcess: true,
+    })
   })
 })
