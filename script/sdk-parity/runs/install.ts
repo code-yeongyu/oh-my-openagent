@@ -20,6 +20,7 @@ const ROWS = [
   "install.setup.apply",
   "install.update",
   "install.version",
+  "install.sdkRoot",
 ] as const
 
 const OPENCODE_KEY = "sk-c1c-fixture-not-a-secret"
@@ -175,6 +176,19 @@ function updatePorts(fakes: ScenarioFakes, clock: Clock) {
   }
 }
 
+// The package's own manifest, read through the recorded port: an omo-ai/sdk export the root's path is taken from.
+function sdkRootPorts(fakes: ScenarioFakes) {
+  return {
+    packageDir: "/omo-ai",
+    fs: {
+      readFile: async () => {
+        fakes.recorder.record("fs", "read", { path: "<package>/package.json" })
+        return JSON.stringify({ exports: { "./sdk": { import: "./dist/sdk/index.js" } } })
+      },
+    },
+  }
+}
+
 function versionPorts(fakes: ScenarioFakes) {
   return {
     read: () => {
@@ -203,6 +217,7 @@ function installCores(clock: Clock) {
       return installCore(context, {
         update: updatePorts(fakes, clock),
         version: versionPorts(fakes),
+        sdkRoot: sdkRootPorts(fakes),
         setup: {
           fs: recordedSetupFs(fakes),
           after: clock.after,

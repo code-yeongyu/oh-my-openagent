@@ -44,7 +44,7 @@ export async function sdkRoot(
  * and home; the root's call options are not ports. `overrides` replaces ports per call (the SDK's scenario drivers pass
  * their fakes); the `omo-ai/sdk` entry passes none.
  * @param {import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").CoreContext} context
- * @param {{ update?: Record<string, unknown>, setup?: Record<string, unknown>, version?: Record<string, unknown> }} [overrides]
+ * @param {{ update?: Record<string, unknown>, setup?: Record<string, unknown>, version?: Record<string, unknown>, sdkRoot?: Parameters<typeof sdkRoot>[1] }} [overrides]
  * @returns {Promise<import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").NamespaceCore<"install">>}
  */
 export async function installCore(context, overrides = {}) {
@@ -56,7 +56,7 @@ export async function installCore(context, overrides = {}) {
   // This root's own setup calls: a plan its plan call answered is applied only through its apply.
   const setup = createSetup()
   return {
-    sdkRoot: (input) => sdkRoot(input),
+    sdkRoot: (input) => sdkRoot(input, overrides.sdkRoot),
     version: async (input) => calls.version(input, overrides.version),
     update: (input, options) => calls.update(input, updatePorts, options),
     "setup.detect": (input, options) => setup.detect(input, ports, options),

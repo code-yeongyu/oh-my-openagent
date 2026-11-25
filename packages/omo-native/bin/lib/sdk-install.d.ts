@@ -7,6 +7,7 @@ export function installCore(
     readonly update?: Readonly<Record<string, unknown>>
     readonly setup?: Readonly<Record<string, unknown>>
     readonly version?: Readonly<Record<string, unknown>>
+    readonly sdkRoot?: { packageDir: string; fs: { readFile: (path: string) => Promise<string> } }
   },
 ): Promise<NamespaceCore<"install">>
 

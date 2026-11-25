@@ -42,8 +42,9 @@ beforeAll(async () => {
 }, 120_000)
 
 describe("C1c scenario drivers over the real omo SDK root", () => {
-  test("#given runs/install.ts #then every scenario of the five install rows it serves has exactly one run", () => {
+  test("#given runs/install.ts #then every scenario of the six install rows it serves has exactly one run", () => {
     expect([...served].toSorted()).toEqual([
+      "install.sdkRoot",
       "install.setup.apply",
       "install.setup.detect",
       "install.setup.plan",
