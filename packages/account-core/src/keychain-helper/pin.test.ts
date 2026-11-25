@@ -123,7 +123,11 @@ describe("pinned helper copies (#11586 review LOWs)", () => {
     const source = join(root, "omo-keychain")
     writeFileSync(source, "signed helper")
     const access = await resolveHelperAccess([source], {
+      port: "a test port",
       verify: alwaysValid,
+      spawn: () => {
+        throw new Error("this test never spawns the helper")
+      },
       pin: (from, verify) => {
         rmSync(from)
         return pinVerifiedCopy(from, verify, root)

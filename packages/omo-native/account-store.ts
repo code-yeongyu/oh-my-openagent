@@ -98,7 +98,7 @@ export const accountStoreDependencies = (
   api,
   platform: process.platform,
   state: () => dedicatedStoreState(),
-  access: helperAccess,
+  access: () => helperAccess("omo account store"),
   desktopInstalled: () => desktopRuntimeCandidates(homedir()).some(({ app }) => existsSync(app)),
   ...io,
 })

@@ -42,6 +42,7 @@ describe("helper access: pinned copy, re-checked before every spawn (#11586 revi
     const verify = contentCheck()
     mkdirSync(pins, { mode: 0o700 })
     const access = await resolveHelperAccess([source], {
+      port: "a test port",
       verify,
       spawn,
       pin: (from, check) => pinVerifiedCopy(from, check, pins),
@@ -61,6 +62,7 @@ describe("helper access: pinned copy, re-checked before every spawn (#11586 revi
     const { source, pins, spawned, spawn } = fixture()
     mkdirSync(pins, { mode: 0o700 })
     const access = await resolveHelperAccess([source], {
+      port: "a test port",
       verify: contentCheck(),
       spawn,
       pin: (from, check) => pinVerifiedCopy(from, check, pins),
@@ -81,7 +83,11 @@ describe("helper access: pinned copy, re-checked before every spawn (#11586 revi
     let calls = 0
     const verify = async (): Promise<SignatureVerdict> => (++calls === 1 ? "valid" : "invalid")
     expect(
-      await resolveHelperAccess([source], { verify, pin: (from, check) => pinVerifiedCopy(from, check, pins) }),
+      await resolveHelperAccess([source], {
+        port: "a test port",
+        verify,
+        pin: (from, check) => pinVerifiedCopy(from, check, pins),
+      }),
     ).toEqual({
       kind: "invalid",
       rejected: [source],

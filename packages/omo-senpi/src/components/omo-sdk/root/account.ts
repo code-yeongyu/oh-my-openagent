@@ -136,7 +136,7 @@ export function accountNamespace(options: {
       api: access.origin,
       platform: process.platform,
       state: () => dedicatedStoreState(),
-      access: helperAccess,
+      access: () => helperAccess("account.store"),
     })
   return {
     members: {
