@@ -10,16 +10,20 @@ Source was read at `dev` `2e2a815ac8` and at the engine's `main` `48983b7bf8` on
 
 ## 1. What this design must hold
 
-Making the SDK the superset of the CLI puts on an importable surface calls that exist today only as commands a person runs. Four properties are required, and each is a section of this document and a line of the review checklist.
+Making the SDK the superset of the CLI puts on an importable surface calls that exist today only as commands a person runs. Six properties are required. The first four are the lines of the review checklist.
 
 | # | Property | Section |
 |---|---|---|
-| I1 | No secret is ever a field of a returned value, a failure, a stream event, a receipt or a store row, and none is written to a log, a telemetry event, a crash report, a child process's argv or environment, or a model-facing surface | 5, 6 |
+| I1 | Non-disclosure. Outside an authorized custody operation (defined below), no secret is ever a field of a returned value, a failure, a stream event, a receipt or a store row, and none is written to a log, a telemetry event, a diagnostic or crash report, a child process's argv or environment, standard output or error, or a model-facing surface. Inside one, the secret goes to that operation's one approved destination and to nothing else in this list | 5, 6 |
 | I2 | Capability per principal: who may run what is decided in the core and behind it, never by an export or an import rule | 3, 4 |
 | I3 | Revocation reaches a live SDK instance, an open stream and a handed-over credential, with a stated bound where it cannot be immediate | 7 |
 | I4 | Audit trail: every custody-bearing call and every command that crosses a device leaves a record that names who, what, where and the outcome, and never a secret | 8 |
 | I5 | No new authority and no lost capability: after the migration each principal can do exactly what it can do today | 4, 9 |
 | I6 | A ceremony a person performs stays a ceremony a person performs. A model-driven or unattended process is refused before any secret exists | 5.1 |
+
+One definition is used by every section. An **authorized custody operation** is an operation listed in the custody matrix of section 5.0, and nothing else. For each, the matrix fixes the secret, the one destination and who owns it, who is authorized to receive it, the minimum data that moves, and what happens when the transfer fails or is cancelled. Moving a secret by any path that is not a row of that matrix violates I1, whatever a compatibility note elsewhere says, and no row may permit general-purpose disclosure. The matrix needs the security owner's approval as a whole; a row is not approved by this document's review alone.
+
+Everything this document calls a test is a requirement on a future slice. None of it is evidence yet, and section 12 says what evidence each invariant needs.
 
 ## 2. Threat model
 
@@ -60,6 +64,20 @@ Making the SDK the superset of the CLI puts on an importable surface calls that 
 
 A process running as the same OS user can read the credential store with the same code the CLI uses. The SDK cannot stop it and does not pretend to: a private factory or an import rule is architecture, not a guard. The goals are narrower and checkable: the migration opens no path that does not exist today (I5), no secret reaches a durable or transmitted surface (I1), and the model-facing surfaces gain nothing (I6).
 
+### 2.5 Which component guarantees what
+
+| Property | Guaranteed by | Not guaranteed by |
+|---|---|---|
+| A credential at rest is readable only by the OS user | The OS credential store and file modes | The SDK |
+| A request to the account service is from a signed-in device | The account service, checking the device's session | The SDK, which only presents the session |
+| A command reaches another device only from a device of the same account, in a sender kind that transport accepts | The device service and the relay | The SDK |
+| An outside message becomes a turn only when the engine admits it | The engine's admission | The SDK or an adapter |
+| A principal is refused a capability it lacks | The core that implements the capability, before any side effect | An export, an import rule, or the adapter |
+| No secret appears in a result, a log or a record | The core's custody rules, checked by the non-disclosure test | A reviewer's reading alone |
+| An OAuth or provider token is valid and scoped | The provider or the MCP server that issued it | omo |
+
+The SDK depends on these components and trusts them as the CLI does today: the OS credential store, the account service, the relay and device service, the engine, and for MCP the server's own authorization service. A test that drives the SDK against fakes shows the SDK's part of a property. It is not proof of a property another component controls, and no acceptance row in this document claims otherwise.
+
 ## 3. Principals
 
 A principal is fixed when a root is built. It selects which existing leg a call uses and what it stamps on what it sends; the core checks it against each capability.
@@ -81,6 +99,8 @@ Legend: **A** allow; **R** refuse, with the typed code; **n/a** the call has no 
 The principal branches in the source are few, and the tables below list all of them: the search for a branch on the sender kind across `R/` and `T/` finds the send identity, `author`, the open rules and the four service mutators in the remote module, and the two transport refusals and the parked intake in the thread core. Where a cell says "no principal check today", the call runs for any client kind.
 
 A connector root and a service root are narrow by construction. A program that holds only a connector root cannot reach the account or the machine through it. This is least privilege for a well-behaved program, not a guard against a hostile one: section 2.4 applies.
+
+**Status of the tables below.** They are a grouped summary for readers, and no approval rests on a grouped row. The authoritative artifact is the closed per-operation matrix for both editions: one row per operation of the first-party design's section 6, with the callers that exist today, the authority that is effective today, today's outcome, the proposed outcome, the component that enforces it, and the compatibility evidence, for every allowed and every refused outcome and every operation-specific condition. A cell whose current behaviour is not shown by a source line is marked unproven there, and an unproven cell is not approved. Cells for operations that do not exist yet are proposals and are marked as such. No new authority and no narrowing of a capability a caller has today is inferred from how a root is constructed or from what an entry exports. That matrix, with its independent review, is kept in the private security-review record and is not published here; this document's review does not certify it.
 
 ### 4.1 Threads
 
@@ -140,6 +160,8 @@ A session can run any `omo` command through a shell today, including the ones ma
 | `engine.launch.interactive`, `print`, `rpc`, `hand`, `headless` | A | R **new**: a session starts other sessions through `threads.create` and its task tools, within its own approval mode | R **new** | R | Launch flags; commands only |
 | `spawned_by` (ancestry) on a launch | A only from the engine's own task host, which sets it today; any other caller R **new** | R | R | R | `--spawned-by` (`E/cli/args.ts`) |
 | `project_trust` on a launch or a package call | A, passed explicitly, never defaulted to trust | R **new** | R | R | `--approve`, `--no-approve` |
+| The presenter inputs of `engine.launch.rpc` and of the host's ensure and handoff (`bootstrap_fd`, `enforcement`) | A only from the launcher that starts a host today. Proposed here and unproven until the closed matrix cites its enforcement | R **new** | R | R | `--mcp-presenter-fd`, `--mcp-presenter-enforcement` (`E/cli/args.ts:347-351`) |
+| `codex_autonomous` on `install.plugin`: `true` configures that platform's autonomous permissions, `false` leaves existing settings unchanged, absent takes the mode's default | A | R **new** | R | R | `C/cli-program.ts:74-76`, `C/install-validators.ts:244` |
 | A provider API key as a launch input | A, through the carrier of 5.5 | R **new** | R | R | `--api-key` |
 | `threads.runToCompletion` (OpenCode edition) | A | R **new** | R | R | That edition's `run` command |
 | `on_complete` on `runToCompletion`: runs a command as the caller's OS user | A | R **new** | R | R | `--on-complete` |
@@ -169,6 +191,26 @@ An agent session that builds its own root in an eval cell is a script principal:
 ## 5. Custody
 
 One rule first: **the destination of a secret is fixed by the core, or it is a handle the caller already holds and nothing else.** A call never returns a secret, and a caller never names an arbitrary function for the core to pass one to where a narrower destination exists.
+
+### 5.0 The custody matrix
+
+Every authorized custody operation, and only these. The subsections that follow give the details of each.
+
+| Operation | Secret | The one destination, and its owner | Who may receive it | Minimum data | Failed or cancelled |
+|---|---|---|---|---|---|
+| `sync.enable` | The recovery phrase, at creation | The controlling terminal of the calling process; the person at it | That person | The phrase, shown once | Nothing is shown before eligibility passes; a cancel after display voids the ceremony as it does today |
+| `sync.recover` | The recovery phrase, typed | Read from the controlling terminal with echo off; the recovery engine | The recovery engine | The phrase, held in memory for the ceremony | A failed or cancelled recovery keeps nothing |
+| `account.credentials.handOver` (`access_token`) | The account access token | A handle the caller already holds; the caller's own process | Another process of ours that the caller pipes it to | The token and its non-secret metadata; never refresh material | One write; a failed write delivers nothing usable and is recorded `not_delivered` |
+| `account.credentials.handOver` (`stored_credential`) | The stored credential | As above | A process that will `adopt` it | The record `adopt` needs | As above |
+| `account.adopt` | A handed-over credential, incoming | The credential store of this device; this device | This device's session | The record as received | A conflict or an invalid record stores nothing |
+| `account.signIn` | The user code, matching code and verification URL, while valid | The `onUserCode` callback; the person who must approve | That person | The codes and their expiry | An expired or denied approval leaves no credential |
+| `engine.auth.credentials`, `apiKey`, `bearerToken` | A provider credential | A handle the caller already holds | The caller's process | The one credential asked for | As the account hand-over |
+| A provider API key at launch | A provider credential, incoming | The engine process being launched | That process | The key | A refused launch keeps nothing |
+| `mcp.oauth.login` | OAuth tokens | The MCP client core's token store | That store | The tokens the server issued | A failed or cancelled flow stores nothing |
+| `account.keys.init` | This device's private keys | The OS key store | The key store | The key material | A failed init leaves no partial keyring |
+| The transport's read of a socket secret or a key under `key_root` | An endpoint credential | The endpoint it authenticates to | That endpoint | The credential | A failed connection sends nothing further |
+
+The security owner approves this matrix as a whole. Until then every row is a proposal.
 
 ### 5.1 The sync recovery phrase
 
@@ -220,10 +262,12 @@ Every slice that adds a call of section 5 ships this test, and slice P1b ships i
 
 - Fake ports hold recognizable canaries, one per asset of 2.1: an access token, a refresh token, a private key, a recovery phrase, a provider API key, an OAuth token, a socket secret, a user code.
 - Each call of the namespace is driven through its ok path, each refusal of section 4, and one injected fault per step (a store that locks, a 401, a write that fails halfway, a cancelled signal).
-- The scan covers: the returned value; the failure; every stream event; every gateway store row and receipt the call wrote; everything written to the logger port and the telemetry port; the message of any thrown error that the boundary caught; the argv and environment of any child process the call started; the tool result where a tool exists; the CLI's stdout and stderr, except the one designated handle of a hand-over verb.
-- A canary anywhere outside its designated destination fails the test. The designated destinations are exactly: the phrase terminal (5.1), the caller's handle (5.2, 5.5), the `onUserCode` callback (5.4), the credential store.
+- Prohibited outputs, each scanned on every outcome: the returned value; the failure; every stream event; every gateway store row, receipt and other persisted record the call wrote, the audit records included; everything written to the logger port and the telemetry port; the message and stack of an unexpected exception, including one the boundary did not expect; whatever the diagnostic and crash-reporting path would send; the argv and environment of any child process the call started; the tool result where a tool exists; and the CLI's standard output and error as the production adapter renders them, not a test double of the renderer.
+- Authorized destinations, each asserted explicitly: for every row of the custody matrix (5.0), the canary arrives at that row's destination on success, and on a failed or cancelled transfer the destination holds exactly what the row's last column says.
+- Both directions are required for every operation: the successful outcome and each unsuccessful one, with synthetic canaries only.
+- A canary anywhere outside its row's destination fails the test. A scan of the root's result objects alone is not acceptance evidence for I1.
 
-The existing scan (`S/omo-sdk.test.ts:76-82`, asserted at `:118-129` and `:151-158`) is the starting point; it covers returned values of four calls today.
+The existing scan (`S/omo-sdk.test.ts:76-82`, asserted at `:118-129` and `:151-158`) covers the returned values of four calls. It is a starting point for the scanner and is not evidence for any claim about the whole root.
 
 ## 7. Revocation
 
@@ -238,22 +282,52 @@ The existing scan (`S/omo-sdk.test.ts:76-82`, asserted at `:118-129` and `:151-1
 | A root is closed | Requests in flight are aborted; later account and device calls answer `internal_error` naming a closed instance (`S/access.ts`) | as stated | Immediate |
 | A connector's binding is removed | Its client's calls are refused by the relay | The relay's typed refusal | At the relay; this design adds no cache that outlives it |
 
-Rules for the implementation: no namespace caches an access token, a device row's authorization or a control-switch state across calls beyond what the session and the remote module already hold; a cached listing is used for addressing only and never as proof that a command is allowed; and each event above has a test that drives a live root and an open stream through it on the virtual clock.
+The table above says what each event does. What it does to each kind of lifetime, and whose clock bounds it:
+
+| Lifetime | After sign-out, forget or a remote revoke | After a device switch is turned off | Who controls the bound |
+|---|---|---|---|
+| New work on a live root | Refused at the SDK's boundary with the typed code, on the first call that needs the session | Refused by the device service or the relay | The SDK for sign-out and forget on this device; the account service for a remote revoke, at its next contact |
+| Work already admitted (a turn running on another device, a delivery queued, a command in flight) | Not recalled by the SDK. It ends as the engine, the relay and the service end it today | Same | Externally controlled: the engine, the relay, the account service. The SDK promises nothing here |
+| An open stream or attach | Ends with one terminal failure event when its transport refuses or its connection closes | An open attach ends with a terminal event | Externally controlled for the moment of refusal; the SDK guarantees only that the stream ends with a terminal event and never hangs silently |
+| Cached state in a root (a device listing, a session index) | Used for addressing only; it authorizes nothing, so nothing in it needs revoking | Same | The SDK |
+| A custody handle already written to (5.0) | Not recalled. A handed-over access token works until the service rejects it or it expires | Not affected | Externally controlled: the account service's token lifetime. This design states no number for it; the closed matrix records the measured value and its source |
+
+Rules for the implementation: no namespace caches an access token, a device row's authorization or a control-switch state across calls beyond what the session and the remote module already hold, and a cached listing is never proof that a command is allowed. Where the migration cannot strengthen a behaviour without changing what a caller sees, it keeps today's behaviour and section 11 lists the change for the owner.
+
+Acceptance: one synthetic-clock row for every cell above whose bound the SDK controls, driving a live root, an open stream and a written handle through the event; and for every externally controlled cell, a test against the fake service that the SDK's own part holds (the typed code, the terminal event), with the external duration named as external. No test asserts an elapsed-time bound the SDK does not control.
 
 ## 8. Audit trail
 
 ### 8.1 What is recorded today
 
 - **Deliveries.** Every send writes a gateway row and a receipt with the sender principal, the target, the lane and the outcome, kept 30 days (`T/` budgets: receipts and delivered rows). The delivered message carries a provenance header naming where it came from (`T/gateway/provenance.ts`).
-- **Creation.** A created thread records its creator when a session created it; a script records none (`T/sdk.ts:178-181`).
+- **Creation.** A created thread records its creator when a session created it; a script records none (`T/sdk.ts:142-146`).
 - **Commands to another device.** Each carries a command id and its state events through the relay (`R/types.ts`, `CommandStateEvent`).
 - **Account.** The account service keeps the device list with last-seen times.
 
 ### 8.2 What this design adds
 
-1. **A local custody log.** One append-only file in the account home, owner-only, one JSON line per custody-bearing call (every call of section 5, plus `devices.revoke`, `account.signOut` and `forget`): time, principal kind and id, capability, target device, outcome code. Never a value, a code or a handle's content. The line is written before the secret moves; if it cannot be written, a hand-over call fails closed and moves nothing. Kept 90 days, pruned on write.
+1. **A local custody log.** One append-only file in the account home, owner-only, one JSON line per custody-bearing call (every call of section 5, plus `devices.revoke`, `account.signOut` and `forget`): in the schema below. Two records per operation, `started` and `terminal`, joined by the operation id. The `started` record is written before the secret moves; if it cannot be written the operation fails closed and moves nothing. If the `terminal` record cannot be written, the operation's result says so and the next call that can write records the gap. Kept 90 days, pruned on write.
 2. **Cross-device control is attributable on the target.** A control command that arrives from another device (interrupt, close, unload, set model, set reasoning, rename, archive, attach, an answered dialog) leaves a record on the device that ran it, naming the sender principal, the sending device and the command id. Slice T1b verifies with a test which of these the engine and the device service already record and adds what is missing; a command that changes a session with no such record does not pass.
-3. **A read call.** `account.audit.list({ since? })`, person and script only, returns the custody log's lines.
+3. **A read call.** `account.audit.list({ since? })`, person and script only, returns the custody log's records. The file is owner-only; no other principal and no tool reads it.
+
+The record schema, for both kinds of record:
+
+| Field | Content |
+|---|---|
+| `id`, `at` | A record id and the time |
+| `operation_id` | Joins `started` and `terminal`; for a cross-device command also the relay's `command_id`, for a delivery its `delivery_id` |
+| `principal` | Kind and id of the caller: a uid, a durable session id, a connector binding |
+| `capability` | The operation's registry id |
+| `target` | The device and thread it acted on, where it has one |
+| `phase` | `started` or `terminal` |
+| `outcome` | On `terminal`: `ok`, `refused`, `cancelled`, `partial` or `failed`, with the typed code |
+
+A record never holds a credential, a code, a handle's content, a message body, an argument's text or any other caller-supplied string that could carry a secret: only ids, kinds and codes. The schema is reviewed independently with the closed matrix.
+
+When the audit mechanism is unavailable: a custody operation, a revoke, a sign-out and a forget fail closed. A cross-device control command is not refused for it, because refusing would remove a capability callers have today (I5); the command runs, its result carries an `audit_unavailable` note in `details`, and a `diagnostics.run` finding reports it.
+
+Acceptance: for every operation of the custody matrix and every cross-device command of the closed matrix, a synthetic run of each terminal outcome (ok, refused, cancelled, partial, failed) asserts the pair of records and their correlation, and the unavailable-audit behaviour above.
 
 No audit record is a place a secret can land: the non-disclosure test of section 6 scans the custody log and the control records too.
 
@@ -274,12 +348,12 @@ No audit record is a place a secret can land: the non-disclosure test of section
 - **Order.** Reads and refusals first: the root ships with the matrix's refusals and the non-disclosure test before any custody-bearing call exists. Each custody-bearing call then ships in its own slice, behind its CLI verb, which keeps working unchanged until the adapter over the SDK passes the same goldens.
 - **Entry criteria for a custody slice.** This design CLEAR; the fake ports and canaries of section 6 in place; the custody log writable in the slice's tests; the slice's refusal rows listed in its issue.
 - **Exit criteria.** The non-disclosure test passes over the new call and over the whole root; the revocation tests of section 7 pass with the call in use; the audit line is asserted; the CLI verb's golden output and exit code are unchanged.
-- **Rollback.** Rollback is reverting the adapter's pull request, which restores the verb's own body. A rollback never leaves a custody-bearing SDK call exported without its checks; the call and its adapter revert together.
+- **Rollback.** A source revert is not the rollback. Each slice states, before it merges, a rollback check across what it changed: the root and its facades, both editions' adapters, the engine version the pin names, and durable state (the custody log's format, the credential store's record format, the gateway store's schema). The check shows that the previous build reads the state the new build wrote, that no custody-bearing call stays exported without its checks, and that the authority and custody rows this design approved hold on the rolled-back build. It is run on synthetic state in the slice's tests. If a slice has no safe rollback, for example a store migration the previous build cannot read, its rollout stops before merge and the decision goes to the owner.
 - **Stop conditions.** A canary found outside its destination, a refusal row that passes where it must refuse, or an audit line missing for a moved secret stops the rollout of that slice and of every slice that depends on it.
 
 ## 11. Decisions this design does not make
 
-Each of these would change what a principal can do today, so none is part of the parity migration (I5). They are listed for the owner, and none blocks a slice.
+Each of these would change what a principal can do today, so none is part of the parity migration (I5). They are listed for the owner, and none blocks a slice. The rule for anything found later is the same: a discrepancy between the matrix and the code is not settled by changing an existing capability under the label of parity. It is recorded here and goes to the owner as its own decision.
 
 1. **Narrowing `export`.** Replace the standalone stored-credential export with a paired hand-over that only another `adopt` on the same machine can consume.
 2. **Refusing the hand-over verbs under an agent marker**, as the sync ceremony already does. Today a session can run `omo account token` through a shell.
@@ -288,9 +362,13 @@ Each of these would change what a principal can do today, so none is part of the
 
 ## 12. Review checklist
 
-| Checklist line | Where it is answered | How a slice proves it |
-|---|---|---|
-| No secret is ever returned to a caller or written to a log | I1; sections 5 and 6 | The non-disclosure test with canaries over results, failures, events, receipts, store rows, logs, telemetry, child argv and env, tool results and CLI output |
-| Capability per principal | I2; sections 3 and 4 | One conformance scenario per refusal cell; the principal is checked in the core before any side effect |
-| Revocation | I3; section 7 | One test per event on a live root and an open stream, on the virtual clock |
-| Audit trail | I4; section 8 | The custody log line asserted for every custody-bearing call, written before the secret moves; the control record asserted on the target device |
+Every row below is a requirement on future slices, not evidence. An invariant is met for an operation only when its evidence exists at an exact head.
+
+| Checklist line | Answered in | Evidence owner | Coverage required | Acceptance receipt | Negative control |
+|---|---|---|---|---|---|
+| No secret is ever returned to a caller or written to a log | I1; 5, 6 | The slice that adds the operation; P1b for the whole root | Every operation, every outcome, every prohibited output and every authorized destination of 5.0 | The non-disclosure test's run at the slice's exact head, with the list of operations it drove | A canary planted in each prohibited output in turn must fail the test |
+| Capability per principal | I2; 3, 4 | The slice that wires the operation | Every cell of the closed matrix for that operation: each allowed outcome and each refused one | The conformance run at the exact head, one scenario per cell | An allowed cell made to refuse, and a refused cell made to pass, must each fail |
+| Revocation | I3; 7 | The slice that wires the operation | Every lifetime row the SDK controls; the SDK's part of every external one | The synthetic-clock run at the exact head | A stream left open after its transport refuses must fail |
+| Audit trail | I4; 8 | The slice that adds the operation | Every custody operation and cross-device command, every terminal outcome | The record-pair assertions at the exact head | A missing `terminal` record, and a record holding a canary, must each fail |
+
+All evidence is produced with synthetic data against fake ports. No acceptance row uses a live credential or a privilege experiment.
