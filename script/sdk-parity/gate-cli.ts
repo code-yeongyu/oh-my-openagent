@@ -77,18 +77,18 @@ if (expectedHead !== undefined && git("rev-parse", "HEAD").trim() !== expectedHe
   process.exit(1)
 }
 const mergeBase = git("merge-base", arg("--base") ?? "origin/dev", "HEAD").trim()
-const scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
-const baseTree = join(scratch, "tree")
-git("worktree", "add", "--detach", baseTree, mergeBase)
 // A run stopped by a signal skips the finally below, which left the base worktree and its scratch directory behind; the
 // handler removes them and exits with the signal's code.
 // Idempotent: the signal handler and the finally may both run. prune clears a worktree record left half-created.
+// The cleanup is installed before anything is created, so a failure or a signal at any step leaves nothing behind.
+let scratch: string | undefined
 let removed = false
 const removeBaseTree = (): void => {
   if (removed) return
   removed = true
+  if (scratch === undefined) return
   try {
-    git("worktree", "remove", "--force", baseTree)
+    git("worktree", "remove", "--force", join(scratch, "tree"))
   } catch {
     // Not a worktree any more (already removed, or never fully added); prune below clears its record.
   }
@@ -104,7 +104,10 @@ for (const [signal, code] of [
     removeBaseTree()
     process.exit(code)
   })
+scratch = mkdtempSync(join(tmpdir(), "sdk-parity-base-"))
+const baseTree = join(scratch, "tree")
 try {
+  git("worktree", "add", "--detach", baseTree, mergeBase)
   const lockMoved = git("diff", "--name-only", mergeBase, "HEAD", "--", "bun.lock").trim() !== ""
   if (lockMoved)
     execFileSync(process.execPath, ["install", "--frozen-lockfile", "--ignore-scripts"], {
