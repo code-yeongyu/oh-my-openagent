@@ -124,6 +124,16 @@ export const S2_OFFENDERS: Readonly<Record<string, Offender>> = {}
 
 // S3 starts at today's surfaces; U5 and U6 move them onto components/remote/index.ts and remove their rows.
 export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
+  // The device-service administration adapters stay on device-service-core until they call the omo SDK's deviceService.*
+  // capabilities (routing them through remote/admin.ts would only hide the same dependency).
+  "packages/omo-native/remote-bootstrap.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
+  },
+  "packages/omo-native/remote-cold-wake.ts": {
+    uses: [DEVICE_SERVICE_CORE],
+    removedBy: "omo#15032 (deviceService.* through the omo SDK, #14943)",
+  },
   "packages/omo-senpi/src/components/thread/consumer/device-service-port.ts": {
     uses: [DEVICE_SERVICE_CORE],
     removedBy: "omo#13414 U5 (thread tools onto the module)",

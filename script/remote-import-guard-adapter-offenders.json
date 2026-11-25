@@ -2,6 +2,7 @@
   "packages/omo-native/account-cli.ts": {
     "uses": [
       "node:net",
+      "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
@@ -51,6 +52,7 @@
     "uses": [
       "node:net",
       "node:tls",
+      "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
@@ -62,6 +64,7 @@
   "packages/omo-native/launcher-commands.ts": {
     "uses": [
       "node:net",
+      "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
@@ -91,13 +94,14 @@
   },
   "packages/omo-native/remote-bootstrap.ts": {
     "uses": [
-      "packages/omo-senpi/src/components/remote/"
+      "packages/device-service-core/src/"
     ],
     "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
   },
   "packages/omo-native/remote-cli.ts": {
     "uses": [
       "node:net",
+      "packages/device-service-core/src/",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
       "packages/omo-senpi/src/components/thread/remote/"
@@ -106,13 +110,14 @@
   },
   "packages/omo-native/remote-cold-wake.ts": {
     "uses": [
-      "packages/omo-senpi/src/components/remote/"
+      "packages/device-service-core/src/"
     ],
     "removedBy": "#14943 T3 and A2a (omo remote onto the SDK)"
   },
   "packages/omo-native/remote-entry.ts": {
     "uses": [
       "node:net",
+      "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
@@ -129,6 +134,7 @@
   "packages/omo-native/service-auth-command.ts": {
     "uses": [
       "node:net",
+      "packages/device-service-core/src/",
       "packages/omo-native/device-service-handoff.ts",
       "packages/omo-opencode/src/cli/service-auth/",
       "packages/omo-senpi/src/components/remote/",
