@@ -1,6 +1,6 @@
 // Parity pins for `omo doctor` on the compiled binary (#14959): every mode through the compiled entry's
 // dispatch, the printed bytes and the exit code, written before the diagnostics move and kept unmodified
-// through it. The compiled binary has no `--fix`; today that argument prints the plain report.
+// through it, except `--fix`, which runs the same sweep as the npm launcher since #14982.
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
@@ -71,9 +71,18 @@ describe("compiled omo doctor golden", () => {
     expect(await compiled(install, release(install), [], quiet(install))).toEqual(HEALTHY)
   })
 
-  test("#given --fix #when the compiled doctor runs #then it prints the plain report, as today", async () => {
+  test("#given --fix, --fix --dry-run and an extra argument #when the compiled doctor runs #then it sweeps like the npm launcher, and refuses the extra argument (#14982)", async () => {
     const install = createInstall(roots)
-    expect(await compiled(install, release(install), ["--fix", "--dry-run"], quiet(install))).toEqual(HEALTHY)
+    const execDir = release(install)
+    expect([
+      await compiled(install, execDir, ["--fix", "--dry-run"], quiet(install)),
+      await compiled(install, execDir, ["--fix"], quiet(install)),
+      await compiled(install, execDir, ["--fix", "--all"], quiet(install)),
+    ]).toEqual([
+      { stdout: "INFO nothing to fix", stderr: "", exitCode: 0 },
+      { stdout: "PASS no stale reflection locks", stderr: "", exitCode: 0 },
+      { stdout: 'FAIL unknown argument "--all": omo doctor --fix [--dry-run]', stderr: "", exitCode: 1 },
+    ])
   })
 
   test("#given a degraded release #when doctor runs #then every finding renders exactly as today and the exit code is 1", async () => {

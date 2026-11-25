@@ -1,10 +1,12 @@
 import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
+import { createRequire } from "node:module"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
 import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
 import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
 import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
-import { printDoctorReap, printDoctorReport } from "./bin/lib/doctor.js"
+import { printDoctorFix, printDoctorReap, printDoctorReport } from "./bin/lib/doctor.js"
+import { TASK_CONFIG_RUNTIME } from "./bin/lib/daemon-config.js"
 import {
   memoryRuntimeDiscardResolver,
   memoryRuntimeMaxBytesResolver,
@@ -103,6 +105,16 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
     return
   }
   const env = options.env ?? process.env
+  if (input.args?.[0] === "--fix") {
+    // The global memory settings come from this binary's provisioned runtime, not the npm package layout.
+    const taskConfig = join(input.execDir, "plugin", TASK_CONFIG_RUNTIME)
+    process.exitCode = await printDoctorFix(input.args.slice(1), {
+      env,
+      ...(options.homeDir === undefined ? {} : { home: options.homeDir }),
+      loadTaskConfig: () => createRequire(import.meta.url)(taskConfig),
+    })
+    return
+  }
   if (input.args?.[0] === "--models") {
     process.exitCode = await runDoctorModels([...input.args.slice(1)], {
       agentDir: canonicalAgentDir(env),
