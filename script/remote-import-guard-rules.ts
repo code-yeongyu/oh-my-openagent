@@ -104,14 +104,6 @@ export const ADAPTER_RULES: AdapterRules = {
   forbiddenBuiltins: ["net", "tls", "http", "https", "http2", "dgram", "ws"],
 }
 
-// A layer whose code moved keeps its offenders (#14364): the account core left the two cli directories, which keep only the
-// CLI's own commands and wiring, so a base row that names either directory also admits the account core. A reach of the
-// moved code is not a new reach.
-export const ADAPTER_LAYER_RENAMES: Readonly<Record<string, string>> = {
-  [`${OPENCODE_CLI}service-auth/`]: ACCOUNT_CORE,
-  [`${OPENCODE_CLI}account-keys/`]: ACCOUNT_CORE,
-}
-
 // Offender lists may only shrink: the guard fails on a new entry AND on an entry that no longer offends, so the PR that
 // removes a use also removes its row.
 export const S1_OFFENDERS: Readonly<Record<string, Offender>> = {

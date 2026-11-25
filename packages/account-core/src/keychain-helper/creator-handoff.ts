@@ -1,5 +1,6 @@
 import { dirname, join, posix } from "node:path"
-import { bunFile, spawn } from "@oh-my-opencode/utils/runtime"
+import { bunFile } from "@oh-my-opencode/utils/runtime"
+import { spawn } from "@oh-my-opencode/utils/runtime"
 import type { RequirementCheck } from "./signature"
 import { runtimeDeclaresKeychainHandoff } from "./runtime-capabilities"
 import { verifyWithSecurityFramework } from "./signature"
