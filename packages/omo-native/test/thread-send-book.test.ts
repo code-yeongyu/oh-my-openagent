@@ -53,20 +53,33 @@ function world() {
 }
 
 describe("one key, one thread, one delivery across surfaces of one class", () => {
-  for (const [leg, thread] of Object.entries(LEGS))
-    for (const first of SURFACES)
-      for (const second of SURFACES.filter((via) => via !== first))
-        test(`#given ${first} sent under a key to the thread ${leg} #when ${second} repeats it #then the repeat answers the first delivery's identifiers, deduplicated`, async () => {
-          const { send, onB } = world()
-          const one = await send(first, thread, "same message", "k-pair")
-          const two = await send(second, thread, "same message", "k-pair")
-          expect(one).toMatchObject({ kind: "ok", deduplicated: false })
-          expect(two).toMatchObject({ kind: "ok", deduplicated: true })
-          // Here the gateway row names the delivery; on b the holder's admissions count it.
-          if (leg === "here") expect(two["delivery_id"]).toBe(one["delivery_id"])
-          else expect(onB()).toHaveLength(1)
-          expect(JSON.stringify(two)).not.toContain("undefined")
-        })
+  for (const first of SURFACES)
+    for (const second of SURFACES.filter((via) => via !== first))
+      test(`#given ${first} sent under a key to the thread here #when ${second} repeats it #then the repeat answers the first delivery's identifiers, deduplicated`, async () => {
+        const { send } = world()
+        const one = await send(first, LEGS.here, "same message", "k-pair")
+        const two = await send(second, LEGS.here, "same message", "k-pair")
+        expect(one).toMatchObject({ kind: "ok", deduplicated: false })
+        expect(two).toMatchObject({ kind: "ok", deduplicated: true })
+        expect(two["delivery_id"]).toBe(one["delivery_id"])
+        expect(JSON.stringify(two)).not.toContain("undefined")
+      })
+})
+
+describe("one key, one thread on b: two senders, until the derived holder id (T1a)", () => {
+  for (const first of SURFACES)
+    for (const second of SURFACES.filter((via) => via !== first)) {
+      const oneSender = first !== "tool" && second !== "tool"
+      test(`#given ${first} sent under a key to the thread on b #when ${second} repeats it #then ${oneSender ? "one sender: b is handed it once" : "two senders: b is handed it twice"}`, async () => {
+        const { send, onB } = world()
+        const one = await send(first, LEGS.b, "same message", "k-pair")
+        const two = await send(second, LEGS.b, "same message", "k-pair")
+        expect(one).toMatchObject({ kind: "ok", deduplicated: false })
+        expect(two).toMatchObject({ kind: "ok" })
+        expect(onB()).toHaveLength(oneSender ? 1 : 2)
+        expect(JSON.stringify(two)).not.toContain("undefined")
+      })
+    }
 })
 
 describe("a conflict carries no text from either message", () => {

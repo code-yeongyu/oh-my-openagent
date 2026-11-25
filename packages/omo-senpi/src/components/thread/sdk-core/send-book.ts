@@ -1,5 +1,3 @@
-import { rowKey } from "@oh-my-opencode/thread-address-core"
-
 import type { ThreadToolResult } from "../contracts"
 import { createReceipts, type Receipts } from "../control/receipts"
 import type { GatewayStore } from "../gateway/store"
@@ -13,8 +11,9 @@ import type { DeliveryOutcome, DeliveryTarget } from "../gateway/transport"
 export type SendClass = "local" | "connector" | "service"
 
 /**
- * The one book every keyed send admits through before any transport (#15021): scoped by (resolved thread, key, class), so
- * the same key sent to one thread through the tools, the SDK and `omo thread` delivers once. A replay answers the outcome
+ * The one book every keyed send to a thread on this device admits through before any transport (#15021): scoped by
+ * (resolved thread, key, class), so the same key sent to one thread through the tools, the SDK and `omo thread` delivers
+ * once. A send to another device answers from the relay transport's own receipt instead. A replay answers the outcome
  * and identifiers only, never the message; a different message under the key is `idempotency_conflict`, with no text from
  * either side. Accepted within one class: a guessed key shows that a send under it exists, and a principal already
  * allowed to send to the thread can take a key first. Until the engine shares one id space between prompts and
@@ -30,8 +29,11 @@ export async function throughSendBook(
   hashed: unknown,
   deliver: () => Promise<DeliveryOutcome>,
 ): Promise<DeliveryOutcome> {
+  // A send to another device has its own receipt in the relay transport: one hand-off per sender, and a repeat answers
+  // the holder's reconciled outcome (pending, applied, refused, outcome_unavailable), which this book would hide.
+  if (target.kind === "remote") return await deliver()
   const receipts = bookOf(store)
-  const thread = target.kind === "local" ? `here/${target.thread_id}` : rowKey(target.row)
+  const thread = `here/${target.thread_id}`
   const scope = { principal: `send:${sendClass}:${thread}`, operation: "thread_send" as const, idempotency_key: key }
   const admission = await receipts.admit(scope, hashed)
   if (admission.kind === "answer") return replayed(admission.result)
