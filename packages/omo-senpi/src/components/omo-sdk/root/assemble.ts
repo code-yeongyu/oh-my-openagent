@@ -83,9 +83,23 @@ export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
   next_action: OMO_CODE_REGISTRY.invalid_arguments.next_action,
 })
 
+/**
+ * Calls whose unknown top-level input keys are dropped before the schema check, as their shipped members ignore them
+ * today (design lane ruling on closed schemas). Closed list: slice P1a's follow-up fills it and pins each call; whether
+ * such a key should be refused instead is a later, recorded decision.
+ */
+export const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
+
+/** The input as its schema sees it: for a call in the list, only the keys the schema names. */
+export function checkedInput(key: RootCallKey, input: unknown): unknown {
+  if (!UNKNOWN_KEYS_DROPPED.includes(key) || typeof input !== "object" || input === null) return input
+  const named = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
+  return Object.fromEntries(Object.entries(input).filter(([field]) => named.includes(field)))
+}
+
 function checked(key: RootCallKey, member: Call): Call {
   const refuse = refusing(key, invalidInput(key))
-  return (...args) => (inputAccepts(key, args[0] ?? {}) ? member(...args) : refuse())
+  return (...args) => (inputAccepts(key, checkedInput(key, args[0] ?? {})) ? member(...args) : refuse())
 }
 
 function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {
