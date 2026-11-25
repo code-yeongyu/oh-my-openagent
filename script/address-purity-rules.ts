@@ -52,3 +52,25 @@ export const ADDRESS_PURITY_OFFENDERS: Readonly<Record<string, Offender>> = {
       "T1a: the send book's disk scan asks the address core whether a name matched (sendAddressBook into address/)",
   },
 }
+
+// T1a deliverable 6 (#14937 carried): the stale-route recovery of a send lives once, in the thread core's relay transport
+// (thread/remote/): the holder is asked read-only, a parked session is re-addressed or reopened, and a route_unlisted
+// refusal is retried once with the first attempt's ids. No adapter asks the holder or reopens a parked row itself.
+// thread_read asks the same holder view and reopens a parked row for its own answer (#14799), not for a send, and is
+// named here for that.
+export const STALE_ROUTE_RULES: GuardRules = {
+  testFile: isTestFile,
+  s1: [],
+  s2Origins: [
+    { names: ["holderView", "sessionFileOf"], modules: [`${THREAD}remote/find-session.ts`] },
+    { names: ["reopenParkedRow"], modules: [`${THREAD}remote/reopen-parked.ts`] },
+  ],
+  s2AllowedImporters: [
+    `${THREAD}remote/`,
+    // The barrels re-export the transport's pieces for the sidecar runtime; they recover nothing themselves.
+    `${THREAD}index.ts`,
+    `${THREAD}live-surface.ts`,
+    `${THREAD}tools/read-ops.ts`,
+  ],
+  s3: { surface: () => false, layers: [], entry: "" },
+}

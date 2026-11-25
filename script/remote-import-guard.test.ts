@@ -18,7 +18,7 @@ import {
   S3_OFFENDERS,
 } from "./remote-import-guard-rules"
 import { scanRepository } from "./remote-import-guard-scan"
-import { ADDRESS_PURITY_OFFENDERS, ADDRESS_PURITY_RULES } from "./address-purity-rules"
+import { ADDRESS_PURITY_OFFENDERS, ADDRESS_PURITY_RULES, STALE_ROUTE_RULES } from "./address-purity-rules"
 
 // Guard G1 of the "one remote module" design (v6 sections 1 and 12): the vendored local-API client (L0) is imported only
 // by device-service-core (L1), and the functions that open a local-API connection or a relay transport are called only
@@ -91,6 +91,42 @@ describe("address purity (#14943 T1a, design section 5)", () => {
       expect(asRecord(found.s2)).toEqual({
         [`${thread}/barrel.ts`]: ["resolveAddress"],
         [`${thread}/tools.ts`]: ["resolveAddress"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("stale-route recovery once, in the core's send path (#14943 T1a deliverable 6, #14937)", () => {
+  test("#given every entry and adapter #then none asks the holder or reopens a parked row itself", () => {
+    const repo = checkImports(repoFacts, createResolver(REPO_ROOT), STALE_ROUTE_RULES)
+    expect(asRecord(repo.s2)).toEqual({})
+  })
+
+  test("#given an adapter that re-implements the recovery #then it is named; the relay transport is not", () => {
+    const root = mkdtempSync(join(tmpdir(), "stale-route-"))
+    try {
+      const thread = "packages/omo-senpi/src/components/thread"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${thread}/remote/find-session.ts`, "export const holderView = () => 1\n")
+      put(`${thread}/remote/reopen-parked.ts`, "export const reopenParkedRow = () => 1\n")
+      put(
+        `${thread}/remote/relay-transport.ts`,
+        'import { holderView } from "./find-session.ts"\nimport { reopenParkedRow } from "./reopen-parked.ts"\nholderView(); reopenParkedRow()\n',
+      )
+      put(`${thread}/tools.ts`, 'import { reopenParkedRow } from "./remote/reopen-parked.ts"\nreopenParkedRow()\n')
+      put(`${thread}/sdk-send.ts`, 'import { holderView } from "./remote/find-session.ts"\nholderView()\n')
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkImports(scanRepository(root), createResolver(root), STALE_ROUTE_RULES)
+      expect(asRecord(found.s2)).toEqual({
+        [`${thread}/sdk-send.ts`]: ["holderView"],
+        [`${thread}/tools.ts`]: ["reopenParkedRow"],
       })
     } finally {
       rmSync(root, { recursive: true, force: true })
