@@ -78,7 +78,7 @@ describe("helper access: pinned copy, re-checked before every spawn (#11586 revi
   })
 
   test("#given a pinned copy that fails its own check #when resolving #then the access is invalid and the copy is removed", async () => {
-    const { source, pins } = fixture()
+    const { source, pins, spawn } = fixture()
     mkdirSync(pins, { mode: 0o700 })
     let calls = 0
     const verify = async (): Promise<SignatureVerdict> => (++calls === 1 ? "valid" : "invalid")
@@ -86,6 +86,7 @@ describe("helper access: pinned copy, re-checked before every spawn (#11586 revi
       await resolveHelperAccess([source], {
         port: "a test port",
         verify,
+        spawn,
         pin: (from, check) => pinVerifiedCopy(from, check, pins),
       }),
     ).toEqual({
