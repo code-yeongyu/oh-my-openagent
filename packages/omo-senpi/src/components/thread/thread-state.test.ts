@@ -569,6 +569,20 @@ describe("a thread its engine closed (t2pp, measured on omo 5.1.69: it vanished 
       return (await tool.execute(`call-${name}-${Math.random()}`, args, undefined, undefined, undefined as never))
         .details.result as ThreadToolResult
     }
+    const open = sessions[0]
+    if (open === undefined) throw new Error("missing fixture session")
+    sessions[0] = { ...open, status: "opening" }
+    expect(rows(await run("thread_list", {}))).toEqual([
+      expect.objectContaining({ thread: "dur-a", state: "opening", status: "live" }),
+    ])
+    expect(rows(await run("thread_list", { state: ["idle"] }))).toEqual([])
+    expect(rows(await run("thread_list", { state: ["opening"] }))).toHaveLength(1)
+    expect(await run("thread_close", { thread: "dur-a" })).toMatchObject({
+      kind: "error",
+      error: { code: "host_unavailable", details: { reason: "session_opening" } },
+    })
+    expect(sessions).toHaveLength(1)
+    sessions[0] = open
     expect(table(await run("thread_list", {}))).toEqual({ "dur-a": { state: "idle", status: "live", model: null } })
     expect(await run("thread_close", { thread: "dur-a" })).toMatchObject({ kind: "ok", closed: true })
     for (const scope of [{}, { all_scope: true }])

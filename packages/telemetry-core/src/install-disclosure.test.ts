@@ -39,3 +39,13 @@ describe("telemetry install disclosure shipped copies", () => {
     expect(TELEMETRY_NOTICE).toBe(TELEMETRY_INSTALL_DISCLOSURE_LINES.join("\n"))
   })
 })
+
+describe("telemetry install disclosure destinations", () => {
+  // #14920: the disclosure names every shipped destination, PostHog and the OTLP collector.
+  test("#given the disclosure lines #when joined #then every destination host is named", () => {
+    const joined = TELEMETRY_INSTALL_DISCLOSURE_LINES.join("\n")
+
+    expect(joined).toContain("https://us.i.posthog.com")
+    expect(joined).toContain("https://t.omo.dev")
+  })
+})

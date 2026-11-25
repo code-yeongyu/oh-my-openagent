@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
-import { readProcessCpuSeconds } from "./native-process"
+import { spawn } from "node:child_process"
+import { once } from "node:events"
+import { readProcessCpuSeconds, readProcessTreeCpuSeconds } from "./native-process"
 
 // The startup bounds (stall window, CPU cap) read a child's CPU seconds through this reader. A wrong unit silently moves
 // every bound: on Apple Silicon proc_taskinfo counts Mach ticks of 125/3 ns, so reading them as nanoseconds made the
@@ -31,5 +33,43 @@ describe("readProcessCpuSeconds", () => {
     expect(readProcessCpuSeconds(0)).toBeNull()
     expect(readProcessCpuSeconds(-1)).toBeNull()
     expect(readProcessCpuSeconds(1.5)).toBeNull()
+  })
+})
+
+// A launcher that starts the engine as its own child (an npm shim, a wrapper script) idles while the engine boots. The
+// startup bounds read the whole tree, so the engine's CPU must show up under the launcher's pid (#14820).
+const GRANDCHILD =
+  'const s = process.cpuUsage(); const burned = () => { const u = process.cpuUsage(s); return (u.user + u.system) / 1e6 }; while (burned() < 0.6) {} console.log("burned"); setInterval(() => {}, 1000)'
+const WRAPPER = `require("node:child_process").spawn(process.execPath, ["-e", ${JSON.stringify(GRANDCHILD)}], { stdio: "inherit" }); setInterval(() => {}, 1000)`
+
+describe("readProcessTreeCpuSeconds", () => {
+  test("#given a launcher that idles while its child burns CPU #when the launcher's tree is read #then the child's CPU counts", async () => {
+    // given: wait for the grandchild to report its own 0.6 CPU s, so no wall clock decides the amount
+    const wrapper = spawn(process.execPath, ["-e", WRAPPER], {
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "inherit"],
+    })
+    const pid = wrapper.pid ?? 0
+    try {
+      let output = ""
+      while (!output.includes("burned")) {
+        const [chunk] = (await once(wrapper.stdout, "data")) as [Buffer]
+        output += chunk.toString()
+      }
+
+      // when
+      const launcherOnly = readProcessCpuSeconds(pid)
+      const tree = readProcessTreeCpuSeconds(pid)
+
+      // then
+      expect(launcherOnly).not.toBeNull()
+      expect(launcherOnly ?? 0).toBeLessThan(0.45)
+      expect(tree ?? 0).toBeGreaterThan((launcherOnly ?? 0) + 0.45)
+    } finally {
+      const exited = once(wrapper, "exit")
+      if (process.platform === "win32") spawn("taskkill", ["/pid", String(pid), "/t", "/f"])
+      else process.kill(-pid, "SIGKILL")
+      await exited
+    }
   })
 })

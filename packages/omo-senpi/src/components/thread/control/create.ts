@@ -22,6 +22,7 @@ import { resolveAddress } from "../address/lazy"
 import {
   addressBook,
   failure,
+  noteCause,
   sendAddressBook,
   sendBookFor,
   summary,
@@ -36,6 +37,7 @@ import { locateControl } from "./locate"
 import type { PromptStart } from "./prompt-start"
 import { controlRefusalOf } from "./port"
 import { createdThreadId, type HostedThread, type SessionOpenOutcome } from "./session-host"
+import type { ThreadWorktree } from "../worktree/thread-worktree"
 
 /** The longest untyped rename error kept as `local_name_unavailable_reason`, in code points; longer ones end in an ellipsis. */
 const RENAME_REASON_MAX_CHARS = 300
@@ -101,12 +103,17 @@ export async function createThread(
       "Pass prompt (the new thread's first message) or name, or pass thread to open an existing thread.",
     )
   // #14060: an earlier run under this key failed after it may have made a thread. It is re-run only when the thread
-  // the key derives is on this device; otherwise (a create on another device, a host that ignored the derived id)
+  // the key derives is found: on this device, or (a create on another device) in that device's listing, where the
+  // retry finishes it and opens nothing. Otherwise (a host that ignored the derived id, a device that does not list it)
   // a thread may exist that nothing here can find, so the retry is refused as any other uncertain operation is.
+  let retriesElsewhere = false
   if (retrying !== undefined) {
     const derived = await existingHere(options, current, createdThreadId(callerId, operationId), callerId)
-    if (derived.kind !== "live" && derived.kind !== "file") return uncertainFailure(retrying.error_note)
+    retriesElsewhere = derived.kind !== "live" && derived.kind !== "file"
   }
+  const stillUncertain = () => uncertainFailure(retrying?.error_note ?? null)
+  // #14569: the worktree the first run made on the far device, kept in its uncertain answer, is the adopted thread's own.
+  const firstWorktree = keptWorktree(retrying?.error_note)
   // The session the open answered, with its listing key: a first prompt to a thread on another device needs it.
   let opened: HostedThread | undefined
   const made = await (async (): Promise<ThreadToolResult> => {
@@ -145,6 +152,8 @@ export async function createThread(
       },
       existing: (address) => existingHere(options, current, address, callerId),
     })
+    if (retriesElsewhere && (plan.kind === "done" || !plan.creates || plan.host.adopt === undefined))
+      return stillUncertain()
     if (plan.kind === "done") {
       // A thread live already answers from placement (deduplicated); its prompt, if any, still goes to it (#14335).
       if (plan.thread !== undefined && plan.result.kind === "ok") opened = plan.thread
@@ -153,12 +162,15 @@ export async function createThread(
     // An alias no account holds names the thread on its device instead (#13104); a given name wins.
     // Trimmed like thread_rename's alias-as-name, so " x " and "x" name the thread the same way.
     const name = plan.localAlias === undefined ? value.name : (value.name ?? value.alias?.trim())
-    // #14060: a new thread on this device is created under an id derived from this call's idempotency key, so a
-    // create whose reply was lost (the connection closed after the host made the session) is found again: on the
-    // spot, and by a retry under the same key, which reopens or reuses that thread and admits its prompt once.
-    const createdId =
-      plan.creates && plan.host.device === undefined ? createdThreadId(callerId, operationId) : undefined
-    const earlier = createdId === undefined ? undefined : await existingHere(options, current, createdId, callerId)
+    // #14060: a new thread, on this device or another, is created under an id derived from this call's idempotency
+    // key, so a create whose reply was lost (the connection closed, or the call's budget ran out, after the host made
+    // the session) is found again: on the spot, and by a retry under the same key, which reopens or reuses that thread
+    // and admits its prompt once. Another device's host finds it in that device's listing (SessionHost.adopt).
+    const createdId = plan.creates ? createdThreadId(callerId, operationId) : undefined
+    const earlier =
+      createdId === undefined || plan.host.device !== undefined
+        ? undefined
+        : await existingHere(options, current, createdId, callerId)
     const deduplicated = earlier?.kind === "live" || earlier?.kind === "file"
     // The thread an earlier run made may already carry this name: it is this create's own thread, not a conflict.
     // A reopen checks its name after the open, against every thread but itself (keepName): its own name is no conflict.
@@ -166,7 +178,9 @@ export async function createThread(
     const checksNameBeforeOpen = plan.creates || plan.host.device !== undefined
     if (checksNameBeforeOpen && name !== undefined && !deduplicated) {
       const conflict = checkNameConflict(
-        (await plan.host.visible()).filter((thread) => thread.thread_id !== plan.reopenedId),
+        (await plan.host.visible()).filter(
+          (thread) => thread.thread_id !== plan.reopenedId && thread.thread_id !== createdId,
+        ),
         name,
       )
       if (conflict.kind === "error") return { kind: "error", error: conflict } as ThreadToolResult
@@ -177,7 +191,7 @@ export async function createThread(
     const kept = plan.creates ? undefined : (name ?? plan.previousName)
     const openName = plan.creates ? name : plan.host.device === undefined ? undefined : kept
     const reopened = async (): Promise<SessionOpenOutcome | undefined> => {
-      if (createdId === undefined) return undefined
+      if (createdId === undefined || plan.host.device !== undefined) return undefined
       const found = await existingHere(options, await view(), createdId, callerId)
       if (found.kind === "live") return { kind: "ok", thread: found.thread }
       return found.kind === "file" ? await plan.host.open(fileOpen(found)) : undefined
@@ -185,7 +199,21 @@ export async function createThread(
     let outcome: SessionOpenOutcome
     if (earlier?.kind === "live") outcome = { kind: "ok", thread: earlier.thread }
     else if (earlier?.kind === "file") outcome = await plan.host.open(fileOpen(earlier))
-    else
+    else if (retriesElsewhere) {
+      const found =
+        createdId === undefined
+          ? undefined
+          : await plan.host.adopt?.(
+              {
+                durableSessionId: createdId,
+                ...(openName === undefined ? {} : { name: openName }),
+                ...(firstWorktree === undefined ? {} : { worktree: firstWorktree }),
+              },
+              { confirmReach: true },
+            )
+      if (found === undefined) return stillUncertain()
+      outcome = found
+    } else
       try {
         outcome = await plan.host.open(
           {
@@ -497,3 +525,16 @@ const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
   sessionPath: file.sessionPath,
   ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
 })
+
+/** The worktree an uncertain create's first answer kept (its receipt note, `uncertainNote`), when it names a whole one. */
+function keptWorktree(note: string | null | undefined): ThreadWorktree | undefined {
+  const kept = note === null || note === undefined ? undefined : noteCause(note).details?.["worktree"]
+  if (typeof kept !== "object" || kept === null) return undefined
+  const { path, branch, base, repository } = kept as Record<string, unknown>
+  return typeof path === "string" &&
+    typeof branch === "string" &&
+    typeof base === "string" &&
+    typeof repository === "string"
+    ? (kept as ThreadWorktree)
+    : undefined
+}

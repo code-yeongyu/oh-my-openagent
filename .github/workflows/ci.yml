@@ -62,6 +62,10 @@ jobs:
   ci-mode:
     runs-on: ubuntu-26.04
     timeout-minutes: 3
+    # actions: read lets base-platform-green.sh read the base's dev push run.
+    permissions:
+      contents: read
+      actions: read
     outputs:
       generated_release_push: ${{ steps.classify.outputs.generated_release_push }}
       web_only: ${{ steps.classify.outputs.web_only }}
@@ -82,7 +86,10 @@ jobs:
           BASE_SHA: ${{ github.event_name == 'merge_group' && github.event.merge_group.base_sha || (github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before) }}
           HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message || '' }}
           HEAD_REF: ${{ github.head_ref || '' }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || '' }}
+          PR_HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name || '' }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) || '[]' }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
@@ -95,6 +102,25 @@ jobs:
             DIFF_AVAILABLE=false
             : > "$PATHS_FILE"
           fi
+
+          # A release-state pull request skips the macOS/Windows matrix only when its stamp commit is ONE commit on the pinned
+          # source, that pin is on the base branch, the pin's completed dev push run passed with every macOS/Windows leg run
+          # and green, the head is not a fork, and the stamp changes nothing but versions (release-stamp-strict.mjs prints
+          # STRICT_STAMP_OK; exit 0 without it is no proof). Any
+          # failure, API error or unfinished run keeps the full matrix (#14847).
+          BASE_PLATFORM_GREEN=false
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ] && [[ "$HEAD_REF" =~ ^release/v.+-source-state$ ]] &&
+             [ "$DIFF_AVAILABLE" = true ] && [ "$PR_HEAD_REPO" = "$GITHUB_REPOSITORY" ] &&
+             [ -n "$PR_HEAD_SHA" ] && git cat-file -e "${PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+            STAMP_PARENTS="$(git show -s --format=%P "$PR_HEAD_SHA")"
+            if [ "$(wc -w <<< "$STAMP_PARENTS")" -eq 1 ] &&
+               git merge-base --is-ancestor "$STAMP_PARENTS" "$BASE_SHA" &&
+               [ "$(node script/release-stamp-strict.mjs "$STAMP_PARENTS" "$PR_HEAD_SHA")" = STRICT_STAMP_OK ] &&
+               [ "$(GH_REPO="$GITHUB_REPOSITORY" BASE_SHA="$STAMP_PARENTS" bash .github/scripts/base-platform-green.sh || true)" = true ]; then
+              BASE_PLATFORM_GREEN=true
+            fi
+          fi
+          echo "release-stamp platform proof: $BASE_PLATFORM_GREEN"
 
           MERGE_PARENTS="$(git show -s --format=%P "$GITHUB_SHA" | wc -w)"
           BODY_FILE="$RUNNER_TEMP/pr-body.md"
@@ -110,6 +136,7 @@ jobs:
             --labels "${PR_LABELS:-[]}" \
             --body-file "$BODY_FILE" \
             --changed-files "$(jq -r '.pull_request.changed_files // 0' "$GITHUB_EVENT_PATH")" \
+            --base-platform-green "$BASE_PLATFORM_GREEN" \
             < "$PATHS_FILE")"
 
           jq -r '"generated_release_push=\(.generatedReleasePush)"' <<< "$MODE_JSON" >> "$GITHUB_OUTPUT"
@@ -230,7 +257,7 @@ jobs:
     strategy:
       fail-fast: false
       # merge_group uses these same matrix contexts (the macOS ones come from the
-      # macos-combined status jobs, the Linux ones from linux-test-status), without PR labels.
+      # macos-combined-1/-2 status jobs, the Linux ones from linux-test-status), without PR labels.
       # Queue commits always run heavy validation on every OS leg, including
       # docs/web-only groups; the fast path remains a pull-request optimization.
       matrix:
@@ -601,26 +628,26 @@ jobs:
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
-  # One macOS allocation per head for the four former matrix legs. Native
-  # binary parity remains independent. A full install runs prepare once and
-  # provides the LSP daemon/runtime artifacts the compatibility suites need.
-  macos-combined:
+  # Two parallel macOS allocations per head for the four former matrix legs (#14849); one sequential job was the long
+  # pole of push CI (58m02s in run 45354936676). The parts are split by the measured step times of that run: job 1 runs
+  # LSP + shard 1 (both halves) + shard 2 light + Codex (~28 min of steps), job 2 runs shard 2 heavy + Senpi (~28 min),
+  # each plus its own ~2-3 min install. Native binary parity remains independent. Each job's full install runs prepare
+  # and provides the LSP daemon/runtime artifacts its suites need. ci-macos-partition.test.ts proves the two jobs run
+  # every root test file exactly once.
+  macos-combined-1:
     needs: [ci-mode]
     if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
     runs-on: macos-latest
-    # Each part has its own step timeout so one hung part fails only its own
-    # context; the job budget covers install plus the sum of the part budgets.
-    # Shard 2 is two parts (heavy, light). Their budgets replaced the single
-    # 20-minute step that run 43943966867 hit while tests were still passing.
-    timeout-minutes: 110
+    # Each part has its own step timeout so one hung part fails only its own context. The job budget is the sum of the
+    # part budgets (69) plus 10 minutes for checkout, setup, install (measured 2-6 min) and the upload/summary steps;
+    # ci-macos-combined.test.ts checks that sum.
+    timeout-minutes: 80
     outputs:
       lsp: ${{ steps.lsp-daemon-tests.outcome }}
       shard1a: ${{ steps.root-tests-posix-1a.outcome }}
       shard1b: ${{ steps.root-tests-posix-1b.outcome }}
-      shard2a: ${{ steps.root-tests-posix-2a.outcome }}
       shard2b: ${{ steps.root-tests-posix-2b.outcome }}
       codex: ${{ steps.codex-platform-tests.outcome }}
-      senpi: ${{ steps.senpi-tests-posix.outcome }}
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -651,7 +678,7 @@ jobs:
       - name: Run root test shard 1 memory-core sync
         id: root-tests-posix-1a
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        # 14, not 20: the part budgets must stay inside the job's 110 minutes (ci-macos-combined.test.ts); ~11 min at 2.7x.
+        # 14 minutes: ~11 min projected at 2.7x the fast runner's 249 s.
         timeout-minutes: 14
         env:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
@@ -667,13 +694,6 @@ jobs:
         run: |
           mkdir -p "$CI_JUNIT_DIR"
           bun --config=bunfig.macos-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"
-      - name: Run root test shard 2 heavy
-        id: root-tests-posix-2a
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        timeout-minutes: 20
-        env:
-          CI_JUNIT_DIR: ${{ runner.temp }}/junit
-        run: bash .github/scripts/ci-root-shard-2.sh heavy
       - name: Run root test shard 2 light
         id: root-tests-posix-2b
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -689,6 +709,66 @@ jobs:
           bash .github/scripts/ci-codex-platform-build.sh
           bash .github/scripts/ci-codex-platform-node.sh
           bun test packages/omo-opencode/src/cli/cli-installer.platform.test.ts
+
+      # The JUnit reports prove a re-sharded layout runs exactly the tests this one runs (#13315).
+      - name: Upload macOS JUnit reports
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: macos-junit-1-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/junit/*.xml
+          if-no-files-found: warn
+          overwrite: false
+
+      - name: Write job summary
+        if: always()
+        env:
+          JOB_SUMMARY_TITLE: macOS validation 1/2
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
+            - Root shard 1 memory-core sync: `${{ steps.root-tests-posix-1a.outcome }}`.
+            - Root shard 1 rest: `${{ steps.root-tests-posix-1b.outcome }}`.
+            - Root shard 2 light: `${{ steps.root-tests-posix-2b.outcome }}`.
+            - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
+          JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  macos-combined-2:
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
+    runs-on: macos-latest
+    # The job budget is the sum of the part budgets (40) plus 10 minutes for checkout, setup, install (measured 2-6 min)
+    # and the upload/summary steps; ci-macos-combined.test.ts checks that sum.
+    timeout-minutes: 50
+    outputs:
+      shard2a: ${{ steps.root-tests-posix-2a.outcome }}
+      senpi: ${{ steps.senpi-tests-posix.outcome }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+      - uses: actions/cache@v6
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
+      - name: Install dependencies
+        id: install
+        run: |
+          bun install --frozen-lockfile
+          bun run script/remove-stale-self-package-tests.ts
+      - name: Run root test shard 2 heavy
+        id: root-tests-posix-2a
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        timeout-minutes: 20
+        env:
+          CI_JUNIT_DIR: ${{ runner.temp }}/junit
+        run: bash .github/scripts/ci-root-shard-2.sh heavy
       - name: Run Senpi compatibility tests
         id: senpi-tests-posix
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -703,7 +783,7 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: macos-junit-${{ github.run_id }}-${{ github.run_attempt }}
+          name: macos-junit-2-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/junit/*.xml
           if-no-files-found: warn
           overwrite: false
@@ -711,24 +791,21 @@ jobs:
       - name: Write job summary
         if: always()
         env:
-          JOB_SUMMARY_TITLE: Combined macOS validation
+          JOB_SUMMARY_TITLE: macOS validation 2/2
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - LSP daemon: `${{ steps.lsp-daemon-tests.outcome }}`.
-            - Root shard 1 memory-core sync: `${{ steps.root-tests-posix-1a.outcome }}`.
-            - Root shard 1 rest: `${{ steps.root-tests-posix-1b.outcome }}`.
             - Root shard 2 heavy: `${{ steps.root-tests-posix-2a.outcome }}`.
-            - Root shard 2 light: `${{ steps.root-tests-posix-2b.outcome }}`.
-            - Codex platform: `${{ steps.codex-platform-tests.outcome }}`.
             - Senpi: `${{ steps.senpi-tests-posix.outcome }}`.
           JOB_SUMMARY_NEXT: Inspect the failed part; independent parts continue after an earlier failure.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
   # Matrix values deliberately retain the ruleset's exact required check names,
   # but these status jobs never allocate macOS runners, including on fast paths.
+  # Each needs exactly the macOS job(s) its parts ran in; test 2/2 reads both (shard 2 heavy runs in job 2), so its
+  # LEG_JOB_STATUS lists both results. An output of a job that did not run reads as 'missing' and fails the status.
   macos-test-1-status:
     name: test
-    needs: [ci-mode, macos-combined]
+    needs: [ci-mode, macos-combined-1]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-26.04
     strategy:
@@ -744,8 +821,8 @@ jobs:
       - name: Write job summary
         env:
           LEG_OS: ${{ matrix.os }}
-          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard1a }} ${{ needs.macos-combined.outputs.shard1b }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined-1.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined-1.outputs.lsp || 'missing' }} ${{ needs.macos-combined-1.outputs.shard1a || 'missing' }} ${{ needs.macos-combined-1.outputs.shard1b || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -753,7 +830,7 @@ jobs:
 
   macos-test-2-status:
     name: test
-    needs: [ci-mode, macos-combined]
+    needs: [ci-mode, macos-combined-1, macos-combined-2]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-26.04
     strategy:
@@ -769,8 +846,8 @@ jobs:
       - name: Write job summary
         env:
           LEG_OS: ${{ matrix.os }}
-          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.lsp }} ${{ needs.macos-combined.outputs.shard2a }} ${{ needs.macos-combined.outputs.shard2b }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined-1.result }} ${{ needs.macos-combined-2.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined-1.outputs.lsp || 'missing' }} ${{ needs.macos-combined-2.outputs.shard2a || 'missing' }} ${{ needs.macos-combined-1.outputs.shard2b || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -778,7 +855,7 @@ jobs:
 
   macos-codex-status:
     name: codex-compatibility
-    needs: [ci-mode, macos-combined]
+    needs: [ci-mode, macos-combined-1]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-26.04
     strategy:
@@ -794,8 +871,8 @@ jobs:
       - name: Write job summary
         env:
           LEG_OS: ${{ matrix.os }}
-          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.codex }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined-1.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined-1.outputs.codex || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -803,7 +880,7 @@ jobs:
 
   macos-senpi-status:
     name: senpi-compatibility
-    needs: [ci-mode, macos-combined]
+    needs: [ci-mode, macos-combined-2]
     if: ${{ always() && !cancelled() }}
     runs-on: ubuntu-26.04
     strategy:
@@ -817,8 +894,8 @@ jobs:
       - name: Write job summary
         env:
           LEG_OS: ${{ matrix.os }}
-          LEG_JOB_STATUS: ${{ needs.macos-combined.result }}
-          TEST_OUTCOMES: ${{ needs.macos-combined.outputs.senpi }}
+          LEG_JOB_STATUS: ${{ needs.macos-combined-2.result }}
+          TEST_OUTCOMES: ${{ needs.macos-combined-2.outputs.senpi || 'missing' }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
@@ -1110,7 +1187,7 @@ jobs:
             - Builds the local-path Senpi adapter package artifacts.
             - Builds the shared LSP daemon once before staging Senpi artifacts.
             - Packs the generated Pi package and runs hermetic Senpi and QA-contract tests.
-            - Covers the Windows named-pipe daemon smoke; Linux runs as the senpi-* jobs below, macOS in macos-combined.
+            - Covers the Windows named-pipe daemon smoke; Linux runs as the senpi-* jobs below, macOS in macos-combined-2.
           JOB_SUMMARY_NEXT: Inspect the first omo-senpi build, sync, directive, or package test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 

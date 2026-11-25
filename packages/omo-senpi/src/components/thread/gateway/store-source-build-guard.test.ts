@@ -22,7 +22,10 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
 })
 
-function account(options: { readonly sourceBuild: boolean }): { readonly home: string; readonly shared: string } {
+function account(options: { readonly sourceBuild: boolean; readonly launched?: boolean }): {
+  readonly home: string
+  readonly shared: string
+} {
   const home = realpathSync(mkdtempSync(join(tmpdir(), "omo-source-build-home-")))
   const payload = join(home, "payload")
   mkdirSync(payload, { recursive: true })
@@ -32,7 +35,8 @@ function account(options: { readonly sourceBuild: boolean }): { readonly home: s
   mkdirSync(join(shared, "sessions"), { recursive: true })
   const saved = { HOME: process.env.HOME, OMO_PACKAGE_DIR: process.env.OMO_PACKAGE_DIR }
   process.env.HOME = home
-  process.env.OMO_PACKAGE_DIR = payload
+  if (options.launched === false) delete process.env.OMO_PACKAGE_DIR
+  else process.env.OMO_PACKAGE_DIR = payload
   cleanups.push(() => {
     for (const [key, value] of Object.entries(saved)) {
       if (value === undefined) delete process.env[key]
@@ -64,6 +68,26 @@ test("#given an omob source build #when it opens the shared agent dir's store #t
   const opened = await settled(h.store({ agentDir: shared }).identity())
   expect(opened.error).toMatchObject({ code: "gateway_migration_failed" })
   expect(userVersion(shared) ?? 0).toBe(0)
+})
+
+test("#given a run from TypeScript source that no launcher started #when it opens the shared agent dir's store #then it refuses to migrate it", async () => {
+  const h = (harness = createGatewayHarness())
+  const { shared } = account({ sourceBuild: false, launched: false })
+
+  const opened = await settled(h.store({ agentDir: shared }).identity())
+  expect(opened.error).toMatchObject({ code: "gateway_migration_failed" })
+  expect(userVersion(shared) ?? 0).toBe(0)
+})
+
+test("#given a run from TypeScript source that no launcher started #when it opens an isolated agent dir's store #then it migrates it", async () => {
+  const h = (harness = createGatewayHarness())
+  const { home } = account({ sourceBuild: false, launched: false })
+  const isolated = join(home, "isolated-agent")
+  mkdirSync(isolated, { recursive: true })
+
+  const opened = await settled(h.store({ agentDir: isolated }).identity())
+  expect(opened.error).toBeUndefined()
+  expect(userVersion(isolated)).toBe(GATEWAY_MIGRATIONS.length)
 })
 
 test("#given a release build #when it opens the shared agent dir's store #then it migrates it", async () => {

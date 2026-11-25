@@ -4,6 +4,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { GATEWAY_BUSY_TIMEOUT_MS } from "./constants"
 import type { GatewayDeliverRequest } from "./engine"
 import { gatewayDatabasePath } from "./paths"
 import { GATEWAY_MIGRATIONS, gatewayReaderFloor } from "./schema"
@@ -37,9 +38,16 @@ function kindOf(result: unknown): string {
   return r.kind === "ok" ? (r.delivery?.kind ?? "ok") : `error:${r.error?.code}`
 }
 
+/** A second write connection to the store that waits for the worker's lock as the store's own connections do. */
+function openStoreWriter(agentDir: string): Database {
+  const db = new Database(gatewayDatabasePath(agentDir))
+  db.exec(`PRAGMA busy_timeout = ${GATEWAY_BUSY_TIMEOUT_MS}`)
+  return db
+}
+
 /** What another binary leaves behind: the store at `version`, with the floor it recorded (none when `floor` is null). */
 function migrateAhead(agentDir: string, version: number, floor: number | null): void {
-  const db = new Database(gatewayDatabasePath(agentDir))
+  const db = openStoreWriter(agentDir)
   try {
     db.exec(`PRAGMA user_version = ${version}`)
     if (floor === null) db.query("DELETE FROM gateway_meta WHERE key = ?").run(GATEWAY_READER_FLOOR_KEY)
@@ -52,6 +60,31 @@ function migrateAhead(agentDir: string, version: number, floor: number | null): 
     db.close()
   }
 }
+
+test("#given another process holds the store's write lock for a moment #when migrateAhead rewrites the version #then it waits for the lock instead of failing SQLITE_BUSY", async () => {
+  const h = (harness = createGatewayHarness())
+  await h.store().identity()
+  const holder = Bun.spawn(
+    [
+      process.execPath,
+      "-e",
+      `const { Database } = require("bun:sqlite"); const db = new Database(${JSON.stringify(gatewayDatabasePath(h.agentDir))}); db.exec("BEGIN IMMEDIATE"); console.log("LOCKED"); setTimeout(() => { db.exec("COMMIT"); db.close() }, 300)`,
+    ],
+    { stdout: "pipe", stderr: "inherit" },
+  )
+  cleanups.push(() => holder.kill())
+  const reader = holder.stdout.getReader()
+  const first = await Promise.race([
+    reader.read(),
+    Bun.sleep(10_000).then(() => {
+      throw new Error("waited 10s for the lock holder to print LOCKED")
+    }),
+  ])
+  expect(new TextDecoder().decode(first.value)).toContain("LOCKED")
+
+  expect(() => migrateAhead(h.agentDir, GATEWAY_MIGRATIONS.length + 1, null)).not.toThrow()
+  expect(await holder.exited).toBe(0)
+})
 
 test("#given this binary opens its store #then it records reader floor 14 (v15 and v16 claim nothing a schema-14 reader uses)", async () => {
   const h = (harness = createGatewayHarness())
@@ -186,7 +219,7 @@ test.each([
 
 /** The store at `version` with `floor` stored exactly as given: a raw value, nothing, or no gateway_meta table at all. */
 function storeFloorAs(agentDir: string, version: number, floor: string | number | null | "no gateway_meta"): void {
-  const db = new Database(gatewayDatabasePath(agentDir))
+  const db = openStoreWriter(agentDir)
   try {
     db.exec(`PRAGMA user_version = ${version}`)
     if (floor === "no gateway_meta") db.exec("DROP TABLE gateway_meta")

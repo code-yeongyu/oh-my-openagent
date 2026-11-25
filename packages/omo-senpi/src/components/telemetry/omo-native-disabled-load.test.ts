@@ -19,14 +19,14 @@ type Setup = { readonly env: Record<string, string>; readonly configEnabled?: bo
 type Run = { readonly sidecarLoaded: boolean; readonly transport: number; readonly stateFiles: readonly string[] }
 
 const DISABLED: readonly (readonly [string, (agentDir: string) => Setup])[] = [
-  ["OMO_DISABLE_TELEMETRY=1", () => ({ env: { OMO_DISABLE_TELEMETRY: "1" }, configEnabled: true })],
-  ["telemetry.enabled false in config", () => ({ env: {}, configEnabled: false })],
+  ["OMO_DISABLE_TELEMETRY=1", () => ({ env: { OMO_DISABLE_TELEMETRY: "1" }, configEnabled: true, seedConsent: false })],
+  ["telemetry.enabled false in config", () => ({ env: {}, configEnabled: false, seedConsent: false })],
   [
     "first run before consent (placeholder config)",
     (agentDir) => {
       mkdirSync(join(agentDir, ".omo"), { recursive: true })
       writeFileSync(join(agentDir, ".omo", "omo.jsonc"), JSON.stringify({ telemetry: { enabled: false } }))
-      return { env: { HOME: agentDir } }
+      return { env: { HOME: agentDir }, seedConsent: false }
     },
   ],
 ]
@@ -49,7 +49,7 @@ async function runSession(agentDir: string, setup: Setup, turns = 2): Promise<Ru
     writeFileSync(
       join(work, "probe.ts"),
       [
-        'import { readdirSync, existsSync, writeFileSync } from "node:fs"',
+        'import { readdirSync, existsSync, rmSync, writeFileSync } from "node:fs"',
         `const { FakeExtensionAPI } = await import(${JSON.stringify(join(HERE, "../../../test-support/fake-extension-api.ts"))})`,
         `const { createOmoNativeTelemetryComponent } = await import(${JSON.stringify(join(HERE, "omo-native-component.ts"))})`,
         `const support = await import(${JSON.stringify(join(HERE, "telemetry.test-support.ts"))})`,
@@ -69,6 +69,7 @@ async function runSession(agentDir: string, setup: Setup, turns = 2): Promise<Ru
         "  stateDir,",
         "  transportFactory: () => { transport += 1; return { capture() {}, async captureImmediate() {}, async flush() {}, async shutdown() {} } },",
         "}).register(pi, { config: pi, logger: support.createSilentLogger() })",
+        'if (setup.seedConsent === false) rmSync(`${stateDir}/consent-answer`, { force: true })',
         'const ctx = { cwd: agentDir, sessionManager: { getSessionId: () => "load-spy" } }',
         'await pi.dispatch("session_start", { type: "session_start", reason: "startup" }, ctx)',
         `for (let i = 0; i < ${turns}; i += 1) await pi.dispatch("turn_end", { type: "turn_end", turnIndex: i, message: { role: "assistant", content: [], provider: "openai", model: "gpt-5.6-sol", usage: { input: 1, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 3, cost: { total: 0.0002 } }, stopReason: "stop", timestamp: 1 }, toolResults: [] }, ctx)`,
