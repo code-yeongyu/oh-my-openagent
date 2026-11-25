@@ -139,6 +139,7 @@ export type World = {
     readonly roots: number
     readonly rootsLeft: readonly string[]
     readonly processesLeft: number
+    readonly processProbe: "read" | "failed"
   }
 }
 
@@ -264,13 +265,23 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     teardown: () => {
       const roots = [a.dir, b.dir]
       const left = roots.filter((dir) => existsSync(dir))
-      const processes = roots.flatMap((dir) =>
-        Bun.spawnSync(["pgrep", "-f", dir])
-          .stdout.toString()
-          .split("\n")
-          .filter((pid) => pid.trim() !== ""),
+      // pgrep answers 0 with matches, 1 with none, anything else when it could not look: only 0 and 1 are a reading.
+      const probes = roots.map((dir) => Bun.spawnSync(["pgrep", "-f", dir]))
+      const probed = probes.every((probe) => probe.exitCode === 0 || probe.exitCode === 1)
+      const processes = probes.flatMap((probe) =>
+        probe.exitCode === 0
+          ? probe.stdout
+              .toString()
+              .split("\n")
+              .filter((pid) => pid.trim() !== "")
+          : [],
       )
-      return { roots: roots.length, rootsLeft: left, processesLeft: processes.length }
+      return {
+        roots: roots.length,
+        rootsLeft: left,
+        processesLeft: processes.length,
+        processProbe: probed ? ("read" as const) : ("failed" as const),
+      }
     },
   }
 }

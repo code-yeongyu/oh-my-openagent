@@ -12,7 +12,7 @@ export type StepWorld = Pick<World, "account" | "observer" | "release">
 // One step's bound: a surface that has not answered by then failed the step; its call is aborted (a driver that started
 // a process stops it), and the surface's later cells are not reached, so no step runs beside a stalled one.
 const STEP_DEADLINE_MS = 180_000
-const withinStep = (
+export const withinStep = (
   run: (signal: AbortSignal) => Promise<Answer>,
   call: string,
   deadlineMs: number,

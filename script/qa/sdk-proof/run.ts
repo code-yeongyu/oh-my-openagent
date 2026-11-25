@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     await world.close()
   }
   const torn = world.teardown()
-  const tornDown = torn.rootsLeft.length === 0 && torn.processesLeft === 0
+  const tornDown = torn.rootsLeft.length === 0 && torn.processesLeft === 0 && torn.processProbe === "read"
   const isolated = isolation.refused.length === 0 && !isolation.sessionBus
   writeFileSync(
     join(evidence, "isolation.json"),
@@ -124,7 +124,7 @@ async function main(): Promise<void> {
   )
   const table = summary(build, SCENARIO, runs, [
     `Isolation: ${isolation.refused.length} request(s) to a non-loopback address refused; the loopback guard loaded in ${isolation.guarded} world processes; session bus in the world's environment: ${isolation.sessionBus ? "present" : "absent"}.`,
-    `Teardown, read back after the world closed: ${torn.roots - torn.rootsLeft.length} of ${torn.roots} scratch roots gone; ${torn.processesLeft} process(es) still naming one.`,
+    `Teardown, read back after the world closed: ${torn.roots - torn.rootsLeft.length} of ${torn.roots} scratch roots gone; ${torn.processProbe === "read" ? `${torn.processesLeft} process(es) still naming one` : "the process table could not be read (the check fails)"}.`,
     "Attribution: a fail cell is the product's only on the surface's own answer (its error code, or its success while device B, read through B's own engine, shows otherwise); a stall is the harness's; a world-setup failure is not reached. Each observation is tied to its call: B's thread by the id its open adopted, a tool result by a nonce in that step's prompt, an SDK result by its request id, a CLI result by its own process.",
     "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",
   ])
