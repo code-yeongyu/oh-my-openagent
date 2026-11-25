@@ -16,6 +16,7 @@ import {
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
   behaviourChangeProblems,
+  type AwaitingOwnerRow,
   documentRowProblems,
   sectionFourRows,
   matrixProblems,
@@ -243,19 +244,19 @@ describe("negative controls of custody and the held table (#14949)", () => {
     )
   })
 
-  // Section 4.6 (design lane ruling): rows read from the document's own headings, an absent 4.6 is no rows, and a 4.6
-  // row without a line is allowed only while a closed, self-retiring awaiting entry names it with the document's slice.
-  test("#given the revision with section 4.6 #then an awaiting row needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
+  // The awaiting record against revision 22 as a fixture (design lane ruling): an entry needs its row and, where the
+  // table has an Owner slice column, that exact slice; it goes stale once a line covers the row; a row dropped from the
+  // record without a line fails.
+  test("#given revision 22 #then an awaiting entry needs its exact slice, fails once lined, and a listed row dropped from the list fails", () => {
     const revision = readFileSync(join(import.meta.dir, "fixtures/security-design-rev22.md"), "utf8")
     const awaiting = (
       JSON.parse(readFileSync(join(import.meta.dir, "awaiting-owner-rows.json"), "utf8")) as {
-        rows: { row: string; slice: string }[]
+        rows: AwaitingOwnerRow[]
       }
     ).rows
-    expect(sectionFourRows(securityDesign).some((row) => row.section === "4.6")).toBe(false)
-    const ownedOnly = (problems: readonly string[]) =>
-      problems.filter((problem) => problem.startsWith("section 4.6 ") || problem.startsWith("awaiting row "))
-    expect(ownedOnly(documentRowProblems(PRINCIPAL_MATRIX, revision, awaiting))).toEqual([])
+    const withoutSixth = revision.replace(/^### 4\.6 [\s\S]*?(?=^### |^## )/m, "")
+    expect(sectionFourRows(withoutSixth).some((row) => row.section === "4.6")).toBe(false)
+    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, awaiting, true)).toEqual([])
     const sdkRoot = sectionFourRows(revision).find((row) => row.capability.startsWith("`install.sdkRoot`"))
     if (sdkRoot === undefined) throw new Error("no install.sdkRoot row")
     const lined = [
@@ -284,5 +285,12 @@ describe("negative controls of custody and the held table (#14949)", () => {
         awaiting.map((entry) => (entry.row === "daemon.run" ? { ...entry, slice: "T1a" } : entry)),
       ).join("\n"),
     ).toContain('awaiting row daemon.run: slice "T1a" is not the document\'s "C1a"')
+    const typo = [...awaiting, { section: "4.6", row: "threads.teleport", slice: "T1a" }]
+    expect(documentRowProblems(PRINCIPAL_MATRIX, revision, typo, true)).toContain(
+      "awaiting row 4.6 threads.teleport: not a row of the document",
+    )
+    expect(documentRowProblems(PRINCIPAL_MATRIX, withoutSixth, typo)).not.toContain(
+      "awaiting row 4.6 threads.teleport: not a row of the document",
+    )
   })
 })

@@ -87,8 +87,14 @@ export function sectionFourRows(document: string): DocumentRow[] {
   return rows
 }
 
-/** A 4.6 row with no line yet, waiting for the slice the document names (closed, self-retiring list). */
-export type AwaitingOwnerRow = { readonly row: string; readonly slice: string }
+/**
+ * A row of section 4 with no line yet, waiting for its owner slice (closed, self-retiring list). `row` is the row's first
+ * backticked call or the start of its first column; `slice` equals the row's Owner slice column where its table has one.
+ */
+export type AwaitingOwnerRow = { readonly section: string; readonly row: string; readonly slice: string }
+
+const awaits = (entry: AwaitingOwnerRow, row: DocumentRow): boolean =>
+  entry.section === row.section && (rowKey(row.capability) === entry.row || row.capability.startsWith(entry.row))
 
 /**
  * Every call an awaiting row names stays without a line, so each of its (call, principal) pairs is either in the
@@ -102,7 +108,7 @@ export function awaitingPairProblems(
 ): string[] {
   const rows = sectionFourRows(document).filter((row) => row.owner !== undefined)
   return awaiting.flatMap((entry) => {
-    const row = rows.find((candidate) => rowKey(candidate.capability) === entry.row)
+    const row = rows.find((candidate) => awaits(entry, candidate))
     if (row === undefined) return []
     const named = [...row.capability.matchAll(/`([^`]+)`/g)]
       .map((match) => match[1] ?? "")
@@ -134,6 +140,7 @@ export function documentRowProblems(
   lines: readonly MatrixLine[],
   document: string,
   awaiting: readonly AwaitingOwnerRow[] = [],
+  exact = false,
 ): string[] {
   const problems: string[] = []
   const rows = sectionFourRows(document)
@@ -141,19 +148,20 @@ export function documentRowProblems(
   for (const row of rows)
     if (
       !lines.some((line) => source(line) === row.capability && line.section === row.section) &&
-      !awaiting.some((entry) => entry.row === rowKey(row.capability))
+      !awaiting.some((entry) => awaits(entry, row))
     )
       problems.push(`section ${row.section} row "${row.capability}": no line of the matrix`)
-  // The awaiting list (design lane ruling): only rows of a table with an Owner slice column, each naming the slice the
-  // document names, and stale once a line covers the row. With no such table in the document, the list is not checked.
-  const owned = rows.filter((row) => row.owner !== undefined)
-  for (const entry of owned.length === 0 ? [] : awaiting) {
-    const row = owned.find((candidate) => rowKey(candidate.capability) === entry.row)
+  // The awaiting list (design lane ruling): each entry names a row of the document, with the slice its Owner slice column
+  // names where its table has one, and goes stale once a line covers the row. An entry whose row the document does not
+  // have is inert (a document older than the revision that adds it); with `exact`, it fails, so the revision's own text
+  // validates every entry.
+  for (const entry of awaiting) {
+    const row = rows.find((candidate) => awaits(entry, candidate))
     if (row === undefined) {
-      problems.push(`awaiting row ${entry.row}: not a row of the document's owner-slice table`)
+      if (exact) problems.push(`awaiting row ${entry.section} ${entry.row}: not a row of the document`)
       continue
     }
-    if (row.owner !== entry.slice)
+    if (row.owner !== undefined && row.owner !== entry.slice)
       problems.push(`awaiting row ${entry.row}: slice "${entry.slice}" is not the document's "${row.owner}"`)
     if (lines.some((line) => source(line) === row.capability && line.section === row.section))
       problems.push(`awaiting row ${entry.row}: stale, a line now covers it; delete the entry`)
@@ -230,11 +238,14 @@ export function inventoryProblems(
   document: string,
   ids: ReadonlySet<string>,
   aliases: readonly CallAlias[],
+  awaiting: readonly AwaitingOwnerRow[] = [],
 ): string[] {
   const problems: string[] = []
   const rows = sectionFourRows(document)
   const source = (line: MatrixLine): string => line.docRow ?? line.capability
   for (const row of rows) {
+    // A row awaiting its owner slice has no line yet; documentRowProblems holds it to the awaiting record.
+    if (awaiting.some((entry) => awaits(entry, row))) continue
     const traced = lines.filter((line) => source(line) === row.capability && line.section === row.section)
     const covered = new Set(traced.flatMap((line) => line.rows))
     for (const call of documentCalls(row.capability, ids, aliases))
