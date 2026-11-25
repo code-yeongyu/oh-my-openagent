@@ -702,8 +702,8 @@
       ]
     },
     {
-      "id": "account.whoami/unknown-key-refused",
-      "row": "account.whoami",
+      "id": "account.show/unknown-key-refused",
+      "row": "account.show",
       "kind": "refusal",
       "refusal": "invalid_arguments",
       "invalid": true,

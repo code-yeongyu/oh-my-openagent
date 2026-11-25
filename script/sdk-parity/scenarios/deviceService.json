@@ -543,8 +543,8 @@
       ]
     },
     {
-      "id": "deviceService.status/unknown-key-refused",
-      "row": "deviceService.status",
+      "id": "deviceService.info/unknown-key-refused",
+      "row": "deviceService.info",
       "kind": "refusal",
       "refusal": "invalid_arguments",
       "invalid": true,
@@ -554,7 +554,7 @@
       "expect": [
         {
           "port": "deviceService",
-          "op": "service.status",
+          "op": "service.info",
           "count": 0
         }
       ]

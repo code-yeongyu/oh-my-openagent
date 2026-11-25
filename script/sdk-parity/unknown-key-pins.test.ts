@@ -5,6 +5,7 @@ import { join } from "node:path"
 
 import { createOmoSdk } from "../../packages/omo-senpi/src/components/omo-sdk"
 import type { OmoSdkPorts } from "../../packages/omo-senpi/src/components/omo-sdk/options"
+import { loadScenarioTable } from "./scenario-table"
 
 // #15014: the root's input schemas are closed (contract/call-spec.ts). These seven shipped calls have always ignored an
 // unknown top-level key and keep doing so (root/assemble.ts UNKNOWN_KEYS_DROPPED) until #15016 decides otherwise. Each
@@ -60,4 +61,15 @@ describe("shipped root calls that ignore an unknown key today (recorded differen
         rmSync(home, { recursive: true, force: true })
       }
     })
+})
+
+describe("the scenario table agrees with the recorded difference", () => {
+  test("#given the seven calls that ignore an unknown key #then no scenario claims one of them refuses it", () => {
+    const ignoring = new Set(SHIPPED_IGNORING.map(([key]) => key))
+    const claims = loadScenarioTable()
+      .flatMap((file) => file.scenarios)
+      .filter((scenario) => ignoring.has(scenario.row) && "unknown_key_probe" in scenario.input)
+      .map((scenario) => scenario.id)
+    expect(claims).toEqual([])
+  })
 })

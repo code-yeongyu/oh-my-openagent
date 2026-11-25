@@ -181,8 +181,8 @@
       ]
     },
     {
-      "id": "config.status/unknown-key-refused",
-      "row": "config.status",
+      "id": "config.migrate/unknown-key-refused",
+      "row": "config.migrate",
       "kind": "refusal",
       "refusal": "invalid_arguments",
       "invalid": true,

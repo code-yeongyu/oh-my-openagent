@@ -611,18 +611,19 @@
       ]
     },
     {
-      "id": "devices.list/unknown-key-refused",
-      "row": "devices.list",
+      "id": "devices.resolve/unknown-key-refused",
+      "row": "devices.resolve",
       "kind": "refusal",
       "refusal": "invalid_arguments",
       "invalid": true,
       "input": {
+        "device": "desktop",
         "unknown_key_probe": 1
       },
       "expect": [
         {
-          "port": "credentialStore",
-          "op": "read",
+          "port": "remote",
+          "op": "devices.resolve",
           "count": 0
         }
       ]
