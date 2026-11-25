@@ -9,6 +9,7 @@ import { type OmoPrincipal, ROOT_CALLS, type RootCallKey } from "../contract"
 import { inputAccepts } from "../contract/validate"
 import type { OmoSdkPorts } from "../options"
 import { assembleOmoSdk } from "../assembly"
+import type { GatewayStore } from "../../thread/gateway/store"
 import type { ThreadHost } from "../../thread/tools"
 import { invalidInput } from "./assemble"
 import { boundaryRefusals } from "./authority"
@@ -119,6 +120,13 @@ function canaryHost(fault: boolean): ThreadHost {
   }
 }
 
+function faultingStore(): GatewayStore {
+  const fails = failing(CANARIES.socketSecret)
+  return new Proxy({} as GatewayStore, {
+    get: (_target, name) => (name === "dispose" ? async () => undefined : name === "then" ? undefined : fails),
+  })
+}
+
 function canaryPorts(fault: boolean): OmoSdkPorts {
   return {
     desktopLaunch: () => false,
@@ -141,6 +149,8 @@ function canaryPorts(fault: boolean): OmoSdkPorts {
     deviceServiceStatus: fault ? failing(CANARIES.providerKey) : async () => "not_running",
     signInProcess: failing(CANARIES.userCode) as never,
     host: canaryHost(fault),
+    // With ports faulting the gateway store faults too; healthy, the store is real, so its file is read column by column.
+    ...(fault ? { store: faultingStore() } : {}),
   }
 }
 
@@ -153,6 +163,38 @@ const PRINCIPALS = [
 ] as const
 
 type Captured = { readonly key: RootCallKey; readonly answer: unknown }
+
+// Which port each call touched (reach by case, design lane ruling): every port function is wrapped to record the call
+// running when it was invoked.
+let running: RootCallKey | undefined
+const touches: { readonly key: RootCallKey; readonly port: string }[] = []
+function recorded<T>(value: T, port: string): T {
+  if (typeof value === "function")
+    return function (this: unknown, ...args: unknown[]) {
+      if (running !== undefined) touches.push({ key: running, port })
+      return (value as (...inner: unknown[]) => unknown).apply(this, args)
+    } as T
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return value
+  return new Proxy(value, {
+    get: (target, name, receiver) =>
+      typeof name === "symbol" || name === "then"
+        ? Reflect.get(target, name, receiver)
+        : recorded(Reflect.get(target, name, receiver), `${port}.${name}`),
+  })
+}
+
+// The pure calls (the registry's closed list): they touch no port.
+const ROWS_DIR = join(import.meta.dir, "../../../../../../script/sdk-parity/rows")
+const PURE_CALLS = new Set(
+  readdirSync(ROWS_DIR)
+    .filter((name) => name.endsWith(".json"))
+    .flatMap(
+      (name) =>
+        (JSON.parse(readFileSync(join(ROWS_DIR, name), "utf8")) as { rows: { sdk?: string; pure?: true }[] }).rows,
+    )
+    .filter((row) => row.pure === true && row.sdk !== undefined)
+    .map((row) => row.sdk as string),
+)
 
 // The ONE named, counted exception (B8, carried by slice T1b's PR 15000): the thread core's thrown() (thread/sdk-core/
 // failures.ts) answers internal_error with the unexpected exception's message in its own message, as every shipped thread
@@ -174,6 +216,7 @@ async function drive(key: RootCallKey, member: unknown, captured: Captured[]): P
 }
 
 async function driveOnce(key: RootCallKey, member: unknown, captured: Captured[], input: unknown): Promise<void> {
+  running = key
   try {
     const answer = (member as (input: unknown, options: unknown) => unknown)(input, { deadline_ms: 5 })
     if (typeof answer === "object" && answer !== null && Symbol.asyncIterator in answer) {
@@ -183,6 +226,8 @@ async function driveOnce(key: RootCallKey, member: unknown, captured: Captured[]
     captured.push({ key, answer: await answer })
   } catch (error) {
     captured.push({ key, answer: error })
+  } finally {
+    running = undefined
   }
 }
 
@@ -217,6 +262,16 @@ const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, 
   },
 }
 
+// Built, permitted calls that answer without touching a port, with every port faulting (observed; each with its reason).
+// config.status reads the config files under the caller's home directly (no port); daemon.warm opens the operator
+// daemon's socket in the agent dir directly (the scan's has none). Both answer without a faked port.
+const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = {
+  script: ["config.status", "daemon.warm"],
+  person: ["config.status", "daemon.warm"],
+  session: ["config.status"],
+  service: ["config.status"],
+}
+
 // Where a caller's own input comes back in the answer to that caller, as observed (reported to the design lane).
 const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
   ok: {
@@ -243,7 +298,7 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.extensions.call",
     ],
   },
-  fault: { script: ["threads.extensions.call"], person: ["threads.extensions.call"] },
+  fault: {},
 }
 
 describe("the non-disclosure scan over the whole root", () => {
@@ -296,13 +351,14 @@ describe("the non-disclosure scan over the whole root", () => {
           return () => void (console[level] = original)
         })
         const captured: Captured[] = []
+        touches.length = 0
         const options = {
           env: { OMO_SERVICE_API_URL: "https://accounts.example.test", HOME: home, OMO_CODING_AGENT_DIR: home },
           cwd: home,
           home,
           agentDir: home,
           ...(principal === undefined ? {} : { principal }),
-          ports: canaryPorts(fault),
+          ports: recorded(canaryPorts(fault), "ports"),
         }
         try {
           const root = assembleOmoSdk(options, {})
@@ -364,6 +420,21 @@ describe("the non-disclosure scan over the whole root", () => {
             .map((entry): string => entry.key)
             .filter((key, index, keys) => keys.indexOf(key) === index),
         ).toEqual([...(EXPECTED_INPUT_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? [])])
+        // Reach by case, with every port faulting: a refused cell and a pure call stop before any port; a call that is
+        // permitted and built reaches a port, unless it is named below with the reason it answers without one.
+        if (fault) {
+          const touched = (key: string) => touches.some((touch) => touch.key === key)
+          const unbuilt = (key: string) =>
+            captured
+              .filter((entry) => entry.key === key)
+              .every((entry) => (errorOf(entry) as { readonly code?: unknown } | undefined)?.code === "not_implemented")
+          expect([...refused.keys()].filter(touched)).toEqual([])
+          expect([...PURE_CALLS].filter(touched)).toEqual([])
+          const silent: string[] = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
+            (key) => !refused.has(key) && !PURE_CALLS.has(key) && !unbuilt(key) && !touched(key),
+          )
+          expect(silent).toEqual([...(ANSWERED_WITHOUT_A_PORT[principal?.kind ?? "script"] ?? [])])
+        }
         expect([...new Set(echoed.map((entry): string => entry.key))]).toEqual([
           ...(EXPECTED_B8_ECHO[fault ? "fault" : "ok"][principal?.kind ?? "script"] ?? []),
         ])
