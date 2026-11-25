@@ -2208,7 +2208,7 @@ describe("T1b pins: the X1a findings", () => {
     `)
   })
 
-  test("a steer without expected_turn_id, here and on b, through the tool and the SDK", async () => {
+  test("a steer without expected_turn_id per principal and leg: the tool (a session) is refused on both legs; the SDK (a script) is refused here and steers on b today", async () => {
     const { sdk, tool } = fresh()
     expect(
       await table(["here", "b"], {
