@@ -149,6 +149,23 @@ describe("T1b pins: the remote module's session members", () => {
     `)
   })
 
+  test("#given an engine that reports the interrupted turn's background jobs #when sessions.interrupt runs #then it asks the engine to stop them and answers the jobs, as interruptThread does on every leg", async () => {
+    const base = world()
+    const live = base.sessions[0]
+    if (live === undefined) throw new Error("the default world holds a live session")
+    const background = { stopped: [{ kind: "bash", id: "bash_1", description: "sleep 60" }], failed: [] }
+    const owner = await startOwner({
+      ...base,
+      sessions: [{ ...live, delegated: { data: { ...REPLY, background }, frames: [] } }],
+    })
+    const client = clientOn(owner.stateDir, fakeClock())
+    const answer = await client.sessions.interrupt(LIVE)
+    expect(owner.state.commands.filter((rpc) => rpc["type"] === "interrupt")).toEqual([
+      expect.objectContaining({ background: "stop" }),
+    ])
+    expect(answer).toMatchObject({ kind: "ok", value: { background: { status: "stopped", ...background } } })
+  })
+
   test("interrupt twice: the remote module takes no idempotency key, so each call reaches the engine", async () => {
     const { client, sent } = await onWorld()
     await client.sessions.interrupt(LIVE)

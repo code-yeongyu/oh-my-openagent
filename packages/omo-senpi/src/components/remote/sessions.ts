@@ -4,7 +4,14 @@ import type { DeviceService } from "@oh-my-opencode/device-service-core/device-s
 import type { ThreadThinkingLevel, ThreadToolResult } from "../thread/contracts"
 import { DEFAULT_THREAD_DELIVERY } from "../thread/contracts/fields"
 import { isPermissionPreset, presetWithin } from "../thread/contracts/permission-presets"
-import { answered, closeOptions, closeThread, setModelOn, setThinkingLevelOn } from "../thread/control/operations"
+import {
+  answered,
+  closeOptions,
+  closeThread,
+  interruptThread,
+  setModelOn,
+  setThinkingLevelOn,
+} from "../thread/control/operations"
 import { ControlRefusal, type SessionControl } from "../thread/control/port"
 import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
@@ -33,8 +40,6 @@ import { sessionDetail } from "./session-detail"
 import type {
   DeviceRow,
   SessionRow,
-  InterruptJob,
-  InterruptResult,
   OpenRequest,
   OpenResult,
   Opts,
@@ -109,24 +114,6 @@ const modelUnavailable = (failure: RemoteFailure, model: string | undefined): Re
         },
       )
     : failure
-
-const isJob = (value: unknown): value is InterruptJob =>
-  isObject(value) && typeof value["kind"] === "string" && typeof value["id"] === "string"
-
-/** senpi#6675's per-job report of the interrupted turn's background jobs; an engine without it reports none. */
-const backgroundOf = (value: unknown): InterruptResult["background"] => {
-  if (!isObject(value) || value["status"] !== "stopped") return { status: "not_supported" }
-  const { stopped, failed } = value
-  if (!Array.isArray(stopped) || !Array.isArray(failed)) return { status: "not_supported" }
-  return {
-    status: "stopped",
-    stopped: stopped.filter(isJob),
-    failed: failed.filter(
-      (job): job is InterruptJob & { readonly reason: string } =>
-        isObject(job) && typeof job["reason"] === "string" && isJob(job),
-    ),
-  }
-}
 
 const unknownSession = (device: string, session?: string): RemoteFailure =>
   remoteFailure(
@@ -413,7 +400,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     thread: ThreadHandle,
     opts: Opts | undefined,
     body: (control: SessionControl, target: Target, svc: DeviceService) => Promise<ThreadToolResult>,
-    value: (result: ThreadToolResult) => T,
+    value: (result: ThreadToolResult, target: Target) => T,
     onThisDevice: (target: SessionTarget) => Promise<Outcome<T>>,
   ): R<T> => {
     const stage = budget(core.timers, opts, DEADLINES.drive)
@@ -423,7 +410,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
     return core.member(stage(), DEADLINES.drive, true, async (svc) => {
       if (await isThisDevice(svc, target.device)) return await onThisDevice(target)
       const result = await answered(() => body(controlOf(svc, target), target, svc))
-      return result.kind === "error" ? fromThread(result.error) : ok(value(result))
+      return result.kind === "error" ? fromThread(result.error) : ok(value(result, target))
     })
   }
 
@@ -713,32 +700,24 @@ export function sessionMembers(core: ClientCore): SessionMembers {
         }
       })
     },
-    // The engine's interrupt record itself (relay-control's body drops the background report InterruptResult carries).
-    interrupt: async (thread, opts) => {
-      const stage = budget(core.timers, opts, DEADLINES.drive)
-      const resolved = await resolve(thread, stage)
-      if (resolved.kind === "error") return resolved
-      const target = resolved.value
-      return core.member(stage(), DEADLINES.drive, true, async (svc) => {
-        if (await isThisDevice(svc, target.device))
-          return await onThisDevice(target.device, (local) => local.interrupt(target, thread))
-        const { device, session } = target
-        const outcome = await legOf(svc).remote.sessions.sessionCommand(device, session, {
-          type: "interrupt",
-          sessionId: session,
-        })
-        if (outcome.kind !== "ok") return fromThread(outcomeFailure(outcome, device).error)
-        const reply = replyData(outcome.response)
-        const turn = text(reply["turnId"])
-        return ok({
-          thread,
-          ...(turn === undefined ? {} : { turn_id: turn }),
-          interrupted: reply["interrupted"] === true,
-          background: backgroundOf(reply["background"]),
-          device,
-        })
-      })
-    },
+    // The thread tools' interrupt body (#14951): one record that also stops the turn's background jobs, read by one rule.
+    interrupt: async (thread, opts) =>
+      controlled(
+        thread,
+        opts,
+        (control) => interruptThread(control, undefined),
+        (result, { device }) => {
+          const answer = result as Extract<ThreadToolResult, { readonly interrupted: boolean }>
+          return {
+            thread,
+            ...(answer.turn_id === undefined ? {} : { turn_id: answer.turn_id }),
+            interrupted: answer.interrupted,
+            background: answer.background,
+            device,
+          }
+        },
+        (target) => onThisDevice(target.device, (local) => local.interrupt(target, thread)),
+      ),
     setModel: async (thread, model, opts) => {
       const wanted = splitModel(model)
       if ("kind" in wanted) return wanted
