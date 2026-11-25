@@ -456,7 +456,7 @@ const ROWS: readonly Row[] = [
       sdk_send: "ok HERE/hereSlash",
       sdk_locate: "ok HERE/hereSlash",
       sdk_interrupt: "ok HERE/hereSlash interrupted=false",
-      remote_sessions_resolve: "not_found(device)",
+      remote_sessions_resolve: "ok HERE/hereSlash",
       omo_remote_control: "not_found(device)",
       omo_remote_send: "not_found(device)",
     },
