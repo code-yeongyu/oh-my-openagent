@@ -194,3 +194,20 @@ describe("the workspace scope is pinned by the scope scenarios' answers", () => 
     expect((await judged(broken(id))).length).toBeGreaterThan(0)
   })
 })
+
+describe("the fake store's receipt book reaches the root's answer (T1b)", () => {
+  test("#given a keyed rename #when the key is repeated with other arguments, then with the same #then the root answers idempotency_conflict, then the first answer, and the host renamed once", async () => {
+    const scenario = scenarioOf("threads.rename/name")
+    const setup = scenarioSetup(scenario)
+    const rename = (name: string) =>
+      (setup.root.threads.rename as (input: unknown) => Promise<unknown>)({
+        thread: "t-1",
+        name,
+        idempotency_key: "k-book",
+      })
+    const first = await rename("review")
+    expect(await rename("other")).toMatchObject({ kind: "error", error: { code: "idempotency_conflict" } })
+    expect(await rename("review")).toEqual(first)
+    expect(setup.calls().filter((call) => call.op === "rename_session")).toHaveLength(1)
+  })
+})
