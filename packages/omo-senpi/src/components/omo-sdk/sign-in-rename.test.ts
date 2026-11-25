@@ -61,7 +61,9 @@ describe("account.signIn", () => {
     })
     expect(shown).toEqual([code])
     expect(runs.map((run) => run.args)).toEqual([["account", "sign-in", "--stdin"]])
-    expect(runs.map((run) => JSON.parse(run.stdin))).toEqual([{ deviceName: "device-b", replace: true, custodyRecordedByCaller: true }])
+    expect(runs.map((run) => JSON.parse(run.stdin))).toEqual([
+      { deviceName: "device-b", replace: true, custodyRecordedByCaller: true },
+    ])
     expect(runs[0]?.env["OMO_SERVICE_API_URL"]).toBe(ORIGIN)
   })
 
