@@ -42,6 +42,8 @@ export type Contract = {
   readonly heldCodes: Readonly<Record<string, HeldReason>>
   readonly sourceCodes: readonly string[]
   readonly accepts: (call: string, input: unknown) => boolean
+  /** Inputs the root types ahead of a row's descriptor until the slice that serves the call adds them. */
+  readonly ahead?: readonly { readonly row: string; readonly field: string }[]
 }
 
 const ROOT = "root"
@@ -140,7 +142,11 @@ export function inputProblems(rows: readonly Row[], contract: Contract): string[
     const held = heldFields(contract.gated, row.id)
     const own = held.reduce((node, field) => withoutPath(node, field.split(".")), asNode(row.input))
     const rowFields = Object.keys(own.properties ?? {})
-    const callFields = Object.keys(call.properties)
+    const ahead = (contract.ahead ?? []).filter((entry) => entry.row === row.id).map((entry) => entry.field)
+    for (const field of ahead)
+      if (rowFields.includes(field))
+        problems.push(`row ${row.id}: its descriptor has ${field} now; delete the descriptor-ahead entry`)
+    const callFields = Object.keys(call.properties).filter((field) => !ahead.includes(field))
     for (const field of rowFields)
       if (!callFields.includes(field))
         problems.push(`row ${row.id}: input ${field} is missing from the schema of ${row.sdk}`)
@@ -152,9 +158,10 @@ export function inputProblems(rows: readonly Row[], contract: Contract): string[
         ...schemaDifferences(own.properties?.[field], call.properties[field], `row ${row.id} input ${field}`),
       )
     const required = (list: readonly string[]): string => JSON.stringify([...list].toSorted())
-    if (required(own.required ?? []) !== required(call.required))
+    const callRequired = call.required.filter((field) => !ahead.includes(field))
+    if (required(own.required ?? []) !== required(callRequired))
       problems.push(
-        `row ${row.id}: required is ${required(own.required ?? [])} in the row and ${required(call.required)} in the schema`,
+        `row ${row.id}: required is ${required(own.required ?? [])} in the row and ${required(callRequired)} in the schema`,
       )
   }
   return problems

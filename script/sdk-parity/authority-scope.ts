@@ -10,8 +10,10 @@ import {
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { AUTHORITY_CALLS } from "../../packages/omo-senpi/src/components/omo-sdk/contract/calls/authority"
+import { UNRESOLVED_PATH } from "./baseline"
 import { callInputOf } from "./call-input"
 import type { CallInput, Contract } from "./contract-check"
+import { TYPED_AHEAD_INPUTS } from "./typed-ahead"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { loadScenarioTable } from "./scenario-table"
 
@@ -65,6 +67,7 @@ export const sliceContract: Contract = {
   heldCodes: {},
   sourceCodes: SOURCE_CODES,
   accepts: (call, input) => inputAccepts(call, input),
+  ahead: TYPED_AHEAD_INPUTS,
 }
 export const sliceInputContract: Contract = { ...sliceContract, calls: fullCalls }
 
@@ -95,3 +98,12 @@ export const isTyped = (entry: string): boolean => {
   const [row = "", field] = entry.split("#")
   return field === undefined ? calls[row] !== undefined : hasPath(calls[row], field.split("."))
 }
+
+export const contractCalls: Readonly<Record<string, CallInput>> = Object.fromEntries(
+  Object.entries(ROOT_CALLS).map(([key, call]) => [key, callInputOf(call.input)]),
+)
+export const UNRESOLVED_IDS: ReadonlySet<string> = new Set(
+  (JSON.parse(readFileSync(join(REPO_ROOT, UNRESOLVED_PATH), "utf8")) as { entries: { id: string }[] }).entries.map(
+    (entry) => entry.id,
+  ),
+)

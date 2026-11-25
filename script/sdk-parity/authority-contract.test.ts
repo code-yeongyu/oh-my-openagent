@@ -57,8 +57,11 @@ import {
   sliceInputContract,
   sliceFiles,
   sliceRows,
+  contractCalls,
+  UNRESOLVED_IDS,
 } from "./authority-scope"
 import { inputProblems } from "./contract-check"
+import { TYPED_AHEAD_INPUTS, typedAheadProblems } from "./typed-ahead"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
 import { scenarioProblems, scenarioShapeProblems } from "./scenario-check"
 
@@ -199,6 +202,7 @@ describe("the table P1a held, slice P1a-s (#14949)", () => {
 
   test("#given the rows and fields this slice typed #then P1a's input, scenario and code checks hold over them", () => {
     expect(inputProblems(sliceRows, sliceInputContract)).toEqual([])
+    expect(typedAheadProblems(TYPED_AHEAD_INPUTS, rows, contractCalls, UNRESOLVED_IDS)).toEqual([])
     expect(scenarioProblems(sliceRows, sliceContract, sliceFiles)).toEqual([])
     const byId = new Map(rows.map((row) => [row.id, row]))
     const elsewhere = files.flatMap((file) =>
