@@ -71,6 +71,7 @@ export function hostPort(
   }
   const durableOf = (routing: string, durable?: string): string => durable ?? routing.replace(/^rpc-/, "")
   let current: { provider: string; id: string } = { ...CATALOG[0] }
+  const effects = new Set<string>()
   const listView: NonNullable<ThreadHost["listView"]> = async (request = {}) => {
     const { result } = recorder.record("host", "list_sessions", { ...request })
     writeSessionFiles()
@@ -117,8 +118,18 @@ export function hostPort(
     setSessionName: async (sessionId, name, durable) => {
       recorder.record("host", "rename_session", { thread: durableOf(sessionId, durable), name })
     },
-    setModel: async (sessionId, provider, modelId, durable) => {
-      recorder.record("host", "set_model", { thread: durableOf(sessionId, durable), model: `${provider}/${modelId}` })
+    setModel: async (sessionId, provider, modelId, durable, effectId) => {
+      // The engine's effect ledger (senpi runSetModel): a repeated effect id is answered as a replay of the first switch
+      // and switches nothing; another id is another switch.
+      const replay = effectId !== undefined && effects.has(effectId)
+      recorder.record("host", "set_model", {
+        thread: durableOf(sessionId, durable),
+        model: `${provider}/${modelId}`,
+        ...(effectId === undefined ? {} : { effect: effectId }),
+        ...(replay ? { replay: true } : {}),
+      })
+      if (replay) return { provider, id: modelId }
+      if (effectId !== undefined) effects.add(effectId)
       current = { provider, id: modelId }
       return { provider, id: modelId }
     },

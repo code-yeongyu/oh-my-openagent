@@ -3493,7 +3493,8 @@
           "op": "set_model",
           "args": {
             "thread": "t-1",
-            "model": "anthropic/m-1"
+            "model": "anthropic/m-1",
+            "effect": "set_model:418e064535edaa71cdeee20d482fb2229acaf87a"
           }
         }
       ],
@@ -3518,7 +3519,9 @@
               "op": "set_model",
               "args": {
                 "thread": "t-1",
-                "model": "anthropic/m-1"
+                "model": "anthropic/m-1",
+                "effect": "set_model:418e064535edaa71cdeee20d482fb2229acaf87a",
+                "replay": true
               }
             }
           ],
