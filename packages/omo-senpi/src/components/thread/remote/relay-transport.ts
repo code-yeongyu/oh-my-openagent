@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto"
 import { keyedMessageId } from "./client-message-id"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
@@ -432,26 +431,22 @@ export function createRelayTransport(
   ): Promise<{ readonly delivery_id: string; readonly root_id: string; readonly hop: number }> {
     const cause = options.callerCause?.()
     const prior = cause === undefined ? undefined : (await store.deliveryView(cause))?.row
+    const thread =
+      delivery.target.kind === "remote"
+        ? {
+            device: delivery.target.row.device,
+            session: delivery.target.row.session_id,
+            durable: delivery.target.row.durable_id,
+          }
+        : { device: "", session: delivery.target.thread_id }
+    // #15011, #15021: derived from the thread, the key and the principal class, so a repeat from any surface or process
+    // reaches the receiving engine under the id it already admitted. A chain this delivery starts is rooted at that id,
+    // so the same message under the same key renders the same record: past the sender's receipt horizon the holder
+    // answers it as a repeat, and only a different message is the conflict (ruling B9: a send key names one message).
+    const delivery_id = keyedMessageId(thread, senderClass(delivery.sender), delivery.idempotency_key)
     return {
-      // #15011: derived from the sender and the key, so a repeat from a process whose store holds no receipt reaches the
-      // receiving engine under the id it already admitted (admit_external_message answers already_admitted for it).
-      delivery_id:
-        delivery.target.kind === "remote"
-          ? keyedMessageId(
-              {
-                device: delivery.target.row.device,
-                session: delivery.target.row.session_id,
-                durable: delivery.target.row.durable_id,
-              },
-              senderClass(delivery.sender),
-              delivery.idempotency_key,
-            )
-          : keyedMessageId(
-              { device: "", session: delivery.target.thread_id },
-              senderClass(delivery.sender),
-              delivery.idempotency_key,
-            ),
-      root_id: prior?.root_id ?? `root-${randomUUID()}`,
+      delivery_id,
+      root_id: prior?.root_id ?? `root-${delivery_id}`,
       hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1,
     }
   }
