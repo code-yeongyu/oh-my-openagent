@@ -48,7 +48,7 @@ const toolCall = (
 
 /** The agent session on device A, as the run gives it: one prompt in, the named tool's result text out. */
 export type ToolSession = {
-  readonly prompt: (text: string, tool: string, signal?: AbortSignal) => Promise<string>
+  readonly prompt: (text: string, tool: string, args: object, signal?: AbortSignal) => Promise<string>
 }
 
 const directive = (tool: string, args: object): string =>
@@ -71,7 +71,7 @@ export function createToolsDriver(session: ToolSession): Driver {
     mapping: MAPPING,
     run: async ({ op, input }: Call, signal?: AbortSignal): Promise<Answer> => {
       const { tool, args } = toolCall(op, input)
-      const raw = resultOf(await session.prompt(directive(tool, args), tool, signal))
+      const raw = resultOf(await session.prompt(directive(tool, args), tool, args, signal))
       const thread = threadOf(raw)
       return {
         call: `${tool} ${JSON.stringify(args)}`,

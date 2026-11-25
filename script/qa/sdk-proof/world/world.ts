@@ -19,7 +19,8 @@ import {
   openHostSession,
   startFakeModel,
   startShardHost,
-  awaitToolResult,
+  toolCallResults,
+  waitFor,
   type FakeModel,
   type OmoInstall,
   type Scratch,
@@ -198,7 +199,7 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     const hostA = await startShardHost(a, install, "x1a-a")
     const opened = await openHostSession(hostA.client, a.work)
     session = {
-      prompt: async (text, tool, signal) => {
+      prompt: async (text, tool, args, signal) => {
         const from = fake.requests.length
         await hostA.client.request({ type: "prompt", sessionId: opened.routingId, message: text })
         // A step past its deadline aborts A's turn, so the session is idle again before the next step runs.
@@ -210,7 +211,13 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
           if (signal?.aborted === true) stop()
           else signal?.addEventListener("abort", stop, { once: true })
         })
-        return JSON.stringify(await Promise.race([awaitToolResult(fake, tool, from, { timeoutMs: 120_000 }), aborted]))
+        // The result of THIS call: the one whose arguments are the ones sent, never an earlier call's late result.
+        const sent = JSON.stringify(args)
+        const result = waitFor(
+          () => toolCallResults(fake, tool, from).find((entry) => JSON.stringify(entry.args) === sent),
+          { label: `${tool} result for this step`, timeoutMs: 120_000 },
+        )
+        return JSON.stringify((await Promise.race([result, aborted])).result)
       },
     }
     return session
