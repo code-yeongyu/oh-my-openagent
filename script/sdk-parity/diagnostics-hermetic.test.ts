@@ -92,3 +92,53 @@ test("#given a real home full of canaries and a root built for an empty scratch 
   expect(answer.value.findings.filter((finding) => finding.check === "settings.packages")).toEqual([])
   expect({ real: tree(realHome), scratch: tree(scratch) }).toEqual(before)
 })
+
+// Two directories, each in turn the process's cwd and the root's: a relative memory home holding a canary identity lives
+// under one; the answer names the canary exactly when that directory is the root's cwd, and the daemon's config loader
+// sees the root's cwd only.
+for (const canaryUnderRootCwd of [false, true]) {
+  test(`#given a relative memory home with a canary identity under ${canaryUnderRootCwd ? "the root's" : "the process's"} cwd #when diagnostics.run answers #then the canary is ${canaryUnderRootCwd ? "found" : "absent"} and the daemon's config loader sees the root's cwd only`, async () => {
+    const canaryDir = mkdtempSync(join(tmpdir(), "c1b-canary-cwd-"))
+    const otherDir = mkdtempSync(join(tmpdir(), "c1b-other-cwd-"))
+    roots.push(canaryDir, otherDir)
+    const processCwd = canaryUnderRootCwd ? otherDir : canaryDir
+    const scratch = canaryUnderRootCwd ? canaryDir : otherDir
+    mkdirSync(join(canaryDir, "rel-memory", "agents", `${CANARY}-identity`, "repo"), { recursive: true })
+    const home = join(scratch, "home")
+    const agentDir = join(home, ".omo", "agent")
+    mkdirSync(agentDir, { recursive: true })
+    const seenCwd: string[] = []
+    const loader = createDiagnosticsLoader({
+      process: { spawn: async () => ({ exitCode: 0, stdout: "" }), signal: async () => {} },
+      host: { status: async () => ({ endpoints: [] }) },
+      fetchDistTags: () => undefined,
+      loadTaskConfig: () => ({
+        resolveDaemonTaskSettings: ({ cwd }: { readonly cwd: string }) => {
+          seenCwd.push(cwd)
+          return {}
+        },
+      }),
+    })
+    const root = assembleOmoSdk(
+      {
+        env: { HOME: home, OMO_CODING_AGENT_DIR: agentDir, OMO_MEMORY_HOME: "rel-memory", PATH: "" },
+        cwd: scratch,
+        home,
+      },
+      { cores: { diagnostics: loader } },
+    )
+    const previous = process.cwd()
+    process.chdir(processCwd)
+    let answer
+    try {
+      answer = await root.diagnostics.run({})
+    } finally {
+      process.chdir(previous)
+    }
+    if (canaryUnderRootCwd) expect(JSON.stringify(answer)).toContain(CANARY)
+    else expect(JSON.stringify(answer)).not.toContain(CANARY)
+    expect(JSON.stringify(answer)).not.toContain(processCwd)
+    expect(seenCwd.length).toBeGreaterThan(0)
+    expect([...new Set(seenCwd)]).toEqual([scratch])
+  })
+}

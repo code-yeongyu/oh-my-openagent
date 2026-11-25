@@ -15,10 +15,10 @@ const MEMORY_TRANSIENT_DIRNAME = "transient-runs"
 const MEMORY_REPO_DIRNAME = "repo"
 
 /** @param {Env} env */
-function memoryRoot(env, home = homedir()) {
+function memoryRoot(env, home = homedir(), cwd = process.cwd()) {
   const override = env[MEMORY_ROOT_ENV_VAR]
   if (override === undefined || override.trim() === "") return join(home, ".omo", "memory")
-  return resolve(process.cwd(), override)
+  return resolve(cwd, override)
 }
 
 // An unreadable or absent directory is `undefined`, never an empty list: the report must stay
@@ -76,12 +76,13 @@ export function transientMemoryFindings(counts) {
  * @param {{
  *   env?: Env,
  *   homeDir?: string,
+ *   cwd?: string,
  *   listDirs?: (path: string) => string[] | undefined,
  *   hasRepo?: (identityRoot: string) => boolean,
  * }} ports
  */
 export function memoryIdentityFindings(ports) {
-  const root = memoryRoot(ports.env ?? process.env, ports.homeDir)
+  const root = memoryRoot(ports.env ?? process.env, ports.homeDir, ports.cwd)
   return transientMemoryFindings(
     countTransientMemoryIdentities({
       agentsRoot: join(root, MEMORY_AGENTS_DIRNAME),

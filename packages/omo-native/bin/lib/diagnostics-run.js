@@ -65,6 +65,7 @@ function npmMemoryRuntime(ports) {
   return memoryRuntimeReport({
     ...(ports.env === undefined ? {} : { env: ports.env }),
     ...(ports.homeDir === undefined ? {} : { home: ports.homeDir }),
+    ...(ports.cwd === undefined ? {} : { cwd: ports.cwd }),
     maxBytesFor: memoryRuntimeMaxBytesResolver(scope),
     discardFor: memoryRuntimeDiscardResolver(scope),
   }).then((report) => report.findings, memoryRuntimeUnavailable)
@@ -97,7 +98,14 @@ async function daemonSection(ports, pluginRoot) {
   if (ports.daemon !== undefined) return ports.daemon()
   const env = ports.env ?? process.env
   const agentDir = canonicalAgentDir(env, ports.homeDir)
-  const common = { pluginRoot, agentDir, env, platform: process.platform }
+  const common = {
+    pluginRoot,
+    agentDir,
+    env,
+    platform: process.platform,
+    ...(ports.cwd === undefined ? {} : { cwd: ports.cwd }),
+    ...(ports.loadTaskConfig === undefined ? {} : { loadTaskConfig: ports.loadTaskConfig }),
+  }
   if (ports.host !== undefined) {
     const answer = await ports.host.status({ all: true, include_workers: true })
     return daemonFindings({
