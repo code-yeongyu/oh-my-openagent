@@ -31,6 +31,7 @@ import { createDeliveryPipeline } from "../omo-senpi/src/components/thread/gatew
 import { createdDeviceRow } from "../omo-senpi/src/components/thread/remote/address-book"
 import { stampThisDevice } from "../omo-senpi/src/components/thread/remote/this-device"
 import type { Provenance } from "../omo-senpi/src/components/thread/gateway/types"
+import { threadToolFailure } from "../omo-senpi/src/components/thread/errors"
 import { threadLink } from "../omo-senpi/src/components/thread/thread-link"
 import { openedResult } from "../omo-senpi/src/components/thread/tools/thread-row"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
@@ -41,7 +42,7 @@ import type { RemoteCommandDependencies } from "./remote-local"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
 import { candidateLines, personNextAction, sendWaitNotice, sessionVerbLines } from "./remote-render"
 import { localPermissionPreset } from "./remote-permission-preset"
-import type { SessionArgs } from "./remote-session-args"
+import { STDIN_TEXT, type SessionArgs } from "./remote-session-args"
 
 /**
  * Where the gateway store's worker is in the shipped `omo`: the `gateway-store-worker.mjs` sidecar beside the plugin's
@@ -214,7 +215,14 @@ async function runSessionOn(
   const answer: Show = (result, label) => show(named(result), label)
   // The output names the session by its address, whatever the person typed for it.
   const label = resolved.address
-  if (args.verb === "send") return sendTo(remote, row, args, { label, json, show: answer, named }, dependencies)
+  if (args.verb === "send") {
+    const text = args.text === STDIN_TEXT ? await (dependencies.readStdin ?? readProcessStdin)() : args.text
+    if (text === "") {
+      dependencies.error("omo remote send: stdin was empty; pipe the message text in, or pass it as an argument")
+      return REMOTE_EXIT.usage
+    }
+    return sendTo(remote, row, { ...args, text }, { label, json, show: answer, named }, dependencies)
+  }
   const control = createRelayControl(remote, row)
   switch (args.verb) {
     case "model":
@@ -480,6 +488,18 @@ async function sendTo(
  * the tool's hint says `force: true`, which this command takes as `--force`, and the ids (or `unavailable`) are printed.
  */
 function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
+  // omo#13905: the shared close body answers a session its device does not hold as ok with closed:false. For the CLI that
+  // is a failed close: a script must never read an id or route miss as success while the session may still run.
+  if (result.kind === "ok" && "closed" in result && result.closed === false)
+    return {
+      kind: "error",
+      error: threadToolFailure(
+        "not_found",
+        `${label} is not open on its device, so nothing was closed.`,
+        "Run omo remote sessions to see the sessions each device holds, then close one by its address.",
+        { thread: label },
+      ),
+    }
   if (result.kind !== "error" || result.error.details?.["pending_deliveries"] === undefined) return result
   const pending = result.error.details["pending_deliveries"]
   const ids = Array.isArray(pending)
@@ -492,4 +512,11 @@ function cliClose(result: ThreadToolResult, label: string): ThreadToolResult {
       next_action: `${ids}. Run omo remote close ${label} --force to close it anyway; those messages are dropped.`,
     },
   }
+}
+
+/** The whole of this process's stdin as UTF-8, for `omo remote send <target> -` (omo#13905). */
+async function readProcessStdin(): Promise<string> {
+  const chunks: Buffer[] = []
+  for await (const chunk of process.stdin) chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+  return Buffer.concat(chunks).toString("utf8")
 }

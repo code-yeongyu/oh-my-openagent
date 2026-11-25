@@ -243,3 +243,17 @@ describe("pipeAddress", () => {
     ).not.toBe(address)
   })
 })
+
+// omo#11999 item 3: the 64 MiB bound is per line, not the whole receive buffer.
+test("#given one chunk of many complete small lines totalling past the whole-buffer bound #when it arrives #then the connection answers and stays open", async () => {
+  const endpoint = await endpointFor()
+  const tui = await TuiPeer.connect(endpoint.socketPath)
+  const line = JSON.stringify({ id: "bulk", type: "set_client_info", width: 80, capabilities: [] })
+  const count = Math.ceil((64 * 1024 * 1024 + 1024) / (line.length + 1))
+  let chunk = ""
+  for (let i = 0; i < count; i++) chunk += line + "\n"
+  tui.socket.write(chunk)
+  const answered = await within(tui.request({ type: "list_sessions" }), "the list_sessions response", 60_000)
+  expect(answered.type).toBe("response")
+  tui.socket.destroy()
+}, 90_000)
