@@ -2,7 +2,7 @@
 // any of them points outside that device's scratch directory, so nothing the world runs writes outside it by default.
 import { isAbsolute, relative, resolve } from "node:path"
 
-export const WRITE_ROOT_VARS = [
+const WRITE_ROOT_VARS = [
   "HOME",
   "USERPROFILE",
   "TMPDIR",
