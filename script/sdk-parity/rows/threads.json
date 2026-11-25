@@ -401,7 +401,9 @@
       ],
       "planned": {},
       "omitted": {},
-      "projection": {},
+      "projection": {
+        "receipt_expires_at": "the SDK only: the tool omits it, because the tool answer is the persisted thread contract the design keeps unmoved (4.4); one receipt book, two projections"
+      },
       "scenarios": {
         "effect": [],
         "refusal": []
@@ -742,7 +744,8 @@
       "planned": {},
       "omitted": {},
       "projection": {
-        "prompt": "widens: the SDK also takes the prompt object form ({ message, delivery?, expected_turn_id?, summary?, attachments?, author? }); the tool takes the string form"
+        "prompt": "widens: the SDK also takes the prompt object form ({ message, delivery?, expected_turn_id?, summary?, attachments?, author? }); the tool takes the string form",
+        "receipt_expires_at": "the SDK only: the tool omits it, because the tool answer is the persisted thread contract the design keeps unmoved (4.4); one receipt book, two projections"
       },
       "scenarios": {
         "effect": [],
@@ -1356,7 +1359,9 @@
       ],
       "planned": {},
       "omitted": {},
-      "projection": {},
+      "projection": {
+        "receipt_expires_at": "the SDK only: the tool omits it, because the tool answer is the persisted thread contract the design keeps unmoved (4.4); one receipt book, two projections"
+      },
       "scenarios": {
         "effect": [],
         "refusal": []
@@ -1920,7 +1925,9 @@
         "cli": "T3"
       },
       "omitted": {},
-      "projection": {},
+      "projection": {
+        "receipt_expires_at": "the SDK only: the tool omits it, because the tool answer is the persisted thread contract the design keeps unmoved (4.4); one receipt book, two projections"
+      },
       "scenarios": {
         "effect": [],
         "refusal": []
@@ -2560,7 +2567,9 @@
       ],
       "planned": {},
       "omitted": {},
-      "projection": {},
+      "projection": {
+        "receipt_expires_at": "the SDK only: the tool omits it, because the tool answer is the persisted thread contract the design keeps unmoved (4.4); one receipt book, two projections"
+      },
       "scenarios": {
         "effect": [],
         "refusal": []

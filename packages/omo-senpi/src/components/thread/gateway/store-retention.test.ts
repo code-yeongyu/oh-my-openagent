@@ -1,7 +1,12 @@
 import { Database } from "bun:sqlite"
 import { afterEach, describe, expect, test } from "bun:test"
 
-import { DELIVERY_RETENTION_MS, RETENTION_SWEEP_BATCH, RETENTION_SWEEP_INTERVAL_MS } from "./constants"
+import {
+  DELIVERY_RETENTION_MS,
+  GATEWAY_RECEIPT_RETENTION_MS,
+  RETENTION_SWEEP_BATCH,
+  RETENTION_SWEEP_INTERVAL_MS,
+} from "./constants"
 import { gatewayDatabasePath } from "./paths"
 import type { GatewayStore } from "./store"
 import { createGatewayHarness, type GatewayHarness } from "./testing/harness"
@@ -181,7 +186,10 @@ describe("gateway store retention", () => {
       ids(db, "receipts", "idempotency_key").filter((key) => key.startsWith(`${prefix}-`)).length
     const toolCall = async (key: string) => {
       const scope = { principal: "session:caller", operation: "thread_list", idempotency_key: key }
-      expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({ kind: "accepted" })
+      expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({
+        kind: "accepted",
+        expires_at: h.clock.now + GATEWAY_RECEIPT_RETENTION_MS,
+      })
       expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
     }
     try {
@@ -222,6 +230,7 @@ describe("gateway store retention", () => {
           const store = h.get("A").store
           expect(await store.toolReceiptBegin({ ...scope, now: h.clock.now, args_hash: "h" })).toEqual({
             kind: "accepted",
+            expires_at: h.clock.now + GATEWAY_RECEIPT_RETENTION_MS,
           })
           expect(await store.toolReceiptSettle({ ...scope, now: h.clock.now, result: { kind: "ok" } })).toBe(true)
         },

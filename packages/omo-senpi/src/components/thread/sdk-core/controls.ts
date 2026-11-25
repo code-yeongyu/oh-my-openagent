@@ -15,7 +15,7 @@ import { locateControl } from "../control/locate"
 import { answered, closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
 import { controlIdentity } from "../control/port"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
-import { createReceipts } from "../control/receipts"
+import { createReceipts, withReceiptExpiry } from "../control/receipts"
 import { renameThread } from "../control/rename"
 import { sendToTarget } from "../sdk-send"
 import { UNKNOWN_CALLER } from "../tools/ports"
@@ -51,7 +51,8 @@ export function createControls(context: ThreadCoreContext) {
         operation: name,
         idempotency_key: key !== undefined && key.length > 0 ? key : `call:${randomUUID()}`,
       }
-      const admission = await receipts.admit(scope, value)
+      const named = key !== undefined && key.length > 0
+      const admission = await receipts.admit(scope, value, named)
       if (admission.kind === "answer") return admission.result
       let result: ThreadToolResult
       try {
@@ -61,7 +62,7 @@ export function createControls(context: ThreadCoreContext) {
         throw error
       }
       await receipts.settle(scope, result, admission.retrying)
-      return result
+      return named ? withReceiptExpiry(result, admission.expires_at) : result
     })
   }
   async function located(address: string, allScope: boolean | undefined) {

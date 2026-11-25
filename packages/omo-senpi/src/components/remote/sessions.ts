@@ -17,6 +17,7 @@ import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
 import type { SessionOpenRequest } from "../thread/control/session-host"
 import type { ThreadToolFailure } from "../thread/errors"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "../thread/gateway/constants"
 import { hashArgs } from "../thread/gateway/hash-args"
 import { resolveProvenance } from "../thread/gateway/provenance-resolver"
 import type { ToolReceiptBegin } from "../thread/gateway/store-tool-receipts"
@@ -182,7 +183,13 @@ function keepNewest<V extends { readonly settled: boolean }>(held: Map<string, V
  * without a key keeps a receipt under a fresh one nobody can retry, so the store keeps the newest (keepNewest).
  */
 function createReceipts(now: () => number): RelayTransportOptions["store"] {
-  type Receipt = { readonly hash: string; settled: boolean; result?: unknown; note?: string }
+  type Receipt = {
+    readonly hash: string
+    readonly expires_at: number
+    settled: boolean
+    result?: unknown
+    note?: string
+  }
   const held = new Map<string, Receipt>()
   const keyOf = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) =>
     `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
@@ -191,13 +198,14 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
     toolReceiptBegin: async (request): Promise<ToolReceiptBegin> => {
       const known = held.get(keyOf(request))
       if (known === undefined) {
-        keepNewest(held, keyOf(request), { hash: request.args_hash, settled: false })
-        return { kind: "accepted" }
+        const expires_at = request.now + GATEWAY_RECEIPT_RETENTION_MS
+        keepNewest(held, keyOf(request), { hash: request.args_hash, expires_at, settled: false })
+        return { kind: "accepted", expires_at }
       }
       if (known.hash !== request.args_hash) return { kind: "conflict" }
-      if (!known.settled) return { kind: "in_progress" }
+      if (!known.settled) return { kind: "in_progress", expires_at: known.expires_at }
       if (known.note !== undefined) return { kind: "uncertain", error_note: known.note }
-      return { kind: "replay", result: known.result }
+      return { kind: "replay", result: known.result, expires_at: known.expires_at }
     },
     toolReceiptSettle: async (request) => {
       const known = held.get(keyOf(request))

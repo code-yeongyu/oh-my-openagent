@@ -434,16 +434,25 @@ export type ThreadSetReasoningResult =
     }
   | ThreadDataError
 
-export type ThreadToolResult =
-  | ThreadCreateResult
-  | ThreadListResult
-  | ThreadReadResult
-  | ThreadReceiptResult
-  | ThreadSendResult
-  | ThreadInterruptResult
-  | ThreadCloseResult
-  | ThreadHandoffResult
-  | ThreadRenameResult
-  | ThreadSetModelResult
-  | ThreadSetReasoningResult
-  | ThreadArchiveResult
+/**
+ * When the receipt of a call made under the caller's own `idempotency_key` expires (ISO time): until then a repeat under
+ * that key answers this result again and acts no second time (control/receipts.ts `RECEIPT_HORIZON_MS`, #14951).
+ * Absent when the caller named no key.
+ */
+export type ReceiptExpiry = { readonly receipt_expires_at?: string }
+
+export type ThreadToolResult = ReceiptExpiry &
+  (
+    | ThreadCreateResult
+    | ThreadListResult
+    | ThreadReadResult
+    | ThreadReceiptResult
+    | ThreadSendResult
+    | ThreadInterruptResult
+    | ThreadCloseResult
+    | ThreadHandoffResult
+    | ThreadRenameResult
+    | ThreadSetModelResult
+    | ThreadSetReasoningResult
+    | ThreadArchiveResult
+  )

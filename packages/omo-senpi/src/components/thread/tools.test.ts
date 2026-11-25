@@ -1345,8 +1345,10 @@ describe("receipts stored before one field named a session (#14044 4a)", () => {
     const parsed = parseThreadParams(threadToolParamSchemas[operation], args)
     if (parsed.kind !== "ok") throw new Error(`invalid ${operation} args`)
     const scope = { principal: "session:caller", operation, idempotency_key: String(args["idempotency_key"]) }
-    expect(await f.store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(parsed.value) })).toEqual({
+    const now = Date.now()
+    expect(await f.store.toolReceiptBegin({ ...scope, now, args_hash: hashArgs(parsed.value) })).toEqual({
       kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
     await f.store.toolReceiptSettle({ ...scope, now: Date.now(), result: result as ThreadToolResult })
   }

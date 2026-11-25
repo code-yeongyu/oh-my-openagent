@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import type { ThreadToolResult } from "../contracts"
+import { GATEWAY_RECEIPT_RETENTION_MS } from "../gateway/constants"
 import { hashArgs } from "../gateway/hash-args"
 import { createRemoteThreadFixture } from "../thread-remote-fixture"
 import type { ThreadHostSession } from "../tools"
@@ -75,8 +76,10 @@ describe("thread_create survives a lost open reply (#14060)", () => {
     const { run, store } = surface(a.remote)
     const args = { device: "studio", name: "remote-retry", idempotency_key: "atomic-4" }
     const scope = { principal: "session:dur-caller", operation: "thread_create", idempotency_key: "atomic-4" }
-    expect(await store.toolReceiptBegin({ ...scope, now: Date.now(), args_hash: hashArgs(args) })).toEqual({
+    const now = Date.now()
+    expect(await store.toolReceiptBegin({ ...scope, now, args_hash: hashArgs(args) })).toEqual({
       kind: "accepted",
+      expires_at: now + GATEWAY_RECEIPT_RETENTION_MS,
     })
     await store.toolReceiptSettle({
       ...scope,

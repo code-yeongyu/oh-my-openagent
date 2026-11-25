@@ -10,6 +10,14 @@ import { currentResult } from "../tools/thread-row"
 /** How many keys a surface keeps for recovering receipts whose admission reply was lost. */
 export const RECEIPT_RECOVERY_MAX_KEYS = 4_096
 
+/**
+ * The repeat horizon of a control call's idempotency key (#14951): for this long after a keyed call is admitted, a repeat
+ * under the same key answers that call's first outcome and acts no second time; a repeat with other arguments is
+ * `idempotency_conflict`. Receipts leave the store by time only, at this horizon, so a key reused after it is a new call.
+ * Every answer to a call that named its key carries `receipt_expires_at`, so a caller decides without this constant.
+ */
+export const RECEIPT_HORIZON_MS = GATEWAY_RECEIPT_RETENTION_MS
+
 /** The calls that may run again under a key whose earlier run is uncertain: the call itself finds what the first run did. */
 const RETRIES_UNCERTAIN: ReadonlySet<ThreadToolName> = new Set(["thread_create"])
 
@@ -20,8 +28,19 @@ export type ReceiptScope = {
 }
 
 export type Admission =
-  | { readonly kind: "run"; readonly retrying?: { readonly error_note: string | null } }
+  | {
+      readonly kind: "run"
+      readonly retrying?: { readonly error_note: string | null }
+      /** When this call's receipt leaves the store: admission time plus the horizon. */
+      readonly expires_at: number
+    }
   | { readonly kind: "answer"; readonly result: ThreadToolResult }
+
+/** The answer to a call that named its key, with when its receipt expires (`RECEIPT_HORIZON_MS`). */
+export const withReceiptExpiry = (result: ThreadToolResult, expiresAt: number): ThreadToolResult => ({
+  ...result,
+  receipt_expires_at: new Date(expiresAt).toISOString(),
+})
 
 /**
  * The one receipt protocol of a thread control call (#14951): a call under a key is admitted through the gateway store's
@@ -71,7 +90,8 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
     )
   }
 
-  async function admit(scope: ReceiptScope, value: unknown): Promise<Admission> {
+  /** `explicit`: the caller named the key, so its answers carry `receipt_expires_at`. */
+  async function admit(scope: ReceiptScope, value: unknown, explicit = false): Promise<Admission> {
     // Nothing has run yet, so a store that cannot admit the receipt fails the call as data: the store lock held past its
     // wait bound is `overloaded`, any other store failure `internal_error`.
     const key = keyOf(scope)
@@ -127,16 +147,14 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
     if (admission.kind === "in_progress" && recoverable(key, at) && !running.has(key) && !unsettled.has(key))
       admission =
         admission.recovery === undefined
-          ? { kind: "accepted" }
-          : { kind: "retry", error_note: admission.recovery.error_note }
+          ? { kind: "accepted", expires_at: admission.expires_at }
+          : { kind: "retry", error_note: admission.recovery.error_note, expires_at: admission.expires_at }
     unanswered.delete(key)
     if (admission.kind === "replay") {
       const result = currentResult(admission.result as ThreadToolResult)
-      return {
-        kind: "answer",
-        result:
-          scope.operation === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result,
-      }
+      const replayed =
+        scope.operation === "thread_create" && result.kind === "ok" ? { ...result, deduplicated: true } : result
+      return { kind: "answer", result: explicit ? withReceiptExpiry(replayed, admission.expires_at) : replayed }
     }
     if (admission.kind === "conflict")
       return {
@@ -171,8 +189,8 @@ export function createReceipts(store: Pick<GatewayStore, "toolReceiptBegin" | "t
     if (admission.kind === "uncertain") return { kind: "answer", result: uncertainFailure(admission.error_note) }
     running.add(key)
     return admission.kind === "retry"
-      ? { kind: "run", retrying: { error_note: admission.error_note } }
-      : { kind: "run" }
+      ? { kind: "run", retrying: { error_note: admission.error_note }, expires_at: admission.expires_at }
+      : { kind: "run", expires_at: admission.expires_at }
   }
 
   /** The call ran and answered `result`; a call that may have acted without an answer stays uncertain under its note. */
