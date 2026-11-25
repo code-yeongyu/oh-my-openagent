@@ -32,7 +32,7 @@ import { thisDeviceId } from "./remote/this-device"
 import type { AgentEndFacts } from "./run-alerts/error-streak"
 import { createRunAlerts, type RunAlertsOptions } from "./run-alerts/run-alerts"
 import type { IntakeAdmission } from "./gateway/intake-admission"
-import type { SameDeviceWake } from "./gateway/same-device-wake"
+import { lazySameDeviceWake } from "./wake/lazy-same-device-wake"
 import type { ThreadWakeOptions } from "./wake/runtime"
 import { ledgerDevice } from "./delivery-ledger"
 
@@ -363,25 +363,14 @@ export function createThreadComponent(options: ThreadComponentOptions = {}): Omo
       // lives in its own sidecar (#omo-wake-runtime -> extensions/omo-wake.js): the main bundle carries only the lazy
       // shells below, and a load that fails answers as if no wake exists rather than taking the send down with it.
       const wakeRuntime = (): Promise<typeof import("#omo-wake-runtime")> => import("#omo-wake-runtime")
-      let sameDeviceBuilt: Promise<SameDeviceWake> | undefined
-      const sameDeviceWake: SameDeviceWake = {
-        afterSend: async (result) => {
-          sameDeviceBuilt ??= wakeRuntime().then((module) =>
-            module.createSameDeviceWake({
-              options: wakeOptions,
-              store,
-              agentDir,
-              sessionsDirectory,
-              cwd: callerWorkspaceRoot,
-              warn,
-            }),
-          )
-          return await sameDeviceBuilt.then(
-            (wake) => wake.afterSend(result),
-            () => result,
-          )
-        },
-      }
+      const sameDeviceWake = lazySameDeviceWake({
+        options: wakeOptions,
+        store,
+        agentDir,
+        sessionsDirectory,
+        cwd: callerWorkspaceRoot,
+        warn,
+      })
       let admissionBuilt: Promise<(device: string) => Promise<IntakeAdmission>> | undefined
       const wakeAdmission = async (device: string): Promise<IntakeAdmission> => {
         admissionBuilt ??= wakeRuntime().then((module) => module.intakeAdmission(wakeOptions, agentDir))
