@@ -86,8 +86,9 @@ export class FakeSessionRuntime implements SessionRuntimePort {
       this.enqueueCalls.push({ lane, delivery_id: id })
       return { kind: "queued", turn_epoch: turnEpoch }
     }
-    if (input.deliverAs === "steer") {
-      if (input.expected_turn_id === undefined) return { kind: "turn_conflict", turn_epoch: turnEpoch }
+    if (input.whenBusy === "steer" || input.deliverAs === "steer") {
+      if (input.whenBusy !== "steer" && input.expected_turn_id === undefined)
+        return { kind: "turn_conflict", turn_epoch: turnEpoch }
       this.pending.set(id, "steer")
       this.steering.push(id)
       this.enqueueCalls.push({ lane: "steer", delivery_id: id })
