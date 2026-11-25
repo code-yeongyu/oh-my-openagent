@@ -1,19 +1,13 @@
 import { z } from "zod"
 import { DeviceSignInRefused, loginDevice } from "../account-core/src/device-flow"
 import { deviceName, devicePlatform } from "../account-core/src/device-name"
-import {
-  CredentialStoreError,
-  KeychainLockedError,
-  type CredentialStore,
-} from "../account-core/src/keystore"
+import { CredentialStoreError, KeychainLockedError, type CredentialStore } from "../account-core/src/keystore"
 import { AccountsUnreachable, beginLogin } from "../account-core/src/login-prelude"
-import {
-  MachineAlreadySignedIn,
-  MachineCredentialUnreadable,
-} from "../account-core/src/machine-device"
+import { MachineAlreadySignedIn, MachineCredentialUnreadable } from "../account-core/src/machine-device"
 import { advertisesMachineIdentity, readMachineDigest } from "../account-core/src/machine-digest"
 import { ApiRefusal, type ListedDevice, RequestFailure } from "../account-core/src/protocol"
 import type { DeviceServiceHandoff, Session } from "../account-core/src/session"
+import { accountSignInCheck } from "../account-core/src/calls/sign-out"
 import { ACCOUNT_EXIT } from "./account-show"
 
 // `omo account sign-in`: the device-code sign-in as a machine interface for programs that drive it (the omo SDK, and an
@@ -173,7 +167,7 @@ async function readOptions(
 export async function runSignInVerb(dependencies: SignInVerbDependencies, flags: readonly string[]): Promise<number> {
   // A probe for a program that drives this verb (enroll): it answers that the verb exists and touches nothing.
   if (flags.length === 1 && flags[0] === "--check") {
-    dependencies.output(JSON.stringify({ event: "ready" } satisfies SignInEvent))
+    if (accountSignInCheck().ready) dependencies.output(JSON.stringify({ event: "ready" } satisfies SignInEvent))
     return ACCOUNT_EXIT.ok
   }
   const parsed = await readOptions(flags, dependencies.readStdin)

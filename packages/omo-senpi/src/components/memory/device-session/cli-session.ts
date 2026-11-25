@@ -14,6 +14,7 @@ import {
   retireSyncPinOnDiscard,
   type Session,
 } from "@oh-my-opencode/account-core"
+import type { DeviceServiceHandoff } from "@oh-my-opencode/account-core/session"
 import { createOmoNativeProductConfig } from "../../telemetry/product-identity"
 import type { HeldCredentialRelay } from "./account-source"
 
@@ -35,6 +36,17 @@ export function engineDeviceService(
     },
   }
 }
+
+/** The device-service handoff of the CLI session below: it forgets this machine's device, and never adopts. */
+export const cliSessionDeviceService = (log: (line: string) => void): DeviceServiceHandoff => ({
+  adopt: async () => undefined,
+  forget: () =>
+    engineDeviceService(undefined, undefined, log)
+      .forget()
+      .catch((error: unknown) =>
+        log(`the device service forget failed (${error instanceof Error ? error.message : String(error)})`),
+      ),
+})
 
 export const cliCredentialStore = (origin: string): CredentialStore =>
   createCredentialStore(origin, { notice: quietNotice })
@@ -62,14 +74,6 @@ export function openCliSession(options: {
       pinDir: () => syncPinDir(resolveMemoryRoot({ ...options.env }, options.cwd)),
       log,
     }),
-    deviceService: {
-      adopt: async () => undefined,
-      forget: () =>
-        engineDeviceService(undefined, undefined, log)
-          .forget()
-          .catch((error: unknown) =>
-            log(`the device service forget failed (${error instanceof Error ? error.message : String(error)})`),
-          ),
-    },
+    deviceService: cliSessionDeviceService(log),
   })
 }

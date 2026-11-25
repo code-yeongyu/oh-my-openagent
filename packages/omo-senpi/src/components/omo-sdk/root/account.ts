@@ -8,7 +8,9 @@ import {
 } from "@oh-my-opencode/account-core/calls/store"
 import { helperAccess } from "@oh-my-opencode/account-core/keychain-helper/darwin-backend"
 import { dedicatedStoreState } from "@oh-my-opencode/account-core/keychain-helper/dedicated-store"
+import { accountForget } from "@oh-my-opencode/account-core/calls/forget"
 import { accountShow, type SyncState } from "@oh-my-opencode/account-core/calls/show"
+import { accountSignInCheck, accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 import { type AccountAccess, failure } from "../access"
 import { OMO_CODE_REGISTRY, type OmoFailure, type OmoValue } from "../contract"
@@ -76,6 +78,37 @@ export function accountNamespace(options: {
     })
   return {
     members: {
+      "account.signInCheck": async () => ({ kind: "ok", value: accountSignInCheck() }),
+      "account.signOut": () =>
+        answer(access, async () => ({
+          kind: "ok",
+          value: await accountSignOut({ session: access.account().session }),
+        })),
+      "account.forget": (input) =>
+        answer(access, async () => {
+          const forgotten = await accountForget(
+            access.account(),
+            input?.device === undefined ? {} : { device: input.device },
+          )
+          if (forgotten.kind === "ok") return forgotten
+          switch (forgotten.code) {
+            case "empty_device":
+              return failed("invalid_arguments", "device must name this device's id.", { field: "device" })
+            case "other_device":
+              return failed(
+                "invalid_arguments",
+                "account.forget acts on this device only; another device is devices.revoke.",
+                {
+                  field: "device",
+                  device: forgotten.device,
+                },
+              )
+            case "unreadable_credential":
+              return failed("credential_store_unavailable", "The stored sign-in could not be read.", {
+                reason: "unreadable_credential",
+              })
+          }
+        }),
       "account.show": (input) =>
         answer(access, async () => {
           const shown = await accountShow(

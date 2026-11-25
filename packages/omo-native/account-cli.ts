@@ -1,11 +1,6 @@
 import { resolveMemoryRoot } from "../memory-core/src/identity/layout"
 import { syncPinDir } from "../memory-core/src/sync/pin-dir"
-import {
-  createCredentialStore,
-  type CredentialStore,
-  INTERACTIVE_READ_WAIT,
-  InvalidCredentialState,
-} from "../account-core/src/keystore"
+import { createCredentialStore, type CredentialStore, INTERACTIVE_READ_WAIT } from "../account-core/src/keystore"
 import { type Credentials, credentialSchema, serviceOrigin } from "../account-core/src/protocol"
 import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import {
@@ -18,6 +13,7 @@ import { retireSyncPinOnDiscard } from "../account-core/src/sync-pin-retire"
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
+import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
 import { accountStoreDependencies, runAccountStore } from "./account-store"
@@ -145,7 +141,6 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
       return current === null ? signedOut(dependencies, sessionOf(dependencies)) : reply(dependencies, current)
     }
     case "forget": {
-      const session = sessionOf(dependencies)
       if (flags.length > 0) {
         const device = flags[1]
         if (
@@ -158,30 +153,28 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           dependencies.error("omo account forget: use forget or forget --device <id>")
           return ACCOUNT_EXIT.invalid
         }
-        try {
-          let forgotten = false
-          const code = await session.update(async (current) => {
-            if (current !== null && current.device.id !== device) {
-              dependencies.error(
-                `omo account forget --device acts on this device only; sign out device ${device} with omo account devices revoke ${device}`,
-              )
-              return reply(dependencies, { forgotten: false, device: deviceOf(current) }, ACCOUNT_EXIT.conflict)
-            }
-            if (current !== null) await session.discard(current, "forget")
-            await dependencies.store.clear()
-            forgotten = true
-            return reply(dependencies, { forgotten: true })
-          })
-          if (forgotten) await dependencies.deviceService?.forget()
-          return code
-        } catch (error) {
-          if (!(error instanceof InvalidCredentialState)) throw error
-          dependencies.error(error.message)
-          return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
-        }
       }
-      await session.forget()
-      return reply(dependencies, { forgotten: true })
+      const forgotten = await accountForget(
+        {
+          session: sessionOf(dependencies),
+          store: dependencies.store,
+          ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
+        },
+        flags.length === 0 ? {} : { device: flags[1] },
+      )
+      if (forgotten.kind === "ok") return reply(dependencies, forgotten.value)
+      if (forgotten.code === "empty_device") {
+        dependencies.error("omo account forget: use forget or forget --device <id>")
+        return ACCOUNT_EXIT.invalid
+      }
+      if (forgotten.code === "unreadable_credential") {
+        dependencies.error(forgotten.message)
+        return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
+      }
+      dependencies.error(
+        `omo account forget --device acts on this device only; sign out device ${flags[1]} with omo account devices revoke ${flags[1]}`,
+      )
+      return reply(dependencies, { forgotten: false, device: forgotten.device }, ACCOUNT_EXIT.conflict)
     }
     case "store":
       return runAccountStore(accountStoreDependencies(dependencies.api, dependencies), flags)

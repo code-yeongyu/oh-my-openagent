@@ -1,4 +1,5 @@
 import { Command } from "commander"
+import { accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { isCancel, select, confirm } from "@clack/prompts"
 import { serviceAccountsOpen } from "@oh-my-opencode/account-core/accounts-gate"
 import { isClosedBareLogin, isClosedDeviceLogin, withClosedDeviceLoginOptions } from "./closed-device-login"
@@ -91,7 +92,7 @@ async function run(
       }),
     })
     if (action === "logout") {
-      const revoked = await session.logout()
+      const { revoked } = await accountSignOut({ session })
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
       if (!revoked)
         console.error(

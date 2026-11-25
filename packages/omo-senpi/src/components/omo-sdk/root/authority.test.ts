@@ -49,6 +49,16 @@ function untouchedRoot(principal: OmoPrincipal, root: Readonly<Record<string, un
     session: { accessToken: touch("session"), request: touch("session") },
     deviceServiceStatus: touch("deviceService"),
     signInProcess: touch("process"),
+    accountSession: {
+      session: {
+        logout: touch("accountSession"),
+        forget: touch("accountSession"),
+        update: touch("accountSession"),
+        discard: touch("accountSession"),
+      },
+      store: { clear: touch("accountSession") },
+      deviceService: { forget: touch("accountSession") },
+    },
     accountStore: {
       platform: "darwin",
       available: touch("accountStore"),
