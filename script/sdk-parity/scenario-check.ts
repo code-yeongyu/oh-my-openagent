@@ -44,7 +44,7 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const accepted =
     marked.length === 0
       ? contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
-      : marked.every((field) => field in (contract.calls[row.sdk]?.properties ?? {}))
+      : marked.every((field) => Object.hasOwn(row.input.properties, field))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
