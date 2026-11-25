@@ -11,6 +11,7 @@ import type { OmoSdkPorts } from "../options"
 import { assembleOmoSdk } from "../assembly"
 import type { GatewayStore } from "../../thread/gateway/store"
 import type { ThreadHost } from "../../thread/tools"
+import { createThreadSdk } from "../../thread/sdk"
 import { invalidInput } from "./assemble"
 import { boundaryRefusals } from "./authority"
 
@@ -263,14 +264,23 @@ const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, 
 }
 
 // Built, permitted calls that answer without touching a port, with every port faulting (observed; each with its reason).
-// config.status reads the config files under the caller's home directly (no port); daemon.warm opens the operator
-// daemon's socket in the agent dir directly (the scan's has none). Both answer without a faked port.
-const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = {
-  script: ["config.status", "daemon.warm"],
-  person: ["config.status", "daemon.warm"],
-  session: ["config.status"],
-  service: ["config.status"],
-}
+// Permitted, built calls that still answer without a port: GAPS, each with the slice that gives the call its port. The
+// list is closed and self-retiring: once the call touches a port, the exact-list check below fails until its entry is
+// removed. config.status reads the config files under the home directly; daemon.warm opens the daemon's socket directly.
+const PORT_GAPS: readonly {
+  readonly call: RootCallKey
+  readonly principals: readonly string[]
+  readonly owner: string
+}[] = [
+  { call: "config.status", principals: ["script", "person", "session", "service"], owner: "C1b" },
+  { call: "daemon.warm", principals: ["script", "person"], owner: "C1a" },
+]
+const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Object.fromEntries(
+  ["script", "person", "session", "connector", "service"].map((kind) => [
+    kind,
+    PORT_GAPS.filter((gap) => gap.principals.includes(kind)).map((gap) => gap.call),
+  ]),
+)
 
 // Where a caller's own input comes back in the answer to that caller, as observed (reported to the design lane).
 const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
@@ -323,6 +333,26 @@ describe("the non-disclosure scan over the whole root", () => {
     db.close()
     expect(storeColumnsHolding(path, [INPUT_CANARY]).toSorted()).toEqual(["deliveries.body", "receipts.result"])
     expect(storeColumnsHolding(path, CANARY_VALUES)).toEqual(["receipts.result"])
+  })
+
+  // The shipped thread facade's store extension operations answer an unexpected store failure with fixed text (the
+  // thread core's own mapping); the store's exception never reaches the caller.
+  test("#given the shipped thread facade and a failing store #when it registers a store extension #then no canary reaches the caller", async () => {
+    const home = mkdtempSync(join(tmpdir(), "non-disclosure-facade-"))
+    directories.push(home)
+    const facade = createThreadSdk({ agentDir: home, cwd: home, uid: 501, user: "scan", store: faultingStore() })
+    const extension = {
+      name: "x",
+      migrations: [["create table t (id)"]],
+      moduleUrl: "file:///tmp/x.js",
+      sessionCallable: [],
+    }
+    const settled = await facade.registerStoreExtension(extension as never).then(
+      (answer) => answer,
+      (error: unknown) => error,
+    )
+    expect(settled).toMatchObject({ kind: "refused", code: "internal_error" })
+    expect(canariesIn(settled)).toEqual([])
   })
 
   test("#given every call of the root #when the driver builds its inputs #then both pass the call's schema, so the scan is never refused for its input", () => {
