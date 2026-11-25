@@ -126,7 +126,12 @@ export type SetupSummaryItem = Phrased &
         readonly keys: readonly { readonly provider: string; readonly source: string }[]
       }
     | ({ readonly class: "logins"; readonly kind: "api_key"; readonly state: "already_present" } & Ids)
-    | ({ readonly class: "logins"; readonly kind: "api_key"; readonly state: "unserved"; readonly models_path: string } & Ids)
+    | ({
+        readonly class: "logins"
+        readonly kind: "api_key"
+        readonly state: "unserved"
+        readonly models_path: string
+      } & Ids)
     | ({
         readonly class: "logins"
         readonly kind: "oauth_login"
@@ -140,7 +145,11 @@ export type SetupSummaryItem = Phrased &
         readonly state: "will_import" | "already_present" | "store_malformed"
       } & Ids)
     | ({ readonly class: "mcp_servers"; readonly kind: "mcp_server"; readonly state: "refused" } & Reasons)
-    | ({ readonly class: "skills"; readonly kind: "skill"; readonly state: "will_import" | "already_present" | "bundled" } & Ids)
+    | ({
+        readonly class: "skills"
+        readonly kind: "skill"
+        readonly state: "will_import" | "already_present" | "bundled"
+      } & Ids)
     | ({ readonly class: "skills"; readonly kind: "skill"; readonly state: "skipped" } & Reasons)
     | {
         readonly class: "providers"
@@ -165,10 +174,24 @@ export type SetupSummaryItem = Phrased &
         readonly categories: readonly string[]
         readonly agents: readonly string[]
       }
-    | ({ readonly class: "model_choices"; readonly kind: "model_choice"; readonly state: "kept" | "carried" | "blocked" } & Ids)
-    | { readonly class: "model_choices"; readonly kind: "model_choice"; readonly state: "dropped"; readonly count: number }
+    | ({
+        readonly class: "model_choices"
+        readonly kind: "model_choice"
+        readonly state: "kept" | "carried" | "blocked"
+      } & Ids)
+    | {
+        readonly class: "model_choices"
+        readonly kind: "model_choice"
+        readonly state: "dropped"
+        readonly count: number
+      }
     | { readonly class: "categories"; readonly kind: "category"; readonly state: "all_usable"; readonly count: number }
-    | ({ readonly class: "categories"; readonly kind: "category"; readonly state: "usable"; readonly total: number } & Ids)
+    | ({
+        readonly class: "categories"
+        readonly kind: "category"
+        readonly state: "usable"
+        readonly total: number
+      } & Ids)
     | {
         readonly class: "categories"
         readonly kind: "category"

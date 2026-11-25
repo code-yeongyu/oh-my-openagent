@@ -139,11 +139,15 @@ export const InstallSetupApply = Type.Object({
   consent: Type.Union([Type.Literal("all"), Type.Literal("each")], {
     description: "all: --yes, asked once; each: --ask-each, asked per stage.",
   }),
-  decide: Type.Optional(
-    callback<
-      (stage: { readonly id: SetupStageId; readonly description: string }) => "apply" | "skip" | Promise<"apply" | "skip">
-    >(),
-  ),
+  decide:
+    Type.Optional(
+      callback<
+        (stage: {
+          readonly id: SetupStageId
+          readonly description: string
+        }) => "apply" | "skip" | Promise<"apply" | "skip">
+      >(),
+    ),
 })
 export const InstallUpdate = Type.Object({ dry_run: Type.Optional(Type.Boolean()) })
 export const InstallVersion = None
