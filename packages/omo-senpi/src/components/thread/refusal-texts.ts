@@ -5,8 +5,9 @@ import { threadToolFailure, type ThreadToolFailure } from "./errors"
 import { RELAY_TEXTS } from "./remote/refusal-texts"
 
 // The one producer of a keyed refusal's sentence (#14951, design lane ruling): each refusal is TEMPLATE DATA with named
-// slots, so the same table renders the first answer, lets a receipt record which input a sentence quoted (by reference,
-// never the text), and renders a repeat from the repeating call's own input, byte-equal to the first.
+// slots, so the same table renders the first answer, a receipt records the template id and slots the producer attached
+// (each slot by reference when it is a whole input field, never the text), and a repeat renders from the repeating call's
+// own input, byte-equal to the first.
 
 export type RefusalText = {
   readonly code: ThreadErrorCode
@@ -32,25 +33,6 @@ function fill(template: string, slots: Readonly<Record<string, string>>): string
   })
 }
 
-function patternOf(template: string): { readonly pattern: RegExp; readonly names: readonly string[] } {
-  const names: string[] = []
-  let source = ""
-  let last = 0
-  for (const match of template.matchAll(SLOT)) {
-    source += escapeRegExp(template.slice(last, match.index))
-    if (match[1] === undefined) source += escapeRegExp(match[0] === "{{" ? "{" : "}")
-    else {
-      names.push(match[1])
-      source += "([\\s\\S]*?)"
-    }
-    last = (match.index ?? 0) + match[0].length
-  }
-  source += escapeRegExp(template.slice(last))
-  return { pattern: new RegExp(`^${source}$`), names }
-}
-
-const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-
 /** A refusal's first answer: the one producer of its sentence. */
 export function refusal(
   id: RefusalId,
@@ -58,45 +40,31 @@ export function refusal(
   details?: Readonly<Record<string, unknown>>,
 ): ThreadToolFailure {
   const text: RefusalText = REFUSAL_TEXTS[id]
-  return threadToolFailure(text.code, fill(text.message, slots), fill(text.next_action, slots), details)
+  const failure = threadToolFailure(text.code, fill(text.message, slots), fill(text.next_action, slots), details)
+  PROVENANCE.set(failure, { id, slots: { ...slots } })
+  return failure
 }
 
-/** The slots of `failure` read back through the template of its code that renders it exactly, with the template's id. */
-export function readRefusal(
-  failure: Pick<ThreadToolFailure, "code" | "message" | "next_action">,
+// Each failure refusal() produced, with its template id and slots: out of band, so it never serialises into an answer, and
+// never recovered by parsing a sentence back (a slot value is caller input and can look like the template around it).
+const PROVENANCE = new WeakMap<
+  ThreadToolFailure,
+  { readonly id: RefusalId; readonly slots: Readonly<Record<string, string>> }
+>()
+
+/** Where `failure` came from, when refusal() produced it; a failure built any other way has none. */
+export function provenanceOf(
+  failure: ThreadToolFailure,
 ): { readonly id: RefusalId; readonly slots: Readonly<Record<string, string>> } | undefined {
-  for (const [id, text] of Object.entries(REFUSAL_TEXTS) as [RefusalId, RefusalText][]) {
-    if (text.code !== failure.code) continue
-    const slots: Record<string, string> = {}
-    let matched = true
-    for (const [template, said] of [
-      [text.message, failure.message],
-      [text.next_action, failure.next_action],
-    ] as const) {
-      const { pattern, names } = patternOf(template)
-      const found = pattern.exec(said)
-      if (found === null) {
-        matched = false
-        break
-      }
-      for (const [index, name] of names.entries()) {
-        const value = found[index + 1] ?? ""
-        if (slots[name] !== undefined && slots[name] !== value) matched = false
-        slots[name] = value
-      }
-    }
-    if (matched && refusalMatches(id, slots, failure)) return { id, slots }
-  }
-  return undefined
+  return PROVENANCE.get(failure)
 }
 
-const refusalMatches = (
-  id: RefusalId,
-  slots: Readonly<Record<string, string>>,
-  failure: Pick<ThreadToolFailure, "message" | "next_action">,
-): boolean => {
-  const again = refusal(id, slots)
-  return again.message === failure.message && again.next_action === failure.next_action
+/** `failure` with `details` merged in, keeping its provenance (a spread alone would drop it). */
+export function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
+  const merged: ThreadToolFailure = { ...failure, details: { ...failure.details, ...details } }
+  const known = PROVENANCE.get(failure)
+  if (known !== undefined) PROVENANCE.set(merged, known)
+  return merged
 }
 
 /** A repeat of a refusal: its template filled again; a code with no template answers its fixed text. */
