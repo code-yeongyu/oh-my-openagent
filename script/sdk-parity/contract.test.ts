@@ -195,3 +195,27 @@ describe("wait options against their cores (design lane ruling on review 6061342
     expect(HONOURED_CALLS.filter((key) => !waiting.includes(key))).toEqual([])
   })
 })
+
+describe("producers and sequences (review 6062113819)", () => {
+  test("#given internal_error #then the registry names threads, whose create answers it in a shipped test", () => {
+    // thread/control/thread-create-remote-lost-reply.test.ts:218-229: a remote create whose recovery admission reply is
+    // lost answers internal_error, so threads returns the code today.
+    expect(OMO_CODE_REGISTRY.internal_error.namespaces).toContain("threads")
+  })
+
+  test("#given the lost-acknowledgement create retry #then its last step answers the original thread and device", () => {
+    const retry = scenarios
+      .flatMap((file) => file.scenarios)
+      .find((scenario) => scenario.id === "threads.create/lost-ack-then-retry") as
+      | {
+          readonly then?: readonly {
+            readonly kind: string
+            readonly answer?: { readonly value?: Record<string, unknown> }
+          }[]
+        }
+      | undefined
+    const last = retry?.then?.at(-1)
+    expect(last?.kind).toBe("effect")
+    expect(last?.answer?.value).toMatchObject({ kind: "ok", thread: "t-k9", device: "studio" })
+  })
+})

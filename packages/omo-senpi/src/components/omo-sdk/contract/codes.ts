@@ -104,7 +104,7 @@ export const OMO_CODE_REGISTRY = {
     next_action: "Read the target's current state before repeating; it may have run.",
   },
   internal_error: {
-    namespaces: ["account", "devices"],
+    namespaces: ["account", "devices", "threads"],
     next_action: "Retry; if it fails again, report it with the details.",
   },
   invalid_arguments: {

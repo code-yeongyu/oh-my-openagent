@@ -119,6 +119,35 @@ function enumProblems(row: Row, scenarios: readonly TableScenario[], contract: C
   return problems
 }
 
+// Design 7.3: every control verb on a live, an ended and an offline target, each declared as the fixture state of
+// the scenario (`given`), so the driver can set it up rather than read it from prose.
+const CONTROL_VERBS = [
+  "threads.send",
+  "threads.interrupt",
+  "threads.close",
+  "threads.setModel",
+  "threads.setReasoning",
+  "threads.rename",
+  "threads.archive",
+  "threads.handoff",
+]
+
+type Given = { readonly state?: { readonly session?: string; readonly online?: boolean } }
+const givenOf = (scenario: TableScenario): readonly Given[] =>
+  (scenario as { readonly given?: readonly Given[] }).given ?? []
+
+function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): string[] {
+  if (!CONTROL_VERBS.includes(row.id)) return []
+  const states: readonly [string, (given: Given) => boolean][] = [
+    ["a live session (given session: live)", (given) => given.state?.session === "live"],
+    ["an ended session (given session: ended)", (given) => given.state?.session === "ended"],
+    ["an offline device (given online: false)", (given) => given.state?.online === false],
+  ]
+  return states.flatMap(([name, matches]) =>
+    scenarios.some((scenario) => givenOf(scenario).some(matches)) ? [] : [`row ${row.id}: no scenario on ${name}`],
+  )
+}
+
 export function scenarioProblems(
   rows: readonly Row[],
   contract: Contract,
@@ -145,6 +174,7 @@ export function scenarioProblems(
   const inert = new Map(files.flatMap((file) => Object.entries(file.inert)))
   for (const row of inScope.values()) {
     problems.push(...coverageProblems(row, byRow.get(row.id) ?? [], inert, contract))
+    problems.push(...targetStateProblems(row, byRow.get(row.id) ?? []))
     const named = [...row.scenarios.effect, ...row.scenarios.refusal]
     if (named.length > 0)
       problems.push(`row ${row.id}: scenarios stays empty in P1a; P1b fills it once its drivers ran`)

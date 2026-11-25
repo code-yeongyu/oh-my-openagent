@@ -6148,7 +6148,24 @@
               "op": "sessions.open",
               "count": 0
             }
-          ]
+          ],
+          "answer": {
+            "value": {
+              "kind": "ok",
+              "thread": "t-k9",
+              "device": "studio"
+            }
+          }
+        }
+      ],
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": true,
+            "created_thread_id": "t-k9"
+          }
         }
       ]
     },
@@ -6210,6 +6227,756 @@
         {
           "port": "remote",
           "op": "sessions.follow",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.send/session-live",
+      "row": "threads.send",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "message": "hi"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.send/session-ended",
+      "row": "threads.send",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "message": "hi"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "value": {
+          "kind": "ok",
+          "delivery": {
+            "lane": "queued_offline"
+          }
+        }
+      }
+    },
+    {
+      "id": "threads.send/device-offline",
+      "row": "threads.send",
+      "kind": "effect",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "hi"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          },
+          "result": {
+            "lane": "queued_offline",
+            "queue_position": 1,
+            "wake": "none"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.interrupt/session-live",
+      "row": "threads.interrupt",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.interrupt/session-ended",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "not_resumable",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "abort",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.interrupt/device-offline",
+      "row": "threads.interrupt",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.interrupt",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.close/session-live",
+      "row": "threads.close",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.close/session-ended",
+      "row": "threads.close",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "close_session",
+          "count": 0
+        }
+      ],
+      "answer": {
+        "value": {
+          "kind": "ok",
+          "closed": false,
+          "reason": "not_live"
+        }
+      }
+    },
+    {
+      "id": "threads.close/device-offline",
+      "row": "threads.close",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.close",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/session-live",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/session-ended",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "not_resumable",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setModel/device-offline",
+      "row": "threads.setModel",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2",
+        "model": "anthropic/m-1"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setReasoning/session-live",
+      "row": "threads.setReasoning",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "high"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.setReasoning/session-ended",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "not_resumable",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "level": "high"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.setReasoning/device-offline",
+      "row": "threads.setReasoning",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2",
+        "level": "high"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.setReasoning",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.rename/session-live",
+      "row": "threads.rename",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.rename/session-ended",
+      "row": "threads.rename",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1",
+        "name": "review"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "rename_session",
+          "count": 0
+        },
+        {
+          "port": "fs",
+          "op": "write",
+          "args": {
+            "name": "review"
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.rename/device-offline",
+      "row": "threads.rename",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2",
+        "name": "review"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.rename",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.archive/session-live",
+      "row": "threads.archive",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "args": {
+            "thread": "t-1",
+            "archived": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.archive/session-ended",
+      "row": "threads.archive",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "t-1"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "set_archived",
+          "args": {
+            "thread": "t-1",
+            "archived": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "threads.archive/device-offline",
+      "row": "threads.archive",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/t-2"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.archive",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/session-live",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "review",
+        "message": "take over"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "live"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt"
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/session-ended",
+      "row": "threads.handoff",
+      "kind": "effect",
+      "target": "this_device",
+      "input": {
+        "thread": "review",
+        "message": "take over"
+      },
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "host",
+          "op": "open_session",
+          "args": {
+            "thread": "t-1"
+          }
+        },
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt"
+        }
+      ]
+    },
+    {
+      "id": "threads.handoff/device-offline",
+      "row": "threads.handoff",
+      "kind": "refusal",
+      "refusal": "device_offline",
+      "target": "other_device",
+      "input": {
+        "thread": "studio/review",
+        "message": "take over"
+      },
+      "given": [
+        {
+          "port": "remote",
+          "state": {
+            "device": "studio",
+            "online": false
+          }
+        }
+      ],
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "count": 0
+        },
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "threads.create/recovery-admission-lost",
+      "row": "threads.create",
+      "kind": "refusal",
+      "refusal": "internal_error",
+      "target": "other_device",
+      "input": {
+        "device": "studio",
+        "name": "lost-admit",
+        "prompt": "build it",
+        "idempotency_key": "k8"
+      },
+      "given": [
+        {
+          "port": "store",
+          "state": {
+            "idempotency": {
+              "key": "k8",
+              "state": "uncertain",
+              "cause": "lost_open"
+            }
+          }
+        }
+      ],
+      "fault": {
+        "port": "store",
+        "op": "idempotency_put",
+        "fault": "lost_reply"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.open",
           "count": 0
         }
       ]

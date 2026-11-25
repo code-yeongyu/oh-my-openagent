@@ -285,3 +285,18 @@ describe("negative controls added with the design lane's ruling on release", () 
     )
   })
 })
+
+describe("negative controls added by the fourth review", () => {
+  test("#given a control verb with no scenario on an ended session #then the scenario check names the state", () => {
+    const files = scenarios.map((file) => ({
+      ...file,
+      scenarios: file.scenarios.filter((scenario) => {
+        const given = (scenario as { given?: readonly { state?: { session?: string } }[] }).given ?? []
+        return !(scenario.row === "threads.setModel" && given.some((entry) => entry.state?.session === "ended"))
+      }),
+    }))
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      "row threads.setModel: no scenario on an ended session (given session: ended)",
+    )
+  })
+})
