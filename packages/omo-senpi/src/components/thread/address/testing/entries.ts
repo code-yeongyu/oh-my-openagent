@@ -22,7 +22,7 @@ export type Cleanups = (() => Promise<void> | void)[]
 
 /** This device's live sessions and session files, as the fixture's own (unexported) HERE_SESSIONS / HERE_DISK hold them. */
 const HERE_SOCKET = "/tmp/i-0123456789abcdef.sock"
-export const hereSessions: readonly ThreadHostSession[] = (
+const hereSessions: readonly ThreadHostSession[] = (
   [
     [T.hereLive, ROUTE.hereLive, NAMES.hereLive],
     [T.hereShared, ROUTE.hereShared, NAMES.shared],
@@ -37,7 +37,7 @@ export const hereSessions: readonly ThreadHostSession[] = (
   socket: HERE_SOCKET,
   endpoint_kind: "rpc_host" as const,
 }))
-export const hereDisk: readonly string[] = [T.hereEnded, T.stale]
+const hereDisk: readonly string[] = [T.hereEnded, T.stale]
 
 /**
  * The remote client's sessions.resolve over the same account: the roster and listing the thread surface reads, this
