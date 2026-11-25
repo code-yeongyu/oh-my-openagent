@@ -27,11 +27,10 @@ import {
 import type { ToolSession } from "../drivers/tools.ts"
 import { METER_MODEL, PARK_TO, parkModelId, SWITCH_TO } from "../scenario.ts"
 import { enginePort } from "./engine-port.ts"
-import { type Device, type FakeRelay, startFakeRelay } from "./fake-relay.ts"
+import { DEVICE_A, DEVICE_B } from "./devices.ts"
+import { type FakeRelay, startFakeRelay } from "./fake-relay.ts"
 import { type Observer, observeB } from "./observe.ts"
-
-export const DEVICE_A: Device = { id: "x1a-device-a", name: "x1a-a" }
-export const DEVICE_B: Device = { id: "x1a-device-b", name: "x1a-b" }
+import { assertWriteRoots } from "./write-roots.ts"
 
 /** What the run proves about isolation: requests the guard refused, processes it covered, and whether a session bus leaked in. */
 export type Isolation = { readonly refused: readonly string[]; readonly guarded: number; readonly sessionBus: boolean }
@@ -132,8 +131,6 @@ export type World = {
   readonly roots: readonly string[]
   /** Read before close: the scratch directories holding the guard's records go with the world. */
   readonly isolation: () => Isolation
-  /** Each environment the world runs processes with, and the scratch directory its writes must stay in. */
-  readonly writeEnvs: readonly { readonly name: string; readonly env: Record<string, string>; readonly root: string }[]
   readonly close: () => Promise<void>
 }
 
@@ -151,7 +148,6 @@ const addThinkingModel = (agentDir: string): void => {
 
 export async function startWorld(trace: (line: string) => void): Promise<World> {
   installCleanupHooks()
-  const install = await buildOmoInstall("x1a-proof")
   // The model reports usage the way a real provider does (about four characters a token over the whole request), so B's
   // context estimate follows the thread and a switch can need a compaction (the parked step, #14939).
   const fake = await startFakeModel({ promptTokens: (body) => Math.ceil(JSON.stringify(body).length / 4) })
@@ -164,9 +160,25 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
   const b = makeScratch("x1a-b", fake)
   addThinkingModel(b.agentDir)
   const guards = [isolate(a), isolate(b)]
-  const hostB = await startShardHost(b, install, "x1a-b")
   const relayDir = join(a.dir, "ds")
   mkdirSync(relayDir, { recursive: true })
+  a.env["OMO_DEVICE_SERVICE_STATE_DIR"] = relayDir
+  const account = signedIn(a)
+  // Fail closed before anything is installed or launched: every write root of every environment the world runs
+  // processes with stays inside that device's scratch directory.
+  try {
+    assertWriteRoots([
+      { name: "device A", env: a.env, root: a.dir },
+      { name: "device B", env: b.env, root: b.dir },
+      { name: "device A's CLI", env: account.env, root: a.dir },
+    ])
+  } catch (error) {
+    bus.off("tick", rerelease)
+    await cleanupAll()
+    throw error
+  }
+  const install = await buildOmoInstall("x1a-proof")
+  const hostB = await startShardHost(b, install, "x1a-b")
   const relay = await startFakeRelay({
     here: DEVICE_A,
     peer: DEVICE_B,
@@ -174,8 +186,6 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     trace,
     stateDir: relayDir,
   })
-  a.env["OMO_DEVICE_SERVICE_STATE_DIR"] = relay.stateDir
-  const account = signedIn(a)
   // Device A's own engine host (its operator endpoint, rpc.sock), as a signed-in device runs it: a create or a send
   // from A asks it first, whichever device the thread lands on.
   const daemonA = await omo(a, install, ["daemon", "run", "--json"])
@@ -188,10 +198,19 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     const hostA = await startShardHost(a, install, "x1a-a")
     const opened = await openHostSession(hostA.client, a.work)
     session = {
-      prompt: async (text, tool) => {
+      prompt: async (text, tool, signal) => {
         const from = fake.requests.length
         await hostA.client.request({ type: "prompt", sessionId: opened.routingId, message: text })
-        return JSON.stringify(await awaitToolResult(fake, tool, from, { timeoutMs: 120_000 }))
+        // A step past its deadline aborts A's turn, so the session is idle again before the next step runs.
+        const aborted = new Promise<never>((_resolve, reject) => {
+          const stop = (): void => {
+            void hostA.client.request({ type: "abort", sessionId: opened.routingId }).catch(() => undefined)
+            reject(new Error("the step deadline aborted the tool call"))
+          }
+          if (signal?.aborted === true) stop()
+          else signal?.addEventListener("abort", stop, { once: true })
+        })
+        return JSON.stringify(await Promise.race([awaitToolResult(fake, tool, from, { timeoutMs: 120_000 }), aborted]))
       },
     }
     return session
@@ -200,11 +219,6 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     engine: ENGINE_VERSION,
     account: true,
     cliEnv: account.env,
-    writeEnvs: [
-      { name: "device A", env: a.env, root: a.dir },
-      { name: "device B", env: b.env, root: b.dir },
-      { name: "device A's CLI", env: account.env, root: a.dir },
-    ],
     install,
     a,
     relay,

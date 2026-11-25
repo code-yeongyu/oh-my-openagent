@@ -10,14 +10,14 @@ import { appendFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } f
 import { join, resolve } from "node:path"
 
 import { createCliDriver } from "./drivers/cli.ts"
-import { cellOf, turnOf } from "./cell.ts"
-import type { Answer, Driver } from "./drivers/driver.ts"
+import { type Driver, isRecord } from "./drivers/driver.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
-import { type Cell, redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
-import { fill, parkModelId, parkWindowFor, SCENARIO } from "./scenario.ts"
+import { redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
+import { SCENARIO } from "./scenario.ts"
+import { runSteps } from "./steps.ts"
 import { startSdkDriver } from "./world/sdk-process.ts"
-import { CANARY, DEVICE_A, DEVICE_B, type Isolation, startWorld, type World } from "./world/world.ts"
-import { outsideWriteRoots } from "./world/write-roots.ts"
+import { DEVICE_A, DEVICE_B } from "./world/devices.ts"
+import { CANARY, type Isolation, startWorld, type World } from "./world/world.ts"
 
 const REPO = resolve(import.meta.dir, "..", "..")
 const arg = (name: string): string | undefined => {
@@ -45,24 +45,6 @@ const driverFor = async (surface: Surface, world: World): Promise<Driver> => {
   }
 }
 
-// One step's bound: a surface that has not answered by then failed the step; its call is aborted (a driver that started
-// a process stops it), and the surface's later cells are not reached, so no step runs beside a stalled one.
-const STEP_DEADLINE_MS = 180_000
-const withinStep = (
-  run: (signal: AbortSignal) => Promise<Answer>,
-  call: string,
-): Promise<Answer & { stalled?: true }> => {
-  const controller = new AbortController()
-  let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<Answer & { stalled: true }>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort()
-      resolve({ call, raw: { no_answer_within_ms: STEP_DEADLINE_MS }, answered: false, stalled: true })
-    }, STEP_DEADLINE_MS)
-  })
-  return Promise.race([run(controller.signal), expired]).finally(() => clearTimeout(timer))
-}
-
 async function runSurface(surface: Surface, world: World): Promise<StepRecord[]> {
   const driver = await driverFor(surface, world)
   try {
@@ -70,98 +52,6 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
   } finally {
     await driver.close()
   }
-}
-
-async function runSteps(surface: Surface, world: World, driver: Driver): Promise<StepRecord[]> {
-  const values: Record<string, string> = { deviceB: DEVICE_B.id, run: surface }
-  const records: StepRecord[] = []
-  let key: string | undefined
-  // Set once this surface cannot go on (its open needs an account the world lacks, or a step stalled): every later cell
-  // of the surface reads not reached with the same reason, never fail and never pass.
-  let notRun: { readonly cell: Cell; readonly why: string } | undefined
-  const record = (entry: StepRecord): void => {
-    records.push(entry)
-    process.stderr.write(`x1a ${surface} ${entry.step}: ${entry.cell} (${entry.why})\n`)
-  }
-  for (const step of SCENARIO) {
-    const input = Object.fromEntries(Object.entries(step.input).map(([name, text]) => [name, fill(text, values)]))
-    const mapping = driver.mapping[step.op]
-    const skipped = (why: string, cell: Cell, slice: string): void =>
-      record({ step: step.id, op: step.op, input, call: "-", raw: null, observed: null, cell, why, slice })
-    if (mapping.kind === "unavailable") {
-      skipped("no call on this surface today", "not reached", mapping.slice)
-      continue
-    }
-    if (mapping.kind === "needs_account" && !world.account)
-      notRun = {
-        cell: "not reached",
-        why: "the world carries no account",
-      }
-    if (notRun !== undefined) {
-      skipped(notRun.why, notRun.cell, step.owner.slice)
-      continue
-    }
-    // A step that names the thread cannot run when this surface's open answered none: it is not reached.
-    if (step.op !== "create" && values["thread"] === undefined) {
-      skipped("this surface's open answered no thread", "not reached", `${SCENARIO[0]?.owner.slice} (open)`)
-      continue
-    }
-    const before = step.op === "create" ? await world.observer.keys() : new Set<string>()
-    if (step.before === "fill-context") {
-      const filled = await world.observer.fill(key)
-      const window = "requirement" in filled ? parkWindowFor(filled.requirement) : undefined
-      if (!("requirement" in filled) || window === undefined) {
-        const why = "failed" in filled ? filled.failed : `no ladder window below the requirement ${filled.requirement}`
-        skipped(`world setup failed, not a product result: ${why}`, "not reached", step.owner.slice)
-        continue
-      }
-      values["park"] = parkModelId(window)
-      Object.assign(
-        input,
-        Object.fromEntries(Object.entries(step.input).map(([name, text]) => [name, fill(text, values)])),
-      )
-    }
-    const answer = await withinStep(
-      (signal) =>
-        driver.run({ op: step.op, input }, signal).catch((error: unknown) => ({
-          call: mapping.how,
-          raw: { thrown: String(error) },
-          answered: false,
-        })),
-      mapping.how,
-    )
-    if ("stalled" in answer)
-      notRun = {
-        cell: "fail",
-        why: "not reached: an earlier step of this surface did not answer within the step deadline",
-      }
-    if (step.op === "create") {
-      key = await world.observer.adopt(before)
-      if ("thread" in answer && typeof answer.thread === "string") values["thread"] = answer.thread
-    }
-    const turn = turnOf(answer.raw)
-    if (turn !== undefined) values["turn"] = turn
-    if (step.release !== undefined) world.release(fill(step.release, values))
-    const expect = JSON.parse(fill(JSON.stringify(step.expect), values))
-    const refusal = step.refusedTo?.surfaces.includes(surface) === true ? step.refusedTo.code : undefined
-    const verdict = await world.observer.judge(key, expect, answer.raw, answer.answered && refusal === undefined)
-    // An interrupted held turn is over: its tag stays released, or a later request quoting it (B's compaction summary)
-    // would be held again with no step left to release it.
-    if (expect.kind === "interrupted") world.release(expect.tag)
-    const { cell, why } = cellOf(answer, verdict.ok ? undefined : verdict.why, refusal)
-    record({
-      step: step.id,
-      op: step.op,
-      input,
-      call: answer.call,
-      raw: answer.raw,
-      observed: verdict.state,
-      cell,
-      why,
-      slice: step.owner.slice,
-    })
-  }
-  return records
 }
 
 async function main(): Promise<void> {
@@ -180,12 +70,6 @@ async function main(): Promise<void> {
   const runs: Record<Surface, StepRecord[]> = { sdk: [], tools: [], cli: [] }
   let isolation: Isolation = { refused: [], guarded: 0, sessionBus: false }
   try {
-    // Fail closed before any surface runs: every write root of every environment the world uses stays in its scratch.
-    const escaped = world.writeEnvs.flatMap(({ name, env, root }) =>
-      outsideWriteRoots(env, [root]).map((entry) => `${name}: ${entry}`),
-    )
-    if (escaped.length > 0)
-      throw new Error(`x1a world: a write root is outside the scratch directory: ${escaped.join("; ")}`)
     for (const surface of only) {
       runs[surface] = await runSurface(surface, world)
       writeFileSync(join(evidence, `${surface}.md`), redact(transcript(surface, build, runs[surface]), redaction))
@@ -197,6 +81,22 @@ async function main(): Promise<void> {
   const isolated = isolation.refused.length === 0 && !isolation.sessionBus
   writeFileSync(join(evidence, "isolation.json"), JSON.stringify(isolation, null, 2))
   writeFileSync(join(evidence, "relay-requests.json"), JSON.stringify(world.relay.requests, null, 2))
+  // What the fake model was asked and how it answered, in order: the answer kind and the hold tag, never the bodies.
+  writeFileSync(
+    join(evidence, "model-requests.json"),
+    JSON.stringify(
+      world.fake.requests.map((request) => {
+        const answer = isRecord(request) && isRecord(request["answer"]) ? request["answer"] : {}
+        return {
+          kind: answer["kind"] ?? null,
+          tag: answer["tag"] ?? answer["hold"] ?? null,
+          tool: answer["tool"] ?? null,
+        }
+      }),
+      null,
+      2,
+    ),
+  )
   const table = summary(build, SCENARIO, runs, [
     `Isolation: ${isolation.refused.length} request(s) to a non-loopback address refused; the loopback guard loaded in ${isolation.guarded} world processes; session bus in the world's environment: ${isolation.sessionBus ? "present" : "absent"}.`,
     "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",

@@ -22,8 +22,9 @@ export type Driver = {
 export const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
   typeof value === "object" && value !== null && !Array.isArray(value)
 
-/** A thread result's success, as the SDK, the tools and `--json` all shape it: `kind: "error"` is the failure. */
-export const succeeded = (raw: unknown): boolean => isRecord(raw) && raw["kind"] !== "error"
+/** A thread result's success, as the SDK, the tools and `--json` all shape it: only `kind: "ok"` is one. Anything else
+ * (an error, an unknown kind, text, a thrown error, nothing) is not. */
+export const succeeded = (raw: unknown): boolean => isRecord(raw) && raw["kind"] === "ok"
 
 /** The thread string an open answered: the result's `thread`, or the opened row's own `thread`. */
 export function threadOf(raw: unknown): string | undefined {

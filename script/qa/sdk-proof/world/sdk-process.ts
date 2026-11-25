@@ -30,6 +30,8 @@ export function startSdkDriver(options: {
     pending.get(reply["id"])?.(reply["raw"])
     pending.delete(reply["id"])
   })
+  // Settles once the script is gone, whether it exited or was killed (a killed child keeps exitCode null).
+  const ended = new Promise<"ended">((resolve) => child.once("close", () => resolve("ended")))
   child.once("close", (code) => {
     for (const settle of pending.values()) settle({ exited: code, stderr })
     pending.clear()
@@ -37,11 +39,14 @@ export function startSdkDriver(options: {
   let next = 0
   return {
     mapping: MAPPING,
-    run: async ({ op, input }: Call): Promise<Answer> => {
+    // The script has one call at a time in flight; a call past its deadline stops the script (the surface is not reached
+    // again), and the pending call settles through the close handler.
+    run: async ({ op, input }: Call, signal?: AbortSignal): Promise<Answer> => {
       next += 1
       const id = next
       const raw = await new Promise<unknown>((resolve) => {
         pending.set(id, resolve)
+        signal?.addEventListener("abort", () => child.kill("SIGKILL"), { once: true })
         child.stdin.write(`${JSON.stringify({ id, op, input })}\n`)
       })
       const thread = threadOf(raw)
@@ -56,16 +61,14 @@ export function startSdkDriver(options: {
     // Bounded: a call that never settled keeps the script alive, so it is stopped after CLOSE_GRACE_MS.
     close: async () => {
       child.stdin.end()
-      if (child.exitCode !== null) return
-      const closed = new Promise((resolve) => child.once("close", resolve))
       let timer: ReturnType<typeof setTimeout> | undefined
-      const grace = new Promise((resolve) => {
-        timer = setTimeout(resolve, CLOSE_GRACE_MS)
+      const grace = new Promise<"grace">((resolve) => {
+        timer = setTimeout(() => resolve("grace"), CLOSE_GRACE_MS)
       })
-      await Promise.race([closed, grace]).finally(() => clearTimeout(timer))
-      if (child.exitCode === null) {
+      const outcome = await Promise.race([ended, grace]).finally(() => clearTimeout(timer))
+      if (outcome === "grace") {
         child.kill("SIGKILL")
-        await closed
+        await ended
       }
     },
   }

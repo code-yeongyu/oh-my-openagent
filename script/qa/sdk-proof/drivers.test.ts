@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, test } from "bun:test"
+import { randomUUID } from "node:crypto"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -46,6 +47,39 @@ describe("the CLI driver", () => {
   })
 })
 
+// A process whose command line carries `marker` and is still alive; the read-back of a driver's teardown.
+const alive = (marker: string): boolean => Bun.spawnSync(["pgrep", "-f", marker]).stdout.toString().trim().length > 0
+
+const abortSoon = (): AbortSignal => AbortSignal.timeout(100)
+
+describe("the CLI driver, stalled or answering nonsense", () => {
+  test("#given omo that never exits #when the step deadline aborts the call #then the process is gone and the cell is red", async () => {
+    // given
+    const marker = `x1a-stall-${randomUUID()}`
+    const driver = createCliDriver({
+      launcher: [process.execPath, "-e", `/* ${marker} */ setInterval(() => {}, 1000)`],
+      env: process.env,
+      cwd: dir,
+    })
+
+    // when
+    const answer = await driver.run(OPEN, abortSoon())
+
+    // then
+    expect(cellOf(answer, undefined).cell).toBe("fail")
+    expect(alive(marker)).toBe(false)
+  })
+
+  test("#given omo printing text that is not a thread result #when the open runs #then the cell is red", async () => {
+    const driver = createCliDriver({
+      launcher: [process.execPath, "-e", 'console.log("done")'],
+      env: process.env,
+      cwd: dir,
+    })
+    expect(cellOf(await driver.run(OPEN), undefined).cell).toBe("fail")
+  })
+})
+
 describe("the tools driver", () => {
   const answering = (result: object) =>
     createToolsDriver({ prompt: async () => JSON.stringify({ details: { result } }) })
@@ -57,6 +91,30 @@ describe("the tools driver", () => {
   test("#given a tool answering the thread #when the open runs #then the cell is green", async () => {
     const answer = await answering(OK).run(OPEN)
     expect([cellOf(answer, undefined).cell, threadOf(answer.raw)]).toEqual(["pass", "dev-b/t-1"])
+  })
+
+  test("#given a tool answering text that is not a thread result #when the open runs #then the cell is red", async () => {
+    const driver = createToolsDriver({ prompt: async () => "the tool printed something else" })
+    expect(cellOf(await driver.run(OPEN), undefined).cell).toBe("fail")
+  })
+
+  test("#given a tool call that never answers #when the step deadline aborts it #then the call ends and its cell is red", async () => {
+    // given
+    const driver = createToolsDriver({
+      prompt: (_text, _tool, signal) =>
+        new Promise((_resolve, reject) =>
+          signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
+        ),
+    })
+
+    // when
+    const settled = await driver.run(OPEN, abortSoon()).then(
+      (answer) => cellOf(answer, undefined).cell,
+      () => "rejected",
+    )
+
+    // then
+    expect(settled).toBe("rejected")
   })
 
   test("#given the contract's refusal for a session principal #when the steer runs #then only that refusal is green", async () => {
@@ -89,6 +147,35 @@ describe("the SDK driver", () => {
 
   test("#given an SDK entry answering an error #when the open runs #then the cell is red", async () => {
     expect(cellOf(await run(ERROR), undefined).cell).toBe("fail")
+  })
+
+  test("#given an SDK entry without the operation #when the open runs #then the cell is red", async () => {
+    const path = join(dir, `entry-${randomUUID()}.mjs`)
+    writeFileSync(path, "export const createThreadSdk = () => ({ dispose: async () => {} })\n")
+    const driver = startSdkDriver({ entry: path, env: { PATH: process.env["PATH"] ?? "" }, cwd: dir })
+    try {
+      expect(cellOf(await driver.run(OPEN), undefined).cell).toBe("fail")
+    } finally {
+      await driver.close()
+    }
+  })
+
+  test("#given an SDK call that never settles #when the step deadline aborts it #then the script is gone and the cell is red", async () => {
+    // given
+    const path = join(dir, `entry-stall-${randomUUID()}.mjs`)
+    writeFileSync(
+      path,
+      "export const createThreadSdk = () => ({ create: () => new Promise(() => {}), dispose: async () => {} })\n",
+    )
+    const driver = startSdkDriver({ entry: path, env: { PATH: process.env["PATH"] ?? "" }, cwd: dir })
+
+    // when
+    const answer = await driver.run(OPEN, abortSoon())
+    await driver.close()
+
+    // then
+    expect(cellOf(answer, undefined).cell).toBe("fail")
+    expect(alive(path)).toBe(false)
   })
 
   test("#given an SDK entry answering the thread #when the open runs #then the cell is green", async () => {

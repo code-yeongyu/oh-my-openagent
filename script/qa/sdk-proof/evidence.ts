@@ -1,7 +1,7 @@
 // The X1a proof's evidence: one transcript per surface (each step's input, the surface's raw answer, and what device B
 // showed afterwards) and one summary table, step by surface. Every id, device id and scratch path is redacted, so the
 // table can be committed and the transcripts quoted. Transcripts stay local under .omo/evidence (#8703).
-import { ISSUES, type Op, type Surface, SURFACES } from "./scenario.ts"
+import { ISSUES, type Op, OWNERS, type Surface, SURFACES } from "./scenario.ts"
 
 export { type Surface, SURFACES }
 
@@ -80,7 +80,8 @@ export function summary(
     if (record === undefined) return "surface not run (--only)"
     if (record.cell === "pass") return "pass"
     const issue = ISSUES[`${surface}:${step}`]
-    return `${record.cell}: ${record.why} (${record.slice}${issue === undefined ? "" : `, ${issue}`})`
+    const owner = record.cell === "fail" ? (OWNERS[`${surface}:${step}`] ?? record.slice) : record.slice
+    return `${record.cell}: ${record.why} (${owner}${issue === undefined ? "" : `, ${issue}`})`
   }
   const rows = steps.map((step) => `| ${step.id} (${step.op}) | ${SURFACES.map((s) => cell(s, step.id)).join(" | ")} |`)
   return [

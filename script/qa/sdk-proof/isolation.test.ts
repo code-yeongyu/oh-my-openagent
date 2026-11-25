@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { outsideWriteRoots } from "./world/write-roots.ts"
+import { assertWriteRoots, outsideWriteRoots } from "./world/write-roots.ts"
 
 // The X1a world fails closed: the run refuses to start with a write root outside the scratch directory, and the guard
 // every world process loads refuses and records a request to any address but loopback. Security-relevant isolation
@@ -25,6 +25,17 @@ describe("write roots", () => {
 
   test("#given a sibling whose name starts like the root #when checked #then it escapes", () => {
     expect(outsideWriteRoots({ HOME: `${dir}-other/home` }, [dir])).toEqual([`HOME=${dir}-other/home`])
+  })
+})
+
+describe("the world's start", () => {
+  test("#given a device environment whose write root escapes #when the world checks before launching #then it refuses naming it", () => {
+    const escaping = [{ name: "device A", env: { HOME: join(dir, "a"), TMPDIR: "/tmp" }, root: dir }]
+    expect(() => assertWriteRoots(escaping)).toThrow("device A: TMPDIR=/tmp")
+  })
+
+  test("#given every write root inside its scratch #when the world checks #then it starts", () => {
+    expect(() => assertWriteRoots([{ name: "device A", env: { HOME: join(dir, "a") }, root: dir }])).not.toThrow()
   })
 })
 

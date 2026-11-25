@@ -76,21 +76,22 @@ export async function observeB(socket: string, heldTags: () => readonly string[]
   const judge = async (key: string | undefined, expect: Expect, raw: unknown, answered: boolean) => {
     let state = await read(key)
     if (!answered) {
-      const why = verdictOf(expect, state, raw)
+      const why = verdictOf(expect, state, raw, key !== undefined)
       return { ok: why === undefined, why: why ?? "B shows the expected state", state }
     }
     try {
       state = await waitFor(
         async () => {
           const now = await read(key)
-          return verdictOf(expect, now, raw) === undefined ? now : undefined
+          return verdictOf(expect, now, raw, key !== undefined) === undefined ? now : undefined
         },
-        { label: `B shows ${expect.kind}`, timeoutMs: SETTLE_MS },
+        // A turn after a held switch runs a compaction first (a model call of its own), slower on a loaded host.
+        { label: `B shows ${expect.kind}`, timeoutMs: expect.kind === "applied" ? FILL_WAIT_MS : SETTLE_MS },
       )
     } catch {
       state = await read(key)
     }
-    const why = verdictOf(expect, state, raw)
+    const why = verdictOf(expect, state, raw, key !== undefined)
     return { ok: why === undefined, why: why ?? "B shows the expected state", state }
   }
   return {

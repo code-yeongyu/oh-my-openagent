@@ -13,6 +13,8 @@ export const MAPPING: Readonly<Record<Op, Mapping>> = {
   read: call("omo thread read <thread> --json"),
   interrupt: call("omo remote interrupt <thread> --json"),
   setModel: call("omo remote model <thread> <provider/id:level> --json"),
+  // No CLI verb sets a thread's thinking level today (`omo remote` has model only; `omo thread` has no reasoning verb).
+  setReasoning: { kind: "unavailable", slice: "T3 (the omo thread verbs over the SDK root)" },
   close: call("omo thread close <thread> --json"),
 }
 
@@ -38,6 +40,8 @@ const argvOf = (op: Op, input: Readonly<Record<string, string>>): string[] => {
       return ["remote", "interrupt", at("thread"), "--json"]
     case "setModel":
       return ["remote", "model", at("thread"), at("model"), "--json"]
+    case "setReasoning":
+      return []
     case "close":
       return ["thread", "close", at("thread"), "--json"]
   }

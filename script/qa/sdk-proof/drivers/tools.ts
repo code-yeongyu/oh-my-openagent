@@ -11,6 +11,7 @@ export const MAPPING: Readonly<Record<Op, Mapping>> = {
   read: call("thread_read { thread }"),
   interrupt: call("thread_interrupt { thread }"),
   setModel: call("thread_set_model { thread, model }"),
+  setReasoning: call("thread_set_reasoning { thread, level }"),
   close: call("thread_close { thread }"),
 }
 
@@ -38,13 +39,17 @@ const toolCall = (
       return { tool: "thread_interrupt", args: { thread } }
     case "setModel":
       return { tool: "thread_set_model", args: { thread, model: input["model"] } }
+    case "setReasoning":
+      return { tool: "thread_set_reasoning", args: { thread, level: input["level"] } }
     case "close":
       return { tool: "thread_close", args: { thread } }
   }
 }
 
 /** The agent session on device A, as the run gives it: one prompt in, the named tool's result text out. */
-export type ToolSession = { readonly prompt: (text: string, tool: string) => Promise<string> }
+export type ToolSession = {
+  readonly prompt: (text: string, tool: string, signal?: AbortSignal) => Promise<string>
+}
 
 const directive = (tool: string, args: object): string =>
   `QA:CALL ${tool} ${Buffer.from(JSON.stringify(args), "utf8").toString("base64url")}`
@@ -64,9 +69,9 @@ const resultOf = (text: string): unknown => {
 export function createToolsDriver(session: ToolSession): Driver {
   return {
     mapping: MAPPING,
-    run: async ({ op, input }: Call): Promise<Answer> => {
+    run: async ({ op, input }: Call, signal?: AbortSignal): Promise<Answer> => {
       const { tool, args } = toolCall(op, input)
-      const raw = resultOf(await session.prompt(directive(tool, args), tool))
+      const raw = resultOf(await session.prompt(directive(tool, args), tool, signal))
       const thread = threadOf(raw)
       return {
         call: `${tool} ${JSON.stringify(args)}`,

@@ -46,9 +46,15 @@ const passing: readonly Case[] = [
   ],
   ["closed", { kind: "closed" }, idle([], { listed: false }), {}],
   [
-    "applied after compaction",
-    { kind: "applied", token: TOKEN, provider: "p", id: "m", thinking: "high" },
-    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/m", thinking: "high" }),
+    "applied after compaction, at its previous level",
+    { kind: "applied", token: TOKEN, provider: "p", id: "m" },
+    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/m", thinking: "medium" }),
+    {},
+  ],
+  [
+    "level set once landed",
+    { kind: "level", provider: "p", id: "m", thinking: "high" },
+    idle([], { model: "p/m", thinking: "high" }),
     {},
   ],
 ]
@@ -89,14 +95,24 @@ const failing: readonly Case[] = [
   ],
   ["closed but still listed", { kind: "closed" }, idle([]), {}],
   [
-    "applied at another thinking level",
-    { kind: "applied", token: TOKEN, provider: "p", id: "m", thinking: "high" },
-    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/m", thinking: "medium" }),
+    "applied but the old model still runs",
+    { kind: "applied", token: TOKEN, provider: "p", id: "m" },
+    idle([user(TOKEN), assistant(ackOf(TOKEN))], { model: "p/old" }),
+    {},
+  ],
+  [
+    "level still the previous one",
+    { kind: "level", provider: "p", id: "m", thinking: "high" },
+    idle([], { model: "p/m", thinking: "medium" }),
     {},
   ],
 ]
 
 describe("a step's verdict on device B", () => {
+  test("#given no thread adopted on B #when a close is judged #then the absence proves nothing", () => {
+    expect(verdictOf({ kind: "closed" }, idle([], { listed: false }), {}, false)).toEqual(expect.any(String))
+  })
+
   test.each(passing)("#given %s #when judged #then it holds", (_name, expected, state, raw) => {
     expect(verdictOf(expected, state, raw)).toBeUndefined()
   })

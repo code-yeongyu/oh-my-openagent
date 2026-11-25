@@ -11,7 +11,7 @@ export type Surface = "sdk" | "tools" | "cli"
 export const SURFACES: readonly Surface[] = ["sdk", "tools", "cli"]
 
 /** The operations the scenario uses, named as the SDK root names them (design 6.2). */
-export type Op = "create" | "send" | "read" | "interrupt" | "setModel" | "close"
+export type Op = "create" | "send" | "read" | "interrupt" | "setModel" | "setReasoning" | "close"
 
 /** What device B's engine must show after the step, read through B's own socket (world/observe.ts). */
 export type Expect =
@@ -22,13 +22,8 @@ export type Expect =
   | { readonly kind: "interrupted"; readonly tag: string }
   | { readonly kind: "model"; readonly provider: string; readonly id: string; readonly thinking: string }
   | { readonly kind: "parked"; readonly provider: string; readonly id: string; readonly thinking: string }
-  | {
-      readonly kind: "applied"
-      readonly token: string
-      readonly provider: string
-      readonly id: string
-      readonly thinking: string
-    }
+  | { readonly kind: "applied"; readonly token: string; readonly provider: string; readonly id: string }
+  | { readonly kind: "level"; readonly provider: string; readonly id: string; readonly thinking: string }
   | { readonly kind: "closed" }
 
 export type Step = {
@@ -167,8 +162,18 @@ export const SCENARIO: readonly Step[] = [
     id: "after-compaction",
     op: "send",
     input: { thread: "{{thread}}", message: `x1a after compaction ${AFTER}`, delivery: "follow_up" },
-    expect: { kind: "applied", token: AFTER, provider: PARK_TO.provider, id: "{{park}}", thinking: PARK_TO.thinking },
+    expect: { kind: "applied", token: AFTER, provider: PARK_TO.provider, id: "{{park}}" },
     owner: { row: "threads.setModel, applies after compaction (#14939)", slice: "T1b-m (#14939, folded into T1b)" },
+  },
+  {
+    // The level the held switch could not carry (design ruling of 2026-11-25): the caller sets it once the switch has
+    // landed, as the parked answer tells it (thinking_level_sent false). When the pinned engine carries the level with the
+    // held switch (senpi#7468), this step goes and after-compaction expects the level directly.
+    id: "set-level",
+    op: "setReasoning",
+    input: { thread: "{{thread}}", level: PARK_TO.thinking },
+    expect: { kind: "level", provider: PARK_TO.provider, id: "{{park}}", thinking: PARK_TO.thinking },
+    owner: { row: "threads.setReasoning (#14939, engine senpi#7468)", slice: "T1b-m (#14939, folded into T1b)" },
   },
   {
     id: "close",
@@ -179,14 +184,28 @@ export const SCENARIO: readonly Step[] = [
   },
 ]
 
+/** Where a cell's finding belongs to someone other than its step's slice (the design lane's routing), by `<surface>:<step id>`. */
+export const OWNERS: Readonly<Record<string, string>> = {
+  "tools:steer": "the engine (senpi#7478: a started delivery answers the turn before the one it starts)",
+  "tools:interrupt": "the engine (senpi#7478: a started delivery answers the turn before the one it starts)",
+  "cli:close": "T1b (PR 15000)",
+}
+
 /** The issue filed for a cell's finding, by `<surface>:<step id>`, shown beside the cell while it fails. */
 export const ISSUES: Readonly<Record<string, string>> = {
   "sdk:open": "#15006",
   "tools:steer": "#15013",
-  "cli:close": "#15012",
+  "tools:interrupt": "#15013",
+  "sdk:set-model-parked": "#14939",
+  "tools:set-model-parked": "#14939",
+  "cli:set-model-parked": "#14939",
+  "sdk:after-compaction": "#14939",
+  "tools:after-compaction": "#14939",
+  "cli:after-compaction": "#14939",
+  "cli:close": "#14992",
 }
 
-export const OPS: readonly Op[] = ["create", "send", "read", "interrupt", "setModel", "close"]
+export const OPS: readonly Op[] = ["create", "send", "read", "interrupt", "setModel", "setReasoning", "close"]
 
 /** How a driver answers an operation today: the call it makes, or why the surface cannot make it yet. */
 export type Mapping =

@@ -16,6 +16,8 @@ export const MAPPING: Readonly<Record<Op, Mapping>> = {
   read: call("read({ thread })"),
   interrupt: call("interrupt({ thread })"),
   setModel: call("set_model({ thread, model })"),
+  // The SDK root has no reasoning call yet (threads.setReasoning, slice T1b); the cell starts running when it lands.
+  setReasoning: { kind: "unavailable", slice: "T1b (threads.setReasoning)" },
   close: call("close({ thread })"),
 }
 
@@ -45,6 +47,8 @@ const viaFacade = (sdk: Sdk, op: Op, input: Readonly<Record<string, string>>): P
       return member(sdk, "interrupt", { thread: input["thread"] })
     case "setModel":
       return member(sdk, "set_model", { thread: input["thread"], model: input["model"] })
+    case "setReasoning":
+      return member(sdk, "set_reasoning", { thread: input["thread"], level: input["level"] })
     case "close":
       return member(sdk, "close", { thread: input["thread"] })
   }

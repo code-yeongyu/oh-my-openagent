@@ -29,3 +29,18 @@ export const outsideWriteRoots = (
     const value = env[name]
     return value === undefined || value === "" || inside(value, roots) ? [] : [`${name}=${value}`]
   })
+
+/** Throws naming every write root, of every environment the world runs processes with, outside its scratch directory. */
+export function assertWriteRoots(
+  envs: readonly {
+    readonly name: string
+    readonly env: Readonly<Record<string, string | undefined>>
+    readonly root: string
+  }[],
+): void {
+  const escaped = envs.flatMap(({ name, env, root }) =>
+    outsideWriteRoots(env, [root]).map((entry) => `${name}: ${entry}`),
+  )
+  if (escaped.length > 0)
+    throw new Error(`x1a world: a write root is outside the scratch directory: ${escaped.join("; ")}`)
+}

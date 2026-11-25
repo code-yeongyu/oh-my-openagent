@@ -22,7 +22,7 @@ const said = (state: BState, role: "user" | "assistant", needle: string): boolea
       (message.role === role || (role === "user" && message.role === "custom")) && message.text.includes(needle),
   )
 // The expected state, checked once B has had the chance to reach it (a wait that times out is a fail, not a throw).
-export const verdictOf = (expect: Expect, state: BState, raw: unknown): string | undefined => {
+export const verdictOf = (expect: Expect, state: BState, raw: unknown, adopted = true): string | undefined => {
   switch (expect.kind) {
     case "exchange":
       return said(state, "user", expect.token) && said(state, "assistant", ackOf(expect.token)) && !state.streaming
@@ -69,21 +69,26 @@ export const verdictOf = (expect: Expect, state: BState, raw: unknown): string |
         : "B parked the switch, but the surface did not answer the after-compaction outcome"
     }
     case "applied": {
-      // #14939: the next turn compacts first, then the held switch applies with the thinking level it was asked for.
+      // #14939: the next turn compacts first, then the held switch applies: the asked model is in effect. Its level is
+      // the step after (set-level), since the pinned engine's held switch carries none (senpi#7468).
       const wanted = `${expect.provider}/${expect.id}`
       const reasons = [
-        ...(state.model === wanted && state.thinking === expect.thinking
-          ? []
-          : [
-              `after the compaction B runs ${state.model ?? "?"} at ${state.thinking ?? "?"}, not ${wanted} at ${expect.thinking}`,
-            ]),
+        ...(state.model === wanted ? [] : [`after the compaction B runs ${state.model ?? "?"}, not ${wanted}`]),
         ...(said(state, "user", expect.token) && said(state, "assistant", ackOf(expect.token)) && !state.streaming
           ? []
           : [`B's transcript lacks the message or its answer ${ackOf(expect.token)}`]),
       ]
       return reasons.length === 0 ? undefined : reasons.join("; ")
     }
+    case "level": {
+      const wanted = `${expect.provider}/${expect.id}`
+      return state.model === wanted && state.thinking === expect.thinking
+        ? undefined
+        : `B runs ${state.model ?? "?"} at ${state.thinking ?? "?"}, not ${wanted} at ${expect.thinking}`
+    }
     case "closed":
+      // Absence proves a close only of a thread this surface's open made on B (adopted); with none it proves nothing.
+      if (!adopted) return "no thread of this surface was adopted on B, so its absence proves no close"
       return state.listed ? "B still lists the thread" : undefined
   }
 }
