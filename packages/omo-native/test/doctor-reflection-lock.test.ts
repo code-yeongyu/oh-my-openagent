@@ -16,11 +16,18 @@ import { createHash } from "node:crypto"
 
 import {
   decideReflectionLock,
-  formatReflectionLockLines,
+  reflectionLockFindings,
   reflectionLockFix,
-  reflectionLockReport,
+  reflectionLockReport as reflectionLockFindingsReport,
 } from "../bin/lib/doctor-reflection-lock.js"
 import { runDoctor } from "../bin/lib/doctor.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const reflectionLockReport = async (options: Parameters<typeof reflectionLockFindingsReport>[0]) =>
+  renderFindings(await reflectionLockFindingsReport(options))
+const formatReflectionLockLines = (...args: Parameters<typeof reflectionLockFindings>) =>
+  renderFindings(reflectionLockFindings(...args))
 
 const roots: string[] = []
 

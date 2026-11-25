@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
+import { finding } from "./diagnostics-findings.js"
 
 function readJson(path) {
   if (!existsSync(path)) return undefined
@@ -110,41 +111,65 @@ function terminalLine(endpoint) {
   return `${line}: not responding (${endpoint.reason ?? "unreachable"}; omo daemon gc reaps it once its process is gone)`
 }
 
-export function formatEndpointLines(endpoints) {
-  const lines = []
+// One row per line `omo daemon status` prints, with what the row is about, so the doctor's view is built from the
+// same rows instead of reading the printed text back.
+function endpointRows(endpoints) {
+  const rows = []
   for (const endpoint of endpoints) {
+    const kind = endpointKind(endpoint)
     if (isTerminal(endpoint)) {
-      lines.push(terminalLine(endpoint))
+      rows.push({ row: "terminal", kind, text: terminalLine(endpoint) })
       continue
     }
     const name = endpointName(endpoint)
     if (!endpoint.reachable) {
-      lines.push(`${name}: not running (retained state kept; run omo daemon gc)`)
+      rows.push({
+        row: "unreachable",
+        kind,
+        name,
+        text: `${name}: not running (retained state kept; run omo daemon gc)`,
+      })
       continue
     }
-    lines.push(`${name}: ${runningDetails(endpoint, endpointKind(endpoint) !== "daemon")}`)
+    rows.push({ row: "running", kind, name, text: `${name}: ${runningDetails(endpoint, kind !== "daemon")}` })
     if ((endpoint.generations?.length ?? 0) > 1) {
-      for (const generation of endpoint.generations) lines.push(generationLine(generation, endpoint))
+      for (const generation of endpoint.generations)
+        rows.push({
+          row: "generation",
+          kind,
+          name,
+          generation: generation.generation,
+          text: generationLine(generation, endpoint),
+        })
     }
   }
   const aggregate = aggregateEndpoints(endpoints)
-  lines.push(
-    `hosts: ${aggregate.live} live (${aggregate.shards} shards, ${aggregate.threads} threads)${aggregate.terminals > 0 ? ` · ${aggregate.terminals} terminal(s)` : ""} · ${aggregate.sessions} session(s) · rss ${aggregate.rss_mb} MB (host ${aggregate.host_rss_mb} MB) · crashes ${aggregate.crashes} (recorded, newest 50 per endpoint)`,
-  )
-  return lines
+  rows.push({
+    row: "aggregate",
+    aggregate,
+    text: `hosts: ${aggregate.live} live (${aggregate.shards} shards, ${aggregate.threads} threads)${aggregate.terminals > 0 ? ` · ${aggregate.terminals} terminal(s)` : ""} · ${aggregate.sessions} session(s) · rss ${aggregate.rss_mb} MB (host ${aggregate.host_rss_mb} MB) · crashes ${aggregate.crashes} (recorded, newest 50 per endpoint)`,
+  })
+  return rows
 }
 
-export function formatDoctorLines(endpoints) {
-  return formatEndpointLines(endpoints).map((line) => {
-    const prefix = line.startsWith("hosts:")
-      ? "INFO Hosts:"
-      : line.includes(": not running")
-        ? "WARN "
-        : line.startsWith("  gen ")
-          ? "INFO "
-          : "INFO "
-    if (line.startsWith("hosts:")) return `${prefix}${line.slice("hosts:".length)}`
-    return `${prefix}${line[0]?.toUpperCase() ?? ""}${line.slice(1)}`
+export function formatEndpointLines(endpoints) {
+  return endpointRows(endpoints).map((row) => row.text)
+}
+
+/** The doctor's daemon section: an unreachable endpoint warns, every other row informs. */
+export function endpointFindings(endpoints) {
+  return endpointRows(endpoints).map(({ row, text, ...details }) => {
+    if (row === "aggregate")
+      return finding("daemon", "notice", `Hosts:${text.slice("hosts:".length)}`, details.aggregate)
+    return finding(
+      "daemon",
+      row === "unreachable" ? "warn" : "notice",
+      `${text[0]?.toUpperCase() ?? ""}${text.slice(1)}`,
+      {
+        row,
+        ...details,
+      },
+    )
   })
 }
 

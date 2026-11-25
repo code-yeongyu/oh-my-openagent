@@ -25,6 +25,7 @@ export type DiagnosticCheck =
   | "memory.sweep"
   | "launch-spec"
   | "keychain-helper"
+  | "credential-store"
   | "daemon"
   | "engine.trust"
   | "computer-use"
@@ -96,7 +97,7 @@ export type ProcessEntry = {
 }
 
 type Env = Readonly<Record<string, string | undefined>>
-type Lines = readonly string[]
+type Findings = readonly DiagnosticFinding[]
 
 export type Inventory = {
   readonly harnesses: readonly { readonly id: string; readonly installed?: boolean; readonly entryCount?: number }[]
@@ -111,13 +112,13 @@ export type DaemonEngine = {
 
 /** The compiled binary's own sections, which only its build can load. */
 export type CompiledSources = {
-  readonly config: () => Lines
-  readonly trust: () => Promise<Lines>
-  readonly claudeCode: () => Lines
-  readonly computerUse: () => Promise<Lines>
-  readonly coverage: () => Promise<Lines>
-  readonly memoryRuntime: () => Promise<Lines>
-  readonly keychainHelper: () => Lines
+  readonly config: () => Findings
+  readonly trust: () => Promise<Findings>
+  readonly claudeCode: () => Findings
+  readonly computerUse: () => Promise<Findings>
+  readonly coverage: () => Promise<Findings>
+  readonly memoryRuntime: () => Promise<Findings>
+  readonly keychainHelper: () => Findings
 }
 
 export type DiagnosticsInstall =
@@ -150,13 +151,13 @@ export type RunPorts = ProcessPorts & {
   readonly pluginRoot?: string
   readonly launchSpecIo?: Readonly<Record<string, unknown>>
   readonly daemonEngine?: DaemonEngine
-  readonly daemon?: () => Lines
-  readonly keychainHelper?: () => Lines
-  readonly configDiagnostics?: () => Promise<Lines>
-  readonly reflectionLock?: () => Promise<Lines>
-  readonly memoryRuntime?: () => Promise<Lines>
-  readonly computerUse?: () => Promise<Lines>
-  readonly categoryCoverage?: () => Promise<Lines>
+  readonly daemon?: () => Findings
+  readonly keychainHelper?: () => Findings
+  readonly configDiagnostics?: () => Promise<Findings>
+  readonly reflectionLock?: () => Promise<Findings>
+  readonly memoryRuntime?: () => Promise<Findings>
+  readonly computerUse?: () => Promise<Findings>
+  readonly categoryCoverage?: () => Promise<Findings>
 }
 
 export type ModelsPorts = {

@@ -2,22 +2,24 @@ import { adoptedEngineTrust } from "@code-yeongyu/senpi/engine-trust"
 import { createRequire } from "node:module"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./bin/lib/agent-dir.js"
-import { doctorCoverageLines } from "./bin/lib/category-coverage.js"
-import { doctorComputerUseLines } from "./bin/lib/computer-use-doctor.js"
-import { keychainHelperDoctorLines } from "./bin/lib/keychain-helper-doctor.js"
+import { doctorCoverageFindings } from "./bin/lib/category-coverage.js"
+import { doctorComputerUseFindings } from "./bin/lib/computer-use-doctor.js"
+import { findingsFromLines } from "./bin/lib/diagnostics-findings.js"
+import { keychainHelperFindings } from "./bin/lib/keychain-helper-doctor.js"
 import { printDoctorFix, printDoctorReap, printDoctorReport } from "./bin/lib/doctor.js"
 import { TASK_CONFIG_RUNTIME } from "./bin/lib/daemon-config.js"
 import {
   memoryRuntimeDiscardResolver,
   memoryRuntimeMaxBytesResolver,
   memoryRuntimeReport,
+  memoryRuntimeUnavailable,
 } from "./bin/lib/doctor-memory-runtime.js"
 import { runDoctorModels } from "./bin/lib/model-chains.js"
 import type { detectHarnesses } from "./bin/lib/setup-detect.js"
 import { compiledDiagnosticRuntimeLoader, loadCompiledCoverageEngine } from "./compiled-diagnostic-runtime"
-import { configDoctorLines } from "./config-doctor-runtime"
-import { claudeCodeDoctorLines } from "./claude-code-doctor"
-import { engineTrustDoctorLines, readEngineTrustRecords } from "./engine-trust-doctor"
+import { configDoctorFindings } from "./config-doctor-runtime"
+import { claudeCodeFindings } from "./claude-code-doctor"
+import { engineTrustFindings, readEngineTrustRecords } from "./engine-trust-doctor"
 
 type DaemonEngine = {
   run(
@@ -50,9 +52,10 @@ export type CompiledDoctorInput = {
   readonly options?: CompiledDoctorOptions
 }
 
-function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
-  if (input.options?.computerUseLines) return input.options.computerUseLines()
-  return doctorComputerUseLines({
+async function computerUseFindings(input: CompiledDoctorInput, env: NodeJS.ProcessEnv) {
+  const injected = input.options?.computerUseLines
+  if (injected) return findingsFromLines("computer-use", await injected())
+  return doctorComputerUseFindings({
     loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
     packageRoot: input.execDir,
     version: input.version,
@@ -60,37 +63,35 @@ function computerUseLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): P
   })
 }
 
-/** Design revision 11: the adopted generation's default-file outcome, INFO only, from the trust log beside it. */
-async function trustLines(options: CompiledDoctorOptions): Promise<string[]> {
-  if (options.trustLines) return options.trustLines()
+/** Design revision 11: the adopted generation's default-file outcome, a notice only, from the trust log beside it. */
+async function trustFindings(options: CompiledDoctorOptions) {
+  if (options.trustLines) return findingsFromLines("engine.trust", await options.trustLines())
   const marker = adoptedEngineTrust()
-  return engineTrustDoctorLines({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
+  return engineTrustFindings({ platform: process.platform, marker, records: await readEngineTrustRecords(marker) })
 }
 
-/** The memory-runtime section the npm launcher's doctor prints (bin/lib/launcher.js), from the same report. */
-async function memoryRuntimeLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
+/** The memory-runtime section the npm launcher's doctor prints, from the same report. */
+async function memoryRuntimeFindings(input: CompiledDoctorInput, env: NodeJS.ProcessEnv) {
   try {
-    if (input.options?.memoryRuntimeLines) return await input.options.memoryRuntimeLines()
+    const injected = input.options?.memoryRuntimeLines
+    if (injected) return findingsFromLines("memory.runtime", await injected())
     const pluginRoot = join(input.execDir, "plugin")
     const report = await memoryRuntimeReport({
       env,
       maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot, env }),
       discardFor: memoryRuntimeDiscardResolver({ pluginRoot, env }),
     })
-    return report.lines
+    return report.findings
   } catch (error) {
     // A runtime the user cannot read (EACCES) must not take the rest of doctor down with it.
-    return [memoryRuntimeUnavailableLine(error)]
+    return memoryRuntimeUnavailable(error)
   }
 }
 
-function memoryRuntimeUnavailableLine(error: unknown): string {
-  return `WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`
-}
-
-function coverageLines(input: CompiledDoctorInput, env: NodeJS.ProcessEnv): Promise<string[]> {
-  if (input.options?.coverageLines) return input.options.coverageLines()
-  return doctorCoverageLines({
+async function coverageFindings(input: CompiledDoctorInput, env: NodeJS.ProcessEnv) {
+  const injected = input.options?.coverageLines
+  if (injected) return findingsFromLines("task-categories", await injected())
+  return doctorCoverageFindings({
     agentDir: canonicalAgentDir(env),
     env,
     loadRuntime: compiledDiagnosticRuntimeLoader(input.execDir),
@@ -135,15 +136,18 @@ export async function runCompiledDoctor(input: CompiledDoctorInput): Promise<voi
       versionText: input.versionText,
       updateCommand: input.updateCommand,
       sources: {
-        config: () => configDoctorLines({ cwd: process.cwd(), env }),
-        trust: () => trustLines(options),
-        claudeCode: () => claudeCodeDoctorLines({ runtimeDir: input.execDir, env }),
-        computerUse: () => computerUseLines(input, env),
-        coverage: () => coverageLines(input, env),
-        memoryRuntime: () => memoryRuntimeLines(input, env),
-        keychainHelper: () =>
-          options.keychainHelperLines?.() ??
-          keychainHelperDoctorLines({ packageRoot: input.execDir, helperRelPath: "omo-keychain" }),
+        config: () => configDoctorFindings({ cwd: process.cwd(), env }),
+        trust: () => trustFindings(options),
+        claudeCode: () => claudeCodeFindings({ runtimeDir: input.execDir, env }),
+        computerUse: () => computerUseFindings(input, env),
+        coverage: () => coverageFindings(input, env),
+        memoryRuntime: () => memoryRuntimeFindings(input, env),
+        keychainHelper: () => {
+          const lines = options.keychainHelperLines?.()
+          return lines === undefined
+            ? keychainHelperFindings({ packageRoot: input.execDir, helperRelPath: "omo-keychain" })
+            : findingsFromLines("keychain-helper", lines)
+        },
       },
     },
   })

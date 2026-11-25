@@ -5,7 +5,12 @@ import { join } from "node:path"
 import { readDaemonLaunchSpec } from "../../senpi-task/src/runners/rpc-host/launch-spec"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { preparePluginLaunchSpec } from "../bin/lib/engine-prepare.js"
-import { launchSpecDoctorLines, normalizeLaunchSpecMode } from "../bin/lib/launch-spec-mode.js"
+import { launchSpecFindings, normalizeLaunchSpecMode } from "../bin/lib/launch-spec-mode.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const launchSpecDoctorLines = (...args: Parameters<typeof launchSpecFindings>) =>
+  renderFindings(launchSpecFindings(...args))
 
 const SPEC = {
   spec_version: 1,

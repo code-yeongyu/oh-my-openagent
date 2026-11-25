@@ -229,7 +229,9 @@ describe("diagnostics.run", () => {
           list: () => [],
           keychainHelper: () => [],
           daemon: () => [],
-          configDiagnostics: async () => ["FAIL config: fixture failure"],
+          configDiagnostics: async () => [
+            { level: "fail", check: "config.diagnostics", message: "config: fixture failure" },
+          ],
           reflectionLock: async () => [],
           memoryRuntime: async () => [],
           computerUse: async () => [],

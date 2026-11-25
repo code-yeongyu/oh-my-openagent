@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { engineTrustDoctorLines, readEngineTrustRecords } from "../engine-trust-doctor"
+import { engineTrustFindings, readEngineTrustRecords } from "../engine-trust-doctor"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const engineTrustDoctorLines = (input: Parameters<typeof engineTrustFindings>[0]) =>
+  renderFindings(engineTrustFindings(input))
 
 const sha = "0123456789ab".padEnd(64, "c")
 const other = "f".repeat(64)

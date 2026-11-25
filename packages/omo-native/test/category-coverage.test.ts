@@ -6,15 +6,22 @@ import { join } from "node:path"
 import {
   categoryCoverage,
   coverageSummaryParts,
-  doctorCoverageLines,
+  coverageFindings,
+  doctorCoverageFindings,
   engineAvailableModels,
-  formatDoctorCoverageLines,
   setupCoverage,
 } from "../bin/lib/category-coverage.js"
 import { runDoctor } from "../bin/lib/doctor.js"
 import { runSetup } from "../bin/lib/setup-import.js"
 import { formatSetupSummary } from "../bin/lib/setup-summary.js"
 import { teardownRoots } from "./teardown.test-support"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const doctorCoverageLines = async (options: Parameters<typeof doctorCoverageFindings>[0]) =>
+  renderFindings(await doctorCoverageFindings(options))
+const formatDoctorCoverageLines = (coverage: Parameters<typeof coverageFindings>[0]) =>
+  renderFindings(coverageFindings(coverage))
 
 // The real engine (the pinned senpi this package resolves) and the real resolver entry the build
 // bundles; only the agent dir and HOME are fixtures.

@@ -1,6 +1,7 @@
 import { chmodSync, lstatSync, statSync } from "node:fs"
 import { userInfo } from "node:os"
 import { join } from "node:path"
+import { finding } from "./diagnostics-findings.js"
 
 export const LAUNCH_SPEC_FILENAME = "daemon-launch-spec.json"
 
@@ -54,7 +55,7 @@ function ownerName() {
  * The doctor view applies the task host's own rule (the reader follows symlinks), so it reports
  * exactly the specs the host would refuse: the ones a launch could not normalize.
  */
-export function launchSpecDoctorLines(pluginRoot, io = {}) {
+export function launchSpecFindings(pluginRoot, io = {}) {
   if ((io.platform ?? process.platform) === "win32") return []
   const path = join(pluginRoot, LAUNCH_SPEC_FILENAME)
   let stat
@@ -69,13 +70,23 @@ export function launchSpecDoctorLines(pluginRoot, io = {}) {
   const impact = "the task host refuses it, so process-mode task children and every team_create fail"
   if (uid !== undefined && stat.uid !== uid) {
     return [
-      `FAIL launch spec: launch_spec_insecure: ${path} is not owned by you (uid ${stat.uid}); ${impact}. Fix: reinstall omo as this user, or run: sudo chown ${ownerName()} ${path}`,
+      finding(
+        "launch-spec",
+        "fail",
+        `launch spec: launch_spec_insecure: ${path} is not owned by you (uid ${stat.uid}); ${impact}. Fix: reinstall omo as this user, or run: sudo chown ${ownerName()} ${path}`,
+        { path, problem: "owner", uid: stat.uid },
+      ),
     ]
   }
   if ((stat.mode & WRITABLE_BY_OTHERS) !== 0) {
     const mode = (stat.mode & 0o777).toString(8)
     return [
-      `FAIL launch spec: launch_spec_insecure: ${path} is group/world-writable (${mode}); ${impact}. Fix: chmod 644 ${path}`,
+      finding(
+        "launch-spec",
+        "fail",
+        `launch spec: launch_spec_insecure: ${path} is group/world-writable (${mode}); ${impact}. Fix: chmod 644 ${path}`,
+        { path, problem: "writable", mode },
+      ),
     ]
   }
   return []

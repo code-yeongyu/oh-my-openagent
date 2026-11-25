@@ -2,8 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { rmSync } from "node:fs"
 import { join } from "node:path"
 
-import { daemonReportLines, runDaemonCommand } from "../bin/lib/daemon.js"
+import { daemonFindings, runDaemonCommand } from "../bin/lib/daemon.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 import { capture, endpoint, scriptedEngine, workspace, writeJson } from "./daemon-test-support"
+
+// The doctor's daemon section as `omo doctor` prints it.
+const daemonReportLines = (options: Parameters<typeof daemonFindings>[0]) => renderFindings(daemonFindings(options))
 
 const roots: string[] = []
 

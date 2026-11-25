@@ -2,8 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { keychainHelperDoctorLines, KEYCHAIN_HELPER_REQUIREMENT } from "../bin/lib/keychain-helper-doctor.js"
+import { KEYCHAIN_HELPER_REQUIREMENT, keychainHelperFindings } from "../bin/lib/keychain-helper-doctor.js"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 import { KEYCHAIN_HELPER_REQUIREMENT as BUILT_REQUIREMENT } from "../keychain-helper/build"
+
+// The section as `omo doctor` prints it.
+const keychainHelperDoctorLines = (options: Parameters<typeof keychainHelperFindings>[0]) =>
+  renderFindings(keychainHelperFindings(options))
 
 describe("omo doctor: keychain helper line (#11262 addendum Q1, row 9)", () => {
   test("#given the requirement doctor checks #when compared with the one the helper is built for #then they are identical", () => {

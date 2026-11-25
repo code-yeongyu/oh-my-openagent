@@ -3,9 +3,16 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { doctorConfigLines } from "../bin/lib/config-doctor.js"
+import { doctorConfigFindings } from "../bin/lib/config-doctor.js"
 import { runDoctor } from "../bin/lib/doctor.js"
-import { configDoctorLines } from "../config-doctor-runtime"
+import { configDoctorFindings } from "../config-doctor-runtime"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
+
+// The section as `omo doctor` prints it.
+const doctorConfigLines = async (options?: Parameters<typeof doctorConfigFindings>[0]) =>
+  renderFindings(await doctorConfigFindings(options))
+const configDoctorLines = (input: Parameters<typeof configDoctorFindings>[0]) =>
+  renderFindings(configDoctorFindings(input))
 
 const roots: string[] = []
 
@@ -75,7 +82,7 @@ describe("omo doctor config lines", () => {
     const lines = await doctorConfigLines({
       cwd: home,
       env: { HOME: home },
-      loadRuntime: async () => ({ configDoctorLines }),
+      loadRuntime: async () => ({ configDoctorFindings }),
     })
 
     expect(lines).toEqual(["WARN config: ~/.omo/omo.jsonc: agents.oracle.temperature ignored (invalid value)"])

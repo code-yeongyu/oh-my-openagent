@@ -6,7 +6,7 @@
 
 import { existsSync, readdirSync } from "node:fs"
 import { basename, join } from "node:path"
-import { renderFixEntries } from "./diagnostics-findings.js"
+import { finding, renderFixEntries } from "./diagnostics-findings.js"
 import { fixReflectionLock } from "./diagnostics-repairs.js"
 import {
   classifyReflectionLockHolder,
@@ -27,21 +27,37 @@ export function decideStrandedReflectionRun(runDir, probe = {}) {
   return decideStrandedRun(runDir, probe)
 }
 
-export function formatReflectionLockLines(identity, verdict, reflectionDir, decision) {
+export function reflectionLockFindings(identity, verdict, reflectionDir, decision) {
   if (verdict.state === "none" || verdict.state === "live") return []
   const lock = join(reflectionDir, "active.lock")
+  const details = { identity, run_id: verdict.runId, lock, state: verdict.state }
   if (verdict.state === "dead") {
     return [
-      `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`,
+      finding(
+        "memory.reflection-lock",
+        "warn",
+        `memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock}, but its launcher is gone and it already recorded its outcome. Next step: open a session and send /reflect (or any message); the session settles that run and starts any queued request.`,
+        { ...details, next: "session" },
+      ),
     ]
   }
   if (decision?.kind === "reap") {
     return [
-      `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${decision.reason}. Next step: omo doctor --fix (it would apply ${decision.action}).`,
+      finding(
+        "memory.reflection-lock",
+        "warn",
+        `memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${decision.reason}. Next step: omo doctor --fix (it would apply ${decision.action}).`,
+        { ...details, next: "fix", reason: decision.reason, action: decision.action },
+      ),
     ]
   }
   return [
-    `WARN memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, run omo doctor --fix.`,
+    finding(
+      "memory.reflection-lock",
+      "warn",
+      `memory reflection is stuck on a stale lock (${identity}): run ${verdict.runId} still holds ${lock} and ${verdict.reason}. Next step: run /doctor in a session; if no reflection run is active, run omo doctor --fix.`,
+      { ...details, next: "doctor", reason: verdict.reason },
+    ),
   ]
 }
 
@@ -62,7 +78,7 @@ export async function reflectionLockReport(options = {}) {
   for (const identityRoot of options.listIdentities?.(agentsRoot) ?? listDurableIdentities(agentsRoot)) {
     const reflectionDir = join(identityRoot, "runtime", "reflection")
     const { verdict, decision } = await decideStaleReflectionLock(reflectionDir, options.reflectionLockProbe ?? {})
-    lines.push(...formatReflectionLockLines(basename(identityRoot), verdict, reflectionDir, decision))
+    lines.push(...reflectionLockFindings(basename(identityRoot), verdict, reflectionDir, decision))
   }
   return lines
 }

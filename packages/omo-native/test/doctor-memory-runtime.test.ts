@@ -11,6 +11,7 @@ import {
 } from "../bin/lib/doctor-memory-runtime.js"
 import { DEFAULT_RUNTIME_MAX_BYTES } from "../../memory-core/src/retention/size"
 import * as taskConfigRuntime from "../task-config-entry"
+import { renderFindings } from "../bin/lib/diagnostics-findings.js"
 
 const roots: string[] = []
 
@@ -56,10 +57,12 @@ describe("omo doctor memory runtime sizes (B11)", () => {
       ["agent-c", measured["agent-c"]],
     ])
     expect(report.totalBytes).toBe(total)
-    expect(report.lines.filter((line) => line.startsWith("WARN "))).toHaveLength(1)
-    expect(report.lines.find((line) => line.startsWith("WARN "))).toContain("(agent-a)")
-    expect(report.lines.filter((line) => line.startsWith("INFO memory runtime: agent-"))).toHaveLength(3)
-    expect(report.lines.some((line) => line.startsWith("INFO memory runtime total:"))).toBe(true)
+    expect(renderFindings(report.findings).filter((line) => line.startsWith("WARN "))).toHaveLength(1)
+    expect(renderFindings(report.findings).find((line) => line.startsWith("WARN "))).toContain("(agent-a)")
+    expect(
+      renderFindings(report.findings).filter((line) => line.startsWith("INFO memory runtime: agent-")),
+    ).toHaveLength(3)
+    expect(renderFindings(report.findings).some((line) => line.startsWith("INFO memory runtime total:"))).toBe(true)
   })
 
   test("#given an identity over its cap held by an unreflected journal and the switch off #when the report runs #then it reports the held bytes (r4 R1)", async () => {
@@ -79,8 +82,10 @@ describe("omo doctor memory runtime sizes (B11)", () => {
 
     expect(byDefault.identities[0]?.unreflectedBytes).toBeGreaterThan(900_000)
     expect(byDefault.identities[0]?.discardUnreflectedJournals).toBe(false)
-    expect(byDefault.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toHaveLength(1)
-    expect(on.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
+    expect(
+      renderFindings(byDefault.findings).filter((line) => line.includes("discard_unreflected_journals off")),
+    ).toHaveLength(1)
+    expect(renderFindings(on.findings).filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
   })
 
   test("#given an identity under its cap holding an unreflected journal #when the report runs #then the unreflected bytes, which only the over-cap line prints, are not measured (#12538 review r3 M2)", async () => {
@@ -133,7 +138,9 @@ describe("omo doctor memory runtime sizes (B11)", () => {
     const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => total - 100_000 })
 
     expect(report.identities[0]?.evictableBytes).toBeGreaterThanOrEqual(600_000)
-    expect(report.lines.filter((line) => line.includes("discard_unreflected_journals off"))).toEqual([])
+    expect(renderFindings(report.findings).filter((line) => line.includes("discard_unreflected_journals off"))).toEqual(
+      [],
+    )
   })
 
   test("#given the measurement deadline has fired #when the report runs #then the identity reports size unknown with the budget instead of a number (#12538 review L5)", async () => {
@@ -149,7 +156,9 @@ describe("omo doctor memory runtime sizes (B11)", () => {
 
     expect(report.identities[0]?.sizeUnknown?.budgetMs).toBe(60_000)
     expect(report.totalBytes).toBe(0)
-    expect(report.lines.some((line) => line.startsWith("WARN ") && line.includes("(agent-a)"))).toBe(true)
+    expect(renderFindings(report.findings).some((line) => line.startsWith("WARN ") && line.includes("(agent-a)"))).toBe(
+      true,
+    )
   })
 
   test("#given an unbounded cap #when the report runs #then sizes are measured and nothing warns (B06)", async () => {
@@ -160,7 +169,7 @@ describe("omo doctor memory runtime sizes (B11)", () => {
 
     expect(report.identities).toHaveLength(1)
     expect(report.identities[0]?.bytes).toBeGreaterThan(900_000)
-    expect(report.lines.filter((line) => line.startsWith("WARN "))).toEqual([])
+    expect(renderFindings(report.findings).filter((line) => line.startsWith("WARN "))).toEqual([])
   })
 
   test("#given more identities than the listing shows #when the report runs #then the rest are folded into one line and still counted in the total", async () => {
@@ -171,8 +180,12 @@ describe("omo doctor memory runtime sizes (B11)", () => {
     const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: root }, maxBytesFor: () => 0 })
 
     expect(report.identities).toHaveLength(13)
-    expect(report.lines.filter((line) => line.startsWith("INFO memory runtime: agent-"))).toHaveLength(10)
-    expect(report.lines.some((line) => line.startsWith("INFO memory runtime: 3 more identities"))).toBe(true)
+    expect(
+      renderFindings(report.findings).filter((line) => line.startsWith("INFO memory runtime: agent-")),
+    ).toHaveLength(10)
+    expect(
+      renderFindings(report.findings).some((line) => line.startsWith("INFO memory runtime: 3 more identities")),
+    ).toBe(true)
     expect(report.totalBytes).toBe(report.identities.reduce((sum, entry) => sum + entry.bytes, 0))
   })
 
@@ -191,17 +204,17 @@ describe("omo doctor memory runtime sizes (B11)", () => {
       ["agent-a", { at: "2026-11-05T00:00:00.000Z", total: 3 }],
       ["agent-b", undefined],
     ])
-    expect(report.lines.find((line) => line.startsWith("INFO memory runtime: agent-a "))).toEndWith(
+    expect(renderFindings(report.findings).find((line) => line.startsWith("INFO memory runtime: agent-a "))).toEndWith(
       "; last cleanup 2026-11-05T00:00:00.000Z removed 3",
     )
-    expect(report.lines.find((line) => line.startsWith("INFO memory runtime: agent-b "))).toEndWith(
+    expect(renderFindings(report.findings).find((line) => line.startsWith("INFO memory runtime: agent-b "))).toEndWith(
       "; no cleanup recorded",
     )
   })
 
   test("#given no memory home on disk #when the report runs #then it prints nothing", async () => {
     const report = await memoryRuntimeReport({ env: { OMO_MEMORY_HOME: join(memoryHome(), "missing") } })
-    expect(report.lines).toEqual([])
+    expect(renderFindings(report.findings)).toEqual([])
   })
 })
 

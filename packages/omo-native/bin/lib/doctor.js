@@ -1,6 +1,6 @@
 // `omo doctor`: parse the arguments, make one diagnostics call, render it. Every check, repair and
 // refusal is decided in the diagnostics core (diagnostics.js), the same body the SDK exposes.
-import { renderFindings } from "./diagnostics-findings.js"
+import { findingsFromLines, renderFindings } from "./diagnostics-findings.js"
 import { reapStaleEngines as reap, run } from "./diagnostics.js"
 import { reflectionLockFix } from "./doctor-reflection-lock.js"
 import { MANAGED_MODE_FLAG } from "./engine-processes.js"
@@ -78,7 +78,7 @@ export async function printDoctorFix(args, ports = {}) {
   return result.failed ? 1 : 0
 }
 
-const given = (lines) => async () => lines ?? []
+const givenFindings = (check, lines) => async () => findingsFromLines(check, lines ?? [])
 
 /**
  * The report from precomputed section lines: a section that is not passed prints nothing, as it
@@ -92,12 +92,15 @@ export async function runDoctor(inventory, args = [], options = {}) {
   process.exitCode = await printDoctorReport({
     ...options,
     inventory,
-    daemon: options.daemonReport,
-    keychainHelper: options.keychainHelper === undefined ? undefined : () => options.keychainHelper,
-    configDiagnostics: given(options.configDiagnostics),
-    reflectionLock: given(options.reflectionLock),
-    memoryRuntime: given(options.memoryRuntime),
-    computerUse: given(options.computerUse),
-    categoryCoverage: given(options.categoryCoverage),
+    daemon: options.daemonReport === undefined ? undefined : () => findingsFromLines("daemon", options.daemonReport()),
+    keychainHelper:
+      options.keychainHelper === undefined
+        ? undefined
+        : () => findingsFromLines("keychain-helper", options.keychainHelper),
+    configDiagnostics: givenFindings("config.diagnostics", options.configDiagnostics),
+    reflectionLock: givenFindings("memory.reflection-lock", options.reflectionLock),
+    memoryRuntime: givenFindings("memory.runtime", options.memoryRuntime),
+    computerUse: givenFindings("computer-use", options.computerUse),
+    categoryCoverage: givenFindings("task-categories", options.categoryCoverage),
   })
 }

@@ -6,6 +6,7 @@ import { releaseChannel } from "./package-paths.js"
 import { opencodeConfigSources } from "./setup-opencode-assets.js"
 import { openCodeRoutingGap, openCodeRoutingNotice, readEditionRouting } from "./setup-opencode-models.js"
 import { standaloneBinaryVersion } from "./standalone-binary.js"
+import { finding } from "./diagnostics-findings.js"
 
 // Migration leftovers from the OpenCode edition, reported and never touched: another `omo` ahead of
 // omo-ai's on PATH, the legacy package still installed globally, and the OpenCode plugin still
@@ -346,7 +347,7 @@ function omoInstallRemoval(entry, bunRoot) {
   return `npm uninstall -g omo-ai --prefix ${shellQuote(prefix)}`
 }
 
-export function formatMigrationLines({
+export function migrationFindings({
   shadowing,
   nativeDirectory,
   legacyPackages,
@@ -365,7 +366,13 @@ export function formatMigrationLines({
   // behind the install that runs; it gets its own line and never the repair offer
   // meant for a working older edition.
   for (const entry of broken) {
-    lines.push(`WARN broken omo on PATH: ${entry.binPath} launches ${entry.broken}; remove it`)
+    lines.push(
+      finding("install.migration", "warn", `broken omo on PATH: ${entry.binPath} launches ${entry.broken}; remove it`, {
+        problem: "broken",
+        bin_path: entry.binPath,
+        launches: entry.broken,
+      }),
+    )
   }
   for (const entry of shadowing) {
     if (entry.broken !== undefined) continue
@@ -376,7 +383,12 @@ export function formatMigrationLines({
           ? `remove that file, or put ${target === "omo-ai" ? "omo-ai's bin dir" : "the omo binary's directory"} ahead of it on PATH.`
           : `remove that file, or move ${nativeDirectory} ahead of ${entry.directory} on PATH.`
     lines.push(
-      `WARN another omo precedes ${target} on PATH: ${entry.binPath} (${ownerLabel(entry.owner)}). Fix: ${fix}`,
+      finding(
+        "install.migration",
+        "warn",
+        `another omo precedes ${target} on PATH: ${entry.binPath} (${ownerLabel(entry.owner)}). Fix: ${fix}`,
+        { problem: "shadowing", bin_path: entry.binPath, owner: ownerLabel(entry.owner), target },
+      ),
     )
   }
   // Every further install is a second copy, whatever its kind: two omo-ai installs
@@ -394,7 +406,12 @@ export function formatMigrationLines({
     const others = shadowedOmo.map((entry) => `${entry.binPath} (${ownerLabel(entry.owner)})`).join(", ")
     const removals = shadowedOmo.map((entry) => omoInstallRemoval(entry, bunRoot)).join(" and ")
     lines.push(
-      `WARN more than one OmO install is on PATH: ${first.binPath} (${ownerLabel(first.owner)}) runs when you type omo; ${others} never runs. Keep one: ${removals}, or ${omoInstallRemoval(first, bunRoot)} to use the other.`,
+      finding(
+        "install.migration",
+        "warn",
+        `more than one OmO install is on PATH: ${first.binPath} (${ownerLabel(first.owner)}) runs when you type omo; ${others} never runs. Keep one: ${removals}, or ${omoInstallRemoval(first, bunRoot)} to use the other.`,
+        { problem: "duplicate_install", runs: first.binPath, never_runs: shadowedOmo.map((entry) => entry.binPath) },
+      ),
     )
   }
   for (const found of legacyPackages) {
@@ -406,14 +423,30 @@ export function formatMigrationLines({
           : `npm uninstall -g ${found.name}, then re-run ${restoreCommand} if omo disappears.`
         : `bun remove -g ${found.name}`
     lines.push(
-      `WARN legacy package ${label} is still installed globally (${found.manager}: ${found.packageDir}). Remove: ${remove}`,
+      finding(
+        "install.migration",
+        "warn",
+        `legacy package ${label} is still installed globally (${found.manager}: ${found.packageDir}). Remove: ${remove}`,
+        {
+          problem: "legacy_package",
+          name: found.name,
+          version: found.version,
+          manager: found.manager,
+          package_dir: found.packageDir,
+        },
+      ),
     )
   }
   const byName = new Map()
   for (const { name, path } of registrations) byName.set(name, [...(byName.get(name) ?? []), path])
   for (const [name, paths] of byName) {
     lines.push(
-      `INFO OpenCode still loads the ${name} plugin (${paths.join(", ")}). Keep it if you still use OpenCode; otherwise remove the plugin entry.`,
+      finding(
+        "install.migration",
+        "notice",
+        `OpenCode still loads the ${name} plugin (${paths.join(", ")}). Keep it if you still use OpenCode; otherwise remove the plugin entry.`,
+        { problem: "opencode_registration", plugin: name, paths },
+      ),
     )
   }
   return lines
@@ -434,7 +467,9 @@ export function openCodeRoutingReport({ env, homeDir }) {
     }
   }
   const gap = openCodeRoutingGap(document, readEditionRouting({ home: homeDir, env }))
-  return gap.length === 0 ? [] : [`INFO ${openCodeRoutingNotice(gap)}`]
+  return gap.length === 0
+    ? []
+    : [finding("install.migration", "notice", openCodeRoutingNotice(gap), { problem: "opencode_routing", gap })]
 }
 
 /** The doctor's migration section. `options.env` / `homeDir` / `platform` keep tests off the real machine. */
@@ -445,7 +480,7 @@ export function migrationReport(options, restoreCommand) {
   const bins = scanOmoBins(environment)
   const omoInstalls = omoInstallsOnPath(bins)
   return [
-    ...formatMigrationLines({
+    ...migrationFindings({
       shadowing: shadowingOmoBins(bins),
       nativeDirectory: omoInstalls[0]?.directory ?? null,
       legacyPackages: findLegacyPackages(environment),

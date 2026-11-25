@@ -5,16 +5,17 @@
 import { statSync } from "node:fs"
 import { join } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
-import { doctorCoverageLines } from "./category-coverage.js"
-import { doctorComputerUseLines } from "./computer-use-doctor.js"
-import { doctorConfigLines } from "./config-doctor.js"
-import { daemonReportLines } from "./daemon.js"
-import { finding, findingsFromLines } from "./diagnostics-findings.js"
+import { doctorCoverageFindings } from "./category-coverage.js"
+import { doctorComputerUseFindings } from "./computer-use-doctor.js"
+import { doctorConfigFindings } from "./config-doctor.js"
+import { daemonFindings } from "./daemon.js"
+import { finding } from "./diagnostics-findings.js"
 import { artifactFindings, engineFindings, npmVersionFindings, settingsFindings } from "./diagnostics-install-checks.js"
 import {
   memoryRuntimeDiscardResolver,
   memoryRuntimeMaxBytesResolver,
   memoryRuntimeReport,
+  memoryRuntimeUnavailable,
 } from "./doctor-memory-runtime.js"
 import { migrationReport } from "./doctor-migration.js"
 import { piConfigReport } from "./doctor-pi-config.js"
@@ -25,8 +26,8 @@ import {
   retiredPayloadFindings,
   staleEngineFindings,
 } from "./engine-processes.js"
-import { keychainHelperDoctorLines } from "./keychain-helper-doctor.js"
-import { launchSpecDoctorLines } from "./launch-spec-mode.js"
+import { keychainHelperFindings } from "./keychain-helper-doctor.js"
+import { launchSpecFindings } from "./launch-spec-mode.js"
 import { memoryIdentityFindings } from "./memory-identities.js"
 import { packageRoot, updateTarget } from "./package-paths.js"
 import { listProcesses } from "./process-list.js"
@@ -50,18 +51,13 @@ const BLOCKING = new Set([
   "computer-use",
 ])
 
-/** @param {unknown} error */
-function memoryRuntimeUnavailable(error) {
-  return [`WARN memory runtime: unavailable: ${error instanceof Error ? error.message : String(error)}`]
-}
-
-/** @returns {Promise<readonly string[]>} */
+/** @returns {Promise<readonly DiagnosticFinding[]>} */
 function npmMemoryRuntime() {
   const pluginRoot = join(packageRoot, "plugin")
   return memoryRuntimeReport({
     maxBytesFor: memoryRuntimeMaxBytesResolver({ pluginRoot }),
     discardFor: memoryRuntimeDiscardResolver({ pluginRoot }),
-  }).then(/** @param {{ lines: string[] }} report */ (report) => report.lines, memoryRuntimeUnavailable)
+  }).then((report) => report.findings, memoryRuntimeUnavailable)
 }
 
 /** @param {RunPorts} ports */
@@ -87,10 +83,10 @@ function processFindings(ports) {
  * @param {RunPorts} ports
  * @param {string} pluginRoot
  */
-function daemonLines(ports, pluginRoot) {
+function daemonSection(ports, pluginRoot) {
   if (ports.daemon !== undefined) return ports.daemon()
   if (ports.daemonEngine === undefined) return []
-  return daemonReportLines({
+  return daemonFindings({
     engine: ports.daemonEngine,
     pluginRoot,
     agentDir: canonicalAgentDir(),
@@ -113,11 +109,11 @@ function setupFindings(inventory) {
 async function npmFindings(ports) {
   const pluginRoot = join(packageRoot, "plugin")
   const [config, reflectionLock, memoryRuntime, computerUse, coverage, inventory] = await Promise.all([
-    (ports.configDiagnostics ?? doctorConfigLines)(),
+    (ports.configDiagnostics ?? doctorConfigFindings)(),
     (ports.reflectionLock ?? reflectionLockReport)(),
     (ports.memoryRuntime ?? npmMemoryRuntime)(),
-    (ports.computerUse ?? doctorComputerUseLines)(),
-    (ports.categoryCoverage ?? (() => doctorCoverageLines({ agentDir: canonicalAgentDir() })))(),
+    (ports.computerUse ?? doctorComputerUseFindings)(),
+    (ports.categoryCoverage ?? (() => doctorCoverageFindings({ agentDir: canonicalAgentDir() })))(),
     ports.inventory ?? detectHarnesses(),
   ])
   const engine = engineFindings()
@@ -126,23 +122,20 @@ async function npmFindings(ports) {
     ...artifactFindings(packageRoot),
     ...engine.findings,
     ...npmVersionFindings(engine.engine, ports),
-    ...findingsFromLines("install.migration", migrationReport(ports, updateTarget().command)),
+    ...migrationReport(ports, updateTarget().command),
     ...settingsFindings(),
-    ...findingsFromLines("config.diagnostics", config),
-    ...findingsFromLines("config.directory", piConfigReport({ env: ports.env, homeDir: ports.homeDir })),
+    ...config,
+    ...piConfigReport({ env: ports.env, homeDir: ports.homeDir }),
     ...processes.stale,
     ...processes.retired,
     ...memoryIdentityFindings(ports),
-    ...findingsFromLines("memory.reflection-lock", reflectionLock),
-    ...findingsFromLines("memory.runtime", memoryRuntime),
-    ...findingsFromLines("launch-spec", launchSpecDoctorLines(ports.pluginRoot ?? pluginRoot, ports.launchSpecIo)),
-    ...findingsFromLines(
-      "keychain-helper",
-      (ports.keychainHelper ?? (() => keychainHelperDoctorLines({ packageRoot })))(),
-    ),
-    ...findingsFromLines("daemon", daemonLines(ports, pluginRoot)),
-    ...findingsFromLines("computer-use", computerUse),
-    ...findingsFromLines("task-categories", coverage),
+    ...reflectionLock,
+    ...memoryRuntime,
+    ...launchSpecFindings(ports.pluginRoot ?? pluginRoot, ports.launchSpecIo),
+    ...(ports.keychainHelper ?? (() => keychainHelperFindings({ packageRoot })))(),
+    ...daemonSection(ports, pluginRoot),
+    ...computerUse,
+    ...coverage,
     ...setupFindings(inventory),
   ]
 }
@@ -166,20 +159,20 @@ async function compiledFindings(install, ports) {
     ...artifactFindings(install.execDir),
     ...install.versionText.split("\n").map((line) => finding("install.version", "notice", line)),
     finding("install.update", "notice", `Update: ${install.updateCommand}`, { command: install.updateCommand }),
-    ...findingsFromLines("launch-spec", launchSpecDoctorLines(pluginRoot)),
-    ...findingsFromLines("keychain-helper", sources.keychainHelper()),
-    ...findingsFromLines("daemon", daemonLines(ports, pluginRoot)),
-    ...findingsFromLines("install.migration", migrationReport({ ...ports, standalone: true }, null)),
+    ...launchSpecFindings(pluginRoot),
+    ...sources.keychainHelper(),
+    ...daemonSection(ports, pluginRoot),
+    ...migrationReport({ ...ports, standalone: true }, null),
     ...settingsFindings(),
-    ...findingsFromLines("config.diagnostics", sources.config()),
-    ...findingsFromLines("config.directory", piConfigReport({ env: ports.env, homeDir: ports.homeDir })),
+    ...sources.config(),
+    ...piConfigReport({ env: ports.env, homeDir: ports.homeDir }),
     ...processFindings({ list: ports.list }).stale,
     ...memoryIdentityFindings({ env: ports.env ?? process.env }),
-    ...findingsFromLines("engine.trust", trust),
-    ...findingsFromLines("computer-use", computerUse),
-    ...findingsFromLines("claude-code", sources.claudeCode()),
-    ...findingsFromLines("task-categories", coverage),
-    ...findingsFromLines("memory.runtime", memoryRuntime),
+    ...trust,
+    ...computerUse,
+    ...sources.claudeCode(),
+    ...coverage,
+    ...memoryRuntime,
     ...setupFindings(inventory),
   ]
 }
