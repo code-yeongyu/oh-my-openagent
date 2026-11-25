@@ -165,6 +165,7 @@ describe("attach rows: open", () => {
     }
     const attach = attachMember({
       sender: { kind: "person", uid: "user-1" },
+      onClose: () => undefined,
       timers: clock,
       deps: { version: "5.1.70" },
       dial: unreached,
