@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import { namespaceOf, p1aRows, type Contract } from "./contract-check"
-import { decodeFixtures } from "./bytes-fixtures"
+import { boundaryInput } from "./bytes-fixtures"
 import type { Row } from "./schema"
 import type { Expectation, ScenarioTableFile, TableScenario } from "./scenario-table"
 
@@ -42,7 +42,7 @@ export function scenarioShapeProblems(scenario: TableScenario, row: Row, domain:
   const at = `scenario ${scenario.id}`
   const problems = expectationProblems(at, scenario.expect, contract)
   if (namespaceOf(row.sdk) !== domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-  const accepted = contract.accepts(row.sdk, decodeFixtures(scenario.input, problems, at))
+  const accepted = contract.accepts(row.sdk, boundaryInput(scenario.input, problems, at))
   if (scenario.invalid === true) {
     if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
     if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
@@ -158,7 +158,7 @@ function targetStateProblems(row: Row, scenarios: readonly TableScenario[]): str
  * Which slice fills each row's `scenarios` (row id to slice): each slice adds its own rows in its own pull request, and
  * the check holds both ways: a filled row must be mapped, and a mapped row must be filled.
  */
-const SCENARIO_FILL_OWNERS: Readonly<Record<string, string>> = (
+export const SCENARIO_FILL_OWNERS: Readonly<Record<string, string>> = (
   JSON.parse(readFileSync(join(import.meta.dir, "scenario-fill-owners.json"), "utf8")) as {
     readonly rows: Readonly<Record<string, string>>
   }
