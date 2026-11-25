@@ -244,18 +244,6 @@
           },
           "positionals": {},
           "values": []
-        },
-        {
-          "edition": "opencode",
-          "via": "commander",
-          "route": [],
-          "flags": {
-            "--json": "render",
-            "--verbose": "render",
-            "--no-timestamp": "render"
-          },
-          "positionals": {},
-          "values": []
         }
       ],
       "tool": [],
