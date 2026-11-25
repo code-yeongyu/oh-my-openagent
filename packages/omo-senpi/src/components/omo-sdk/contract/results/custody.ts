@@ -94,25 +94,6 @@ const ProviderFields = {
   usageUrl: Type.Optional(Text),
 }
 
-/**
- * The only provider-supplied strings a session's answer may carry (security design 4.3, the owner's decision at
- * 169406bab8): the account's email, syntactically an address of at most 254 characters, and its organisation name, at
- * most 100 characters with control and newline characters stripped. These bounds are an output contract, not the proof
- * of non-disclosure (46e4d1407c): that proof is the canary test, which plants a canary in each provider field in turn.
- * The engine (slice E1a-s) strips or omits a value outside them where it splits the code from the provider's text.
- */
-export const SESSION_EMAIL = Type.String({ minLength: 3, maxLength: 254, pattern: "^[^\\s@]+@[^\\s@]+$" })
-export const SESSION_ORG_NAME = Type.String({ minLength: 1, maxLength: 100, pattern: "^[^\\u0000-\\u001f\\u007f]*$" })
-
-/**
- * Whether an address-shaped secret in the email is a residual, dropped by a rule, or the email withheld from a session is
- * the security owner's open decision. Withholding it is this one line: set it to "withheld".
- */
-export const SESSION_EMAIL_POLICY: "address" | "withheld" = "address"
-const SessionProviderFields = {
-  ...(SESSION_EMAIL_POLICY === "address" ? { email: Type.Optional(SESSION_EMAIL) } : {}),
-  orgName: Type.Optional(SESSION_ORG_NAME),
-}
 const CheckCore = {
   model: Text,
   outcome: Type.Enum(["ok", "failed"]),
@@ -133,16 +114,27 @@ const AuthAccount = Type.Object(
 )
 
 /**
- * The connection test's result as a session receives it (security owner's ruling on B6): a code from a closed list,
- * never the provider's own text, which can echo a key fragment. The engine builds the code (slice E1a-s).
+ * The connection test's result as a session receives it: a code from a closed list, never the provider's own text, which
+ * can echo a key fragment. The engine builds the code (slice E1a-s).
  */
 export const SESSION_CHECK_CODES = ["auth_error", "account_disabled", "rate_limit", "other"] as const
+
+/**
+ * An account as a session receives it (security design 4.3, the owner's option (c) at 137d6b9879): whether it is signed
+ * in, and status codes from closed sets. No string at all: not its name, its email or its organisation name, which stay
+ * on the person's and script's answer, and no text a provider returned.
+ */
 const SessionAuthAccount = Type.Object(
   {
-    ...AccountFields,
-    ...SessionProviderFields,
+    signedIn: Type.Boolean(),
+    source: Type.Enum(["login", "import", "env"]),
+    blocked: Type.Boolean(),
+    blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
     check: Type.Optional(
-      Type.Object({ ...CheckCore, code: Type.Optional(Type.Enum([...SESSION_CHECK_CODES])) }, closed),
+      Type.Object(
+        { outcome: Type.Enum(["ok", "failed"]), code: Type.Optional(Type.Enum([...SESSION_CHECK_CODES])) },
+        closed,
+      ),
     ),
   },
   closed,
@@ -160,7 +152,7 @@ const AuthStatusFields = {
 /** `omo auth check --json` without --credentials, for a person or a script: status and accounts, never the credential. */
 export const AuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(AuthAccount) }, closed)
 
-/** The same call's answer to a session principal: status only, every provider-returned text left out. */
+/** The same call's answer to a session: whether each account is signed in, the provider, and closed status codes. */
 export const SessionAuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(SessionAuthAccount) }, closed)
 
 /** Fields of a person's or script's answer that may embed provider-returned text; never part of a session's answer. */

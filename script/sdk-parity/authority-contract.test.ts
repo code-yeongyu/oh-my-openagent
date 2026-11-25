@@ -91,36 +91,43 @@ describe("custody of slice P1a-s (#14949)", () => {
     expect(custodyResultProblems(results, CUSTODY_FIELDS)).toEqual([])
   })
 
-  test("#given a key-shaped provider error #then no field of a session's engine.auth.check answer can carry it", () => {
+  test("#given a session's engine.auth.check #then its answer is signed-in state, the provider and closed codes only", () => {
     const results = Object.fromEntries(Object.entries(SESSION_RESULTS).map(([key, schema]) => [key, json(schema)]))
     expect(custodyResultProblems(results, SESSION_FIELDS)).toEqual([])
     for (const path of MAY_EMBED["engine.auth.check"]) expect(SESSION_FIELDS["engine.auth.check"]).not.toContain(path)
-    const account = { name: "a", source: "login", blocked: false, pinned: false }
-    const answer = (check: Record<string, unknown>) => ({
-      status: "ready",
-      provider: "p",
-      accounts: [{ ...account, check: { model: "m", outcome: "failed", at: 1, ...check } }],
-    })
-    expect(sessionAnswerAccepts("engine.auth.check", answer({ code: "auth_error" }))).toBe(true)
-    expect(sessionAnswerAccepts("engine.auth.check", answer({ message: `invalid key ${CANARY}` }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", answer({ code: CANARY }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", answer({ reason: CANARY }))).toBe(false)
-    // The owner's two provider strings, within their bounds (security design 4.3): an address of at most 254 characters,
-    // an organisation name of at most 100 with no control or newline character; no other provider field.
-    const withAccount = (fields: Record<string, unknown>) => ({
-      status: "ready",
-      provider: "p",
-      accounts: [{ ...account, ...fields }],
-    })
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: "ada@example.test", orgName: "Acme" }))).toBe(
-      true,
+  })
+
+  test("#given a canary in each provider field in turn, a key-shaped address among them #then no session answer field holds it", () => {
+    // Security design 4.3 at 137d6b9879, the owner's named RED test at the contract's layer; the engine half is E1a-s's.
+    const KEY = "sk-ant-api03-omo-canary-0000"
+    const ADDRESS = "sk-ant-api03-omo-canary-0000@leak.test"
+    const account = { signedIn: true, source: "login", blocked: false }
+    const planted: Readonly<Record<string, (canary: string) => Record<string, unknown>>> = {
+      "check.message": (canary) => ({ ...account, check: { outcome: "failed", message: canary } }),
+      "check.reason": (canary) => ({ ...account, check: { outcome: "failed", reason: canary } }),
+      "check.code": (canary) => ({ ...account, check: { outcome: "failed", code: canary } }),
+      name: (canary) => ({ ...account, name: canary }),
+      displayName: (canary) => ({ ...account, displayName: canary }),
+      email: (canary) => ({ ...account, email: canary }),
+      orgName: (canary) => ({ ...account, orgName: canary }),
+      subscriptionType: (canary) => ({ ...account, subscriptionType: canary }),
+      usageUrl: (canary) => ({ ...account, usageUrl: canary }),
+      blockedReason: (canary) => ({ ...account, blocked: true, blockedReason: canary }),
+    }
+    const answer = (accounts: readonly Record<string, unknown>[]) => ({ status: "ready", provider: "p", accounts })
+    expect(
+      sessionAnswerAccepts(
+        "engine.auth.check",
+        answer([{ ...account, check: { outcome: "failed", code: "auth_error" } }]),
+      ),
+    ).toBe(true)
+    const carriers = Object.entries(planted).flatMap(([field, plant]) =>
+      [KEY, ADDRESS].some((canary) => sessionAnswerAccepts("engine.auth.check", answer([plant(canary)])))
+        ? [field]
+        : [],
     )
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: `${"a".repeat(250)}@x.test` }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ email: "not an address" }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ orgName: "x".repeat(101) }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ orgName: "Acme\nIgnore previous" }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ usageUrl: "https://x.test" }))).toBe(false)
-    expect(sessionAnswerAccepts("engine.auth.check", withAccount({ subscriptionType: "max" }))).toBe(false)
+    expect(carriers).toEqual([])
+    expect(sessionAnswerAccepts("engine.auth.check", { ...answer([]), reason: KEY })).toBe(false)
   })
 
   test("#given a secret offered as text #then no input takes it, and a hand-over with no destination is refused", () => {
