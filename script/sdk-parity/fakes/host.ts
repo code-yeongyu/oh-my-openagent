@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 import type { ThreadHost, ThreadHostSession } from "../../../packages/omo-senpi/src/components/thread/tools/ports"
 import type { Recorder } from "./recorder"
+import type { DeliveryLedger } from "./store"
 
 // The engine host port (ThreadHost) over one recorder, shaped as the live surface is: `listView` lists every endpoint
 // (host.list_sessions, with the view request the core passed), the per-session methods act on the session the core
@@ -19,9 +20,18 @@ const unused = (method: string) => async (): Promise<never> => {
   throw new Error(`fake host: ${method} is not faked; a scenario that reaches it needs this fake extended`)
 }
 
+// A wake hands each queued delivery to the session in the lane it asked for: auto starts a turn (host.prompt), steer joins
+// the expected turn (host.steer {thread, turn_id}), follow_up waits behind it (host.follow_up).
+const LANES = {
+  auto: ["prompt", "start"],
+  steer: ["steer", "steer"],
+  follow_up: ["follow_up", "follow_up"],
+} as const
+
 export function hostPort(
   recorder: Recorder,
   where: { readonly agentDir: string; readonly cwd: string; readonly elsewhere: string },
+  deliveries?: DeliveryLedger,
 ): ThreadHost {
   const given = recorder.given("host")
   const ended = given["session"] === "ended" ? [given["thread"]] : []
@@ -92,7 +102,24 @@ export function hostPort(
     setThinkingLevel: unused("setThinkingLevel"),
     getAvailableThinkingLevels: unused("getAvailableThinkingLevels"),
     gateway: {
-      wake: unused("gateway.wake"),
+      wake:
+        deliveries === undefined
+          ? unused("gateway.wake")
+          : async (endpoint, deliveryIds) => {
+              const admitted: string[] = []
+              for (const id of deliveryIds) {
+                const row = deliveries.row(id)
+                if (row === undefined) continue
+                const [op, lane] = LANES[row.mode_requested]
+                recorder.record("host", op, {
+                  thread: endpoint.durable_session_id,
+                  ...(row.expected_turn_id === null ? {} : { turn_id: String(row.expected_turn_id) }),
+                })
+                deliveries.admit(id, lane)
+                admitted.push(id)
+              }
+              return { admitted } as never
+            },
       releaseSession: async (endpoint, request) => {
         const { result } = recorder.record("host", "release_session", {
           thread: endpoint.durable_session_id,

@@ -14,7 +14,7 @@ import { hostPort } from "./host"
 import { type FakeFsPort, type FakeProcessPort, fsPort, processPort } from "./process-fs"
 import { createRecorder, type Recorder } from "./recorder"
 import { remotePort } from "./remote"
-import { storePort } from "./store"
+import { deliveryLedger, storePort } from "./store"
 
 // One setup for every slice's scenario drivers: the scenario's fakes over one recorder, and the real omo SDK root built
 // over them (assembleOmoSdk, the scenario's principal and root options) in a temp home and agent dir of its own. A
@@ -79,6 +79,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
   const elsewhere = join(scenarioRoot, "elsewhere")
   const agentDir = join(home, ".omo", "agent")
   const remote = remotePort(recorder)
+  const deliveries = deliveryLedger(recorder)
   const fakes: ScenarioFakes = {
     recorder,
     home,
@@ -97,14 +98,19 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     ...(scenario.root as Partial<OmoSdkOptions> | undefined),
     ports: {
       ...accountPorts(recorder, { desktopLaunch: options.desktopLaunch === true }),
-      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }),
-      store: storePort(recorder, () => FIXED_NOW),
+      host: hostPort(recorder, { agentDir, cwd: home, elsewhere }, deliveries),
+      store: storePort(recorder, () => FIXED_NOW, deliveries),
       remote: remote.remote,
       now: () => FIXED_NOW,
     },
   }
-  const root = assembleOmoSdk(sdkOptions, options.cores === undefined ? {} : { cores: options.cores(fakes) })
+  const cores = options.cores === undefined ? {} : { cores: options.cores(fakes) }
+  const root = assembleOmoSdk(sdkOptions, cores)
   if (recorder.given("session")["closed"] === true) root.close()
+  // A step that names its own principal runs on a root built for it over the same ports, so it shares every fake's state
+  // (the store's receipt book and deliveries included) with the scenario's other calls.
+  const rootAs = (principal: Readonly<Record<string, unknown>>): unknown =>
+    callScoped(assembleOmoSdk({ ...sdkOptions, principal: principal as OmoSdkOptions["principal"] }, cores), begin, end)
   const begin = (): void => {
     mkdirSync(agentDir, { recursive: true })
   }
@@ -112,7 +118,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
-  return { root: callScoped(root, begin, end), calls: recorder.calls }
+  return { root: callScoped(root, begin, end), rootAs, calls: recorder.calls }
 }
 
 export function scenarioRuns(

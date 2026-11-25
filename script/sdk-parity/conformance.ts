@@ -1,6 +1,7 @@
 import {
   type Expectation,
   expectationProblems,
+  isRepeat,
   isSubsetOf,
   type ObservedCall,
   type PortOperations,
@@ -19,6 +20,8 @@ export type EffectEvidence = {
   readonly kind: "effect" | "refusal"
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
+  /** The principal a `then` step was made as, when it named its own. */
+  readonly principal?: Readonly<Record<string, unknown>>
   /** The state the scenario's fakes start from. */
   readonly given?: readonly unknown[]
   readonly expect: readonly Expectation[]
@@ -61,10 +64,11 @@ function recordProblems(row: Row, record: EffectEvidence, context: ConformanceCo
     return [
       `row ${row.id}: scenario ${record.scenario} is a ${record.kind} scenario but the row lists it under ${listed}`,
     ]
-  return [record, ...(record.steps ?? [])].flatMap((call) => callProblems(row, call, context))
+  const calls = [record, ...(record.steps ?? [])]
+  return calls.flatMap((call, index) => callProblems(row, call, context, isRepeat(calls.slice(0, index), call)))
 }
 
-function callProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
+function callProblems(row: Row, record: EffectEvidence, context: ConformanceContext, repeat: boolean): string[] {
   const where = `row ${row.id}: scenario ${record.scenario}`
   if (record.code === "not_implemented") return [`${where} answered not_implemented; ${row.sdk} is a stub, build it`]
   if (record.threw !== undefined) return [`${where} threw ${record.threw}`]
@@ -89,7 +93,11 @@ function callProblems(row: Row, record: EffectEvidence, context: ConformanceCont
         `${where}: a pure call touched ${record.observed.map((call) => `${call.port}.${call.op}`).join(", ")}; it must touch nothing`,
       ]
     if (record.answer === undefined) return [`${where}: a pure call is proven by its answer; state it`]
-  } else if (record.kind === "effect" && record.expect.every((expectation) => (expectation.count ?? 1) === 0))
+  } else if (
+    record.kind === "effect" &&
+    !repeat &&
+    record.expect.every((expectation) => (expectation.count ?? 1) === 0)
+  )
     return [`${where} states no port effect; an answer alone does not build a row`]
   const problems = expectationProblems(record.expect, record.observed).map((problem) => `${where}: ${problem}`)
   for (const call of record.observed)

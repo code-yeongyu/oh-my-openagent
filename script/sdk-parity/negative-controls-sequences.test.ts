@@ -77,6 +77,135 @@ describe("sequences: a retry after a lost acknowledgement (H1)", () => {
   })
 })
 
+describe("a repeat stated with count 0 (design lane ruling, option b)", () => {
+  const target = withLocate({})
+  // The first call kills once; the repeat states only that the kill did not happen again, and its answer.
+  const repeated = (actsAgain: boolean): ScenarioRun => {
+    const table: TableScenario = {
+      ...scenario("by-id", undefined),
+      expect: [{ port: "host", op: "kill", args: { key: "k1" } }],
+      then: [
+        {
+          input: { thread: "t1" },
+          kind: "effect",
+          expect: [{ port: "host", op: "kill", count: 0 }],
+          answer: { thread: "t1" },
+        },
+      ],
+    }
+    return {
+      scenario: table,
+      setup: () => {
+        const calls: ObservedCall[] = []
+        let done = false
+        const locate = () => {
+          if (!done || actsAgain) calls.push(host("kill", { key: "k1" }))
+          done = true
+          return { kind: "ok", thread: "t1" }
+        }
+        return { root: { threads: { locate } }, calls: () => calls }
+      },
+    }
+  }
+
+  test("#given a repeat that acts no further and answers the first thread #then it passes", async () => {
+    expect(await problems([repeated(false), ...pair.slice(1)], target)).toEqual([])
+  })
+
+  test("#given a repeat whose call does touch the port it states count 0 for #then it fails", async () => {
+    expect(await problems([repeated(true), ...pair.slice(1)], target)).toContainEqual(
+      "row threads.locate: scenario threads.locate/by-id#step2: host.kill expected 0 call(s), observed 1",
+    )
+  })
+
+  test("#given a count-0 step with no answer, or whose operation no earlier step showed #then the table refuses it", () => {
+    const stated = (step: NonNullable<TableScenario["then"]>[number]): TableScenario => ({
+      ...scenario("by-id", undefined),
+      expect: [{ port: "host", op: "kill", args: { key: "k1" } }],
+      then: [step],
+    })
+    const others = [scenario("all-scope", true), scenario("other-device", undefined, "other_device")]
+    const refused =
+      "scenario threads.locate/by-id step 2: an effect scenario states a port effect; an answer alone builds nothing"
+    expect(
+      tableProblems(target, [
+        stated({ input: { thread: "t1" }, kind: "effect", expect: [{ port: "host", op: "kill", count: 0 }] }),
+        ...others,
+      ]),
+    ).toEqual([refused])
+    expect(
+      tableProblems(target, [
+        stated({
+          input: { thread: "t1" },
+          kind: "effect",
+          expect: [{ port: "host", op: "spawn", count: 0 }],
+          answer: { thread: "t1" },
+        }),
+        ...others,
+      ]),
+    ).toEqual([refused])
+  })
+})
+
+describe("a step made as its own principal (design lane ruling, option b)", () => {
+  const target = withLocate({})
+  // Each root answers the principal it was built for; the step states the script's answer.
+  const asScript = (honours: "yes" | "ignores" | "absent"): ScenarioRun => ({
+    scenario: {
+      ...scenario("by-id", undefined),
+      then: [
+        {
+          input: { thread: "t1" },
+          principal: { kind: "script" },
+          kind: "effect",
+          expect: [{ port: "host", op: "listSessions", args: { allScope: false } }],
+          answer: { caller: "script" },
+        },
+      ],
+    },
+    setup: () => {
+      const calls: ObservedCall[] = []
+      const rootFor = (kind: string) => ({
+        threads: {
+          locate: () => {
+            calls.push(host("listSessions", { allScope: false }))
+            return { kind: "ok", caller: kind }
+          },
+        },
+      })
+      const root = rootFor("person")
+      return {
+        root,
+        calls: () => calls,
+        ...(honours === "absent"
+          ? {}
+          : {
+              rootAs: (principal: Readonly<Record<string, unknown>>) =>
+                honours === "yes" ? rootFor(String(principal["kind"])) : root,
+            }),
+      }
+    },
+  })
+
+  test("#given a setup that builds the step's principal its own root #then the step passes on that principal's answer", async () => {
+    const [record] = await runEffectScenarios(target, [asScript("yes")])
+    expect(record?.steps?.[0]?.principal).toEqual({ kind: "script" })
+    expect(await problems([asScript("yes"), ...pair.slice(1)], target)).toEqual([])
+  })
+
+  test("#given a setup that runs the step as the scenario's principal instead #then the step fails", async () => {
+    expect(await problems([asScript("ignores"), ...pair.slice(1)], target)).toContainEqual(
+      'row threads.locate: scenario threads.locate/by-id#step2: answered {"kind":"ok","caller":"person"}, not the expected {"caller":"script"}',
+    )
+  })
+
+  test("#given a setup with no root for another principal #then the step fails, never running as the scenario's", async () => {
+    expect(await problems([asScript("absent"), ...pair.slice(1)], target)).toContainEqual(
+      "row threads.locate: scenario threads.locate/by-id#step2 threw the setup builds no root for a step's own principal",
+    )
+  })
+})
+
 describe("the success discriminator and step shapes (review 6062344773)", () => {
   test("#given an effect call that returns something other than a kind ok result #then it is not a success", async () => {
     const bare = run(scenario("by-id", undefined), undefined, (calls) => {

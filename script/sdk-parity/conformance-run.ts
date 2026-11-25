@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import type { ConformanceContext, EffectEvidence } from "./conformance"
-import type { ObservedCall, TableScenario } from "./expectation"
+import type { ObservedCall, ScenarioStep, TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
 // The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
@@ -17,6 +17,8 @@ import type { Row } from "./schema"
 
 export type ScenarioSetup = {
   readonly root: unknown
+  /** A root for another principal over the same fakes, for a `then` step that names its own principal. */
+  readonly rootAs?: (principal: Readonly<Record<string, unknown>>) => unknown
   readonly calls: () => readonly ObservedCall[]
   /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed. Needed only by an aborting scenario. */
   readonly after?: (ms: number, fire: () => void) => void
@@ -144,10 +146,10 @@ export async function runEffectScenarios(
   const evidence: EffectEvidence[] = []
   for (const { scenario, setup } of runs) {
     const row = rows.find((candidate) => candidate.id === scenario.row)
-    const { root, calls, after } = setup()
+    const { root, rootAs, calls, after } = setup()
     const invoked: string[] = []
-    const memberOf = (): unknown => {
-      let member: unknown = forwarding(root, [], invoked)
+    const memberOf = (on: unknown): unknown => {
+      let member: unknown = forwarding(on, [], invoked)
       for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
       return member
     }
@@ -158,13 +160,19 @@ export async function runEffectScenarios(
     for (const [index, step] of sequence.entries()) {
       const seen = calls().length
       const before = invoked.length
-      const result = await invoke(memberOf(), step, controller.signal)
+      const principal = index === 0 ? undefined : (step as ScenarioStep).principal
+      // A step's own principal is run on its own root, never quietly on the scenario's.
+      const result =
+        principal !== undefined && rootAs === undefined
+          ? { threw: "the setup builds no root for a step's own principal" }
+          : await invoke(memberOf(principal === undefined ? root : rootAs?.(principal)), step, controller.signal)
       records.push({
         scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
         row: scenario.row,
         kind: step.kind,
         member: invoked.slice(before).join(","),
         input: step.input,
+        ...(principal === undefined ? {} : { principal }),
         ...(scenario.given === undefined ? {} : { given: scenario.given }),
         expect: step.expect,
         observed: calls().slice(seen),

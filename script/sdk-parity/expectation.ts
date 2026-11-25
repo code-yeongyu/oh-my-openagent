@@ -34,6 +34,8 @@ export type Fault = {
 
 export type ScenarioStep = {
   readonly input: Readonly<Record<string, unknown>>
+  /** The principal this call is made as (security design 3); absent, the scenario's. Its root shares the scenario's fakes. */
+  readonly principal?: { readonly kind: string } & Readonly<Record<string, unknown>>
   readonly kind: "effect" | "refusal"
   readonly refusal?: string
   readonly refusal_from?: "root" | "value"
@@ -104,6 +106,27 @@ const isSubset = (expected: unknown, observed: unknown): boolean => {
 }
 
 export const isSubsetOf = (expected: unknown, observed: unknown): boolean => isSubset(expected, observed)
+
+/**
+ * A repeat (design lane ruling, option b): a call whose stated effects are all `count: 0`, each an operation an earlier
+ * call of the scenario stated as happening, with its answer stated. It proves the repeat did nothing further and answered
+ * what it states; a call of those operations during it still fails the matcher.
+ */
+export function isRepeat(
+  earlier: readonly { readonly expect: readonly Expectation[] }[],
+  call: { readonly expect: readonly Expectation[]; readonly answer?: unknown },
+): boolean {
+  const shown = new Set(
+    earlier.flatMap((step) =>
+      step.expect.filter((expectation) => (expectation.count ?? 1) > 0).map(({ port, op }) => `${port}.${op}`),
+    ),
+  )
+  return (
+    call.answer !== undefined &&
+    call.expect.length > 0 &&
+    call.expect.every((expectation) => expectation.count === 0 && shown.has(`${expectation.port}.${expectation.op}`))
+  )
+}
 
 export function expectationProblems(expect: readonly Expectation[], observed: readonly ObservedCall[]): string[] {
   const problems: string[] = []
