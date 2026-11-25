@@ -55,7 +55,12 @@ export type SessionControl = {
   }) => Promise<{ readonly models: readonly ModelChoice[]; readonly held: boolean }>
   /** A fresh `get_state` snapshot of the model and level, for restoring a refused compound switch. */
   readonly getModelState: () => Promise<SessionModelState | undefined>
-  readonly setModel: (provider: string, id: string) => Promise<{ readonly provider: string; readonly id: string }>
+  /** `effectId`: the holder's effect ledger answers a repeat under it without switching again. */
+  readonly setModel: (
+    provider: string,
+    id: string,
+    options?: { readonly effectId?: string },
+  ) => Promise<{ readonly provider: string; readonly id: string }>
   readonly getAvailableThinkingLevels: () => Promise<readonly string[]>
   /**
    * Changes only this session's level (`SESSION_ONLY_THINKING_SCOPE`), never the device's remembered level for the

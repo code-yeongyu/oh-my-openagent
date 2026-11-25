@@ -1086,7 +1086,16 @@ describe("omo remote session verbs", () => {
     [
       ["model", "b/dur-on-b", "anthropic/claude-opus"],
       "b/dur-on-b now uses anthropic/claude-opus.",
-      ["status", "status", "devices", "sessions:b", "command:get_available_models", "command:set_model"],
+      [
+        "status",
+        "status",
+        "devices",
+        "sessions:b",
+        "command:get_available_models",
+        "command:set_model",
+        // #14939: the state read that tells an applied switch from one held until compaction.
+        "command:get_state",
+      ],
     ],
     [
       ["interrupt", "b/dur-on-b"],

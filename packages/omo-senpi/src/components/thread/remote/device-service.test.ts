@@ -751,6 +751,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
           return {
             isStreaming: engine.streaming,
             model: engine.model,
+            thinkingLevel: "off",
+            pendingModelSwitch: null,
             pendingMessageCount: 0,
             ...(engine.currentTurnId === undefined ? {} : { currentTurnId: engine.currentTurnId }),
           }
@@ -1269,9 +1271,10 @@ describe("device-service adapter: relay round trips per thread op", () => {
       ["view", ["session.command"]],
       ["send", ["session.command"]],
       ["status after send", ["session.command"]],
-      ["model (cold catalog)", ["session.command", "session.command"]],
-      ["model (exact provider/id)", ["session.command"]],
-      ["model (by id)", ["session.command", "session.command"]],
+      // #14939: every switch ends with one fresh get_state, which tells an applied switch from one held for compaction.
+      ["model (cold catalog)", ["session.command", "session.command", "session.command"]],
+      ["model (exact provider/id)", ["session.command", "session.command"]],
+      ["model (by id)", ["session.command", "session.command", "session.command"]],
       ["interrupt", ["session.command"]],
       ["close", ["session.command"]],
     ])
@@ -1318,12 +1321,13 @@ describe("device-service adapter: relay round trips per thread op", () => {
     w.snapshot()
     w.take()
     w.inFlight(w.snapshot)
+    // Each switch ends with its #14939 state read: catalog + set_model + get_state, or set_model + get_state when held.
     await setModelRemote(w.surface, row, { model: "a/m1" })
-    expect(w.take()).toEqual(["session.command", "session.command"])
+    expect(w.take()).toEqual(["session.command", "session.command", "session.command"])
     await setModelRemote(w.surface, row, { model: "a/m2" })
-    expect(w.take()).toEqual(["session.command", "session.command"])
+    expect(w.take()).toEqual(["session.command", "session.command", "session.command"])
     await setModelRemote(w.surface, row, { model: "a/m1" })
-    expect(w.take()).toEqual(["session.command"])
+    expect(w.take()).toEqual(["session.command", "session.command"])
   })
 
   test("#given a held catalog #when the exact set may have run (its reply lost) and the channel then refuses the catalog read #then the answer is idempotency_uncertain, as on dev, and nothing is re-read", async () => {
@@ -1344,7 +1348,8 @@ describe("device-service adapter: relay round trips per thread op", () => {
     w.addModel({ provider: "x", id: "a/m1-v2" })
     const result = await setModelRemote(w.surface, row, { model: "a/m1" })
     expect(result.kind === "ok" && "model" in result ? result.model : result).toEqual({ provider: "x", id: "a/m1-v2" })
-    expect(w.take()).toEqual(["session.command", "session.command", "session.command"])
+    // The refused set, the fresh catalog, the rematched set, and the #14939 state read after it.
+    expect(w.take()).toEqual(["session.command", "session.command", "session.command", "session.command"])
   })
 
   test.each([

@@ -147,11 +147,13 @@ export type ThreadHost = {
   readonly setSessionName: (sessionId: string, name: string, durable_session_id?: string) => Promise<void>
   /** senpi `set_session_archived`: writes the flag into the session file. Absent on a port that cannot send it. */
   readonly setSessionArchived?: (sessionId: string, archived: boolean, durable_session_id?: string) => Promise<void>
+  /** `effectId`: the engine's effect ledger replays a repeat under it instead of switching again (#14939). */
   readonly setModel: (
     sessionId: string,
     provider: string,
     modelId: string,
     durable_session_id?: string,
+    effectId?: string,
   ) => Promise<{ provider: string; id: string; name?: string }>
   readonly getAvailableModels: (
     sessionId: string,

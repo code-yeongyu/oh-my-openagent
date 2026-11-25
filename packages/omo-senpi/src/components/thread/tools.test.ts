@@ -56,10 +56,12 @@ function fixture() {
   let model = { provider: "openai", id: "gpt-previous" }
   let thinkingLevel = "off"
   const getState = async () => ({ isStreaming: false, model, thinkingLevel })
-  const setModel = mock(async (_sessionId: string, provider: string, modelId: string, _durableId?: string) => {
-    model = { provider, id: modelId }
-    return { ...model, name: "Selected model" }
-  })
+  const setModel = mock(
+    async (_sessionId: string, provider: string, modelId: string, _durableId?: string, _effectId?: string) => {
+      model = { provider, id: modelId }
+      return { ...model, name: "Selected model" }
+    },
+  )
   const getAvailableModels = mock(async (_sessionId: string) => models)
   const setThinkingLevel = mock(
     async (_sessionId: string, level: string, _scope?: "session" | "turn", _durableId?: string) => {
@@ -134,7 +136,13 @@ describe("thread tool registration", () => {
     expect(await runner(f)("thread_set_model", { thread: "dur-peer", model: "openai/gpt-x" })).toMatchObject({
       kind: "ok",
     })
-    expect(f.setModel.mock.calls[0]).toEqual(["route-peer", "openai", "gpt-x", "dur-peer"])
+    expect(f.setModel.mock.calls[0]).toEqual([
+      "route-peer",
+      "openai",
+      "gpt-x",
+      "dur-peer",
+      expect.stringMatching(/^set_model:/),
+    ])
   })
 
   test("registers exactly the eleven contract tools with eval exposure", () => {
@@ -420,7 +428,9 @@ describe("thread session controls", () => {
       in_effect: { model: { provider: "openai", id: "gpt-x" }, thinking_level: "off" },
     })
     expect(f.getAvailableModels.mock.calls).toEqual([["route-peer"]])
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
+    expect(f.setModel.mock.calls).toEqual([
+      ["route-peer", "openai", "gpt-x", "dur-peer", expect.stringMatching(/^set_model:/)],
+    ])
   })
 
   test.each([
@@ -567,7 +577,9 @@ describe("thread session controls", () => {
       model_switch: "applied",
       in_effect: { model: { provider: "openai", id: "gpt-x" }, thinking_level: "off" },
     })
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "openai", "gpt-x", "dur-peer"]])
+    expect(f.setModel.mock.calls).toEqual([
+      ["route-peer", "openai", "gpt-x", "dur-peer", expect.stringMatching(/^set_model:/)],
+    ])
   })
 
   test("set_model provider narrows a fragment shared across providers", async () => {
@@ -580,7 +592,9 @@ describe("thread session controls", () => {
       model_switch: "applied",
       in_effect: { model: { provider: "other", id: "gpt-y" }, thinking_level: "off" },
     })
-    expect(f.setModel.mock.calls).toEqual([["route-peer", "other", "gpt-y", "dur-peer"]])
+    expect(f.setModel.mock.calls).toEqual([
+      ["route-peer", "other", "gpt-y", "dur-peer", expect.stringMatching(/^set_model:/)],
+    ])
   })
 
   test("set_model refuses a cross-workspace id until all_scope is supplied", async () => {
@@ -598,7 +612,9 @@ describe("thread session controls", () => {
     expect(
       await run("thread_set_model", { thread: "dur-other", model: "gpt-x", all_scope: true }, undefined, "call-2"),
     ).toMatchObject({ kind: "ok", thread: "dur-other" })
-    expect(f.setModel.mock.calls).toEqual([["route-other", "openai", "gpt-x", "dur-other"]])
+    expect(f.setModel.mock.calls).toEqual([
+      ["route-other", "openai", "gpt-x", "dur-other", expect.stringMatching(/^set_model:/)],
+    ])
   })
 
   test.each([undefined, "session", "turn"] as const)(

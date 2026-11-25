@@ -56,9 +56,9 @@ export function createLazyLiveThreadSurface(
         if (port.setSessionArchived === undefined) throw new Error("unsupported:set_session_archived")
         return await port.setSessionArchived(sessionId, archived, durableId)
       },
-      setModel: async (sessionId, provider, modelId, durableId) => {
+      setModel: async (sessionId, provider, modelId, durableId, effectId) => {
         const port = await target()
-        return await port.setModel(sessionId, provider, modelId, durableId)
+        return await port.setModel(sessionId, provider, modelId, durableId, effectId)
       },
       getAvailableModels: async (sessionId) => {
         const port = await target()

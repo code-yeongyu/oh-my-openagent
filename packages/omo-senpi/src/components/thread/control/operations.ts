@@ -1,4 +1,5 @@
 import type { ThreadModel, ThreadModelInEffect, ThreadSetReasoningInput, ThreadToolResult } from "../contracts"
+import { createHash } from "node:crypto"
 import { threadToolFailure } from "../errors"
 import { failure } from "../tools/internals"
 import { exactModel, matchModel, modelPatternFailure } from "../tools/model-match"
@@ -93,10 +94,19 @@ export async function closeThread(
  * catalog may predate the model leaving that device) is answered as a fresh catalog answers it: its own miss, the
  * model it matches set, or the set's refusal when it matches the same model.
  */
+/**
+ * The effect id a model switch carries for an idempotency key (#14939): one per caller and key, within the engine's
+ * 256-character bound, so a repeat under the key is answered from the holder's effect ledger and never switches again.
+ */
+export function modelSwitchEffectId(principal: string, key: string): string {
+  return `set_model:${createHash("sha256").update(`${principal}\n${key}`).digest("hex").slice(0, 40)}`
+}
+
 export async function setModelOn(
   control: SessionControl,
   model: string,
   provider: string | undefined,
+  options: { readonly effectId?: string } = {},
 ): Promise<ThreadToolResult> {
   const empty = modelPatternFailure(model)
   if (empty !== undefined) return empty
@@ -113,7 +123,7 @@ export async function setModelOn(
   let previous = await modelBeforeSwitch(control, matched.thinkingLevel)
   let selected: ThreadModel
   try {
-    selected = await control.setModel(matched.model.provider, matched.model.id)
+    selected = await control.setModel(matched.model.provider, matched.model.id, options)
   } catch (error) {
     const refusal = controlRefusalOf(error)
     if (refusal === undefined || refusal.code === "idempotency_uncertain") throw error
@@ -133,7 +143,12 @@ export async function setModelOn(
       if (controlRefusalOf(stateError)?.details?.reason === "model_state_unavailable") throw error
       throw stateError
     }
-    selected = await control.setModel(rematched.model.provider, rematched.model.id)
+    // The refused first switch is recorded under its effect id with its own model, so the rematch needs an id of its own.
+    selected = await control.setModel(
+      rematched.model.provider,
+      rematched.model.id,
+      options.effectId === undefined ? {} : { effectId: `${options.effectId}:rematch` },
+    )
     matched = rematched
   }
   return await settleModelSwitch(
@@ -311,7 +326,7 @@ function partialModelSwitch(
   return failure(
     "partial_commit",
     `The switch to ${selected.provider}/${selected.id} took effect; thinking level ${level} did not.`,
-    "Read details.partial for what is in effect, then set the thinking level again with thread_set_reasoning.",
+    "Read details.partial for what is in effect, then set the thinking level again with thread_set_reasoning (tool.thread_set_reasoning() in an eval cell).",
     {
       ...controlIdentity(control),
       reason,

@@ -29,7 +29,14 @@ describe("thread_set_model on another device", () => {
         "session",
         "b",
         "rk-on-b",
-        { type: "set_model", sessionId: "rk-on-b", provider: "anthropic", modelId: "claude-opus", scope: "session" },
+        {
+          type: "set_model",
+          sessionId: "rk-on-b",
+          provider: "anthropic",
+          modelId: "claude-opus",
+          scope: "session",
+          effectId: expect.stringMatching(/^set_model:[0-9a-f]{40}$/),
+        },
       ],
       ["session", "b", "rk-on-b", { type: "get_state", sessionId: "rk-on-b" }],
     ])

@@ -117,9 +117,16 @@ export function createRelayControl(
       return { models: modelsOf(replyData(outcome.response)["models"]), held: outcome.local === true }
     },
     getModelState: async () => sessionModelState(await command({ type: "get_state" }, { fresh: true })),
-    setModel: async (provider, id) => {
+    setModel: async (provider, id, options) => {
       // `scope: "session"` switches only this session; without it the engine persists the device's default model.
-      const reply = await command({ type: "set_model", provider, modelId: id, scope: "session" })
+      const effectId = options?.effectId
+      const reply = await command({
+        type: "set_model",
+        provider,
+        modelId: id,
+        scope: "session",
+        ...(effectId === undefined ? {} : { effectId }),
+      })
       const confirmedProvider = reply["provider"]
       const confirmedId = reply["id"]
       return {

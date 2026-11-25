@@ -825,8 +825,12 @@ export function createLiveThreadSurface(
       await send("set_session_archived", { sessionId, archived }, durableId)
     },
     // `scope: "session"` switches only this session; without it the engine persists the device's default model.
-    setModel: (sessionId, provider, modelId, durableId) =>
-      send("set_model", { sessionId, provider, modelId, scope: "session" }, durableId),
+    setModel: (sessionId, provider, modelId, durableId, effectId) =>
+      send(
+        "set_model",
+        { sessionId, provider, modelId, scope: "session", ...(effectId === undefined ? {} : { effectId }) },
+        durableId,
+      ),
     getAvailableModels: async (sessionId) => {
       const { models } = await send<{ models: Awaited<ReturnType<ThreadHost["getAvailableModels"]>> }>(
         "get_available_models",
