@@ -48,6 +48,12 @@ describe("omo doctor golden (npm launcher, child process)", () => {
         "INFO Update: npm i -g omo-ai@beta",
         "WARN config: diagnostics unavailable: <runtime message>",
         "INFO config dir: <ROOT>/home/.omo/agent",
+        // macOS only: the install carries no signed keychain helper (keychain-helper-doctor.js).
+        ...(process.platform === "darwin"
+          ? [
+              "WARN keychain helper: missing bin/darwin/omo-keychain; macOS sign-in uses the previous keychain path and may ask for access again. Reinstall omo.",
+            ]
+          : []),
         "INFO Daemon: not running",
         "INFO Hosts: engine too old to enumerate",
         "WARN computer use: diagnostics unavailable: <runtime message>",
