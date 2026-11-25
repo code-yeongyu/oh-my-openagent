@@ -35,4 +35,4 @@ export const CONTENT_STRESS_SCRIPT = `(() => {
 		if (["SCRIPT", "STYLE", "TEXTAREA", "OPTION", "TITLE"].includes(el.tagName)) continue;
 		last.textContent = last.textContent + " " + token;
 	}
-})();`
+})()`
