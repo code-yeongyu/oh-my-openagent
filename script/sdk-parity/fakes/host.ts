@@ -11,8 +11,8 @@ import type { Recorder } from "./recorder"
 // host spans two workspaces: t-1 runs in the caller's cwd and t-3 in another folder; a scenario moves a thread to that
 // other workspace with `given: {thread, workspace: "elsewhere"}`, so a call finds it only with all_scope.
 
-export const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
-export const HOST_THREADS = ["t-1", "t-3"] as const
+const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
+const HOST_THREADS = ["t-1", "t-3"] as const
 const ELSEWHERE_THREADS: readonly string[] = ["t-3"]
 
 const unused = (method: string) => async (): Promise<never> => {

@@ -28,7 +28,7 @@ const CANARIES = {
 const CANARY_VALUES = Object.values(CANARIES)
 
 /** Every place a canary is found in a value, by path; strings, keys, nested objects, arrays and errors are walked. */
-export function canariesIn(value: unknown, path = "$", seen = new Set<unknown>()): string[] {
+function canariesIn(value: unknown, path = "$", seen = new Set<unknown>()): string[] {
   if (typeof value === "string")
     return CANARY_VALUES.filter((canary) => value.includes(canary)).map((canary) => `${path}: ${canary}`)
   if (typeof value !== "object" || value === null || seen.has(value)) return []

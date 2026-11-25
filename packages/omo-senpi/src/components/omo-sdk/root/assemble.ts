@@ -88,10 +88,10 @@ export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
  * today (design lane ruling on closed schemas). Closed list: slice P1a's follow-up fills it and pins each call; whether
  * such a key should be refused instead is a later, recorded decision.
  */
-export const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
+const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
 
 /** The input as its schema sees it: for a call in the list, only the keys the schema names. */
-export function checkedInput(key: RootCallKey, input: unknown): unknown {
+function checkedInput(key: RootCallKey, input: unknown): unknown {
   if (!UNKNOWN_KEYS_DROPPED.includes(key) || typeof input !== "object" || input === null) return input
   const named = Object.keys((ROOT_CALLS[key].input as { readonly properties?: object }).properties ?? {})
   return Object.fromEntries(Object.entries(input).filter(([field]) => named.includes(field)))

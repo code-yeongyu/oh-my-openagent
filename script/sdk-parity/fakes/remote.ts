@@ -12,8 +12,8 @@ import type { Recorder } from "./recorder"
 // (set_session_name is sessions.rename); a record with no port operation is refused loudly. Reads of the connection's
 // own state (service status, this device, capabilities) carry no operation of the table and pass through unrecorded.
 
-export const STUDIO = { id: "b", label: "studio" } as const
-export const STUDIO_THREAD = "t-2"
+const STUDIO = { id: "b", label: "studio" } as const
+const STUDIO_THREAD = "t-2"
 
 const RPC_OPS: Readonly<Record<string, string>> = {
   set_session_name: "sessions.rename",

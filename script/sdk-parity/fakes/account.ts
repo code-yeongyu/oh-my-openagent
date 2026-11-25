@@ -8,7 +8,7 @@ import type { Recorder } from "./recorder"
 // /v1/devices/<id> is `devices.rename {id, name}`, GET /v1/me is `me`. A stated stimulus becomes the service's own
 // answer: a device list, `{ error: { status, code } }` an ApiRefusal, `{ error: "request_failed" }` a RequestFailure.
 
-export const SIGNED_IN_DEVICE = { id: "dev-1", name: "laptop" } as const
+const SIGNED_IN_DEVICE = { id: "dev-1", name: "laptop" } as const
 
 const credentials = (device: { readonly id: string; readonly name: string }): Credentials => ({
   accessToken: "fake-access-token",
