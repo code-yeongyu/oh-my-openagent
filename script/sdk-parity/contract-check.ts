@@ -6,7 +6,10 @@ import { schemaDifferences } from "./tool-check"
 // naming the row, call, field, code or scenario to fix; the tests assert the real tree has none and that each check
 // fails on a fixture that breaks it.
 
-export type CallInput = { readonly properties: Readonly<Record<string, FieldSchema>>; readonly required: readonly string[] }
+export type CallInput = {
+  readonly properties: Readonly<Record<string, FieldSchema>>
+  readonly required: readonly string[]
+}
 
 export type GatedEntry = {
   readonly row: string
@@ -42,7 +45,9 @@ export function scopeProblems(rows: readonly Row[], contract: Contract): string[
   const inScope = p1aRows(rows, contract.gated)
   for (const row of inScope)
     if (contract.calls[row.sdk] === undefined)
-      problems.push(`row ${row.id}: the root type has no call ${row.sdk}; add it, or hold the row in GATED with its S0 section`)
+      problems.push(
+        `row ${row.id}: the root type has no call ${row.sdk}; add it, or hold the row in GATED with its S0 section`,
+      )
   const sdks = new Set(inScope.map((row) => row.sdk))
   for (const key of Object.keys(contract.calls))
     if (!sdks.has(key)) problems.push(`call ${key}: no P1a row names it; remove it or give it a row`)
@@ -72,19 +77,29 @@ export function inputProblems(rows: readonly Row[], contract: Contract): string[
     const rowFields = Object.keys(row.input.properties).filter((field) => !held.has(field))
     const callFields = Object.keys(call.properties)
     for (const field of rowFields)
-      if (!callFields.includes(field)) problems.push(`row ${row.id}: input ${field} is missing from the schema of ${row.sdk}`)
+      if (!callFields.includes(field))
+        problems.push(`row ${row.id}: input ${field} is missing from the schema of ${row.sdk}`)
     for (const field of callFields)
-      if (!rowFields.includes(field)) problems.push(`row ${row.id}: the schema of ${row.sdk} takes ${field}, which the row lacks`)
+      if (!rowFields.includes(field))
+        problems.push(`row ${row.id}: the schema of ${row.sdk} takes ${field}, which the row lacks`)
     for (const field of rowFields.filter((name) => callFields.includes(name)))
-      problems.push(...schemaDifferences(row.input.properties[field], call.properties[field], `row ${row.id} input ${field}`))
+      problems.push(
+        ...schemaDifferences(row.input.properties[field], call.properties[field], `row ${row.id} input ${field}`),
+      )
     const required = (list: readonly string[]): string => JSON.stringify(list.filter((f) => !held.has(f)).toSorted())
     if (required(row.input.required) !== required(call.required))
-      problems.push(`row ${row.id}: required is ${required(row.input.required)} in the row and ${required(call.required)} in the schema`)
+      problems.push(
+        `row ${row.id}: required is ${required(row.input.required)} in the row and ${required(call.required)} in the schema`,
+      )
   }
   return problems
 }
 
-const usedCodes = (rows: readonly Row[], contract: Contract, files: readonly ScenarioTableFile[]): Map<string, Set<string>> => {
+const usedCodes = (
+  rows: readonly Row[],
+  contract: Contract,
+  files: readonly ScenarioTableFile[],
+): Map<string, Set<string>> => {
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
   const used = new Map<string, Set<string>>()
   for (const scenario of files.flatMap((file) => file.scenarios)) {
@@ -107,10 +122,12 @@ export function codeProblems(rows: readonly Row[], contract: Contract, files: re
     }
     const want = JSON.stringify([...namespaces].toSorted())
     const have = JSON.stringify([...entry.namespaces].toSorted())
-    if (want !== have) problems.push(`code ${code}: the registry names namespaces ${have}; the rows that return it are ${want}`)
+    if (want !== have)
+      problems.push(`code ${code}: the registry names namespaces ${have}; the rows that return it are ${want}`)
   }
   for (const [code, entry] of Object.entries(contract.registry)) {
-    if (!used.has(code)) problems.push(`code ${code}: no row returns it; remove it from the registry or declare the refusal`)
+    if (!used.has(code))
+      problems.push(`code ${code}: no row returns it; remove it from the registry or declare the refusal`)
     if (entry.next_action.trim() === "") problems.push(`code ${code}: give it a next_action form`)
     if (!sources.has(code)) problems.push(`code ${code}: not a code of the three source lists of design 4.4`)
     if (contract.heldCodes[code] !== undefined) problems.push(`code ${code}: both in the registry and held`)
@@ -125,7 +142,11 @@ export function codeProblems(rows: readonly Row[], contract: Contract, files: re
 
 const ID = /^[a-z][A-Za-z0-9.]*\/[a-z0-9]+(-[a-z0-9]+)*$/
 
-export function scenarioProblems(rows: readonly Row[], contract: Contract, files: readonly ScenarioTableFile[]): string[] {
+export function scenarioProblems(
+  rows: readonly Row[],
+  contract: Contract,
+  files: readonly ScenarioTableFile[],
+): string[] {
   const problems: string[] = []
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
   const ports = new Set(contract.ports)
@@ -143,8 +164,10 @@ export function scenarioProblems(rows: readonly Row[], contract: Contract, files
         problems.push(`${at}: row ${scenario.row} is not a P1a row`)
         continue
       }
-      if (namespaceOf(row.sdk) !== file.domain) problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
-      if (scenario.expect.length === 0) problems.push(`${at}: has no observable expected effect; name what a fake port observes`)
+      if (namespaceOf(row.sdk) !== file.domain)
+        problems.push(`${at}: belongs in scenarios/${namespaceOf(row.sdk)}.json`)
+      if (scenario.expect.length === 0)
+        problems.push(`${at}: has no observable expected effect; name what a fake port observes`)
       for (const expectation of scenario.expect) {
         if (!ports.has(expectation.port)) problems.push(`${at}: ${expectation.port} is not a port of design 4.6`)
         if (expectation.observes.trim() === "") problems.push(`${at}: say what ${expectation.port} observes`)
@@ -152,10 +175,14 @@ export function scenarioProblems(rows: readonly Row[], contract: Contract, files
       const accepted = contract.accepts(row.sdk, scenario.input)
       if (scenario.invalid === true) {
         if (accepted) problems.push(`${at}: marked invalid, but ${row.sdk}'s schema accepts its input`)
-        if (scenario.refusal !== "invalid_arguments") problems.push(`${at}: an invalid input is refused invalid_arguments`)
-      } else if (!accepted) problems.push(`${at}: ${row.sdk}'s schema refuses its input; fix the input or mark it invalid`)
-      if (scenario.kind === "effect" && scenario.refusal !== undefined) problems.push(`${at}: an effect scenario names no refusal`)
-      if (scenario.kind === "refusal" && scenario.refusal === undefined) problems.push(`${at}: a refusal scenario names its code`)
+        if (scenario.refusal !== "invalid_arguments")
+          problems.push(`${at}: an invalid input is refused invalid_arguments`)
+      } else if (!accepted)
+        problems.push(`${at}: ${row.sdk}'s schema refuses its input; fix the input or mark it invalid`)
+      if (scenario.kind === "effect" && scenario.refusal !== undefined)
+        problems.push(`${at}: an effect scenario names no refusal`)
+      if (scenario.kind === "refusal" && scenario.refusal === undefined)
+        problems.push(`${at}: a refusal scenario names its code`)
       if (scenario.kind === "effect" && scenario.invalid !== true) {
         const fields = covered.get(row.id) ?? new Set<string>()
         for (const field of Object.keys(scenario.input)) fields.add(field)
@@ -169,8 +196,11 @@ export function scenarioProblems(rows: readonly Row[], contract: Contract, files
       const reason = inert.get(`${row.id}.${field}`)
       const hit = covered.get(row.id)?.has(field) === true
       if (!hit && (reason === undefined || reason.trim() === ""))
-        problems.push(`row ${row.id}: input ${field} changes no effect scenario; add one, or list it as inert with the reason`)
-      if (hit && reason !== undefined) problems.push(`row ${row.id}: input ${field} is listed inert and has an effect scenario`)
+        problems.push(
+          `row ${row.id}: input ${field} changes no effect scenario; add one, or list it as inert with the reason`,
+        )
+      if (hit && reason !== undefined)
+        problems.push(`row ${row.id}: input ${field} is listed inert and has an effect scenario`)
     }
     for (const id of [...row.scenarios.effect, ...row.scenarios.refusal])
       if (!seen.has(id)) problems.push(`row ${row.id}: scenario ${id} is not in the scenario table`)

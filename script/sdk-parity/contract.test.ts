@@ -9,7 +9,14 @@ import {
   ROOT_CALLS,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import { type CallInput, codeProblems, type Contract, inputProblems, scenarioProblems, scopeProblems } from "./contract-check"
+import {
+  type CallInput,
+  codeProblems,
+  type Contract,
+  inputProblems,
+  scenarioProblems,
+  scopeProblems,
+} from "./contract-check"
 import { allRows, loadDomainFiles } from "./registry"
 import type { Row } from "./schema"
 import { loadScenarioTable, type TableScenario, type ScenarioTableFile } from "./scenario-table"
@@ -60,7 +67,9 @@ const rowOf = (sdk: string): Row => {
   return row
 }
 const withScenario = (files: readonly ScenarioTableFile[], scenario: TableScenario): ScenarioTableFile[] =>
-  files.map((file) => (file.domain === scenario.row.split(".")[0] ? { ...file, scenarios: [...file.scenarios, scenario] } : file))
+  files.map((file) =>
+    file.domain === scenario.row.split(".")[0] ? { ...file, scenarios: [...file.scenarios, scenario] } : file,
+  )
 
 describe("negative controls of the P1a checks", () => {
   test("#given a call removed from the root #then the scope check names the row", () => {
@@ -80,7 +89,10 @@ describe("negative controls of the P1a checks", () => {
   test("#given a schema field whose type drifted from the row #then the input check names it", () => {
     const sdk = "threads.setModel"
     const call = contract.calls[sdk] ?? { properties: {}, required: [] }
-    const calls = { ...contract.calls, [sdk]: { ...call, properties: { ...call.properties, model: { type: "number" } } } }
+    const calls = {
+      ...contract.calls,
+      [sdk]: { ...call, properties: { ...call.properties, model: { type: "number" } } },
+    }
     expect(inputProblems(rows, { ...contract, calls }).join("\n")).toContain("row threads.setModel input model")
   })
 
@@ -92,12 +104,22 @@ describe("negative controls of the P1a checks", () => {
   test("#given a registered code no row returns #then the code check names it", () => {
     const registry = { ...contract.registry, local_only: { namespaces: ["threads"], next_action: "x" } }
     const heldCodes = Object.fromEntries(Object.entries(contract.heldCodes).filter(([code]) => code !== "local_only"))
-    expect(codeProblems(rows, { ...contract, registry, heldCodes }, scenarios).join("\n")).toContain("code local_only: no row returns it")
+    expect(codeProblems(rows, { ...contract, registry, heldCodes }, scenarios).join("\n")).toContain(
+      "code local_only: no row returns it",
+    )
   })
 
   test("#given a scenario with no observable effect #then the scenario check names it", () => {
-    const broken: TableScenario = { id: "threads.setModel/nothing", row: "threads.setModel", kind: "effect", input: { thread: "a", model: "m" }, expect: [] }
-    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain("no observable expected effect")
+    const broken: TableScenario = {
+      id: "threads.setModel/nothing",
+      row: "threads.setModel",
+      kind: "effect",
+      input: { thread: "a", model: "m" },
+      expect: [],
+    }
+    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain(
+      "no observable expected effect",
+    )
   })
 
   test("#given a scenario whose input the schema refuses #then the scenario check names it", () => {
@@ -108,21 +130,31 @@ describe("negative controls of the P1a checks", () => {
       input: { thread: "a" },
       expect: [{ port: "host", observes: "set_model" }],
     }
-    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain("schema refuses its input")
+    expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain(
+      "schema refuses its input",
+    )
   })
 
   test("#given a behaviour input no scenario exercises #then the scenario check names it", () => {
     const files = scenarios.map((file) => ({
       ...file,
-      scenarios: file.scenarios.filter((scenario) => !(scenario.row === "threads.setModel" && "provider" in scenario.input)),
+      scenarios: file.scenarios.filter(
+        (scenario) => !(scenario.row === "threads.setModel" && "provider" in scenario.input),
+      ),
     }))
-    expect(scenarioProblems(rows, contract, files).join("\n")).toContain("row threads.setModel: input provider changes no effect scenario")
+    expect(scenarioProblems(rows, contract, files).join("\n")).toContain(
+      "row threads.setModel: input provider changes no effect scenario",
+    )
   })
 
   test("#given a row naming a scenario id the table lacks #then the scenario check names it", () => {
     const patched = rows.map((row) =>
-      row.id === "threads.setModel" ? { ...row, scenarios: { effect: ["threads.setModel/missing"], refusal: [] } } : row,
+      row.id === "threads.setModel"
+        ? { ...row, scenarios: { effect: ["threads.setModel/missing"], refusal: [] } }
+        : row,
     )
-    expect(scenarioProblems(patched, contract, scenarios).join("\n")).toContain("scenario threads.setModel/missing is not in the scenario table")
+    expect(scenarioProblems(patched, contract, scenarios).join("\n")).toContain(
+      "scenario threads.setModel/missing is not in the scenario table",
+    )
   })
 })
