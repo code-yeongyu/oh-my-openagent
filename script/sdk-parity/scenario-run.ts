@@ -92,7 +92,7 @@ async function runLoopParse(tree: string, scenario: LoopParseScenario): Promise<
   return { brief: parser.positionalText(scenario.argv) }
 }
 
-export async function runScenarios(
+async function runScenarios(
   tree: string,
   scenarios: readonly Scenario[] = SCENARIOS,
 ): Promise<Record<string, Outcome>> {

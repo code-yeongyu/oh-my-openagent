@@ -27,8 +27,7 @@ export type Refusal = {
   readonly before_side_effect: true
 }
 
-export const refusalScenarioId = (row: string, slug: string, kind: PrincipalKind): string =>
-  `${row}/${slug}-refuses-${kind}`
+const refusalScenarioId = (row: string, slug: string, kind: PrincipalKind): string => `${row}/${slug}-refuses-${kind}`
 
 export const REFUSALS: readonly Refusal[] = PRINCIPAL_MATRIX.flatMap((line) =>
   line.rows.flatMap((row) =>

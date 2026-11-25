@@ -19,7 +19,7 @@ import { reachableModules } from "./reachable"
 //   a `"--a --b".split(" ")` table, or a constant whose value is one (`const FLAG = "--x"`).
 // A decision computed from plain code that compares no literal (a regex, a computed name) is outside it (7.5).
 
-export { GENERATED_SOURCES, reachableModules } from "./reachable"
+export { GENERATED_SOURCES } from "./reachable"
 
 export const NATIVE_ENTRY_POINTS = ["packages/omo-native/bin/omo.js", "packages/omo-native/compile-entry.ts"] as const
 
@@ -95,7 +95,7 @@ const MEMBER_TESTS = new Set(["includes", "indexOf", "has", "startsWith", "find"
 const COMMANDER_TEXT = new Set(["command", "alias", "option", "requiredOption", "addOption"])
 
 /** Flag and word tokens a Commander `.command("x [y]")` or `.option("-a, --all <v>")` text declares. */
-export function commanderTokens(text: string): string[] {
+function commanderTokens(text: string): string[] {
   return text
     .split(/[\s,|]+/)
     .filter((part) => part !== "" && !part.startsWith("<") && !part.startsWith("["))

@@ -53,7 +53,7 @@ const stated = (record: EffectEvidence, call: ObservedCall): boolean =>
       (expectation.args === undefined || isSubsetOf(expectation.args, call.args)),
   )
 
-export function recordProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
+function recordProblems(row: Row, record: EffectEvidence, context: ConformanceContext): string[] {
   const listed = row.scenarios.effect.includes(record.scenario) ? "effect" : "refusal"
   if (record.kind !== listed)
     return [
@@ -171,7 +171,7 @@ function addressProblems(row: Row, passing: readonly EffectEvidence[]): string[]
     .map(([kind, target]) => `row ${row.id}: no passing ${kind} scenario addresses a thread on ${target}; add one`)
 }
 
-export function evidenceProblems(row: Row, evidence: readonly EffectEvidence[], context: ConformanceContext): string[] {
+function evidenceProblems(row: Row, evidence: readonly EffectEvidence[], context: ConformanceContext): string[] {
   const problems: string[] = []
   if (row.scenarios.effect.length === 0)
     problems.push(
