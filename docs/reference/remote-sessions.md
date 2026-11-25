@@ -42,7 +42,9 @@ neither this device nor on the account fails with exit 2 and names it.
 effect (`model_switch: "applied"`, exit 0). Held until the session's next compaction, because its context fits the
 new model only after one: it keeps running on the old model, which the answer names (`model_switch:
 "after_compaction"`, `in_effect`, `pending`, exit 0); nothing more needs doing, and a thinking level asked with it
-(`provider/id:high`) was not sent, so set it with the thread's reasoning control once the switch lands. Not applied:
+(`provider/id:high`) was not sent. The switch has landed when `omo thread list --json` shows the session's `model` as
+the asked one; then set the level with the agent tool `thread_set_reasoning` (no `omo remote` verb sets a level yet).
+Not applied:
 the session answered and the switch is not in effect (`not_applied`, exit 1; repeating is safe). A state that cannot be read
 back is `idempotency_uncertain` (exit 1): read the session's model before repeating.
 

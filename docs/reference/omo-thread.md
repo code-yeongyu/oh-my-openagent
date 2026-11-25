@@ -354,7 +354,9 @@ again; the SDK keeps no tool receipt, so any other repeated call runs again.
 `set_model` answers `model_switch: "applied"` when the model is in effect, or `"after_compaction"` when the session
 holds the switch until its next compaction: `in_effect` names the model and level it still runs on, `pending` the
 model it will switch to, and a thinking level asked with it (`provider/id:high`) is listed there with
-`thinking_level_sent: false`: set it with `thread_set_reasoning` once the switch lands. A session that answered and
+`thinking_level_sent: false`. The switch has landed when `list` (or `omo thread list --json`) shows the thread's
+`model` as the asked one; set the level then with the agent tool `thread_set_reasoning` (the SDK has no reasoning call
+yet). A session that answered and
 shows the switch not in effect is `not_applied` (safe to repeat); one whose state cannot be read back is
 `idempotency_uncertain` with `uncertain: true`.
 
