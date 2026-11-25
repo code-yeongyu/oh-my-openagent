@@ -1,4 +1,4 @@
-import type { Namespace, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
+import type { Namespace, OmoFailure, OmoSdkRoot, OmoStream, RootCallKey } from "../contract"
 import { ROOT_CALLS } from "../contract/calls"
 import type { CoreContext, CoreLoaders, NamespaceServing } from "./members"
 import { notImplemented } from "./not-implemented"
@@ -32,14 +32,56 @@ function lazyStream(open: () => Promise<OmoStream<unknown, unknown>>): OmoStream
   }
 }
 
-function loaded(key: RootCallKey, context: CoreContext, loaders: CoreLoaders): Call | undefined {
+type Load = () => Promise<Node | undefined>
+
+// One load per namespace, shared by all its members, so concurrent first calls load the core once. A load that fails is
+// not kept: that call answers internal_error and the next call loads again.
+function namespaceLoads(loaders: CoreLoaders, context: CoreContext): ReadonlyMap<string, Load> {
+  const loads = new Map<string, Load>()
+  for (const [namespace, loader] of Object.entries(
+    loaders as Readonly<Record<string, (context: CoreContext) => Promise<Node>>>,
+  )) {
+    let core: Promise<Node> | undefined
+    loads.set(namespace, async () => {
+      core ??= loader(context)
+      try {
+        return await core
+      } catch {
+        core = undefined
+        return undefined
+      }
+    })
+  }
+  return loads
+}
+
+const loadFailure = (namespace: string) => async () => ({
+  kind: "error",
+  error: {
+    code: "internal_error",
+    message: `The ${namespace} core could not be loaded.`,
+    next_action: "Call it again; if it fails again, reinstall omo.",
+  },
+})
+
+function refusing(key: RootCallKey, error: OmoFailure["error"]): Call {
+  if (ROOT_CALLS[key].answer !== "stream") return async () => ({ kind: "error", error })
+  return () => ({
+    stop: () => undefined,
+    async *[Symbol.asyncIterator]() {
+      yield { kind: "end", failure: error }
+    },
+  })
+}
+
+function loaded(key: RootCallKey, loads: ReadonlyMap<string, Load>): Call | undefined {
   const [namespace, ...rest] = key.split(".") as [Namespace, ...string[]]
-  const loader = (loaders as Readonly<Record<string, (context: CoreContext) => Promise<Node>>>)[namespace]
-  if (loader === undefined) return undefined
-  let core: Promise<Node> | undefined
+  const load = loads.get(namespace)
+  if (load === undefined) return undefined
   const target = async (): Promise<Call> => {
-    core ??= loader(context)
-    const member = (await core)[rest.join(".")]
+    const core = await load()
+    if (core === undefined) return loadFailure(namespace)
+    const member = core[rest.join(".")]
     return typeof member === "function" ? (member as Call) : notImplemented(key)
   }
   if (ROOT_CALLS[key].answer === "stream")
@@ -56,11 +98,18 @@ export function assembleRoot(
   servings: readonly NamespaceServing[],
   loaders: CoreLoaders,
   context: CoreContext,
+  refusals: ReadonlyMap<RootCallKey, OmoFailure["error"]>,
 ): OmoSdkRoot {
   const tree: Node = {}
+  const loads = namespaceLoads(loaders, context)
   for (const key of Object.keys(ROOT_CALLS) as RootCallKey[]) {
+    const refused = refusals.get(key)
+    if (refused !== undefined) {
+      place(tree, key, refusing(key, refused))
+      continue
+    }
     const served = servings.find((serving) => serving.members[key] !== undefined)?.members[key]
-    place(tree, key, served ?? loaded(key, context, loaders) ?? notImplemented(key))
+    place(tree, key, served ?? loaded(key, loads) ?? notImplemented(key))
   }
   const close = (): void => {
     for (const serving of servings) serving.close?.()

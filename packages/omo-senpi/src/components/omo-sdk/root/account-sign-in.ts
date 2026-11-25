@@ -4,7 +4,8 @@ import type { OmoResult } from "../result"
 import type { MemberOf } from "./members"
 import { notImplemented } from "./not-implemented"
 
-type RootSignedIn = MemberOf<"account.signIn"> extends (...args: never[]) => Promise<OmoValue<infer Value>> ? Value : never
+type RootSignedIn =
+  MemberOf<"account.signIn"> extends (...args: never[]) => Promise<OmoValue<infer Value>> ? Value : never
 type RootInput = RootCallInput<"account.signIn">
 type SignIn = AccountApi["signIn"] & MemberOf<"account.signIn">
 
