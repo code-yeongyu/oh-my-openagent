@@ -1,4 +1,21 @@
-import { completionOutcome, type AgentEndFacts } from "../gateway/completion"
+/** The facts senpi's final `agent_end` carries about a run. */
+export type AgentEndFacts = {
+  readonly aborted?: boolean
+  readonly messages?: readonly unknown[]
+}
+
+/** The run's outcome as the final `agent_end` reports it: an abort is `cancelled`, an assistant turn that stopped on an error is `failed`. */
+function runOutcome(event: AgentEndFacts): "completed" | "failed" | "cancelled" {
+  if (event.aborted === true) return "cancelled"
+  const last = [...(event.messages ?? [])]
+    .reverse()
+    .find(
+      (message) =>
+        typeof message === "object" && message !== null && (message as { role?: unknown }).role === "assistant",
+    ) as { readonly stopReason?: unknown } | undefined
+  if (last?.stopReason === "aborted") return "cancelled"
+  return last?.stopReason === "error" ? "failed" : "completed"
+}
 
 export type RunErrorClass = "rate_limit" | "auth" | "overloaded" | "network" | "unknown"
 
@@ -47,7 +64,7 @@ export function classifyRunError(errorMessage: unknown): RunErrorClass {
 }
 
 export function runEndOf(event: AgentEndFacts): RunEnd {
-  const outcome = completionOutcome(event)
+  const outcome = runOutcome(event)
   if (outcome === "cancelled") return { kind: "aborted" }
   if (outcome === "completed") return { kind: "completed" }
   const last = [...(event.messages ?? [])]

@@ -10,14 +10,7 @@ import { senderFacts } from "./envelope"
 import { resultFromRow } from "./result"
 import { resolveProvenance } from "./provenance-resolver"
 import type { GatewayStore } from "./store"
-import type {
-  DeliveryAuthority,
-  ExternalAuthor,
-  GatewayDeliveryMode,
-  GatewayDeliveryResult,
-  GatewaySender,
-  Provenance,
-} from "./types"
+import type { DeliveryAuthority, GatewayDeliveryMode, GatewayDeliveryResult, GatewaySender, Provenance } from "./types"
 
 export type GatewayTarget = {
   readonly durable_id: string
@@ -60,7 +53,10 @@ export type GatewayEngine = {
 export type GatewayEngineOptions = {
   /** Sender-owned context, kept outside every delivery/tool request. */
   readonly senderProvenance?: () => Promise<Provenance>
-  readonly store: Pick<GatewayStore, "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt">
+  readonly store: Pick<
+    GatewayStore,
+    "now" | "enqueue" | "completeReceipt" | "deliveryView" | "abandonReceipt" | "receiptOutcome"
+  >
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
   readonly now?: () => number
@@ -124,14 +120,16 @@ function argsHash(value: unknown): string {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex")
 }
 
-/** The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. */
-export function deliveryArgsHash(fields: {
+/**
+ * The arguments a delivery receipt is keyed by: a retry with the same ones replays, different ones conflict. The hash
+ * keeps the `binding: null` every send carried before the binding removal (#14312), so a receipt written by an older
+ * build still replays its unchanged retry instead of answering idempotency_conflict (#14623 review M1).
+ */
+function deliveryArgsHash(fields: {
   readonly target: string
   readonly text: string
   readonly mode: GatewayDeliveryMode
   readonly expected_turn_id: number | null
-  readonly binding: { readonly binding_id: string; readonly revision: number } | null
-  readonly author: ExternalAuthor | undefined
   readonly collapse_key?: string
 }): string {
   return argsHash({
@@ -139,8 +137,7 @@ export function deliveryArgsHash(fields: {
     text: fields.text,
     mode: fields.mode,
     expected_turn_id: fields.expected_turn_id,
-    binding: fields.binding,
-    author: fields.author,
+    binding: null,
     ...(fields.collapse_key === undefined ? {} : { collapse_key: fields.collapse_key }),
   })
 }
@@ -196,7 +193,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       body: request.text,
       mode,
       expected_turn_id: request.expected_turn_id ?? null,
-      binding: facts.binding,
+      binding: null,
       receipt: {
         idempotency_key: idempotencyKey,
         args_hash: deliveryArgsHash({
@@ -204,8 +201,6 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
           text: request.text,
           mode,
           expected_turn_id: request.expected_turn_id ?? null,
-          binding: facts.binding,
-          author: request.sender.kind === "external" ? request.sender.origin.author : undefined,
           ...(request.collapse_key === undefined ? {} : { collapse_key: request.collapse_key }),
         }),
       },
@@ -219,7 +214,17 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
     if (outcome.kind === "refused") return fail(outcome.code, outcome.message, outcome.details)
     if (outcome.kind === "replay") {
       const replayed = outcome.result as GatewayDeliveryResult
-      return replayed.kind === "ok" ? { ...replayed, deduplicated: true } : replayed
+      if (replayed.kind !== "ok") return replayed
+      return {
+        ...replayed,
+        deduplicated: true,
+        outcome: await store.receiptOutcome({
+          now: now(),
+          principal: facts.principal,
+          delivery_id: replayed.delivery_id,
+          target_durable_id: replayed.thread_id,
+        }),
+      }
     }
     const settle = async (result: GatewayDeliveryResult): Promise<GatewayDeliveryResult> => {
       await store.completeReceipt({ now: now(), principal: facts.principal, idempotency_key: idempotencyKey, result })

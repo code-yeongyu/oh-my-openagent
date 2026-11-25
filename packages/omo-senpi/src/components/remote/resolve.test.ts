@@ -13,6 +13,8 @@ import {
   PEER,
   type World,
 } from "../../../../device-service-core/test/local-api/conformance/world.ts"
+import type { RemoteClient } from "./client"
+import { remoteFailure } from "./codes"
 import { budget, resolveMember, resolveRemoteDevice } from "./resolve"
 import { clientOn, closeClients, failureOf, fakeClock } from "./testing/fake-service"
 
@@ -215,14 +217,13 @@ describe("sessions.resolve", () => {
     })
   })
 
-  test("#given two rows on one device that both answer a session part #when a device-qualified address names it #then ambiguous_target with both candidates, as a bare address answers", async () => {
+  test("#given one row whose thread id and another row whose listing key are the same text #when it is resolved #then the exact thread id wins, device-qualified and bare alike (the shared ladder: exact id > listing key)", async () => {
     const { client } = await account([listed(PEER, "rk-1", "dur-1", "Bot"), listed(PEER, "dur-1", "dur-9", "Other")])
-    const failure = failureOf(await client.sessions.resolve(`${PEER}/dur-1`))
-    expect(failure.code).toBe("ambiguous_target")
-    expect(failure.details?.["candidates"]).toEqual([
-      expect.objectContaining({ thread: `${PEER}/rk-1` }),
-      expect.objectContaining({ thread: `${PEER}/dur-1` }),
-    ])
+    for (const address of [`${PEER}/dur-1`, "dur-1"])
+      expect(await client.sessions.resolve(address)).toMatchObject({
+        kind: "ok",
+        value: { thread: `${PEER}/rk-1`, durable_id: "dur-1" },
+      })
   })
 
   test("#given a device part no device answers to #when it is resolved #then not_found keeps sessions.list's details.id, with device and candidates added beside it", async () => {
@@ -256,16 +257,19 @@ describe("sessions.resolve", () => {
       last_seen_ms: null,
       caps: { attach: true, machine: false, control: false },
     }
-    const unreached = () => Promise.reject(new Error("resolve reads only the roster and the listing"))
+    const unreached = () =>
+      Promise.reject(new Error("resolve reads only the roster, the listing and the alias registry"))
     const resolve = resolveMember({
       sender: { kind: "person", uid: "user-1" },
       timers: clock,
       deps: { version: "5.1.70" },
       dial: unreached,
       member: unreached,
-      self: () => {
-        throw new Error("unreached")
-      },
+      // A miss asks the alias registry once, after the listing; it holds no alias here.
+      self: () =>
+        ({
+          aliases: { resolve: async () => remoteFailure("not_found", "No alias.", "Pass a thread id.") },
+        }) as unknown as RemoteClient,
       localSessions: unreached,
       devicesList: async () => {
         clock.advance(600)

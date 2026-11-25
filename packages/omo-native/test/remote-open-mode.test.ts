@@ -11,6 +11,7 @@ import { REMOTE_EXIT, runRemoteVerb } from "../remote-cli"
 import { UsageError } from "../remote-exit"
 import { localPermissionPreset } from "../remote-permission-preset"
 import { parseSession } from "../remote-session-args"
+import { useIsolatedAgentDir } from "./remote-cli-harness"
 
 // #6189: `omo remote open` names the mode the new session runs in - --permission-preset, else this device's own
 // engine setting - so the session never falls into the engine's delegated `ask` default with nobody to answer.
@@ -20,6 +21,7 @@ const SIGNED_IN = {
   stdout: JSON.stringify({ signedIn: true, device: { id: "dev-self", name: "This Mac" }, refreshState: "ok" }),
 }
 const fixture = createRemoteThreadFixture()
+useIsolatedAgentDir()
 const dirs: string[] = []
 const owners: FakeOwner[] = []
 afterEach(async () => {

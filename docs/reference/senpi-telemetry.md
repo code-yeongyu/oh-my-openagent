@@ -2,7 +2,9 @@
 
 ## What this is
 
-OmO Native, the standalone edition, ships an anonymous product analytics pipeline. It is enabled by default and uses an opt-out model: every switch in the opt-out matrix below turns it fully off. Telemetry sends to the PostHog project configured in the packaged default; setting `POSTHOG_API_KEY` overrides that project key.
+OmO Native, the standalone edition, ships an anonymous product analytics pipeline. It is enabled by default and uses an opt-out model: every switch in the opt-out matrix below turns it fully off. Telemetry goes to two destinations: the PostHog project configured in the packaged default (`https://us.i.posthog.com`; setting `POSTHOG_API_KEY` overrides that project key), and, in addition, every event is dual-sent to OmO's own OTLP collector at `https://t.omo.dev` (`/v1/register` records the install hash once before the first send, `/v1/logs` carries the events).
+
+Since the first-run consent question (#14920), a fresh install also records an explicit answer before anything is sent: an interactive session is asked once and the answer is persisted (`consent-answer` marker in the state directory); runs with no dialog (headless, print, RPC) never write one and count as not consented.
 
 The payloads carry only booleans, buckets, counters, and allowlisted enum values. No free-form text ever leaves your machine. The exact schema is machine-generated below; if the generator and this document ever disagree, a drift test fails in CI.
 
@@ -409,7 +411,7 @@ PostHog's node client attaches `$lib` and `$lib_version` to every event. Since s
 
 ## Opt-out matrix
 
-Each switch below turns telemetry fully off: both the OmO Native events in the schema above and the legacy `omo_senpi_daily_active` event.
+Each switch below turns telemetry fully off: both the OmO Native events in the schema above and the legacy `omo_senpi_daily_active` event. The `omo.json` switch also stops the Codex adapter's `omo_codex_daily_active` ping.
 
 | Switch | Value that disables | Notes |
 | ------ | ------------------- | ----- |
@@ -417,12 +419,13 @@ Each switch below turns telemetry fully off: both the OmO Native events in the s
 | `OMO_SENPI_DISABLE_POSTHOG` | `1` | Adapter-specific kill switch |
 | `OMO_DISABLE_POSTHOG` | `1` | Global kill switch across omo packages |
 | `OMO_DISABLE_TELEMETRY` | `1`, `true` or `yes` | Global kill switch across omo packages, named for the product rather than the vendor |
-| `OMO_SENPI_SEND_ANONYMOUS_TELEMETRY` | any opt-out value, including `yes` | See the quirk note below |
-| `OMO_SEND_ANONYMOUS_TELEMETRY` | any opt-out value, including `yes` | See the quirk note below |
-| `omo.json` | `telemetry.enabled: false` | Config-file opt-out |
+| `OTEL_SDK_DISABLED` | `true` | Stops every sender (PostHog and the collector), not only the OTLP branch |
+| `OMO_SENPI_SEND_ANONYMOUS_TELEMETRY` | `0`, `false` or `no` | See the migration note below |
+| `OMO_SEND_ANONYMOUS_TELEMETRY` | `0`, `false` or `no` | See the migration note below |
+| `omo.json` | `telemetry.enabled: false` | Config-file opt-out; also stops the Codex adapter's daily ping |
 | Component flag | `omo-senpi-telemetry-disabled` | Per-component disable flag |
 
-Quirk, documented honestly: the `*_SEND_ANONYMOUS_TELEMETRY` variables treat the value `yes` as an opt-out. This is a pre-existing behavior in the shared telemetry core, knowingly preserved for compatibility. Don't set `yes` expecting it to opt in; leaving the variable unset is what keeps telemetry on.
+Migration note ([#14920](https://github.com/code-yeongyu/oh-my-openagent/issues/14920)): before this change the `*_SEND_ANONYMOUS_TELEMETRY` variables treated the value `yes` as an opt-out — a quirk preserved for compatibility. `yes` now keeps telemetry on, matching every other flag; `0`, `false` and `no` still turn it off. If you relied on `=yes` to disable, switch to `=no` or `DO_NOT_TRACK=1`.
 
 ## Known issue fixed in 5.1.35
 

@@ -33,6 +33,10 @@ export type RemoteSessionRow = {
   readonly model?: { readonly provider: string; readonly id: string }
   /** Rows 4: the engine archived the session; absent means not archived. */
   readonly archived?: true
+  /** Rows 6: the holder's retry wait as its engine names it (`{kind, attempt, maxAttempts, delayMs, until}`); absent = none or unknown. */
+  readonly waiting?: unknown
+  /** Rows 7: the version of the engine that holds the session live; absent = unknown. */
+  readonly engine_version?: string
 }
 
 export type RemoteDevice = {
@@ -147,6 +151,12 @@ export type RemoteWatchOutcome =
   { readonly kind: "ok"; readonly watch: RemoteSessionWatch } | { readonly kind: "refused"; readonly reason: string }
 
 export type RemoteSessionsPort = {
+  /** Authenticated query-only device-service request; never an engine command or cold wake. */
+  readonly receipt?: (
+    device: string,
+    durableId: string,
+    deliveryId: string,
+  ) => Promise<RemoteCommandOutcome | { readonly kind: "unavailable" }>
   /** The device service state; `plan_required` means the account's plan has no relay (A5: paid only). */
   readonly status: () => Promise<RemoteServiceState>
   readonly thisDevice: () => Promise<string | null>

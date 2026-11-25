@@ -224,6 +224,7 @@
       "name": "@oh-my-opencode/omo-codex",
       "version": "5.1.83",
       "dependencies": {
+        "@oh-my-opencode/omo-config-core": "workspace:*",
         "@oh-my-opencode/shared-skills": "workspace:*",
         "@oh-my-opencode/utils": "workspace:*",
       },
