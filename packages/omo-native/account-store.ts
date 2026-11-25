@@ -1,16 +1,16 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
-import { credentialId } from "../omo-opencode/src/cli/service-auth/keystore"
-import { withCredentialLock } from "../omo-opencode/src/cli/service-auth/credential-lock"
-import type { HelperAccess } from "../omo-opencode/src/cli/service-auth/keychain-helper/access"
-import { desktopRuntimeCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/creator-handoff"
-import { helperAccess } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+import { credentialId } from "../account-core/src/keystore"
+import { withCredentialLock } from "../account-core/src/credential-lock"
+import type { HelperAccess } from "../account-core/src/keychain-helper/access"
+import { desktopRuntimeCandidates } from "../account-core/src/keychain-helper/creator-handoff"
+import { helperAccess } from "../account-core/src/keychain-helper/darwin-backend"
 import {
   type DedicatedStoreState,
   dedicatedStoreRoot,
   dedicatedStoreState,
-} from "../omo-opencode/src/cli/service-auth/keychain-helper/dedicated-store"
-import { StoreSwitchError, storeSwitch } from "../omo-opencode/src/cli/service-auth/keychain-helper/dedicated-switch"
+} from "../account-core/src/keychain-helper/dedicated-store"
+import { StoreSwitchError, storeSwitch } from "../account-core/src/keychain-helper/dedicated-switch"
 import { ACCOUNT_EXIT } from "./account-show"
 
 // `omo account store status|enable|disable [--discard]` (#13116): the opt-in OmO keychain for a Mac whose login

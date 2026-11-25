@@ -48,7 +48,7 @@ import { EMBEDDED_PAYLOAD_ROOT, RUNTIME_MANIFEST_REL_PATH } from "./embedded-pay
 import {
   RUNTIME_CAPABILITIES_FILE,
   runtimeCapabilitiesText,
-} from "../packages/omo-opencode/src/cli/service-auth/keychain-helper/runtime-capabilities"
+} from "@oh-my-opencode/account-core/keychain-helper/runtime-capabilities"
 import { reportEmbeddedPayload } from "./embedded-payload-probe"
 
 export { compileDefinesForOmoBinary, reportEmbeddedPayload }

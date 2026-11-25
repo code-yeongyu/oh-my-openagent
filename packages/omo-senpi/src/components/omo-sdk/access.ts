@@ -11,7 +11,7 @@ import {
   SessionEnded,
   SignInError,
   serviceOrigin,
-} from "@oh-my-opencode/omo-opencode/service-auth"
+} from "@oh-my-opencode/account-core"
 import { launchCarriedPrivateTable } from "../memory/desktop-sync/launchClassification"
 import { DEFAULT_SERVICE_API } from "../memory/device-session/account-source"
 import { cliCredentialStore, openCliSession } from "../memory/device-session/cli-session"

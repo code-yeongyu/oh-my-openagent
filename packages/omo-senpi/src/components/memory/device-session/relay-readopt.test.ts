@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
 
 import type { HeldDeviceCredential } from "@oh-my-opencode/device-service-core"
-import type { CredentialStore, Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { CredentialStore, Credentials } from "@oh-my-opencode/account-core"
 
 import { createCliAccountSource, type HeldCredentialRelay } from "./account-source"
 

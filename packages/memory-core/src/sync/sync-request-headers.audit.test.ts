@@ -18,6 +18,7 @@ const CLIENT_SCOPES = [
   "packages/omo-native/*.ts",
   "packages/omo-opencode/src/cli/service-auth/**/*.ts",
   "packages/omo-opencode/src/cli/account-keys/**/*.ts",
+  "packages/account-core/src/**/*.ts",
 ]
 // Bun.Glob yields native separators (backslashes on Windows); every comparison below is against POSIX paths.
 const posixPath = (file: string): string => file.split(sep).join("/")

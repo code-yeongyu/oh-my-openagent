@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { createSession } from "../../omo-opencode/src/cli/service-auth/session"
+import { createSession } from "../../account-core/src/session"
 import {
   clock,
   fakeApi,
@@ -9,7 +9,7 @@ import {
   minted,
   refusal,
   temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+} from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 import { runSignInVerb, type SignInEvent } from "../account-sign-in"
 

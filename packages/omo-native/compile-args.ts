@@ -4,7 +4,7 @@ import { join } from "node:path"
 import { isEngineCommand } from "./bin/lib/engine-commands.js"
 import { LAUNCH_SPEC_FILENAME } from "./bin/lib/launch-spec-mode.js"
 import { isSelfUpdate, updateUsageAnswer } from "./bin/lib/update-args.js"
-import { serviceAccountsOpen } from "../omo-opencode/src/cli/service-auth/accounts-gate"
+import { serviceAccountsOpen } from "../account-core/src/accounts-gate"
 import {
   parsesAsBareClosedLogin,
   parsesAsClosedDeviceLogin,

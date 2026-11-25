@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
-import { openSignInBrowser } from "./browser"
+import { openSignInBrowser } from "@oh-my-opencode/account-core/browser"
 import { Command } from "commander"
 import { configureServiceAuthCommands } from "./commands"
-import { serviceOrigin } from "./protocol"
+import { serviceOrigin } from "@oh-my-opencode/account-core/protocol"
 
 test.each(["darwin", "win32", "linux"] as const)(
   "browser child on %s receives no credentials in argv or environment",

@@ -21,6 +21,7 @@ export const corePackagePaths = [
   "packages/isolation-core",
   "packages/memory-core",
   "packages/device-service-core",
+  "packages/account-core",
   "packages/telemetry-core",
   "packages/claude-code-compat-core",
   "packages/skills-loader-core",

@@ -674,22 +674,22 @@
   "packages/omo-opencode/src/cli/service-auth/commands-review.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/omo-opencode/src/cli/service-auth/credential-lock-held.test.ts": {
+  "packages/account-core/src/credential-lock-held.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
-  "packages/omo-opencode/src/cli/service-auth/credential-lock-torn.test.ts": {
+  "packages/account-core/src/credential-lock-torn.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/omo-opencode/src/cli/service-auth/logout-outcomes.test.ts": {
     "omo-testing/no-flake-masking": 3
   },
-  "packages/omo-opencode/src/cli/service-auth/refresh-process.test.ts": {
+  "packages/account-core/src/refresh-process.test.ts": {
     "omo-testing/no-flake-masking": 3
   },
-  "packages/omo-opencode/src/cli/service-auth/session-machine-reconcile.test.ts": {
+  "packages/account-core/src/session-machine-reconcile.test.ts": {
     "omo-testing/no-flake-masking": 2
   },
-  "packages/omo-opencode/src/cli/service-auth/versioned-keystore.test.ts": {
+  "packages/account-core/src/versioned-keystore.test.ts": {
     "omo-testing/no-flake-masking": 1
   },
   "packages/omo-opencode/src/cli/worktree-sweep/worktree-sweep.test.ts": {

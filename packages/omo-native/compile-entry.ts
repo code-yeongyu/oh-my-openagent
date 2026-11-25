@@ -49,7 +49,7 @@ import { applyCachedClaudeCode } from "../omo-senpi/src/components/claude-code/i
 import { buildSenpiArgs, shouldPrintCompiledBanner, trustLaunchKind } from "./compile-args"
 import { runLoroSmoke } from "./loro-smoke"
 import { runAccountCommand } from "./account-cli"
-import { registerHelperCandidates } from "../omo-opencode/src/cli/service-auth/keychain-helper/darwin-backend"
+import { registerHelperCandidates } from "../account-core/src/keychain-helper/darwin-backend"
 import { refreshSessionHostUnit, runRemoteAttachCommand, runRemoteCommand } from "./remote-entry"
 import { runtimeGate } from "./release-version"
 import { runSyncCommand } from "./sync-cli"

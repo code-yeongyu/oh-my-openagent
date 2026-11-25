@@ -11,11 +11,11 @@ import {
   KeychainLockedError,
   SESSION_READ_WAIT,
   SecretServiceUnavailableError,
-} from "../omo-opencode/src/cli/service-auth/keystore"
-import { type Credentials, SignInError, serviceOrigin } from "../omo-opencode/src/cli/service-auth/protocol"
-import { readRecoveryClock, type RecoveryClock } from "../omo-opencode/src/cli/service-auth/recovery-clock"
-import { eligibleAttempt } from "../omo-opencode/src/cli/service-auth/refresh-attempt"
-import { readSignedOutMarker, signedOutMarkerPath } from "../omo-opencode/src/cli/service-auth/signed-out-marker"
+} from "../account-core/src/keystore"
+import { type Credentials, SignInError, serviceOrigin } from "../account-core/src/protocol"
+import { readRecoveryClock, type RecoveryClock } from "../account-core/src/recovery-clock"
+import { eligibleAttempt } from "../account-core/src/refresh-attempt"
+import { readSignedOutMarker, signedOutMarkerPath } from "../account-core/src/signed-out-marker"
 
 // `omo account show`, apart from the verbs that sign in, refresh or hand keys over: it reads the stored credential, the
 // signed-out marker and the sync pin, and nothing here reaches the account service (omo#13440).

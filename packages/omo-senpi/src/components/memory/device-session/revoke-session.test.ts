@@ -12,7 +12,7 @@ import { join } from "node:path"
 
 import { buildIdentityPaths } from "@oh-my-opencode/memory-core"
 import type { SyncSession } from "@oh-my-opencode/memory-core/sync-engine"
-import type { CredentialStore, Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import type { CredentialStore, Credentials } from "@oh-my-opencode/account-core"
 
 import * as syncRuntime from "../sync-runtime"
 import { createSyncRunner } from "../sync-runner"

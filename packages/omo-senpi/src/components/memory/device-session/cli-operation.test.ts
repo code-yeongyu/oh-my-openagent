@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { generateKeyPairSync } from "node:crypto"
-import { createCredentialStore, type Credentials } from "@oh-my-opencode/omo-opencode/service-auth"
+import { createCredentialStore, type Credentials } from "@oh-my-opencode/account-core"
 import { createCliAccountSource } from "./account-source"
 
 const keys = () => ({

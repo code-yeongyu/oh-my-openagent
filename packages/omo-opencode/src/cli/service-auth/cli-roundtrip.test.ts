@@ -2,8 +2,8 @@ import { expect, onTestFinished, test } from "bun:test"
 import { existsSync } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import { join, resolve } from "node:path"
-import { fakeApi, grant, minted, temporaryHome } from "./test-support"
-import { credentialSchema } from "./protocol"
+import { fakeApi, grant, minted, temporaryHome } from "@oh-my-opencode/account-core/test-support"
+import { credentialSchema } from "@oh-my-opencode/account-core/protocol"
 
 test("real omo launcher signs in, reports status, and logs out without disk or output credentials", async () => {
   const home = await temporaryHome()

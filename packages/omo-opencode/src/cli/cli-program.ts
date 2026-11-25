@@ -7,7 +7,7 @@ import { doctor, resolveDoctorTarget } from "./doctor"
 import { createMcpOAuthCommand } from "./mcp-oauth"
 import { configureAccountKeysCommands } from "./account-keys/commands"
 import "./service-auth/cli-service-auth-hooks.js"
-import { serviceAccountsOpen } from "./service-auth/accounts-gate"
+import { serviceAccountsOpen } from "@oh-my-opencode/account-core/accounts-gate"
 import { openCodeServiceAuthHooks } from "./service-auth/cli-service-auth-state"
 import { configureServiceAuthCommands } from "./service-auth/commands"
 import { resolveInstallArgs, type InstallCommandOptions } from "./install-command-options"
@@ -240,5 +240,7 @@ configureAccountKeysCommands(program)
 export function runCli(): void {
   program.parse()
 }
+
+export { program as cliProgram }
 
 export { openCodeServiceAuthHooks }

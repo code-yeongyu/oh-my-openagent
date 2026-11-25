@@ -7,7 +7,7 @@ import {
   type Credentials,
   KeychainLockedError,
   RequestFailure,
-} from "@oh-my-opencode/omo-opencode/service-auth"
+} from "@oh-my-opencode/account-core"
 import { LocalApiError } from "@oh-my-opencode/device-service-core"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 

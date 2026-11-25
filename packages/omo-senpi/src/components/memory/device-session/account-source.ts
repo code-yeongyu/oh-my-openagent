@@ -15,7 +15,7 @@ import {
   quietNotice,
   serviceOrigin,
   SignInError,
-} from "@oh-my-opencode/omo-opencode/service-auth"
+} from "@oh-my-opencode/account-core"
 import { randomUUID } from "node:crypto"
 import type { HeldDeviceCredential } from "@oh-my-opencode/device-service-core"
 import { syncRequestHeaders } from "@oh-my-opencode/memory-core/sync-capabilities"

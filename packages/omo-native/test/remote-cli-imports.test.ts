@@ -13,7 +13,7 @@ const OFFENDERS: readonly string[] = [
   "remote-cli.ts -> ../device-service-core/src/index.ts",
   "remote-cold-wake.ts -> ../device-service-core/src/index.ts",
   "remote-entry.ts -> ../device-service-core/src/device-service.ts",
-  "remote-entry.ts -> ../omo-opencode/src/cli/service-auth/keystore",
+  "remote-entry.ts -> ../account-core/src/keystore",
   "remote-entry.ts -> ./account-show",
   "remote-entry.ts -> ./bin/lib/agent-dir.js",
   "remote-entry.ts -> ./device-service-handoff",

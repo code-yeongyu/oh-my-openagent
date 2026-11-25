@@ -4,9 +4,9 @@ import { lstat, readFile, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
 import { buildServiceAuth } from "../../../../../script/build-service-auth"
-import { credentialId } from "./keystore"
-import { credentialSchema } from "./protocol"
-import { fakeApi, grant, minted, temporaryHome } from "./test-support"
+import { credentialId } from "@oh-my-opencode/account-core/keystore"
+import { credentialSchema } from "@oh-my-opencode/account-core/protocol"
+import { fakeApi, grant, minted, temporaryHome } from "@oh-my-opencode/account-core/test-support"
 
 // #7185b: on a Linux machine with no Secret Service, `omo login` keeps the shared sign-in in the private state file, a
 // second process uses the same device instead of registering a new one, and `omo logout` removes the file. The launcher

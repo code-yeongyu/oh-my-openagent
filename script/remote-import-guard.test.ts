@@ -1,12 +1,17 @@
 import { afterAll, describe, expect, test } from "bun:test"
 import { execFileSync } from "node:child_process"
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
+import { ACCOUNT_CORE, ACCOUNT_CORE_RULES, ACCOUNT_LOGIC_MARKERS } from "./remote-import-guard-account-rules"
+import { checkAdapterImports, logicOutside, offenderGrowth } from "./remote-import-guard-adapter"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
 import {
+  ADAPTER_LAYER_RENAMES,
+  ADAPTER_OFFENDERS,
+  ADAPTER_RULES,
   NON_LITERAL_IMPORT_OFFENDERS,
   REMOTE_IMPORT_RULES,
   S1_OFFENDERS,
@@ -28,8 +33,12 @@ const asRecord = (map: ReadonlyMap<string, readonly string[]>): Record<string, r
 const usesOf = (offenders: Readonly<Record<string, { readonly uses: readonly string[] }>>) =>
   Object.fromEntries(Object.entries(offenders).map(([file, offender]) => [file, offender.uses.toSorted()]))
 
+// One scan of the repository serves G1 and family A.
+const REPO_ROOT = join(import.meta.dir, "..")
+const repoFacts = scanRepository(REPO_ROOT)
+
 describe("remote import guard G1 over packages/**", () => {
-  const repo = findings(join(import.meta.dir, ".."))
+  const repo = checkImports(repoFacts, createResolver(REPO_ROOT), REMOTE_IMPORT_RULES)
 
   test("#given S1 #then the vendored local-API client and bunshin relay transport are imported only where allowed", () => {
     // A new importer fails here; a removed one must leave S1_OFFENDERS in the same PR (the list only shrinks).
@@ -49,6 +58,139 @@ describe("remote import guard G1 over packages/**", () => {
   test("#given non-literal import() outside tests #then no file gains one", () => {
     const outsideTests = [...repo.nonLiteralImports].filter(([file]) => !REMOTE_IMPORT_RULES.testFile(file))
     expect(Object.fromEntries(outsideTests)).toEqual(NON_LITERAL_IMPORT_OFFENDERS)
+  })
+})
+
+describe("adapter import family A (#14943 design 7.5)", () => {
+  test("#given every adapter of both editions #then the layers it reaches are exactly its offender row (the list only shrinks)", () => {
+    // An architecture contract: a new reach fails here, and a removed one must leave ADAPTER_OFFENDERS in the same PR.
+    const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ADAPTER_RULES)
+    expect(Object.fromEntries(found)).toEqual(usesOf(ADAPTER_OFFENDERS))
+  })
+
+  test("#given the merge base's offender record #then this head's record only shrinks against it", () => {
+    const base = execFileSync("git", ["merge-base", process.env.SDK_PARITY_BASE ?? "origin/dev", "HEAD"], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+    }).trim()
+    let recorded: string | undefined
+    try {
+      recorded = execFileSync("git", ["show", `${base}:script/remote-import-guard-adapter-offenders.json`], {
+        cwd: REPO_ROOT,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "ignore"],
+      })
+    } catch {
+      recorded = undefined
+    }
+    const baseRecord = recorded === undefined ? undefined : JSON.parse(recorded)
+    expect(offenderGrowth(baseRecord, ADAPTER_OFFENDERS, ADAPTER_LAYER_RENAMES)).toEqual([])
+  })
+
+  test("#given a layer whose code moved #then a base row naming it also admits the new layer, and nothing else does", () => {
+    const base = { "a.ts": { uses: ["old/", "L1"] } }
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L1"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "old/"] } }, { "old/": "new/" })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/", "L2"] } }, { "old/": "new/" })).toEqual([
+      "a.ts gained L2, which the merge base's record does not list; route it through the SDK",
+    ])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["new/"] } })).toEqual([
+      "a.ts gained new/, which the merge base's record does not list; route it through the SDK",
+    ])
+  })
+
+  test("#given a record that drops a reach #then it passes; one that adds a file or a layer #then each is named", () => {
+    const base = { "a.ts": { uses: ["L1", "L2"] }, "b.ts": { uses: ["L1"] } }
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1"] } })).toEqual([])
+    expect(offenderGrowth(base, { "a.ts": { uses: ["L1", "L3"] }, "c.ts": { uses: ["L1"] } })).toEqual([
+      "a.ts gained L3, which the merge base's record does not list; route it through the SDK",
+      "c.ts is a new adapter offender (L1); route it through the SDK instead",
+    ])
+  })
+
+  test("#given an adapter that imports the delivery pipeline, directly or through a helper #then the reach is named, and the walk stops at the SDK entry", () => {
+    const root = mkdtempSync(join(tmpdir(), "adapter-guard-"))
+    try {
+      const thread = "packages/omo-senpi/src/components/thread"
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-senpi/package.json", '{"name":"@oh-my-opencode/omo-senpi"}')
+      put(`${thread}/gateway/pipeline.ts`, "export const deliver = () => 1\n")
+      put(`${thread}/sdk.ts`, 'import { deliver } from "./gateway/pipeline.ts"\nexport const sdk = { deliver }\n')
+      put(`${thread}/helper.ts`, 'export { deliver } from "./gateway/pipeline.ts"\n')
+      put(
+        `${thread}/tools.ts`,
+        'import { deliver } from "./helper.ts"\nimport { sdk } from "./sdk.ts"\nimport "node:net"\n',
+      )
+      put(`${thread}/tools/extension-tools.ts`, 'import { sdk } from "../sdk.ts"\n')
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkAdapterImports(scanRepository(root), createResolver(root), ADAPTER_RULES)
+      expect(Object.fromEntries(found)).toEqual({
+        [`${thread}/tools.ts`]: ["node:net", "packages/omo-senpi/src/components/thread/gateway/"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("account core family A (#14364)", () => {
+  const isNotLogic = (file: string): boolean =>
+    /\.test\.[cm]?[jt]s$/.test(file) ||
+    /(?:^|[/.-])(?:fixture|test-support)\b/.test(file) ||
+    file.split("/").some((segment) => segment === "test" || segment === "testing")
+
+  test("#given every file of the account core, tests included #then none reaches an edition package or a cli directory", () => {
+    const found = checkAdapterImports(repoFacts, createResolver(REPO_ROOT), ACCOUNT_CORE_RULES)
+    expect(repoFacts.some((fact) => fact.file.startsWith(ACCOUNT_CORE))).toBe(true)
+    expect(Object.fromEntries(found)).toEqual({})
+  })
+
+  test("#given every non-test source outside the account core #then none holds credential-store, device-key or device-code logic", () => {
+    const sources = repoFacts
+      .filter((fact) => !isNotLogic(fact.file))
+      .map((fact) => ({ file: fact.file, text: readFileSync(join(REPO_ROOT, fact.file), "utf8") }))
+    expect(Object.fromEntries(logicOutside(sources, ACCOUNT_CORE, ACCOUNT_LOGIC_MARKERS))).toEqual({})
+    expect(logicOutside(sources, "packages/none/", ACCOUNT_LOGIC_MARKERS).size).toBeGreaterThan(0)
+  })
+
+  test("#given a core file that imports a cli module, directly or through a helper #then the edition package is named", () => {
+    const root = mkdtempSync(join(tmpdir(), "account-core-guard-"))
+    try {
+      const put = (path: string, text: string): void => {
+        mkdirSync(dirname(join(root, path)), { recursive: true })
+        writeFileSync(join(root, path), text)
+      }
+      put("packages/omo-opencode/src/cli/terminal.ts", "export const t = 1\n")
+      put("packages/account-core/src/helper.ts", 'export { t } from "../../omo-opencode/src/cli/terminal.ts"\n')
+      put("packages/account-core/src/session.ts", 'import { t } from "./helper.ts"\nexport const s = t\n')
+      put("packages/account-core/src/clean.ts", "export const c = 1\n")
+      execFileSync("git", ["init", "-q"], { cwd: root })
+      execFileSync("git", ["add", "packages"], { cwd: root })
+      const found = checkAdapterImports(scanRepository(root), createResolver(root), ACCOUNT_CORE_RULES)
+      expect(Object.fromEntries(found)).toEqual({
+        "packages/account-core/src/helper.ts": ["packages/omo-opencode/"],
+        "packages/account-core/src/session.ts": ["packages/omo-opencode/"],
+      })
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+
+  test("#given a marker outside the core #then the file and its kind are named; the same text inside the core is not", () => {
+    const sources = [
+      { file: "packages/omo-native/store.ts", text: 'spawn("secret-tool", ["lookup"])' },
+      { file: "packages/omo-senpi/flow.ts", text: 'request("/v1/device/code")' },
+      { file: `${ACCOUNT_CORE}keystore.ts`, text: 'spawn("secret-tool", ["store"])' },
+      { file: "packages/omo-native/clean.ts", text: "export const clean = 1" },
+    ]
+    expect(Object.fromEntries(logicOutside(sources, ACCOUNT_CORE, ACCOUNT_LOGIC_MARKERS))).toEqual({
+      "packages/omo-native/store.ts": ["credential store or device keys"],
+      "packages/omo-senpi/flow.ts": ["device-code flow"],
+    })
   })
 })
 

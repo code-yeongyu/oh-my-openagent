@@ -564,8 +564,8 @@ describe("checkExtensionCurrent", () => {
     const { mainInputs, deviceAccountInputs } = await sharedOutputs()
     for (const suffix of [
       "packages/omo-senpi/src/components/memory/device-session/account-source.ts",
-      "packages/omo-opencode/src/cli/service-auth/keystore.ts",
-      "packages/omo-opencode/src/cli/service-auth/session.ts",
+      "packages/account-core/src/keystore.ts",
+      "packages/account-core/src/session.ts",
     ]) {
       expect(
         mainInputs.some((input) => toPortableBuildPath(input).endsWith(suffix)),

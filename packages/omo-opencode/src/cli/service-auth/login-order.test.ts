@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test"
 import { beginLogin } from "./commands"
-import type { CredentialStore } from "./keystore"
-import { MachineAlreadySignedIn } from "./machine-device"
-import type { Credentials } from "./protocol"
-import { createSession, type DeviceServiceHandoff, type MachineDeviceState } from "./session"
-import { fakeApi, grant, privateKeys, temporaryHome } from "./test-support"
+import type { CredentialStore } from "@oh-my-opencode/account-core/keystore"
+import { MachineAlreadySignedIn } from "@oh-my-opencode/account-core/machine-device"
+import type { Credentials } from "@oh-my-opencode/account-core/protocol"
+import { createSession, type DeviceServiceHandoff, type MachineDeviceState } from "@oh-my-opencode/account-core/session"
+import { fakeApi, grant, privateKeys, temporaryHome } from "@oh-my-opencode/account-core/test-support"
 
 const stored: Credentials = {
   ...grant,

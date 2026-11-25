@@ -14,7 +14,7 @@ import { syncPinDir } from "../../memory-core/src/sync/pin-dir"
 import { createInMemoryDeviceKeyring } from "../../memory-core/src/sync/keyring-port"
 import { Command } from "commander"
 
-import { ApiRefusal, refusalGuidance, SignInError } from "../../omo-opencode/src/cli/service-auth/protocol"
+import { ApiRefusal, refusalGuidance, SignInError } from "../../account-core/src/protocol"
 import {
   fakeApi,
   grant,
@@ -22,7 +22,7 @@ import {
   privateKeys,
   refusal,
   temporaryHome,
-} from "../../omo-opencode/src/cli/service-auth/test-support"
+} from "../../account-core/src/test-support"
 import { withGenesisLock } from "../../memory-core/src/sync/genesis/intent-store"
 import { configureSyncCommands, EXIT_UNSUPPORTED_HERE, type SyncCommandDependencies } from "../sync-cli"
 import { signedInSyncContext, type SyncContext } from "../sync-context"
