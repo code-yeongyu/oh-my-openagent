@@ -14,7 +14,7 @@ export const NOT_ARGV: Readonly<Record<string, NotArgv>> = {
     tokens: ["--internal-", "upgrade"],
     reason: "matches the command line of running engine processes, not omo's argv",
   },
-  "packages/omo-native/bin/lib/install-calls.js": {
+  "packages/omo-native/bin/lib/install-setup-calls.js": {
     tokens: ["inventory", "pending", "stages", "summary", "target_roots"],
     reason: "the keys of the value install.setup.plan answers, not argv",
   },

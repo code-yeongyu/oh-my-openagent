@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import type { setup } from "../bin/lib/install-calls.js"
+import type { setup } from "../bin/lib/install-setup-calls.js"
 import {
   type SetupCountEntry,
   type SetupPlanEntry,

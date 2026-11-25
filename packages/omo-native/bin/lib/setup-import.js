@@ -5,7 +5,7 @@
  */
 
 import { createInterface } from "node:readline/promises"
-import { setup, thrownBy } from "./install-calls.js"
+import { setup, thrownBy } from "./install-setup-calls.js"
 import { renderSetupSummary, TELEMETRY_NOTICE } from "./setup-summary.js"
 
 function write(lines) {

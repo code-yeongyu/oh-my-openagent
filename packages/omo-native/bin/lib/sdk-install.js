@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 // The install core's part the omo SDK root loads through `omo-ai/sdk` (first-party design 3.1, 4.1). Each call takes its
-// ports as one argument with real defaults; the calls of slice C1c live in install-calls.js, loaded on the first call.
+// ports as one argument with real defaults; the calls of slice C1c live in install-calls.js and install-setup-calls.js, loaded on the first call.
 
 const PACKAGE_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..")
 const SDK_EXPORT = "./sdk"
@@ -52,8 +52,9 @@ export async function installCore(context, overrides = {}) {
   const updatePorts = { ...base, ...overrides.update }
   const ports = { ...base, ...overrides.setup }
   const calls = await import("./install-calls.js")
+  const { createSetup } = await import("./install-setup-calls.js")
   // This root's own setup calls: a plan its plan call answered is applied only through its apply.
-  const setup = calls.createSetup()
+  const setup = createSetup()
   return {
     sdkRoot: (input) => sdkRoot(input),
     version: async (input) => calls.version(input, overrides.version),
