@@ -229,7 +229,7 @@ Direction: **SDK ⊇ CLI and SDK ⊇ tools.** Every row has an SDK call. A CLI o
 | Locate a thread's holder | none | `threads.locate({ thread, all_scope? })` | none | yes | Tool and CLI: resolution is internal to every verb; a caller gets the holder on the `thread_list` row. Kept in the SDK for `daemon adopt` and connectors |
 | Attach live: snapshot, records, pending dialogs, answer one, detach | `omo remote attach <s>` (TUI); `omo remote answer` arrives with #14890 | `threads.attach({ thread })` answering `{ snapshot, events, read, pending, answer, command, detach }` | none | partial: remote module `attach` | Tool: answering another session's approval dialog is an authority decision, and no ruling gives a session that authority over a peer. The TUI is rendering over the handle |
 | Take a host session into this terminal | `omo daemon adopt <s> [--interrupt] [--force]` | `threads.release({ thread, interrupt?, force? })` | none | yes (`locate` + `release`) | Tool: it ends in replacing a terminal process, which no tool call can do. The process replacement stays in the CLI |
-| Start the interactive terminal, resume, or print mode | `omo [flags] [prompt]`, `omo --session`, engine print flags | `threads.create` + `threads.attach`, or `threads.create` + `threads.send` + `threads.follow` | none | partial, as the rows above | The terminal UI is a renderer, not a capability |
+| Start the interactive terminal, resume, print mode, or serve the engine's RPC on stdio | `omo [flags] [prompt]`, `omo --session`, `omo --resume`, `omo --print`, `omo --mode rpc` | `threads.create` + `threads.attach`, or `threads.create` + `threads.send` + `threads.follow` | none | partial, as the rows above | The terminal UI and the stdio RPC stream are renderers of the same calls, not capabilities |
 | Warm the operator daemon | part of `omo daemon run` | `daemon.warm()` | none | yes (`warmDaemon`) | See 6.5 |
 | Declare and call a store extension | none | `threads.extensions.register(...)`, `threads.extensions.call(...)` | `ext_<extension>_<tool>` | yes | CLI: extension ops are session tools by declaration; no person-facing verb is asked for |
 
@@ -281,16 +281,16 @@ Direction: **SDK ⊇ CLI and SDK ⊇ tools.** Every row has an SDK call. A CLI o
 |---|---|---|---|---|---|
 | Which config files loaded, with diagnostics | `omo doctor` (its `WARN config:` lines) | `config.status()` | none | yes | CLI gains `omo config status` only if #14366 asks for it |
 | Explain, check, edit, revert | none | `config.explain`, `.check`, `.edit`, `.revert` (#14366) | none | no | Owned by #14366; the namespace is reserved here |
-| Ensure the operator daemon | `omo daemon run [--no-upgrade] [--json]`; `omo host ensure` | `daemon.ensure({ policy? })`, `daemon.warm()` | none | partial: `warmDaemon` only | Tool: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call |
-| Who serves, which sessions | `omo daemon status`; `omo host status [--all] [--include-workers]` | `daemon.status({ all?, include_workers? })` | none | **no** | Tool: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) |
+| Ensure the operator daemon | `omo daemon run [--no-upgrade] [--pinned] [--json]`; `omo host ensure [--launch-spec] [--policy]` | `daemon.ensure({ policy?, pinned? })`, `daemon.warm()` | none | partial: `warmDaemon` only | Tool: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call |
+| Who serves, which sessions | `omo daemon status [--include-workers]`; `omo host status [--all] [--include-workers]` | `daemon.status({ all?, include_workers? })` | none | **no** | Tool: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) |
 | Stop, drain, stop all and wait | `omo daemon stop [--drain] [--all [--wait [--timeout]]]`; `omo host stop` | `daemon.stop({ drain?, all?, wait?, deadline_ms? })` | none | **no** | Same reason as ensure |
 | Hand the socket to this build | `omo daemon handoff`; `omo host handoff` | `daemon.handoff({ allow_downgrade? })` | none | **no** | Same reason |
 | Remove dead endpoint state | `omo daemon gc [--prune-store-index]`; `omo host gc` | `daemon.gc({ prune_store_index? })` | none | **no** | Same reason |
-| Prepare a downgrade | `omo daemon rollback-prepare` | `daemon.rollbackPrepare()` | none | **no** | Same reason |
+| Prepare a downgrade | `omo daemon rollback-prepare [--store <dir>]... [--allow-missing-index]` | `daemon.rollbackPrepare({ stores?, allow_missing_index? })` | none | **no** | Same reason |
 | Name a shard socket | `omo host shard-path --kind --owner` | `daemon.shardPath({ kind, owner, root? })` | none | **no** | Tool: an endpoint internal |
 | Diagnose the install | `omo doctor`; `--models`; `--fix [--dry-run]`; `--reap` | `diagnostics.run()` answering findings as data, `.models()`, `.fixReflectionLock({ dry_run? })`, `.reapStaleEngines({ pids })` | none | **no** | Tool: it reads and repairs the installation under the running session; `reapStaleEngines` ends processes and takes explicit pids only |
-| Import settings from other harnesses | `omo setup [args]` | `install.setup.detect()`, `install.setup.plan()`, `install.setup.apply(plan)` | none | **no** | Tool: plan, consent, write is a person's flow |
-| Update omo | `omo update` and every self-update spelling | `install.update({ channel? })` | none | **no** | Tool: replaces the binary the session runs on |
+| Import settings from other harnesses | `omo setup [--yes] [--ask-each] [--dry-run]` | `install.setup.detect()`, `install.setup.plan()` (what `--dry-run` prints), `install.setup.apply(plan, { consent })` (the callback is asked once, or per stage as `--ask-each` does) | none | **no** | Tool: plan, consent, write is a person's flow |
+| Update omo | `omo update [--dry-run \| --print] [--self]`, and the `self`, `senpi`, `omo` targets | `install.update({ dry_run? })` | none | **no** | Tool: replaces the binary the session runs on |
 | Version, SDK location | `omo --version`; `omo sdk root` (new) | `install.version()`, `install.sdkRoot()` | none | **no** | Tool: `OMO_SDK_ROOT` is already in a session's environment |
 | The ulw loop | `omo ulw-loop` (answers that it moved) | the agent toolkit SDK, re-exported as `omo.toolkit` | n/a | yes | The CLI verb is already retired in favour of the SDK |
 
@@ -300,7 +300,8 @@ The launcher forwards these to the pinned engine unchanged (`bin/lib/engine-comm
 
 | Capability | CLI today | SDK call | Tool | SDK today | Adapter omission and its reason |
 |---|---|---|---|---|---|
-| Extension packages | `omo install`, `remove`, `uninstall`, `list` | `engine.packages.install`, `.remove`, `.list` | none | **no** | Tool: installs code into the engine |
+| Extension packages | `omo install`, `remove`, `uninstall`, `list`, `omo update --extensions` | `engine.packages.install`, `.remove`, `.list`, `.update` | none | **no** | Tool: installs code into the engine |
+| Model catalogs | `omo update --models` | `engine.models.update()` | none | **no** | Tool: `thread_set_model` resolves against the catalog the target already has |
 | Engine settings | `omo config` | `engine.config.*` | none | **no** | Tool: #14366 decides what a session may edit |
 | Model provider credentials | `omo auth` | `engine.auth.*` (status and removal as data; a login takes callbacks; a key is an input, never a result) | none | **no** | Tool: provider credentials |
 | Schedules | `omo schedule` | `engine.schedule.*` | none | **no** | Tool: the engine's own schedule tool, where it exists, is the session surface |
@@ -313,6 +314,8 @@ The sub-verbs and flags of `install`, `config`, `auth` and `schedule` are enumer
 ### 6.8 Rows that are not capabilities
 
 Internal entries the binary dispatches for its own processes (`__kill-guard`, `__device-service-bootstrap` from #14890, `remote enable --after-login`) are listed in the registry as `internal`, each with the capability it serves (`deviceService.bootstrap`), so a new hidden verb cannot bypass the check by being hidden.
+
+A retired verb that only answers where it went (`omo app-server`, `omo ulw-loop`) is listed as `retired` with the call that replaced it. `--help` and `-h` on any verb, and `--json`, are rendering and have no row.
 
 ### 6.9 The OpenCode-edition binary
 
