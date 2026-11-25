@@ -4,8 +4,10 @@ import {
   type OmoFailure,
   type OmoPrincipal,
   PRINCIPAL_MATRIX,
+  ROOT_CALLS,
   type RootCallKey,
 } from "../contract"
+import { PENDING_CELLS } from "./pending-cells"
 
 /** The facts of a root a matrix line may be conditioned on: the root options it was built with. */
 export type RootFacts = Readonly<Record<string, unknown>>
@@ -20,6 +22,11 @@ function boundaryLines(facts: RootFacts) {
     (line) => line.input === undefined && Object.keys(line.root ?? {}).every((option) => facts[option] !== undefined),
   )
 }
+
+/** The calls no line of the matrix names: a pair with no cell is refused by default, never served by omission. */
+export const UNLINED_CALLS: readonly RootCallKey[] = (Object.keys(ROOT_CALLS) as RootCallKey[]).filter(
+  (call) => !PRINCIPAL_MATRIX.some((line) => (line.rows as readonly string[]).includes(call)),
+)
 
 /**
  * Every call the root refuses its principal outright (security design 4), keyed by call, decided once when the root is
@@ -42,6 +49,15 @@ export function boundaryRefusals(
           next_action: OMO_CODE_REGISTRY[code].next_action,
           details: { principal: principal.kind },
         })
+  }
+  for (const call of UNLINED_CALLS) {
+    if (PENDING_CELLS.some((pending) => pending.call === call && pending.principal === principal.kind)) continue
+    refusals.set(call, {
+      code: "sender_not_allowed",
+      message: `${call} has no cell for a ${principal.kind} principal in security design 4, so it is refused.`,
+      next_action: OMO_CODE_REGISTRY.sender_not_allowed.next_action,
+      details: { principal: principal.kind, reason: "no_matrix_cell" },
+    })
   }
   return refusals
 }

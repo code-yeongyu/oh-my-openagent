@@ -124,6 +124,21 @@ describe("gateway store worker sidecar", () => {
   })
 })
 
+// The node packages a shipped SDK runtime inlines, by name (LEAD ruling on the P1b regression that widened the thread SDK
+// runtime from 1 package to 29): a new import that widens either bundle fails here naming the package.
+const inlinedPackages = (inputs) =>
+  [...new Set(inputs.flatMap((input) => /.*node_modules\/((?:@[^/]+\/)?[^/]+)/.exec(input)?.[1] ?? []))].sort()
+
+describe("shipped SDK runtimes inline a pinned set of packages", () => {
+  test("#given the thread SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
+    expect(inlinedPackages((await sharedOutputs()).threadSdkInputs)).toEqual(["typebox"])
+  })
+
+  test("#given the omo SDK runtime build #when its inputs are read #then the inlined packages are exactly the pinned set", async () => {
+    expect(inlinedPackages((await sharedOutputs()).omoSdkInputs)).toEqual(["jsonc-parser", "typebox", "zod"])
+  })
+})
+
 describe("thread SDK runtime", () => {
   test("#given the thread SDK build #when its inputs and exports are inspected #then it is a standalone entry that inlines no package but the contracts' typebox", async () => {
     const outputs = await sharedOutputs()

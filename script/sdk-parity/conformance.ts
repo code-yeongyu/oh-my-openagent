@@ -19,6 +19,8 @@ export type EffectEvidence = {
   readonly kind: "effect" | "refusal"
   readonly member: string
   readonly input: Readonly<Record<string, unknown>>
+  /** The state the scenario's fakes start from. */
+  readonly given?: readonly unknown[]
   readonly expect: readonly Expectation[]
   readonly target?: "this_device" | "other_device"
   readonly observed: readonly ObservedCall[]
@@ -129,8 +131,16 @@ const effectOf = (record: EffectEvidence): string =>
     ),
   )
 
-// Coverage is computed, never declared: an optional input is covered by two passing records of the row whose inputs
-// differ in that field alone and that differ in kind or stated effect. Required inputs and inert fields are exempt.
+// Coverage is computed, never declared: an optional input is covered by two passing records of the row that start from
+// the same given state, whose inputs differ in that field alone, and that differ in kind, in stated effect or in the
+// answer both state (design lane ruling: an effect is a different trace or a different answer). Required inputs and
+// inert fields are exempt.
+const answerOf = (record: EffectEvidence): string | undefined =>
+  record.answer === undefined ? undefined : JSON.stringify(canonical(record.answer))
+const answersDiffer = (a: EffectEvidence, b: EffectEvidence): boolean => {
+  const [left, right] = [answerOf(a), answerOf(b)]
+  return left !== undefined && right !== undefined && left !== right
+}
 function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: ReadonlySet<string>): string[] {
   const same = (a: EffectEvidence, b: EffectEvidence, field: string): boolean =>
     [...new Set([...Object.keys(a.input), ...Object.keys(b.input)])]
@@ -146,7 +156,8 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              (a.kind !== b.kind || effectOf(a) !== effectOf(b)),
+              JSON.stringify(canonical(a.given ?? [])) === JSON.stringify(canonical(b.given ?? [])) &&
+              (a.kind !== b.kind || effectOf(a) !== effectOf(b) || answersDiffer(a, b)),
           ),
         ),
     )
