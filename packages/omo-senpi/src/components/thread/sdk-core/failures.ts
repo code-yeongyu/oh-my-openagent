@@ -69,27 +69,34 @@ export function unexpectedFailure(
   next = "Run omo thread list and retry after checking the target.",
 ): Failure {
   const written = reportUnexpected(onUnexpected, error)
-  // The fixed text names the local file the port wrote the details to (B8 sink ruling), only when it wrote it.
+  // The fixed text names the local file the port wrote the details to (B8 sink ruling), only when it wrote it, and says so
+  // when a port that keeps a file could not write it.
   const message =
-    written === undefined ? UNEXPECTED_FAILURE_MESSAGE : `${UNEXPECTED_FAILURE_MESSAGE} The details are in ${written}.`
+    written === undefined
+      ? UNEXPECTED_FAILURE_MESSAGE
+      : written === false
+        ? `${UNEXPECTED_FAILURE_MESSAGE} Its details could not be written to the local log.`
+        : `${UNEXPECTED_FAILURE_MESSAGE} The details are in ${written}.`
   return fail("internal_error", message, next)
 }
 
 /**
  * Where a surface records an unexpected exception (B8): the only place its text may go. A port that wrote it to a local
- * file answers that file's path, which the fixed message then names; any other answer names nothing.
+ * file answers that file's path, which the fixed message then names; `false` when it keeps a file it could not write.
  */
 export type UnexpectedPort = (error: unknown) => unknown
 
 /** Hands an exception to the logger port, isolated from the outcome: a port that throws changes no answer and no receipt. */
-export function reportUnexpected(onUnexpected: UnexpectedPort | undefined, error: unknown): string | undefined {
+export function reportUnexpected(onUnexpected: UnexpectedPort | undefined, error: unknown): string | false | undefined {
   try {
     // Never awaited: a port that hangs holds nothing; one that rejects is caught here, never an unhandled rejection.
     const answered: unknown = onUnexpected?.(error)
     if (answered instanceof Promise) answered.catch(() => undefined)
+    if (answered === false) return false
     return typeof answered === "string" && answered !== "" ? answered : undefined
   } catch {
-    // The port's own failure is dropped on purpose: reporting it would need the very sink that just failed.
+    // The port's own failure is dropped on purpose (reporting it would need the very sink that just failed), and it changes
+    // nothing in the answer: only a port that answers `false` says its file could not be written.
     return undefined
   }
 }

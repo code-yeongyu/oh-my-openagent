@@ -1,5 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { join } from "node:path"
 
 import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
@@ -15,6 +24,7 @@ import {
 
 const TAG = "cnry-b8-cli"
 const FIXED = "The thread operation failed unexpectedly."
+const UNWRITTEN = `${FIXED} Its details could not be written to the local log.`
 const fixture = createRemoteThreadFixture()
 afterEach(fixture.cleanup)
 
@@ -79,7 +89,7 @@ describe("omo thread: the unexpected-failure log (B8)", () => {
       symlinkSync(elsewhere, join(agentDir, "logs", "thread-unexpected.log"))
     })
     expect(result.exit).toBe(5)
-    expect(result.message).toBe(FIXED)
+    expect(result.message).toBe(UNWRITTEN)
     expect(existsSync(elsewhere)).toBe(false)
     expect(result.stdout + result.stderr).not.toContain(TAG)
   })
@@ -87,7 +97,7 @@ describe("omo thread: the unexpected-failure log (B8)", () => {
   test("#given a log directory it cannot create #when a call fails unexpectedly #then the same exit and the fixed message without a file", async () => {
     const result = await run((agentDir) => writeFileSync(join(agentDir, "logs"), "not a directory"))
     expect(result.exit).toBe(5)
-    expect(result.message).toBe(FIXED)
+    expect(result.message).toBe(UNWRITTEN)
     expect(result.stdout + result.stderr).not.toContain(TAG)
   })
 
@@ -99,7 +109,7 @@ describe("omo thread: the unexpected-failure log (B8)", () => {
       })
     })
     const logs = join(result.agentDir, "logs")
-    expect(result.message).toBe(FIXED)
+    expect(result.message).toBe(UNWRITTEN)
     expect(existsSync(join(logs, "thread-unexpected.log.1"))).toBe(false)
     expect(readFileSync(join(logs, "thread-unexpected.log"), "utf8")).not.toContain(TAG)
   })
@@ -112,6 +122,22 @@ describe("omo thread: the unexpected-failure log (B8)", () => {
     expect(statSync(join(agentDir, "logs", "thread-unexpected.log")).size).toBeLessThanOrEqual(
       UNEXPECTED_RECORD_MAX_BYTES + 1,
     )
+  })
+
+  test("#given a log that rotates twice #when each rotation happens #then exactly one rotated file is kept, and the two files never pass twice the bound", async () => {
+    const remote = fixture.account().remote
+    const agentDir = fixture.surface(remote).agentDir
+    const logs = join(agentDir, "logs")
+    mkdirSync(logs, { mode: 0o700 })
+    const port = agentDirUnexpectedLog(agentDir)
+    for (const round of [1, 2]) {
+      writeFileSync(join(logs, "thread-unexpected.log"), "x".repeat(UNEXPECTED_LOG_MAX_BYTES), { mode: 0o600 })
+      expect(port(new Error(`${TAG}-round-${round}`))).toBeString()
+    }
+    const kept = readdirSync(logs).sort()
+    expect(kept).toEqual(["thread-unexpected.log", "thread-unexpected.log.1"])
+    const total = kept.reduce((sum, name) => sum + statSync(join(logs, name)).size, 0)
+    expect(total).toBeLessThanOrEqual(2 * UNEXPECTED_LOG_MAX_BYTES)
   })
 
   test("#given a log at its size bound #when a call fails unexpectedly #then the full log moves to .1 and a new owner-only file holds the record", async () => {

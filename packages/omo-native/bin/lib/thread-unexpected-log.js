@@ -24,16 +24,16 @@ const OWNER_ONLY = 0o077
  * `omo thread`'s sink for an unexpected exception (B8, the security owner's ruling): an owner-only local file under the
  * agent directory, never a stream. The returned port writes the exception's whole text (message, stack, causes,
  * properties) and answers the file's real path, which the fixed message then names; any failure writes nothing and
- * answers nothing, so it changes no answer and no exit.
+ * answers false (the message then says the log could not be written), and changes no exit.
  */
 export function agentDirUnexpectedLog(agentDir, uid = process.getuid?.()) {
   const directory = join(agentDir, "logs")
   const file = join(directory, "thread-unexpected.log")
   return (error) => {
     try {
-      if (!ownerOnlyDirectory(directory, uid)) return undefined
+      if (!ownerOnlyDirectory(directory, uid)) return false
       const descriptor = openOwnerOnly(file, uid)
-      if (descriptor === undefined) return undefined
+      if (descriptor === undefined) return false
       try {
         writeSync(descriptor, record(error))
       } finally {
@@ -41,7 +41,7 @@ export function agentDirUnexpectedLog(agentDir, uid = process.getuid?.()) {
       }
       return join(realpathSync(directory), "thread-unexpected.log")
     } catch {
-      return undefined
+      return false
     }
   }
 }
