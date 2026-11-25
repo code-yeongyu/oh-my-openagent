@@ -456,7 +456,9 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "pure": true,
+      "pureReason": "a probe of whether sign-in is ready; design 6.4 says it touches nothing"
     },
     {
       "id": "account.signOut",
