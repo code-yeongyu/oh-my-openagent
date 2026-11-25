@@ -145,14 +145,21 @@ describe("install.setup.apply after a stage's write throws", () => {
 describe("install.setup.detect and .plan read only through the named port reads and write nothing", () => {
   // The guard of the design lane's ruling: the port claims that the named reads happen, never that only they do, so
   // a read through the port of any other path throws here, as does every effect: detect and plan must still answer.
-  const guarded = (named: ReadonlySet<string>, seen: string[]) => {
-    const refuse = (what: string) => () => {
-      throw new Error(`setup wrote through ${what}`)
-    }
+  // Each disallowed attempt is recorded before it throws, so a caller that turns the throw into a warning cannot hide it.
+  const guarded = (named: ReadonlySet<string>, seen: string[], disallowed: string[]) => {
+    const refuse =
+      (what: string) =>
+      (path: string): never => {
+        disallowed.push(`${what} ${path}`)
+        throw new Error(`setup wrote through ${what}`)
+      }
     return {
       ...REAL_SETUP_FS,
       read: (path: string) => {
-        if (!named.has(path)) throw new Error(`setup read ${path} through the port`)
+        if (!named.has(path)) {
+          disallowed.push(`read ${path}`)
+          throw new Error(`setup read ${path} through the port`)
+        }
         seen.push(path)
         return REAL_SETUP_FS.read(path)
       },
@@ -175,8 +182,10 @@ describe("install.setup.detect and .plan read only through the named port reads 
       const auth = join(ports.env.XDG_DATA_HOME as string, "opencode", "auth.json")
       const named = new Set([auth, ...opencodeConfigSources(ports.home, ports.env).files])
       const seen: string[] = []
-      const answer = await setup[call]({}, { ...ports, fs: guarded(named, seen) })
+      const disallowed: string[] = []
+      const answer = await setup[call]({}, { ...ports, fs: guarded(named, seen, disallowed) })
       expect(answer.kind).toBe("ok")
+      expect(disallowed).toEqual([])
       expect(seen).toContain(auth)
       if (call === "plan") expect(seen).toContain(config)
     })
