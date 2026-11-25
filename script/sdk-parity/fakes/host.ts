@@ -15,6 +15,28 @@ const HOST_SOCKET = "/tmp/i-0123456789abcdef.sock"
 const HOST_THREADS = ["t-1", "t-3"] as const
 const ELSEWHERE_THREADS: readonly string[] = ["t-3"]
 
+// #14939: the catalog every thread on this host reads (a read the table has no operation for, so it is not recorded), and
+// the levels its models take. A model in the table is a `provider/id` string; the engine answers `{ provider, id }`.
+export const CATALOG = [
+  { provider: "openai", id: "m-0" },
+  { provider: "anthropic", id: "m-1" },
+  { provider: "google", id: "m-2" },
+] as const
+export const LEVELS = ["off", "low", "high"] as const
+const engineModel = (model: unknown): unknown => {
+  if (typeof model !== "string") return model
+  const slash = model.indexOf("/")
+  return { provider: model.slice(0, slash), id: model.slice(slash + 1) }
+}
+/** A `get_state` answer from the table's shape: models as `provider/id`, a held switch as `pendingModelSwitch`. */
+export const engineState = (state: Readonly<Record<string, unknown>>): Record<string, unknown> => ({
+  ...state,
+  ...(state["model"] === undefined ? {} : { model: engineModel(state["model"]) }),
+  ...(state["pendingModelSwitch"] === undefined
+    ? {}
+    : { pendingModelSwitch: engineModel(state["pendingModelSwitch"]) }),
+})
+
 const unused = (method: string) => async (): Promise<never> => {
   throw new Error(`fake host: ${method} is not faked; a scenario that reaches it needs this fake extended`)
 }
@@ -48,6 +70,7 @@ export function hostPort(
       )
   }
   const durableOf = (routing: string, durable?: string): string => durable ?? routing.replace(/^rpc-/, "")
+  let current: { provider: string; id: string } = { ...CATALOG[0] }
   const listView: NonNullable<ThreadHost["listView"]> = async (request = {}) => {
     const { result } = recorder.record("host", "list_sessions", { ...request })
     writeSessionFiles()
@@ -79,18 +102,35 @@ export function hostPort(
       return []
     },
     getState: async (sessionId, durable) => {
-      recorder.record("host", "get_state", { thread: durableOf(sessionId, durable) })
-      return { isStreaming: false }
+      const { result } = recorder.record("host", "get_state", { thread: durableOf(sessionId, durable) })
+      // A stated failure is a read that got no answer (a lost reply): the socket client throws it the same way.
+      const failed = Reflect.get(Object(result), "code")
+      if (typeof failed === "string") throw new Error(`${failed}: the reply to get_state was lost`)
+      const state = (result ?? given["state"]) as Readonly<Record<string, unknown>> | undefined
+      // With no state stated, an engine that applies every switch at once: the model last set is in effect.
+      if (state === undefined)
+        return { isStreaming: false, model: current, thinkingLevel: "off", pendingModelSwitch: null }
+      return { isStreaming: false, ...engineState(state) }
     },
     prompt: unused("prompt"),
     interrupt: unused("interrupt"),
     setSessionName: async (sessionId, name, durable) => {
       recorder.record("host", "rename_session", { thread: durableOf(sessionId, durable), name })
     },
-    setModel: unused("setModel"),
-    getAvailableModels: unused("getAvailableModels"),
-    setThinkingLevel: unused("setThinkingLevel"),
-    getAvailableThinkingLevels: unused("getAvailableThinkingLevels"),
+    setModel: async (sessionId, provider, modelId, durable) => {
+      recorder.record("host", "set_model", { thread: durableOf(sessionId, durable), model: `${provider}/${modelId}` })
+      current = { provider, id: modelId }
+      return { provider, id: modelId }
+    },
+    getAvailableModels: async () => CATALOG.map((model) => ({ ...model })),
+    setThinkingLevel: async (sessionId, level, _scope, durable) => {
+      const { result } = recorder.record("host", "set_thinking_level", { thread: durableOf(sessionId, durable), level })
+      const code = Reflect.get(Object(result), "code")
+      // The live surface's rethrow of the engine's refusal (live-surface.ts), so the control types it.
+      if (code === "thinking_level_unsupported")
+        throw new Error(`thinking_level_unsupported:Thinking level ${level} is not supported by the active model.`)
+    },
+    getAvailableThinkingLevels: async () => [...LEVELS],
     gateway: {
       wake: unused("gateway.wake"),
       releaseSession: async (endpoint, request) => {

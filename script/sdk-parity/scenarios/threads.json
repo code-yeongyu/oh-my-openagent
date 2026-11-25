@@ -3429,8 +3429,8 @@
       "kind": "effect",
       "input": {
         "thread": "t-1",
-        "model": "m-1",
-        "provider": "anthropic"
+        "model": "m",
+        "provider": "google"
       },
       "expect": [
         {
@@ -3438,8 +3438,7 @@
           "op": "set_model",
           "args": {
             "thread": "t-1",
-            "model": "m-1",
-            "provider": "anthropic"
+            "model": "google/m-2"
           }
         }
       ],
@@ -3457,10 +3456,7 @@
       "expect": [
         {
           "port": "host",
-          "op": "list_sessions",
-          "args": {
-            "scope": "all"
-          }
+          "op": "list_sessions"
         },
         {
           "port": "host",
@@ -3471,7 +3467,16 @@
           }
         }
       ],
-      "target": "this_device"
+      "target": "this_device",
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "workspace": "elsewhere"
+          }
+        }
+      ]
     },
     {
       "id": "threads.setModel/idempotent-repeat",
@@ -3484,22 +3489,48 @@
       },
       "expect": [
         {
-          "port": "store",
-          "op": "idempotency_get",
-          "args": {
-            "key": "k1"
-          },
-          "result": {
-            "stored": true
-          }
-        },
-        {
           "port": "host",
           "op": "set_model",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
         }
       ],
-      "target": "this_device"
+      "target": "this_device",
+      "answer": {
+        "model": {
+          "provider": "anthropic",
+          "id": "m-1"
+        },
+        "model_switch": "applied"
+      },
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "model": "anthropic/m-1",
+            "idempotency_key": "k1"
+          },
+          "expect": [
+            {
+              "port": "host",
+              "op": "set_model",
+              "args": {
+                "thread": "t-1",
+                "model": "anthropic/m-1"
+              }
+            }
+          ],
+          "answer": {
+            "model": {
+              "provider": "anthropic",
+              "id": "m-1"
+            },
+            "model_switch": "applied"
+          }
+        }
+      ]
     },
     {
       "id": "threads.setModel/unknown",
@@ -3514,9 +3545,7 @@
         {
           "port": "host",
           "op": "set_model",
-          "result": {
-            "code": "model_unavailable"
-          }
+          "count": 0
         }
       ],
       "target": "this_device"
@@ -3534,13 +3563,7 @@
         {
           "port": "host",
           "op": "set_model",
-          "result": {
-            "code": "model_unavailable",
-            "candidates": [
-              "a/m-1",
-              "b/m-1"
-            ]
-          }
+          "count": 0
         }
       ],
       "target": "this_device"
@@ -3568,6 +3591,7 @@
           "op": "get_state",
           "result": {
             "model": "openai/m-0",
+            "thinkingLevel": "low",
             "pendingModelSwitch": null
           }
         }
@@ -3752,18 +3776,10 @@
           "port": "host",
           "op": "get_state",
           "result": {
-            "model": "openai/m-0",
-            "thinkingLevel": "low",
-            "pendingModelSwitch": null
+            "code": "transport_closed"
           }
         }
       ],
-      "fault": {
-        "port": "host",
-        "op": "get_state",
-        "fault": "lost_reply",
-        "occurrence": 1
-      },
       "target": "this_device"
     },
     {
@@ -3792,7 +3808,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         },
         {
           "port": "host",
@@ -3809,7 +3826,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         },
         {
           "port": "host",
@@ -3826,7 +3844,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "high",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         }
       ],
       "answer": {
@@ -3868,7 +3887,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -3885,7 +3905,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": "anthropic/m-1"
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -3941,7 +3962,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -3958,7 +3980,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -3995,7 +4018,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -4009,10 +4033,9 @@
           "port": "host",
           "op": "get_state",
           "result": {
-            "model": "openai/m-0",
-            "thinkingLevel": "low",
-            "pendingModelSwitch": null
-          }
+            "code": "transport_closed"
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -4020,12 +4043,6 @@
           "count": 0
         }
       ],
-      "fault": {
-        "port": "host",
-        "op": "get_state",
-        "fault": "lost_reply",
-        "occurrence": 2
-      },
       "target": "this_device"
     },
     {
@@ -4055,7 +4072,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 5
         },
         {
           "port": "host",
@@ -4072,7 +4090,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 5
         },
         {
           "port": "host",
@@ -4083,6 +4102,14 @@
           },
           "result": {
             "code": "thinking_level_unsupported"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "openai/m-0"
           }
         }
       ],
@@ -4115,7 +4142,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -4132,7 +4160,8 @@
             "model": "google/m-2",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "host",
@@ -4320,18 +4349,10 @@
           "port": "remote",
           "op": "sessions.get",
           "result": {
-            "model": "openai/m-0",
-            "thinkingLevel": "low",
-            "pendingModelSwitch": null
+            "code": "transport_closed"
           }
         }
       ],
-      "fault": {
-        "port": "remote",
-        "op": "sessions.get",
-        "fault": "lost_reply",
-        "occurrence": 1
-      },
       "target": "other_device"
     },
     {
@@ -4360,7 +4381,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         },
         {
           "port": "remote",
@@ -4377,7 +4399,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         },
         {
           "port": "remote",
@@ -4394,7 +4417,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "high",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 3
         }
       ],
       "answer": {
@@ -4436,7 +4460,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4453,7 +4478,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": "anthropic/m-1"
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4509,7 +4535,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4526,7 +4553,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4563,7 +4591,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4577,10 +4606,9 @@
           "port": "remote",
           "op": "sessions.get",
           "result": {
-            "model": "openai/m-0",
-            "thinkingLevel": "low",
-            "pendingModelSwitch": null
-          }
+            "code": "transport_closed"
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4588,12 +4616,6 @@
           "count": 0
         }
       ],
-      "fault": {
-        "port": "remote",
-        "op": "sessions.get",
-        "fault": "lost_reply",
-        "occurrence": 2
-      },
       "target": "other_device"
     },
     {
@@ -4623,7 +4645,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 5
         },
         {
           "port": "remote",
@@ -4640,7 +4663,8 @@
             "model": "anthropic/m-1",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 5
         },
         {
           "port": "remote",
@@ -4651,6 +4675,14 @@
           },
           "result": {
             "code": "thinking_level_unsupported"
+          }
+        },
+        {
+          "port": "remote",
+          "op": "sessions.setModel",
+          "args": {
+            "thread": "studio/t-2",
+            "model": "openai/m-0"
           }
         }
       ],
@@ -4683,7 +4715,8 @@
             "model": "openai/m-0",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4700,7 +4733,8 @@
             "model": "google/m-2",
             "thinkingLevel": "low",
             "pendingModelSwitch": null
-          }
+          },
+          "count": 2
         },
         {
           "port": "remote",
@@ -4722,18 +4756,20 @@
       "expect": [
         {
           "port": "host",
-          "op": "get_state",
-          "result": {
-            "live": false
-          }
-        },
-        {
-          "port": "host",
           "op": "set_model",
           "count": 0
         }
       ],
-      "target": "this_device"
+      "target": "this_device",
+      "given": [
+        {
+          "port": "host",
+          "state": {
+            "thread": "t-1",
+            "session": "ended"
+          }
+        }
+      ]
     },
     {
       "id": "threads.setReasoning/session",
@@ -5849,7 +5885,7 @@
           "op": "set_model",
           "args": {
             "thread": "t-1",
-            "model": "m-1"
+            "model": "anthropic/m-1"
           }
         }
       ],

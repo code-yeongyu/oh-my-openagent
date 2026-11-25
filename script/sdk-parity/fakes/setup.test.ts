@@ -44,6 +44,7 @@ const ROWS = [
   "threads.locate",
   "threads.release",
   "threads.rename",
+  "threads.setModel",
   "config.status",
 ]
 const table = loadScenarioTable()
@@ -91,9 +92,9 @@ async function judged(changed: TableScenario): Promise<string[]> {
 }
 
 describe("P1b scenario drivers over the real omo SDK root", () => {
-  test("#given the three runs modules #then every table scenario of the eight rows has exactly one run", () => {
+  test("#given the three runs modules #then every table scenario of the driven rows has exactly one run", () => {
     expect(RUNS.map((run) => run.scenario.id).toSorted()).toEqual(scenarios.map((s) => s.id).toSorted())
-    expect(RUNS).toHaveLength(57)
+    expect(RUNS).toHaveLength(92)
   })
 
   test("#given the differences record #then it is sorted, complete per entry, and names only rows still unresolved", () => {
@@ -154,6 +155,22 @@ describe("negative controls: a wrong expectation is reported for each fake famil
       expect((await judged(wrong(id, index, change))).length).toBeGreaterThan(0)
     },
   )
+
+  test("#given two stated results for one operation #when it is called three times #then each answers in turn and the last repeats", () => {
+    const recorder = createRecorder({
+      ...scenarioOf("threads.setModel/applied-here-suffix"),
+      expect: [
+        { port: "host", op: "get_state", result: { model: "openai/m-0" } },
+        { port: "host", op: "get_state", result: { model: "anthropic/m-1" } },
+      ],
+    })
+    const read = () => recorder.record("host", "get_state", { thread: "t-1" }).result
+    expect([read(), read(), read()]).toEqual([
+      { model: "openai/m-0" },
+      { model: "anthropic/m-1" },
+      { model: "anthropic/m-1" },
+    ])
+  })
 
   test("#given process and fs calls #when expected wrongly #then expectationProblems reports them", async () => {
     const recorder = createRecorder(scenarioOf("config.status/reads-config-files"))
