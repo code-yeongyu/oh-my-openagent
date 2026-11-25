@@ -1,13 +1,17 @@
 import { THREAD_ERROR_CODES, type ThreadErrorCode, type ThreadToolFailure } from "../../thread/errors"
 import { OMO_CODE_REGISTRY, type OmoCode, type OmoFailure } from "../contract"
 
+/** Where a code the registry lacks rides on the root's failure; the inverse reads only this key. */
+export const HELD_CODE = "$held_code"
+
 const isRegistered = (code: string): code is Exclude<OmoCode, "not_implemented"> =>
   Object.hasOwn(OMO_CODE_REGISTRY, code)
 
 /**
  * A thread core failure on the root (design 4.4). Every code the thread core produces is in the registry and passes
  * unchanged, details included; a code held with no producer (contract/codes.ts HELD_CODES) is never expected here, and
- * if one appears it is kept in `details.code` under internal_error rather than typed as a code the registry lacks.
+ * if one appears it rides under internal_error with the code in `details.$held_code` (a key no producer writes), so a
+ * `details.code` a failure legitimately carries is never read as the marker.
  */
 export function threadFailure(error: ThreadToolFailure): OmoFailure {
   if (isRegistered(error.code)) return { kind: "error", error: { ...error, code: error.code } }
@@ -17,7 +21,7 @@ export function threadFailure(error: ThreadToolFailure): OmoFailure {
       code: "internal_error",
       message: error.message,
       next_action: error.next_action,
-      details: { ...error.details, code: error.code },
+      details: { ...error.details, [HELD_CODE]: error.code },
     },
   }
 }
@@ -28,9 +32,9 @@ const isThreadCode = (code: unknown): code is ThreadErrorCode =>
 /** The inverse of threadFailure: the thread failure a root failure was made from, so the thread facade answers it as it did. */
 export function threadToolFailureOf(failure: OmoFailure): ThreadToolFailure {
   const { code, message, next_action, details } = failure.error
-  const held = details?.["code"]
+  const held = details?.[HELD_CODE]
   if (code === "internal_error" && isThreadCode(held)) {
-    const { code: _held, ...rest } = details ?? {}
+    const { [HELD_CODE]: _held, ...rest } = details ?? {}
     return { code: held, message, next_action, ...(Object.keys(rest).length === 0 ? {} : { details: rest }) }
   }
   return { code: code as ThreadErrorCode, message, next_action, ...(details === undefined ? {} : { details }) }
