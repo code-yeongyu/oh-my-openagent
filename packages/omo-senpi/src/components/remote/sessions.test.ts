@@ -657,12 +657,20 @@ describe("#13756 review", () => {
 
   test("#15011 #given a keyed send #when a fresh client sends other text under the same key #then the holder refuses it client_message_id_conflict", async () => {
     const { owner } = await onWorld()
-    await valueOf(clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "m", idempotency_key: "k" }))
+    // The security owner's ruling (#15021): the conflict carries no text from either message, in any field.
+    await valueOf(
+      clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, { text: "CANARY-FIRST-7c1", idempotency_key: "k" }),
+    )
     const other = await clientOn(owner.stateDir, fakeClock()).sessions.send(LIVE, {
-      text: "other",
+      text: "CANARY-SECOND-9d4",
       idempotency_key: "k",
     })
-    expect(JSON.stringify(other)).toContain("client_message_id_conflict")
+    const answer = JSON.stringify(other)
+    expect(answer).toContain("client_message_id_conflict")
+    expect({ first: answer.includes("CANARY-FIRST"), second: answer.includes("CANARY-SECOND") }).toEqual({
+      first: false,
+      second: false,
+    })
   })
 
   test("#given a keyed send then a long run of unkeyed sends #when the key is retried #then it replays within the last 256 receipts and reaches the device again past them (L37)", async () => {

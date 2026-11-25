@@ -49,6 +49,31 @@ describe("a send to a thread on another device answers its delivery_id", () => {
   })
 })
 
+// #15021: one keyed send is one message at the holder whatever adapter and principal carried it, so the id the holder
+// admits is derived from the thread and the key: the tool's delivery and the script's prompt to one thread under one key
+// carry the same id (the engine's two id books are code-yeongyu/senpi#7479; this device's receipt book is T1b's half).
+describe("a keyed send's holder id is derived from the thread and the key (#15021)", () => {
+  test("#given one key #when thread_send and ThreadSdk.send address one thread on device b #then the delivery and the prompt carry one id", async () => {
+    // given
+    const td = createTwoDevices()
+    cleanups.push(td.cleanup)
+
+    // when
+    await td.run("thread_send", { thread: T.bLive, message: "x", idempotency_key: "k-15021" })
+    await sdkOn(td, cleanups).send({ thread: T.bLive, text: "x", idempotency_key: "k-15021" })
+
+    // then
+    const sent = td.account.sent.map((entry) => entry.rpc ?? {})
+    const delivery = sent.filter((rpc) => rpc["type"] === "admit_external_message").map((rpc) => rpc["deliveryId"])
+    const prompt = sent.filter((rpc) => rpc["type"] === "prompt").map((rpc) => rpc["clientMessageId"])
+    expect({ delivery: delivery.length, prompt: prompt.length, same: delivery[0] === prompt[0] }).toEqual({
+      delivery: 1,
+      prompt: 1,
+      same: true,
+    })
+  })
+})
+
 type Answer = {
   readonly kind: string
   readonly delivery?: { readonly kind?: string }

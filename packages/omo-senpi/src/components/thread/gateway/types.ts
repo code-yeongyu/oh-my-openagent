@@ -181,6 +181,16 @@ export type GatewaySender =
   /** The person at a terminal sending their own input to a session on another device (`omo remote send`): a prompt, never a delivery with an envelope. */
   | { readonly kind: "person"; readonly uid: number; readonly user: string }
 
+/** Every gateway sender kind is first party (a person, a script or a session); a connector or a service names its own. */
+export const senderClass = (sender: GatewaySender): "first_party" => {
+  switch (sender.kind) {
+    case "session":
+    case "cli":
+    case "person":
+      return "first_party"
+  }
+}
+
 export type EnqueueRequest = {
   readonly provenance: Provenance
   readonly now: number

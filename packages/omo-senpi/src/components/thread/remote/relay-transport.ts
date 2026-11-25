@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { clientMessageIdOf } from "./client-message-id"
+import { keyedMessageId } from "./client-message-id"
 import { rowKey } from "@oh-my-opencode/thread-address-core"
 import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { rowStatus } from "./ports"
@@ -11,7 +11,13 @@ import { renderDeliveryDisplayText, renderDeliveryText } from "../gateway/proven
 import { REFUSAL_CODES } from "../gateway/result"
 import type { GatewayStore } from "../gateway/store"
 import type { DeliveryOutcome, DeliveryTransport, OutboundDelivery, RelayDeliverySuccess } from "../gateway/transport"
-import type { DeliveryWait, EffectiveLane, GatewayDeliveryDelivery, Provenance } from "../gateway/types"
+import {
+  senderClass,
+  type DeliveryWait,
+  type EffectiveLane,
+  type GatewayDeliveryDelivery,
+  type Provenance,
+} from "../gateway/types"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { JsonObject, RemoteCommandOutcome, RemoteSessionRow, RemoteThreadSurface } from "./ports"
 import { replyData } from "./remote-ops"
@@ -429,7 +435,22 @@ export function createRelayTransport(
     return {
       // #15011: derived from the sender and the key, so a repeat from a process whose store holds no receipt reaches the
       // receiving engine under the id it already admitted (admit_external_message answers already_admitted for it).
-      delivery_id: clientMessageIdOf(delivery.caller_id, delivery.idempotency_key),
+      delivery_id:
+        delivery.target.kind === "remote"
+          ? keyedMessageId(
+              {
+                device: delivery.target.row.device,
+                session: delivery.target.row.session_id,
+                durable: delivery.target.row.durable_id,
+              },
+              senderClass(delivery.sender),
+              delivery.idempotency_key,
+            )
+          : keyedMessageId(
+              { device: "", session: delivery.target.thread_id },
+              senderClass(delivery.sender),
+              delivery.idempotency_key,
+            ),
       root_id: prior?.root_id ?? `root-${randomUUID()}`,
       hop: Math.max(prior?.hop ?? 0, options.callerChainHop?.() ?? 0) + 1,
     }

@@ -13,7 +13,7 @@ import type { ThreadToolFailure } from "../thread/errors"
 import { hashArgs } from "../thread/gateway/hash-args"
 import { resolveProvenance } from "../thread/gateway/provenance-resolver"
 import type { ToolReceiptBegin } from "../thread/gateway/store-tool-receipts"
-import type { GatewaySender } from "../thread/gateway/types"
+import { senderClass, type GatewaySender } from "../thread/gateway/types"
 import { namedDeviceRow } from "../thread/remote/address-book"
 import { outcomeFailure } from "../thread/remote/outcome"
 import type { JsonObject, RemoteThreadSurface } from "../thread/remote/ports"
@@ -27,7 +27,7 @@ import { createDeviceServiceSessions } from "./port/device-service"
 import { idShaped } from "@oh-my-opencode/thread-address-core"
 import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
-import { clientMessageIdOf } from "../thread/remote/client-message-id"
+import { keyedMessageId, type KeyedThread } from "../thread/remote/client-message-id"
 import type { LocalSessions } from "./local-sessions"
 import { sessionDetail } from "./session-detail"
 import type {
@@ -141,6 +141,12 @@ const unknownSession = (device: string, session?: string): RemoteFailure =>
 const NO_SESSION: ReadonlySet<unknown> = new Set(["unknown_session", "session_not_found"])
 
 /** A resolved session: the device's row, the session part a member sends to it, and its listing row when listed. */
+const keyedThreadOf = (target: SessionTarget): KeyedThread => ({
+  device: target.device,
+  session: target.session,
+  durable: target.row?.durable_id,
+})
+
 export type SessionTarget = {
   readonly device: string
   readonly session: string
@@ -179,7 +185,7 @@ const selfDelivery = (device: string): RemoteFailure =>
  * How many idempotency keys a client remembers for replay, in each of its stores (opens, sends, send receipts). These
  * stores are a CACHE held by this process (#15011): a hit answers a repeat without a round trip, and a miss (an evicted
  * key, a fresh process) must be safe. It is for a send: the prompt's client message id and a delivery's id are derived
- * from the caller and the key, and the holder's engine admits each once. A keyed open has no such id at the holder yet
+ * from the thread and the key (#15021), and the holder's engine admits each once. A keyed open has no such id at the holder yet
  * (code-yeongyu/senpi#7475), so its at-most-once rests on this cache within the process.
  */
 const KEYS_KEPT = 256
@@ -356,7 +362,13 @@ export function sessionMembers(core: ClientCore): SessionMembers {
   ): Promise<Outcome<SendReceipt>> => {
     const run = () =>
       onThisDevice(target.device, (local) =>
-        local.send(target, thread, device, request, clientMessageIdOf(caller, request.idempotency_key)),
+        local.send(
+          target,
+          thread,
+          device,
+          request,
+          keyedMessageId(keyedThreadOf(target), "first_party", request.idempotency_key),
+        ),
       )
     const key = request.idempotency_key
     if (key === undefined) return await run()
@@ -502,7 +514,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       // answers it carries it too. The relay's steer record carries none, so a steer names none.
       const clientMessageId =
         from.sender.kind === "person" && mode !== "steer"
-          ? clientMessageIdOf(from.caller, request.idempotency_key)
+          ? keyedMessageId(keyedThreadOf(target), senderClass(from.sender), request.idempotency_key)
           : undefined
       const sent = await legOf(svc).relay.deliver({
         sender: from.sender,
