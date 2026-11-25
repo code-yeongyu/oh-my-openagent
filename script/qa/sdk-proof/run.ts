@@ -98,8 +98,13 @@ async function main(): Promise<void> {
     isolation = world.isolation()
     await world.close()
   }
+  const torn = world.teardown()
+  const tornDown = torn.rootsLeft.length === 0 && torn.processesLeft === 0
   const isolated = isolation.refused.length === 0 && !isolation.sessionBus
-  writeFileSync(join(evidence, "isolation.json"), JSON.stringify(isolation, null, 2))
+  writeFileSync(
+    join(evidence, "isolation.json"),
+    JSON.stringify({ ...isolation, teardown: { ...torn, rootsLeft: torn.rootsLeft.length } }, null, 2),
+  )
   writeFileSync(join(evidence, "relay-requests.json"), JSON.stringify(world.relay.requests, null, 2))
   // What the fake model was asked and how it answered, in order: the answer kind and the hold tag, never the bodies.
   writeFileSync(
@@ -119,6 +124,8 @@ async function main(): Promise<void> {
   )
   const table = summary(build, SCENARIO, runs, [
     `Isolation: ${isolation.refused.length} request(s) to a non-loopback address refused; the loopback guard loaded in ${isolation.guarded} world processes; session bus in the world's environment: ${isolation.sessionBus ? "present" : "absent"}.`,
+    `Teardown, read back after the world closed: ${torn.roots - torn.rootsLeft.length} of ${torn.roots} scratch roots gone; ${torn.processesLeft} process(es) still naming one.`,
+    "Attribution: a fail cell is the product's only on the surface's own answer (its error code, or its success while device B, read through B's own engine, shows otherwise); a stall is the harness's; a world-setup failure is not reached. Each observation is tied to its call: B's thread by the id its open adopted, a tool result by a nonce in that step's prompt, an SDK result by its request id, a CLI result by its own process.",
     "The table states what this world (real engine hosts, fake model, account and relay) shows; it claims nothing about production beyond it.",
   ])
   const results = keyed.length === 0 ? table : `${table}${keyedTable(keyed)}`
@@ -131,7 +138,7 @@ async function main(): Promise<void> {
   ].filter((path) => readFileSync(path, "utf8").includes(CANARY))
   if (leaked.length > 0) process.stderr.write(`x1a: the credential canary appears in ${leaked.join(", ")}\n`)
   process.stdout.write(`${results}\nevidence: ${evidence}\n`)
-  if (!isolated || leaked.length > 0) process.exitCode = 1
+  if (!isolated || leaked.length > 0 || !tornDown) process.exitCode = 1
 }
 
 if (import.meta.main) await main()

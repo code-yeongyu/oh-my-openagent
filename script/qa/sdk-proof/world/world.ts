@@ -4,7 +4,8 @@
 //   FAKE: the model (the kit's fake model on loopback: QA-ACK answers and QA:HOLD turns), the account (two signed-in
 //         devices) and the relay (world/fake-relay.ts: device A's device service, forwarding to B's engine host).
 // Nothing leaves loopback and no account or credential exists; every wait is bounded and event-driven.
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -19,7 +20,6 @@ import {
   openHostSession,
   startFakeModel,
   startShardHost,
-  toolCallResults,
   waitFor,
   type FakeModel,
   type OmoInstall,
@@ -31,6 +31,7 @@ import { enginePort } from "./engine-port.ts"
 import { DEVICE_A, DEVICE_B } from "./devices.ts"
 import { type FakeRelay, startFakeRelay } from "./fake-relay.ts"
 import { type Observer, observeB } from "./observe.ts"
+import { toolResultFor } from "./tool-result.ts"
 import { assertWriteRoots } from "./write-roots.ts"
 
 /** What the run proves about isolation: requests the guard refused, processes it covered, and whether a session bus leaked in. */
@@ -133,6 +134,12 @@ export type World = {
   /** Read before close: the scratch directories holding the guard's records go with the world. */
   readonly isolation: () => Isolation
   readonly close: () => Promise<void>
+  /** After close: the scratch roots and processes read back as gone (counts, never paths). */
+  readonly teardown: () => {
+    readonly roots: number
+    readonly rootsLeft: readonly string[]
+    readonly processesLeft: number
+  }
 }
 
 // B's catalog gains a model that reasons, so the switch with a thinking suffix has a level to apply (#14939).
@@ -199,9 +206,9 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
     const hostA = await startShardHost(a, install, "x1a-a")
     const opened = await openHostSession(hostA.client, a.work)
     session = {
-      prompt: async (text, tool, args, signal) => {
-        const from = fake.requests.length
-        await hostA.client.request({ type: "prompt", sessionId: opened.routingId, message: text })
+      prompt: async (text, tool, signal) => {
+        const nonce = `x1a-call-${randomUUID()}`
+        await hostA.client.request({ type: "prompt", sessionId: opened.routingId, message: `${text}\n${nonce}` })
         // A step past its deadline aborts A's turn, so the session is idle again before the next step runs.
         const aborted = new Promise<never>((_resolve, reject) => {
           const stop = (): void => {
@@ -211,13 +218,14 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
           if (signal?.aborted === true) stop()
           else signal?.addEventListener("abort", stop, { once: true })
         })
-        // The result of THIS call: the one whose arguments are the ones sent, never an earlier call's late result.
-        const sent = JSON.stringify(args)
         const result = waitFor(
-          () => toolCallResults(fake, tool, from).find((entry) => JSON.stringify(entry.args) === sent),
+          () => {
+            const found = toolResultFor(fake.requests as never, tool, nonce)
+            return found === undefined ? undefined : { found }
+          },
           { label: `${tool} result for this step`, timeoutMs: 120_000 },
         )
-        return JSON.stringify((await Promise.race([result, aborted])).result)
+        return JSON.stringify((await Promise.race([result, aborted])).found)
       },
     }
     return session
@@ -250,6 +258,19 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
       observer.close()
       await relay.stop()
       await cleanupAll()
+      for (const dir of [a.dir, b.dir]) rmSync(dir, { recursive: true, force: true })
+    },
+    // Read back after close: which scratch roots still exist, and which processes still name one on their command line.
+    teardown: () => {
+      const roots = [a.dir, b.dir]
+      const left = roots.filter((dir) => existsSync(dir))
+      const processes = roots.flatMap((dir) =>
+        Bun.spawnSync(["pgrep", "-f", dir])
+          .stdout.toString()
+          .split("\n")
+          .filter((pid) => pid.trim() !== ""),
+      )
+      return { roots: roots.length, rootsLeft: left, processesLeft: processes.length }
     },
   }
 }

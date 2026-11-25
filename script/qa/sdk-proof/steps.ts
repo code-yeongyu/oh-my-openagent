@@ -105,7 +105,8 @@ export async function runSteps(
         observed: null,
         cell: "fail",
         why: "the surface answered nothing within the step deadline",
-        slice: step.owner.slice,
+        // A stall shows no product behaviour: it is the harness's finding until a product answer says otherwise.
+        slice: "the harness (no answer to attribute; not a product finding)",
       })
       continue
     }

@@ -101,7 +101,7 @@ describe("the tools driver", () => {
   test("#given a tool call that never answers #when the step deadline aborts it #then the call ends and its cell is red", async () => {
     // given
     const driver = createToolsDriver({
-      prompt: (_text, _tool, _args, signal) =>
+      prompt: (_text, _tool, signal) =>
         new Promise((_resolve, reject) =>
           signal?.addEventListener("abort", () => reject(new Error("aborted")), { once: true }),
         ),

@@ -68,11 +68,6 @@ export function openHostSession(
   readonly durableId: string | undefined
   readonly sessionPath: string | undefined
 }>
-export function toolCallResults(
-  fake: FakeModel,
-  tool: string,
-  from?: number,
-): readonly { readonly args: unknown; readonly result: unknown }[]
 export function awaitToolResult(
   fake: FakeModel,
   tool: string,
