@@ -1,4 +1,3 @@
-import { onTestFinished } from "bun:test"
 import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join, resolve } from "node:path"
@@ -54,6 +53,11 @@ export type Observed = {
   readonly storedDevices: readonly string[]
 }
 
+const cleanups: (() => unknown)[] = []
+const onFinished = (cleanup: () => unknown): void => {
+  cleanups.push(cleanup)
+}
+
 const root = resolve(import.meta.dir, "../../..")
 let launcherTree: string | undefined
 
@@ -63,8 +67,23 @@ export async function prepareLauncher(): Promise<void> {
   await buildServiceAuth(false, join(launcherTree, "lib", "service-auth.generated.js"))
 }
 
-export const removeLauncher = (): void => {
+export async function cleanUp(): Promise<void> {
+  for (const cleanup of cleanups.splice(0)) await cleanup()
   if (launcherTree !== undefined) rmSync(launcherTree, { recursive: true, force: true })
+}
+
+/** Runs every case, a few at a time: each owns its HOME, its store file and its service, so none shares state. */
+export async function runAll(
+  cases: readonly GoldenCase[],
+  width = 4,
+): Promise<ReadonlyMap<string, readonly Observed[]>> {
+  const results = new Map<string, readonly Observed[]>()
+  const queue = [...cases]
+  const worker = async (): Promise<void> => {
+    for (let next = queue.shift(); next !== undefined; next = queue.shift()) results.set(next.id, await runCase(next))
+  }
+  await Promise.all(Array.from({ length: width }, worker))
+  return results
 }
 
 const entryOf = (edition: GoldenCase["edition"]): string => {
@@ -123,7 +142,7 @@ function fakeService(service: Service, requests: string[]): string {
       return new Response("", { status: 404 })
     },
   })
-  onTestFinished(() => server.stop(true))
+  onFinished(() => server.stop(true))
   return server.url.origin
 }
 
@@ -146,9 +165,9 @@ function normalize(text: string, api: string, home: string): string {
     .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<port>")
 }
 
-export async function runCase(golden: GoldenCase): Promise<readonly Observed[]> {
+async function runCase(golden: GoldenCase): Promise<readonly Observed[]> {
   const home = mkdtempSync(join(tmpdir(), "omo-golden-home-"))
-  onTestFinished(() => rmSync(home, { recursive: true, force: true }))
+  onFinished(() => rmSync(home, { recursive: true, force: true }))
   const runtimeDir = join(home, "xdg-run")
   mkdirSync(runtimeDir, { recursive: true })
   const storeFile = join(home, ".golden-store.json")
@@ -188,7 +207,7 @@ export async function runCase(golden: GoldenCase): Promise<readonly Observed[]> 
         stderr: "pipe",
       },
     )
-    onTestFinished(async () => {
+    onFinished(async () => {
       if (child.exitCode === null) child.kill()
       await child.exited
     })

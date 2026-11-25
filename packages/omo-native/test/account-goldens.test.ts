@@ -2,7 +2,7 @@ import { afterAll, beforeAll, expect, test } from "bun:test"
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { GOLDEN_CASES } from "./account-goldens.cases"
-import { CANARY, type Observed, prepareLauncher, removeLauncher, runCase } from "./account-goldens.test-support"
+import { CANARY, cleanUp, type Observed, prepareLauncher, runAll } from "./account-goldens.test-support"
 
 // The account verbs of both editions, pinned on unmodified code before the account calls move into the core
 // (#14364, slice A1b of #14943). Each case runs the real entry (the npm launcher with the service-auth bundle built
@@ -17,24 +17,29 @@ const GOLDENS_FILE = join(import.meta.dir, "account-goldens.json")
 const family = process.platform === "darwin" ? "darwin" : "other"
 const recording = process.env.OMO_RECORD_ACCOUNT_GOLDENS === "1"
 const goldens: Goldens = existsSync(GOLDENS_FILE) ? (JSON.parse(readFileSync(GOLDENS_FILE, "utf8")) as Goldens) : {}
+let observed: ReadonlyMap<string, readonly Observed[]> = new Map()
 
-beforeAll(prepareLauncher, 180_000)
-afterAll(() => {
-  removeLauncher()
-  if (recording) writeFileSync(GOLDENS_FILE, `${JSON.stringify(goldens, null, 2)}\n`)
+// Every case runs here, as shared setup: the entries are separate processes, so the whole set takes minutes on a
+// loaded host while each assertion below takes none.
+beforeAll(async () => {
+  await prepareLauncher()
+  observed = await runAll(GOLDEN_CASES)
+}, 900_000)
+
+afterAll(async () => {
+  await cleanUp()
+  if (!recording) return
+  for (const [id, steps] of observed) goldens[id] = { ...goldens[id], [family]: steps }
+  writeFileSync(GOLDENS_FILE, `${JSON.stringify(goldens, null, 2)}\n`)
 })
 
-test.each(GOLDEN_CASES.map((golden) => [golden.id, golden] as const))(
+test.each(GOLDEN_CASES.map((golden) => [golden.id] as const))(
   "#given the account goldens #when %s runs #then its output, exit code and effects are unchanged",
-  async (id, golden) => {
-    const observed = await runCase(golden)
-    for (const step of observed)
+  (id) => {
+    const steps = observed.get(id) ?? []
+    for (const step of steps)
       for (const secret of Object.values(CANARY)) expect(`${step.stdout}\n${step.stderr}`).not.toContain(secret)
-    if (recording) {
-      goldens[id] = { ...goldens[id], [family]: observed }
-      return
-    }
-    expect(observed).toEqual(goldens[id]?.all ?? goldens[id]?.[family] ?? [])
+    if (recording) return
+    expect(steps).toEqual(goldens[id]?.all ?? goldens[id]?.[family] ?? [])
   },
-  60_000,
 )
