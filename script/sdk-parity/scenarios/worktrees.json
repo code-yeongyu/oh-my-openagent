@@ -1,0 +1,268 @@
+{
+  "domain": "worktrees",
+  "inert": {},
+  "scenarios": [
+    {
+      "id": "worktrees.sweep/dry-run-cwd-reports-only",
+      "row": "worktrees.sweep",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "list",
+              "--porcelain"
+            ]
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "remove"
+            ]
+          },
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "prune"
+            ]
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/apply-removes-merged-and-prunes",
+      "row": "worktrees.sweep",
+      "kind": "effect",
+      "input": {
+        "apply": true
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "list",
+              "--porcelain"
+            ]
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "remove"
+            ]
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "prune"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/older-than-sweeps-aged-unmerged",
+      "row": "worktrees.sweep",
+      "kind": "effect",
+      "input": {
+        "apply": true,
+        "older_than_days": 14
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "list",
+              "--porcelain"
+            ]
+          }
+        },
+        {
+          "port": "clock",
+          "op": "now"
+        },
+        {
+          "port": "fs",
+          "op": "read",
+          "args": {
+            "path": "<worktree>"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "remove"
+            ]
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "prune"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/repos-each-listed",
+      "row": "worktrees.sweep",
+      "kind": "effect",
+      "input": {
+        "repos": [
+          "/r/a",
+          "/r/b"
+        ]
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "list",
+              "--porcelain"
+            ],
+            "cwd": "/r/a"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "list",
+              "--porcelain"
+            ],
+            "cwd": "/r/b"
+          }
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "remove"
+            ]
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/no-default-branch",
+      "row": "worktrees.sweep",
+      "kind": "refusal",
+      "refusal": "not_found",
+      "input": {},
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "remove"
+            ]
+          },
+          "count": 0
+        },
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "command": "git",
+            "args": [
+              "worktree",
+              "prune"
+            ]
+          },
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/negative-older-than",
+      "row": "worktrees.sweep",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "older_than_days": -1
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "worktrees.sweep/empty-repos",
+      "row": "worktrees.sweep",
+      "kind": "refusal",
+      "invalid": true,
+      "refusal": "invalid_arguments",
+      "input": {
+        "repos": []
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}

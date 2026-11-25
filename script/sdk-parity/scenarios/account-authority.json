@@ -1,0 +1,1169 @@
+{
+  "domain": "account",
+  "inert": {
+    "account.signIn.onOpenUrl": "a callback the person's code supplies; JSON carries a placeholder, P1b's driver the function",
+    "account.signIn.signal": "an abort signal; cancellation is a P1b scenario on the virtual clock"
+  },
+  "scenarios": [
+    {
+      "id": "account.signIn/authority-base",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in"
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-method",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "args": {
+            "method": "device_code"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-open-browser",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "open_browser": true
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "args": {
+            "open_browser": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-device-name",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "deviceName": "x-deviceName"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "args": {
+            "deviceName": "x-deviceName"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-replace",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "replace": true
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "args": {
+            "replace": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-method-browser",
+      "row": "account.signIn",
+      "kind": "effect",
+      "input": {
+        "method": "browser",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "args": {
+            "method": "browser"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/authority-base",
+      "row": "account.adopt",
+      "kind": "effect",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write"
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/authority-credential",
+      "row": "account.adopt",
+      "kind": "effect",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write",
+          "args": {
+            "credential": {
+              "$handle": "fake-readable"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/authority-replace",
+      "row": "account.adopt",
+      "kind": "effect",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        },
+        "replace": true
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write",
+          "args": {
+            "replace": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/authority-base",
+      "row": "account.credentials.handOver",
+      "kind": "effect",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read"
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/authority-what",
+      "row": "account.credentials.handOver",
+      "kind": "effect",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "args": {
+            "what": "access_token"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/authority-destination",
+      "row": "account.credentials.handOver",
+      "kind": "effect",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "args": {
+            "destination": {
+              "kind": "terminal"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/authority-what-stored-credential",
+      "row": "account.credentials.handOver",
+      "kind": "effect",
+      "input": {
+        "what": "stored_credential",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "args": {
+            "what": "stored_credential"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/authority-base",
+      "row": "account.keys.init",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init"
+        }
+      ]
+    },
+    {
+      "id": "account.keys.status/authority-base",
+      "row": "account.keys.status",
+      "kind": "effect",
+      "input": {},
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.status"
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-refused-accounts-unreachable",
+      "row": "account.signIn",
+      "kind": "refusal",
+      "refusal": "accounts_unreachable",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "result": {
+            "event": "refused",
+            "code": "accounts_unreachable"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-refused-already-signed-in",
+      "row": "account.signIn",
+      "kind": "refusal",
+      "refusal": "already_signed_in",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "result": {
+            "event": "refused",
+            "code": "already_signed_in"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-refused-device-limit",
+      "row": "account.signIn",
+      "kind": "refusal",
+      "refusal": "device_limit",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "result": {
+            "event": "refused",
+            "code": "device_limit"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/authority-refused-machine-exists",
+      "row": "account.signIn",
+      "kind": "refusal",
+      "refusal": "machine_exists",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "result": {
+            "event": "refused",
+            "code": "machine_exists"
+          }
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/account-read-refuses-connector",
+      "row": "account.whoami",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/account-read-refuses-service",
+      "row": "account.whoami",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/sign-in-refuses-connector",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/sign-in-refuses-service",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/sign-in-replace-refuses-connector",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "replace": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/sign-in-replace-refuses-session",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "replace": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "effect",
+      "change": "B4",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in"
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/sign-in-replace-refuses-service",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback",
+        "replace": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/origin-refuses-connector",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/origin-refuses-session",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signIn/origin-refuses-service",
+      "row": "account.signIn",
+      "input": {
+        "method": "device_code",
+        "onUserCode": "$callback"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_in",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/origin-refuses-connector",
+      "row": "account.whoami",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/origin-refuses-session",
+      "row": "account.whoami",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.whoami/origin-refuses-service",
+      "row": "account.whoami",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "root": {
+        "api": "https://api.example.test"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "me",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signOut/sign-out-refuses-connector",
+      "row": "account.signOut",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_out",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signOut/sign-out-refuses-session",
+      "row": "account.signOut",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_out",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.signOut/sign-out-refuses-service",
+      "row": "account.signOut",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "session",
+          "op": "sign_out",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/sign-out-refuses-connector",
+      "row": "account.forget",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/sign-out-refuses-session",
+      "row": "account.forget",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.forget/sign-out-refuses-service",
+      "row": "account.forget",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "clear",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/custody-refuses-connector",
+      "row": "account.adopt",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/custody-refuses-session",
+      "row": "account.adopt",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.adopt/custody-refuses-service",
+      "row": "account.adopt",
+      "input": {
+        "credential": {
+          "$handle": "fake-readable"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "write",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/custody-refuses-connector",
+      "row": "account.credentials.handOver",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/custody-refuses-session",
+      "row": "account.credentials.handOver",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.credentials.handOver/custody-refuses-service",
+      "row": "account.credentials.handOver",
+      "input": {
+        "what": "access_token",
+        "destination": {
+          "kind": "terminal"
+        }
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.status/custody-refuses-connector",
+      "row": "account.store.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.status/custody-refuses-session",
+      "row": "account.store.status",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.status/custody-refuses-service",
+      "row": "account.store.status",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/custody-refuses-connector",
+      "row": "account.store.enable",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/custody-refuses-session",
+      "row": "account.store.enable",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.enable/custody-refuses-service",
+      "row": "account.store.enable",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.enable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/custody-refuses-connector",
+      "row": "account.store.disable",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/custody-refuses-session",
+      "row": "account.store.disable",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.store.disable/custody-refuses-service",
+      "row": "account.store.disable",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "store.disable",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/custody-refuses-connector",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/custody-refuses-session",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/custody-refuses-service",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/opencode-credential-refuses-connector",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/opencode-credential-refuses-session",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/opencode-credential-refuses-service",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.status/opencode-read-refuses-connector",
+      "row": "account.keys.status",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.status",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.status/opencode-read-refuses-service",
+      "row": "account.keys.status",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.status",
+          "count": 0
+        }
+      ]
+    }
+  ]
+}
