@@ -276,11 +276,18 @@ describe("thread_create on another device survives a lost open reply", () => {
     const a = account({ openLosesReply: 1, ignoresDurableSessionId: true })
     const { run } = surface(a.remote)
 
-    const result = await run("thread_create", { device: "studio", name: "retry-hint", idempotency_key: "remote-lost-hint" })
+    const result = await run("thread_create", {
+      device: "studio",
+      name: "retry-hint",
+      idempotency_key: "remote-lost-hint",
+    })
 
     expect(result).toMatchObject({
       kind: "error",
-      error: { code: "idempotency_uncertain", details: { retry_same_key_safe: true, idempotency_key: "remote-lost-hint" } },
+      error: {
+        code: "idempotency_uncertain",
+        details: { retry_same_key_safe: true, idempotency_key: "remote-lost-hint" },
+      },
     })
     expect(result.kind === "error" ? result.error.next_action : "").toContain("same idempotency_key")
   })

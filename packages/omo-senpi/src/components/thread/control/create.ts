@@ -550,7 +550,12 @@ function keyedRetryHint(
   createdId: string | undefined,
   device: string | undefined,
 ): ThreadToolResult {
-  if (outcome.error.code !== "idempotency_uncertain" || key === undefined || createdId === undefined || device === undefined)
+  if (
+    outcome.error.code !== "idempotency_uncertain" ||
+    key === undefined ||
+    createdId === undefined ||
+    device === undefined
+  )
     return outcome
   return {
     ...outcome,
