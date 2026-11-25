@@ -5,6 +5,7 @@ import { built, CONTEXT, open, pair, run, scenario } from "./conformance-fixture
 import { runEffectScenarios, type ScenarioRun } from "./conformance-run"
 import type { ObservedCall, TableScenario } from "./expectation"
 import { rows } from "./gate-fixture"
+import { tableProblems } from "./scenario-rules"
 import { rowProblems, type Row } from "./schema"
 
 // Negative controls for review 6062172318 and the design lane's rulings on round 5: every `then` step runs in order on
@@ -73,6 +74,40 @@ describe("sequences: a retry after a lost acknowledgement (H1)", () => {
     expect(await problems([retry({ thread: "t2" }), ...pair.slice(1)], target)).toContainEqual(
       'row threads.locate: scenario threads.locate/by-id#step2: answered {"kind":"ok","thread":"t1","caller":"me"}, not the expected {"thread":"t2"}',
     )
+  })
+})
+
+describe("the success discriminator and step shapes (review 6062344773)", () => {
+  test("#given an effect call that returns something other than a kind ok result #then it is not a success", async () => {
+    const bare = run(
+      scenario("by-id", undefined),
+      undefined,
+      (calls) => (calls.push(host("listSessions", { allScope: false })), { thread: "t1" }),
+    )
+    expect(await problems([bare, ...pair.slice(1)], withLocate({}))).toContainEqual(
+      'row threads.locate: scenario threads.locate/by-id answered {"thread":"t1"}, not a successful result (kind "ok")',
+    )
+  })
+
+  test("#given a then step that breaks the table's shape rules #then the table names the step", () => {
+    const stepped: TableScenario = {
+      ...scenario("by-id", undefined),
+      then: [
+        { input: {}, kind: "refusal", expect: [] },
+        { input: {}, kind: "effect", refusal_from: "value", expect: [{ port: "host", op: "kill", count: 0 }] },
+      ],
+    }
+    expect(
+      tableProblems(withLocate({}), [
+        stepped,
+        scenario("all-scope", true),
+        scenario("other-device", undefined, "other_device"),
+      ]),
+    ).toEqual([
+      "scenario threads.locate/by-id step 2: a refusal scenario names its code",
+      "scenario threads.locate/by-id step 3: refusal_from belongs to a refusal",
+      "scenario threads.locate/by-id step 3: an effect scenario states a port effect; an answer alone builds nothing",
+    ])
   })
 })
 
