@@ -14,18 +14,22 @@ async function sdkRoot(_input = {}, ports = { entryDir: SDK_ENTRY_DIR }) {
 }
 
 /**
- * The install namespace's calls, keyed as the root names them after `install.`. The root's call options are not ports:
- * a member passes only the input, so each call runs on its own real ports.
+ * The install namespace's calls, keyed as the root names them after `install.`. They run on the root's own environment
+ * and home; the root's call options are not ports.
+ * @param {import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").CoreContext} context
  * @returns {Promise<import("../../../omo-senpi/src/components/omo-sdk/root/members.ts").NamespaceCore<"install">>}
  */
-export async function installCore() {
+export async function installCore(context) {
+  const ports = { env: { ...context.env }, ...(context.home === undefined ? {} : { home: context.home }) }
   const calls = await import("./install-calls.js")
+  // This root's own setup calls: a plan its plan call answered is applied only through its apply.
+  const setup = calls.createSetup()
   return {
     sdkRoot: (input) => sdkRoot(input),
     version: async (input) => calls.version(input),
-    update: (input) => calls.update(input),
-    "setup.detect": (input) => calls.setup.detect(input),
-    "setup.plan": (input) => calls.setup.plan(input),
-    "setup.apply": (input) => calls.setup.apply(input),
+    update: (input) => calls.update(input, ports),
+    "setup.detect": (input) => setup.detect(input, ports),
+    "setup.plan": (input) => setup.plan(input, ports),
+    "setup.apply": (input) => setup.apply(input, ports),
   }
 }

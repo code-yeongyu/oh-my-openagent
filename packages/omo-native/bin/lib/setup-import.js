@@ -5,7 +5,7 @@
  */
 
 import { createInterface } from "node:readline/promises"
-import { setup } from "./install-calls.js"
+import { setup, thrownBy } from "./install-calls.js"
 import { renderSetupSummary, TELEMETRY_NOTICE } from "./setup-summary.js"
 
 function write(lines) {
@@ -29,7 +29,7 @@ async function ask(question, options, defaultYes) {
 }
 
 function answered(answer) {
-  if (answer.kind === "error") throw new Error(String(answer.error.details?.cause ?? answer.error.message))
+  if (answer.kind === "error") throw thrownBy(answer) ?? new Error(answer.error.message)
   return answer.value
 }
 

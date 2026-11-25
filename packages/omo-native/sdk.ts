@@ -10,7 +10,7 @@ export function createOmoSdk(options: OmoSdkOptions = {}): OmoSdk {
   refuseCallerCores(options)
   return assembleOmoSdk(options, {
     cores: {
-      install: async () => installCore(),
+      install: async (context) => installCore(context),
     },
   })
 }

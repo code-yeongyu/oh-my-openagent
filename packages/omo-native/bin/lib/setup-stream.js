@@ -295,33 +295,48 @@ export function authWritesPending(plans, stageIds) {
  * and `options.staleGuard`, re-checked right before each write, refuses a stage whose target
  * changed since planning by throwing `SetupStaleError`.
  */
+// The stages an apply had written and the stage it faulted in, per thrown error, kept beside the error rather than on
+// it: the error a command prints stays exactly what the stage threw.
+const APPLY_FAULTS = new WeakMap()
+
+/** Which stages \`applySetupStages\` had applied when \`error\` left it, and the stage that threw; undefined otherwise. */
+export function setupApplyFault(error) {
+  return typeof error === "object" && error !== null ? APPLY_FAULTS.get(error) : undefined
+}
+
 export async function applySetupStages(plans, confirm, report = () => {}, options = {}) {
   const applied = new Set()
   // Files this apply already rewrote: a later stage's stale check must not mistake them for a
   // user's change (the credentials stage and the provider keys share auth.json; #10496 review).
   const written = new Set()
   for (const stage of setupStages(plans)) {
-    if (
-      stage.id === "model-choices" &&
-      stage.plan !== undefined &&
-      plans.planChoices !== undefined &&
-      (plans.providers?.pending ?? 0) > 0 &&
-      !applied.has("providers")
-    ) {
-      const shown = new Set(plans.modelChoices.notices)
-      plans.modelChoices = await plans.planChoices([])
-      stage.plan = plans.modelChoices
-      for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
+    try {
+      if (
+        stage.id === "model-choices" &&
+        stage.plan !== undefined &&
+        plans.planChoices !== undefined &&
+        (plans.providers?.pending ?? 0) > 0 &&
+        !applied.has("providers")
+      ) {
+        const shown = new Set(plans.modelChoices.notices)
+        plans.modelChoices = await plans.planChoices([])
+        stage.plan = plans.modelChoices
+        for (const notice of plans.modelChoices.notices) if (!shown.has(notice)) report(notice)
+      }
+      if (stage.plan === undefined || stage.plan.pending === 0) continue
+      if (!(await confirm(stage))) continue
+      if (options.staleGuard !== undefined) {
+        const stale = options.staleGuard(stage.id, written)
+        if (stale !== undefined && stale.length > 0) throw new SetupStaleError(stale, [...applied])
+      }
+      await stage.apply(stage.plan, { ...options, report })
+      applied.add(stage.id)
+      for (const path of stageWrittenPaths(plans, stage.id)) written.add(resolve(path))
+    } catch (error) {
+      if (typeof error === "object" && error !== null && !APPLY_FAULTS.has(error))
+        APPLY_FAULTS.set(error, { applied: [...applied], stage: stage.id })
+      throw error
     }
-    if (stage.plan === undefined || stage.plan.pending === 0) continue
-    if (!(await confirm(stage))) continue
-    if (options.staleGuard !== undefined) {
-      const stale = options.staleGuard(stage.id, written)
-      if (stale !== undefined && stale.length > 0) throw new SetupStaleError(stale, [...applied])
-    }
-    await stage.apply(stage.plan, { ...options, report })
-    applied.add(stage.id)
-    for (const path of stageWrittenPaths(plans, stage.id)) written.add(resolve(path))
   }
   return applied
 }

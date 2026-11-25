@@ -150,6 +150,11 @@ export function staleSetupTargets(
 /** True when any of the given stages would write into a credential store. */
 export function authWritesPending(plans: SetupPlans, stageIds: Iterable<SetupStageId>): boolean
 
+/** Which stages an apply had written when \`error\` left it, and the stage that threw. */
+export function setupApplyFault(
+  error: unknown,
+): { readonly applied: readonly SetupStageId[]; readonly stage: SetupStageId } | undefined
+
 export function applySetupStages(
   plans: SetupPlans,
   confirm: (stage: SetupApplyStage) => boolean | Promise<boolean>,

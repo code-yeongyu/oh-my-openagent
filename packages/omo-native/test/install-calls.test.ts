@@ -120,6 +120,27 @@ describe("install.setup.plan answers a typed failure, never a rejection", () => 
   })
 })
 
+describe("install.setup.apply after a stage's write throws", () => {
+  test("#given the assets stage cannot write after credentials did #then internal_error names the applied stages and the failed one", async () => {
+    const fixture = setupHome()
+    const config = join(fixture.ports.env.XDG_CONFIG_HOME as string, "opencode", "skills", "fixture-skill")
+    mkdirSync(config, { recursive: true })
+    writeFileSync(join(config, "SKILL.md"), "---\nname: fixture-skill\ndescription: d\n---\nbody\n")
+    const agentDir = dirname(fixture.authFile)
+    mkdirSync(agentDir, { recursive: true })
+    writeFileSync(join(agentDir, "skills"), "not a directory\n")
+    const planned = await setup.plan({}, fixture.ports)
+    if (planned.kind !== "ok") throw new Error("plan failed")
+    const answer = await setup.apply({ plan: planned.value, consent: "all" }, fixture.ports)
+    expect(answer).toMatchObject({
+      kind: "error",
+      error: { code: "internal_error", details: { applied_stages: ["credentials"], failed_stage: "assets" } },
+    })
+    expect(existsSync(fixture.authFile)).toBe(true)
+    expect(JSON.stringify(answer)).not.toContain(CANARY)
+  })
+})
+
 describe("install.setup.apply refuses its own input before any write", () => {
   test("#given consent each without decide #then invalid_arguments names decide and nothing is written", async () => {
     const { plan, authFile } = await plannedSetup()

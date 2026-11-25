@@ -92,8 +92,8 @@
     // pre-existing at origin dev 4686e425b5: unused export(s) API_BY_NPM
     "packages/omo-native/bin/lib/setup-opencode-providers.js": ["API_BY_NPM"],
     // pre-existing at origin dev 4686e425b5: unused export(s) SETUP_SOURCES, canonicalAgentDir, scanSetup, collectSetupPlans, SetupStaleError, staleSetupTargets, authWritesPending, applySetupStages
-    // setupEntryText, setupStages: declared for install-calls.js (#14960), which imports them through the .js module
-    "packages/omo-native/bin/lib/setup-stream.d.ts": ["SETUP_SOURCES", "canonicalAgentDir", "scanSetup", "collectSetupPlans", "SetupStaleError", "staleSetupTargets", "authWritesPending", "applySetupStages", "setupEntryText", "setupStages"],
+    // setupEntryText, setupStages, setupApplyFault: declared for install-calls.js (#14960), which imports them through the .js module
+    "packages/omo-native/bin/lib/setup-stream.d.ts": ["SETUP_SOURCES", "canonicalAgentDir", "scanSetup", "collectSetupPlans", "SetupStaleError", "staleSetupTargets", "authWritesPending", "applySetupStages", "setupEntryText", "setupStages", "setupApplyFault"],
     // pre-existing at origin dev 4686e425b5: unused export(s) threadExitCode
     "packages/omo-native/bin/lib/thread.js": ["threadExitCode"],
     // pre-existing at origin dev 4686e425b5: unused export(s) UPDATE_USAGE
