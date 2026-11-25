@@ -1,4 +1,5 @@
-import { type OmoFailure, type OmoStream, ROOT_CALLS, type RootCallKey } from "../contract"
+import type { OmoFailure, OmoStream, RootCallKey } from "../contract"
+import { ROOT_CALLS } from "../contract/calls"
 
 // Design 4.4: a call whose slice has not landed answers not_implemented as data. It never counts as built: a scenario
 // that runs into it fails (script/sdk-parity/conformance.ts), so its row stays in unresolved.json.
