@@ -295,3 +295,60 @@ describe("tables the root's consumers read", () => {
     expect(rows.filter((row) => JSON.stringify(syncRow(row)) !== JSON.stringify(row)).map((row) => row.id)).toEqual([])
   })
 })
+
+// Objects inside a root input that stay open on purpose, each with its owner's reason (#15014). Every other object a
+// root input carries, the top-level input of every call included, refuses a key its schema does not name.
+const OPEN_ON_PURPOSE: Readonly<Record<string, string>> = {
+  "install.setup.apply.plan":
+    "passed back exactly as install.setup.plan answered it; a field a newer report adds must not refuse it",
+  "install.setup.apply.plan.inventory": "part of the answered plan (see plan)",
+  "install.setup.apply.plan.inventory.harnesses[]": "part of the answered plan (see plan)",
+  "install.setup.apply.plan.stages[]": "part of the answered plan (see plan)",
+  "deviceService.bootstrap.account": "security input owned by slice P1a-s",
+  "account.adopt.credential": "security input owned by slice P1a-s",
+  "engine.launch.interactive.api_key": "security input owned by slice P1a-s",
+  "engine.launch.print.api_key": "security input owned by slice P1a-s",
+  "engine.launch.rpc.api_key": "security input owned by slice P1a-s",
+  "engine.launch.hand.api_key": "security input owned by slice P1a-s",
+  "engine.launch.headless.api_key": "security input owned by slice P1a-s",
+  "toolkit.addGoal.successCriteria[]": "security input owned by slice P1a-s",
+  "toolkit.steer.childGoals[]": "security input owned by slice P1a-s",
+}
+
+type SchemaNode = {
+  readonly type?: string
+  readonly anyOf?: readonly SchemaNode[]
+  readonly properties?: Readonly<Record<string, SchemaNode>>
+  readonly items?: SchemaNode
+  readonly additionalProperties?: unknown
+  readonly patternProperties?: unknown
+}
+const openObjects = (node: SchemaNode, path: string): string[] => [
+  ...(node.anyOf ?? []).flatMap((variant) => openObjects(variant, path)),
+  ...(node.type === "object" && node.additionalProperties === undefined && node.patternProperties === undefined
+    ? [path]
+    : []),
+  ...Object.entries(node.type === "object" ? (node.properties ?? {}) : {}).flatMap(([key, child]) =>
+    openObjects(child, `${path}.${key}`),
+  ),
+  ...(node.type === "array" && node.items !== undefined ? openObjects(node.items, `${path}[]`) : []),
+]
+
+describe("unknown keys (finding relayed from C1c, design 4.4)", () => {
+  test("#given every root call's input schema #then the only open objects are the ones listed open on purpose", () => {
+    const open = Object.entries(ROOT_CALLS).flatMap(([key, call]) =>
+      openObjects(JSON.parse(JSON.stringify(call.input)) as SchemaNode, key),
+    )
+    expect(open.toSorted()).toEqual(Object.keys(OPEN_ON_PURPOSE).toSorted())
+  })
+
+  test("#given any root call #then an input carrying a key its schema does not name is refused", () => {
+    const opened = Object.keys(ROOT_CALLS).filter((key) => {
+      const sample = scenarios
+        .flatMap((file) => file.scenarios)
+        .find((scenario) => scenario.invalid !== true && rows.find((row) => row.id === scenario.row)?.sdk === key)
+      return sample !== undefined && inputAccepts(key, { ...sample.input, unknown_key_probe: 1 })
+    })
+    expect(opened).toEqual([])
+  })
+})

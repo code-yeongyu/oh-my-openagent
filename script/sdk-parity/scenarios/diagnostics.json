@@ -302,6 +302,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "diagnostics.run/unknown-key-refused",
+      "row": "diagnostics.run",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "count": 0
+        }
+      ]
     }
   ]
 }

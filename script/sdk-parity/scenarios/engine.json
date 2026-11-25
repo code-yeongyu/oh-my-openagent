@@ -1294,6 +1294,23 @@
           }
         }
       ]
+    },
+    {
+      "id": "engine.config.agentDir/unknown-key-refused",
+      "row": "engine.config.agentDir",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.agentDir",
+          "count": 0
+        }
+      ]
     }
   ]
 }

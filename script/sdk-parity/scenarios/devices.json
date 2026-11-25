@@ -609,6 +609,23 @@
           "count": 0
         }
       ]
+    },
+    {
+      "id": "devices.list/unknown-key-refused",
+      "row": "devices.list",
+      "kind": "refusal",
+      "refusal": "invalid_arguments",
+      "invalid": true,
+      "input": {
+        "unknown_key_probe": 1
+      },
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "read",
+          "count": 0
+        }
+      ]
     }
   ]
 }

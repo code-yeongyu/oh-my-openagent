@@ -25,11 +25,14 @@ export const ThreadsSendAndFollow = Type.Object({ ...ThreadsSend.properties, dea
 const FirstPrompt = Type.Optional(
   Type.Union([
     Type.String({ minLength: 1, maxLength: THREAD_MESSAGE_MAX_BYTES }),
-    Type.Object({
-      ...Type.Pick(ThreadSendParams, ["message", "delivery", "expected_turn_id", "summary"]).properties,
-      attachments: Attachments,
-      author: Author,
-    }),
+    Type.Object(
+      {
+        ...Type.Pick(ThreadSendParams, ["message", "delivery", "expected_turn_id", "summary"]).properties,
+        attachments: Attachments,
+        author: Author,
+      },
+      { additionalProperties: false },
+    ),
   ]),
 )
 
