@@ -802,7 +802,10 @@ export async function enqueue(
       rollbackQuietly(ctx)
       return placement
     }
-    const budget = takePairToken(ctx, request)
+    // The pair bucket stops two agents looping on each other: an agent session here, or one on another device (whose
+    // intake only ever carries an agent). A person typing and the CLI are never a loop, so every line of theirs arrives.
+    const agentSender = /^(session|device):/.test(request.rate_principal ?? request.sender_principal)
+    const budget = agentSender ? takePairToken(ctx, request) : undefined
     if (budget !== undefined) {
       rollbackQuietly(ctx)
       return budget

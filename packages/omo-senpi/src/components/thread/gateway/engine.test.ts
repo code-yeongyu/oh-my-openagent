@@ -530,6 +530,26 @@ describe("causal_cycle_hop_and_rate_budgets", () => {
     expect(summary(await send(h, "R", "S", "m10", { idempotency_key: "r10" }))).toBe("error:pair_loop_guard")
   })
 
+  // Q's steer-all order (omo#14972): the pair bucket stops an agent loop; a person typing many lines fast, and the CLI the
+  // gateway seat-sends use, are not loops, so every line arrives.
+  test("#given a person and the CLI each send 12 lines to one session at once #then every line is accepted, while an agent's 9th is still refused", async () => {
+    const h = open()
+    h.session("R")
+    h.phantom("S")
+    const engine = h.get("R").engine
+    const lines = (sender: Parameters<typeof engine.deliver>[0]["sender"], tag: string) =>
+      Promise.all(
+        Array.from({ length: 12 }, (_, index) =>
+          engine.deliver({ sender, target: "S", text: `${tag} ${index}`, idempotency_key: `${tag}${index}` }),
+        ),
+      )
+    const person = await lines({ kind: "person", uid: 1000, user: "q" }, "person")
+    const cli = await lines({ kind: "cli", uid: 1000, user: "q" }, "cli")
+    expect([...person, ...cli].map(summary)).toEqual(Array.from({ length: 24 }, () => "queued_offline"))
+    for (let index = 1; index <= 8; index++) await send(h, "R", "S", `m${index}`, { idempotency_key: `r${index}` })
+    expect(summary(await send(h, "R", "S", "m9", { idempotency_key: "r9" }))).toBe("error:pair_loop_guard")
+  })
+
   test("#given A sends to B in one burst #when the 9th send follows the 8th at once and the refill window then passes #then all 8 deliver, the 9th is refused pair_loop_guard with the measured burst and the wait, and the next send is accepted", async () => {
     const h = open()
     h.session("A")
