@@ -17,7 +17,6 @@ import {
   updateTarget,
 } from "./package-paths.js"
 import { findHolders, heldTarget, isLockFailure, listWindowsProcesses, LOCK_RETRY_DELAYS_MS } from "./update-lock.js"
-import { findVersionedInstall, versionedInstallUpdate, versionedUpdateTarget } from "./versioned-install.js"
 import { homedir } from "node:os"
 import { dirname, join, relative } from "node:path"
 import { canonicalAgentDir } from "./agent-dir.js"
@@ -142,6 +141,9 @@ export async function update(input = {}, ports = {}) {
   const sleep = ports.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)))
   const progress = ports.onProgress ?? (() => {})
 
+  // Loaded here, not at module load: its bun-runtime import claims the private-descriptor table, which an engine boot
+  // that imports this module for version or setup must still find (memory-sync-boot-claim.test.ts).
+  const { findVersionedInstall, versionedInstallUpdate, versionedUpdateTarget } = await import("./versioned-install.js")
   const before = readInstalled()
   const channel = releaseChannel(before.omo)
   const target = channelDistTagVersion(fetchDistTags(), before.omo)
@@ -330,13 +332,15 @@ async function heldInstall({ result, before, install, resolveUpdate, readInstall
 }
 
 /**
- * @typedef {import("./setup-stream.js").SetupEntry & { readonly text: string }} InstallSetupEntry
+ * @typedef {import("./setup-stream.js").SetupStageId} SetupStageId
+ * @typedef {import("./setup-stream.js").SetupPlanEntry & { readonly text: string }} InstallSetupPlanEntry
+ * @typedef {import("./setup-stream.js").SetupCountEntry & { readonly text: string }} InstallSetupCountEntry
  * @typedef {import("./setup-stream.js").SetupInventory} InstallSetupInventory
- * @typedef {{ id: string, description: string, present: boolean, pending: number, entries: InstallSetupEntry[] }} InstallSetupStage
+ * @typedef {{ id: SetupStageId, description: string, present: boolean, pending: number, entries: InstallSetupPlanEntry[] }} InstallSetupStage
  * @typedef {{ inventory: InstallSetupInventory, stages: InstallSetupStage[], summary: ReturnType<typeof setupSummary>,
  *   pending: number, target_roots: string[] }} InstallSetupPlan
- * @typedef {{ id: string, outcome: "applied" | "skipped" | "nothing_pending", entries: InstallSetupEntry[] }} InstallSetupStageApplied
- * @typedef {{ applied: string[], skipped: string[], stages: InstallSetupStageApplied[] }} InstallSetupApplied
+ * @typedef {{ id: SetupStageId, outcome: "applied" | "skipped" | "nothing_pending", entries: InstallSetupCountEntry[] }} InstallSetupStageApplied
+ * @typedef {{ applied: SetupStageId[], skipped: SetupStageId[], stages: InstallSetupStageApplied[] }} InstallSetupApplied
  * @typedef {{ home?: string, env?: NodeJS.ProcessEnv, loadCoverageRuntime?: () => Promise<any>,
  *   loadCoverageEngine?: () => Promise<any>, loadModelCatalog?: () => Promise<any>, pluginRoot?: string,
  *   onProgress?: (event: { kind: "notice", text: string }) => void }} SetupPorts
@@ -360,7 +364,10 @@ function setupFailure(error) {
   })
 }
 
-/** @param {import("./setup-stream.js").SetupEntry} entry @returns {InstallSetupEntry} */
+/**
+ * @template {import("./setup-stream.js").SetupEntry} Entry
+ * @param {Entry} entry @returns {Entry & { readonly text: string }}
+ */
 const withText = (entry) => ({ ...entry, text: setupEntryText(entry) })
 
 /**
@@ -403,51 +410,51 @@ export const setup = {
    * @returns {Promise<Result<InstallSetupPlan>>}
    */
   async plan(_input = {}, ports = {}) {
-    const runtime = setupRuntime(ports)
-    const { home, env, agentDir } = runtime
-    let collected
     try {
+      const runtime = setupRuntime(ports)
+      const { home, env, agentDir } = runtime
       // The CLI has always carried OpenCode's custom providers; the onboarding RPC leaves them opt-in.
-      collected = await collectSetupPlans(scanSetup(runtime, agentDir, { includeCustomProviders: true }))
+      const { inventory, plans } = await collectSetupPlans(
+        scanSetup(runtime, agentDir, { includeCustomProviders: true }),
+      )
+      const categories = await setupCoverage({
+        agentDir,
+        home,
+        env,
+        plans,
+        loadRuntime: ports.loadCoverageRuntime,
+        loadEngine: ports.loadCoverageEngine,
+      })
+      const stages = setupStages(plans).map((stage) => {
+        const pending = stage.plan?.pending ?? 0
+        return {
+          id: stage.id,
+          description: pending > 0 ? stage.question(stage.plan) : "",
+          present: stage.present,
+          pending,
+          entries: stage.present ? stage.entries(stage.plan).map(withText) : [],
+        }
+      })
+      /** @type {InstallSetupPlan} */
+      const value = {
+        inventory,
+        stages,
+        summary: setupSummary({ home, agentDir, inventory, ...plans, categories }),
+        pending: stages.reduce((total, stage) => total + stage.pending, 0),
+        target_roots: targetRoots(plans, agentDir, home),
+      }
+      HELD_PLANS.set(value, plans)
+      return { kind: "ok", value }
     } catch (error) {
       return setupFailure(error)
     }
-    const { inventory, plans } = collected
-    const categories = await setupCoverage({
-      agentDir,
-      home,
-      env,
-      plans,
-      loadRuntime: ports.loadCoverageRuntime,
-      loadEngine: ports.loadCoverageEngine,
-    })
-    const stages = setupStages(plans).map((stage) => {
-      const pending = stage.plan?.pending ?? 0
-      return {
-        id: stage.id,
-        description: pending > 0 ? stage.question(stage.plan) : "",
-        present: stage.present,
-        pending,
-        entries: stage.present ? stage.entries(stage.plan).map(withText) : [],
-      }
-    })
-    /** @type {InstallSetupPlan} */
-    const value = {
-      inventory,
-      stages,
-      summary: setupSummary({ home, agentDir, inventory, ...plans, categories }),
-      pending: stages.reduce((total, stage) => total + stage.pending, 0),
-      target_roots: targetRoots(plans, agentDir, home),
-    }
-    HELD_PLANS.set(value, plans)
-    return { kind: "ok", value }
   },
 
   /**
    * install.setup.apply({ plan, consent, decide? }): writes what the plan holds. consent "all" applies every pending
    * stage; "each" calls decide once per pending stage, in plan order, before that stage's write.
    * @param {{ plan: InstallSetupPlan, consent: "all" | "each",
-   *   decide?: (stage: { id: string, description: string }) => "apply" | "skip" | Promise<"apply" | "skip"> }} input
+   *   decide?: (stage: { id: SetupStageId, description: string }) => "apply" | "skip" | Promise<"apply" | "skip"> }} input
    * @param {SetupPorts} [ports]
    * @returns {Promise<Result<InstallSetupApplied>>}
    */

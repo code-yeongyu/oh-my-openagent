@@ -54,16 +54,56 @@ export type SetupApplyStage = {
   readonly question: (plan: SetupStagePlan) => string
 }
 
-/** One line of `omo setup --dry-run` or of the counts after an apply, typed: a list of ids or a number. */
-export type SetupEntry = { readonly key: string; readonly value: number | readonly string[] }
+type ListEntry<Key extends string> = { readonly key: Key; readonly value: readonly string[] }
+type CountEntry<Key extends string> = { readonly key: Key; readonly value: number }
+
+/** One line of `omo setup --dry-run`: what a stage's plan holds, by key. */
+export type SetupPlanEntry =
+  | ListEntry<
+      | "planned-add"
+      | "skipped-existing"
+      | "skipped-oauth"
+      | "skipped-unmapped"
+      | "planned-mcp"
+      | "mcp-skipped-existing"
+      | "planned-skills"
+      | "skills-skipped-existing"
+      | "skills-skipped-bundled"
+      | "planned-providers"
+      | "providers-skipped-existing"
+      | "planned-model-choices"
+      | "model-choices-skipped-existing"
+      | "model-choices-already-carried"
+    >
+  | CountEntry<"model-choices-not-carried">
+
+/** One line of the counts an apply reports, by key. */
+export type SetupCountEntry =
+  | CountEntry<
+      | "imported"
+      | "skipped-existing"
+      | "skipped-oauth"
+      | "skipped-unmapped"
+      | "mcp-imported"
+      | "mcp-skipped-existing"
+      | "skills-imported"
+      | "skills-skipped-existing"
+      | "skills-skipped-bundled"
+      | "provider-keys-imported"
+      | "providers-skipped-existing"
+      | "model-choices-not-carried"
+    >
+  | ListEntry<"providers-imported" | "model-choices-carried" | "model-choices-skipped-existing">
+
+export type SetupEntry = SetupPlanEntry | SetupCountEntry
 
 export function setupEntryText(entry: SetupEntry): string
 
 export type SetupStage = SetupApplyStage & {
   readonly plan: SetupStagePlan | undefined
   readonly present: boolean
-  readonly entries: (plan: SetupStagePlan) => SetupEntry[]
-  readonly countEntries: (plan: SetupStagePlan) => SetupEntry[]
+  readonly entries: (plan: SetupStagePlan) => SetupPlanEntry[]
+  readonly countEntries: (plan: SetupStagePlan) => SetupCountEntry[]
 }
 
 /** In apply order; a stage whose source failed has no plan and is never applied. */

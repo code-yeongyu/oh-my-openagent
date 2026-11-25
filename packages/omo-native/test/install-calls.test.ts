@@ -63,6 +63,21 @@ describe("install.update refuses its own input before any lookup", () => {
   })
 })
 
+describe("install.setup.plan answers a typed failure, never a rejection", () => {
+  test("#given a coverage runtime whose answer the summary cannot project #then plan answers internal_error with the cause", async () => {
+    const { ports } = setupHome()
+    const answer = await setup.plan(
+      {},
+      {
+        ...ports,
+        loadCoverageRuntime: async () => ({ categoryCoverage: () => ({ usable: null, unusable: null }) }),
+      },
+    )
+    expect(answer).toMatchObject({ kind: "error", error: { code: "internal_error" } })
+    expect(JSON.stringify(answer)).not.toContain(CANARY)
+  })
+})
+
 describe("install.setup.apply refuses its own input before any write", () => {
   test("#given consent each without decide #then invalid_arguments names decide and nothing is written", async () => {
     const { plan, authFile } = await plannedSetup()
