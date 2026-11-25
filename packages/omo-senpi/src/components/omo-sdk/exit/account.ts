@@ -69,6 +69,7 @@ const ACCOUNT_SHOW: SurfaceExits = {
   rules: [
     { code: "invalid_arguments", exit: 2 },
     { code: "credential_store_locked", exit: 7 },
+    { code: "credential_store_unavailable", details: { reason: "keychain_unavailable" }, exit: 8 },
     { code: "credential_store_unavailable", exit: 9 },
   ],
 }
@@ -211,6 +212,7 @@ const ACCOUNT_FORGET: SurfaceExits = {
     { code: "invalid_arguments", exit: 2 },
     { code: "credential_store_locked", exit: 7 },
     { code: "credential_store_unavailable", details: { reason: "unreadable_credential" }, exit: 1 },
+    { code: "credential_store_unavailable", details: { reason: "keychain_unavailable" }, exit: 8 },
     { code: "credential_store_unavailable", exit: 9 },
   ],
 }
@@ -246,7 +248,6 @@ const ACCOUNT_STORE: SurfaceExits = {
       "idempotency_in_progress",
       "idempotency_uncertain",
       "internal_error",
-      "invalid_arguments",
       "local_only",
       "loop_detected",
       "machine_exists",
@@ -282,7 +283,9 @@ const ACCOUNT_STORE: SurfaceExits = {
     { code: "unsupported", details: { reason: "macos_only" }, exit: 2 },
     { code: "credential_store_unavailable", details: { reason: "helper_unavailable" }, exit: 9 },
     { code: "credential_store_unavailable", details: { reason: "switch_failed" }, exit: 1 },
+    { code: "invalid_arguments", exit: 2 },
     { code: "credential_store_locked", exit: 7 },
+    { code: "credential_store_unavailable", details: { reason: "keychain_unavailable" }, exit: 8 },
     { code: "credential_store_unavailable", exit: 9 },
     { code: "unsupported", exit: 1 },
   ],

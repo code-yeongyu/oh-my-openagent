@@ -63,7 +63,15 @@ export const SIGN_IN = "sign this device in to OmO, then retry"
 export function failure<T>(error: unknown): OmoResult<T> {
   if (error instanceof KeychainLockedError)
     return refused("credential_store_locked", "the credential store is locked", "unlock the keychain, then retry")
-  if (error instanceof SecretServiceUnavailableError || error instanceof CredentialStoreError)
+  // The native keychain itself unavailable is its own outcome (omo account exits 8, not 9), so it keeps its reason.
+  if (error instanceof SecretServiceUnavailableError)
+    return refused(
+      "credential_store_unavailable",
+      "the system keychain is unavailable",
+      "make the system keychain available to this process, then retry",
+      { reason: "keychain_unavailable" },
+    )
+  if (error instanceof CredentialStoreError)
     return refused(
       "credential_store_unavailable",
       "the credential store could not be read",

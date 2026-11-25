@@ -1,6 +1,16 @@
 import { expect, test } from "bun:test"
 
-import { ACCOUNT_EXIT } from "../../../../../omo-native/account-show"
+import {
+  CredentialStoreError,
+  DedicatedStoreError,
+  KeychainApprovalPendingError,
+  KeychainItemNotOwnedError,
+  KeychainLockedError,
+  SecretServiceUnavailableError,
+} from "@oh-my-opencode/account-core/keystore"
+import { ACCOUNT_EXIT, type AccountShowDependencies, accountStoreFailure } from "../../../../../omo-native/account-show"
+import { type AccountStoreDependencies, runAccountStore } from "../../../../../omo-native/account-store"
+import { failure as accessFailure } from "../access"
 import { exitOf, type SurfaceExits } from "."
 import { SURFACE_EXITS } from "./surfaces"
 
@@ -14,6 +24,8 @@ const at = (route: string) => SURFACE_EXITS[route] as SurfaceExits
 test.each([
   ["account show", failure("credential_store_locked"), ACCOUNT_EXIT.keychainLocked],
   ["account show", failure("credential_store_unavailable"), ACCOUNT_EXIT.storeUnavailable],
+  ["account show", failure("credential_store_unavailable", "keychain_unavailable"), ACCOUNT_EXIT.keychainUnavailable],
+  ["account store status", failure("invalid_arguments"), ACCOUNT_EXIT.invalid],
   ["account show", failure("invalid_arguments"), ACCOUNT_EXIT.invalid],
   ["account sign-in", failure("already_signed_in"), ACCOUNT_EXIT.conflict],
   ["account sign-in", failure("machine_exists"), ACCOUNT_EXIT.conflict],
@@ -33,4 +45,29 @@ test.each([
 ] as const)("#given %s #when a failure is projected #then it exits as the verb prints today", (route, answer, exit) => {
   expect(exitOf(at(route), answer)).toBe(exit)
   expect(exitOf(at(route), { kind: "ok" })).toBe(ACCOUNT_EXIT.ok)
+})
+
+// The projection is a copy of the verbs' exits; these cases read the verbs themselves, so the copy cannot drift.
+const quiet = { output: () => undefined, error: () => undefined }
+const STORE_ERRORS = [
+  new KeychainLockedError("locked"),
+  new SecretServiceUnavailableError("no keychain"),
+  new CredentialStoreError("unreadable"),
+  new DedicatedStoreError("damaged"),
+  new KeychainItemNotOwnedError("not owned"),
+  new KeychainApprovalPendingError("pending"),
+]
+for (const route of ["account show", "account forget", "account store enable", "account store disable"])
+  test.each(STORE_ERRORS.map((error) => [route, error.constructor.name, error] as const))(
+    "#given %s #when the store throws %s #then the root's answer exits as the verb does",
+    (_route, _name, error) => {
+      const cli = accountStoreFailure(quiet as unknown as AccountShowDependencies, error)
+      expect(exitOf(at(route), accessFailure(error))).toBe(cli)
+    },
+  )
+
+test("#given account store with a malformed verb #then the root's invalid_arguments exits as the verb's usage error", async () => {
+  const cli = await runAccountStore(quiet as unknown as AccountStoreDependencies, ["enable", "--bogus"])
+  expect(cli).toBe(ACCOUNT_EXIT.invalid)
+  expect(exitOf(at("account store enable"), failure("invalid_arguments"))).toBe(cli)
 })
