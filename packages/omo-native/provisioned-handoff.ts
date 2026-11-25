@@ -1,8 +1,10 @@
-import { closeSync, fstatSync } from "node:fs"
+import { closeSync, fstatSync, writeSync } from "node:fs"
 import { dirname, isAbsolute } from "node:path"
 import { propagateResult, runChild } from "./bin/lib/child-process.js"
+import { isEngineCommand } from "./bin/lib/engine-commands.js"
 import { inspectPrivateFdTable, PRIVATE_FDS_ENV, privateFdHandoffFor } from "./bin/lib/private-fd-table.js"
 import { isProvisionedExecutable } from "./compile-runtime"
+import { isInternalSupervisorLaunch } from "./supervisor-fast-path"
 
 // Set on the child a launch hands off to, naming the provisioned executable the parent spawned. The
 // child trusts it over its own executable identity, which Bun on Windows has misreported before, so
@@ -70,6 +72,7 @@ function handedOffLauncher(launcher: string | undefined, expected: string): stri
 // senpi's startup hand-off (`SENPI_RPC_HOST_STARTUP_EVENTS`) and the pipe it names at `STARTUP_EVENT_FD`.
 const STARTUP_EVENTS_ENV = "SENPI_RPC_HOST_STARTUP_EVENTS"
 const STARTUP_EVENT_FD = 16
+const RESET_MOUSE_AND_FOCUS = "\x1b[?1006l\x1b[?1004l\x1b[?1003l\x1b[?1002l\x1b[?1000l"
 
 function holdsStartupPipe(env: NodeJS.ProcessEnv, platform: NodeJS.Platform): boolean {
   if (platform === "win32" || !env[STARTUP_EVENTS_ENV]) return false
@@ -90,6 +93,26 @@ function withStartupPipe(handoff: ChildHandoff | undefined, env: NodeJS.ProcessE
   while (stdio.length <= STARTUP_EVENT_FD) stdio.push("ignore")
   stdio[STARTUP_EVENT_FD] = STARTUP_EVENT_FD
   return { ...base, stdio }
+}
+
+async function resetHerdrTerminal(argv: string[]): Promise<void> {
+  if (isEngineCommand(argv) || isInternalSupervisorLaunch(argv)) return
+  if ([
+    "account", "app-server", "daemon", "doctor", "login", "logout", "loro-smoke",
+    "remote", "setup", "sync", "thread", "trust", "ulw-loop", "whoami",
+  ].includes(argv[0] ?? "")) return
+  try {
+    const { parseArgs } = await import("../../node_modules/@code-yeongyu/senpi/dist/cli/args.js")
+    const args = parseArgs(argv)
+    if (
+      args.mode === "rpc" || args.mode === "json" || args.print || args.printPromptSizes ||
+      args.help || args.version || args.listModels !== undefined || args.listTips || args.export !== undefined ||
+      args.diagnostics.some(({ type }) => type === "error")
+    ) return
+    writeSync(process.stdout.fd, RESET_MOUSE_AND_FOCUS)
+  } catch {
+    // Terminal cleanup is best effort; it must not replace the child's exit status.
+  }
 }
 
 export async function reexecProvisionedRuntime(expected: string, options: ReexecOptions = {}): Promise<void> {
@@ -116,6 +139,12 @@ export async function reexecProvisionedRuntime(expected: string, options: Reexec
     }
   }
   const result = await run(expected, argv, handoff ?? { env })
+  if (
+    platform === "win32" && env.HERDR_ENV === "1" && !result.error && result.status !== 0 &&
+    process.stdin.isTTY && process.stdout.isTTY
+  ) {
+    await resetHerdrTerminal(argv)
+  }
   propagate(result)
 }
 
