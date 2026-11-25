@@ -67,7 +67,11 @@ type AttachmentBytes = Extract<
   { readonly bytes: unknown }
 >["bytes"]
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
-export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true, true, true, true, true] = [
+export const rootTypeChecks: readonly true[] = [
+  // Review 6061836983 H2: an instant call whose input has required fields takes that input as required.
+  true satisfies Equal<undefined extends Parameters<OmoSdkRoot["daemon"]["shardPath"]>[0] ? true : false, false>,
+  // H1: install.setup.apply takes the plan as required, as design 6.7 and the row have it.
+  true satisfies Equal<undefined extends RootCallInput<"install.setup.apply">["plan"] ? true : false, false>,
   // Design lane ruling on M1: bytes are a Uint8Array on the root; the scenario table's fixture reference is not an input.
   true satisfies Equal<AttachmentBytes, Uint8Array>,
   true satisfies Equal<{ readonly $bytes: { readonly fixture: string } } extends AttachmentBytes ? true : false, false>,
@@ -149,10 +153,10 @@ describe("input schemas of the root (review 6061342489)", () => {
 })
 
 describe("input schemas of the root (review 6061577043)", () => {
-  test("#given install.setup.apply #then a plan is accepted only in the shape install.setup.plan answers", () => {
+  test("#given install.setup.apply #then the plan is required, in the shape install.setup.plan answers", () => {
     const plan = { inventory: { harnesses: [] }, stages: [{ id: "import-credentials", description: "import" }] }
     expect(inputAccepts("install.setup.apply", { consent: "all", plan })).toBe(true)
-    expect(inputAccepts("install.setup.apply", { consent: "each" })).toBe(true)
+    expect(inputAccepts("install.setup.apply", { consent: "each" })).toBe(false)
     expect(inputAccepts("install.setup.apply", { consent: "all", plan: { stages: "all" } })).toBe(false)
   })
 

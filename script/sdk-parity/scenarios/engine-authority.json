@@ -545,6 +545,23 @@
       ]
     },
     {
+      "id": "engine.launch.interactive/authority-tui-mode-fullscreen",
+      "row": "engine.launch.interactive",
+      "kind": "effect",
+      "input": {
+        "tui_mode": "fullscreen"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "tui_mode": "fullscreen"
+          }
+        }
+      ]
+    },
+    {
       "id": "engine.launch.print/authority-base",
       "row": "engine.launch.print",
       "kind": "effect",
@@ -671,6 +688,24 @@
             "presenter": {
               "bootstrap_fd": 4
             }
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.launch.print/authority-mode-json",
+      "row": "engine.launch.print",
+      "kind": "effect",
+      "input": {
+        "input": {},
+        "mode": "json"
+      },
+      "expect": [
+        {
+          "port": "process",
+          "op": "spawn",
+          "args": {
+            "mode": "json"
           }
         }
       ]

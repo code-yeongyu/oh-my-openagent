@@ -1236,6 +1236,64 @@
           "op": "tips"
         }
       ]
+    },
+    {
+      "id": "engine.config.setResource/state-unload",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "unload"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "unload"
+          }
+        }
+      ]
+    },
+    {
+      "id": "engine.config.setResource/state-load",
+      "row": "engine.config.setResource",
+      "kind": "effect",
+      "input": {
+        "local": true,
+        "source": "npm:@foo/bar",
+        "resource": {
+          "type": "extensions",
+          "path": "ext/a.ts"
+        },
+        "state": "load"
+      },
+      "expect": [
+        {
+          "port": "engine",
+          "op": "config.setResource",
+          "args": {
+            "local": true,
+            "source": "npm:@foo/bar",
+            "resource": {
+              "type": "extensions",
+              "path": "ext/a.ts"
+            },
+            "state": "load"
+          }
+        }
+      ]
     }
   ]
 }

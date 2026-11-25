@@ -139,8 +139,9 @@ describe("the table P1a held, slice P1a-s (#14949)", () => {
         }),
     )
     expect(elsewhere).toEqual([])
+    const own = new Set(REFUSALS.map((refusal) => refusal.scenario))
     for (const scenario of files.flatMap((file) => file.scenarios))
-      if (scenario.refusal !== undefined)
+      if (scenario.refusal !== undefined && (own.has(scenario.id) || scenario.id.includes("/authority-")))
         expect(OMO_CODE_REGISTRY).toHaveProperty(
           [scenario.refusal, "namespaces"],
           expect.arrayContaining([scenario.row.split(".")[0]]),

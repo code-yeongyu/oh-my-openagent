@@ -1,22 +1,47 @@
-import type { CliEntry, Edition, Row } from "./schema"
+import { type CliEntry, type Edition, type Row, schemaAt } from "./schema"
 
-// The descriptor seam (design 3.2, review 6061267823 M8): the rows are the descriptors, and this is the one dispatch over
-// them. An argv selects one entry by its longest route, then by the branch flags (`when`) it carries, then by whether a
-// positional is given and is one of the entry's values; the selected row's call is invoked on the root with the input
-// built from the entry's mappings. An argv two rows answer equally is ambiguous, never resolved by order.
+// The descriptor seam (design 3.2, reviews 6061267823 M8 and 6061624223 M3): the rows are the descriptors, and this is
+// the one dispatch over them. An argv selects one entry by its longest route, then by the branch flags (`when`) it
+// carries, then by whether its positionals are given and are among the entry's values; the selected row's call is
+// invoked on the root with the input the entry's mappings build. An argv two rows answer equally is ambiguous.
 
 export type Selection =
   | { readonly kind: "selected"; readonly row: Row; readonly entry: CliEntry }
   | { readonly kind: "ambiguous"; readonly rows: readonly string[] }
   | { readonly kind: "none" }
 
+// Targets that build no input: the adapter's rendering, process control, branch selectors, parse-only flags, root options.
+const NOT_INPUT = new Set(["render", "process", "when", "parse"])
+const isInputTarget = (target: string): boolean => !NOT_INPUT.has(target) && !target.startsWith("root.")
+
 const whenFlags = (entry: CliEntry): string[] =>
   Object.entries(entry.flags)
     .filter(([, target]) => target === "when")
     .map(([flag]) => flag)
 
+// A flag takes the next word as its value when it maps to an input field that is not a boolean and names no fixed value.
+export function takesValue(row: Row, entry: CliEntry, flag: string): boolean {
+  const target = entry.flags[flag]
+  if (target === undefined || !isInputTarget(target) || target.includes("=")) return false
+  const type = schemaAt(row.input, target)?.type
+  return type !== "boolean" && !(Array.isArray(type) && type.length === 1 && type[0] === "boolean")
+}
+
+export function positionalsOf(row: Row, entry: CliEntry, rest: readonly string[]): string[] {
+  const out: string[] = []
+  for (let index = 0; index < rest.length; index++) {
+    const word = rest[index] ?? ""
+    if (word.startsWith("-")) {
+      if (takesValue(row, entry, word)) index++
+      continue
+    }
+    out.push(word)
+  }
+  return out
+}
+
 // A root entry with no branch flag is an option carrier (`--platform`), not a route, except the bare launch of the engine.
-const isDescriptor = (row: Row, entry: CliEntry): boolean =>
+export const isDescriptor = (row: Row, entry: CliEntry): boolean =>
   row.kind !== "render" && (entry.route.length > 0 || whenFlags(entry).length > 0 || entry.via === "engine")
 
 export function selectDescriptor(rows: readonly Row[], edition: Edition, argv: readonly string[]): Selection {
@@ -33,34 +58,47 @@ export function selectDescriptor(rows: readonly Row[], edition: Edition, argv: r
       const rest = argv.slice(entry.route.length)
       const branch = whenFlags(entry)
       if (!branch.every((flag) => rest.includes(flag))) return []
-      const positional = rest.find((word) => !word.startsWith("-"))
+      const positionals = positionalsOf(row, entry, rest)
       const takes = Object.keys(entry.positionals).length > 0
-      if (takes !== (positional !== undefined)) return []
-      if (positional !== undefined && entry.values.length > 0 && !entry.values.includes(positional)) return []
-      const valued = positional !== undefined && entry.values.includes(positional) ? 1 : 0
+      if (takes !== positionals.length > 0) return []
+      const [first] = positionals
+      if (first !== undefined && entry.values.length > 0 && !entry.values.includes(first)) return []
+      const valued = first !== undefined && entry.values.includes(first) ? 1 : 0
       return [{ row, entry, score: branch.length * 2 + valued }]
     })
   const best = Math.max(-1, ...scored.map(({ score }) => score))
   const top = scored.filter(({ score }) => score === best)
   const ids = [...new Set(top.map(({ row }) => row.id))]
-  const [first] = top
-  if (first === undefined) return { kind: "none" }
+  const [chosen] = top
+  if (chosen === undefined) return { kind: "none" }
   if (ids.length > 1) return { kind: "ambiguous", rows: ids }
-  return { kind: "selected", row: first.row, entry: first.entry }
+  return { kind: "selected", row: chosen.row, entry: chosen.entry }
 }
 
-export function buildInput(entry: CliEntry, rest: readonly string[]): Record<string, unknown> {
+function setPath(input: Record<string, unknown>, path: string, value: unknown): void {
+  const segments = path.split(".")
+  let node = input
+  for (const segment of segments.slice(0, -1)) {
+    const next = node[segment]
+    node = typeof next === "object" && next !== null ? (next as Record<string, unknown>) : (node[segment] = {})
+  }
+  node[segments.at(-1) ?? ""] = value
+}
+
+export function buildInput(row: Row, entry: CliEntry, rest: readonly string[]): Record<string, unknown> {
   const input: Record<string, unknown> = {}
   for (const [flag, target] of Object.entries(entry.flags)) {
-    if (!rest.includes(flag) || ["render", "process", "when", "parse"].includes(target) || target.startsWith("root."))
-      continue
-    const [path = "", value] = target.split("=")
-    input[path] = value ?? rest[rest.indexOf(flag) + 1] ?? true
+    const at = rest.indexOf(flag)
+    if (at < 0 || !isInputTarget(target)) continue
+    const [path = "", fixed] = target.split("=")
+    const value = fixed !== undefined ? fixed : takesValue(row, entry, flag) ? rest[at + 1] : true
+    setPath(input, path, fixed === "true" ? true : fixed === "false" ? false : value)
   }
-  const [positional] = rest.filter((word) => !word.startsWith("-"))
-  const [target] = Object.values(entry.positionals)
-  if (positional !== undefined && target !== undefined && !["process", "when"].includes(target))
-    input[target] = positional
+  const targets = Object.values(entry.positionals)
+  positionalsOf(row, entry, rest).forEach((word, index) => {
+    const target = targets[index]
+    if (target !== undefined && isInputTarget(target) && input[target] === undefined) setPath(input, target, word)
+  })
   return input
 }
 
@@ -69,8 +107,7 @@ export function dispatch(rows: readonly Row[], edition: Edition, argv: readonly 
   if (selection.kind !== "selected") return selection
   let member: unknown = root
   for (const key of selection.row.sdk.split(".")) member = Reflect.get(Object(member), key)
-  Reflect.apply(member as (input: unknown) => unknown, undefined, [
-    buildInput(selection.entry, argv.slice(selection.entry.route.length)),
-  ])
+  const input = buildInput(selection.row, selection.entry, argv.slice(selection.entry.route.length))
+  Reflect.apply(member as (input: unknown) => unknown, undefined, [input])
   return selection
 }

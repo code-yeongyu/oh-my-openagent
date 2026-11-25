@@ -111,6 +111,33 @@
       "id": "install.setup.apply/host-change-refuses-connector",
       "row": "install.setup.apply",
       "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
         "consent": "all"
       },
       "principal": {
@@ -131,6 +158,33 @@
       "id": "install.setup.apply/host-change-refuses-session",
       "row": "install.setup.apply",
       "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
         "consent": "all"
       },
       "principal": {
@@ -151,6 +205,33 @@
       "id": "install.setup.apply/host-change-refuses-service",
       "row": "install.setup.apply",
       "input": {
+        "plan": {
+          "inventory": {
+            "harnesses": [
+              {
+                "id": "x-id",
+                "installed": true,
+                "providers": [
+                  "x-providers"
+                ],
+                "credentialTypes": [
+                  "x-credentialTypes"
+                ],
+                "modelHint": "x-modelHint",
+                "notices": [
+                  "x-notices"
+                ],
+                "importableCount": 1
+              }
+            ]
+          },
+          "stages": [
+            {
+              "id": "x-id",
+              "description": "x-description"
+            }
+          ]
+        },
         "consent": "all"
       },
       "principal": {
