@@ -8,12 +8,14 @@ import {
 } from "@oh-my-opencode/account-core/calls/store"
 import { helperAccess } from "@oh-my-opencode/account-core/keychain-helper/darwin-backend"
 import { dedicatedStoreState } from "@oh-my-opencode/account-core/keychain-helper/dedicated-store"
+import { type CustodyLog, custodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import { accountForget } from "@oh-my-opencode/account-core/calls/forget"
+import { accountHome } from "@oh-my-opencode/account-core/credential-lock"
 import { accountShow, type SyncState } from "@oh-my-opencode/account-core/calls/show"
 import { accountSignInCheck, accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { resolveMemoryRoot, syncPinDir } from "@oh-my-opencode/memory-core/sync-device-retire"
 import { type AccountAccess, failure } from "../access"
-import { OMO_CODE_REGISTRY, type OmoFailure, type OmoValue } from "../contract"
+import { OMO_CODE_REGISTRY, type OmoFailure, type OmoPrincipal, type OmoValue } from "../contract"
 import type { NamespaceServing } from "./members"
 
 // The account calls of first-party design 6.4 that slice A1b serves on the root, each over its one body in the account
@@ -61,13 +63,38 @@ async function trustPinState(env: Env, cwd: string, account: string): Promise<Sy
   return pin.reason === "corrupt_pin" ? "corrupt_pin" : "not_joined"
 }
 
+function principalId(principal: OmoPrincipal): string {
+  switch (principal.kind) {
+    case "person":
+    case "script":
+      return String(principal.uid)
+    case "session":
+      return principal.session_id
+    case "connector":
+      return principal.binding
+    case "service":
+      return "service"
+  }
+}
+
+const auditNote = (value: { readonly auditUnavailable?: true }) =>
+  value.auditUnavailable === true ? { audit_unavailable: true as const } : {}
+
 export function accountNamespace(options: {
+  readonly principal: OmoPrincipal
+  readonly custody?: CustodyLog
   readonly access: AccountAccess
   readonly env: Env
   readonly cwd: string
   readonly store?: StorePort
 }): NamespaceServing {
   const { access } = options
+  const custody =
+    options.custody ??
+    custodyLog({
+      home: accountHome(),
+      principal: { kind: options.principal.kind, id: principalId(options.principal) },
+    })
   const store =
     options.store ??
     storeSwitchPort({
@@ -80,17 +107,17 @@ export function accountNamespace(options: {
     members: {
       "account.signInCheck": async () => ({ kind: "ok", value: accountSignInCheck() }),
       "account.signOut": () =>
-        answer(access, async () => ({
-          kind: "ok",
-          value: await accountSignOut({ session: access.account().session }),
-        })),
+        answer(access, async () => {
+          const { revoked, ...note } = await accountSignOut({ session: access.account().session, custody })
+          return { kind: "ok", value: { signedOut: true, revoked, ...auditNote(note) } }
+        }),
       "account.forget": (input) =>
         answer(access, async () => {
           const forgotten = await accountForget(
-            access.account(),
+            { ...access.account(), custody },
             input?.device === undefined ? {} : { device: input.device },
           )
-          if (forgotten.kind === "ok") return forgotten
+          if (forgotten.kind === "ok") return { kind: "ok", value: { forgotten: true, ...auditNote(forgotten.value) } }
           switch (forgotten.code) {
             case "empty_device":
               return failed("invalid_arguments", "device must name this device's id.", { field: "device" })

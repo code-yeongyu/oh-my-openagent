@@ -15,6 +15,7 @@ import {
 import { retireSyncDevice } from "../memory-core/src/sync/device-retire"
 import { runDevicesVerb } from "./account-devices"
 import { type DeviceServiceOutcome, runSignInVerb } from "./account-sign-in"
+import { processCustodyLog } from "../account-core/src/calls/custody-log"
 import { accountForget } from "../account-core/src/calls/forget"
 import { sessionFailure, signedOut } from "./account-session-outcome"
 import { ACCOUNT_EXIT, accountStoreFailure, showAccount } from "./account-show"
@@ -161,18 +162,16 @@ async function runVerb(dependencies: AccountCommandDependencies, args: readonly 
           session: sessionOf(dependencies),
           store: dependencies.store,
           ...(dependencies.deviceService === undefined ? {} : { deviceService: dependencies.deviceService }),
+          custody: processCustodyLog("person"),
         },
         flags.length === 0 ? {} : { device: flags[1] },
       )
-      if (forgotten.kind === "ok") return reply(dependencies, forgotten.value)
-      if (forgotten.code === "empty_device") {
-        dependencies.error("omo account forget: use forget or forget --device <id>")
-        return ACCOUNT_EXIT.invalid
-      }
+      if (forgotten.kind === "ok") return reply(dependencies, { forgotten: true })
       if (forgotten.code === "unreadable_credential") {
         dependencies.error(forgotten.message)
         return reply(dependencies, { forgotten: false, error: "unreadable-credential" }, ACCOUNT_EXIT.failed)
       }
+      if (forgotten.code === "empty_device") return ACCOUNT_EXIT.invalid
       dependencies.error(
         `omo account forget --device acts on this device only; sign out device ${flags[1]} with omo account devices revoke ${flags[1]}`,
       )

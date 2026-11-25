@@ -1,5 +1,6 @@
 import { type CredentialStore, InvalidCredentialState } from "../keystore"
 import type { DeviceServiceHandoff, Session } from "../session"
+import { type Audited, audited, type CustodyLog } from "./custody-log"
 import { type CallOutcome, ok, refusedWith } from "./outcome"
 
 // account.forget (first-party design 6.4): this device forgets its own sign-in, never another device's (that is
@@ -10,6 +11,8 @@ export type ForgetDependencies = {
   readonly session: Pick<Session, "forget" | "update" | "discard">
   readonly store: Pick<CredentialStore, "clear">
   readonly deviceService?: Pick<DeviceServiceHandoff, "forget">
+  /** The custody log (security design 8.2); the forget never waits on it. */
+  readonly custody?: CustodyLog
 }
 
 export type ForgetRefusal =
@@ -18,12 +21,12 @@ export type ForgetRefusal =
   /** The stored credential does not parse; `message` is the credential store's own words, which name the recovery. */
   | { readonly code: "unreadable_credential"; readonly message: string }
 
-export async function accountForget(
+export type Forgotten = Audited<{ readonly forgotten: true }>
+
+async function forget(
   deps: ForgetDependencies,
-  input: { readonly device?: string },
+  device: string | undefined,
 ): Promise<CallOutcome<{ readonly forgotten: true }, ForgetRefusal>> {
-  const { device } = input
-  if (device === "") return refusedWith({ code: "empty_device" })
   if (device === undefined) {
     await deps.session.forget()
     return ok({ forgotten: true })
@@ -42,4 +45,12 @@ export async function accountForget(
   }
   await deps.deviceService?.forget()
   return ok({ forgotten: true })
+}
+
+export async function accountForget(
+  deps: ForgetDependencies,
+  input: { readonly device?: string },
+): Promise<CallOutcome<Forgotten, ForgetRefusal>> {
+  if (input.device === "") return refusedWith({ code: "empty_device" })
+  return audited(deps.custody, "account.forget", input.device, () => forget(deps, input.device))
 }

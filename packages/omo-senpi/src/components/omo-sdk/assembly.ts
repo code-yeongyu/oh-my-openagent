@@ -73,6 +73,8 @@ function assembleWithInternals(
   })
   const account = accountNamespace({
     access,
+    principal,
+    ...(ports.custody === undefined ? {} : { custody: ports.custody }),
     env,
     cwd,
     ...(ports.accountStore === undefined ? {} : { store: ports.accountStore }),

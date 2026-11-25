@@ -47,12 +47,30 @@ const RUNS: readonly Run[] = [
 
 describe("the account calls on the root disclose no planted secret (#14945 section 6, #14364)", () => {
   for (const run of RUNS)
-    test(`#given ${run.name} #then its answers and logs hold no canary`, async () => {
-      const { sdk, logs } = await canaryRoot(run.fault)
+    test(`#given ${run.name} #then its answers, logs and custody records hold no canary`, async () => {
+      const { sdk, logs, custodyRecords } = await canaryRoot(run.fault)
       const answer = await run.call(sdk)
-      expect(leaked([answer, logs])).toEqual([])
-      expect(leaked([answer, logs], { userCode: USER_CODE })).toEqual([])
+      const records = await custodyRecords()
+      expect(leaked([answer, logs, records])).toEqual([])
+      expect(leaked([answer, logs, records], { userCode: USER_CODE })).toEqual([])
     })
+
+  test("#given forget then signOut on the root #then each writes its started and terminal pair, attributed to the root's principal", async () => {
+    const { sdk, custodyRecords } = await canaryRoot()
+    await sdk.account.forget({ device: "other-device" })
+    await sdk.account.signOut()
+    const records = (await custodyRecords())
+      .split("\n")
+      .filter(Boolean)
+      .map((line) => JSON.parse(line))
+    expect(records.map((record) => [record.capability, record.phase, record.outcome ?? null])).toEqual([
+      ["account.forget", "started", null],
+      ["account.forget", "terminal", "refused"],
+      ["account.signOut", "started", null],
+      ["account.signOut", "terminal", "ok"],
+    ])
+    expect(new Set(records.map((record) => record.principal.id))).toEqual(new Set(["501"]))
+  })
 
   test("#given a fresh device-code sign-in #then only the user code leaves, and only through onUserCode", async () => {
     const { sdk, logs } = await canaryRoot()

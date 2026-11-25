@@ -1,6 +1,7 @@
 import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 
+import { custodyLog, custodyLogPath } from "@oh-my-opencode/account-core/calls/custody-log"
 import { accountSignIn } from "@oh-my-opencode/account-core/calls/sign-in"
 import { storeSwitchPort } from "@oh-my-opencode/account-core/calls/store"
 import { dedicatedFake } from "@oh-my-opencode/account-core/keychain-helper/dedicated-fake.test-support"
@@ -78,6 +79,7 @@ export async function canaryRoot(fault: Fault = "none") {
       cwd: home,
       ports: {
         desktopLaunch: () => false,
+        custody: custodyLog({ home, principal: { kind: "person", id: "501" } }),
         credentialStore: signedIn,
         session,
         accountSession: { session, store: signedIn, deviceService: { forget: async () => undefined } },
@@ -105,7 +107,11 @@ export async function canaryRoot(fault: Fault = "none") {
         ),
     },
   )
-  return { sdk, logs }
+  const custodyRecords = async () =>
+    await Bun.file(custodyLogPath(home))
+      .text()
+      .catch(() => "")
+  return { sdk, logs, custodyRecords }
 }
 
 const pickKeys = () => ({

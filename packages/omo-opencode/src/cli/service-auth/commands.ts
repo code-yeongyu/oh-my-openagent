@@ -1,5 +1,6 @@
 import { Command } from "commander"
 import { accountSignIn, DEFAULT_ACCOUNTS_ORIGIN } from "@oh-my-opencode/account-core/calls/sign-in"
+import { processCustodyLog } from "@oh-my-opencode/account-core/calls/custody-log"
 import { accountSignOut } from "@oh-my-opencode/account-core/calls/sign-out"
 import { accountWhoami, notSignedInMessage } from "@oh-my-opencode/account-core/calls/whoami"
 import { isCancel, select, confirm } from "@clack/prompts"
@@ -89,7 +90,7 @@ async function run(
       }),
     })
     if (action === "logout") {
-      const { revoked } = await accountSignOut({ session })
+      const { revoked } = await accountSignOut({ session, custody: processCustodyLog("person") })
       console.log("Signed out of OmO. Stored credentials and device keys were removed.")
       if (!revoked)
         console.error(

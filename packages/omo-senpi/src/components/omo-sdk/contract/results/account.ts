@@ -28,9 +28,10 @@ export type { ControlSessionWakeState as WakeState } from "../../../../../../dev
 export type SignInCheck = { readonly ready: true }
 
 /** `omo logout`: the stored credential and device keys are gone; `revoked` is whether the service confirmed the revoke. */
-export type SignedOut = { readonly signedOut: true; readonly revoked: boolean }
+export type SignedOut = { readonly signedOut: true; readonly revoked: boolean; readonly audit_unavailable?: true }
 
-export type Forgotten = { readonly forgotten: true }
+/** `audit_unavailable`: a custody record could not be written (security design 8.2); the call ran as it always has. */
+export type Forgotten = { readonly forgotten: true; readonly audit_unavailable?: true }
 
 /**
  * `omo account store status|enable|disable`: one shape per verb, what each prints today (design lane ruling,
