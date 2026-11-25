@@ -150,7 +150,9 @@ export function assembleRoot(
     }
     const serving = servings.find((candidate) => candidate.members[key] !== undefined)
     const member = serving?.members[key] ?? loaded(key, loads)
-    if (member === undefined) place(tree, key, notImplemented(key))
+    // The order of answers (design 4.4): the principal's line (placed above), then the input, then availability, then the
+    // port; an unbuilt call checks its input before it answers not_implemented.
+    if (member === undefined) place(tree, key, checked(key, notImplemented(key)))
     else place(tree, key, serving?.legacy?.includes(key) === true ? member : checked(key, member as Call))
   }
   const close = (): void => {
