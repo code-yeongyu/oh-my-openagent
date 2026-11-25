@@ -9,7 +9,9 @@ param(
 
   [Parameter(Mandatory = $true)]
   [ValidateNotNullOrEmpty()]
-  [string[]]$TestArguments
+  [string[]]$TestArguments,
+
+  [switch]$TimingRecord
 )
 
 Set-StrictMode -Version Latest
@@ -41,6 +43,20 @@ if (($TestArguments -contains "test") -and -not ($TestArguments | Where-Object {
     if ($argument -eq "test") { $withJunit += @("--reporter=junit", "--reporter-outfile=$junitPath") }
   }
   $TestArguments = $withJunit
+}
+
+# A part of a split Windows suite (#14942) also writes Bun's per-file timing record, which lists every test file the
+# run loaded, including files that register no test on Windows and so never reach the JUnit report. The Linux status
+# jobs check the parts' records against the unsplit suite with script/ci-shard-coverage.ts.
+if ($TimingRecord -and ($TestArguments -contains "test")) {
+  New-Item -ItemType Directory -Force -Path $ArtifactDirectory | Out-Null
+  $timingPath = Join-Path $ArtifactDirectory "$Invocation.timings.json"
+  $withTimings = @()
+  foreach ($argument in $TestArguments) {
+    $withTimings += $argument
+    if ($argument -eq "test") { $withTimings += @("--timings=$timingPath", "--update-timings") }
+  }
+  $TestArguments = $withTimings
 }
 
 $telemetryErrors = [System.Collections.Generic.List[object]]::new()

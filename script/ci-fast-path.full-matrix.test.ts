@@ -484,7 +484,7 @@ describe("full-matrix workflow wiring", () => {
   })
 
   describe("#given the OS matrix jobs", () => {
-    test.each(["test", "codex-compatibility", "senpi-compatibility"])(
+    test.each(["test", "codex-compatibility"])(
       "#then every heavy step in %s is ubuntu-first",
       (jobName) => {
         // given
@@ -507,7 +507,7 @@ describe("full-matrix workflow wiring", () => {
       },
     )
 
-    test.each(["test", "codex-compatibility", "senpi-compatibility"])(
+    test.each(["test", "codex-compatibility", "test-windows-1", "senpi-tests-windows"])(
       "#then checkout and summary steps in %s stay unconditional",
       (jobName) => {
         // given

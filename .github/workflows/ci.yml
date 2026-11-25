@@ -260,10 +260,10 @@ jobs:
       # macos-combined-1/-2 status jobs, the Linux ones from linux-test-status), without PR labels.
       # Queue commits always run heavy validation on every OS leg, including
       # docs/web-only groups; the fast path remains a pull-request optimization.
+      # Windows shard 1/2 runs as the parallel test-windows-1 jobs, whose required context comes from
+      # windows-test-1-status (#14942); shard 2/2 still runs here.
       matrix:
         include:
-          - os: windows-latest
-            shard: "1/2"
           - os: windows-latest
             shard: "2/2"
     steps:
@@ -324,28 +324,8 @@ jobs:
         run: npm test
         working-directory: packages/lsp-daemon
 
-      # Windows splits the root suite into two parallel jobs: shard 1 runs
-      # omo-opencode + memory-core in one process, shard 2 runs the shared serial
-      # quarantine first and then the remainder. Linux runs the same groups as
-      # the four test-linux parts below.
-      - name: Run tests with Windows telemetry
-        id: root-tests-windows-1
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && matrix.shard == '1/2' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        shell: pwsh
-        env:
-          WINDOWS_TEST_SHARD: ${{ matrix.shard }}
-          # #10821: a git that outlives its timeout records the live process table here, and every
-          # git writes a trace2 perf log, so the next stalled `git add` carries its own evidence.
-          OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR: ${{ runner.temp }}/git-timeout-diagnostics
-          GIT_TRACE2_PERF: ${{ runner.temp }}/git-trace2
-        run: |
-          New-Item -ItemType Directory -Force -Path $env:GIT_TRACE2_PERF | Out-Null
-          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
-          & .github/scripts/windows-ci-telemetry.ps1 `
-            -ArtifactDirectory $telemetryDirectory `
-            -Invocation "shard-1" `
-            -TestArguments @("test", "packages/omo-opencode", "packages/memory-core")
-
+      # Windows shard 2 runs the shared serial quarantine first and then the remainder; shard 1 (omo-opencode +
+      # memory-core) runs in the test-windows-1 jobs. Linux runs the same groups as the four test-linux parts below.
       # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform
       # tests observe sh instead of the native PowerShell/cmd execution path.
       - name: Run tests
@@ -381,48 +361,12 @@ jobs:
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.shard == '1/2' && 'shard-1' || 'shard-2' }}
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-shard-2
           path: |
             ${{ runner.temp }}/windows-root-test-telemetry/*.json
             ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
-
-      # #10821: keep the evidence of any git that timed out: the recorded process tables and the
-      # trace2 logs of every git that never reached its exit event (killed or still stuck).
-      - name: Collect timed-out git evidence
-        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        continue-on-error: true
-        shell: pwsh
-        run: |
-          $diagnostics = Join-Path $env:RUNNER_TEMP "git-timeout-diagnostics"
-          if (-not (Test-Path $diagnostics)) { "no git timed out"; exit 0 }
-          $unfinished = Join-Path $diagnostics "trace2-unfinished"
-          New-Item -ItemType Directory -Force -Path $unfinished | Out-Null
-          Get-ChildItem (Join-Path $env:RUNNER_TEMP "git-trace2") -File -ErrorAction SilentlyContinue |
-            Where-Object { -not (Select-String -Path $_.FullName -Pattern '\|\s*atexit\s*\|' -Quiet -ErrorAction Continue) } |
-            Copy-Item -Destination $unfinished -ErrorAction Continue
-          # The upload can be refused (artifact quota), so the evidence is also printed here.
-          foreach ($record in Get-ChildItem $diagnostics -Filter 'git-timeout-*.json' -File) {
-            "::group::git timeout record $($record.Name)"
-            Get-Content $record.FullName -TotalCount 200
-            "::endgroup::"
-          }
-          foreach ($trace in Get-ChildItem $unfinished -File) {
-            "::group::unfinished git trace2 $($trace.Name)"
-            Get-Content $trace.FullName -Tail 60
-            "::endgroup::"
-          }
-
-      - name: Upload timed-out git evidence
-        if: always() && runner.os == 'Windows' && matrix.shard == '1/2' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
-        continue-on-error: true
-        uses: actions/upload-artifact@v6
-        with:
-          name: windows-git-timeout-evidence-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/git-timeout-diagnostics
-          if-no-files-found: ignore
-          retention-days: 14
 
       # A leg whose test steps were all skipped must never look like a pass.
       - name: Check that this leg ran its tests
@@ -431,7 +375,7 @@ jobs:
         env:
           LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
-          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-1.outcome }} ${{ steps.root-tests-windows-2.outcome }}
+          TEST_OUTCOMES: ${{ steps.lsp-daemon-tests.outcome }} ${{ steps.root-tests-windows-2.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
         run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
@@ -445,7 +389,7 @@ jobs:
           JOB_SUMMARY_DETAILS: |
             - Builds vendored LSP packages before tests.
             - Runs `npm test` for `packages/lsp-daemon`.
-            - Runs all non-Senpi root tests on Windows sharded two ways: shard 1 covers omo-opencode + memory-core, shard 2 runs the shared serial quarantine first and then the remainder with `--parallel`.
+            - Runs Windows root shard 2: the shared serial quarantine first, then the remainder with `--parallel`. Shard 1 (omo-opencode + memory-core) runs in the two test-windows-1 jobs.
             - Splits by the same package groups as the Linux parts so global zauc mock bootstraps stay with their consumers.
           JOB_SUMMARY_NEXT: Open the first failing test or package-build step; matrix failures are usually OS-specific.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
@@ -693,7 +637,7 @@ jobs:
           CI_JUNIT_DIR: ${{ runner.temp }}/junit
         run: |
           mkdir -p "$CI_JUNIT_DIR"
-          bun --config=bunfig.macos-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"
+          bun --config=bunfig.root-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"
       - name: Run root test shard 2 light
         id: root-tests-posix-2b
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -901,6 +845,200 @@ jobs:
           RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
+  # Windows root shard 1 as two parallel jobs (#14942). One job ran omo-opencode + memory-core in one process for
+  # 37-48 min (runs 45475381113, 45484013255, 45487529817), ~42 of them in memory-core. The cut is the macOS 1a/1b cut,
+  # measured on those Windows runs: part a runs memory-core's sync and memfs trees (19-25 min of file time), part b runs
+  # omo-opencode, still in one process (global zauc mocks), plus the rest of memory-core through bunfig.root-shard-1b.toml
+  # (18-22 min). Each part writes a Bun timing record; windows-test-1-status checks that a + b ran every shard-1 file
+  # exactly once. The DACL user and the LSP daemon tests stay in shard 2, whose tests use them.
+  test-windows-1:
+    name: test-windows-1 (${{ matrix.part }})
+    needs: [ci-mode]
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [a, b]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: "1.4.4"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Remove stale self-package test copies
+        run: bun run script/remove-stale-self-package-tests.ts
+
+      # Git Bash sets SHELL/MSYSTEM on Windows, which makes process-platform tests observe sh instead of the native
+      # PowerShell/cmd execution path, so both parts run under pwsh.
+      - name: Run root test shard 1a with Windows telemetry
+        id: root-tests-windows-1a
+        if: matrix.part == 'a'
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: 1/2
+          # #10821: a git that outlives its timeout records the live process table here, and every
+          # git writes a trace2 perf log, so the next stalled `git add` carries its own evidence.
+          OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR: ${{ runner.temp }}/git-timeout-diagnostics
+          GIT_TRACE2_PERF: ${{ runner.temp }}/git-trace2
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:GIT_TRACE2_PERF | Out-Null
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-1a" `
+            -TimingRecord `
+            -TestArguments @("test", "./packages/memory-core/src/sync", "./packages/memory-core/src/memfs")
+
+      - name: Run root test shard 1b with Windows telemetry
+        id: root-tests-windows-1b
+        if: matrix.part == 'b'
+        shell: pwsh
+        env:
+          WINDOWS_TEST_SHARD: 1/2
+          OMO_GIT_TIMEOUT_DIAGNOSTICS_DIR: ${{ runner.temp }}/git-timeout-diagnostics
+          GIT_TRACE2_PERF: ${{ runner.temp }}/git-trace2
+        run: |
+          New-Item -ItemType Directory -Force -Path $env:GIT_TRACE2_PERF | Out-Null
+          $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-root-test-telemetry"
+          & .github/scripts/windows-ci-telemetry.ps1 `
+            -ArtifactDirectory $telemetryDirectory `
+            -Invocation "shard-1b" `
+            -TimingRecord `
+            -TestArguments @("--config=bunfig.root-shard-1b.toml", "test", "packages/omo-opencode", "packages/memory-core")
+
+      - name: Upload Windows post-test telemetry
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-root-test-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-shard-1${{ matrix.part }}
+          path: |
+            ${{ runner.temp }}/windows-root-test-telemetry/*.json
+            ${{ runner.temp }}/windows-root-test-telemetry/*.junit.xml
+          if-no-files-found: warn
+          overwrite: false
+
+      # The coverage record, apart from the per-attempt telemetry: a re-run of one failed part overwrites only its own.
+      - name: Upload Windows shard record
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-shard-record-root-1${{ matrix.part }}
+          path: ${{ runner.temp }}/windows-root-test-telemetry/*.timings.json
+          if-no-files-found: error
+          overwrite: true
+
+      # #10821: keep the evidence of any git that timed out: the recorded process tables and the
+      # trace2 logs of every git that never reached its exit event (killed or still stuck).
+      - name: Collect timed-out git evidence
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $diagnostics = Join-Path $env:RUNNER_TEMP "git-timeout-diagnostics"
+          if (-not (Test-Path $diagnostics)) { "no git timed out"; exit 0 }
+          $unfinished = Join-Path $diagnostics "trace2-unfinished"
+          New-Item -ItemType Directory -Force -Path $unfinished | Out-Null
+          Get-ChildItem (Join-Path $env:RUNNER_TEMP "git-trace2") -File -ErrorAction SilentlyContinue |
+            Where-Object { -not (Select-String -Path $_.FullName -Pattern '\|\s*atexit\s*\|' -Quiet -ErrorAction Continue) } |
+            Copy-Item -Destination $unfinished -ErrorAction Continue
+          # The upload can be refused (artifact quota), so the evidence is also printed here.
+          foreach ($record in Get-ChildItem $diagnostics -Filter 'git-timeout-*.json' -File) {
+            "::group::git timeout record $($record.Name)"
+            Get-Content $record.FullName -TotalCount 200
+            "::endgroup::"
+          }
+          foreach ($trace in Get-ChildItem $unfinished -File) {
+            "::group::unfinished git trace2 $($trace.Name)"
+            Get-Content $trace.FullName -Tail 60
+            "::endgroup::"
+          }
+
+      - name: Upload timed-out git evidence
+        if: always()
+        continue-on-error: true
+        uses: actions/upload-artifact@v6
+        with:
+          name: windows-git-timeout-evidence-${{ github.run_id }}-${{ github.run_attempt }}-shard-1${{ matrix.part }}
+          path: ${{ runner.temp }}/git-timeout-diagnostics
+          if-no-files-found: ignore
+          retention-days: 14
+
+      # A leg whose test steps were all skipped must never look like a pass.
+      - name: Check that this leg ran its tests
+        if: always()
+        shell: bash
+        env:
+          LEG_JOB_STATUS: ${{ job.status }}
+          TEST_OUTCOMES: ${{ steps.root-tests-windows-1a.outcome }} ${{ steps.root-tests-windows-1b.outcome }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+        run: node script/ci-leg-tests-guard.mjs --os windows-latest --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
+
+      - name: Write job summary
+        if: always()
+        shell: bash
+        env:
+          JOB_SUMMARY_TITLE: Root test shard 1${{ matrix.part }} (windows-latest)
+          JOB_SUMMARY_STATUS: ${{ job.status }}
+          JOB_SUMMARY_DETAILS: |
+            - Part a runs memory-core's sync and memfs trees; part b runs omo-opencode in one process plus the rest of memory-core.
+            - Uploads the JUnit report, telemetry and the Bun timing record that `test (windows-latest, 1/2)` checks for coverage.
+          JOB_SUMMARY_NEXT: Open the first failing test; `test (windows-latest, 1/2)` reports both parts.
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The required test (windows-latest, 1/2) context, reported from Linux like the macOS ones: passes only when both
+  # test-windows-1 parts passed and their timing records run every shard-1 file exactly once, and fails closed when the
+  # parts did not run although the classifier asked for the full matrix.
+  windows-test-1-status:
+    name: test
+    needs: [ci-mode, test-windows-1]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            shard: "1/2"
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.test-windows-1.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download Windows shard 1 records
+        if: needs.test-windows-1.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: windows-shard-record-root-*
+          path: ${{ runner.temp }}/windows-shard-records
+      - name: Verify Windows shard 1 coverage
+        id: coverage
+        if: needs.test-windows-1.result == 'success'
+        run: bun script/ci-shard-coverage.ts windows-root "$RUNNER_TEMP/windows-shard-records"
+      - name: Write job summary
+        if: always()
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.test-windows-1.result }}
+          TEST_OUTCOMES: ${{ needs.test-windows-1.result }} ${{ steps.coverage.outcome || 'missing' }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
+
   typecheck:
     needs: [ci-mode]
     runs-on: ubuntu-26.04
@@ -1082,114 +1220,187 @@ jobs:
           JOB_SUMMARY_NEXT: Inspect the failing component build or the first Codex compatibility test failure for this OS.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
 
-  senpi-compatibility:
+  # The Windows Senpi leg as three parallel jobs (#14942). One job ran `bun test packages/omo-senpi` for 42-63 min (runs
+  # 45475381113, 45484013255, 45487529817); Linux splits it by `--shard` on Linux timings, which do not transfer: on
+  # Windows the memory and thread components take ~45 of ~57 min. The parts, by measured Windows file time: one runs
+  # components/thread (14-20 min) plus the one-off pack, daemon, typecheck and evidence-dir checks; two runs
+  # components/memory except memory/worker (13-20 min); three runs memory/worker and a catch-all over everything else
+  # (15-21 min), so a new test directory lands in part three. Each invocation writes a Bun timing record;
+  # windows-senpi-status checks that the parts ran every Senpi file exactly once.
+  senpi-tests-windows:
+    name: senpi-tests-windows (${{ matrix.part }})
     needs: [ci-mode]
-    # #11815: without a job budget a hung leg sits until GitHub's 360-minute default; healthy legs take 33-55 minutes.
+    if: needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'
+    # #11815: without a job budget a hung leg sits until GitHub's 360-minute default.
     timeout-minutes: 100
-    # Preserve required matrix check names during the Ubuntu image migration.
-    # Outside the full matrix a macOS/Windows leg still reports its required context, from an ubuntu
-    # runner with every heavy step skipped, so it never waits for a hosted macOS/Windows slot (#10856).
-    runs-on: ${{ (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix != 'true') && 'ubuntu-26.04' || matrix.os }}
+    runs-on: windows-latest
     strategy:
       fail-fast: false
-      # merge_group retains this matrix. The required ubuntu context comes from linux-senpi-status, which gathers the
-      # parallel Linux jobs (bundle check, EQ.omo, two test parts) (#14573).
       matrix:
-        os: [windows-latest]
+        part: [one, two, three]
     steps:
       - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v7
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           node-version: "24"
 
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           bun-version: "1.4.4"
 
       - uses: actions/cache@v6
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         with:
           path: ~/.bun/install/cache
           key: ${{ runner.os }}-bun-1.4.4-${{ hashFiles('bun.lock') }}
 
       - name: Install dependencies
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun install --frozen-lockfile --ignore-scripts
 
       - name: Remove stale self-package test copies
-        if: needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         run: bun run script/remove-stale-self-package-tests.ts
 
       - name: Run Senpi compatibility tests with Windows telemetry
         id: senpi-tests-windows
         # #11815: this step has hung and stayed in_progress for hours under GitHub's 360-minute default job limit.
-        # Healthy runs take 31-52 minutes (21 runs, 2026-10); 75 minutes fails a hang on its own and lets the telemetry
-        # upload and the summary below still run.
+        # 75 minutes fails a hang on its own and lets the telemetry upload and the summary below still run.
         timeout-minutes: 75
-        if: needs.ci-mode.outputs.run_heavy == 'true' && runner.os == 'Windows' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
         shell: pwsh
         env:
           WINDOWS_TEST_SHARD: senpi-compatibility
+          SENPI_PART: ${{ matrix.part }}
         run: |
           bun run build:senpi-plugin
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          $packDirectory = Join-Path $env:RUNNER_TEMP "omo-senpi-pack"
-          New-Item -ItemType Directory -Path $packDirectory -Force | Out-Null
-          npm pack --pack-destination $packDirectory packages/omo-senpi/plugin
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bun check --no-script --all -p packages/omo-senpi/tsconfig.json
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           $telemetryDirectory = Join-Path $env:RUNNER_TEMP "windows-senpi-compatibility-telemetry"
-          & .github/scripts/windows-ci-telemetry.ps1 `
-            -ArtifactDirectory $telemetryDirectory `
-            -Invocation "senpi-compatibility" `
-            -TestArguments @("test", "packages/omo-senpi")
-          exit $LASTEXITCODE
+          if ($env:SENPI_PART -eq "one") {
+            $packDirectory = Join-Path $env:RUNNER_TEMP "omo-senpi-pack"
+            New-Item -ItemType Directory -Path $packDirectory -Force | Out-Null
+            npm pack --pack-destination $packDirectory packages/omo-senpi/plugin
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            npm --prefix packages/lsp-daemon test -- test/daemon-roundtrip.test.ts
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            bun check --no-script --all -p packages/omo-senpi/tsconfig.json
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            bun test ./.agents/skills/senpi-qa/scripts/resolve-evidence-dir.test.mjs
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+            & .github/scripts/windows-ci-telemetry.ps1 `
+              -ArtifactDirectory $telemetryDirectory `
+              -Invocation "senpi-one" `
+              -TimingRecord `
+              -TestArguments @("test", "./packages/omo-senpi/src/components/thread")
+            exit $LASTEXITCODE
+          }
+          if ($env:SENPI_PART -eq "two") {
+            & .github/scripts/windows-ci-telemetry.ps1 `
+              -ArtifactDirectory $telemetryDirectory `
+              -Invocation "senpi-two" `
+              -TimingRecord `
+              -TestArguments @("--config=bunfig.windows-senpi-memory.toml", "test", "./packages/omo-senpi/src/components/memory")
+            exit $LASTEXITCODE
+          }
+          if ($env:SENPI_PART -eq "three") {
+            & .github/scripts/windows-ci-telemetry.ps1 `
+              -ArtifactDirectory $telemetryDirectory `
+              -Invocation "senpi-three-worker" `
+              -TimingRecord `
+              -TestArguments @("test", "./packages/omo-senpi/src/components/memory/worker")
+            $workerExitCode = $LASTEXITCODE
+            & .github/scripts/windows-ci-telemetry.ps1 `
+              -ArtifactDirectory $telemetryDirectory `
+              -Invocation "senpi-three-rest" `
+              -TimingRecord `
+              -TestArguments @("--config=bunfig.windows-senpi-rest.toml", "test", "packages/omo-senpi")
+            if ($workerExitCode -ne 0) { exit $workerExitCode }
+            exit $LASTEXITCODE
+          }
+          throw "unknown Senpi part: $env:SENPI_PART"
 
       - name: Upload Windows Senpi telemetry
-        if: always() && runner.os == 'Windows' && needs.ci-mode.outputs.run_heavy == 'true' && (matrix.os == 'ubuntu-latest' || needs.ci-mode.outputs.full_matrix == 'true')
+        if: always()
         continue-on-error: true
         uses: actions/upload-artifact@v6
         with:
-          name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}
+          name: windows-senpi-compatibility-telemetry-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.part }}
           path: |
             ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.json
             ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.junit.xml
           if-no-files-found: warn
           overwrite: false
 
+      # The coverage record, apart from the per-attempt telemetry: a re-run of one failed part overwrites only its own.
+      - name: Upload Windows shard record
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-shard-record-senpi-${{ matrix.part }}
+          path: ${{ runner.temp }}/windows-senpi-compatibility-telemetry/*.timings.json
+          if-no-files-found: error
+          overwrite: true
+
       # A leg whose test steps were all skipped must never look like a pass.
       - name: Check that this leg ran its tests
         if: always()
         shell: bash
         env:
-          LEG_OS: ${{ matrix.os }}
           LEG_JOB_STATUS: ${{ job.status }}
           TEST_OUTCOMES: ${{ steps.senpi-tests-windows.outcome }}
           RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
           FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
-        run: node script/ci-leg-tests-guard.mjs --os "$LEG_OS" --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
+        run: node script/ci-leg-tests-guard.mjs --os windows-latest --job-status "$LEG_JOB_STATUS" --outcomes "$TEST_OUTCOMES" --run-heavy "$RUN_HEAVY" --full-matrix "$FULL_MATRIX"
 
       - name: Write job summary
         if: always()
         shell: bash
         env:
-          JOB_SUMMARY_TITLE: Senpi compatibility (${{ matrix.os }})
+          JOB_SUMMARY_TITLE: Senpi compatibility (windows-latest, part ${{ matrix.part }})
           JOB_SUMMARY_STATUS: ${{ job.status }}
           JOB_SUMMARY_DETAILS: |
-            - Builds the local-path Senpi adapter package artifacts.
-            - Builds the shared LSP daemon once before staging Senpi artifacts.
-            - Packs the generated Pi package and runs hermetic Senpi and QA-contract tests.
-            - Covers the Windows named-pipe daemon smoke; Linux runs as the senpi-* jobs below, macOS in macos-combined-2.
-          JOB_SUMMARY_NEXT: Inspect the first omo-senpi build, sync, directive, or package test failure for this OS.
+            - Builds the local-path Senpi adapter package artifacts and runs this part of the hermetic Senpi tests.
+            - Part one also packs the Pi package, runs the Windows named-pipe daemon smoke, `bun check` and the evidence-dir test.
+            - Linux runs as the senpi-* jobs below, macOS in macos-combined-2.
+          JOB_SUMMARY_NEXT: Open the first failing test; `senpi-compatibility (windows-latest)` reports all three parts.
         run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/write-job-summary.sh
+
+  # The senpi-compatibility (windows-latest) context, reported from Linux: passes only when the three senpi-tests-windows
+  # parts passed and their timing records run every Senpi file exactly once, and fails closed when they did not run
+  # although the classifier asked for the full matrix.
+  windows-senpi-status:
+    name: senpi-compatibility
+    needs: [ci-mode, senpi-tests-windows]
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        os: [windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        if: needs.senpi-tests-windows.result == 'success'
+        with:
+          bun-version: "1.4.4"
+      - name: Download Windows Senpi records
+        if: needs.senpi-tests-windows.result == 'success'
+        uses: actions/download-artifact@v8
+        with:
+          pattern: windows-shard-record-senpi-*
+          path: ${{ runner.temp }}/windows-shard-records
+      - name: Verify Windows Senpi coverage
+        id: coverage
+        if: needs.senpi-tests-windows.result == 'success'
+        run: bun script/ci-shard-coverage.ts windows-senpi "$RUNNER_TEMP/windows-shard-records"
+      - name: Write job summary
+        if: always()
+        env:
+          LEG_OS: ${{ matrix.os }}
+          LEG_JOB_STATUS: ${{ needs.senpi-tests-windows.result }}
+          TEST_OUTCOMES: ${{ needs.senpi-tests-windows.result }} ${{ steps.coverage.outcome || 'missing' }}
+          RUN_HEAVY: ${{ needs.ci-mode.outputs.run_heavy }}
+          FULL_MATRIX: ${{ needs.ci-mode.outputs.full_matrix }}
+          RUNTIME_TOUCHING: ${{ needs.ci-mode.outputs.runtime_touching }}
+        run: GITHUB_STEP_SUMMARY="$GITHUB_STEP_SUMMARY" bash .github/scripts/ci-macos-status.sh
 
   # The Linux Senpi leg as parallel jobs (#14573): none of the three needs another's output.
   senpi-bundle-check:
@@ -1793,7 +2004,7 @@ jobs:
   auto-commit-schema:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9947.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, windows-test-1-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     permissions:
       contents: write
@@ -1844,7 +2055,7 @@ jobs:
   draft-release:
     # Pin until this release/deploy path is proven on Ubuntu 26.04: #9948.
     runs-on: ubuntu-24.04
-    needs: [ci-mode, lint-ratchet, test, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, senpi-compatibility, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
+    needs: [ci-mode, lint-ratchet, test, windows-test-1-status, linux-test-status, macos-test-1-status, macos-test-2-status, typecheck, codex-compatibility, macos-codex-status, windows-senpi-status, linux-senpi-status, macos-senpi-status, build, omo-ai-payload-check]
     if: >-
       github.event_name == 'push' &&
       github.ref == 'refs/heads/dev' &&

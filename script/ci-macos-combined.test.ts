@@ -115,7 +115,7 @@ describe("combined macOS CI execution contract (#9974)", () => {
       'mkdir -p "$CI_JUNIT_DIR"\nbun test --timeout 20000 packages/memory-core/src/sync/ packages/memory-core/src/memfs/ --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1a.xml"\n',
     )
     expect(steps.find((step) => step.id === "root-tests-posix-1b")?.run).toBe(
-      'mkdir -p "$CI_JUNIT_DIR"\nbun --config=bunfig.macos-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"\n',
+      'mkdir -p "$CI_JUNIT_DIR"\nbun --config=bunfig.root-shard-1b.toml test --timeout 20000 packages/omo-opencode packages/memory-core --reporter=junit --reporter-outfile="$CI_JUNIT_DIR/root-1b.xml"\n',
     )
     expect(steps.find((step) => step.id === "root-tests-posix-2a")?.run).toBe(
       "bash .github/scripts/ci-root-shard-2.sh heavy",

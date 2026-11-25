@@ -1,5 +1,5 @@
 {
-  "workflowSha256": "6c903680c978cfcdcbab93c82c89cbe5345624c8f37bc6bcc9f39a0be087eb20",
+  "workflowSha256": "7116e54ac5b2f09b5c7b4039b9068145275081ec3c6894b310edac1fabfa9f12",
   "jobs": {
     "Lint ratchet": [
       "Run actions/checkout@v7",
@@ -20,23 +20,6 @@
       "Check PR target branch",
       "Write job summary"
     ],
-    "test (windows-latest, 1/2)": [
-      "Run actions/checkout@v7",
-      "Run actions/setup-node@v7",
-      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
-      "Run actions/cache@v6",
-      "Install dependencies",
-      "Remove stale self-package test copies",
-      "Create the second local user for the DACL tests",
-      "Run vendored lsp-daemon tests",
-      "Run tests with Windows telemetry",
-      "Run tests",
-      "Upload Windows post-test telemetry",
-      "Collect timed-out git evidence",
-      "Upload timed-out git evidence",
-      "Check that this leg ran its tests",
-      "Write job summary"
-    ],
     "test (windows-latest, 2/2)": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
@@ -46,11 +29,8 @@
       "Remove stale self-package test copies",
       "Create the second local user for the DACL tests",
       "Run vendored lsp-daemon tests",
-      "Run tests with Windows telemetry",
       "Run tests",
       "Upload Windows post-test telemetry",
-      "Collect timed-out git evidence",
-      "Upload timed-out git evidence",
       "Check that this leg ran its tests",
       "Write job summary"
     ],
@@ -191,6 +171,44 @@
       "Run actions/setup-node@v7",
       "Write job summary"
     ],
+    "test-windows-1 (a)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Run root test shard 1a with Windows telemetry",
+      "Run root test shard 1b with Windows telemetry",
+      "Upload Windows post-test telemetry",
+      "Upload Windows shard record",
+      "Collect timed-out git evidence",
+      "Upload timed-out git evidence",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test-windows-1 (b)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Run root test shard 1a with Windows telemetry",
+      "Run root test shard 1b with Windows telemetry",
+      "Upload Windows post-test telemetry",
+      "Upload Windows shard record",
+      "Collect timed-out git evidence",
+      "Upload timed-out git evidence",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "test (windows-latest, 1/2)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download Windows shard 1 records",
+      "Verify Windows shard 1 coverage",
+      "Write job summary"
+    ],
     "typecheck": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
@@ -232,7 +250,7 @@
       "Check that this leg ran its tests",
       "Write job summary"
     ],
-    "senpi-compatibility (windows-latest)": [
+    "senpi-tests-windows (one)": [
       "Run actions/checkout@v7",
       "Run actions/setup-node@v7",
       "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
@@ -241,7 +259,42 @@
       "Remove stale self-package test copies",
       "Run Senpi compatibility tests with Windows telemetry",
       "Upload Windows Senpi telemetry",
+      "Upload Windows shard record",
       "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "senpi-tests-windows (two)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Run Senpi compatibility tests with Windows telemetry",
+      "Upload Windows Senpi telemetry",
+      "Upload Windows shard record",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "senpi-tests-windows (three)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Run actions/cache@v6",
+      "Install dependencies",
+      "Remove stale self-package test copies",
+      "Run Senpi compatibility tests with Windows telemetry",
+      "Upload Windows Senpi telemetry",
+      "Upload Windows shard record",
+      "Check that this leg ran its tests",
+      "Write job summary"
+    ],
+    "senpi-compatibility (windows-latest)": [
+      "Run actions/checkout@v7",
+      "Run actions/setup-node@v7",
+      "Run oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6",
+      "Download Windows Senpi records",
+      "Verify Windows Senpi coverage",
       "Write job summary"
     ],
     "senpi-bundle-check": [
@@ -425,22 +478,25 @@
       "reason": "The Windows leg runs the platform smoke; the full suite runs on the Linux leg."
     },
     {
-      "job": "test (windows-latest, 1/2)",
+      "job": "test-windows-1 (a)",
       "steps": [
-        "Run actions/cache@v6",
-        "Run tests"
+        "Run root test shard 1b with Windows telemetry"
       ],
-      "reason": "Windows does not use the POSIX cache; shard 1 runs its tests through the telemetry step."
+      "reason": "Part a runs only shard 1a; part b runs shard 1b."
+    },
+    {
+      "job": "test-windows-1 (b)",
+      "steps": [
+        "Run root test shard 1a with Windows telemetry"
+      ],
+      "reason": "Part b runs only shard 1b; part a runs shard 1a."
     },
     {
       "job": "test (windows-latest, 2/2)",
       "steps": [
-        "Run actions/cache@v6",
-        "Run tests with Windows telemetry",
-        "Collect timed-out git evidence",
-        "Upload timed-out git evidence"
+        "Run actions/cache@v6"
       ],
-      "reason": "Windows does not use the POSIX cache; telemetry and git diagnostics belong to shard 1."
+      "reason": "Windows does not use the POSIX cache."
     },
     {
       "job": "test-linux (memory-core)",

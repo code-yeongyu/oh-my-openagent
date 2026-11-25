@@ -86,6 +86,25 @@ describe("#given platform-jobs.jq", () => {
     expect(classify([failed, ...combined("failure")])["codex-compatibility (macos-latest, platform)"]).toBe("failure")
   })
 
+  // The split Windows parts (#14942) report through Linux status jobs whose coverage steps run only when every part passed.
+  posixBashTest(
+    "#when a Windows status job verified its parts' records #then it is success, and no-tests when it skipped them",
+    () => {
+      const name = "test (windows-latest, 1/2)"
+      const status = (conclusion: string) => ({
+        ...statusJob(name),
+        steps: [
+          step("Run actions/checkout@v7"),
+          step("Download Windows shard 1 records", conclusion),
+          step("Verify Windows shard 1 coverage", conclusion),
+          step("Write job summary"),
+        ],
+      })
+      expect(classify([status("success")])[name]).toBe("success")
+      expect(classify([status("skipped")])[name]).toBe("no-tests")
+    },
+  )
+
   posixBashTest("#when a Windows leg ran only setup steps #then it is no-tests whatever the macOS jobs did", () => {
     const windows = { ...statusJob("test (windows-latest, 1/2)"), labels: ["windows-latest"] }
     expect(classify([windows, ...combined("success")])["test (windows-latest, 1/2)"]).toBe("no-tests")

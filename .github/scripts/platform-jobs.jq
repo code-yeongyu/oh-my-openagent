@@ -5,6 +5,8 @@
 # the two parallel jobs that run the macOS tests (ci-macos-status.sh), so a passing one with no test step of its own is
 # proof only when both macOS jobs actually ran (each ended success or failure); when either was skipped, cancelled or
 # absent the status job is "no-tests".
+# The Windows status jobs that report the split Windows parts (#14942) need no exception: their record download and
+# coverage steps run only when every part they report passed, so those steps count as the job's own test steps.
 # A run made before the split has one job, "macos-combined", and neither part; it is judged by the same rule with that
 # single job, so platform-red-first-red.sh still finds green pre-split runs in its 30-run lookback. Remove the legacy
 # branch once 30 ci.yml runs on dev have completed after the split merged.

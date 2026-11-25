@@ -182,7 +182,7 @@ describe("#given the dev push runs that now carry macOS/Windows coverage", () =>
 })
 
 describe("#given the OS matrix jobs that report required contexts", () => {
-  test.each(["test", "codex-compatibility", "senpi-compatibility"])(
+  test.each(["test", "codex-compatibility"])(
     "#then %s allocates a macOS or Windows runner only for the full matrix",
     (name) => {
       const runsOn = String(job("ci.yml", name)["runs-on"])
@@ -204,11 +204,14 @@ describe("#given the OS matrix jobs that report required contexts", () => {
   )
 })
 
-describe("#given native binary parity, which has no ubuntu leg", () => {
-  test("#then the whole job is skipped outside the full matrix and heavy validation", () => {
-    const condition = String(job("ci.yml", "native-binary-parity")["if"])
-    expect(condition).toBe("needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'")
-  })
+describe("#given the platform jobs that have no ubuntu leg (native binary parity, the split Windows jobs)", () => {
+  test.each(["native-binary-parity", "test-windows-1", "senpi-tests-windows"])(
+    "#then %s is skipped outside the full matrix and heavy validation",
+    (name) => {
+      const condition = String(job("ci.yml", name)["if"])
+      expect(condition).toBe("needs.ci-mode.outputs.run_heavy == 'true' && needs.ci-mode.outputs.full_matrix == 'true'")
+    },
+  )
 })
 
 describe("#given the path-filtered workflows that also run macOS/Windows on dev pushes", () => {
