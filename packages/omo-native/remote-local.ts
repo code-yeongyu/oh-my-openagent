@@ -88,7 +88,8 @@ export function localRemoteDependencies(packageRoot?: string): RemoteCommandDepe
     now: () => Date.now(),
     // Machine-readable output (--json) passes through unchanged; human lines are escaped where they are built.
     output: (line) => process.stdout.write(`${line}\n`),
-    write: (text) => process.stdout.write(text),
+    // The streamed reply text of a human run (never --json) takes the display escaping.
+    write: (text) => process.stdout.write(escapeForDisplay(text, { keepLineFeeds: true })),
     error,
   }
 }
