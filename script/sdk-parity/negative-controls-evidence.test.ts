@@ -94,6 +94,11 @@ describe("negative controls: goldens, evidence and the first closure (7.6)", () 
     const [setupA, setupB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
     if (setupA === undefined || setupB === undefined) throw new Error("no pair")
     expect(problems([setupA, { ...setupB, setup: { before: [{ row: "threads.create" }] } }])).toContain(uncovered)
+    // A callbacks entry keyed by the input that differs is part of the difference; any other callbacks entry is fixture.
+    const [cbA, cbB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
+    if (cbA === undefined || cbB === undefined) throw new Error("no pair")
+    expect(problems([cbA, { ...cbB, setup: { callbacks: { all_scope: "answers yes" } } }])).not.toContain(uncovered)
+    expect(problems([cbA, { ...cbB, setup: { callbacks: { other: "answers yes" } } }])).toContain(uncovered)
     const [answeredA, silentB] = sameTrace({ thread: "t-1" }, { thread: "t-2" })
     if (answeredA === undefined || silentB === undefined) throw new Error("no pair")
     const { answer: _dropped, ...withoutAnswer } = silentB

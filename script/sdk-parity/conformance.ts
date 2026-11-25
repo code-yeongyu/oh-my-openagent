@@ -164,8 +164,8 @@ function coverageProblems(row: Row, passing: readonly EffectEvidence[], inert: R
               a !== b &&
               JSON.stringify(a.input[field]) !== JSON.stringify(b.input[field]) &&
               same(a, b, field) &&
-              JSON.stringify(canonical([a.given, a.setup ?? {}])) ===
-                JSON.stringify(canonical([b.given, b.setup ?? {}])) &&
+              JSON.stringify(canonical([a.given, fixtureOf(a.setup, field)])) ===
+                JSON.stringify(canonical([b.given, fixtureOf(b.setup, field)])) &&
               (a.kind !== b.kind || effectOf(a) !== effectOf(b) || answersDiffer(a, b)),
           ),
         ),
@@ -221,6 +221,19 @@ export const isBuilt = (row: Row, evidence: readonly EffectEvidence[], context: 
   row.today === "yes" && evidenceProblems(row, evidence, context).length === 0
 
 // Every capability row not in unresolved.json counts as built and must carry that evidence.
+// A scenario's fixture beyond its given state, for a pair proving `field`: every `before` call and every `callbacks`
+// entry, except the callbacks entry keyed by `field` itself (only the scenario that has a callback input can script
+// it, so it is part of what differs, not of where the pair starts).
+function fixtureOf(setup: Readonly<Record<string, unknown>> | undefined, field: string): unknown {
+  const callbacks = setup?.["callbacks"]
+  const kept =
+    typeof callbacks === "object" && callbacks !== null
+      ? Object.fromEntries(Object.entries(callbacks).filter(([key]) => key !== field))
+      : {}
+  const rest = Object.fromEntries(Object.entries(setup ?? {}).filter(([key]) => key !== "callbacks"))
+  return Object.keys(kept).length === 0 ? rest : { ...rest, callbacks: kept }
+}
+
 export function conformanceProblems(
   rows: readonly Row[],
   unresolved: ReadonlySet<string>,
