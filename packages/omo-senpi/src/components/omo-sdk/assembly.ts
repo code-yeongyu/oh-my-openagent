@@ -3,6 +3,7 @@ import { userInfo } from "node:os"
 import { createAccountAccess } from "./access"
 import type { OmoSdk, OmoSdkOptions } from "./options"
 import { assembleRoot } from "./root/assemble"
+import { boundaryRefusals } from "./root/authority"
 import { type CoreLoaders, LAUNCHER_NAMESPACES } from "./root/members"
 import { shippedNamespaces } from "./root/shipped"
 
@@ -10,6 +11,12 @@ import { shippedNamespaces } from "./root/shipped"
 export type OmoSdkAssembly = { readonly cores?: CoreLoaders }
 
 const processUid = (): number => process.getuid?.() ?? userInfo().uid
+
+/** Launcher-side cores are the shipping entry's to set; a caller's own value is not taken by any public entry. */
+export function refuseCallerCores(options: object): void {
+  if (Object.hasOwn(options, "cores"))
+    throw new TypeError("createOmoSdk: cores is set by the entry that ships the launcher library, not by a caller")
+}
 
 // Architecture, not a guard (security design 2.4): a loader adds a namespace whose core this package cannot import, and a
 // caller in the same process could reach any core anyway; refusing a built-in namespace keeps one core per domain.
@@ -40,12 +47,17 @@ export function assembleOmoSdk(options: OmoSdkOptions, assembly: OmoSdkAssembly)
     ...(ports.deviceServiceStatus === undefined ? {} : { deviceServiceStatus: ports.deviceServiceStatus }),
     ...(ports.fileSystem === undefined ? {} : { fileSystem: ports.fileSystem }),
   })
-  const root = assembleRoot([shipped], cores, {
-    env,
-    cwd,
-    ...(options.home === undefined ? {} : { home: options.home }),
-    principal,
-  })
+  const root = assembleRoot(
+    [shipped],
+    cores,
+    {
+      env,
+      cwd,
+      ...(options.home === undefined ? {} : { home: options.home }),
+      principal,
+    },
+    boundaryRefusals(principal, options),
+  )
   // The shipped serving placed the shipped API objects' own functions at these keys, so the tree is that surface too.
   return root as OmoSdk
 }
