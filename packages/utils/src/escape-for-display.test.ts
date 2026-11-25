@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { escapeForDisplay, hasUnsafeForDisplay } from "./escape-for-display"
+import { escapeForDisplay, hasControlCharacter } from "./escape-for-display"
 import { DISPLAY_UNSAFE, ORDINARY, unsafeCodeUnits } from "./testing/display-unsafe"
 
 // #13304: text that another device sent is shown with every control, format and separator character escaped, so it
@@ -65,18 +65,26 @@ describe("escapeForDisplay", () => {
   })
 })
 
-describe("hasUnsafeForDisplay", () => {
-  test("#given every display fixture #when checked twice in a row #then both answers are true", () => {
-    for (const fixture of DISPLAY_UNSAFE) {
-      expect({ fixture, first: hasUnsafeForDisplay(fixture), second: hasUnsafeForDisplay(fixture) }).toEqual({
-        fixture,
+describe("hasControlCharacter", () => {
+  test("#given each control character (C0, DEL, C1) #when checked twice in a row #then both answers are true", () => {
+    for (const text of ["a\u0000b", "a\tb", "a\nb", "a\rb", "a\u001b[31mb", "a\u007fb", "a\u009b2Jb"]) {
+      expect({ text, first: hasControlCharacter(text), second: hasControlCharacter(text) }).toEqual({
+        text,
         first: true,
         second: true,
       })
     }
   })
 
-  test("#given ordinary text and plain spaces #when checked #then the answer is false", () => {
-    for (const text of [...ORDINARY, "  plain words  "]) expect(hasUnsafeForDisplay(text)).toBe(false)
+  test("#given format, separator and ordinary text #when checked #then the answer is false: those stay addressable (#13304)", () => {
+    for (const text of [
+      ...ORDINARY,
+      "  plain words  ",
+      "p\u202Eq r\u200Dt",
+      "a\u2066b\u2069",
+      "a\u2028b",
+      "a\u{E0041}b",
+    ])
+      expect(hasControlCharacter(text)).toBe(false)
   })
 })

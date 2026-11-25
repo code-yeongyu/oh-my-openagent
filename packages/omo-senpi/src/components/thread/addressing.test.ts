@@ -342,11 +342,14 @@ describe("resolveTarget malformed input", () => {
   })
 })
 
-describe("typed references holding a display-unsafe character", () => {
+describe("typed references holding a control or format character", () => {
   const entries = [thread({ thread_id: "t-1", name: "ab" }), thread({ thread_id: "t-2", name: "a b" })]
+  const holdsControl = (text: string) => /\p{Cc}/u.test(text.replace(/[\t\n\v\f\r]/g, " "))
 
-  test("#given every display fixture as a target, a fuzzy query and a new name #when checked #then each is refused with the same text and the value is not echoed", () => {
-    for (const fixture of DISPLAY_UNSAFE) {
+  test("#given every display fixture holding a control character as a target, a fuzzy query and a new name #when checked #then each is refused with the same text and the value is not echoed", () => {
+    const controls = DISPLAY_UNSAFE.filter(holdsControl)
+    expect(controls.length).toBeGreaterThan(0)
+    for (const fixture of controls) {
       const refusals = [
         ["thread address", resolveTarget(entries, fixture, { callerWorkspaceRoot: CALLER })],
         ["fuzzy query", fuzzyMatch(entries, `${fixture}cd`)],
@@ -360,6 +363,55 @@ describe("typed references holding a display-unsafe character", () => {
         })
         expect(error.next_action).not.toContain(fixture)
       }
+    }
+  })
+
+  test("#given a thread named with each fixture holding no control character but whitespace controls #when addressed by that exact name #then it resolves: format characters stay addressable (#13304)", () => {
+    const formats = DISPLAY_UNSAFE.filter((fixture) => !holdsControl(fixture))
+    expect(formats.length).toBeGreaterThan(0)
+    for (const [index, name] of formats.entries()) {
+      const named = [thread({ thread_id: `f-${index}`, name })]
+      const result = resolveTarget(named, name, { callerWorkspaceRoot: CALLER })
+      expect({ name, resolved: result.kind === "ok" ? result.entry.thread_id : result.kind }).toEqual({
+        name,
+        resolved: `f-${index}`,
+      })
+    }
+  })
+
+  test("#given a typed reference holding each whitespace control #when resolved #then it folds into a space as at dev and the thread is found", () => {
+    for (const control of ["\t", "\n", "\v", "\f", "\r"]) {
+      const result = resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER })
+      expect({ control, found: result.kind === "ok" ? result.entry.thread_id : result.kind }).toEqual({
+        control,
+        found: "t-2",
+      })
+    }
+  })
+
+  test("#given a typed reference holding another C0 control or DEL #when resolved #then it is refused with dev's refusal text", () => {
+    for (const control of ["\u0000", "\u0007", "\u001b", "\u001f", "\u007f"]) {
+      const error = expectError(
+        resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER }),
+        "invalid_arguments",
+      )
+      expect({ control, message: error.message }).toEqual({
+        control,
+        message: "The thread address contains control characters.",
+      })
+    }
+  })
+
+  test("#given a typed reference holding a C1 control #when resolved #then it is refused (new: dev accepted it)", () => {
+    for (const control of ["\u0080", "\u009b", "\u009f"]) {
+      const error = expectError(
+        resolveTarget(entries, `a${control}b`, { callerWorkspaceRoot: CALLER }),
+        "invalid_arguments",
+      )
+      expect({ control, message: error.message }).toEqual({
+        control,
+        message: "The thread address contains control characters.",
+      })
     }
   })
 

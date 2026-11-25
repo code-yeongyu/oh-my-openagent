@@ -35,7 +35,7 @@
  */
 
 import { matchThread, rowKey, rowName, type LadderView } from "@oh-my-opencode/thread-address-core"
-import { escapeForDisplay, hasUnsafeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
+import { escapeForDisplay, hasControlCharacter } from "@oh-my-opencode/utils/escape-for-display"
 import {
   normalizeName,
   SESSION_ID_SHAPE,
@@ -148,7 +148,9 @@ function guardInput(value: string, what: string): Guarded {
       ),
     }
   }
-  if (hasUnsafeForDisplay(value)) {
+  // The whitespace controls (tab, line feed, vertical tab, form feed, carriage return) fold into a space as before (the
+  // whitespace pass); every other control character, C1 included, is refused.
+  if (hasControlCharacter(value.replace(/[\t\n\v\f\r]/g, " "))) {
     return {
       ok: false,
       error: addressError(

@@ -112,4 +112,15 @@ describe("text from another device in the thread tools' output (#13304)", () => 
       device: "b",
     })
   })
+  test("#given a thread titled with direction-override and zero-width-joiner characters #when a send addresses that exact title #then the thread is found and the link the answer shows has them escaped", async () => {
+    const title = "p\u202Eq r\u200Dt"
+    const row = poisoned("b", "rk-on-b", "dur-on-b", title)
+    const a = fixture.account({ rows: [row], live: [row.session_id] })
+    const result = await fixture.surface(a.remote).run("thread_send", { thread: title, message: "hi" })
+    expect(result).toMatchObject({ kind: "ok", device: "b" })
+    const link = String((result as { link?: unknown }).link)
+    expect(link).not.toMatch(/[\u202E\u200D]/u)
+    expect(link).toContain(String.raw`\u202e`)
+    expect(link).toContain(String.raw`\u200d`)
+  })
 })

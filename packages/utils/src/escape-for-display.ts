@@ -9,7 +9,9 @@
  * set, a carriage return included, is still escaped.
  */
 const UNSAFE_FOR_DISPLAY = /[\p{Cc}\p{Cf}\p{Cs}\p{Zl}\p{Zp}]/gu
-const UNSAFE_FOR_DISPLAY_TEST = new RegExp(UNSAFE_FOR_DISPLAY.source, "u")
+// A typed reference (a thread address) refuses control characters only: format characters stay addressable, because a
+// peer may name a thread with them and matching uses the raw data (#13304); where such text is shown it is escaped.
+const CONTROL_CHARACTER = /\p{Cc}/u
 
 export function escapeForDisplay(
   text: string,
@@ -22,6 +24,6 @@ export function escapeForDisplay(
   })
 }
 
-export function hasUnsafeForDisplay(text: string): boolean {
-  return UNSAFE_FOR_DISPLAY_TEST.test(text)
+export function hasControlCharacter(text: string): boolean {
+  return CONTROL_CHARACTER.test(text)
 }
