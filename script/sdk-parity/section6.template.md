@@ -89,7 +89,7 @@ Where an operation has inputs that the security design gates (the endpoint selec
 | `input` | `messages?: string[]` in the order given, `files?: string[]`, `stdin?: boolean`. Several messages and files are kept as given; the parser's selection among them and its refusals are the contract | Positional arguments, each `@<file>` argument, `-` to read stdin, everything after `--` (`E/cli/args.ts:155-160, 374-400`); `--print [message]` adds its message to the list (`:268-273`) |
 | `presenter` | `{ bootstrap_fd: 4, enforcement?: boolean }`. Its contract is the security design's; until that approval these two inputs are a recorded gap, not a flag classified away | `--mcp-presenter-fd 4`, `--mcp-presenter-enforcement` (`E/cli/args.ts:347-351`) |
 | `gated` | `{ grok_neo?: boolean }`: an input the engine's parser accepts only while its feature gate is on. With the gate off the same text is not this input and falls to the unknown-flag path, as today (`E/cli/args.ts:339-340`). The row exists now, with that availability rule; each later gated input needs its own | `--grok-neo` |
-| A credential | A provider API key for the run; its carrier is fixed by S0 | `--api-key` |
+| A credential | A provider API key for the run. The registry records it as an `api_key` input of each launch operation, a recorded gap that only slice E1a-s can clear; its SDK name and its carrier are fixed by S0 | `--api-key` |
 
 Operations:
 
@@ -101,7 +101,7 @@ Which `setup` fields each mode admits, beyond the refusals named in its row, is 
 
 ### 6.10 Rows that are not capabilities
 
-- **Internal**: entries the binary dispatches for its own processes (`__kill-guard`, `__device-service-bootstrap` from #14890, `remote enable --after-login`, the engine's `--omo-local-update-worker`, and the compiled binary's `loro-smoke` at `N/compile-entry.ts:180-183`, a self-check that the bundled sync runtime initializes and reproduces its committed encodings). Each is registered as `internal` with the capability it serves (`deviceService.bootstrap`, `install.update`, and a finding of `diagnostics.run` for the self-check), so a hidden verb cannot bypass the check by being hidden.
+- **Internal**: entries the binary dispatches for its own processes (`__kill-guard`, `__device-service-bootstrap` from #14890, `remote enable --after-login`, the engine's `--omo-local-update-worker`, the compiled binary's `--internal-rpc-host-supervisor` at `N/supervisor-fast-path.ts:10`, and the compiled binary's `loro-smoke` at `N/compile-entry.ts:180-183`, a self-check that the bundled sync runtime initializes and reproduces its committed encodings). Each is registered as `internal` with the capability it serves (`deviceService.bootstrap`, `install.update`, `daemon.ensure` for the supervisor flag, the launch operations of 6.9 for `__kill-guard`, which is the judge a running session's shell shims ask before a kill and is anchored on the interactive launch row, and a finding of `diagnostics.run` for the self-check), so a hidden verb cannot bypass the check by being hidden.
 - **Retired**: a verb that only answers where it went (`omo app-server`, the native `omo ulw-loop`), registered with the call that replaced it.
 - **Render**: `--help`, `-h`, `--json`, `--verbose`, `--no-timestamp` on any verb.
 

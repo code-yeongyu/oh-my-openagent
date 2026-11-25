@@ -52,5 +52,8 @@ export async function opencodeInventory(): Promise<OpencodeInventory> {
       flags: [...new Set([...(previous?.flags ?? []), ...route.flags])].toSorted(),
     })
   }
-  return { routes: [...merged.values()].toSorted((a, b) => a.route.join(" ").localeCompare(b.route.join(" "))), root: rootFlags(cliProgram) }
+  return {
+    routes: [...merged.values()].toSorted((a, b) => a.route.join(" ").localeCompare(b.route.join(" "))),
+    root: rootFlags(cliProgram),
+  }
 }

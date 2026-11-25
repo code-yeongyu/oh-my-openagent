@@ -96,7 +96,9 @@
         "properties": {
           "provider": {},
           "model": {},
-          "refresh": {}
+          "refresh": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -223,7 +225,9 @@
       "input": {
         "properties": {
           "local": {},
-          "trust": {}
+          "trust": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -267,7 +271,9 @@
       "input": {
         "properties": {
           "local": {},
-          "trust": {},
+          "trust": {
+            "type": "boolean"
+          },
           "source": {},
           "resource": {},
           "enabled": {},
@@ -315,11 +321,84 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
           "input": {},
-          "presenter": {},
-          "gated": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -385,7 +464,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.headless",
@@ -398,12 +478,85 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
           "listen": {},
           "input": {},
-          "presenter": {},
-          "gated": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -470,7 +623,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.interactive",
@@ -483,14 +637,97 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "input": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "input": {
+            "properties": {
+              "messages": {},
+              "files": {},
+              "stdin": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "tui_mode": {},
           "verbose": {},
-          "attach": {},
-          "presenter": {},
+          "attach": {
+            "properties": {
+              "socket": {}
+            }
+          },
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "api_key": {}
         },
         "required": []
@@ -562,7 +799,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "Also serves the internal __kill-guard. The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.print",
@@ -575,12 +813,91 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "input": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "input": {
+            "properties": {
+              "messages": {},
+              "files": {},
+              "stdin": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "mode": {},
-          "presenter": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "api_key": {}
         },
         "required": [
@@ -655,7 +972,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.launch.rpc",
@@ -668,12 +986,85 @@
       ],
       "input": {
         "properties": {
-          "session": {},
-          "setup": {},
-          "gated": {},
+          "session": {
+            "properties": {
+              "continue": {},
+              "path": {},
+              "id": {},
+              "fork": {},
+              "rebind": {},
+              "ephemeral": {},
+              "dir": {},
+              "spawned_by": {},
+              "name": {}
+            }
+          },
+          "setup": {
+            "properties": {
+              "model": {},
+              "provider": {},
+              "model_patterns": {},
+              "reasoning": {},
+              "system_prompt": {},
+              "append_system_prompt": {},
+              "tools": {
+                "properties": {
+                  "allow": {},
+                  "deny": {},
+                  "none": {},
+                  "no_builtin": {}
+                }
+              },
+              "extensions": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "skills": {
+                "properties": {
+                  "names": {},
+                  "none": {}
+                }
+              },
+              "prompt_templates": {
+                "properties": {
+                  "paths": {},
+                  "none": {}
+                }
+              },
+              "themes": {
+                "properties": {
+                  "paths": {},
+                  "none": {},
+                  "use": {}
+                }
+              },
+              "context_files": {
+                "type": "boolean"
+              },
+              "project_trust": {
+                "type": "boolean"
+              },
+              "offline": {},
+              "session_runtime": {},
+              "tool_runtime": {},
+              "auto_title": {}
+            }
+          },
+          "gated": {
+            "properties": {
+              "grok_neo": {}
+            }
+          },
           "listen": {},
           "multi_session": {},
-          "presenter": {},
+          "presenter": {
+            "properties": {
+              "bootstrap_fd": {},
+              "enforcement": {}
+            }
+          },
           "input": {},
           "api_key": {}
         },
@@ -742,7 +1133,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "The api_key input is a registry name only; its SDK name and carrier are the security design's, and only slice E1a-s clears that gap (amendment 2, D4)."
     },
     {
       "id": "engine.models.discover",
@@ -778,7 +1170,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
       },
       "projection": {},
       "scenarios": {
@@ -818,7 +1210,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_set_model` resolves against the catalog the target already has (as for engine.models.update)"
       },
       "projection": {},
       "scenarios": {
@@ -877,7 +1269,9 @@
         "properties": {
           "source": {},
           "local": {},
-          "trust": {}
+          "trust": {
+            "type": "boolean"
+          }
         },
         "required": [
           "source"
@@ -924,7 +1318,9 @@
       ],
       "input": {
         "properties": {
-          "trust": {}
+          "trust": {
+            "type": "boolean"
+          }
         },
         "required": []
       },
@@ -946,7 +1342,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -967,7 +1363,9 @@
         "properties": {
           "source": {},
           "local": {},
-          "trust": {}
+          "trust": {
+            "type": "boolean"
+          }
         },
         "required": [
           "source"
@@ -1012,7 +1410,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -1077,7 +1475,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason. These are the engine targets the launcher forwards today. `omo update --all` is not one of them: the launcher takes it as a product update with an unknown flag and refuses it, and that refusal is kept"
+        "tool": "Tool omitted: installs code into the engine (as for engine.packages.install)"
       },
       "projection": {},
       "scenarios": {
@@ -1167,7 +1565,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: the engine's `schedule_prompt` tool is the session surface for creating one (as for engine.schedule.list)"
       },
       "projection": {},
       "scenarios": {
@@ -1397,9 +1795,70 @@
         "refusal": []
       },
       "modules": []
+    },
+    {
+      "id": "engine.trust.ensure",
+      "kind": "capability",
+      "sdk": "engine.trust.ensure",
+      "today": "no",
+      "slices": [
+        "C1a",
+        "S0"
+      ],
+      "input": {
+        "properties": {
+          "wait": {},
+          "lease_pid": {}
+        },
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "trust",
+            "ensure"
+          ],
+          "flags": {
+            "--json": "render",
+            "--wait": "wait",
+            "--lease-pid": "lease_pid"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {
+        "tool": "Tool omitted: a host integration's call that writes the trust store"
+      },
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Answers the JSON record the verb prints. Security-gated: the security design (S0) covers it before any slice clears it (amendment 2, D1)."
     }
   ],
   "tables": [
+    {
+      "table": "6.7",
+      "position": 5,
+      "ids": [
+        "engine.trust.ensure"
+      ],
+      "cells": [
+        "`engine.trust.ensure({ wait?, lease_pid? })` answering the JSON record the command prints: it imports the engine's trust material within the launch budget, writes the private generation and leases it, for the caller or for another process",
+        "`omo trust ensure --json [--wait] [--lease-pid <pid>]` (`N/trust-stage.ts:68-91`, `N/compile-args.ts:41-42`)",
+        "none",
+        "**no**",
+        "Tool omitted: a host integration's call that writes the trust store",
+        "C1a, after S0"
+      ]
+    },
     {
       "table": "6.8",
       "position": 1,

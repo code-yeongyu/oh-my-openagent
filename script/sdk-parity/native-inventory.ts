@@ -2,8 +2,7 @@ import { readFileSync } from "node:fs"
 import { join } from "node:path"
 import ts from "@typescript/typescript6"
 
-import { createResolver } from "../remote-import-guard-resolve"
-import { scanRepository } from "../remote-import-guard-scan"
+import { reachableModules } from "./reachable"
 
 // Inventory (1) of design section 7.1 for the native edition: every comparison of an argv element against a string
 // literal in a module reachable from the binary's two entry points. Its findings are compared with the registry's native
@@ -20,40 +19,26 @@ import { scanRepository } from "../remote-import-guard-scan"
 //   a `"--a --b".split(" ")` table, or a constant whose value is one (`const FLAG = "--x"`).
 // A decision computed from plain code that compares no literal (a regex, a computed name) is outside it (7.5).
 
+export { GENERATED_SOURCES, reachableModules } from "./reachable"
+
 export const NATIVE_ENTRY_POINTS = ["packages/omo-native/bin/omo.js", "packages/omo-native/compile-entry.ts"] as const
 
-// Committed bundles stand for their build entry: the launcher loads them by path, the scan reads their source.
-export const GENERATED_SOURCES: Readonly<Record<string, string>> = {
-  "packages/omo-native/bin/lib/service-auth.generated.js": "packages/omo-native/launcher-commands.ts",
-}
+// Where a flag literal sits: the word keys on its object-table path (`COMMANDS.send.values` gives send and values), the
+// verbs an enclosing `if`/`case` compares an argv element with, and whether it is in a table every verb shares.
+export type ArgvScope = { readonly words: readonly string[]; readonly shared: boolean }
 
-export type ArgvFinding = { readonly token: string; readonly file: string; readonly line: number }
+export type ArgvFinding = {
+  readonly token: string
+  readonly file: string
+  readonly line: number
+  readonly scope?: ArgvScope
+}
 
 const FLAG = /^--?[A-Za-z][A-Za-z0-9-]*=?$/
 const WORD = /^[a-z_][a-z0-9_-]*$/
 const VERB_TABLE = /(VERB|COMMAND|SUBCOMMAND|TARGET|ROUTE)S?$/i
+const SHARED_TABLE = /^(COMMON|SHARED|GLOBAL)/i
 const ARGV_NAME = /^(?:args?|argv|rest|tail|params|flags)$/i
-
-/** The reachable source set: static, `require()` and literal `import()` edges, generated bundles swapped for their source. */
-export function reachableModules(repoRoot: string, entries: readonly string[] = NATIVE_ENTRY_POINTS): string[] {
-  const resolve = createResolver(repoRoot)
-  const seen = new Set<string>()
-  const queue = [...entries]
-  while (queue.length > 0) {
-    const raw = queue.shift()
-    if (raw === undefined) break
-    const file = GENERATED_SOURCES[raw] ?? raw
-    if (seen.has(file) || !file.startsWith("packages/") || file.includes("/node_modules/")) continue
-    seen.add(file)
-    const [facts] = scanRepository(repoRoot, [file])
-    for (const edge of facts?.edges ?? []) {
-      if (edge.typeOnly) continue
-      const target = resolve(file, edge.specifier)
-      if (target !== undefined) queue.push(target)
-    }
-  }
-  return [...seen].toSorted()
-}
 
 function splitTable(node: ts.Node): string[] | undefined {
   if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return undefined
@@ -69,7 +54,8 @@ const literalOf = (node: ts.Node): string | undefined =>
 function isArgvElement(node: ts.Node, bound: ReadonlySet<string>): boolean {
   if (ts.isParenthesizedExpression(node) || ts.isNonNullExpression(node)) return isArgvElement(node.expression, bound)
   if (ts.isIdentifier(node)) return bound.has(node.text)
-  if (ts.isElementAccessExpression(node)) return ts.isNumericLiteral(node.argumentExpression) && isArgvRoot(node.expression)
+  if (ts.isElementAccessExpression(node))
+    return ts.isNumericLiteral(node.argumentExpression) && isArgvRoot(node.expression)
   if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression))
     return node.expression.name.text === "at" && isArgvRoot(node.expression.expression)
   return false
@@ -123,9 +109,47 @@ export function scanArgvComparisons(file: string, text: string): ArgvFinding[] {
   const bound = argvBindings(source)
   const found: ArgvFinding[] = []
   const lineOf = (node: ts.Node): number => source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1
+  const comparedWords = (condition: ts.Node): string[] => {
+    const words: string[] = []
+    const walk = (node: ts.Node): void => {
+      if (ts.isBinaryExpression(node) && COMPARE.has(node.operatorToken.kind))
+        for (const [literal, other] of [
+          [node.right, node.left],
+          [node.left, node.right],
+        ] as const) {
+          const value = literalOf(literal)
+          if (value !== undefined && WORD.test(value) && isArgvElement(other, bound)) words.push(value)
+        }
+      ts.forEachChild(node, walk)
+    }
+    walk(condition)
+    return words
+  }
+  const scopeOf = (node: ts.Node): ArgvScope => {
+    const words: string[] = []
+    let shared = false
+    for (let at: ts.Node | undefined = node; at !== undefined; at = at.parent) {
+      const parent: ts.Node | undefined = at.parent
+      if (ts.isPropertyAssignment(at) && ts.isIdentifier(at.name) && WORD.test(at.name.text)) words.push(at.name.text)
+      if (ts.isPropertyAssignment(at) && ts.isStringLiteral(at.name) && WORD.test(at.name.text))
+        words.push(at.name.text)
+      if (ts.isVariableDeclaration(at) && ts.isIdentifier(at.name) && SHARED_TABLE.test(at.name.text)) shared = true
+      if (parent !== undefined && ts.isIfStatement(parent) && parent.thenStatement === at)
+        words.push(...comparedWords(parent.expression))
+      if (
+        ts.isCaseClause(at) &&
+        ts.isSwitchStatement(at.parent.parent) &&
+        isArgvElement(at.parent.parent.expression, bound)
+      ) {
+        const value = literalOf(at.expression)
+        if (value !== undefined && WORD.test(value)) words.push(value)
+      }
+    }
+    return { words, shared }
+  }
   const add = (token: string, node: ts.Node): void => {
     const clean = token.endsWith("=") ? token.slice(0, -1) : token
-    found.push({ token: clean, file, line: lineOf(node) })
+    found.push({ token: clean, file, line: lineOf(node), ...(FLAG.test(clean) ? { scope: scopeOf(node) } : {}) })
   }
   const flagOrArgvWord = (literal: ts.Node, other: ts.Node | undefined): void => {
     const value = literalOf(literal)
@@ -160,7 +184,12 @@ export function scanArgvComparisons(file: string, text: string): ArgvFinding[] {
     }
     if (ts.isObjectLiteralExpression(node))
       for (const property of node.properties) {
-        const key = property.name === undefined ? undefined : ts.isIdentifier(property.name) ? property.name.text : literalOf(property.name)
+        const key =
+          property.name === undefined
+            ? undefined
+            : ts.isIdentifier(property.name)
+              ? property.name.text
+              : literalOf(property.name)
         if (argvTable && key !== undefined && (FLAG.test(key) || WORD.test(key))) add(key, property)
         // A per-verb spec nests its flag lists: `{ send: { values: ["--mode"], booleans: [] } }`.
         if (ts.isPropertyAssignment(property)) {
@@ -202,7 +231,12 @@ export function scanArgvComparisons(file: string, text: string): ArgvFinding[] {
       const init = ts.isAsExpression(node.initializer) ? node.initializer.expression : node.initializer
       const argvTable = VERB_TABLE.test(node.name.text)
       flagOrArgvWord(init, undefined)
-      if (argvTable || ts.isArrayLiteralExpression(init) || ts.isNewExpression(init) || ts.isObjectLiteralExpression(init))
+      if (
+        argvTable ||
+        ts.isArrayLiteralExpression(init) ||
+        ts.isNewExpression(init) ||
+        ts.isObjectLiteralExpression(init)
+      )
         tableElements(init, argvTable)
     }
     // `parseArgs({ options: { json: { type: "boolean" } } })`: each key is a `--key` flag.
@@ -210,7 +244,12 @@ export function scanArgvComparisons(file: string, text: string): ArgvFinding[] {
       const isParseArgs = ts.isObjectLiteralExpression(node.parent) && ts.isCallExpression(node.parent.parent)
       if (isParseArgs && ts.isObjectLiteralExpression(node.initializer))
         for (const property of node.initializer.properties) {
-          const key = property.name === undefined ? undefined : ts.isIdentifier(property.name) ? property.name.text : literalOf(property.name)
+          const key =
+            property.name === undefined
+              ? undefined
+              : ts.isIdentifier(property.name)
+                ? property.name.text
+                : literalOf(property.name)
           if (key !== undefined) add(`--${key}`, property)
         }
     }

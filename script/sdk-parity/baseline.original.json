@@ -309,33 +309,38 @@
     },
     {
       "id": "engine.launch.hand",
-      "gap": "no SDK call",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
       "slice": "E1a-s",
-      "issue": "new"
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
     },
     {
       "id": "engine.launch.headless",
-      "gap": "no SDK call",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
       "slice": "E1a-s",
-      "issue": "new"
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
     },
     {
       "id": "engine.launch.interactive",
-      "gap": "no SDK call",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
       "slice": "E1a-s",
-      "issue": "new"
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
     },
     {
       "id": "engine.launch.print",
-      "gap": "no SDK call",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
       "slice": "E1a-s",
-      "issue": "new"
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
     },
     {
       "id": "engine.launch.rpc",
-      "gap": "no SDK call",
+      "gap": "no SDK call; api_key is a registry name only (security design)",
       "slice": "E1a-s",
-      "issue": "new"
+      "issue": "new",
+      "clearedOnlyBy": "E1a-s"
     },
     {
       "id": "engine.models.discover",
@@ -420,6 +425,13 @@
       "gap": "no SDK call",
       "slice": "E1a",
       "issue": "new"
+    },
+    {
+      "id": "engine.trust.ensure",
+      "gap": "no SDK call; security-gated, cleared only after the security design (S0) covers it",
+      "slice": "C1a",
+      "issue": "new",
+      "clearedOnlyBy": "C1a"
     },
     {
       "id": "install.cleanup",
@@ -735,7 +747,7 @@
     },
     {
       "id": "toolkit.checkpoint",
-      "gap": "partial: see below",
+      "gap": "partial: see below; the advance input (--no-advance) is missing from the component manifest",
       "slice": "OC2",
       "issue": "new"
     },

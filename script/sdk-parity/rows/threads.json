@@ -132,7 +132,9 @@
             "maxLength": 64
           }
         },
-        "required": []
+        "required": [
+          "alias"
+        ]
       },
       "cli": [],
       "tool": [
@@ -147,6 +149,19 @@
           },
           "reads": [
             "thread",
+            "alias"
+          ]
+        },
+        {
+          "name": "thread_create",
+          "branch": "alias",
+          "when": {
+            "present": [
+              "alias"
+            ],
+            "absent": []
+          },
+          "reads": [
             "alias"
           ]
         }
@@ -242,7 +257,9 @@
             "remote",
             "attach"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {
             "s": "thread"
           },
@@ -307,7 +324,9 @@
             "--force": "force",
             "--graceful": "graceful",
             "--wait-ms": "wait_ms",
-            "--idempotency-key": "idempotency_key"
+            "--idempotency-key": "idempotency_key",
+            "--all-scope": "all_scope",
+            "--json": "render"
           },
           "positionals": {
             "t": "thread"
@@ -324,7 +343,8 @@
           "flags": {
             "--force": "force",
             "--graceful": "graceful",
-            "--wait-ms": "wait_ms"
+            "--wait-ms": "wait_ms",
+            "--json": "render"
           },
           "positionals": {
             "s": "thread"
@@ -496,9 +516,43 @@
             ]
           },
           "prompt": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 32768
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 32768
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "message": {},
+                  "delivery": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "auto"
+                      },
+                      {
+                        "type": "string",
+                        "const": "steer"
+                      },
+                      {
+                        "type": "string",
+                        "const": "follow_up"
+                      }
+                    ],
+                    "default": "auto"
+                  },
+                  "expected_turn_id": {},
+                  "summary": {},
+                  "attachments": {},
+                  "author": {}
+                },
+                "required": [
+                  "message"
+                ]
+              }
+            ]
           },
           "delivery": {
             "anyOf": [
@@ -542,7 +596,8 @@
             "--base": "worktree.base",
             "--prompt": "prompt",
             "--steer": "prompt.delivery=steer",
-            "--follow-up": "prompt.delivery=follow_up"
+            "--follow-up": "prompt.delivery=follow_up",
+            "--json": "render"
           },
           "positionals": {
             "device": "device"
@@ -596,7 +651,9 @@
       ],
       "planned": {},
       "omitted": {},
-      "projection": {},
+      "projection": {
+        "prompt": "widens: the SDK also takes the prompt object form ({ message, delivery?, expected_turn_id?, summary?, attachments?, author? }); the tool takes the string form"
+      },
       "scenarios": {
         "effect": [],
         "refusal": []
@@ -997,7 +1054,9 @@
             "remote",
             "interrupt"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {
             "s": "thread"
           },
@@ -1105,7 +1164,8 @@
           ],
           "flags": {
             "--all-scope": "all_scope",
-            "--state": "state"
+            "--state": "state",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -1120,7 +1180,8 @@
           "flags": {
             "--device": "device",
             "--project": "project",
-            "--state": "state"
+            "--state": "state",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -1283,7 +1344,9 @@
           "flags": {
             "--limit": "limit",
             "--max-bytes": "max_bytes",
-            "--cursor": "cursor"
+            "--cursor": "cursor",
+            "--all-scope": "all_scope",
+            "--json": "render"
           },
           "positionals": {
             "t": "thread"
@@ -1354,7 +1417,8 @@
           }
         },
         "required": [
-          "thread"
+          "thread",
+          "wait_ms"
         ]
       },
       "cli": [],
@@ -1414,6 +1478,7 @@
           }
         },
         "required": [
+          "delivery_id",
           "thread"
         ]
       },
@@ -1601,8 +1666,17 @@
           "model": {},
           "directory": {},
           "session_id": {},
-          "endpoint": {},
-          "on_complete": {},
+          "endpoint": {
+            "properties": {
+              "port": {},
+              "attach_url": {}
+            }
+          },
+          "on_complete": {
+            "properties": {
+              "command": {}
+            }
+          },
           "signal": {}
         },
         "required": [
@@ -1639,9 +1713,7 @@
         }
       ],
       "tool": [],
-      "planned": {
-        "cli": "OC1b"
-      },
+      "planned": {},
       "omitted": {
         "tool": "Planned (OC1b). The existing exit mapping and cancellation are the descriptor's projection"
       },
@@ -1725,7 +1797,9 @@
             "--mode": "delivery",
             "--expected-turn": "expected_turn_id",
             "--idempotency-key": "idempotency_key",
-            "--collapse-key": "collapse_key"
+            "--collapse-key": "collapse_key",
+            "--all-scope": "all_scope",
+            "--json": "render"
           },
           "positionals": {
             "t": "thread",
@@ -1743,7 +1817,8 @@
           "flags": {
             "--steer": "delivery=steer",
             "--follow-up": "delivery=follow_up",
-            "--no-wait": "when"
+            "--no-wait": "when",
+            "--json": "render"
           },
           "positionals": {
             "s": "thread",
@@ -1883,7 +1958,8 @@
           "flags": {
             "--steer": "delivery=steer",
             "--follow-up": "delivery=follow_up",
-            "--timeout": "deadline_ms"
+            "--timeout": "deadline_ms",
+            "--json": "render"
           },
           "positionals": {
             "s": "thread",
@@ -1944,7 +2020,9 @@
             "remote",
             "model"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {
             "s": "thread",
             "provider/id": "model"
@@ -2636,6 +2714,7 @@
     },
     {
       "table": "6.8",
+      "kind": "pointer",
       "position": 18,
       "ids": [
         "threads.create",

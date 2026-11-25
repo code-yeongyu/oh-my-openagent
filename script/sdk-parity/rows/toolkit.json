@@ -11,9 +11,41 @@
       ],
       "input": {
         "properties": {
-          "title": {},
-          "objective": {},
-          "successCriteria": {},
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "successCriteria": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "scenario": {
+                  "type": "string"
+                },
+                "expectedEvidence": {
+                  "type": "string"
+                },
+                "userModel": {
+                  "enum": [
+                    "happy",
+                    "edge",
+                    "regression",
+                    "adversarial"
+                  ]
+                },
+                "essential": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "expectedEvidence",
+                "scenario"
+              ]
+            }
+          },
           "session_id": {}
         },
         "required": [
@@ -65,13 +97,33 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "status": {},
-          "evidence": {},
-          "codexGoalJson": {},
-          "qualityGateJson": {},
-          "printTemplate": {},
-          "advance": {},
+          "goalId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "failed",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
+          "qualityGateJson": {
+            "type": "string"
+          },
+          "printTemplate": {
+            "enum": [
+              true
+            ]
+          },
+          "advance": {
+            "type": "boolean"
+          },
           "session_id": {}
         },
         "required": [
@@ -118,7 +170,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "advance is filled by --no-advance and is missing from the component manifest; the gap stays in the baseline (amendment 2, D3)."
     },
     {
       "id": "toolkit.completeGoals",
@@ -130,7 +183,9 @@
       ],
       "input": {
         "properties": {
-          "retryFailed": {},
+          "retryFailed": {
+            "type": "boolean"
+          },
           "session_id": {}
         },
         "required": []
@@ -178,10 +233,21 @@
       ],
       "input": {
         "properties": {
-          "brief": {},
-          "codexGoalMode": {},
-          "force": {},
-          "validationBatchesJson": {},
+          "brief": {
+            "type": "string"
+          },
+          "codexGoalMode": {
+            "enum": [
+              "aggregate",
+              "per_story"
+            ]
+          },
+          "force": {
+            "type": "boolean"
+          },
+          "validationBatchesJson": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -203,10 +269,10 @@
             "--codex-goal-mode": "codexGoalMode",
             "--validation-batch-json": "validationBatchesJson",
             "--force": "force",
-            "--after-json": "process",
-            "--directive-json": "process",
-            "--directive-file": "process",
-            "--target-goal-id": "process",
+            "--after-json": "parse",
+            "--directive-json": "parse",
+            "--directive-file": "parse",
+            "--target-goal-id": "parse",
             "--json": "render",
             "--help": "render",
             "-h": "render",
@@ -215,7 +281,13 @@
           "positionals": {
             "brief": "brief"
           },
-          "values": []
+          "values": [],
+          "parseOnly": {
+            "--after-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-json": "its value is removed from the positional brief; nothing reads it",
+            "--directive-file": "its value is removed from the positional brief; nothing reads it",
+            "--target-goal-id": "its value is removed from the positional brief; nothing reads it"
+          }
         }
       ],
       "tool": [],
@@ -242,7 +314,9 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
+          "goalId": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -378,12 +452,31 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "criterionId": {},
-          "status": {},
-          "evidence": {},
-          "notes": {},
-          "artifacts": {},
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pass",
+              "fail",
+              "blocked"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
           "session_id": {}
         },
         "required": [
@@ -441,11 +534,21 @@
       ],
       "input": {
         "properties": {
-          "goalId": {},
-          "title": {},
-          "objective": {},
-          "evidence": {},
-          "codexGoalJson": {},
+          "goalId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "codexGoalJson": {
+            "type": "string"
+          },
           "session_id": {}
         },
         "required": [
@@ -549,23 +652,92 @@
       ],
       "input": {
         "properties": {
-          "kind": {},
-          "source": {},
-          "evidence": {},
-          "rationale": {},
-          "goalId": {},
-          "criterionId": {},
-          "scenario": {},
-          "expectedEvidence": {},
-          "userModel": {},
-          "title": {},
-          "objective": {},
-          "childGoals": {},
-          "revisedTitle": {},
-          "revisedObjective": {},
-          "pendingOrder": {},
-          "blockedReason": {},
-          "idempotencyKey": {},
+          "kind": {
+            "enum": [
+              "add_subgoal",
+              "split_subgoal",
+              "reorder_pending",
+              "revise_pending_wording",
+              "revise_criterion",
+              "annotate_ledger",
+              "mark_blocked_superseded"
+            ]
+          },
+          "source": {
+            "enum": [
+              "finding",
+              "user_prompt_submit",
+              "cli"
+            ]
+          },
+          "evidence": {
+            "type": "string"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "goalId": {
+            "type": "string"
+          },
+          "criterionId": {
+            "type": "string"
+          },
+          "scenario": {
+            "type": "string"
+          },
+          "expectedEvidence": {
+            "type": "string"
+          },
+          "userModel": {
+            "enum": [
+              "happy",
+              "edge",
+              "regression",
+              "adversarial"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "objective": {
+            "type": "string"
+          },
+          "childGoals": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string"
+                },
+                "objective": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "objective",
+                "title"
+              ]
+            }
+          },
+          "revisedTitle": {
+            "type": "string"
+          },
+          "revisedObjective": {
+            "type": "string"
+          },
+          "pendingOrder": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "blockedReason": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
           "proposals": {},
           "session_id": {}
         },
@@ -629,6 +801,7 @@
   "tables": [
     {
       "table": "6.11",
+      "kind": "pointer",
       "position": 10,
       "ids": [
         "toolkit.help",
@@ -670,7 +843,7 @@
       ],
       "cells": [
         "`create-goals [--brief \\| --brief-file \\| --from-stdin \\| positional text] [--codex-goal-mode aggregate\\|per_story] [--validation-batch-json] [--force]`",
-        "`createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`. The brief has four sources that all fill the one `brief` field, taken in this order: `--brief`, then the file of `--brief-file`, then stdin with `--from-stdin`, then the positional words not consumed by a flag, joined by spaces. A brief that is empty after that is refused `ULW_LOOP_BRIEF_REQUIRED` (`cli-subcommands.ts:29-41`, `cli-arg-parser.ts:44-54`). The order and the refusal are the descriptor's parse, pinned by scenarios",
+        "`createGoals({ brief, codexGoalMode?, validationBatchesJson?, force? })`. The brief has four sources that all fill the one `brief` field, taken in this order: `--brief`, then the file of `--brief-file`, then stdin with `--from-stdin`, then the positional words not consumed by a flag, joined by spaces. A brief that is empty after that is refused `ULW_LOOP_BRIEF_REQUIRED` (`cli-subcommands.ts:29-41`, `cli-arg-parser.ts:44-54`). The order and the refusal are the descriptor's parse, pinned by scenarios. The parser also accepts `--after-json`, `--directive-json`, `--directive-file` and `--target-goal-id` (`cli-arg-parser.ts:8`) only to keep their values out of the positional brief; nothing reads them. They are adapter parse flags with no SDK input and the written reason \"its value is removed from the positional brief; nothing reads it\", with one scenario that shows the brief excludes the value",
         "same"
       ]
     },
@@ -730,8 +903,8 @@
       ],
       "cells": [
         "`checkpoint --print-template [--goal-id]`; `checkpoint --goal-id --status complete\\|failed\\|blocked --evidence --codex-goal-json [--quality-gate-json] [--no-advance]`",
-        "`toolkit.checkpoint(...)`, two branches",
-        "same"
+        "`toolkit.checkpoint(...)`, two branches. The second branch takes `advance?`, which `--no-advance` sets to false (`checkpoint-continuation.ts:51`); the component's manifest does not carry it in the checkpoint arguments today, so it is an entry of the baseline",
+        "same, without `advance`"
       ]
     },
     {

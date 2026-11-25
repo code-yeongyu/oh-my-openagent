@@ -12,7 +12,7 @@ import {
 import { type CallInput, codeProblems, type Contract, inputProblems, scenarioProblems, scopeProblems } from "./contract-check"
 import { allRows, loadDomainFiles } from "./registry"
 import type { Row } from "./schema"
-import { loadScenarioFiles, type Scenario, type ScenarioFile } from "./scenarios"
+import { loadScenarioTable, type TableScenario, type ScenarioTableFile } from "./scenario-table"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
 // registry rows. Each check also runs once on a fixture that breaks it.
@@ -33,7 +33,7 @@ const contract: Contract = {
 }
 
 const rows = allRows(loadDomainFiles())
-const scenarios = loadScenarioFiles()
+const scenarios = loadScenarioTable()
 
 describe("SDK contract of slice P1a (#14948)", () => {
   test("#given the registry rows #then the root type has one call per P1a row and holds the rest for P1a-s", () => {
@@ -59,7 +59,7 @@ const rowOf = (sdk: string): Row => {
   if (row === undefined) throw new Error(`no row ${sdk}`)
   return row
 }
-const withScenario = (files: readonly ScenarioFile[], scenario: Scenario): ScenarioFile[] =>
+const withScenario = (files: readonly ScenarioTableFile[], scenario: TableScenario): ScenarioTableFile[] =>
   files.map((file) => (file.domain === scenario.row.split(".")[0] ? { ...file, scenarios: [...file.scenarios, scenario] } : file))
 
 describe("negative controls of the P1a checks", () => {
@@ -96,12 +96,12 @@ describe("negative controls of the P1a checks", () => {
   })
 
   test("#given a scenario with no observable effect #then the scenario check names it", () => {
-    const broken: Scenario = { id: "threads.setModel/nothing", row: "threads.setModel", kind: "effect", input: { thread: "a", model: "m" }, expect: [] }
+    const broken: TableScenario = { id: "threads.setModel/nothing", row: "threads.setModel", kind: "effect", input: { thread: "a", model: "m" }, expect: [] }
     expect(scenarioProblems(rows, contract, withScenario(scenarios, broken)).join("\n")).toContain("no observable expected effect")
   })
 
   test("#given a scenario whose input the schema refuses #then the scenario check names it", () => {
-    const broken: Scenario = {
+    const broken: TableScenario = {
       id: "threads.setModel/bad-input",
       row: "threads.setModel",
       kind: "effect",

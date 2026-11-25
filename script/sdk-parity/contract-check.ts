@@ -1,5 +1,5 @@
 import type { FieldSchema, Row } from "./schema"
-import type { ScenarioFile } from "./scenarios"
+import type { ScenarioTableFile } from "./scenario-table"
 import { schemaDifferences } from "./tool-check"
 
 // Slice P1a (#14948): the root's typed contract against the registry. Each check returns the problems it finds, each
@@ -84,7 +84,7 @@ export function inputProblems(rows: readonly Row[], contract: Contract): string[
   return problems
 }
 
-const usedCodes = (rows: readonly Row[], contract: Contract, files: readonly ScenarioFile[]): Map<string, Set<string>> => {
+const usedCodes = (rows: readonly Row[], contract: Contract, files: readonly ScenarioTableFile[]): Map<string, Set<string>> => {
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
   const used = new Map<string, Set<string>>()
   for (const scenario of files.flatMap((file) => file.scenarios)) {
@@ -95,7 +95,7 @@ const usedCodes = (rows: readonly Row[], contract: Contract, files: readonly Sce
   return used
 }
 
-export function codeProblems(rows: readonly Row[], contract: Contract, files: readonly ScenarioFile[]): string[] {
+export function codeProblems(rows: readonly Row[], contract: Contract, files: readonly ScenarioTableFile[]): string[] {
   const problems: string[] = []
   const used = usedCodes(rows, contract, files)
   const sources = new Set(contract.sourceCodes)
@@ -125,7 +125,7 @@ export function codeProblems(rows: readonly Row[], contract: Contract, files: re
 
 const ID = /^[a-z][A-Za-z0-9.]*\/[a-z0-9]+(-[a-z0-9]+)*$/
 
-export function scenarioProblems(rows: readonly Row[], contract: Contract, files: readonly ScenarioFile[]): string[] {
+export function scenarioProblems(rows: readonly Row[], contract: Contract, files: readonly ScenarioTableFile[]): string[] {
   const problems: string[] = []
   const inScope = new Map(p1aRows(rows, contract.gated).map((row) => [row.id, row]))
   const ports = new Set(contract.ports)

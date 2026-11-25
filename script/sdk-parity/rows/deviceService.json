@@ -25,7 +25,9 @@
             "remote",
             "bootstrap"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -62,7 +64,9 @@
             "remote",
             "control"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -70,7 +74,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
       },
       "projection": {},
       "scenarios": {
@@ -99,7 +103,9 @@
             "remote",
             "disable"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -136,7 +142,9 @@
             "remote",
             "enable"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -167,11 +175,10 @@
       },
       "cli": [],
       "tool": [],
-      "planned": {
-        "cli": "A2a"
-      },
+      "planned": {},
       "omitted": {
-        "tool": "Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on"
+        "tool": "Tool omitted: `thread_list` already answers `remote_unavailable` with the reason an agent can act on",
+        "cli": "CLI omitted: omo remote status prints it beside the status (deviceService.status)"
       },
       "projection": {},
       "scenarios": {
@@ -200,7 +207,9 @@
             "remote",
             "control"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -208,7 +217,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
       },
       "projection": {},
       "scenarios": {
@@ -237,7 +246,9 @@
             "remote",
             "wake"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -245,7 +256,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
       },
       "projection": {},
       "scenarios": {
@@ -274,7 +285,9 @@
             "remote",
             "status"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -311,7 +324,9 @@
             "remote",
             "wake"
           ],
-          "flags": {},
+          "flags": {
+            "--json": "render"
+          },
           "positionals": {},
           "values": []
         }
@@ -319,7 +334,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: these switches decide what other devices may do on this machine; that consent is the person's (as for deviceService.disable)"
       },
       "projection": {},
       "scenarios": {

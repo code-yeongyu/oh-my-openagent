@@ -41,7 +41,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call (as for daemon.run)"
       },
       "projection": {},
       "scenarios": {
@@ -74,7 +74,8 @@
             "gc"
           ],
           "flags": {
-            "--prune-store-index": "prune_store_index"
+            "--prune-store-index": "prune_store_index",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -96,7 +97,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
       },
       "projection": {},
       "scenarios": {
@@ -115,10 +116,27 @@
       ],
       "input": {
         "properties": {
-          "policy": {},
+          "policy": {
+            "enum": [
+              "upgrade",
+              "fallback",
+              "never"
+            ]
+          },
           "launch_spec": {},
           "allow_downgrade": {},
-          "when": {}
+          "when": {
+            "properties": {
+              "idle": {
+                "properties": {
+                  "operation": {},
+                  "if_instance": {},
+                  "if_generation": {},
+                  "target_build": {}
+                }
+              }
+            }
+          }
         },
         "required": []
       },
@@ -161,7 +179,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
       },
       "projection": {},
       "scenarios": {
@@ -197,7 +215,8 @@
           "flags": {
             "--store": "stores",
             "--allow-missing-index": "allow_missing_index",
-            "--dry-run": "dry_run"
+            "--dry-run": "dry_run",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -206,7 +225,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
       },
       "projection": {},
       "scenarios": {
@@ -225,7 +244,13 @@
       ],
       "input": {
         "properties": {
-          "policy": {},
+          "policy": {
+            "enum": [
+              "upgrade",
+              "fallback",
+              "never"
+            ]
+          },
           "pinned": {}
         },
         "required": []
@@ -331,7 +356,8 @@
             "status"
           ],
           "flags": {
-            "--include-workers": "include_workers"
+            "--include-workers": "include_workers",
+            "--json": "render"
           },
           "positionals": {},
           "values": []
@@ -418,7 +444,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason as run"
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
       },
       "projection": {},
       "scenarios": {
@@ -464,7 +490,7 @@
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: `thread_list` answers the session-level question; endpoint internals stay out of model-facing output (#14044) (as for daemon.status)"
       },
       "projection": {},
       "scenarios": {
@@ -492,11 +518,10 @@
       },
       "cli": [],
       "tool": [],
-      "planned": {
-        "cli": "C1a"
-      },
+      "planned": {},
       "omitted": {
-        "tool": "Same reason"
+        "tool": "Tool omitted: host lifecycle of the machine the calling session runs on; a session that stops or hands over its own host ends its own call (as for daemon.run)",
+        "cli": "CLI omitted: reached through omo daemon run, which ensures the daemon and then warms it (daemon.run)"
       },
       "projection": {},
       "scenarios": {
@@ -540,7 +565,7 @@
     },
     {
       "table": "6.7",
-      "position": 5,
+      "position": 6,
       "ids": [
         "daemon.status"
       ],
@@ -555,7 +580,7 @@
     },
     {
       "table": "6.7",
-      "position": 6,
+      "position": 7,
       "ids": [
         "daemon.stop"
       ],
@@ -570,7 +595,7 @@
     },
     {
       "table": "6.7",
-      "position": 7,
+      "position": 8,
       "ids": [
         "daemon.stopAll"
       ],
@@ -585,7 +610,7 @@
     },
     {
       "table": "6.7",
-      "position": 8,
+      "position": 9,
       "ids": [
         "daemon.handoff"
       ],
@@ -600,7 +625,7 @@
     },
     {
       "table": "6.7",
-      "position": 9,
+      "position": 10,
       "ids": [
         "daemon.gc"
       ],
@@ -615,7 +640,7 @@
     },
     {
       "table": "6.7",
-      "position": 10,
+      "position": 11,
       "ids": [
         "daemon.rollbackPrepare"
       ],
@@ -630,7 +655,7 @@
     },
     {
       "table": "6.7",
-      "position": 11,
+      "position": 12,
       "ids": [
         "daemon.shardPath"
       ],

@@ -2,29 +2,33 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createGatewayStore } from "../../packages/omo-senpi/src/components/thread/gateway/store"
-import { registerThreadTools, type ThreadHost } from "../../packages/omo-senpi/src/components/thread/tools"
-import {
-  DefaultResourceLoader,
-  ModelRegistry,
-  ModelRuntime,
-  SessionManager,
-  SettingsManager,
-  createAgentSession,
-} from "../../packages/omo-senpi/src/senpi-test-runtime"
+import { REPO_ROOT } from "./registry"
 import type { DiscoveredTool } from "./tool-check"
 
-// The tool registry of a test engine session from the pinned engine (design 7.2): a session with the thread component
-// against one without it, so the difference is exactly what omo registers, a tool added at run time included. The host
-// is a fake that answers nothing; no network, no account and no model call is involved.
+// The tool registry of a test engine session from a tree's pinned engine (design 7.2): a session with the thread
+// component against one without it, so the difference is exactly what omo registers, a tool added at run time included.
+// The tree is a parameter so the gate drives the merge base's own tools with the head's runner. The host is a fake that
+// holds no thread; no network, no account and no model call is involved.
 
-type ExtensionFactory = NonNullable<ConstructorParameters<typeof DefaultResourceLoader>[0]["extensionFactories"]>[number]
+type Runtime = typeof import("../../packages/omo-senpi/src/senpi-test-runtime")
+type Tools = typeof import("../../packages/omo-senpi/src/components/thread/tools")
+type Store = typeof import("../../packages/omo-senpi/src/components/thread/gateway/store")
+type ExtensionFactory = NonNullable<
+  ConstructorParameters<Runtime["DefaultResourceLoader"]>[0]["extensionFactories"]
+>[number]
+type Session = Awaited<ReturnType<Runtime["createAgentSession"]>>["session"]
 
-const idleHost = (root: string): ThreadHost => ({
+export type ToolSession = {
+  readonly tools: readonly DiscoveredTool[]
+  readonly execute: (name: string, args: unknown) => Promise<unknown>
+  readonly close: () => Promise<void>
+}
+
+const idleHost = (root: string) => ({
   socket: join(root, "parity.sock"),
   listSessions: async () => [],
   openSession: async () => {
-    throw new Error("the parity registry session opens no thread")
+    throw new Error("the parity session opens no thread")
   },
   getMessages: async () => [],
   getState: async () => ({ isStreaming: false }),
@@ -37,10 +41,13 @@ const idleHost = (root: string): ThreadHost => ({
   getAvailableThinkingLevels: async () => [],
 })
 
-async function sessionTools(root: string, factories: readonly ExtensionFactory[]): Promise<DiscoveredTool[]> {
+async function engineSession(runtime: Runtime, root: string, factories: readonly ExtensionFactory[]): Promise<Session> {
   const agentDir = mkdtempSync(join(root, "agent-"))
-  const settingsManager = SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: [] })
-  const loader = new DefaultResourceLoader({
+  const settingsManager = runtime.SettingsManager.inMemory({
+    defaultProjectTrust: "always",
+    enabledBuiltinExtensions: [],
+  })
+  const loader = new runtime.DefaultResourceLoader({
     cwd: root,
     agentDir,
     settingsManager,
@@ -52,43 +59,68 @@ async function sessionTools(root: string, factories: readonly ExtensionFactory[]
     extensionFactories: [...factories],
   })
   await loader.reload()
-  const { session } = await createAgentSession({
+  const { session } = await runtime.createAgentSession({
     cwd: root,
     agentDir,
     settingsManager,
-    modelRegistry: new ModelRegistry(ModelRuntime.createSync({ modelsPath: null })),
+    modelRegistry: new runtime.ModelRegistry(runtime.ModelRuntime.createSync({ modelsPath: null })),
     resourceLoader: loader,
-    sessionManager: SessionManager.inMemory(root),
+    sessionManager: runtime.SessionManager.inMemory(root),
     autoTitleSessions: false,
   })
-  try {
-    await session.bindExtensions({ mode: "print" })
-    return session.getAllTools().map((tool) => ({ name: tool.name, parameters: JSON.parse(JSON.stringify(tool.parameters)) }))
-  } finally {
-    session.dispose()
-    await session.whenToolChildClosed()
-  }
+  await session.bindExtensions({ mode: "print" })
+  return session
 }
 
-export async function discoverOmoTools(): Promise<DiscoveredTool[]> {
+const toolsOf = (session: Session): DiscoveredTool[] =>
+  session.getAllTools().map((tool) => ({ name: tool.name, parameters: JSON.parse(JSON.stringify(tool.parameters)) }))
+
+async function dispose(session: Session): Promise<void> {
+  session.dispose()
+  await session.whenToolChildClosed()
+}
+
+export async function openToolSession(tree: string = REPO_ROOT): Promise<ToolSession> {
+  const src = join(tree, "packages/omo-senpi/src")
+  const runtime = (await import(join(src, "senpi-test-runtime.ts"))) as Runtime
+  const { registerThreadTools } = (await import(join(src, "components/thread/tools.ts"))) as Tools
+  const { createGatewayStore } = (await import(join(src, "components/thread/gateway/store.ts"))) as Store
   const root = mkdtempSync(join(tmpdir(), "sdk-parity-tools-"))
   const gatewayDir = join(root, "gateway")
   mkdirSync(gatewayDir)
   const store = createGatewayStore({ agentDir: gatewayDir })
+  const threads: ExtensionFactory = (pi) => {
+    registerThreadTools(pi as unknown as Parameters<Tools["registerThreadTools"]>[0], {
+      host: idleHost(root),
+      store,
+      stateDirectory: root,
+      callerSessionId: () => "parity",
+      callerWorkspaceRoot: () => root,
+    })
+  }
+  const bare = await engineSession(runtime, root, [])
+  const engineOnly = new Set(toolsOf(bare).map((tool) => tool.name))
+  await dispose(bare)
+  const session = await engineSession(runtime, root, [threads])
+  return {
+    tools: toolsOf(session).filter((tool) => !engineOnly.has(tool.name)),
+    execute: async (name, args) => {
+      const result = await session.executeTool(name, args, { activateInactiveTool: true })
+      return (result.details as { readonly result?: unknown } | undefined)?.result ?? result.details
+    },
+    close: async () => {
+      await dispose(session)
+      await store.dispose()
+      rmSync(root, { recursive: true, force: true })
+    },
+  }
+}
+
+export async function discoverOmoTools(tree: string = REPO_ROOT): Promise<DiscoveredTool[]> {
+  const session = await openToolSession(tree)
   try {
-    const threads: ExtensionFactory = (pi) => {
-      registerThreadTools(pi as unknown as Parameters<typeof registerThreadTools>[0], {
-        host: idleHost(root),
-        store,
-        stateDirectory: root,
-        callerSessionId: () => "parity",
-        callerWorkspaceRoot: () => root,
-      })
-    }
-    const engineOnly = new Set((await sessionTools(root, [])).map((tool) => tool.name))
-    return (await sessionTools(root, [threads])).filter((tool) => !engineOnly.has(tool.name))
+    return [...session.tools]
   } finally {
-    await store.dispose()
-    rmSync(root, { recursive: true, force: true })
+    await session.close()
   }
 }
