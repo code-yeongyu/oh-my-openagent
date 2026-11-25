@@ -19,8 +19,8 @@ import {
 // table, recorded before the entries move onto one resolve function (design 7.4: a route's outcomes are pinned before its
 // implementation moves). A row whose entries disagree is a finding of that slice, not a target: each change to a pin
 // lands in its own commit naming the #13016 row it closes. Outcomes are "ok <device>/<thread>" or the refusal code with
-// details.kind or details.reason in parentheses. thread_create_existing on a session file here answers the session the
-// fixture's engine opens (the fixture's session files are not on disk), so it pins the route taken, not a resumed id.
+// details.kind or details.reason in parentheses. thread_create_existing on a session file here answers the session its
+// header names, as the fixture writes this device's session files to disk.
 
 const cleanups: Cleanups = []
 afterEach(async () => {
@@ -487,8 +487,8 @@ const ROWS: readonly Row[] = [
       thread_send: "ok HERE/stale",
       thread_handoff_fuzzy: "ok HERE/stale",
       thread_interrupt: "not_resumable",
-      thread_read: "not_found",
-      thread_create_existing: "ok HERE/dur-created-here",
+      thread_read: "ok HERE/stale",
+      thread_create_existing: "ok HERE/stale",
       monitor_target: "ok HERE/stale",
       sdk_send: "ok HERE/stale",
       sdk_locate: "ok B/stale",
@@ -505,8 +505,8 @@ const ROWS: readonly Row[] = [
       thread_send: "ok HERE/hereEnded",
       thread_handoff_fuzzy: "ok HERE/hereEnded",
       thread_interrupt: "not_resumable",
-      thread_read: "not_found",
-      thread_create_existing: "ok HERE/dur-created-here",
+      thread_read: "ok HERE/hereEnded",
+      thread_create_existing: "ok HERE/hereEnded",
       monitor_target: "ok HERE/hereEnded",
       sdk_send: "ok HERE/hereEnded",
       sdk_locate: "not_found(thread)",

@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs"
+import { join } from "node:path"
 import type { ThreadAddressEntry } from "../../addressing"
 import type {
   AliasHolder,
@@ -262,5 +264,12 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.replySenders === undefined ? {} : { callerReplySenders: () => options.replySenders ?? [] }),
     ...(options.callerWorkspaceRoot === undefined ? {} : { callerWorkspaceRoot: options.callerWorkspaceRoot }),
   })
+  // The base fixture lists this device's disk sessions at <agentDir>/<id>.jsonl without writing them; a session file here
+  // is a real file, so a read or an open of it reaches its header as it would on a device.
+  for (const id of HERE_DISK)
+    writeFileSync(
+      join(tools.agentDir, `${id}.jsonl`),
+      `${JSON.stringify({ type: "session", id, cwd: process.cwd(), timestamp: "2026-11-01T00:00:00Z" })}\n`,
+    )
   return { account, remote, run: tools.run, tools, entries: HERE_ENTRIES, cleanup: fixture.cleanup }
 }
