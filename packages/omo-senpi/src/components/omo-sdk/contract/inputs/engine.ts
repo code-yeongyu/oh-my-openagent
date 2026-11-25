@@ -13,18 +13,31 @@ const Count = Type.Integer({ minimum: 1 })
 
 export const EngineConfigAgentDir = None
 export const EngineConfigResources = Type.Object({ local: Local, trust: Trust })
-/** Global takes `enabled`; project-local (`local: true`) takes `state`, since a boolean cannot express `inherit`. */
-export const EngineConfigSetResource = Type.Object({
-  local: Local,
-  trust: Trust,
-  source: Source,
-  resource: Type.Object(
-    { type: Type.String({ minLength: 1 }), path: Type.String({ minLength: 1 }) },
+const Resource = Type.Object(
+  { type: Type.String({ minLength: 1 }), path: Type.String({ minLength: 1 }) },
+  { additionalProperties: false },
+)
+/**
+ * Two typed forms, because the two settings files do not hold the same thing (design 6.8, amendment 1): the global
+ * form sets `enabled`; the project-local form (`local: true`) sets one of the three override states, which a boolean
+ * cannot express (`inherit`).
+ */
+export const EngineConfigSetResource = Type.Union([
+  Type.Object(
+    { trust: Trust, source: Source, resource: Resource, enabled: Type.Boolean() },
     { additionalProperties: false },
   ),
-  enabled: Type.Optional(Type.Boolean()),
-  state: Type.Optional(Type.Union([Type.Literal("inherit"), Type.Literal("load"), Type.Literal("unload")])),
-})
+  Type.Object(
+    {
+      local: Type.Literal(true),
+      trust: Trust,
+      source: Source,
+      resource: Resource,
+      state: Type.Union([Type.Literal("inherit"), Type.Literal("load"), Type.Literal("unload")]),
+    },
+    { additionalProperties: false },
+  ),
+])
 export const EngineModelsDiscover = Type.Object({ provider: Type.String({ minLength: 1 }) })
 export const EngineModelsList = Type.Object({
   pattern: Type.Optional(Type.String({ minLength: 1 })),

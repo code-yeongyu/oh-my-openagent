@@ -79,7 +79,14 @@ export function gateReport(input: GateInput): GateReport {
   }
   for (const scenario of input.scenarios) {
     const [before, after] = [input.base.outcomes[scenario.id], input.head.outcomes[scenario.id]]
-    if (before === undefined || after === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
+    if (after === undefined) {
+      failures.push(
+        `${scenario.capability}: scenario ${scenario.id} has no outcome at the head; the runner did not run it`,
+      )
+      continue
+    }
+    // A scenario the merge base's tree has no outcome for is new in this pull request; it has nothing to compare against.
+    if (before === undefined || JSON.stringify(before) === JSON.stringify(after)) continue
     if (unresolved.has(scenario.capability) || !baseRows.has(scenario.capability) || initialization) {
       failures.push(
         `${scenario.capability}: scenario ${scenario.id} answers differently on the merge base and the head; this pull request changes what it does without the SDK call ${scenario.capability}`,

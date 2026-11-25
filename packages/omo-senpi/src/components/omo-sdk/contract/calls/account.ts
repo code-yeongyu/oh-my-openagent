@@ -1,4 +1,4 @@
-import { valueCall } from "../call-spec"
+import { instantCall, valueCall } from "../call-spec"
 import * as input from "../inputs/account"
 import type * as result from "../results/account"
 
@@ -6,7 +6,7 @@ import type * as result from "../results/account"
 export const ACCOUNT_CALLS = {
   "account.whoami": valueCall<result.WhoAmI>()(input.AccountWhoami),
   "account.show": valueCall<result.AccountShowResult>()(input.AccountShow),
-  "account.signInCheck": valueCall<result.SignInCheck>()(input.AccountSignInCheck),
+  "account.signInCheck": instantCall<result.SignInCheck>()(input.AccountSignInCheck),
   "account.signOut": valueCall<result.SignedOut>()(input.AccountSignOut),
   "account.forget": valueCall<result.Forgotten>()(input.AccountForget),
   "account.store.status": valueCall<result.AccountStore>()(input.AccountStoreStatus),

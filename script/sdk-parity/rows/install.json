@@ -344,6 +344,90 @@
       ],
       "input": {
         "properties": {
+          "plan": {
+            "type": "object",
+            "required": [
+              "inventory",
+              "stages"
+            ],
+            "properties": {
+              "inventory": {
+                "type": "object",
+                "required": [
+                  "harnesses"
+                ],
+                "properties": {
+                  "harnesses": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "installed",
+                        "providers",
+                        "credentialTypes",
+                        "modelHint",
+                        "notices",
+                        "importableCount"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "installed": {
+                          "type": "boolean"
+                        },
+                        "providers": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "credentialTypes": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "modelHint": {
+                          "type": "string"
+                        },
+                        "notices": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "importableCount": {
+                          "type": "integer",
+                          "minimum": 0
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "stages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "id",
+                    "description"
+                  ],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
           "consent": {
             "anyOf": [
               {
@@ -386,7 +470,8 @@
         "effect": [],
         "refusal": []
       },
-      "modules": []
+      "modules": [],
+      "note": "With neither flag the command asks once and, when accepted, applies every stage: that is consent all, the prompt being the adapter's rendering; --yes is the same call with the prompt answered. A declined prompt makes no call."
     },
     {
       "id": "install.setup.detect",
@@ -400,22 +485,12 @@
         "properties": {},
         "required": []
       },
-      "cli": [
-        {
-          "edition": "native",
-          "via": "launcher",
-          "route": [
-            "setup"
-          ],
-          "flags": {},
-          "positionals": {},
-          "values": []
-        }
-      ],
+      "cli": [],
       "tool": [],
       "planned": {},
       "omitted": {
-        "tool": "Tool omitted: plan, consent, write is a person's flow"
+        "tool": "Tool omitted: plan, consent, write is a person's flow",
+        "cli": "CLI omitted: omo setup detects before it plans and applies, through install.setup.apply"
       },
       "projection": {},
       "scenarios": {
@@ -640,7 +715,7 @@
         "install.setup.apply"
       ],
       "cells": [
-        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent })` (asked once, or per stage as `--ask-each` does)",
+        "`install.setup.detect()`, `.plan()` (what `--dry-run` prints), `.apply(plan, { consent: \"all\" \\| \"each\" })`: `--yes` and the command with neither flag are both `all`, the second with the adapter rendering one confirmation whose refusal makes no call (`N/bin/lib/setup-import.js:72-96`); `--ask-each` is `each`",
         "`omo setup [--yes] [--ask-each] [--dry-run]`",
         "none",
         "**no**",

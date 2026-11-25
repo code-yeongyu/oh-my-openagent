@@ -272,9 +272,7 @@
             "remote",
             "attach"
           ],
-          "flags": {
-            "--json": "render"
-          },
+          "flags": {},
           "positionals": {
             "s": "thread"
           },
@@ -599,12 +597,7 @@
                             "name"
                           ],
                           "properties": {
-                            "bytes": {
-                              "type": "string",
-                              "minLength": 1,
-                              "contentEncoding": "base64",
-                              "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                            },
+                            "bytes": {},
                             "name": {
                               "type": "string",
                               "minLength": 1
@@ -2173,12 +2166,7 @@
                     "name"
                   ],
                   "properties": {
-                    "bytes": {
-                      "type": "string",
-                      "minLength": 1,
-                      "contentEncoding": "base64",
-                      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                    },
+                    "bytes": {},
                     "name": {
                       "type": "string",
                       "minLength": 1
@@ -2403,12 +2391,7 @@
                     "name"
                   ],
                   "properties": {
-                    "bytes": {
-                      "type": "string",
-                      "minLength": 1,
-                      "contentEncoding": "base64",
-                      "pattern": "^[A-Za-z0-9+/]+={0,2}$"
-                    },
+                    "bytes": {},
                     "name": {
                       "type": "string",
                       "minLength": 1
@@ -2877,7 +2860,7 @@
       ],
       "cells": [
         "`threads.read({ thread, cursor?, max_bytes?, all_scope?, idempotency_key?, limit? })`: the bounded transcript projection",
-        "`omo thread read <t> [--limit] [--max-bytes] [--cursor]`",
+        "`omo thread read <t> [--all-scope] [--limit] [--max-bytes] [--cursor]`",
         "`thread_read` (plain branch)",
         "partial: no `idempotency_key`; `--limit` is sliced in the CLI (`N/bin/lib/thread.js:92-95`)",
         "None",
@@ -3026,7 +3009,7 @@
       ],
       "cells": [
         "`threads.send({ thread, message, delivery?, expected_turn_id?, summary?, idempotency_key?, collapse_key?, all_scope?, attachments?, author? })`. `author` only from a connector",
-        "`omo thread send <t> <text> [--mode] [--expected-turn] [--idempotency-key] [--collapse-key]`; `omo remote send <s> <text> [--steer\\|--follow-up] --no-wait`; `omo host session prompt\\|steer <ref> <text\\|@file>`",
+        "`omo thread send <t> <text> [--all-scope] [--mode] [--expected-turn] [--idempotency-key] [--collapse-key]`; `omo remote send <s> <text> [--steer\\|--follow-up] --no-wait`; `omo host session prompt\\|steer <ref> <text\\|@file>`",
         "`thread_send` (all fields but `attachments`, `author`)",
         "partial: own target construction (#13016); `summary` and attachments only in the remote module; the facade's names are `text`, `mode`",
         "Tool omits `attachments` and `author`: a session's message is text plus its provenance header, and `author` is a connector's identity field",
@@ -3086,7 +3069,7 @@
       ],
       "cells": [
         "`threads.close({ thread?, force?, graceful?, wait_ms?, idempotency_key?, all_scope? })`. `thread` omitted or `self` means the calling session and is `caller_context_missing` for any other principal",
-        "`omo thread close <t> [--force \\| --graceful [--wait-ms]] [--idempotency-key]`; `omo remote close <s> [--force] [--graceful] [--wait-ms]`; `omo host session close <ref>`",
+        "`omo thread close <t> [--all-scope] [--force \\| --graceful [--wait-ms]] [--idempotency-key]`; `omo remote close <s> [--force] [--graceful] [--wait-ms]`; `omo host session close <ref>`",
         "`thread_close`",
         "partial: the key is accepted and not honoured (`T/sdk.ts:488-495`)",
         "None",
@@ -3192,7 +3175,7 @@
         "threads.aliases.clear"
       ],
       "cells": [
-        "`threads.aliases.resolve({ alias })`, `.set({ thread, alias })`, `.clear({ thread })`",
+        "`threads.aliases.resolve({ alias })`, `.set({ thread?, alias })` with `thread` optional as for close, because the tool lets a session omit it, `.clear({ thread })`",
         "none",
         "`thread_rename { alias }`, `thread_create { alias }`",
         "partial: remote module `aliases.*`",

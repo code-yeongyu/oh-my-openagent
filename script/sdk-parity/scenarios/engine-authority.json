@@ -1373,7 +1373,8 @@
         "resource": {
           "type": "x-type",
           "path": "x-path"
-        }
+        },
+        "enabled": true
       },
       "principal": {
         "kind": "connector",
@@ -1397,7 +1398,8 @@
         "resource": {
           "type": "x-type",
           "path": "x-path"
-        }
+        },
+        "enabled": true
       },
       "principal": {
         "kind": "session",
@@ -1421,7 +1423,8 @@
         "resource": {
           "type": "x-type",
           "path": "x-path"
-        }
+        },
+        "enabled": true
       },
       "principal": {
         "kind": "service"

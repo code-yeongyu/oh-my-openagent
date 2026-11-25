@@ -10,6 +10,7 @@ import {
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import { AUTHORITY_CALLS } from "../../packages/omo-senpi/src/components/omo-sdk/contract/calls/authority"
+import { callInputOf } from "./call-input"
 import type { CallInput, Contract } from "./contract-check"
 import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { loadScenarioTable } from "./scenario-table"
@@ -20,7 +21,9 @@ export const json = (schema: unknown): CallInput & Record<string, unknown> => {
   const parsed = JSON.parse(JSON.stringify(schema)) as Partial<CallInput> & Record<string, unknown>
   return { ...parsed, properties: parsed.properties ?? {}, required: parsed.required ?? [] }
 }
-export const calls = Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, json(call.input)]))
+export const calls: Readonly<Record<string, CallInput & Record<string, unknown>>> = Object.fromEntries(
+  Object.entries(ROOT_CALLS).map(([key, call]) => [key, { ...json(call.input), ...callInputOf(call.input) }]),
+)
 export const rows = allRows(loadDomainFiles())
 export const files = loadScenarioTable()
 export const securityDesign = readFileSync(join(REPO_ROOT, "docs/reference/omo-sdk-authority-and-custody.md"), "utf8")
@@ -68,7 +71,10 @@ export const sliceInputContract: Contract = { ...sliceContract, calls: fullCalls
 export const sliceFiles = files.map((file) => ({
   ...file,
   inert: Object.fromEntries(
-    Object.entries(file.inert).filter(([key]) => SLICE.has(key.slice(0, key.lastIndexOf(".")))),
+    Object.entries(file.inert).filter(([key]) => {
+      const cut = key.lastIndexOf(".")
+      return sliceContract.calls[key.slice(0, cut)]?.properties[key.slice(cut + 1)] !== undefined
+    }),
   ),
   scenarios: file.scenarios.filter((scenario) => SLICE.has(scenario.row)),
 }))

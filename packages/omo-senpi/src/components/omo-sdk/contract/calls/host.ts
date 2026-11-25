@@ -1,4 +1,4 @@
-import { valueCall } from "../call-spec"
+import { instantCall, valueCall } from "../call-spec"
 import * as input from "../inputs/host"
 import * as oc from "../inputs/opencode"
 import type * as result from "../results/host"
@@ -20,7 +20,7 @@ export const HOST_CALLS = {
   "daemon.handoff": valueCall<result.DaemonHandoff>()(input.DaemonHandoff),
   "daemon.gc": valueCall<result.DaemonGc>()(input.DaemonGc),
   "daemon.rollbackPrepare": valueCall<result.DaemonRollbackPrepare>()(input.DaemonRollbackPrepare),
-  "daemon.shardPath": valueCall<result.DaemonShardPath>()(input.DaemonShardPath),
+  "daemon.shardPath": instantCall<result.DaemonShardPath>()(input.DaemonShardPath),
   "diagnostics.run": valueCall<result.Diagnostics>()(input.DiagnosticsRun),
   "diagnostics.models": valueCall<result.Diagnostics>()(input.DiagnosticsModels),
   "diagnostics.fixReflectionLock": valueCall<result.FixReflectionLock>()(input.DiagnosticsFixReflectionLock),
@@ -29,12 +29,12 @@ export const HOST_CALLS = {
   "install.setup.plan": valueCall<result.SetupPlan>()(input.InstallSetupPlan),
   "install.setup.apply": valueCall<result.SetupApplied>()(input.InstallSetupApply),
   "install.update": valueCall<result.InstallUpdate>()(input.InstallUpdate),
-  "install.version": valueCall<result.InstallVersion>()(input.InstallVersion),
-  "install.sdkRoot": valueCall<result.SdkRoot>()(input.InstallSdkRoot),
+  "install.version": instantCall<result.InstallVersion>()(input.InstallVersion),
+  "install.sdkRoot": instantCall<result.SdkRoot>()(input.InstallSdkRoot),
   "install.plugin": valueCall<ocResult.PluginInstalled>()(oc.InstallPlugin),
   "install.cleanup": valueCall<ocResult.Cleanup>()(oc.InstallCleanup),
   "install.localVersion": valueCall<ocResult.LocalVersion>()(oc.InstallLocalVersion),
   "boulder.status": valueCall<ocResult.BoulderStatus>()(oc.BoulderStatus),
   "worktrees.sweep": valueCall<ocResult.WorktreeSweep>()(oc.WorktreesSweep),
-  "toolkit.help": valueCall<ocResult.ToolkitHelp>()(oc.ToolkitHelp),
+  "toolkit.help": instantCall<ocResult.ToolkitHelp>()(oc.ToolkitHelp),
 } as const

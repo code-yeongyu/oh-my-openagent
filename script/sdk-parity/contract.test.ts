@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import type { SetupPlan } from "../../packages/omo-senpi/src/components/omo-sdk/contract/results/host"
 import type { ReleaseSessionReply } from "../../packages/omo-senpi/src/components/thread/gateway/adapter"
 import type { FollowOutcome } from "../../packages/omo-senpi/src/components/remote/types"
 import type {
@@ -13,7 +14,9 @@ import type {
   RootCallKey,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
 import {
+  cancellationOf,
   GATED,
+  HONOURED_CALLS,
   HELD_CODES,
   inputAccepts,
   OMO_CODE_REGISTRY,
@@ -23,21 +26,21 @@ import {
   SECURITY_SECTIONS,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import { type CallInput, codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
+import { callInputOf } from "./call-input"
+import { codeProblems, type Contract, inputProblems, scopeProblems } from "./contract-check"
 import { scenarioProblems } from "./scenario-check"
-import { allRows, loadDomainFiles } from "./registry"
+import { readFileSync } from "node:fs"
+import { join } from "node:path"
+
+import { UNRESOLVED_PATH } from "./baseline"
+import { allRows, loadDomainFiles, REPO_ROOT } from "./registry"
 import { loadScenarioTable } from "./scenario-table"
 
 // Slice P1a (#14948): the root's type, the code registry, the scenario ids and the input schemas agree with the
 // registry rows. Each check also runs once on a fixture that breaks it.
 
-const asInput = (schema: unknown): CallInput => {
-  const json = JSON.parse(JSON.stringify(schema)) as Partial<CallInput>
-  return { properties: json.properties ?? {}, required: json.required ?? [] }
-}
-
 const contract: Contract = {
-  calls: Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, asInput(call.input)])),
+  calls: Object.fromEntries(Object.entries(ROOT_CALLS).map(([key, call]) => [key, callInputOf(call.input)])),
   gated: GATED,
   ports: PORT_OPERATIONS,
   sections: SECURITY_SECTIONS,
@@ -59,8 +62,17 @@ type Leaves<T, Prefix extends string = ""> = {
 type FollowEventOf<Stream> =
   Stream extends OmoStream<unknown, unknown> ? (Stream extends AsyncIterable<infer E> ? E : never) : never
 type FollowStep = FollowEventOf<ReturnType<OmoSdkRoot["threads"]["follow"]>>
+type AttachmentBytes = Extract<
+  NonNullable<RootCallInput<"threads.send">["attachments"]>[number],
+  { readonly bytes: unknown }
+>["bytes"]
 type PromptObject = Extract<NonNullable<RootCallInput<"threads.create">["prompt"]>, object>
-export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true] = [
+export const rootTypeChecks: [true, true, true, true, true, true, true, true, true, true, true, true, true, true] = [
+  // Design lane ruling on M1: bytes are a Uint8Array on the root; the scenario table's fixture reference is not an input.
+  true satisfies Equal<AttachmentBytes, Uint8Array>,
+  true satisfies Equal<{ readonly $bytes: { readonly fixture: string } } extends AttachmentBytes ? true : false, false>,
+  // Review 6061577043 H1: install.setup.apply takes the plan install.setup.plan answered, as that type.
+  true satisfies Equal<NonNullable<RootCallInput<"install.setup.apply">["plan"]>, SetupPlan>,
   // H1: the object form of create's prompt is typed, with the connector's author slice P1a-s typed (#14949).
   true satisfies Equal<
     "author" extends keyof PromptObject ? ("message" extends keyof PromptObject ? true : false) : false,
@@ -84,6 +96,8 @@ export const rootTypeChecks: [true, true, true, true, true, true, true, true, tr
   // H4: every call takes the wait options of 4.4; a call whose input already names deadline_ms takes only the signal.
   true satisfies Equal<Parameters<OmoSdkRoot["threads"]["readAfterWait"]>[1], CallOptions | undefined>,
   true satisfies Equal<Parameters<OmoSdkRoot["threads"]["wait"]>[1], Omit<CallOptions, "deadline_ms"> | undefined>,
+  // A call that answers at once from this process takes no wait options.
+  true satisfies Equal<Parameters<OmoSdkRoot["install"]["version"]>["length"], 0 | 1>,
 ]
 
 const rows = allRows(loadDomainFiles())
@@ -116,11 +130,64 @@ describe("input schemas of the root (review 6061342489)", () => {
     expect(inputAccepts("threads.create", { prompt: {} })).toBe(false)
   })
 
-  test("#given an attachment's bytes #then only base64 text is accepted, as the schema states", () => {
+  test("#given an attachment's bytes #then only a Uint8Array is accepted, never text or the table's fixture reference", () => {
     const send = (bytes: unknown): boolean =>
       inputAccepts("threads.send", { thread: "t", message: "m", attachments: [{ bytes, name: "a.txt" }] })
-    expect(send("aGk=")).toBe(true)
-    expect(send("not base64!")).toBe(false)
-    expect(send(new Uint8Array([104, 105]))).toBe(false)
+    expect(send(new Uint8Array([104, 105]))).toBe(true)
+    expect(send("aGk=")).toBe(false)
+    expect(send([104, 105])).toBe(false)
+    expect(
+      send({
+        $bytes: {
+          fixture: "hi",
+          length: 2,
+          sha256: "8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4",
+        },
+      }),
+    ).toBe(false)
+  })
+})
+
+describe("input schemas of the root (review 6061577043)", () => {
+  test("#given install.setup.apply #then a plan is accepted only in the shape install.setup.plan answers", () => {
+    const plan = { inventory: { harnesses: [] }, stages: [{ id: "import-credentials", description: "import" }] }
+    expect(inputAccepts("install.setup.apply", { consent: "all", plan })).toBe(true)
+    expect(inputAccepts("install.setup.apply", { consent: "each" })).toBe(true)
+    expect(inputAccepts("install.setup.apply", { consent: "all", plan: { stages: "all" } })).toBe(false)
+  })
+
+  test("#given engine.config.setResource #then exactly the global or the project-local form is accepted", () => {
+    const base = { source: "npm:pkg", resource: { type: "skill", path: "skills/a" } }
+    expect(inputAccepts("engine.config.setResource", { ...base, enabled: false })).toBe(true)
+    expect(inputAccepts("engine.config.setResource", { ...base, trust: true, enabled: true })).toBe(true)
+    expect(inputAccepts("engine.config.setResource", { ...base, local: true, state: "inherit" })).toBe(true)
+    expect(inputAccepts("engine.config.setResource", base)).toBe(false)
+    expect(inputAccepts("engine.config.setResource", { ...base, enabled: true, state: "load" })).toBe(false)
+    expect(inputAccepts("engine.config.setResource", { ...base, local: true, enabled: true })).toBe(false)
+    expect(inputAccepts("engine.config.setResource", { ...base, state: "unload" })).toBe(false)
+    expect(inputAccepts("engine.config.setResource", { ...base, local: false, state: "load" })).toBe(false)
+  })
+})
+
+describe("wait options against their cores (design lane ruling on review 6061342489 H4)", () => {
+  const unresolved = new Set(
+    (
+      JSON.parse(readFileSync(join(REPO_ROOT, UNRESOLVED_PATH), "utf8")) as { entries: readonly { id: string }[] }
+    ).entries.map((entry) => entry.id),
+  )
+  const waiting = Object.entries(ROOT_CALLS).flatMap(([key, call]) => (call.waits ? [key] : []))
+
+  test("#given a call whose core ignores signal and deadline_ms today #then its row is still a recorded gap", () => {
+    const gaps = waiting.filter((key) => cancellationOf(key as Parameters<typeof cancellationOf>[0]) === "gap")
+    const built = gaps.flatMap((key) =>
+      rows
+        .filter((row) => row.kind === "capability" && row.sdk === key && !unresolved.has(row.id))
+        .map((row) => row.id),
+    )
+    expect(built).toEqual([])
+  })
+
+  test("#given the calls marked honoured #then each is a call that can wait", () => {
+    expect(HONOURED_CALLS.filter((key) => !waiting.includes(key))).toEqual([])
   })
 })

@@ -1,5 +1,6 @@
 export type { AnswerShape, CallSpec } from "./call-spec"
 export { ROOT_CALLS } from "./calls"
+export { type Cancellation, cancellationOf, HONOURED_CALLS } from "./cancellation"
 export { HELD_CODES, OMO_CODE_REGISTRY, type OmoCode } from "./codes"
 export { OMO_SDK_CODES, SOURCE_CODES } from "./code-sources"
 export type { OmoFailure, OmoStream, OmoStreamEvent, OmoThreadAnswer, OmoValue } from "./failure"
