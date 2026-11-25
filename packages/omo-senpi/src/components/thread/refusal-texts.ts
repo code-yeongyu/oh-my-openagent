@@ -16,11 +16,19 @@ export type RefusalText = {
   readonly next_action: string
 }
 
+/** A guidance sentence an ok answer carries (a field such as a prompt's `next_action`), rendered like a refusal's. */
+export type GuidanceText = {
+  /** `{slot}` fills a value; `{{` and `}}` are literal braces. */
+  readonly guidance: string
+}
+
 export const REFUSAL_TEXTS = { ...CONTROL_TEXTS, ...ADDRESS_TEXTS, ...RELAY_TEXTS } as const
-export type RefusalId = keyof typeof REFUSAL_TEXTS
+type Texts = typeof REFUSAL_TEXTS
+export type RefusalId = { [K in keyof Texts]: Texts[K] extends RefusalText ? K : never }[keyof Texts]
+export type GuidanceId = { [K in keyof Texts]: Texts[K] extends GuidanceText ? K : never }[keyof Texts]
 
 /** What a repeat answers for a refusal no template produced (an engine's own message): fixed text for its code. */
-export const FIXED_TEXT: Readonly<Partial<Record<ThreadErrorCode, Omit<RefusalText, "code">>>> = {}
+const FIXED_TEXT: Readonly<Partial<Record<ThreadErrorCode, Omit<RefusalText, "code">>>> = {}
 
 const SLOT = /\{\{|\}\}|\{([a-z_]+)\}/g
 
@@ -31,6 +39,33 @@ function fill(template: string, slots: Readonly<Record<string, string>>): string
     if (value === undefined) throw new Error(`refusal template slot ${name} has no value`)
     return value
   })
+}
+
+/** A guidance sentence, rendered from its template: the one producer of that sentence. */
+export function guidance(id: GuidanceId, slots: Readonly<Record<string, string>>): string {
+  const text: GuidanceText = REFUSAL_TEXTS[id]
+  return fill(text.guidance, slots)
+}
+
+type Guided = { readonly field: string; readonly id: GuidanceId; readonly slots: Readonly<Record<string, string>> }
+// Each object whose `field` guidance() rendered, with the template and slots, out of band like a refusal's provenance.
+const GUIDED = new WeakMap<object, Guided>()
+
+/** `object` with `field` set to the guidance `id` renders, the template and slots kept for a receipt to record. */
+export function withGuidance<T extends object>(
+  object: T,
+  field: string,
+  id: GuidanceId,
+  slots: Readonly<Record<string, string>>,
+): T {
+  const guided = { ...object, [field]: guidance(id, slots) }
+  GUIDED.set(guided, { field, id, slots: { ...slots } })
+  return guided
+}
+
+/** Which field of `object` guidance() rendered, with its template and slots; none for any other object. */
+export function guidanceOf(object: object): Guided | undefined {
+  return GUIDED.get(object)
 }
 
 /** A refusal's first answer: the one producer of its sentence. */
@@ -64,7 +99,7 @@ export function carryProvenance<T extends object>(from: object, to: T): T {
 }
 
 /** `failure` with `details` merged in, keeping its provenance (a spread alone would drop it). */
-export function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
+function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
   return carryProvenance(failure, { ...failure, details: { ...failure.details, ...details } })
 }
 

@@ -2,8 +2,9 @@ import { createHash } from "node:crypto"
 
 import type { ThreadToolResult } from "../contracts"
 import type { ThreadErrorCode, ThreadToolFailure } from "../errors"
-import { provenanceOf, type RefusalId, replayRefusal } from "../refusal-texts"
+import { type GuidanceId, guidanceOf, provenanceOf, type RefusalId, replayRefusal } from "../refusal-texts"
 import { parseThreadLinkUrl, threadLink } from "../thread-link"
+import { repeatedGuidance } from "./prompt-guidance"
 
 // What a receipt stores (design lane ruling on the receipts table, #14951): never the caller's key and never the caller's
 // input text. The key is a hash over the book's own scope, so the store cannot list anyone's keys; a result is stored as
@@ -12,14 +13,17 @@ import { parseThreadLinkUrl, threadLink } from "../thread-link"
 
 const INPUT = "\u0000input"
 const LINK = "\u0000link"
-const PARTS = "\u0000parts"
+const GUIDE = "\u0000guide"
 const LINK_FORMAT = /^\[(.*)\]\((omo-thread:\/\/v1\/[^)]+)\)$/s
-// Fields whose value the core minted (an id, a device name, a folder or worktree it made): never dropped because an input
-// is part of it (thread "peer" resolves to "dur-peer"; a worktree's path names its branch), and stored as parts, each
-// input field inside it by reference, so the record holds no input text and a repeat rebuilds the value exactly.
+// The fields whose value is a core-produced identifier (design lane ruling): stored as it is, even when an input is part of
+// it (thread "peer" resolves to "dur-peer"; a worktree's path names its branch), and by reference only when the whole value
+// equals an input field. Any other text that carries input is left out of the record.
 const IDENTIFIERS: ReadonlySet<string> = new Set([
   "thread",
   "thread_id",
+  "session_id",
+  "sessionId",
+  "durable_id",
   "delivery_id",
   "turn_id",
   "device",
@@ -56,28 +60,10 @@ const referenceTo = (leaves: Leaves, text: string): string | undefined => {
 const carriesInput = (leaves: Leaves, text: string): boolean =>
   [...leaves.values()].some((value) => text.includes(value))
 
-/** `value` as literal text and references: at each position the longest input field that starts there, by reference. */
+/** A core identifier: a reference when it is a whole input field, else its literal value. */
 function identifier(leaves: Leaves, value: string): unknown {
   const whole = referenceTo(leaves, value)
-  if (whole !== undefined) return { [INPUT]: whole }
-  const byLength = [...leaves].sort(([, left], [, right]) => right.length - left.length)
-  const parts: unknown[] = []
-  let literal = ""
-  for (let at = 0; at < value.length; ) {
-    const hit = byLength.find(([, text]) => value.startsWith(text, at))
-    if (hit === undefined) {
-      literal += value[at]
-      at += 1
-      continue
-    }
-    if (literal !== "") parts.push(literal)
-    literal = ""
-    parts.push({ [INPUT]: hit[0] })
-    at += hit[1].length
-  }
-  if (parts.length === 0) return value
-  if (literal !== "") parts.push(literal)
-  return { [PARTS]: parts }
+  return whole === undefined ? value : { [INPUT]: whole }
 }
 
 function encodeValue(value: unknown, leaves: Leaves): unknown {
@@ -92,7 +78,7 @@ function encodeValue(value: unknown, leaves: Leaves): unknown {
       const titleRef = referenceTo(leaves, title)
       return {
         [LINK]: {
-          id: identifier(leaves, target.threadId),
+          id: target.threadId,
           title: titleRef === undefined ? (carriesInput(leaves, title) ? null : title) : { [INPUT]: titleRef },
         },
       }
@@ -101,15 +87,32 @@ function encodeValue(value: unknown, leaves: Leaves): unknown {
     return carriesInput(leaves, value) ? undefined : value
   }
   if (Array.isArray(value)) return value.map((item) => encodeValue(item, leaves)).filter((item) => item !== undefined)
-  if (typeof value === "object" && value !== null)
+  if (typeof value === "object" && value !== null) {
+    const guided = guidanceOf(value)
     return Object.fromEntries(
       Object.entries(value)
-        .map(
-          ([key, item]) =>
-            [key, IDENTIFIERS.has(key) && typeof item === "string" ? identifier(leaves, item) : encodeValue(item, leaves)] as const,
-        )
+        .map(([key, item]) => {
+          // A guidance sentence is stored as its template and slots (identifiers), never as the sentence.
+          if (guided !== undefined && key === guided.field)
+            return [
+              key,
+              {
+                [GUIDE]: {
+                  id: guided.id,
+                  slots: Object.fromEntries(
+                    Object.entries(guided.slots).map(([name, slot]) => [name, identifier(leaves, slot)]),
+                  ),
+                },
+              },
+            ] as const
+          return [
+            key,
+            IDENTIFIERS.has(key) && typeof item === "string" ? identifier(leaves, item) : encodeValue(item, leaves),
+          ] as const
+        })
         .filter(([, item]) => item !== undefined),
     )
+  }
   return value
 }
 
@@ -125,15 +128,32 @@ function decodeValue(value: unknown, input: unknown): unknown {
   if (typeof value !== "object" || value === null) return value
   const record = value as Record<string, unknown>
   if (typeof record[INPUT] === "string") return inputAt(input, record[INPUT])
-  if (Array.isArray(record[PARTS]))
-    return record[PARTS].map((part) => (typeof part === "string" ? part : String(decodeValue(part, input) ?? ""))).join("")
   const link = record[LINK] as { readonly id: unknown; readonly title: unknown } | undefined
   if (link !== undefined) {
     const title = decodeValue(link.title, input)
     return threadLink(String(decodeValue(link.id, input) ?? ""), typeof title === "string" ? title : null)
   }
-  return Object.fromEntries(Object.entries(record).map(([key, item]) => [key, decodeValue(item, input)]))
+  const plain: Record<string, unknown> = Object.fromEntries(
+    Object.entries(record)
+      .filter(([, item]) => !isGuide(item))
+      .map(([key, item]) => [key, decodeValue(item, input)]),
+  )
+  // A guidance field is rendered again from its template, judged against the decoded record it sits in.
+  return Object.fromEntries(
+    Object.entries(record).flatMap(([key, item]) => {
+      if (!isGuide(item)) return [[key, plain[key]]]
+      const { id, slots } = item[GUIDE]
+      const filled = Object.fromEntries(
+        Object.entries(slots).map(([name, slot]) => [name, String(decodeValue(slot, input) ?? "")]),
+      )
+      const text = repeatedGuidance(id, filled, plain)
+      return text === undefined ? [] : [[key, text]]
+    }),
+  )
 }
+
+type StoredGuide = { readonly [GUIDE]: { readonly id: GuidanceId; readonly slots: Readonly<Record<string, unknown>> } }
+const isGuide = (item: unknown): item is StoredGuide => typeof item === "object" && item !== null && GUIDE in item
 
 /** The calls whose record is their outcome code only: a repeat re-runs them (a read has no effect to protect). */
 export const RERUN_ON_REPEAT: ReadonlySet<string> = new Set(["thread_list", "thread_read"])
@@ -188,7 +208,9 @@ export function decodeNote(note: string | null, input: unknown): string | null {
   if (note === null || !note.startsWith("{")) return note
   try {
     const parsed = JSON.parse(note) as { readonly message?: unknown; readonly details?: unknown }
-    return parsed.details === undefined ? note : JSON.stringify({ ...parsed, details: decodeValue(parsed.details, input) })
+    return parsed.details === undefined
+      ? note
+      : JSON.stringify({ ...parsed, details: decodeValue(parsed.details, input) })
   } catch {
     return note
   }

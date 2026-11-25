@@ -1,4 +1,4 @@
-import type { RefusalText } from "../refusal-texts"
+import type { GuidanceText, RefusalText } from "../refusal-texts"
 
 const UPDATE_HERE = "Update omo on this device and restart its host."
 const LIST_ALL_THEN_OPEN =
@@ -175,6 +175,14 @@ export const CONTROL_TEXTS = {
       "Thread {thread} was created{where}, but its first prompt did not start a turn (its delivery is {state}{waiting}).",
     next_action:
       "The thread exists: read it with thread_read (tool.thread_read({{ thread }}) in an eval cell) to see whether the prompt ran, then send the prompt again with thread_send to {thread} (tool.thread_send({{ thread, message }}) in an eval cell) if it did not. Do not create the thread again.",
+  },
+  "control.create_prompt_queued_next": {
+    guidance:
+      "The prompt is stored and runs when {thread} wakes: do not send it again. Check it with thread_read (tool.thread_read({{ thread }}) in an eval cell).",
+  },
+  "control.create_prompt_queued_next_on_device": {
+    guidance:
+      "The prompt is stored on device {device} and runs when {thread} wakes: do not send it again. Check it with thread_read (tool.thread_read({{ thread }}) in an eval cell).",
   },
   "control.create_prompt_undelivered": {
     code: "internal_error",
@@ -374,4 +382,4 @@ export const CONTROL_TEXTS = {
     next_action:
       "Call thread_list (tool.thread_list() in an eval cell) to reuse that thread by id, or pass a different name for the new thread.",
   },
-} as const satisfies Readonly<Record<`control.${string}`, RefusalText>>
+} as const satisfies Readonly<Record<`control.${string}`, RefusalText | GuidanceText>>

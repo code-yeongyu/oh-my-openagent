@@ -11,7 +11,8 @@ import type {
   ThreadToolResult,
 } from "../contracts"
 import { gatewaySchemaRefusal, threadToolFailure, type ThreadErrorCode, type ThreadToolFailure } from "../errors"
-import { refusal as refusalText } from "../refusal-texts"
+import { refusal as refusalText, withGuidance } from "../refusal-texts"
+import { queuedPromptGuidance } from "./prompt-guidance"
 import type { DeliveryTarget } from "../gateway/transport"
 import { checkInitialSkills } from "../initial-skills"
 import { createdDeviceRow } from "../remote/address-book"
@@ -304,11 +305,8 @@ async function promptThatRan(
   const { delivery } = prompt
   if (delivery.kind === "started" || delivery.kind === "steered") return prompt
   const local = thread.device === undefined
-  if (delivery.kind === "queued" && delivery.waiting_on?.kind === "wake")
-    return {
-      ...prompt,
-      next_action: `The prompt is stored${local ? "" : ` on device ${thread.device}`} and runs when ${thread.thread_id} wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).`,
-    }
+  const queued = queuedPromptGuidance(delivery, thread.thread_id, thread.device)
+  if (queued !== undefined) return withGuidance(prompt, "next_action", queued.id, queued.slots)
   if (!local && delivery.kind === "queued") return prompt
   const waited =
     local && prompt.delivery_id !== undefined ? await context.awaitPromptStart(prompt.delivery_id) : undefined
@@ -529,7 +527,7 @@ const fileOpen = (file: Extract<LocalExisting, { readonly kind: "file" }>) => ({
   ...(file.cwd === undefined ? {} : { cwd: file.cwd }),
 })
 
-/** The worktree an uncertain create's first answer kept (its receipt note, `uncertainNote`), when it names a whole one. */
+/** The worktree an uncertain create's first answer kept (its receipt note, `encodeNote`), when it names a whole one. */
 function keptWorktree(note: string | null | undefined): ThreadWorktree | undefined {
   const kept = note === null || note === undefined ? undefined : noteCause(note).details?.["worktree"]
   if (typeof kept !== "object" || kept === null) return undefined

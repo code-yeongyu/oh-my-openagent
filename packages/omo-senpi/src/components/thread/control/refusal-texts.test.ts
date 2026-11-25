@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { provenanceOf, refusal, type RefusalId } from "../refusal-texts"
+import { guidance, type GuidanceId, provenanceOf, REFUSAL_TEXTS, refusal, type RefusalId } from "../refusal-texts"
 import { CONTROL_TEXTS } from "./refusal-texts"
 
 // Goldens for the control.* templates (#14951): each expected message and next_action is the sentence its call site built
@@ -414,12 +414,36 @@ const GOLDENS: readonly Golden[] = [
   },
 ]
 
+const GUIDANCE_GOLDENS: readonly {
+  readonly id: GuidanceId
+  readonly slots: Readonly<Record<string, string>>
+  readonly text: string
+}[] = [
+  {
+    id: "control.create_prompt_queued_next",
+    slots: { thread: "dur-1" },
+    text: "The prompt is stored and runs when dur-1 wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).",
+  },
+  {
+    id: "control.create_prompt_queued_next_on_device",
+    slots: { thread: "dur-on-b", device: "b" },
+    text: "The prompt is stored on device b and runs when dur-on-b wakes: do not send it again. Check it with thread_read (tool.thread_read({ thread }) in an eval cell).",
+  },
+]
+
 describe("the control refusal templates (#14951)", () => {
+  test.each(GUIDANCE_GOLDENS.map((golden) => [golden.id, golden] as const))(
+    "#given %s and its slots #when guidance() renders it #then it is the hand-built sentence, byte for byte",
+    (_id, golden) => {
+      expect(guidance(golden.id, golden.slots)).toBe(golden.text)
+    },
+  )
+
   test.each(GOLDENS.map((golden) => [golden.id, golden] as const))(
     "#given %s and its slots #when refusal() renders it #then the message and next_action are the hand-built sentence, byte for byte",
     (_id, golden) => {
       const rendered = refusal(golden.id, golden.slots)
-      expect(rendered.code).toBe(CONTROL_TEXTS[golden.id as keyof typeof CONTROL_TEXTS].code)
+      expect(rendered.code).toBe(REFUSAL_TEXTS[golden.id].code)
       expect(rendered.message).toBe(golden.message)
       expect(rendered.next_action).toBe(golden.next)
       expect(provenanceOf(rendered)).toEqual({ id: golden.id, slots: golden.slots })
@@ -427,7 +451,7 @@ describe("the control refusal templates (#14951)", () => {
   )
 
   test("#given every control template #when the goldens are counted #then each has one", () => {
-    const covered: string[] = GOLDENS.map((golden) => golden.id)
+    const covered: string[] = [...GOLDENS, ...GUIDANCE_GOLDENS].map((golden) => golden.id)
     expect(covered.sort()).toEqual(Object.keys(CONTROL_TEXTS).sort())
   })
 
