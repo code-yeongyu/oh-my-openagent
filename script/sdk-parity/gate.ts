@@ -193,7 +193,7 @@ export function renderReport(report: GateReport): string {
   )
   if (report.liveSchema.length > 0)
     lines.push(
-      `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer checks the live schema and accepted-input compatibility before CLEAR.`,
+      `LIVE SCHEMA CHECK: ${report.liveSchema.join(", ")}: built calls whose input schema changed; the reviewer confirms against the live schema that the set of accepted inputs is the same in both directions (nothing newly refused, nothing newly accepted) before CLEAR.`,
       "",
     )
   if (report.candidates.length === 0) lines.push("No unresolved capability is a candidate: no closure moved.")
