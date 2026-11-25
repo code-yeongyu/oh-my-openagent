@@ -64,10 +64,11 @@ function mergeDeep(base, overlay) {
 function readDocuments(files, label, notices, read) {
   const documents = []
   for (const path of files) {
-    const text = read(path)
-    if (text === undefined) continue
+    if (!existsSync(path)) continue
     let parsed
     try {
+      const text = read(path)
+      if (text === undefined) throw new Error("the file is gone")
       parsed = parseJsonc(text)
     } catch (error) {
       notices.push(`WARN opencode: could not parse ${path}: ${error.message}; its ${label} were not imported`)

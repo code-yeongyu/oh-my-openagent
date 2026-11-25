@@ -25,10 +25,11 @@ function harness(id, installed, providers = [], credentialTypes = [], modelHint 
 }
 
 function readAuthJson(id, path, read = REAL_SETUP_FS.read) {
-  const text = read(path)
-  if (text === undefined) return harness(id, false)
+  if (!existsSync(path)) return harness(id, false)
   const result = harness(id, true)
   try {
+    const text = read(path)
+    if (text === undefined) throw new Error("the file is gone")
     const parsed = JSON.parse(text)
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       throw new Error("expected an object")

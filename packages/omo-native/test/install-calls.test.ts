@@ -183,6 +183,30 @@ describe("install.setup.detect and .plan read only through the named port reads 
   }
 })
 
+describe("a read that fails through the setup file port stays that file's notice", () => {
+  test("#given OpenCode's auth.json and config failing to read #then detect and plan still answer and name each file", async () => {
+    const { ports } = setupHome()
+    const config = join(ports.env.XDG_CONFIG_HOME as string, "opencode", "opencode.json")
+    mkdirSync(dirname(config), { recursive: true })
+    writeFileSync(config, JSON.stringify({ mcp: {} }))
+    const failing = {
+      ...REAL_SETUP_FS,
+      read: (path: string) => {
+        throw new Error(`EACCES: permission denied, open '${path}'`)
+      },
+    }
+    const detected = await setup.detect({}, { ...ports, fs: failing })
+    if (detected.kind !== "ok") throw new Error(`detect failed: ${detected.error.code}`)
+    expect(detected.value.harnesses.find((harness) => harness.id === "opencode")).toMatchObject({
+      installed: true,
+      notices: [expect.stringContaining("could not parse auth.json: EACCES")],
+    })
+    const planned = await setup.plan({}, { ...ports, fs: failing })
+    if (planned.kind !== "ok") throw new Error(`plan failed: ${planned.error.code}`)
+    expect(JSON.stringify(planned.value.summary.notes)).toContain(`could not parse ${config}: EACCES`)
+  })
+})
+
 describe("install.setup.apply writes through the file port it is given", () => {
   test("#given a file port #then the credentials stage's write goes through it", async () => {
     const { plan, ports, authFile } = await plannedSetup()
