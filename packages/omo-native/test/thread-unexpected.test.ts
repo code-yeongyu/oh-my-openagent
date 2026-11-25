@@ -4,7 +4,11 @@ import { join } from "node:path"
 
 import { createRemoteThreadFixture } from "../../omo-senpi/src/components/thread/thread-remote-fixture"
 import { runThreadCommand } from "../bin/lib/thread.js"
-import { UNEXPECTED_LOG_MAX_BYTES } from "../bin/lib/thread-unexpected-log.js"
+import {
+  agentDirUnexpectedLog,
+  UNEXPECTED_LOG_MAX_BYTES,
+  UNEXPECTED_RECORD_MAX_BYTES,
+} from "../bin/lib/thread-unexpected-log.js"
 
 // B8 sink ruling for omo thread: an unexpected exception's text goes only to an owner-only file under the agent dir,
 // which the fixed message names; nowhere else (answer, stdout, stderr). A sink it cannot write names no file.
@@ -85,6 +89,29 @@ describe("omo thread: the unexpected-failure log (B8)", () => {
     expect(result.exit).toBe(5)
     expect(result.message).toBe(FIXED)
     expect(result.stdout + result.stderr).not.toContain(TAG)
+  })
+
+  test("#given a full log readable by others #when a call fails unexpectedly #then it is neither written nor rotated, and the message names no file", async () => {
+    const result = await run((agentDir) => {
+      mkdirSync(join(agentDir, "logs"), { mode: 0o700 })
+      writeFileSync(join(agentDir, "logs", "thread-unexpected.log"), "x".repeat(UNEXPECTED_LOG_MAX_BYTES), {
+        mode: 0o644,
+      })
+    })
+    const logs = join(result.agentDir, "logs")
+    expect(result.message).toBe(FIXED)
+    expect(existsSync(join(logs, "thread-unexpected.log.1"))).toBe(false)
+    expect(readFileSync(join(logs, "thread-unexpected.log"), "utf8")).not.toContain(TAG)
+  })
+
+  test("#given an exception far larger than one record #when it is logged #then the file holds at most one record's bound", async () => {
+    const remote = fixture.account().remote
+    const agentDir = fixture.surface(remote).agentDir
+    const port = agentDirUnexpectedLog(agentDir)
+    expect(port(new Error(`${TAG}-${"y".repeat(4 * UNEXPECTED_RECORD_MAX_BYTES)}`))).toBeString()
+    expect(statSync(join(agentDir, "logs", "thread-unexpected.log")).size).toBeLessThanOrEqual(
+      UNEXPECTED_RECORD_MAX_BYTES + 1,
+    )
   })
 
   test("#given a log at its size bound #when a call fails unexpectedly #then the full log moves to .1 and a new owner-only file holds the record", async () => {
