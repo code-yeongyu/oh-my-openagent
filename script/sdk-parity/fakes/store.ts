@@ -13,10 +13,51 @@ const answer = (result: unknown, fallback: unknown): StoreExtensionResult<never>
   return { kind: "ok", value: (result ?? fallback) as never }
 }
 
+// The receipt book every keyed thread call admits through (T1b, thread/control/receipts.ts): kept in memory with the
+// real store's answers (accepted, replay, conflict, in_progress, uncertain) and never recorded, because bookkeeping is no
+// scenario's effect; a repeated key then acts once, as on the real store.
+type Receipt = {
+  readonly hash: string
+  status: "prepared" | "completed" | "uncertain"
+  result?: unknown
+  note?: string
+}
+
+function receiptBook(
+  now: () => number,
+): Pick<GatewayStore, "toolReceiptBegin" | "toolReceiptSettle" | "toolReceiptRelease"> {
+  const held = new Map<string, Receipt>()
+  const keyOf = (scope: { readonly principal: string; readonly operation: string; readonly idempotency_key: string }) =>
+    `${scope.principal}\u0000${scope.operation}\u0000${scope.idempotency_key}`
+  const expires_at = () => now() + 30 * 24 * 60 * 60 * 1000
+  return {
+    toolReceiptBegin: async (request) => {
+      const known = held.get(keyOf(request))
+      if (known === undefined) {
+        held.set(keyOf(request), { hash: request.args_hash, status: "prepared" })
+        return { kind: "accepted", expires_at: expires_at() }
+      }
+      if (known.hash !== request.args_hash) return { kind: "conflict" }
+      if (known.status === "completed") return { kind: "replay", result: known.result, expires_at: expires_at() }
+      if (known.status === "prepared") return { kind: "in_progress", expires_at: expires_at() }
+      return { kind: "uncertain", error_note: known.note ?? null }
+    },
+    toolReceiptSettle: async (request) => {
+      const known = held.get(keyOf(request))
+      if (known === undefined) return false
+      if ("result" in request) Object.assign(known, { status: "completed", result: request.result })
+      else Object.assign(known, { status: "uncertain", note: request.error_note })
+      return true
+    },
+    toolReceiptRelease: async (scope) => held.delete(keyOf(scope)),
+  }
+}
+
 export function storePort(recorder: Recorder, now: () => number): GatewayStore {
   const faked: Partial<GatewayStore> = {
     busyTimeoutMs: 0,
     now,
+    ...receiptBook(now),
     registerStoreExtension: async (extension) => {
       const { result } = recorder.record("store", "register_extension", {
         name: extension.name,
