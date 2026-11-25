@@ -171,6 +171,8 @@ export type TwoDeviceOptions = {
   readonly replySenders?: readonly { readonly session_id: string; readonly name?: string; readonly device?: string }[]
   /** The caller's workspace root (default this process's cwd). */
   readonly callerWorkspaceRoot?: string
+  /** Write this device's session files to disk, as a device has them (default: listed only, no transcript on disk). */
+  readonly sessionFiles?: boolean
 }
 
 /**
@@ -264,12 +266,13 @@ export function createTwoDevices(options: TwoDeviceOptions = {}) {
     ...(options.replySenders === undefined ? {} : { callerReplySenders: () => options.replySenders ?? [] }),
     ...(options.callerWorkspaceRoot === undefined ? {} : { callerWorkspaceRoot: options.callerWorkspaceRoot }),
   })
-  // The base fixture lists this device's disk sessions at <agentDir>/<id>.jsonl without writing them; a session file here
-  // is a real file, so a read or an open of it reaches its header as it would on a device.
-  for (const id of HERE_DISK)
-    writeFileSync(
-      join(tools.agentDir, `${id}.jsonl`),
-      `${JSON.stringify({ type: "session", id, cwd: process.cwd(), timestamp: "2026-11-01T00:00:00Z" })}\n`,
-    )
+  // The base fixture lists this device's disk sessions at <agentDir>/<id>.jsonl without writing them; with sessionFiles a
+  // session file here is a real file, so a read or an open of it reaches its header as it would on a device.
+  if (options.sessionFiles === true)
+    for (const id of HERE_DISK)
+      writeFileSync(
+        join(tools.agentDir, `${id}.jsonl`),
+        `${JSON.stringify({ type: "session", id, cwd: process.cwd(), timestamp: "2026-11-01T00:00:00Z" })}\n`,
+      )
   return { account, remote, run: tools.run, tools, entries: HERE_ENTRIES, cleanup: fixture.cleanup }
 }

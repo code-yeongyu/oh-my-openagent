@@ -88,7 +88,12 @@ describe("T1a: omo remote session verbs on an ended session, as they answer toda
       const a = fixture.account({ rowState: "ended" })
       const { code, out, err } = await run([...pin.args], undefined, SIGNED_IN, testBootstrap(), a.remote)
       const sent = a.sent.map((entry) => `${entry.via}:${String(entry.rpc?.["type"] ?? "")}`)
-      expect({ code, out, err, sent }).toEqual({ code: pin.code, out: pin.out, err: pin.err, sent: pin.sent })
+      expect({ code, out, err, sent }).toEqual({
+        code: pin.code,
+        out: [...pin.out],
+        err: [...pin.err],
+        sent: [...pin.sent],
+      })
     },
     60_000,
   )

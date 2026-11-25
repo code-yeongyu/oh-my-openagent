@@ -19,8 +19,8 @@ import {
 // table, recorded before the entries move onto one resolve function (design 7.4: a route's outcomes are pinned before its
 // implementation moves). A row whose entries disagree is a finding of that slice, not a target: each change to a pin
 // lands in its own commit naming the #13016 row it closes. Outcomes are "ok <device>/<thread>" or the refusal code with
-// details.kind or details.reason in parentheses. thread_create_existing on a session file here answers the session its
-// header names, as the fixture writes this device's session files to disk.
+// details.kind or details.reason in parentheses. Session files here are written to disk (sessionFiles), so a read or an
+// open of one answers the session its header names.
 
 const cleanups: Cleanups = []
 afterEach(async () => {
@@ -653,7 +653,7 @@ describe("T1a deliverable 1: every resolving entry over one address table, as it
   test.each(ROWS.flatMap((row) => (Object.keys(ENTRIES) as Entry[]).map((entry) => [row.form, entry, row] as const)))(
     "#given %s #when %s resolves it #then it answers its pinned outcome",
     async (_form, entry, row) => {
-      const td = createTwoDevices(row.setup)
+      const td = createTwoDevices({ ...row.setup, sessionFiles: true })
       cleanups.push(td.cleanup)
       expect(await ENTRIES[entry](td, row.address)).toBe(row.answers[entry])
     },
