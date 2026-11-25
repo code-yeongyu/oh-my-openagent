@@ -274,7 +274,8 @@ test("application evidence wins after the deadline; admission alone is not appli
 
 // Ruling B9 (#15011, #15021): a send key names one message per thread, key and class for as long as the holder remembers
 // it. Past the sender's receipt horizon the sender has forgotten the key (the read above answers outcome_unavailable), so
-// the repeat reaches the holder, which answers the same message as a repeat of the first delivery and a different message
+// the repeat reaches the holder, which answers the same message with the delivery's identifiers (the recorded kind; the
+// current kind from slice D1) and delivers nothing, and a different message
 // as the typed conflict, with no text from either: never a second delivery. Before B9 the same key delivered anew.
 test("query by old ID never sends anew after sender receipt retention", async () => {
   const x = await setup()
