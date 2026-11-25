@@ -88,7 +88,17 @@ export const invalidInput = (key: RootCallKey): OmoFailure["error"] => ({
  * today (design lane ruling on closed schemas). Closed list: slice P1a's follow-up fills it and pins each call; whether
  * such a key should be refused instead is a later, recorded decision.
  */
-const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = []
+const UNKNOWN_KEYS_DROPPED: readonly RootCallKey[] = [
+  // The shipped calls that have always ignored an unknown top-level key keep doing so (#15014); whether they should
+  // refuse it instead is #15016. script/sdk-parity/unknown-key-pins.test.ts pins each through the real root.
+  "config.status",
+  "account.whoami",
+  "account.signIn",
+  "devices.list",
+  "devices.rename",
+  "deviceService.status",
+  "daemon.warm",
+]
 
 /** The input as its schema sees it: for a call in the list, only the keys the schema names. */
 function checkedInput(key: RootCallKey, input: unknown): unknown {
