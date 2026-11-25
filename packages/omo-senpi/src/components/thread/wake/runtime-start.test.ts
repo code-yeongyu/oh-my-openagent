@@ -96,7 +96,7 @@ describe("the ensured host's idle-exit setting", () => {
 
 describe("a wake that throws", () => {
   test("#given a carrier whose wake throws #when a send asks the running wake for it #then the failure is warned with the session id instead of vanishing with the caller's catch", async () => {
-    const agentDir = mkdtempSync("/tmp/omo-wake-runtime-")
+    const agentDir = shortTempDir("omo-wake-runtime-")
     writeSessionFile(join(agentDir, "sessions"), "t")
     const real = createGatewayStore({ agentDir })
     const warnings: string[] = []
