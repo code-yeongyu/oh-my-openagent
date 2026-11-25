@@ -10,7 +10,8 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { createCliDriver } from "./drivers/cli.ts"
-import { type Answer, type Driver, isRecord } from "./drivers/driver.ts"
+import { cellOf, turnOf } from "./cell.ts"
+import type { Answer, Driver } from "./drivers/driver.ts"
 import { createToolsDriver } from "./drivers/tools.ts"
 import { type Cell, redact, type StepRecord, summary, type Surface, SURFACES, transcript } from "./evidence.ts"
 import { fill, SCENARIO } from "./scenario.ts"
@@ -43,34 +44,22 @@ const driverFor = async (surface: Surface, world: World): Promise<Driver> => {
   }
 }
 
-// The failure a surface answered, as its code: the thread result's error code (inside --json for the CLI), else a
-// thrown error, a step that never answered, or the raw shape.
-const failureOf = (raw: unknown): string => {
-  const body = isRecord(raw) && isRecord(raw["json"]) ? raw["json"] : raw
-  if (isRecord(body) && isRecord(body["error"]) && typeof body["error"]["code"] === "string")
-    return `error ${body["error"]["code"]}`
-  if (isRecord(raw) && typeof raw["exit"] === "number" && raw["exit"] !== 0)
-    return `exit ${raw["exit"]}: ${
-      String(raw["stderr"] ?? "")
-        .trim()
-        .split("\n")[0] ?? ""
-    }`
-  if (isRecord(raw) && "thrown" in raw) return "a thrown error"
-  if (isRecord(raw) && "no_answer_within_ms" in raw) return "nothing within the step deadline"
-  return "no success result"
-}
-
-// One step's bound: a surface that has not answered by then failed the step, and the run goes on with the next.
+// One step's bound: a surface that has not answered by then failed the step; its call is aborted (a driver that started
+// a process stops it), and the surface's later cells are not reached, so no step runs beside a stalled one.
 const STEP_DEADLINE_MS = 180_000
-const withinStep = <T extends Answer>(answer: Promise<T>, call: string): Promise<T | Answer> => {
+const withinStep = (
+  run: (signal: AbortSignal) => Promise<Answer>,
+  call: string,
+): Promise<Answer & { stalled?: true }> => {
+  const controller = new AbortController()
   let timer: ReturnType<typeof setTimeout> | undefined
-  const expired = new Promise<Answer>((resolve) => {
-    timer = setTimeout(
-      () => resolve({ call, raw: { no_answer_within_ms: STEP_DEADLINE_MS }, answered: false }),
-      STEP_DEADLINE_MS,
-    )
+  const expired = new Promise<Answer & { stalled: true }>((resolve) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      resolve({ call, raw: { no_answer_within_ms: STEP_DEADLINE_MS }, answered: false, stalled: true })
+    }, STEP_DEADLINE_MS)
   })
-  return Promise.race([answer, expired]).finally(() => clearTimeout(timer))
+  return Promise.race([run(controller.signal), expired]).finally(() => clearTimeout(timer))
 }
 
 async function runSurface(surface: Surface, world: World): Promise<StepRecord[]> {
@@ -78,6 +67,9 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
   const values: Record<string, string> = { deviceB: DEVICE_B.id, run: surface }
   const records: StepRecord[] = []
   let key: string | undefined
+  // Set once a cell cannot run in this world (the CLI open needs the account the world does not carry yet): every later
+  // cell of this surface reads not run with the same reason, never fail and never pass.
+  let notRun: { readonly cell: Cell; readonly why: string } | undefined
   const record = (entry: StepRecord): void => {
     records.push(entry)
     process.stderr.write(`x1a ${surface} ${entry.step}: ${entry.cell} (${entry.why})\n`)
@@ -91,29 +83,47 @@ async function runSurface(surface: Surface, world: World): Promise<StepRecord[]>
       skipped("no call on this surface today", "n/a", mapping.slice)
       continue
     }
+    if (mapping.kind === "needs_account" && !world.account)
+      notRun = {
+        cell: "not run",
+        why: "the world has no account yet (follow-up after the account fixture of PR 14996 is on dev)",
+      }
+    if (notRun !== undefined) {
+      skipped(notRun.why, notRun.cell, step.owner.slice)
+      continue
+    }
     // A step that names the thread cannot run when this surface's open answered none: it is not reached.
     if (step.op !== "create" && values["thread"] === undefined) {
       skipped("not reached: this surface's open answered no thread", "fail", `${SCENARIO[0]?.owner.slice} (open)`)
       continue
     }
     const before = step.op === "create" ? await world.observer.keys() : new Set<string>()
+    if (step.before === "fill-context") await world.observer.fill(key)
     const answer = await withinStep(
-      driver.run({ op: step.op, input }).catch((error: unknown) => ({
-        call: mapping.how,
-        raw: { thrown: String(error) },
-        answered: false,
-      })),
+      (signal) =>
+        driver.run({ op: step.op, input }, signal).catch((error: unknown) => ({
+          call: mapping.how,
+          raw: { thrown: String(error) },
+          answered: false,
+        })),
       mapping.how,
     )
+    if ("stalled" in answer)
+      notRun = {
+        cell: "fail",
+        why: "not reached: an earlier step of this surface did not answer within the step deadline",
+      }
     if (step.op === "create") {
       key = await world.observer.adopt(before)
       if ("thread" in answer && typeof answer.thread === "string") values["thread"] = answer.thread
     }
+    const turn = turnOf(answer.raw)
+    if (turn !== undefined) values["turn"] = turn
     if (step.release !== undefined) world.fake.release(fill(step.release, values))
     const expect = JSON.parse(fill(JSON.stringify(step.expect), values))
-    const verdict = await world.observer.judge(key, expect, answer.raw, answer.answered)
-    const cell: Cell = answer.answered && verdict.ok ? "pass" : "fail"
-    const why = !answer.answered ? `the surface answered ${failureOf(answer.raw)}` : verdict.why
+    const refusal = step.refusedTo?.surfaces.includes(surface) === true ? step.refusedTo.code : undefined
+    const verdict = await world.observer.judge(key, expect, answer.raw, answer.answered && refusal === undefined)
+    const { cell, why } = cellOf(answer, verdict.ok ? undefined : verdict.why, refusal)
     record({
       step: step.id,
       op: step.op,

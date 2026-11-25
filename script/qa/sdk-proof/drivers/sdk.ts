@@ -33,7 +33,12 @@ const viaFacade = (sdk: Sdk, op: Op, input: Readonly<Record<string, string>>): P
     case "create":
       return member(sdk, "create", { device: input["device"], prompt: input["prompt"] })
     case "send":
-      return member(sdk, "send", { thread: input["thread"], text: input["message"], mode: input["delivery"] })
+      return member(sdk, "send", {
+        thread: input["thread"],
+        text: input["message"],
+        mode: input["delivery"],
+        ...(input["expected_turn_id"] === undefined ? {} : { expected_turn_id: input["expected_turn_id"] }),
+      })
     case "read":
       return member(sdk, "read", { thread: input["thread"] })
     case "interrupt":

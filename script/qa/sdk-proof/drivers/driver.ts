@@ -14,7 +14,8 @@ export type Answer = {
 
 export type Driver = {
   readonly mapping: Readonly<Record<Op, Mapping>>
-  readonly run: (call: Call) => Promise<Answer>
+  /** `signal` aborts when the step's deadline passes: a driver that started a process stops it. */
+  readonly run: (call: Call, signal?: AbortSignal) => Promise<Answer>
   readonly close: () => Promise<void>
 }
 

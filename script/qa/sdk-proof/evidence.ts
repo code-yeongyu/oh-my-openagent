@@ -1,18 +1,21 @@
 // The X1a proof's evidence: one transcript per surface (each step's input, the surface's raw answer, and what device B
 // showed afterwards) and one summary table, step by surface. Every id, device id and scratch path is redacted, so the
 // table can be committed and the transcripts quoted. Transcripts stay local under .omo/evidence (#8703).
-import type { Op } from "./scenario.ts"
+import { ISSUES, type Op, type Surface, SURFACES } from "./scenario.ts"
 
-export type Surface = "sdk" | "tools" | "cli"
-export const SURFACES: readonly Surface[] = ["sdk", "tools", "cli"]
+export { type Surface, SURFACES }
+
 const SURFACE_TITLE: Readonly<Record<Surface, string>> = {
   sdk: "SDK (plain bun script)",
   tools: "Thread tools (scripted session)",
   cli: "CLI (spawned, --json)",
 }
 
-/** pass: the surface answered and B shows the expected state; fail: either did not; n/a: no call on this surface today. */
-export type Cell = "pass" | "fail" | "n/a"
+/**
+ * pass: the surface answered as the contract says and B shows the expected state; fail: either did not; n/a: no call on
+ * this surface today; not run: the world cannot run the cell yet (the account the CLI open needs).
+ */
+export type Cell = "pass" | "fail" | "n/a" | "not run"
 
 export type StepRecord = {
   readonly step: string
@@ -73,7 +76,9 @@ export function summary(
   const cell = (surface: Surface, step: string): string => {
     const record = runs[surface].find((entry) => entry.step === step)
     if (record === undefined) return "not run"
-    return record.cell === "pass" ? "pass" : `${record.cell}: ${record.why} (${record.slice})`
+    if (record.cell === "pass") return "pass"
+    const issue = ISSUES[`${surface}:${step}`]
+    return `${record.cell}: ${record.why} (${record.slice}${issue === undefined ? "" : `, ${issue}`})`
   }
   const rows = steps.map((step) => `| ${step.id} (${step.op}) | ${SURFACES.map((s) => cell(s, step.id)).join(" | ")} |`)
   return [

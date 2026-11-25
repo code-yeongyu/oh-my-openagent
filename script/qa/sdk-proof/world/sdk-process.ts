@@ -8,6 +8,7 @@ import { type Answer, type Call, type Driver, isRecord, succeeded, threadOf } fr
 import { MAPPING } from "../drivers/sdk.ts"
 
 const SCRIPT = join(import.meta.dir, "..", "drivers", "sdk.ts")
+const CLOSE_GRACE_MS = 10_000
 
 export function startSdkDriver(options: {
   readonly entry: string
@@ -52,9 +53,20 @@ export function startSdkDriver(options: {
         ...(thread === undefined ? {} : { thread }),
       }
     },
+    // Bounded: a call that never settled keeps the script alive, so it is stopped after CLOSE_GRACE_MS.
     close: async () => {
       child.stdin.end()
-      if (child.exitCode === null) await new Promise((resolve) => child.once("close", resolve))
+      if (child.exitCode !== null) return
+      const closed = new Promise((resolve) => child.once("close", resolve))
+      let timer: ReturnType<typeof setTimeout> | undefined
+      const grace = new Promise((resolve) => {
+        timer = setTimeout(resolve, CLOSE_GRACE_MS)
+      })
+      await Promise.race([closed, grace]).finally(() => clearTimeout(timer))
+      if (child.exitCode === null) {
+        child.kill("SIGKILL")
+        await closed
+      }
     },
   }
 }

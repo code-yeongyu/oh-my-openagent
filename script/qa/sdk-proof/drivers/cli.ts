@@ -8,7 +8,7 @@ import type { Mapping, Op } from "../scenario.ts"
 import { type Answer, type Call, call, type Driver, succeeded, threadOf } from "./driver.ts"
 
 export const MAPPING: Readonly<Record<Op, Mapping>> = {
-  create: call("omo remote open <device> --prompt <text> --json"),
+  create: { kind: "needs_account", how: "omo remote open <device> --prompt <text> --json" },
   send: call("omo thread send <thread> <text> --mode <delivery> --json"),
   read: call("omo thread read <thread> --json"),
   interrupt: call("omo remote interrupt <thread> --json"),
@@ -22,7 +22,16 @@ const argvOf = (op: Op, input: Readonly<Record<string, string>>): string[] => {
     case "create":
       return ["remote", "open", at("device"), "--prompt", at("prompt"), "--json"]
     case "send":
-      return ["thread", "send", at("thread"), at("message"), "--mode", at("delivery"), "--json"]
+      return [
+        "thread",
+        "send",
+        at("thread"),
+        at("message"),
+        "--mode",
+        at("delivery"),
+        ...(input["expected_turn_id"] === undefined ? [] : ["--expected-turn", at("expected_turn_id")]),
+        "--json",
+      ]
     case "read":
       return ["thread", "read", at("thread"), "--json"]
     case "interrupt":
@@ -36,7 +45,13 @@ const argvOf = (op: Op, input: Readonly<Record<string, string>>): string[] => {
 
 type Spawned = { readonly code: number | null; readonly stdout: string; readonly stderr: string }
 
-const runOmo = (launcher: readonly string[], argv: readonly string[], env: NodeJS.ProcessEnv, cwd: string) =>
+const runOmo = (
+  launcher: readonly string[],
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  cwd: string,
+  signal: AbortSignal | undefined,
+) =>
   new Promise<Spawned>((resolve, reject) => {
     const [command, ...prefix] = launcher
     if (command === undefined) return reject(new Error("no omo launcher"))
@@ -45,12 +60,13 @@ const runOmo = (launcher: readonly string[], argv: readonly string[], env: NodeJ
       env,
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
+      ...(signal === undefined ? {} : { signal, killSignal: "SIGKILL" as const }),
     })
     let stdout = ""
     let stderr = ""
     child.stdout.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")))
     child.stderr.on("data", (chunk: Buffer) => (stderr += chunk.toString("utf8")))
-    child.once("error", reject)
+    child.once("error", (error) => (signal?.aborted === true ? resolve({ code: null, stdout, stderr }) : reject(error)))
     child.once("close", (code) => resolve({ code, stdout, stderr }))
   })
 
@@ -71,9 +87,9 @@ export function createCliDriver(options: {
 }): Driver {
   return {
     mapping: MAPPING,
-    run: async ({ op, input }: Call): Promise<Answer> => {
+    run: async ({ op, input }: Call, signal?: AbortSignal): Promise<Answer> => {
       const argv = argvOf(op, input)
-      const result = await runOmo(options.launcher, argv, options.env, options.cwd)
+      const result = await runOmo(options.launcher, argv, options.env, options.cwd, signal)
       const json = parsed(result.stdout)
       const raw = {
         exit: result.code,

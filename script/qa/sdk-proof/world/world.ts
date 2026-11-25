@@ -23,7 +23,7 @@ import {
   type Scratch,
 } from "../../../../packages/omo-senpi/scripts/qa/thread-tools/lib/gateway.mjs"
 import type { ToolSession } from "../drivers/tools.ts"
-import { SWITCH_TO } from "../scenario.ts"
+import { PARK_TO, SWITCH_TO } from "../scenario.ts"
 import { enginePort } from "./engine-port.ts"
 import { type Device, type FakeRelay, startFakeRelay } from "./fake-relay.ts"
 import { type Observer, observeB } from "./observe.ts"
@@ -33,6 +33,8 @@ export const DEVICE_B: Device = { id: "x1a-device-b", name: "x1a-b" }
 
 export type World = {
   readonly engine: string
+  /** Whether the world carries a signed-in account (the CLI's omo remote verbs read it); not yet, see run.ts. */
+  readonly account: boolean
   readonly install: OmoInstall
   readonly a: Scratch
   readonly relay: FakeRelay
@@ -49,6 +51,7 @@ const addThinkingModel = (agentDir: string): void => {
   const models = JSON.parse(readFileSync(path, "utf8"))
   const mock = models.providers.mock
   mock.models.push({ ...mock.models[0], id: SWITCH_TO.id, reasoning: true })
+  mock.models.push({ ...mock.models[0], id: PARK_TO.id, reasoning: true, contextWindow: PARK_TO.contextWindow })
   writeFileSync(path, `${JSON.stringify(models, null, 2)}\n`)
 }
 
@@ -84,6 +87,7 @@ export async function startWorld(trace: (line: string) => void): Promise<World> 
   }
   return {
     engine: ENGINE_VERSION,
+    account: false,
     install,
     a,
     relay,

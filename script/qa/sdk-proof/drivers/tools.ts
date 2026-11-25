@@ -23,7 +23,15 @@ const toolCall = (
     case "create":
       return { tool: "thread_create", args: { device: input["device"], prompt: input["prompt"] } }
     case "send":
-      return { tool: "thread_send", args: { thread, message: input["message"], delivery: input["delivery"] } }
+      return {
+        tool: "thread_send",
+        args: {
+          thread,
+          message: input["message"],
+          delivery: input["delivery"],
+          ...(input["expected_turn_id"] === undefined ? {} : { expected_turn_id: input["expected_turn_id"] }),
+        },
+      }
     case "read":
       return { tool: "thread_read", args: { thread } }
     case "interrupt":
