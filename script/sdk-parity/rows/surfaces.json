@@ -1,0 +1,584 @@
+{
+  "domain": "surfaces",
+  "rows": [
+    {
+      "id": "internal.kill-guard",
+      "kind": "internal",
+      "sdk": "engine.launch.interactive",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "__kill-guard"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "The judge the session runtime's shell shims ask before a kill; it serves the launch operations of 6.9 and is anchored on the interactive launch (amendment 2, D5)."
+    },
+    {
+      "id": "internal.loro-smoke",
+      "kind": "internal",
+      "sdk": "diagnostics.run",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "loro-smoke"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "internal.remote-enable-after-login",
+      "kind": "internal",
+      "sdk": "deviceService.bootstrap",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "enable"
+          ],
+          "flags": {
+            "--after-login": "when",
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "internal.rpc-host-supervisor",
+      "kind": "internal",
+      "sdk": "daemon.ensure",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "engine",
+          "route": [],
+          "flags": {
+            "--internal-rpc-host-supervisor": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "A task shard supervisor's fast path into the engine route (amendment 2, D2)."
+    },
+    {
+      "id": "render.help",
+      "kind": "render",
+      "sdk": "render",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "remote",
+            "help"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "opencode",
+          "via": "commander",
+          "route": [],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon"
+          ],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        },
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "thread"
+          ],
+          "flags": {
+            "--help": "render",
+            "-h": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "render.output",
+      "kind": "render",
+      "sdk": "render",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [],
+          "flags": {
+            "--json": "render"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "retired.app-server",
+      "kind": "retired",
+      "sdk": "daemon.run",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "app-server"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "retired.daemon-attach",
+      "kind": "retired",
+      "sdk": "threads.attach",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "attach"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "retired.daemon-run-foreground",
+      "kind": "retired",
+      "sdk": "daemon.run",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "daemon",
+            "run"
+          ],
+          "flags": {
+            "--foreground": "when"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "retired.native-ulw-loop",
+      "kind": "retired",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "native",
+          "via": "launcher",
+          "route": [
+            "ulw-loop"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": []
+    },
+    {
+      "id": "toolkit.hook.post-tool-use-spawn",
+      "kind": "internal",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "hook",
+            "post-tool-use-spawn"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
+    },
+    {
+      "id": "toolkit.hook.pre-tool-use",
+      "kind": "internal",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "hook",
+            "pre-tool-use"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
+    },
+    {
+      "id": "toolkit.hook.pre-tool-use-spawn",
+      "kind": "internal",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "hook",
+            "pre-tool-use-spawn"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
+    },
+    {
+      "id": "toolkit.hook.stop",
+      "kind": "internal",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "hook",
+            "stop"
+          ],
+          "flags": {},
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
+    },
+    {
+      "id": "toolkit.hook.user-prompt-submit",
+      "kind": "internal",
+      "sdk": "toolkit.forSession",
+      "today": "no",
+      "slices": [
+        "OC2"
+      ],
+      "input": {
+        "properties": {},
+        "required": []
+      },
+      "cli": [
+        {
+          "edition": "opencode",
+          "via": "loop",
+          "route": [
+            "hook",
+            "user-prompt-submit"
+          ],
+          "flags": {
+            "--with-ultrawork": "process"
+          },
+          "positionals": {},
+          "values": []
+        }
+      ],
+      "tool": [],
+      "planned": {},
+      "omitted": {},
+      "projection": {},
+      "scenarios": {
+        "effect": [],
+        "refusal": []
+      },
+      "modules": [],
+      "note": "Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root (amendment 2, D6)."
+    }
+  ],
+  "tables": [
+    {
+      "table": "6.11-loop",
+      "position": 11,
+      "ids": [
+        "toolkit.hook.user-prompt-submit",
+        "toolkit.hook.pre-tool-use",
+        "toolkit.hook.stop",
+        "toolkit.hook.post-tool-use-spawn",
+        "toolkit.hook.pre-tool-use-spawn"
+      ],
+      "cells": [
+        "`hook user-prompt-submit [--with-ultrawork]`, `hook pre-tool-use`, `hook stop`, `hook post-tool-use-spawn`, `hook pre-tool-use-spawn`",
+        "Internal: hook entries that read a hook payload on stdin for that edition's plugin. Registered `internal`, each serving `toolkit.forSession`. Slice OC2 re-maps a hook that drives exactly one loop operation when it puts those operations on the root",
+        "n/a"
+      ]
+    }
+  ]
+}

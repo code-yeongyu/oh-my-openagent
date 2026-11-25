@@ -35,9 +35,11 @@
 | Engine hosts per session, `omo daemon`, migration and rollback | [docs/reference/omo-daemon.md](reference/omo-daemon.md) |
 | `omo thread` CLI and thread SDK for scripts and connectors (JSON shapes, exit codes) | [docs/reference/omo-thread.md](reference/omo-thread.md) |
 | `omo remote`: sessions on your other devices (verbs, states, command outcomes, device service install) | [docs/reference/remote-sessions.md](reference/remote-sessions.md) |
+| Design: the omo SDK as the first-party surface (one core per domain, CLI and tools as adapters, the CLI/SDK/tool parity table, slices) | [docs/reference/omo-sdk-first-party-design.md](reference/omo-sdk-first-party-design.md) |
 | Engine trust under a user namespace (bwrap sandbox, inode attestation) | [docs/reference/engine-trust-user-namespaces.md](reference/engine-trust-user-namespaces.md) |
 | Desktop engine attach and `--serve` multi-connection threat model | [docs/reference/desktop-attach-threat-model.md](reference/desktop-attach-threat-model.md) |
 | macOS keychain helper custody threat model (where the helper runs, what the item's ACL trusts) | [docs/reference/keychain-helper-custody-threat-model.md](reference/keychain-helper-custody-threat-model.md) |
+| omo SDK authority and credential custody: principals by capability, custody, revocation, audit (security design) | [docs/reference/omo-sdk-authority-and-custody.md](reference/omo-sdk-authority-and-custody.md) |
 | Known issues & workarounds | [docs/reference/known-issues.md](reference/known-issues.md) |
 | `prompt_async_gate` deep-dive | [docs/reference/prompt-async-gate-rfc.md](reference/prompt-async-gate-rfc.md) |
 | Shared core multi-PR extraction QA | [docs/reference/shared-core-multi-pr.md](reference/shared-core-multi-pr.md) |
