@@ -1,4 +1,5 @@
 import type { SurfaceExits } from "."
+import { INSTALL_SETUP, INSTALL_UPDATE } from "./install"
 
 /** `omo thread` (omo-native bin/lib/thread.js threadExitCode, THREAD_EXIT): 3 unavailable, 5 internal_error. */
 const THREAD: SurfaceExits = {
@@ -31,6 +32,7 @@ const THREAD: SurfaceExits = {
       "idempotency_conflict",
       "idempotency_in_progress",
       "idempotency_uncertain",
+      "install_failed",
       "invalid_arguments",
       "local_only",
       "loop_detected",
@@ -98,6 +100,7 @@ const REMOTE: SurfaceExits = {
       "idempotency_conflict",
       "idempotency_in_progress",
       "idempotency_uncertain",
+      "install_failed",
       "internal_error",
       "invalid_arguments",
       "local_only",
@@ -156,4 +159,6 @@ export const SURFACE_EXITS: Readonly<Record<string, SurfaceExits>> = {
   "remote sessions": REMOTE,
   "remote disable": REMOTE,
   "remote wake": REMOTE,
+  update: INSTALL_UPDATE,
+  setup: INSTALL_SETUP,
 }
