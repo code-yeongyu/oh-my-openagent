@@ -13,7 +13,7 @@ export type CommanderRoute = {
 
 const isHidden = (command: Command): boolean => Reflect.get(command, "_hidden") === true
 
-export function walkCommander(command: Command, prefix: readonly string[] = []): CommanderRoute[] {
+function walkCommander(command: Command, prefix: readonly string[] = []): CommanderRoute[] {
   const routes: CommanderRoute[] = []
   for (const child of command.commands) {
     const hidden = isHidden(child)
@@ -27,7 +27,7 @@ export function walkCommander(command: Command, prefix: readonly string[] = []):
   return routes
 }
 
-export function rootFlags(command: Command): string[] {
+function rootFlags(command: Command): string[] {
   return command.options
     .flatMap((option) => [option.short, option.long].filter((flag) => flag !== undefined))
     .toSorted()

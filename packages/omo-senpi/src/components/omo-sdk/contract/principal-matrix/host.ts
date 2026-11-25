@@ -23,7 +23,7 @@ export const HOST_LINES: readonly MatrixLine[] = [
   {
     section: "4.3",
     capability:
-      "`daemon.ensure`, `stop`, `stopAll`, `handoff`, `gc`, `rollbackPrepare`; `diagnostics.fixReflectionLock`, `reapStaleEngines`; `install.update`, `setup.apply`, `cleanup`; `engine.trust.ensure` (it writes the trust store and can take a lease for another process)",
+      "`daemon.ensure`, `stop`, `stopAll`, `handoff`, `gc`, `rollbackPrepare`; `diagnostics.fixReflectionLock`, `reapStaleEngines`; `install.update`, `setup.apply`, `cleanup`; `install.setup.detect` and `setup.plan`, which read what a setup would import, a pending provider key among it, though they print none; `engine.trust.ensure` (it writes the trust store and can take a lease for another process)",
     slug: "host-change",
     rows: [
       "daemon.ensure",
@@ -37,6 +37,8 @@ export const HOST_LINES: readonly MatrixLine[] = [
       "install.update",
       "install.setup.apply",
       "install.cleanup",
+      "install.setup.detect",
+      "install.setup.plan",
       "engine.trust.ensure",
     ],
     cells: columns({ people: allow(), session: refuse(), connector: refuse(), service: refuse() }),

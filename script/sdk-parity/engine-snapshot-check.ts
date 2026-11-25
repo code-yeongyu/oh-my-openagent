@@ -18,11 +18,11 @@ export type EngineSnapshot = {
   readonly session_required: readonly string[]
 }
 
-export const SNAPSHOT_PATH = join(REPO_ROOT, "script/sdk-parity/engine-snapshot/auth-check-56cddc3b81.json")
+const SNAPSHOT_PATH = join(REPO_ROOT, "script/sdk-parity/engine-snapshot/auth-check-56cddc3b81.json")
 export const loadSnapshot = (): EngineSnapshot => JSON.parse(readFileSync(SNAPSHOT_PATH, "utf8")) as EngineSnapshot
 
 /** The engine's field notation (`value.accounts.[].email`, `provider_text.*`) in omo's (`accounts[].email`). */
-export const omoPath = (field: string): string => field.replace(/^value\./, "").replace(/\.\[\]/g, "[]")
+const omoPath = (field: string): string => field.replace(/^value\./, "").replace(/\.\[\]/g, "[]")
 
 const covers = (pattern: string, field: string): boolean =>
   pattern.endsWith(".*") ? field.startsWith(pattern.slice(0, -1)) : pattern === field
@@ -98,8 +98,8 @@ export function sessionShapeProblems(snapshot: EngineSnapshot, sessionSchema: un
   for (const path of omo.keys())
     if (!(path in snapshot.session_answer))
       problems.push(`omo session ${path}: the engine's session answer has no such field`)
-  const want = JSON.stringify(snapshot.session_required.filter((p) => p !== "accounts").toSorted())
-  const have = JSON.stringify(required.filter((p) => p !== "accounts").toSorted())
+  const want = JSON.stringify([...snapshot.session_required].toSorted())
+  const have = JSON.stringify(required.toSorted())
   if (want !== have) problems.push(`session required fields: omo ${have}, the engine ${want}`)
   return problems
 }
