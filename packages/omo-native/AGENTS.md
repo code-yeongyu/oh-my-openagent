@@ -37,10 +37,15 @@ omo-senpi plugin payload produced by `bun run build:omo-native` (gitignored, nev
     remain Bun-owned symlinks; only marked legacy wrappers for this install are restored to links
     (#11019). Windows/npm keep the shipped Node shebang. A first manual upgrade from an older
     shim can fail before the new code runs; one new-version launch migrates it for the next update.
-  - `doctor.js` — diagnostics plus stale-orphan detection: `classifyEngineProcesses` splits live
-    engines into stale (interactive, PPID 1), attached and managed (`--mode`), and
-    `reapStaleEngines` terminates ONLY explicitly named pids that are still stale at request time.
-    Pattern-killing is forbidden.
+  - `diagnostics.js` — the SDK `diagnostics` namespace's one body (`run`, `models`,
+    `fixReflectionLock`, `reapStaleEngines`), `// @ts-check` against `diagnostics-contract.d.ts`;
+    each call takes its ports as one argument with real defaults and answers findings as data
+    (`diagnostics-findings.js` holds the shape and the `<PREFIX> <message>` rendering). `run`
+    composes the npm launcher's and the compiled binary's section lists (`diagnostics-run.js`).
+  - `doctor.js` — `omo doctor` as the adapter over that core for both binaries: parse argv, one
+    call, render. `engine-processes.js` splits live engines into stale (interactive, PPID 1),
+    attached and managed (`--mode`); `reapStaleEngines` terminates ONLY explicitly named pids that
+    are still stale at request time. Pattern-killing is forbidden.
   - `engine-prepare.js` - the installed-engine preparation (compile-safe css-tree data, RPC stream guard; the Claude Code UA floor rewrite went away with senpi#5131). postinstall (`bin/senpi-patch.mjs`) runs it and stamps the engine tree with `.omo-engine-prepared` (the omo-ai package version); the launcher runs `ensureEnginePrepared` before every engine start so an install whose scripts never ran (`ignore-scripts=true`, Bun's blocked postinstalls) is prepared on first launch (#8713). A failure warns with the reinstall command and never blocks the launch.
   - `launch-spec-mode.js` - `normalizeLaunchSpecMode` strips group/world write bits from `plugin/daemon-launch-spec.json` (regular file owned by this user only, `lstat`, never through a symlink; no-op on win32) because npm/bun extraction applies the installer's umask and the task host refuses a writable spec (#9208). `engine-prepare.js` `preparePluginLaunchSpec` runs it fail-open on every launch (`preparedSenpi()`, before `omo doctor`) and in postinstall; `launchSpecDoctorLines` gives `omo doctor` (npm and compiled) a FAIL line with the fix when the host would still refuse the spec.
   - `rpc-stream-errors.js` - postinstall/launch preparation of the installed engine's stdio RPC serializer. A malformed streamed event produces a failed `prompt` response with `errorCode: invalid_stream_event` and shuts down with exit 1. The same preparation runs after an omob engine swap; repeated preparation is idempotent, and a missing RPC target, missing required binding (including `shutdown`), or unsupported serializer shape fails installation rather than silently missing the guard. Binding checks also run on already-prepared code.
