@@ -5,22 +5,39 @@ import {
   type ThreadCreateInput,
   type ThreadInterruptInput,
   type ThreadRenameInput,
+  type ThreadArchiveInput,
   type ThreadSetModelInput,
+  type ThreadSetReasoningInput,
   type ThreadToolResult,
 } from "../contracts"
 import { createThread } from "../control/create"
 import { locateControl } from "../control/locate"
-import { closeOptions, closeThread, interruptThread, NOT_LIVE, setModelOn } from "../control/operations"
+import {
+  closeOptions,
+  closeThread,
+  interruptThread,
+  NOT_LIVE,
+  setModelOn,
+  setThinkingLevelOn,
+} from "../control/operations"
 import { controlIdentity } from "../control/port"
 import { awaitPromptStart, FIRST_PROMPT_START_RESERVE_MS, FIRST_PROMPT_START_WAIT_MS } from "../control/prompt-start"
 import { renameThread } from "../control/rename"
+import { archiveThread } from "../tools/archive-ops"
 import { sendToTarget } from "../sdk-send"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import { waitWithinCallBudget } from "../../call-budget/call-deadline"
 import type { ThreadCoreContext } from "./context"
 import type { Retrying } from "./keyed"
 
-type ControlName = "thread_create" | "thread_interrupt" | "thread_close" | "thread_rename" | "thread_set_model"
+type ControlName =
+  | "thread_create"
+  | "thread_interrupt"
+  | "thread_close"
+  | "thread_rename"
+  | "thread_set_model"
+  | "thread_set_reasoning"
+  | "thread_archive"
 
 /**
  * The session controls of the agent tools (thread_create, thread_interrupt, thread_close, thread_rename,
@@ -109,5 +126,14 @@ export function createControls(context: ThreadCoreContext) {
         if (found.kind === "not_live") return NOT_LIVE
         return await setModelOn(found.control, value.model, value.provider)
       }),
+    setReasoning: (request: ThreadSetReasoningInput) =>
+      control("thread_set_reasoning", request, async (value) => {
+        const found = await located(value.thread, value.all_scope)
+        if (found.kind === "error") return found.result
+        if (found.kind === "not_live") return NOT_LIVE
+        return await setThinkingLevelOn(found.control, value.level, value.scope)
+      }),
+    archive: (request: ThreadArchiveInput) =>
+      control("thread_archive", request, async (value) => archiveThread(controls, await view(), value, UNKNOWN_CALLER)),
   }
 }

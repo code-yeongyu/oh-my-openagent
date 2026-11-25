@@ -138,6 +138,9 @@ export function threadsNamespace(options: {
     "threads.close": async (input = {}) => onRoot((await thread().close(input)) as result.ThreadCloseResult),
     "threads.rename": async (input = {}) => onRoot((await thread().rename(input)) as result.ThreadRenameResult),
     "threads.setModel": async (input) => onRoot((await thread().setModel(input)) as result.ThreadSetModelResult),
+    "threads.setReasoning": async (input) =>
+      onRoot((await thread().setReasoning(input)) as result.ThreadSetReasoningResult),
+    "threads.archive": async (input) => onRoot((await thread().archive(input)) as result.ThreadArchiveResult),
     "threads.release": async (input) => {
       const refused = unbuilt("threads.release", input, ["thread", "interrupt", "force"])
       if (refused !== undefined) return refused
