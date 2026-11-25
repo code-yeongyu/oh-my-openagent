@@ -108,6 +108,21 @@ describe.skipIf(process.platform === "win32")("C1c fault pins: a setup stage who
     expect(seen.stderr).toContain("at applyAssets (")
   })
 
+  test("#given the npm launcher under OMO_DEBUG #then the same line is followed by the thrown error's stack, on local stderr only", () => {
+    const fixture = faultFixture()
+    const result = spawnSync(process.execPath, [fixture.launcher, "setup", "--yes"], {
+      encoding: "utf8",
+      env: { ...fixture.env, OMO_DEBUG: "1" },
+    })
+    const seen = outcome(result, fixture)
+    expect({ status: seen.status, imported: seen.imported }).toEqual({ status: 1, imported: ["google"] })
+    expect(seen.stderr.startsWith("omo: ENOTDIR: not a directory, lstat '<ROOT>/agent/skills/fixture-skill'\n")).toBe(
+      true,
+    )
+    expect(seen.stderr).toContain("at applyAssets (")
+    expect(seen.stdout).not.toContain("at applyAssets (")
+  })
+
   test("#given the npm launcher #then the credentials stage's write stays, the error is printed and the exit is 1", () => {
     const fixture = faultFixture()
     const result = spawnSync(process.execPath, [fixture.launcher, "setup", "--yes"], {
