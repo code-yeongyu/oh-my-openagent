@@ -1,39 +1,36 @@
-import { REMOTE_CODES } from "../../remote/codes"
 import type { RemoteFailure } from "../../remote/types"
 import { OMO_CODE_REGISTRY, type OmoCode, type OmoFailure } from "../contract"
-import { carriesReservedKey, HELD_CODE, heldOf, reservedKeyRefusal } from "./thread-failures"
-
-type RemoteCode = RemoteFailure["code"]
+import { carriesReservedKey, restored, restoreOf, withRestore } from "./restore"
+import { reservedKeyRefusal } from "./thread-failures"
 
 const isRegistered = (code: string): code is Exclude<OmoCode, "not_implemented"> =>
   Object.hasOwn(OMO_CODE_REGISTRY, code)
-const isRemoteCode = (code: unknown): code is RemoteCode =>
-  typeof code === "string" && (REMOTE_CODES as readonly string[]).includes(code)
+
+const REMOTE_SHAPE = ["kind", "code", "message", "next_action", "uncertain", "command_id", "partial", "details"]
 
 // Design 4.4: the remote module's flat failure on the root. Its three extra fields are first-class on the root's shape
-// and pass with their values; a code the registry holds without a producer rides under internal_error with the code in
-// `details.$held_code`, exactly as a thread failure does, so the inverse restores the failure it was made from.
+// and pass with their values; what the shape cannot hold rides in the reserved key (restore.ts), as for a thread failure.
 export function remoteFailure(failure: RemoteFailure): OmoFailure {
   if (carriesReservedKey(failure.details)) return reservedKeyRefusal()
-  const { kind: _kind, code, details, ...rest } = failure
-  if (isRegistered(code))
-    return { kind: "error", error: { code, ...rest, ...(details === undefined ? {} : { details }) } }
+  const held = isRegistered(failure.code) ? undefined : failure.code
+  const details = withRestore(failure, REMOTE_SHAPE, held)
+  const { uncertain, command_id, partial } = failure
   return {
     kind: "error",
     error: {
-      code: "internal_error",
-      ...rest,
-      details: { ...details, [HELD_CODE]: { code, details: details !== undefined } },
+      code: held === undefined ? (failure.code as Exclude<OmoCode, "not_implemented">) : "internal_error",
+      message: failure.message,
+      next_action: failure.next_action,
+      ...(uncertain === undefined ? {} : { uncertain }),
+      ...(command_id === undefined ? {} : { command_id }),
+      ...("partial" in failure ? { partial } : {}),
+      ...(details === undefined ? {} : { details }),
     },
   }
 }
 
 export function remoteFailureOf(failure: OmoFailure): RemoteFailure {
   const { code, details, ...rest } = failure.error
-  const held = heldOf(details)
-  if (code === "internal_error" && held !== undefined && isRemoteCode(held.code)) {
-    const { [HELD_CODE]: _held, ...kept } = details ?? {}
-    return { kind: "error", code: held.code, ...rest, ...(held.details ? { details: kept } : {}) }
-  }
-  return { kind: "error", code: code as RemoteCode, ...rest, ...(details === undefined ? {} : { details }) }
+  const fields = { kind: "error", code, ...rest, ...(details === undefined ? {} : { details }) }
+  return restored(fields, restoreOf(details)) as RemoteFailure
 }

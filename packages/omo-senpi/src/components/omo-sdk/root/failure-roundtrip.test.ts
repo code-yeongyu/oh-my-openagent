@@ -5,7 +5,8 @@ import { REMOTE_CODES } from "../../remote/codes"
 import type { RemoteFailure } from "../../remote/types"
 import { OMO_CODE_REGISTRY, type OmoFailure } from "../contract"
 import { remoteFailure, remoteFailureOf } from "./remote-failures"
-import { HELD_CODE, threadFailure, threadToolFailureOf } from "./thread-failures"
+import { RESTORE_KEY } from "./restore"
+import { threadFailure, threadToolFailureOf } from "./thread-failures"
 
 // Design 4.4 and the design lane's ruling on review 6064490103: the conversions keep their bookkeeping in one reserved
 // key no ordinary failure may carry, so every code crossed with details that hold the awkward keys on purpose converts
@@ -88,13 +89,13 @@ describe("lossless failure conversion, by property", () => {
   })
 
   test("#given a producer's failure that already carries the reserved key in its details #when converted #then it is refused as internal_error, never read as a held code", () => {
-    const forged = { [HELD_CODE]: "not_found", note: "x" }
+    const forged = { [RESTORE_KEY]: "not_found", note: "x" }
     for (const converted of [
       threadFailure({ code: "invalid_arguments", message: "m", next_action: "n", details: forged }),
       remoteFailure({ kind: "error", code: "invalid_arguments", message: "m", next_action: "n", details: forged }),
     ]) {
       expect(converted.error.code).toBe("internal_error")
-      expect(converted.error.message).toContain(HELD_CODE)
+      expect(converted.error.message).toContain(RESTORE_KEY)
       expect(converted.error.details).toBeUndefined()
     }
   })
