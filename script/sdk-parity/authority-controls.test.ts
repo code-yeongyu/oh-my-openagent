@@ -10,8 +10,14 @@ import {
   REFUSALS,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import { behaviourChangeProblems, matrixProblems, refusalScenarioProblems } from "./authority-check"
-import { CUSTODY_FIELDS, HELD } from "./authority-expected"
+import {
+  behaviourChangeProblems,
+  documentRowProblems,
+  matrixProblems,
+  refusalScenarioProblems,
+  inventoryProblems,
+} from "./authority-check"
+import { CALL_ALIASES, CUSTODY_FIELDS, HELD } from "./authority-expected"
 import { calls, files, isTyped, json, rows, securityDesign } from "./authority-scope"
 import { custodyResultProblems, gatedProblems, principalInputProblems } from "./custody-check"
 import type { ScenarioTableFile, TableScenario } from "./scenario-table"
@@ -54,6 +60,36 @@ describe("negative controls of the principal matrix (#14949)", () => {
       line === SPLIT ? { ...SPLIT, cells: { ...SPLIT.cells, script: SPLIT.cells.person } } : line,
     )
     expect(matrix(lines)).toContain("needs no split")
+  })
+
+  test("#given a row of section 4 with no line, or a line whose cell is not the document's #then the check names it", () => {
+    const dropped = PRINCIPAL_MATRIX.filter((line) => line.capability !== "Unload")
+    expect(documentRowProblems(dropped, securityDesign).join("\n")).toContain(
+      'section 4.1 row "Unload": no line of the matrix',
+    )
+    const flipped = PRINCIPAL_MATRIX.map((line) =>
+      line.capability === "Unload"
+        ? { ...line, cells: { ...line.cells, session: { outcome: "allow" as const } } }
+        : line,
+    )
+    expect(documentRowProblems(flipped, securityDesign).join("\n")).toContain('"Unload": session is not refuse')
+  })
+
+  test("#given a refusal entry deleted, a row added to the document, or an A turned R #then the inventory names it", () => {
+    const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
+    const inventory = (refusals: typeof REFUSALS, document: string): string =>
+      inventoryProblems(PRINCIPAL_MATRIX, refusals, document, ids, CALL_ALIASES).join("\n")
+    const missing = REFUSALS.filter((entry) => entry.scenario !== "threads.unload/unload-refuses-session")
+    expect(inventory(missing, securityDesign)).toContain(
+      'row "Unload": threads.unload for session has 0 refusals, the document says 1',
+    )
+    const added = securityDesign.replace("| Unload |", "| `engine.tips` | A | R | R | R | n/a |\n| Unload |")
+    expect(inventory(REFUSALS, added)).toContain("names engine.tips, which no line covers")
+    const flipped = securityDesign.replace(/^\| Unload \| A \|/m, "| Unload | R |")
+    expect(flipped).not.toBe(securityDesign)
+    expect(documentRowProblems(PRINCIPAL_MATRIX, flipped).join("\n")).toContain(
+      '"Unload": person/script is not the document\'s refuse',
+    )
   })
 
   test("#given a refused cell with no scenario, or one that touches a port #then the refusal check names it", () => {

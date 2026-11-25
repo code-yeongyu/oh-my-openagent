@@ -960,6 +960,59 @@
       ]
     },
     {
+      "id": "account.keys.init/opencode-credential-refuses-connector",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/opencode-credential-refuses-session",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "account.keys.init/opencode-credential-refuses-service",
+      "row": "account.keys.init",
+      "input": {},
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "credentialStore",
+          "op": "keys.init",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "account.keys.status/opencode-read-refuses-connector",
       "row": "account.keys.status",
       "input": {},

@@ -7,6 +7,7 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
   {
     section: "4.2",
     capability: "`devices.list`, `account.whoami`, `sync.status` (reads)",
+    docRow: "`devices.list`, `account.whoami`, `deviceService.status`, `control()`, `wake()`, `sync.status` (reads)",
     slug: "account-read",
     rows: ["devices.list", "account.whoami", "sync.status"],
     cells: columns({
@@ -19,6 +20,7 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
   {
     section: "4.2",
     capability: "`deviceService.status`, `control()`, `wake()` (reads)",
+    docRow: "`devices.list`, `account.whoami`, `deviceService.status`, `control()`, `wake()`, `sync.status` (reads)",
     slug: "service-read",
     rows: ["deviceService.status", "deviceService.info", "deviceService.control", "deviceService.wake"],
     cells: columns({ people: allow(), session: allow(CREDENTIAL_CHECK), connector: allow(), service: allow() }),
@@ -51,7 +53,8 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.2",
-    capability: "`devices.revoke`",
+    capability:
+      "`devices.revoke` (never this device; an ambiguous name or prefix revokes nothing; the name as confirmation)",
     slug: "revoke",
     rows: ["devices.revoke"],
     cells: columns({ people: allow(), session: refuse(), connector: refuse(), service: refuse() }),
@@ -71,6 +74,7 @@ export const ACCOUNT_LINES: readonly MatrixLine[] = [
   {
     section: "4.2",
     capability: "`account.signIn` with `replace`",
+    docRow: "`account.signIn`",
     slug: "sign-in-replace",
     rows: ["account.signIn"],
     input: { replace: true },

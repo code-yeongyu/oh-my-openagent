@@ -1,6 +1,7 @@
 import {
   assertedExpectation,
   type BehaviourChange,
+  type Cell,
   isPrincipal,
   type MatrixLine,
   PRINCIPAL_KINDS,
@@ -39,6 +40,152 @@ export function matrixProblems(
       if (cell.outcome === "refuse" && !sourceCodes.includes(cell.code))
         problems.push(`${at}: ${kind} is refused with ${cell.code}, not a code of design 4.4's source lists`)
     }
+  }
+  return problems
+}
+
+type DocumentRow = { readonly section: string; readonly capability: string; readonly columns: readonly string[] }
+
+/** The rows of the security design's section 4 tables (4.1 to 4.4): first column, then the four principal columns. */
+export function sectionFourRows(document: string): DocumentRow[] {
+  const rows: DocumentRow[] = []
+  let section = ""
+  for (const line of document.split("\n")) {
+    const heading = /^### (4\.[1-5]) /.exec(line)
+    if (heading !== null) section = heading[1] ?? ""
+    if (line.startsWith("## 5")) break
+    if (section === "" || section === "4.5" || !line.startsWith("| ") || line.startsWith("| Capability")) continue
+    const cells = line.slice(2, -2).split(" | ")
+    rows.push({ section, capability: cells[0] ?? "", columns: cells.slice(1, 5) })
+  }
+  return rows
+}
+
+const tokenOf = (column: string): Cell["outcome"] | "as session" =>
+  column.startsWith("n/a")
+    ? "n/a"
+    : column.startsWith("as session")
+      ? "as session"
+      : column.startsWith("R")
+        ? "refuse"
+        : "allow"
+
+// Completeness against the document itself: every row of section 4 has a line, every line comes from a row, and a line
+// that is the row (no `docRow`) has, in each column, the outcome the document's cell starts with.
+export function documentRowProblems(lines: readonly MatrixLine[], document: string): string[] {
+  const problems: string[] = []
+  const rows = sectionFourRows(document)
+  const source = (line: MatrixLine): string => line.docRow ?? line.capability
+  for (const row of rows)
+    if (!lines.some((line) => source(line) === row.capability && line.section === row.section))
+      problems.push(`section ${row.section} row "${row.capability}": no line of the matrix`)
+  for (const line of lines) {
+    const row = rows.find((candidate) => candidate.capability === source(line) && candidate.section === line.section)
+    if (row === undefined) {
+      problems.push(`matrix ${line.section} "${source(line)}": not a row of the document's section ${line.section}`)
+      continue
+    }
+    if (line.docRow !== undefined) continue
+    const [people = "", session = "", connector = "", service = ""] = row.columns.map(tokenOf)
+    const want = (token: string, cell: Cell): boolean =>
+      token === "as session" ? canonical(cell) === canonical(line.cells.session) : token === cell.outcome
+    const peopleOk =
+      line.split === undefined
+        ? want(people, line.cells.person) && want(people, line.cells.script)
+        : want(people, line.cells.person) || want(people, line.cells.script)
+    if (!peopleOk)
+      problems.push(`matrix ${line.section} "${line.capability}": person/script is not the document's ${people}`)
+    if (!want(session, line.cells.session))
+      problems.push(`matrix ${line.section} "${line.capability}": session is not ${session}`)
+    if (!want(connector, line.cells.connector))
+      problems.push(`matrix ${line.section} "${line.capability}": connector is not ${connector}`)
+    if (!want(service, line.cells.service))
+      problems.push(`matrix ${line.section} "${line.capability}": service is not ${service}`)
+  }
+  return problems
+}
+
+/** A backticked name in a row of section 4 that is not itself a registry row id, read as the call it names. */
+export type CallAlias = {
+  readonly docRow: string
+  readonly token: string
+  readonly calls: readonly string[]
+  readonly why: string
+}
+
+// The calls a row of section 4 names: each backticked token that is a registry row, or completes one against the last
+// full name before it (`daemon.ensure`, `stop` is daemon.stop), or a wildcard (`account.store.*`). Other tokens are prose.
+export function documentCalls(capability: string, ids: ReadonlySet<string>, aliases: readonly CallAlias[]): string[] {
+  const calls: string[] = []
+  let prefix = ""
+  for (const match of capability.matchAll(/`([^`]+)`/g)) {
+    const token = (match[1] ?? "").replace(/\(.*$/, "")
+    const alias = aliases.find((entry) => entry.docRow === capability && entry.token === token)
+    if (alias !== undefined) {
+      calls.push(...alias.calls)
+      continue
+    }
+    if (token.endsWith(".*")) {
+      calls.push(...[...ids].filter((id) => id.startsWith(token.slice(0, -1))))
+      continue
+    }
+    if (ids.has(token)) {
+      calls.push(token)
+      prefix = token.slice(0, token.lastIndexOf(".") + 1)
+      continue
+    }
+    for (let scope = prefix; scope !== ""; scope = scope.slice(0, scope.slice(0, -1).lastIndexOf(".") + 1))
+      if (ids.has(`${scope}${token}`)) {
+        calls.push(`${scope}${token}`)
+        break
+      }
+  }
+  return [...new Set(calls)]
+}
+
+// The refusal table's inventory derived from the document: every call a row names has a line, and for the line that is
+// the row, every refused principal has exactly one refusal on each of its calls; every refusal traces to a row.
+export function inventoryProblems(
+  lines: readonly MatrixLine[],
+  refusals: readonly Refusal[],
+  document: string,
+  ids: ReadonlySet<string>,
+  aliases: readonly CallAlias[],
+): string[] {
+  const problems: string[] = []
+  const rows = sectionFourRows(document)
+  const source = (line: MatrixLine): string => line.docRow ?? line.capability
+  for (const row of rows) {
+    const traced = lines.filter((line) => source(line) === row.capability && line.section === row.section)
+    const covered = new Set(traced.flatMap((line) => line.rows))
+    for (const call of documentCalls(row.capability, ids, aliases))
+      if (!covered.has(call))
+        problems.push(`section ${row.section} row "${row.capability}": names ${call}, which no line covers`)
+    const primary = traced.find((line) => line.docRow === undefined)
+    if (primary === undefined) continue
+    for (const call of primary.rows)
+      for (const kind of PRINCIPAL_KINDS) {
+        const count = refusals.filter(
+          (entry) =>
+            entry.row === call &&
+            entry.principal === kind &&
+            entry.scenario.startsWith(`${call}/${primary.slug}-refuses-`),
+        ).length
+        const want = primary.cells[kind].outcome === "refuse" ? 1 : 0
+        if (count !== want)
+          problems.push(
+            `section ${row.section} row "${row.capability}": ${call} for ${kind} has ${count} refusals, the document says ${want}`,
+          )
+      }
+  }
+  for (const entry of refusals) {
+    const line = lines.find(
+      (candidate) =>
+        candidate.rows.includes(entry.row) &&
+        entry.scenario === `${entry.row}/${candidate.slug}-refuses-${entry.principal}`,
+    )
+    if (line === undefined || !rows.some((row) => row.capability === source(line)))
+      problems.push(`refusal ${entry.scenario}: traces to no row of the document's section 4`)
   }
   return problems
 }
@@ -89,8 +236,8 @@ export function behaviourChangeProblems(
 ): string[] {
   const problems: string[] = []
   const ids = changes.map((change) => change.id)
-  if (canonical(ids) !== canonical(["B1", "B2", "B3", "B4", "B5", "B6"]))
-    problems.push(`behaviour changes: section 10 approves exactly B1 to B6, the table has ${ids.join(", ")}`)
+  if (canonical(ids) !== canonical(["B1", "B2", "B3", "B4", "B5", "B6", "B7"]))
+    problems.push(`behaviour changes: the owner approved exactly B1 to B7, the table has ${ids.join(", ")}`)
   const byId = new Map(changes.map((change) => [change.id, change]))
   for (const change of changes) {
     if (change.exists === "today" && change.today.says.trim() === "")
@@ -113,4 +260,15 @@ export function behaviourChangeProblems(
       )
   }
   return problems
+}
+
+/** A disagreement with the document that a named revision of it settles; it must still occur, or it is stale. */
+export type AwaitingRevision = { readonly problem: string; readonly why: string }
+
+export function withoutAwaited(problems: readonly string[], awaited: readonly AwaitingRevision[]): string[] {
+  const out = problems.filter((problem) => !awaited.some((entry) => entry.problem === problem))
+  for (const entry of awaited)
+    if (!problems.includes(entry.problem))
+      out.push(`awaiting revision is stale, the document settled it: ${entry.problem}`)
+  return out
 }

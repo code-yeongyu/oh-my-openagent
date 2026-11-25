@@ -1,9 +1,9 @@
-// The approved behaviour changes B1 to B6 of the security design (#14945, section 10), as data. Each carries the
+// The approved behaviour changes of the security design (#14945, section 10), B1 to B6 and the owner's B7, as data. Each carries the
 // expectation a scenario asserts today and the approved one; `evidence_present` selects which, and it is false for every
 // entry until the change's own evidence exists (the owner's decision, its closed-matrix row proven, the compatibility
 // record, the acceptance test with goldens before and after). An entry whose behaviour does not exist today (`new`: an
 // SDK operation with no shipped form) has no today expectation: it refuses from its first release, flag or no flag.
-export type ChangeId = "B1" | "B2" | "B3" | "B4" | "B5" | "B6"
+export type ChangeId = "B1" | "B2" | "B3" | "B4" | "B5" | "B6" | "B7"
 
 export type Expectation = {
   readonly outcome: "allow" | "refuse"
@@ -113,6 +113,18 @@ export const BEHAVIOUR_CHANGES: readonly BehaviourChange[] = [
     exists: "new",
     why_new: "engine.auth.check has no SDK form today; a session reaches the verb only through its shell, as a script",
     approved: { outcome: "allow", says: "status only, with the refresh off: the auth store is not written" },
+    evidence_present: false,
+  },
+  {
+    id: "B7",
+    rows: ["engine.auth.check"],
+    who: "a program reading omo auth check from anywhere but an admitted terminal (a pipe, a file, a tool runner, an agent pane)",
+    exists: "today",
+    today: { outcome: "allow", says: "the command prints the provider's own text, wherever its output goes" },
+    approved: {
+      outcome: "allow",
+      says: "off an admitted terminal, the closed-code message a session gets, with no provider-returned text; on an admitted terminal the print is unchanged",
+    },
     evidence_present: false,
   },
 ]

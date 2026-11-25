@@ -288,6 +288,124 @@
       ]
     },
     {
+      "id": "mcp.oauth.login/opencode-credential-refuses-connector",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/opencode-credential-refuses-session",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.login/opencode-credential-refuses-service",
+      "row": "mcp.oauth.login",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.login",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-connector",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-session",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "mcp.oauth.logout/opencode-credential-refuses-service",
+      "row": "mcp.oauth.logout",
+      "input": {
+        "server": "x-server"
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "mcp",
+          "op": "oauth.logout",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "mcp.oauth.status/opencode-read-refuses-connector",
       "row": "mcp.oauth.status",
       "input": {},

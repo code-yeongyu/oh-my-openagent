@@ -2837,6 +2837,189 @@
       ]
     },
     {
+      "id": "engine.packages.install/project-trust-refuses-connector",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trust-refuses-session",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.install/project-trust-refuses-service",
+      "row": "engine.packages.install",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.install",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-connector",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-session",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.remove/project-trust-refuses-service",
+      "row": "engine.packages.remove",
+      "input": {
+        "source": "x-source",
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.remove",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-connector",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "connector",
+        "binding": "binding-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-session",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "session",
+        "session_id": "session-1"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
+      "id": "engine.packages.update/project-trust-refuses-service",
+      "row": "engine.packages.update",
+      "input": {
+        "trust": true
+      },
+      "principal": {
+        "kind": "service"
+      },
+      "kind": "refusal",
+      "refusal": "sender_not_allowed",
+      "expect": [
+        {
+          "port": "engine",
+          "op": "packages.update",
+          "count": 0
+        }
+      ]
+    },
+    {
       "id": "engine.launch.rpc/presenter-refuses-connector",
       "row": "engine.launch.rpc",
       "input": {

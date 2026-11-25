@@ -4,6 +4,9 @@ import {
   BEHAVIOUR_CHANGES,
   CUSTODY_RESULTS,
   GATED,
+  MAY_EMBED,
+  sessionAnswerAccepts,
+  SESSION_RESULTS,
   inputAccepts,
   OMO_CODE_REGISTRY,
   PRINCIPAL_ID,
@@ -14,8 +17,16 @@ import {
   type RootCallInput,
   SOURCE_CODES,
 } from "../../packages/omo-senpi/src/components/omo-sdk/contract"
-import { behaviourChangeProblems, matrixProblems, refusalScenarioProblems } from "./authority-check"
-import { CUSTODY_FIELDS, HELD } from "./authority-expected"
+import {
+  behaviourChangeProblems,
+  documentRowProblems,
+  inventoryProblems,
+  matrixProblems,
+  refusalScenarioProblems,
+  sectionFourRows,
+  withoutAwaited,
+} from "./authority-check"
+import { AWAITING_REVISION, CALL_ALIASES, CUSTODY_FIELDS, HELD, SESSION_FIELDS } from "./authority-expected"
 import {
   type AUTHORITY_ROOT_OPTIONS,
   calls,
@@ -61,6 +72,11 @@ describe("principals of slice P1a-s (#14949)", () => {
 
   test("#given section 4 #then every refused cell has its code and a scenario answering it before any side effect", () => {
     expect(matrixProblems(PRINCIPAL_MATRIX, rows, securityDesign, SOURCE_CODES)).toEqual([])
+    expect(sectionFourRows(securityDesign).length).toBeGreaterThanOrEqual(50)
+    expect(documentRowProblems(PRINCIPAL_MATRIX, securityDesign)).toEqual([])
+    const ids = new Set(rows.filter((row) => row.kind === "capability").map((row) => row.id))
+    const inventory = inventoryProblems(PRINCIPAL_MATRIX, REFUSALS, securityDesign, ids, CALL_ALIASES)
+    expect(withoutAwaited(inventory, AWAITING_REVISION)).toEqual([])
     expect(refusalScenarioProblems(REFUSALS, BEHAVIOUR_CHANGES, files)).toEqual([])
   })
 
@@ -73,6 +89,22 @@ describe("custody of slice P1a-s (#14949)", () => {
   test("#given a credential-bearing call #then its answer is closed and has only its non-secret fields", () => {
     const results = Object.fromEntries(Object.entries(CUSTODY_RESULTS).map(([key, schema]) => [key, json(schema)]))
     expect(custodyResultProblems(results, CUSTODY_FIELDS)).toEqual([])
+  })
+
+  test("#given a key-shaped provider error #then no field of a session's engine.auth.check answer can carry it", () => {
+    const results = Object.fromEntries(Object.entries(SESSION_RESULTS).map(([key, schema]) => [key, json(schema)]))
+    expect(custodyResultProblems(results, SESSION_FIELDS)).toEqual([])
+    for (const path of MAY_EMBED["engine.auth.check"]) expect(SESSION_FIELDS["engine.auth.check"]).not.toContain(path)
+    const account = { name: "a", source: "login", blocked: false, pinned: false }
+    const answer = (check: Record<string, unknown>) => ({
+      status: "ready",
+      provider: "p",
+      accounts: [{ ...account, check: { model: "m", outcome: "failed", at: 1, ...check } }],
+    })
+    expect(sessionAnswerAccepts("engine.auth.check", answer({ code: "auth_error" }))).toBe(true)
+    expect(sessionAnswerAccepts("engine.auth.check", answer({ message: `invalid key ${CANARY}` }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", answer({ code: CANARY }))).toBe(false)
+    expect(sessionAnswerAccepts("engine.auth.check", answer({ reason: CANARY }))).toBe(false)
   })
 
   test("#given a secret offered as text #then no input takes it, and a hand-over with no destination is refused", () => {

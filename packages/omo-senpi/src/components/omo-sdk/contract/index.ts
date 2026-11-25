@@ -8,7 +8,7 @@ export { GATED, type GatedEntry, ROOT_OPTION_NAMES, SECURITY_SECTIONS } from "./
 export { NAMESPACES, type Namespace } from "./namespaces"
 export { PORT_OPERATIONS, PORTS, type Port } from "./ports"
 export type { CallOptions, OmoSdkRoot, RootCallInput, RootCallKey } from "./root"
-export { inputAccepts, isPrincipal } from "./validate"
+export { inputAccepts, isPrincipal, sessionAnswerAccepts } from "./validate"
 export { assertedExpectation, BEHAVIOUR_CHANGES, type BehaviourChange, type ChangeId } from "./behaviour-changes"
 export { Destination, Handle, type ReadableHandle } from "./inputs/custody"
 export type { LaunchKeyHandle } from "./inputs/launch"
@@ -21,5 +21,5 @@ export {
   type Refusal,
   refusalScenarioId,
 } from "./principal-matrix"
-export { CUSTODY_RESULTS, type UserCode } from "./results/custody"
+export { CUSTODY_RESULTS, MAY_EMBED, SESSION_CHECK_CODES, SESSION_RESULTS, type UserCode } from "./results/custody"
 export { type Endpoint, EndpointSelector, type RootAuthorityOptions } from "./root-options"

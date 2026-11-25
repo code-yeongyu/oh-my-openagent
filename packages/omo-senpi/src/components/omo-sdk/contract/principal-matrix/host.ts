@@ -23,7 +23,7 @@ export const HOST_LINES: readonly MatrixLine[] = [
   {
     section: "4.3",
     capability:
-      "`daemon.ensure`, `stop`, `stopAll`, `handoff`, `gc`, `rollbackPrepare`; `diagnostics.fixReflectionLock`, `reapStaleEngines`; `install.update`, `setup.apply`, `cleanup`; `engine.trust.ensure`",
+      "`daemon.ensure`, `stop`, `stopAll`, `handoff`, `gc`, `rollbackPrepare`; `diagnostics.fixReflectionLock`, `reapStaleEngines`; `install.update`, `setup.apply`, `cleanup`; `engine.trust.ensure` (it writes the trust store and can take a lease for another process)",
     slug: "host-change",
     rows: [
       "daemon.ensure",

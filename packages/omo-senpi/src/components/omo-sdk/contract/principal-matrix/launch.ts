@@ -15,7 +15,7 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   {
     section: "4.4",
     capability:
-      "The root's `endpoint` selector (`socket`, `key_root`) and the endpoint options of `daemon.ensure`, `stop`, `handoff`",
+      "The root's `endpoint` selector (`socket`, `key_root`) and the endpoint options (the same `socket` and `key_root`) of `daemon.ensure`, `stop`, `handoff`",
     slug: "endpoint",
     rows: ["daemon.ensure", "daemon.stop", "daemon.handoff"],
     root: { endpoint: { socket: "/run/omo-test/host.sock" } },
@@ -48,6 +48,15 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.4",
+    capability: "`project_trust` on a package call (`trust`)",
+    docRow: "`project_trust` on a launch or a package call",
+    slug: "project-trust",
+    rows: ["engine.packages.install", "engine.packages.remove", "engine.packages.update"],
+    input: { trust: true },
+    cells: personOnly("passed explicitly, never defaulted to trust"),
+  },
+  {
+    section: "4.4",
     capability:
       "The presenter inputs of `engine.launch.rpc` and of the host's ensure and handoff (`bootstrap_fd`, `enforcement`)",
     slug: "presenter",
@@ -58,6 +67,8 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   {
     section: "4.4",
     capability: "The presenter inputs of the host's ensure (`mcp_presenter_enforcement`)",
+    docRow:
+      "The presenter inputs of `engine.launch.rpc` and of the host's ensure and handoff (`bootstrap_fd`, `enforcement`)",
     slug: "presenter",
     rows: ["daemon.ensure"],
     input: { mcp_presenter_enforcement: true },
@@ -65,7 +76,8 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.4",
-    capability: "`codex_autonomous` on `install.plugin`",
+    capability:
+      "`codex_autonomous` on `install.plugin`: `true` configures that platform's autonomous permissions, `false` leaves existing settings unchanged, absent takes the mode's default",
     slug: "codex-autonomous",
     rows: ["install.plugin"],
     input: { codex_autonomous: true },
@@ -73,7 +85,7 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.4",
-    capability: "`toolkit.forSession({ cwd, session_id? })`",
+    capability: "`toolkit.forSession({ cwd, session_id? })`: binding the loop operations to one loop session",
     slug: "for-session",
     rows: ["toolkit.forSession"],
     cells: columns({
@@ -86,6 +98,7 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   {
     section: "4.4",
     capability: "`toolkit.forSession` naming a session in its argument",
+    docRow: "`toolkit.forSession({ cwd, session_id? })`: binding the loop operations to one loop session",
     slug: "for-session-named",
     rows: ["toolkit.forSession"],
     input: { session_id: "other-session" },
@@ -114,7 +127,7 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.4",
-    capability: "`on_complete` on `runToCompletion`",
+    capability: "`on_complete` on `runToCompletion`: runs a command as the caller's OS user",
     slug: "on-complete",
     rows: ["threads.runToCompletion"],
     input: { on_complete: { command: "true" } },
@@ -123,7 +136,7 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   {
     section: "4.4",
     capability:
-      "`install.plugin`, `install.cleanup`, `config.migrate`, `worktrees.sweep` with `apply`; `config.modelCapabilities.refresh`",
+      "`install.plugin`, `install.cleanup`, `config.migrate`, `worktrees.sweep` with `apply`; `config.modelCapabilities.refresh` (it writes a cache and fetches from a URL the caller may supply)",
     slug: "opencode-change",
     rows: ["install.plugin", "install.cleanup", "config.migrate", "config.modelCapabilities.refresh"],
     cells: personOnly(),
@@ -131,9 +144,18 @@ export const LAUNCH_LINES: readonly MatrixLine[] = [
   {
     section: "4.4",
     capability: "`worktrees.sweep` with `apply`",
+    docRow:
+      "`install.plugin`, `install.cleanup`, `config.migrate`, `worktrees.sweep` with `apply`; `config.modelCapabilities.refresh` (it writes a cache and fetches from a URL the caller may supply)",
     slug: "sweep-apply",
     rows: ["worktrees.sweep"],
     input: { apply: true },
+    cells: personOnly(),
+  },
+  {
+    section: "4.4",
+    capability: "`mcp.oauth.login`, `logout`; `account.keys.init`",
+    slug: "opencode-credential",
+    rows: ["mcp.oauth.login", "mcp.oauth.logout", "account.keys.init"],
     cells: personOnly(),
   },
   {

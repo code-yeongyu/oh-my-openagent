@@ -30,6 +30,18 @@ export const THREAD_LINES: readonly MatrixLine[] = [
   },
   {
     section: "4.1",
+    capability: "Read a delivery receipt",
+    slug: "receipt",
+    rows: ["threads.receipt"],
+    cells: columns({
+      people: allow("own deliveries only"),
+      session: allow("own deliveries only"),
+      connector: allow("own deliveries only"),
+      service: NA,
+    }),
+  },
+  {
+    section: "4.1",
     capability: "`self` as an address",
     slug: "self-address",
     rows: ["threads.read"],
@@ -40,6 +52,14 @@ export const THREAD_LINES: readonly MatrixLine[] = [
       connector: refuse("caller_context_missing"),
       service: NA,
     }),
+  },
+  {
+    section: "4.1",
+    capability:
+      "A send that is a reply: resolves only to the sender of the delivery it answers, by exact id or stated name, pinned to that sender's device; the reply grant widens only a scope refusal and only to that sender",
+    slug: "reply",
+    rows: ["threads.send"],
+    cells: columns({ people: NA, session: allow(), connector: NA, service: NA }),
   },
   {
     section: "4.1",
@@ -113,13 +133,14 @@ export const THREAD_LINES: readonly MatrixLine[] = [
     cells: columns({
       people: allow("in the approval mode it names"),
       session: allow("keeping or narrowing its own mode"),
-      connector: allow("as session: keeping or narrowing its own mode"),
+      connector: allow("keeping or narrowing its own mode"),
       service: refuse(),
     }),
   },
   {
     section: "4.1",
     capability: "Create or open a thread, wider than the caller's own approval mode",
+    docRow: "Create or open a thread",
     slug: "create-wider-mode",
     rows: ["threads.create"],
     input: { permission_preset: "full-access" },

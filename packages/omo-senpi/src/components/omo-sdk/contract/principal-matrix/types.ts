@@ -11,8 +11,10 @@ export type Cell =
 
 export type MatrixLine = {
   readonly section: "4.1" | "4.2" | "4.3" | "4.4"
-  /** The capability as the document's first column names it. */
+  /** The capability: the document's first column verbatim, or for a line derived from a row with an input or a split
+   * the document names, what it covers, with `docRow` naming that row verbatim. */
   readonly capability: string
+  readonly docRow?: string
   readonly slug: string
   /** The registry rows the line governs; empty only with `noRow` saying why no root call exists for it. */
   readonly rows: readonly string[]

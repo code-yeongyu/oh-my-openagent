@@ -1,3 +1,4 @@
+import type { AwaitingRevision, CallAlias } from "./authority-check"
 import type { Taken } from "./custody-check"
 
 // What slice P1a-s's tests hold the tree to (#14949). HELD is P1a's GATED table as it stood at a5138c95d9 (#14977), each
@@ -138,5 +139,41 @@ export const CUSTODY_FIELDS: Readonly<Record<string, readonly string[]>> = {
     "servers[].authenticated",
     "servers[].expired",
     "servers[].expires_at",
+  ],
+}
+
+const KEYS_ROW = "`account.adopt`, `account.credentials.handOver`, `account.store.*`, `account.keys.*`"
+
+/** Names in section 4 that are not a registry id: what each means, and why. */
+export const CALL_ALIASES: readonly CallAlias[] = [
+  {
+    docRow: "`engine.auth.apiKey`, `bearerToken`, `check` with credentials; `mcp.oauth.login`, `logout`",
+    token: "check",
+    calls: ["engine.auth.credentials"],
+    why: "`check` with credentials is the credential-returning call (first-party design 6.8)",
+  },
+  {
+    docRow: "`deviceService.setEnabled`, `setControl`, `setWake`",
+    token: "deviceService.setEnabled",
+    calls: ["deviceService.enable", "deviceService.disable"],
+    why: "the registry's two rows for the one setEnabled switch (first-party design 6.5)",
+  },
+]
+
+/** Where the matrix follows the security owner's ruling ahead of the document; each fails once the revision lands. */
+export const AWAITING_REVISION: readonly AwaitingRevision[] = [
+  {
+    problem: `section 4.2 row "${KEYS_ROW}": names account.keys.status, which no line covers`,
+    why: "owner's ruling 2026-11-25: account.keys.status is a session read (4.4); 4.2 reads 'account.keys.* R except status' in the next revision",
+  },
+]
+
+/** The session's answer of engine.auth.check: the person's fields less what may embed provider text, plus the code. */
+export const SESSION_FIELDS: Readonly<Record<string, readonly string[]>> = {
+  "engine.auth.check": [
+    ...(CUSTODY_FIELDS["engine.auth.check"] ?? []).filter(
+      (field) => field !== "accounts[].check.reason" && field !== "accounts[].check.message",
+    ),
+    "accounts[].check.code",
   ],
 }

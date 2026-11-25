@@ -66,60 +66,82 @@ export const SyncRecovered = Type.Object({ recovered: Type.Literal(true) }, clos
 
 const Epoch = Type.Integer({ minimum: 0 })
 
-/** The engine's CredentialAccountSummary (core/credential-accounts.ts): an account's state, never its credential. */
+const AccountFields = {
+  name: Text,
+  displayName: Type.Optional(Text),
+  source: Type.Enum(["login", "import", "env"]),
+  blocked: Type.Boolean(),
+  blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
+  blockedUntil: Type.Optional(Epoch),
+  pinned: Type.Boolean(),
+  blockedModels: Type.Optional(Type.Array(Type.Object({ model: Text, until: Epoch }, closed))),
+  unused: Type.Optional(Type.Literal(true)),
+  route: Type.Optional(Type.Enum(["siwc", "legacy"])),
+  planUsageEnabled: Type.Optional(Type.Boolean()),
+  signedOut: Type.Optional(Type.Boolean()),
+  store: Type.Optional(Type.Literal("claude-cli")),
+  signedInAt: Type.Optional(Epoch),
+  email: Type.Optional(Text),
+  orgName: Type.Optional(Text),
+  subscriptionType: Type.Optional(Text),
+  signIn: Type.Optional(Type.Enum(["signed_in", "needs_sign_in"])),
+  active: Type.Optional(Type.Boolean()),
+  paused: Type.Optional(Type.Literal(true)),
+  usageUrl: Type.Optional(Text),
+}
+const CheckCore = {
+  model: Text,
+  outcome: Type.Enum(["ok", "failed"]),
+  status: Type.Optional(Type.Integer()),
+  at: Epoch,
+}
+
+/** The engine's CredentialAccountSummary (core/credential-accounts.ts), as `omo auth check --json` prints it. */
 const AuthAccount = Type.Object(
   {
-    name: Text,
-    displayName: Type.Optional(Text),
-    source: Type.Enum(["login", "import", "env"]),
-    blocked: Type.Boolean(),
-    blockedReason: Type.Optional(Type.Enum(["auth_error", "rate_limit", "disabled"])),
-    blockedUntil: Type.Optional(Epoch),
-    pinned: Type.Boolean(),
-    blockedModels: Type.Optional(Type.Array(Type.Object({ model: Text, until: Epoch }, closed))),
-    unused: Type.Optional(Type.Literal(true)),
-    route: Type.Optional(Type.Enum(["siwc", "legacy"])),
-    planUsageEnabled: Type.Optional(Type.Boolean()),
-    signedOut: Type.Optional(Type.Boolean()),
-    store: Type.Optional(Type.Literal("claude-cli")),
-    signedInAt: Type.Optional(Epoch),
-    email: Type.Optional(Text),
-    orgName: Type.Optional(Text),
-    subscriptionType: Type.Optional(Text),
+    ...AccountFields,
     check: Type.Optional(
-      Type.Object(
-        {
-          model: Text,
-          outcome: Type.Enum(["ok", "failed"]),
-          reason: Type.Optional(Text),
-          message: Type.Optional(Type.String()),
-          status: Type.Optional(Type.Integer()),
-          at: Epoch,
-        },
-        closed,
-      ),
+      Type.Object({ ...CheckCore, reason: Type.Optional(Text), message: Type.Optional(Type.String()) }, closed),
     ),
-    signIn: Type.Optional(Type.Enum(["signed_in", "needs_sign_in"])),
-    active: Type.Optional(Type.Boolean()),
-    paused: Type.Optional(Type.Literal(true)),
-    usageUrl: Type.Optional(Text),
   },
   closed,
 )
 
-/** `omo auth check --json` without --credentials: the engine's AuthCheckResult and its accounts, never the credential. */
-export const AuthStatus = Type.Object(
+/**
+ * The connection test's result as a session receives it (security owner's ruling on B6): a code from a closed list,
+ * never the provider's own text, which can echo a key fragment. The engine builds the code (slice E1a-s).
+ */
+export const SESSION_CHECK_CODES = ["auth_error", "account_disabled", "rate_limit", "other"] as const
+const SessionAuthAccount = Type.Object(
   {
-    status: Type.Enum(["ready", "not_ready", "invalid"]),
-    provider: Text,
-    reason: Type.Optional(
-      Type.Enum(["provider_not_found", "credentials_not_configured", "credential_not_available", "invalid_state"]),
+    ...AccountFields,
+    check: Type.Optional(
+      Type.Object({ ...CheckCore, code: Type.Optional(Type.Enum([...SESSION_CHECK_CODES])) }, closed),
     ),
-    authType: Type.Optional(Type.Enum(["api_key", "oauth"])),
-    accounts: Type.Array(AuthAccount),
   },
   closed,
 )
+
+const AuthStatusFields = {
+  status: Type.Enum(["ready", "not_ready", "invalid"]),
+  provider: Text,
+  reason: Type.Optional(
+    Type.Enum(["provider_not_found", "credentials_not_configured", "credential_not_available", "invalid_state"]),
+  ),
+  authType: Type.Optional(Type.Enum(["api_key", "oauth"])),
+}
+
+/** `omo auth check --json` without --credentials, for a person or a script: status and accounts, never the credential. */
+export const AuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(AuthAccount) }, closed)
+
+/** The same call's answer to a session principal: status only, every provider-returned text left out. */
+export const SessionAuthStatus = Type.Object({ ...AuthStatusFields, accounts: Type.Array(SessionAuthAccount) }, closed)
+
+/** Fields of a person's or script's answer that may embed provider-returned text; never part of a session's answer. */
+export const MAY_EMBED = { "engine.auth.check": ["accounts[].check.reason", "accounts[].check.message"] } as const
+
+/** Answers a session principal receives where they differ from the person's and the script's. */
+export const SESSION_RESULTS = { "engine.auth.check": SessionAuthStatus } as const
 
 export const TrustEnsured = Type.Object({ action: Type.Literal("ensure"), generation: Text }, closed)
 
