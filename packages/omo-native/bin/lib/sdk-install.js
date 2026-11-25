@@ -5,13 +5,16 @@ import { fileURLToPath } from "node:url"
 // ports as one argument with real defaults; slice C1c adds setup, update and version here.
 
 /** The directory the built `omo-ai/sdk` entry lives in for this install: what `omo sdk root` prints. */
-export const SDK_ENTRY_DIR = join(dirname(fileURLToPath(import.meta.url)), "sdk")
+const SDK_ENTRY_DIR = join(dirname(fileURLToPath(import.meta.url)), "sdk")
 
-export async function sdkRoot(_input = {}, ports = { entryDir: SDK_ENTRY_DIR }) {
+async function sdkRoot(_input = {}, ports = { entryDir: SDK_ENTRY_DIR }) {
   return { kind: "ok", value: { path: ports.entryDir } }
 }
 
-/** The install namespace's calls, keyed as the root names them after `install.`. */
+/**
+ * The install namespace's calls, keyed as the root names them after `install.`.
+ * @returns {{ readonly sdkRoot: (input?: object) => Promise<{ readonly kind: "ok"; readonly value: { readonly path: string } }> }}
+ */
 export function installCore() {
   return { sdkRoot: (input) => sdkRoot(input) }
 }

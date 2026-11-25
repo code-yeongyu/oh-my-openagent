@@ -24,7 +24,7 @@ export type ScenarioSetup = {
 
 export type ScenarioRun = { readonly scenario: TableScenario; readonly setup: () => ScenarioSetup }
 
-export const RUNS_DIR = join(import.meta.dir, "runs")
+const RUNS_DIR = join(import.meta.dir, "runs")
 
 /** Every run of every module under `dir` (each exports `runs`); a scenario id that two modules run is refused. */
 export async function loadScenarioRuns(dir: string = RUNS_DIR): Promise<ScenarioRun[]> {
