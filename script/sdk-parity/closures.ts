@@ -13,7 +13,10 @@ const TOOL_ADAPTERS = [`${THREAD}tools.ts`, `${THREAD}contracts/params.ts`, `${T
 const SDK_ENTRIES: Readonly<Record<string, readonly string[]>> = {
   threads: [`${THREAD}sdk.ts`, "packages/omo-senpi/src/components/remote/index.ts"],
   devices: ["packages/omo-senpi/src/components/omo-sdk/index.ts", "packages/omo-senpi/src/components/remote/index.ts"],
-  deviceService: ["packages/omo-senpi/src/components/omo-sdk/index.ts", "packages/omo-senpi/src/components/remote/index.ts"],
+  deviceService: [
+    "packages/omo-senpi/src/components/omo-sdk/index.ts",
+    "packages/omo-senpi/src/components/remote/index.ts",
+  ],
   account: ["packages/omo-senpi/src/components/omo-sdk/index.ts"],
   config: ["packages/omo-senpi/src/components/omo-sdk/index.ts"],
   toolkit: ["packages/omo-codex/plugin/components/ulw-loop/src/sdk.ts"],
@@ -70,7 +73,8 @@ export function adapterModules(row: Row, findings: SurfaceFindings): string[] {
         .filter(([, target]) => target !== "render")
         .map(([flag]) => flag),
     ])
-    const surface = entry.via === "loop" ? findings.loop : entry.via === "commander" ? findings.commander : findings.native
+    const surface =
+      entry.via === "loop" ? findings.loop : entry.via === "commander" ? findings.commander : findings.native
     for (const finding of surface) if (tokens.has(finding.token)) files.add(finding.file)
   }
   if (row.tool.length > 0) for (const file of TOOL_ADAPTERS) files.add(file)

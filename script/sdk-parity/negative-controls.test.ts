@@ -28,7 +28,10 @@ const LAUNCHER = "packages/omo-native/bin/lib/launcher.js"
 
 describe("negative controls: routes and flags (7.6)", () => {
   test("#given a verb with no row #then the native inventory names it", () => {
-    const findings = scanArgvComparisons(LAUNCHER, 'export function run(args) { if (args[0] === "frobnicate") return 1 }\n')
+    const findings = scanArgvComparisons(
+      LAUNCHER,
+      'export function run(args) { if (args[0] === "frobnicate") return 1 }\n',
+    )
     expect(argvProblems(findings, rows, { edition: "native", own: "launcher", also: ["engine"] }, {})).toContainEqual(
       expect.stringContaining('compares argv with "frobnicate", which no native row names'),
     )
@@ -36,8 +39,16 @@ describe("negative controls: routes and flags (7.6)", () => {
 
   test("#given a branch that dispatches outside the dispatch function, in an entry file and in a delegated module #then both are named", () => {
     const entry = scanArgvComparisons("packages/omo-native/bin/omo.js", 'if (process.argv[2] === "sideways") run()\n')
-    const delegated = scanArgvComparisons("packages/omo-native/remote-cli.ts", 'const [verb] = args\nif (verb === "detour") go()\n')
-    const problems = argvProblems([...entry, ...delegated], rows, { edition: "native", own: "launcher", also: ["engine"] }, {})
+    const delegated = scanArgvComparisons(
+      "packages/omo-native/remote-cli.ts",
+      'const [verb] = args\nif (verb === "detour") go()\n',
+    )
+    const problems = argvProblems(
+      [...entry, ...delegated],
+      rows,
+      { edition: "native", own: "launcher", also: ["engine"] },
+      {},
+    )
     expect(problems).toContainEqual(expect.stringContaining('"sideways"'))
     expect(problems).toContainEqual(expect.stringContaining('"detour"'))
   })
@@ -47,7 +58,9 @@ describe("negative controls: routes and flags (7.6)", () => {
     const thread = send.cli.find((entry) => entry.route.join(" ") === "thread send")
     if (thread === undefined) throw new Error("no thread send entry")
     Object.assign(thread.flags, { "--urgency": "urgency" })
-    expect(rowProblems(send)).toContainEqual(expect.stringContaining('fills "urgency", which threads.send does not take'))
+    expect(rowProblems(send)).toContainEqual(
+      expect.stringContaining('fills "urgency", which threads.send does not take'),
+    )
   })
 
   test("#given a Commander command, alias or option with no row #then each is named (OpenCode edition)", async () => {
@@ -58,19 +71,25 @@ describe("negative controls: routes and flags (7.6)", () => {
         ...inventory.routes,
         { route: ["telemetry"], hidden: false, flags: ["--off"] },
         { route: ["doctor-alias"], hidden: false, flags: [] },
-        ...inventory.routes.filter((route) => route.route.join(" ") === "doctor").map((route) => ({ ...route, flags: [...route.flags, "--deep"] })),
+        ...inventory.routes
+          .filter((route) => route.route.join(" ") === "doctor")
+          .map((route) => ({ ...route, flags: [...route.flags, "--deep"] })),
       ],
     }
     const problems = commanderProblems(extra, rows)
     expect(problems).toContainEqual(expect.stringContaining('Commander command "telemetry" has no row'))
     expect(problems).toContainEqual(expect.stringContaining('Commander command "doctor-alias" has no row'))
     expect(problems).toContainEqual(expect.stringContaining('option --deep of "doctor" has no row mapping'))
-  }, 30_000)
+  })
 
   test("#given one route drops a flag another route of the same dispatcher keeps (review H1) #then that route is named", () => {
     const send = row("threads.send")
-    for (const entry of send.cli) if (entry.route.join(" ") === "thread send") delete (entry.flags as Record<string, string>)["--all-scope"]
-    const findings = scanArgvComparisons("packages/omo-native/bin/lib/thread.js", 'const COMMON = ["--json", "--all-scope"]\nconst COMMANDS = { list: {}, send: {}, read: {}, close: {} }\n')
+    for (const entry of send.cli)
+      if (entry.route.join(" ") === "thread send") delete (entry.flags as Record<string, string>)["--all-scope"]
+    const findings = scanArgvComparisons(
+      "packages/omo-native/bin/lib/thread.js",
+      'const COMMON = ["--json", "--all-scope"]\nconst COMMANDS = { list: {}, send: {}, read: {}, close: {} }\n',
+    )
     expect(routeFlagProblems(findings, replaced(send))).toEqual([
       'packages/omo-native/bin/lib/thread.js:1 accepts --all-scope on every thread verb; map it on "thread send" too',
     ])
@@ -87,16 +106,21 @@ describe("negative controls: tools and schemas (7.6)", () => {
     Object.assign(create.parameters.properties?.worktree ?? {}, { required: ["branch"] })
     const problems = toolProblems(tools, rows)
     expect(problems).toContainEqual(expect.stringContaining('tool thread_send input field "urgency" is in no SDK call'))
-    expect(problems).toContainEqual(expect.stringContaining('field worktree: required is ["branch"] in the tool and [] in the SDK'))
-  }, 60_000)
+    expect(problems).toContainEqual(
+      expect.stringContaining('field worktree: required is ["branch"] in the tool and [] in the SDK'),
+    )
+  })
 
   test("#given a branch chosen by a present field (review M4) #then the SDK input must require it", async () => {
     const wait = row("threads.readAfterWait")
-    const relaxed = { ...wait, input: { ...wait.input, required: wait.input.required.filter((field) => field !== "wait_ms") } }
+    const relaxed = {
+      ...wait,
+      input: { ...wait.input, required: wait.input.required.filter((field) => field !== "wait_ms") },
+    }
     expect(toolProblems(await discoverOmoTools(), replaced(relaxed))).toContainEqual(
       expect.stringContaining("(wait -> threads.readAfterWait) field wait_ms: required in the tool"),
     )
-  }, 60_000)
+  })
 
   test("#given a manifest enum the row does not carry (review M2) #then the loop check names it", () => {
     const create = row("toolkit.createGoals")
@@ -116,7 +140,9 @@ describe("negative controls: tools and schemas (7.6)", () => {
     const status = row("daemon.status")
     const silent = { ...status, omitted: { tool: "n/a" } }
     const problems = [...rowProblems(create), ...rowProblems(broken), ...rowProblems(silent)]
-    expect(problems).toContainEqual(expect.stringContaining('fills "worktree.label", a path threads.create\'s input does not have'))
+    expect(problems).toContainEqual(
+      expect.stringContaining('fills "worktree.label", a path threads.create\'s input does not have'),
+    )
     expect(problems).toContainEqual(expect.stringContaining('sets prompt.delivery to "sideways"'))
     expect(problems).toContainEqual(expect.stringContaining('planned cli names "T9", which is not a slice'))
     expect(problems).toContainEqual(expect.stringContaining('slice "Z1" is not a slice of design section 8'))
@@ -124,9 +150,9 @@ describe("negative controls: tools and schemas (7.6)", () => {
   })
 
   test("#given a row whose sdk is empty #then the schema refuses it", () => {
-    expect(registryProblems([{ domain: "x", rows: [{ ...row("threads.list"), sdk: " " }], tables: [] }])).toContainEqual(
-      expect.stringContaining("sdk is required"),
-    )
+    expect(
+      registryProblems([{ domain: "x", rows: [{ ...row("threads.list"), sdk: " " }], tables: [] }]),
+    ).toContainEqual(expect.stringContaining("sdk is required"))
   })
 })
 
@@ -144,8 +170,12 @@ describe("negative controls: descriptors and the published table (7.6)", () => {
     const template = readFileSync(TEMPLATE_PATH, "utf8")
     const edited = files.map((file) => ({
       ...file,
-      rows: file.rows.map((candidate) => (candidate.id === "threads.archive" ? { ...candidate, today: "yes" as const } : candidate)),
+      rows: file.rows.map((candidate) =>
+        candidate.id === "threads.archive" ? { ...candidate, today: "yes" as const } : candidate,
+      ),
     }))
-    expect(cellProblems(template, edited)).toContainEqual(expect.stringContaining('threads.archive is "yes" today, the cell says "no"'))
+    expect(cellProblems(template, edited)).toContainEqual(
+      expect.stringContaining('threads.archive is "yes" today, the cell says "no"'),
+    )
   })
 })

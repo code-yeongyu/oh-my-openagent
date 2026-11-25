@@ -8,7 +8,9 @@ import { schemaDifferences } from "./tool-check"
 // The comparisons of design section 7.1: each inventory read from the code must match the registry's CLI entries
 // exactly. Every message names the route or flag and what to add, so a failure says what to fix.
 
-type EngineSnapshot = { readonly commands: readonly { readonly route: readonly string[]; readonly flags: readonly string[] }[] }
+type EngineSnapshot = {
+  readonly commands: readonly { readonly route: readonly string[]; readonly flags: readonly string[] }[]
+}
 
 const entries = (rows: readonly Row[], edition: Edition, vias: readonly Via[]): CliEntry[] =>
   rows.flatMap((row) => row.cli.filter((entry) => entry.edition === edition && vias.includes(entry.via)))
@@ -39,7 +41,8 @@ export function argvProblems(
   }
   const scanned = new Set(findings.map((finding) => finding.token))
   for (const token of own)
-    if (!scanned.has(token)) problems.push(`a ${scope.edition} row names "${token}", which no dispatch compares; remove it from the row`)
+    if (!scanned.has(token))
+      problems.push(`a ${scope.edition} row names "${token}", which no dispatch compares; remove it from the row`)
   for (const [file, entry] of Object.entries(notArgv))
     for (const token of entry.tokens)
       if (scope.edition === "native" && !excused.get(file)?.has(token))
@@ -80,24 +83,31 @@ export function routeFlagProblems(findings: readonly ArgvFinding[], rows: readon
     const under = native.filter((entry) => prefix.includes(entry.route[0] ?? ""))
     const maps = (entry: CliEntry): boolean => Object.hasOwn(entry.flags, finding.token)
     const where = `${finding.file}:${finding.line}`
-    const verbsHere = new Set(findings.filter((f) => f.file === finding.file && f.scope === undefined).map((f) => f.token))
+    const verbsHere = new Set(
+      findings.filter((f) => f.file === finding.file && f.scope === undefined).map((f) => f.token),
+    )
     const named = finding.scope.words.filter((word) => under.some((entry) => verbOf(entry) === word))
     if (finding.scope.shared) {
       for (const verb of new Set(under.map(verbOf).filter((verb) => verbsHere.has(verb))))
         if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
-          problems.push(`${where} accepts ${finding.token} on every ${prefix.join("|")} verb; map it on "${prefix[0]} ${verb}" too`)
+          problems.push(
+            `${where} accepts ${finding.token} on every ${prefix.join("|")} verb; map it on "${prefix[0]} ${verb}" too`,
+          )
     } else if (named.length > 0) {
       for (const verb of new Set(named))
         if (!under.some((entry) => verbOf(entry) === verb && maps(entry)))
           problems.push(`${where} accepts ${finding.token} on "${prefix[0]} ${verb}"; map it on that route's row entry`)
-    } else if (!under.some(maps)) problems.push(`${where} accepts ${finding.token} under "${prefix[0]}"; map it on the route that reads it`)
+    } else if (!under.some(maps))
+      problems.push(`${where} accepts ${finding.token} under "${prefix[0]}"; map it on the route that reads it`)
   }
   return problems
 }
 
 const isNamespace = (route: CommanderRoute, all: readonly CommanderRoute[]): boolean =>
   route.flags.length === 0 &&
-  all.some((other) => other.route.length > route.route.length && route.route.every((word, i) => other.route[i] === word))
+  all.some(
+    (other) => other.route.length > route.route.length && route.route.every((word, i) => other.route[i] === word),
+  )
 
 export function commanderProblems(inventory: OpencodeInventory, rows: readonly Row[]): string[] {
   const list = entries(rows, "opencode", ["commander"])
@@ -108,15 +118,20 @@ export function commanderProblems(inventory: OpencodeInventory, rows: readonly R
   }
   const problems: string[] = []
   const walked = new Map<string, readonly string[]>([["", inventory.root]])
-  for (const route of inventory.routes) if (!isNamespace(route, inventory.routes)) walked.set(route.route.join(" "), route.flags)
+  for (const route of inventory.routes)
+    if (!isNamespace(route, inventory.routes)) walked.set(route.route.join(" "), route.flags)
   for (const [route, flags] of walked) {
     const named = byRoute.get(route)
     if (named === undefined) {
-      if (route !== "") problems.push(`Commander command "${route}" has no row; add it to the row of the SDK call it reaches`)
+      if (route !== "")
+        problems.push(`Commander command "${route}" has no row; add it to the row of the SDK call it reaches`)
       continue
     }
     for (const flag of flags)
-      if (!named.has(flag)) problems.push(`Commander option ${flag} of "${route || "<root>"}" has no row mapping; name the SDK input field it fills`)
+      if (!named.has(flag))
+        problems.push(
+          `Commander option ${flag} of "${route || "<root>"}" has no row mapping; name the SDK input field it fills`,
+        )
   }
   for (const [route, flags] of byRoute) {
     const real = walked.get(route)
@@ -126,7 +141,9 @@ export function commanderProblems(inventory: OpencodeInventory, rows: readonly R
     }
     for (const flag of flags)
       if (!real.includes(flag) && !(route === "" && flag.startsWith("-h")) && flag !== "--help" && flag !== "-h")
-        problems.push(`a row names option ${flag} of "${route || "<root>"}", which the program does not register; remove it`)
+        problems.push(
+          `a row names option ${flag} of "${route || "<root>"}", which the program does not register; remove it`,
+        )
   }
   return problems
 }
@@ -146,17 +163,26 @@ export function engineProblems(snapshot: EngineSnapshot, rows: readonly Row[]): 
       continue
     }
     for (const flag of flags)
-      if (!named.has(flag)) problems.push(`engine flag ${flag} of "${route || "<launch>"}" has no row mapping; name its SDK input field`)
+      if (!named.has(flag))
+        problems.push(`engine flag ${flag} of "${route || "<launch>"}" has no row mapping; name its SDK input field`)
   }
   for (const [route, flags] of fromRows) {
     const real = pinned.get(route)
-    if (real === undefined) problems.push(`a row forwards "${route || "<launch>"}" to the engine, which the snapshot does not list`)
-    else for (const flag of flags) if (!real.has(flag)) problems.push(`a row forwards ${flag} of "${route || "<launch>"}", which the snapshot does not list`)
+    if (real === undefined)
+      problems.push(`a row forwards "${route || "<launch>"}" to the engine, which the snapshot does not list`)
+    else
+      for (const flag of flags)
+        if (!real.has(flag))
+          problems.push(`a row forwards ${flag} of "${route || "<launch>"}", which the snapshot does not list`)
   }
   return problems
 }
 
-type ManifestOperation = { readonly name: string; readonly method: string; readonly args: Readonly<Record<string, string>> }
+type ManifestOperation = {
+  readonly name: string
+  readonly method: string
+  readonly args: object
+}
 
 export function manifestProblems(operations: readonly ManifestOperation[], rows: readonly Row[]): string[] {
   const problems: string[] = []
@@ -168,18 +194,28 @@ export function manifestProblems(operations: readonly ManifestOperation[], rows:
       continue
     }
     for (const [field, notation] of Object.entries(operation.args)) {
+      if (typeof notation !== "string") continue
       const fieldSchema = row.input.properties[field]
       if (fieldSchema === undefined) problems.push(`toolkit.${operation.method} lacks the manifest argument "${field}"`)
       if (fieldSchema === undefined) continue
       const parsed = parseArgument(notation)
       if (parsed.optional === row.input.required.includes(field))
-        problems.push(`toolkit.${operation.method}.${field} is ${parsed.optional ? "optional" : "required"} in the manifest; match it`)
-      problems.push(...schemaDifferences(parsed.schema, fieldSchema, `toolkit.${operation.method}.${field} (manifest vs row)`))
+        problems.push(
+          `toolkit.${operation.method}.${field} is ${parsed.optional ? "optional" : "required"} in the manifest; match it`,
+        )
+      problems.push(
+        ...schemaDifferences(parsed.schema, fieldSchema, `toolkit.${operation.method}.${field} (manifest vs row)`),
+      )
     }
   }
   const methods = new Set(operations.map((operation) => `toolkit.${operation.method}`))
   for (const row of rows)
-    if (row.kind === "capability" && row.id.startsWith("toolkit.") && row.id !== "toolkit.forSession" && !methods.has(row.id))
+    if (
+      row.kind === "capability" &&
+      row.id.startsWith("toolkit.") &&
+      row.id !== "toolkit.forSession" &&
+      !methods.has(row.id)
+    )
       problems.push(`row ${row.id} names a loop operation the manifest does not have`)
   return problems
 }

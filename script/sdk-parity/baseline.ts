@@ -24,8 +24,10 @@ export const UNRESOLVED_PATH = "script/sdk-parity/unresolved.json"
 
 export const sha256 = (text: string): string => createHash("sha256").update(text).digest("hex")
 
-// A row counts as built only with an SDK call today and, for its inputs, effect scenarios the fake ports observed (7.2).
-export const isBuilt = (row: Row): boolean => row.today === "yes" && row.scenarios.effect.length > 0
+// A row counts as built only with an SDK call today and effect scenarios that have a run record at the head (7.2): a
+// scenario named in the row but never run, or run and answered `not_implemented`, does not build it.
+export const isBuilt = (row: Row, ranAtHead: ReadonlySet<string>): boolean =>
+  row.today === "yes" && row.scenarios.effect.length > 0 && row.scenarios.effect.every((id) => ranAtHead.has(id))
 
 export const countsTowardClosure = (row: Row): boolean => row.kind === "capability"
 
@@ -34,6 +36,7 @@ export type BaselineState = {
   readonly originalText: string | undefined
   readonly pinText: string | undefined
   readonly unresolved: Baseline | undefined
+  readonly ranAtHead: ReadonlySet<string>
   readonly atBase: {
     readonly originalText: string | undefined
     readonly pinText: string | undefined
@@ -67,16 +70,20 @@ export function baselineProblems(state: BaselineState): string[] {
   const atBase = state.atBase.unresolved === undefined ? undefined : ids(state.atBase.unresolved)
   for (const entry of state.unresolved.entries) {
     if (!ids(original).has(entry.id))
-      problems.push(`${UNRESOLVED_PATH} lists ${entry.id}, which ${ORIGINAL_PATH} lacks; build ${entry.id} instead of adding a gap`)
+      problems.push(
+        `${UNRESOLVED_PATH} lists ${entry.id}, which ${ORIGINAL_PATH} lacks; build ${entry.id} instead of adding a gap`,
+      )
     else if (atBase !== undefined && !atBase.has(entry.id))
       problems.push(`${UNRESOLVED_PATH} restores ${entry.id}, which the merge base had cleared; keep ${entry.id} built`)
   }
   const unresolved = ids(state.unresolved)
   for (const row of state.rows) {
     if (!countsTowardClosure(row)) continue
-    if (!isBuilt(row) && !unresolved.has(row.id))
-      problems.push(`row ${row.id} is not built and has no ${UNRESOLVED_PATH} entry; add the SDK call ${row.sdk} and its scenarios`)
-    if (isBuilt(row) && unresolved.has(row.id))
+    if (!isBuilt(row, state.ranAtHead) && !unresolved.has(row.id))
+      problems.push(
+        `row ${row.id} is not built and has no ${UNRESOLVED_PATH} entry; add the SDK call ${row.sdk} and its scenarios`,
+      )
+    if (isBuilt(row, state.ranAtHead) && unresolved.has(row.id))
       problems.push(`row ${row.id} is built; remove its ${UNRESOLVED_PATH} entry`)
   }
   return problems

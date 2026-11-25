@@ -13,7 +13,9 @@ import type { DiscoveredTool } from "./tool-check"
 type Runtime = typeof import("../../packages/omo-senpi/src/senpi-test-runtime")
 type Tools = typeof import("../../packages/omo-senpi/src/components/thread/tools")
 type Store = typeof import("../../packages/omo-senpi/src/components/thread/gateway/store")
-type ExtensionFactory = NonNullable<ConstructorParameters<Runtime["DefaultResourceLoader"]>[0]["extensionFactories"]>[number]
+type ExtensionFactory = NonNullable<
+  ConstructorParameters<Runtime["DefaultResourceLoader"]>[0]["extensionFactories"]
+>[number]
 type Session = Awaited<ReturnType<Runtime["createAgentSession"]>>["session"]
 
 export type ToolSession = {
@@ -41,7 +43,10 @@ const idleHost = (root: string) => ({
 
 async function engineSession(runtime: Runtime, root: string, factories: readonly ExtensionFactory[]): Promise<Session> {
   const agentDir = mkdtempSync(join(root, "agent-"))
-  const settingsManager = runtime.SettingsManager.inMemory({ defaultProjectTrust: "always", enabledBuiltinExtensions: [] })
+  const settingsManager = runtime.SettingsManager.inMemory({
+    defaultProjectTrust: "always",
+    enabledBuiltinExtensions: [],
+  })
   const loader = new runtime.DefaultResourceLoader({
     cwd: root,
     agentDir,

@@ -65,11 +65,16 @@ async function runTools(tree: string, scenarios: readonly ToolScenario[]): Promi
   const outcomes = new Map<string, Outcome>()
   if (scenarios.length === 0) return outcomes
   const session = await openToolSession(tree)
-  const clean = normalizer([[tree, "<tree>"], [tmpdir(), "<tmp>"]])
+  const clean = normalizer([
+    [tree, "<tree>"],
+    [tmpdir(), "<tmp>"],
+  ])
   try {
     for (const scenario of scenarios) {
       try {
-        outcomes.set(scenario.id, { result: JSON.parse(clean(JSON.stringify((await session.execute(scenario.tool, scenario.args)) ?? null))) })
+        outcomes.set(scenario.id, {
+          result: JSON.parse(clean(JSON.stringify((await session.execute(scenario.tool, scenario.args)) ?? null))),
+        })
       } catch (error) {
         outcomes.set(scenario.id, { threw: clean(error instanceof Error ? error.message : String(error)) })
       }
@@ -87,8 +92,14 @@ async function runLoopParse(tree: string, scenario: LoopParseScenario): Promise<
   return { brief: parser.positionalText(scenario.argv) }
 }
 
-export async function runScenarios(tree: string, scenarios: readonly Scenario[] = SCENARIOS): Promise<Record<string, Outcome>> {
-  const tools = await runTools(tree, scenarios.filter((scenario): scenario is ToolScenario => scenario.surface === "tool"))
+export async function runScenarios(
+  tree: string,
+  scenarios: readonly Scenario[] = SCENARIOS,
+): Promise<Record<string, Outcome>> {
+  const tools = await runTools(
+    tree,
+    scenarios.filter((scenario): scenario is ToolScenario => scenario.surface === "tool"),
+  )
   const out: Record<string, Outcome> = {}
   for (const scenario of scenarios)
     out[scenario.id] =

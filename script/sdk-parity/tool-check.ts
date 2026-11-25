@@ -7,7 +7,10 @@ import type { FieldSchema, Row } from "./schema"
 
 export type DiscoveredTool = {
   readonly name: string
-  readonly parameters: { readonly properties?: Readonly<Record<string, FieldSchema>>; readonly required?: readonly string[] }
+  readonly parameters: {
+    readonly properties?: Readonly<Record<string, FieldSchema>>
+    readonly required?: readonly string[]
+  }
 }
 
 // Names a run-time declaration fills (`ext_<extension>_<tool>`): checked where they are declared, not here.
@@ -29,7 +32,9 @@ const COMPARED = [
 
 export function schemaDifferences(tool: unknown, sdk: unknown, path: string): string[] {
   if (typeof tool !== "object" || tool === null || typeof sdk !== "object" || sdk === null)
-    return JSON.stringify(tool) === JSON.stringify(sdk) ? [] : [`${path}: tool ${JSON.stringify(tool)}, SDK ${JSON.stringify(sdk)}`]
+    return JSON.stringify(tool) === JSON.stringify(sdk)
+      ? []
+      : [`${path}: tool ${JSON.stringify(tool)}, SDK ${JSON.stringify(sdk)}`]
   const a = tool as Record<string, unknown>
   const b = sdk as Record<string, unknown>
   const out: string[] = []
@@ -41,11 +46,13 @@ export function schemaDifferences(tool: unknown, sdk: unknown, path: string): st
     out.push(`${path}: required is ${required(a.required)} in the tool and ${required(b.required)} in the SDK`)
   const props = (value: unknown): Record<string, unknown> => (value as Record<string, unknown> | undefined) ?? {}
   const keys = new Set([...Object.keys(props(a.properties)), ...Object.keys(props(b.properties))])
-  for (const key of [...keys].toSorted()) out.push(...schemaDifferences(props(a.properties)[key], props(b.properties)[key], `${path}.${key}`))
+  for (const key of [...keys].toSorted())
+    out.push(...schemaDifferences(props(a.properties)[key], props(b.properties)[key], `${path}.${key}`))
   if (a.items !== undefined || b.items !== undefined) out.push(...schemaDifferences(a.items, b.items, `${path}[]`))
   const variants = (value: unknown): unknown[] => (value as unknown[] | undefined) ?? []
   const [left, right] = [variants(a.anyOf), variants(b.anyOf)]
-  if (left.length !== right.length) out.push(`${path}: ${left.length} variants in the tool and ${right.length} in the SDK`)
+  if (left.length !== right.length)
+    out.push(`${path}: ${left.length} variants in the tool and ${right.length} in the SDK`)
   else left.forEach((variant, i) => out.push(...schemaDifferences(variant, right[i], `${path}|${i}`)))
   return out
 }
@@ -62,7 +69,8 @@ export function toolProblems(discovered: readonly DiscoveredTool[], rows: readon
     }
     const read = new Set(own.flatMap(({ entry }) => entry.reads))
     for (const field of Object.keys(tool.parameters.properties ?? {}))
-      if (!read.has(field)) problems.push(`tool ${tool.name} input field "${field}" is in no SDK call; add it to the call's input`)
+      if (!read.has(field))
+        problems.push(`tool ${tool.name} input field "${field}" is in no SDK call; add it to the call's input`)
     for (const { row, entry } of own)
       for (const field of entry.reads) {
         const projected = row.projection[field]

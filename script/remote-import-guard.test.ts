@@ -78,7 +78,10 @@ describe("adapter import family A (#14943 design 7.5)", () => {
       put(`${thread}/gateway/pipeline.ts`, "export const deliver = () => 1\n")
       put(`${thread}/sdk.ts`, 'import { deliver } from "./gateway/pipeline.ts"\nexport const sdk = { deliver }\n')
       put(`${thread}/helper.ts`, 'export { deliver } from "./gateway/pipeline.ts"\n')
-      put(`${thread}/tools.ts`, 'import { deliver } from "./helper.ts"\nimport { sdk } from "./sdk.ts"\nimport "node:net"\n')
+      put(
+        `${thread}/tools.ts`,
+        'import { deliver } from "./helper.ts"\nimport { sdk } from "./sdk.ts"\nimport "node:net"\n',
+      )
       put(`${thread}/tools/extension-tools.ts`, 'import { sdk } from "../sdk.ts"\n')
       execFileSync("git", ["init", "-q"], { cwd: root })
       execFileSync("git", ["add", "packages"], { cwd: root })

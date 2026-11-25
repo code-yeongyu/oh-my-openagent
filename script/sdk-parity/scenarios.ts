@@ -28,7 +28,12 @@ export type LoopParseScenario = {
 
 export type Scenario = CliScenario | ToolScenario | LoopParseScenario
 
-const native = (id: string, capability: string, argv: readonly string[]): CliScenario => ({ id, capability, surface: "native", argv })
+const native = (id: string, capability: string, argv: readonly string[]): CliScenario => ({
+  id,
+  capability,
+  surface: "native",
+  argv,
+})
 const opencode = (id: string, capability: string, argv: readonly string[]): CliScenario => ({
   id,
   capability,
@@ -103,7 +108,10 @@ export const SCENARIOS: readonly Scenario[] = [
   tool("tool-close-missing", "threads.close", "thread_close", { thread: "missing-thread" }),
   tool("tool-rename-missing", "threads.rename", "thread_rename", { thread: "missing-thread", name: "n" }),
   tool("tool-set-model-missing", "threads.setModel", "thread_set_model", { thread: "missing-thread", model: "m" }),
-  tool("tool-set-reasoning-missing", "threads.setReasoning", "thread_set_reasoning", { thread: "missing-thread", level: "high" }),
+  tool("tool-set-reasoning-missing", "threads.setReasoning", "thread_set_reasoning", {
+    thread: "missing-thread",
+    level: "high",
+  }),
   tool("tool-archive-missing", "threads.archive", "thread_archive", { thread: "missing-thread" }),
   tool("tool-handoff-missing", "threads.handoff", "thread_handoff", { thread: "missing-thread", message: "hi" }),
 ]

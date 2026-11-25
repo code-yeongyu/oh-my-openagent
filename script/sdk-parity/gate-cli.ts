@@ -5,7 +5,7 @@ import { join } from "node:path"
 
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { capabilityClosures, ImportGraph } from "./closures"
-import { gateReport, renderReport, type Side } from "./gate"
+import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
@@ -22,10 +22,16 @@ const arg = (flag: string): string | undefined => {
   const index = process.argv.indexOf(flag)
   return index < 0 ? undefined : process.argv[index + 1]
 }
-const git = (...args: string[]): string => execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 256 << 20 })
+const git = (...args: string[]): string =>
+  execFileSync("git", args, { cwd: REPO_ROOT, encoding: "utf8", maxBuffer: 256 << 20 })
 const show = (ref: string, path: string): string | undefined => {
   try {
-    return execFileSync("git", ["show", `${ref}:${path}`], { cwd: REPO_ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], maxBuffer: 256 << 20 })
+    return execFileSync("git", ["show", `${ref}:${path}`], {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      maxBuffer: 256 << 20,
+    })
   } catch {
     return undefined
   }
@@ -49,7 +55,8 @@ function linkDependencies(base: string): void {
       if (!entry.isDirectory() || entry.name === ".git") continue
       const child = relative === "" ? entry.name : `${relative}/${entry.name}`
       if (entry.name === "node_modules") {
-        if (existsSync(join(base, relative)) && !existsSync(join(base, child))) symlinkSync(join(REPO_ROOT, child), join(base, child))
+        if (existsSync(join(base, relative)) && !existsSync(join(base, child)))
+          symlinkSync(join(REPO_ROOT, child), join(base, child))
       } else if (depth < 5) walk(child, depth + 1)
     }
   }
@@ -57,11 +64,15 @@ function linkDependencies(base: string): void {
 }
 
 function runSide(tree: string): { outcomes: Record<string, Outcome>; tools: DiscoveredTool[] } {
-  const text = execFileSync(process.execPath, [join(REPO_ROOT, "script/sdk-parity/scenario-run.ts"), "--tree", tree, "--with-tools"], {
-    cwd: REPO_ROOT,
-    encoding: "utf8",
-    maxBuffer: 256 << 20,
-  })
+  const text = execFileSync(
+    process.execPath,
+    [join(REPO_ROOT, "script/sdk-parity/scenario-run.ts"), "--tree", tree, "--with-tools"],
+    {
+      cwd: REPO_ROOT,
+      encoding: "utf8",
+      maxBuffer: 256 << 20,
+    },
+  )
   return JSON.parse(text) as { outcomes: Record<string, Outcome>; tools: DiscoveredTool[] }
 }
 
@@ -73,7 +84,10 @@ git("worktree", "add", "--detach", baseTree, mergeBase)
 try {
   const lockMoved = git("diff", "--name-only", mergeBase, "HEAD", "--", "bun.lock").trim() !== ""
   if (lockMoved)
-    execFileSync(process.execPath, ["install", "--frozen-lockfile", "--ignore-scripts"], { cwd: baseTree, stdio: "inherit" })
+    execFileSync(process.execPath, ["install", "--frozen-lockfile", "--ignore-scripts"], {
+      cwd: baseTree,
+      stdio: "inherit",
+    })
   else linkDependencies(baseTree)
   const baseSide = runSide(baseTree)
   const headSide = runSide(REPO_ROOT)
@@ -88,8 +102,11 @@ try {
     commander: nativeArgvInventory(REPO_ROOT, [OPENCODE_CLI]),
   }
   const closures = capabilityClosures(rows, findings, new ImportGraph(REPO_ROOT))
-  const changedFiles = git("diff", "--name-only", mergeBase).split("\n").filter((line) => line !== "")
-  const body = arg("--body") === undefined ? (process.env.SDK_PARITY_PR_BODY ?? "") : readFileSync(arg("--body") ?? "", "utf8")
+  const changedFiles = git("diff", "--name-only", mergeBase)
+    .split("\n")
+    .filter((line) => line !== "")
+  const body =
+    arg("--body") === undefined ? (process.env.SDK_PARITY_PR_BODY ?? "") : readFileSync(arg("--body") ?? "", "utf8")
   const baseRowFiles = baseRows(mergeBase)
   const base: Side = {
     rows: baseRowFiles === undefined ? undefined : allRows(baseRowFiles),
@@ -105,15 +122,29 @@ try {
     closures,
     changedFiles,
     body,
+    headSha: git("rev-parse", "HEAD").trim(),
   })
   const baselineFailures = baselineProblems({
     rows,
     originalText: readFileSync(join(REPO_ROOT, ORIGINAL_PATH), "utf8"),
     pinText: readFileSync(join(REPO_ROOT, PIN_PATH), "utf8"),
     unresolved,
-    atBase: { originalText: show(mergeBase, ORIGINAL_PATH), pinText: show(mergeBase, PIN_PATH), unresolved: base.unresolved === undefined ? undefined : { version: 1, entries: base.unresolved } },
+    ranAtHead: new Set(
+      Object.entries(headSide.outcomes)
+        .filter(([, outcome]) => !JSON.stringify(outcome).includes('"code":"not_implemented"'))
+        .map(([id]) => id),
+    ),
+    atBase: {
+      originalText: show(mergeBase, ORIGINAL_PATH),
+      pinText: show(mergeBase, PIN_PATH),
+      unresolved: base.unresolved === undefined ? undefined : { version: 1, entries: base.unresolved },
+    },
   })
-  const failures = [...report.failures, ...baselineFailures]
+  const goldens = JSON.parse(readFileSync(join(REPO_ROOT, "script/sdk-parity/goldens.json"), "utf8")) as Record<
+    string,
+    Outcome
+  >
+  const failures = [...report.failures, ...baselineFailures, ...goldenProblems(goldens, headSide.outcomes)]
   const text = `${renderReport({ ...report, failures })}\nMerge base ${mergeBase.slice(0, 10)}; ${SCENARIOS.length} scenarios on both trees in ${(comparedMs / 1000).toFixed(1)} s; gate total ${((Date.now() - started) / 1000).toFixed(1)} s.\n`
   process.stdout.write(text)
   const summary = arg("--summary") ?? process.env.GITHUB_STEP_SUMMARY

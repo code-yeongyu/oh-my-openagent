@@ -16,7 +16,18 @@ export const VIAS = ["launcher", "engine", "commander", "loop"] as const
 export type Via = (typeof VIAS)[number]
 
 // The root options of design 4.1 that a CLI flag may fill instead of a call input.
-export const ROOT_OPTIONS = ["api", "accounts", "env", "cwd", "home", "agentDir", "uid", "user", "endpoint", "platform"] as const
+export const ROOT_OPTIONS = [
+  "api",
+  "accounts",
+  "env",
+  "cwd",
+  "home",
+  "agentDir",
+  "uid",
+  "user",
+  "endpoint",
+  "platform",
+] as const
 
 // A flag or positional fills one SDK input field (`field`, `field=value`, `field.nested`), a root option (`root.<name>`),
 // or is not an input: `render` (output shape), `process` (the CLI process itself), `when` (selects this branch),
@@ -89,13 +100,53 @@ export type TableEntry = {
   readonly cells: readonly string[]
 }
 
-export type DomainFile = { readonly domain: string; readonly rows: readonly Row[]; readonly tables: readonly TableEntry[] }
+export type DomainFile = {
+  readonly domain: string
+  readonly rows: readonly Row[]
+  readonly tables: readonly TableEntry[]
+}
 
 // The slices of design section 8; a planned surface or a row's slice names one of them.
 export const SLICES = new Set([
-  "S0", "P0", "P1a", "P1a-s", "P1b", "T1a", "T1b", "T1c", "T1d", "T1e", "D1", "T2", "T3", "A1a", "A1b", "A1c",
-  "A1d", "A2a", "A2b", "A2c", "C1a", "C1b", "C1c", "TEL", "E1a", "E1a-s", "E1b", "E1c", "X1a", "NM", "OC1a", "OC1b",
-  "OC1c", "OC2", "X1c", "X1b", "X2", "shipped", "reserved",
+  "S0",
+  "P0",
+  "P1a",
+  "P1a-s",
+  "P1b",
+  "T1a",
+  "T1b",
+  "T1c",
+  "T1d",
+  "T1e",
+  "D1",
+  "T2",
+  "T3",
+  "A1a",
+  "A1b",
+  "A1c",
+  "A1d",
+  "A2a",
+  "A2b",
+  "A2c",
+  "C1a",
+  "C1b",
+  "C1c",
+  "TEL",
+  "E1a",
+  "E1a-s",
+  "E1b",
+  "E1c",
+  "X1a",
+  "NM",
+  "OC1a",
+  "OC1b",
+  "OC1c",
+  "OC2",
+  "X1c",
+  "X1b",
+  "X2",
+  "shipped",
+  "reserved",
 ])
 
 const fieldOf = (target: Target): string => target.split(/[.=]/)[0] ?? target
@@ -143,7 +194,8 @@ export function rowProblems(row: Row): string[] {
   const checkTarget = (where: string, target: Target): void => {
     if (target === "render" || target === "process" || target === "when") return
     if (target === "parse") {
-      if (parseReason === undefined) problems.push(`${at}: ${where} is a parse flag with no written reason in parseOnly`)
+      if (parseReason === undefined)
+        problems.push(`${at}: ${where} is a parse flag with no written reason in parseOnly`)
       return
     }
     if (target.startsWith("root.")) {
@@ -153,7 +205,9 @@ export function rowProblems(row: Row): string[] {
       return
     }
     if (!inputs.has(fieldOf(target))) {
-      problems.push(`${at}: ${where} fills "${fieldOf(target)}", which ${row.sdk} does not take; add it to the SDK input`)
+      problems.push(
+        `${at}: ${where} fills "${fieldOf(target)}", which ${row.sdk} does not take; add it to the SDK input`,
+      )
       return
     }
     const [path = "", value] = target.split("=")
@@ -166,7 +220,9 @@ export function rowProblems(row: Row): string[] {
     if (value !== undefined && allowed === undefined)
       problems.push(`${at}: ${where} sets ${path} to "${value}", but its schema lists no allowed values; declare them`)
     if (value !== undefined && allowed !== undefined && !allowed.map(String).includes(value))
-      problems.push(`${at}: ${where} sets ${path} to "${value}", which its schema does not allow (${allowed.join(", ")})`)
+      problems.push(
+        `${at}: ${where} sets ${path} to "${value}", which its schema does not allow (${allowed.join(", ")})`,
+      )
   }
   for (const slice of row.slices)
     if (!SLICES.has(slice)) problems.push(`${at}: slice "${slice}" is not a slice of design section 8`)

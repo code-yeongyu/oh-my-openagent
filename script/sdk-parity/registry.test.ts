@@ -6,14 +6,12 @@ import { ULW_LOOP_MANIFEST } from "../../packages/omo-codex/plugin/components/ul
 import { type Baseline, baselineProblems, ORIGINAL_PATH, PIN_PATH, UNRESOLVED_PATH } from "./baseline"
 import { cellProblems } from "./cells"
 import { conformanceProblems } from "./conformance"
-import { goldenProblems } from "./gate"
 import { argvProblems, commanderProblems, engineProblems, manifestProblems, routeFlagProblems } from "./inventory-check"
 import { nativeArgvInventory } from "./native-inventory"
 import { NOT_ARGV } from "./not-argv"
 import { opencodeInventory } from "./opencode-inventory"
 import { allRows, DESIGN_PATH, loadDomainFiles, REPO_ROOT, TEMPLATE_PATH } from "./registry"
 import { firstDifferences, renderSection6, section6Of } from "./render"
-import { runScenarios } from "./scenario-run"
 import { registryProblems } from "./schema"
 import { toolProblems } from "./tool-check"
 import { discoverOmoTools } from "./tool-registry"
@@ -47,10 +45,6 @@ describe("SDK parity registry (#14947)", () => {
     const open = new Set((JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline).entries.map((entry) => entry.id))
     expect(conformanceProblems(rows, open, [])).toEqual([])
   })
-
-  test("#given the committed goldens #then they are the head's live scenario outcomes", async () => {
-    expect(goldenProblems(JSON.parse(repoFile("script/sdk-parity/goldens.json")), await runScenarios(REPO_ROOT))).toEqual([])
-  }, 180_000)
 
   test("#given both native entry points #then every argv comparison has a row and every launcher row token is compared", () => {
     const findings = nativeArgvInventory(REPO_ROOT)
@@ -87,7 +81,7 @@ describe("SDK parity registry (#14947)", () => {
       "thread_set_reasoning",
     ])
     expect(toolProblems(tools, rows)).toEqual([])
-  }, 60_000)
+  })
 
   test("#given the initializing pull request #then the original, its pin and the manifest are admitted together", () => {
     const state = {
@@ -95,6 +89,7 @@ describe("SDK parity registry (#14947)", () => {
       originalText: repoFile(ORIGINAL_PATH),
       pinText: repoFile(PIN_PATH),
       unresolved: JSON.parse(repoFile(UNRESOLVED_PATH)) as Baseline,
+      ranAtHead: new Set<string>(),
       atBase: { originalText: undefined, pinText: undefined, unresolved: undefined },
     }
     expect(baselineProblems(state)).toEqual([])

@@ -60,7 +60,8 @@ type Offender = { readonly uses: readonly string[]; readonly removedBy: string }
 const THREAD = "packages/omo-senpi/src/components/thread/"
 const NATIVE = "packages/omo-native/"
 const OPENCODE_CLI = "packages/omo-opencode/src/cli/"
-const NATIVE_ADAPTER = /^packages\/omo-native\/(?:(?:remote|account|sync)-[^/]+\.ts|service-auth-command\.ts|launcher-commands\.ts|compile-entry\.ts|compile-args\.ts)$/
+const NATIVE_ADAPTER =
+  /^packages\/omo-native\/(?:(?:remote|account|sync)-[^/]+\.ts|service-auth-command\.ts|launcher-commands\.ts|compile-entry\.ts|compile-args\.ts)$/
 const LAUNCHER_ADAPTER =
   /^packages\/omo-native\/bin\/lib\/(?:launcher|thread|thread-args|daemon[a-z-]*|update-args|engine-commands|host-status|retired-command|setup-import|doctor)\.js$/
 const OPENCODE_ADAPTER = new Set([
@@ -201,7 +202,17 @@ export const S3_OFFENDERS: Readonly<Record<string, Offender>> = {
 // Family A offenders: today's adapters reach these layers; the slice named moves each onto the SDK and removes its row.
 export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
   "packages/omo-native/account-cli.ts": {
-    uses: ["node:net", DEVICE_SERVICE_CORE, "packages/omo-native/device-service-handoff.ts", "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/", "packages/thread-address-core/"],
+    uses: [
+      "node:net",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-native/device-service-handoff.ts",
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+      "packages/thread-address-core/",
+    ],
     removedBy: "#14943 A1b (account verbs onto the SDK)",
   },
   "packages/omo-native/account-devices.ts": {
@@ -229,11 +240,32 @@ export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "#14943 C1a, C1c and E1c (launcher verbs onto the SDK)",
   },
   "packages/omo-native/compile-entry.ts": {
-    uses: ["node:net", "node:tls", DEVICE_SERVICE_CORE, "packages/omo-native/device-service-handoff.ts", "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/", "packages/thread-address-core/"],
+    uses: [
+      "node:net",
+      "node:tls",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-native/device-service-handoff.ts",
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+      "packages/thread-address-core/",
+    ],
     removedBy: "#14943 C1a, C1c and E1c (launcher verbs onto the SDK)",
   },
   "packages/omo-native/launcher-commands.ts": {
-    uses: ["node:net", DEVICE_SERVICE_CORE, "packages/omo-native/device-service-handoff.ts", "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/", "packages/thread-address-core/"],
+    uses: [
+      "node:net",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-native/device-service-handoff.ts",
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+      "packages/thread-address-core/",
+    ],
     removedBy: "#14943 A1b (account verbs onto the SDK)",
   },
   "packages/omo-native/remote-attach-dialogs.ts": {
@@ -253,7 +285,15 @@ export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/remote-cli.ts": {
-    uses: ["node:net", DEVICE_SERVICE_CORE, "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/"],
+    uses: [
+      "node:net",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+    ],
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/remote-cold-wake.ts": {
@@ -261,19 +301,49 @@ export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/remote-entry.ts": {
-    uses: ["node:net", DEVICE_SERVICE_CORE, "packages/omo-native/device-service-handoff.ts", "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/"],
+    uses: [
+      "node:net",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-native/device-service-handoff.ts",
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+    ],
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/remote-local.ts": {
-    uses: [DEVICE_SERVICE_CORE, "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/"],
+    uses: [
+      DEVICE_SERVICE_CORE,
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+    ],
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/remote-session-verbs.ts": {
-    uses: [REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/"],
+    uses: [
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+    ],
     removedBy: "#14943 T3 and A2a (omo remote onto the SDK)",
   },
   "packages/omo-native/service-auth-command.ts": {
-    uses: ["node:net", DEVICE_SERVICE_CORE, "packages/omo-native/device-service-handoff.ts", "packages/omo-opencode/src/cli/service-auth/", REMOTE, "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/"],
+    uses: [
+      "node:net",
+      DEVICE_SERVICE_CORE,
+      "packages/omo-native/device-service-handoff.ts",
+      "packages/omo-opencode/src/cli/service-auth/",
+      REMOTE,
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+    ],
     removedBy: "#14943 A1b (account verbs onto the SDK)",
   },
   "packages/omo-native/sync-cli.ts": {
@@ -297,7 +367,12 @@ export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "#14943 OC1a and OC1c (OpenCode-edition verbs onto the SDK)",
   },
   "packages/omo-opencode/src/cli/cli-program.ts": {
-    uses: ["node:http", "node:net", "packages/omo-opencode/src/cli/account-keys/", "packages/omo-opencode/src/cli/service-auth/"],
+    uses: [
+      "node:http",
+      "node:net",
+      "packages/omo-opencode/src/cli/account-keys/",
+      "packages/omo-opencode/src/cli/service-auth/",
+    ],
     removedBy: "#14943 OC1a and OC1c (OpenCode-edition verbs onto the SDK)",
   },
   "packages/omo-opencode/src/cli/mcp-oauth/index.ts": {
@@ -313,7 +388,13 @@ export const ADAPTER_OFFENDERS: Readonly<Record<string, Offender>> = {
     removedBy: "#14943 OC1a and OC1c (OpenCode-edition verbs onto the SDK)",
   },
   "packages/omo-senpi/src/components/thread/tools.ts": {
-    uses: ["packages/omo-senpi/src/components/thread/address/", "packages/omo-senpi/src/components/thread/control/", "packages/omo-senpi/src/components/thread/gateway/", "packages/omo-senpi/src/components/thread/remote/", "packages/thread-address-core/"],
+    uses: [
+      "packages/omo-senpi/src/components/thread/address/",
+      "packages/omo-senpi/src/components/thread/control/",
+      "packages/omo-senpi/src/components/thread/gateway/",
+      "packages/omo-senpi/src/components/thread/remote/",
+      "packages/thread-address-core/",
+    ],
     removedBy: "#14943 T2 (thread tools onto the SDK)",
   },
   "packages/omo-senpi/src/components/thread/tools/extension-tools.ts": {
