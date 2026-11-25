@@ -433,7 +433,7 @@
             "x-migrations"
           ]
         ],
-        "moduleUrl": "x-moduleUrl"
+        "moduleUrl": "file:///tmp/omo-sdk-sample/extension.js"
       },
       "expect": [
         {
@@ -453,7 +453,7 @@
             "x-migrations"
           ]
         ],
-        "moduleUrl": "x-moduleUrl",
+        "moduleUrl": "file:///tmp/omo-sdk-sample/extension.js",
         "sessionCallable": [
           {
             "op": "x-op",
@@ -1681,7 +1681,7 @@
             "x-migrations"
           ]
         ],
-        "moduleUrl": "x-moduleUrl"
+        "moduleUrl": "file:///tmp/omo-sdk-sample/extension.js"
       },
       "principal": {
         "kind": "connector",
@@ -1707,7 +1707,7 @@
             "x-migrations"
           ]
         ],
-        "moduleUrl": "x-moduleUrl"
+        "moduleUrl": "file:///tmp/omo-sdk-sample/extension.js"
       },
       "principal": {
         "kind": "session",
@@ -1733,7 +1733,7 @@
             "x-migrations"
           ]
         ],
-        "moduleUrl": "x-moduleUrl"
+        "moduleUrl": "file:///tmp/omo-sdk-sample/extension.js"
       },
       "principal": {
         "kind": "service"

@@ -21,7 +21,7 @@ type Schema = {
  * builds its inputs from it and the scenario table's inputs are held to it, so a placeholder can never be an input the
  * boundary refuses.
  */
-const FORMAT_CHECKED: Readonly<
+export const FORMAT_CHECKED: Readonly<
   Record<string, { readonly sample: string; readonly accepts: (value: unknown) => boolean }>
 > = {
   moduleUrl: {
