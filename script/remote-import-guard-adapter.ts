@@ -12,6 +12,8 @@ export type AdapterRules = {
   readonly sdkEntries: readonly string[]
   readonly forbidden: readonly string[]
   readonly forbiddenBuiltins: readonly string[]
+  // An adapter may name a core's types; a layer whose every import is a dependency (the account core) counts them too.
+  readonly includeTypeOnly?: boolean
 }
 
 const layerOf = (target: string, forbidden: readonly string[]): string | undefined =>
@@ -83,7 +85,7 @@ export function checkAdapterImports(
       const current = queue.shift()
       if (current === undefined) break
       for (const edge of current.edges) {
-        if (edge.typeOnly) continue
+        if (edge.typeOnly && rules.includeTypeOnly !== true) continue
         const builtin = edge.specifier.replace(/^node:/, "")
         if (rules.forbiddenBuiltins.includes(builtin)) reached.add(`node:${builtin}`)
         const target = resolveOnce(current.file, edge.specifier)

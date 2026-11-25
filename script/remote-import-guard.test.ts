@@ -4,7 +4,12 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 
-import { ACCOUNT_CORE, ACCOUNT_CORE_RULES, ACCOUNT_LOGIC_MARKERS } from "./remote-import-guard-account-rules"
+import {
+  ACCOUNT_CORE,
+  ACCOUNT_CORE_RULES,
+  ACCOUNT_LOGIC_MARKERS,
+  EDITION_PACKAGE_NAMES,
+} from "./remote-import-guard-account-rules"
 import { checkAdapterImports, logicOutside, offenderGrowth } from "./remote-import-guard-adapter"
 import { checkImports, type GuardFindings } from "./remote-import-guard-check"
 import { createResolver } from "./remote-import-guard-resolve"
@@ -149,6 +154,15 @@ describe("account core family A (#14364)", () => {
     expect(Object.fromEntries(found)).toEqual({})
   })
 
+  test("#given the account core's manifest #then no dependency field names an edition package", () => {
+    const manifest = JSON.parse(readFileSync(join(REPO_ROOT, "packages/account-core/package.json"), "utf8"))
+    const named = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"].flatMap((field) =>
+      Object.keys(manifest[field] ?? {}),
+    )
+    expect(named.length).toBeGreaterThan(0)
+    expect(named.filter((name) => (EDITION_PACKAGE_NAMES as readonly string[]).includes(name))).toEqual([])
+  })
+
   test("#given every non-test source outside the account core #then none holds credential-store, device-key or device-code logic", () => {
     const sources = repoFacts
       .filter((fact) => !isNotLogic(fact.file))
@@ -157,7 +171,7 @@ describe("account core family A (#14364)", () => {
     expect(logicOutside(sources, "packages/none/", ACCOUNT_LOGIC_MARKERS).size).toBeGreaterThan(0)
   })
 
-  test("#given a core file that imports a cli module, directly or through a helper #then the edition package is named", () => {
+  test("#given a core file that imports a cli module, directly, through a helper or by type only #then the edition package is named", () => {
     const root = mkdtempSync(join(tmpdir(), "account-core-guard-"))
     try {
       const put = (path: string, text: string): void => {
@@ -168,12 +182,15 @@ describe("account core family A (#14364)", () => {
       put("packages/account-core/src/helper.ts", 'export { t } from "../../omo-opencode/src/cli/terminal.ts"\n')
       put("packages/account-core/src/session.ts", 'import { t } from "./helper.ts"\nexport const s = t\n')
       put("packages/account-core/src/clean.ts", "export const c = 1\n")
+      put("packages/omo-opencode/src/cli/types.ts", "export type T = { readonly t: 1 }\n")
+      put("packages/account-core/src/typed.ts", 'import type { T } from "../../omo-opencode/src/cli/types.ts"\nexport const v: T = { t: 1 }\n')
       execFileSync("git", ["init", "-q"], { cwd: root })
       execFileSync("git", ["add", "packages"], { cwd: root })
       const found = checkAdapterImports(scanRepository(root), createResolver(root), ACCOUNT_CORE_RULES)
       expect(Object.fromEntries(found)).toEqual({
         "packages/account-core/src/helper.ts": ["packages/omo-opencode/"],
         "packages/account-core/src/session.ts": ["packages/omo-opencode/"],
+        "packages/account-core/src/typed.ts": ["packages/omo-opencode/"],
       })
     } finally {
       rmSync(root, { recursive: true, force: true })

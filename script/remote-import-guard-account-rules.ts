@@ -19,7 +19,15 @@ export const ACCOUNT_CORE_RULES: AdapterRules = {
   sdkEntries: [],
   forbidden: EDITION_PACKAGES,
   forbiddenBuiltins: [],
+  includeTypeOnly: true,
 }
+
+export const EDITION_PACKAGE_NAMES = [
+  "@oh-my-opencode/omo-opencode",
+  "omo-ai",
+  "@oh-my-opencode/omo-senpi",
+  "@oh-my-opencode/omo-codex",
+] as const
 
 // The primitives only that logic touches, each a literal no other domain uses: the OS credential facilities a credential
 // store or this device's keyring writes through, and the account service's device-code routes. Tests, fixtures and test
