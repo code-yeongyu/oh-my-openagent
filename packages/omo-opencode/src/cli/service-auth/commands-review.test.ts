@@ -1,6 +1,13 @@
 import { expect, onTestFinished, test } from "bun:test"
 import { join, resolve } from "node:path"
-import { fakeApi, grant, limitDetail, minted, privateKeys, temporaryHome } from "@oh-my-opencode/account-core/test-support"
+import {
+  fakeApi,
+  grant,
+  limitDetail,
+  minted,
+  privateKeys,
+  temporaryHome,
+} from "@oh-my-opencode/account-core/test-support"
 
 for (const scenario of [
   "refusal",

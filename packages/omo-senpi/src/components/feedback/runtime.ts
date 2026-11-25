@@ -3,12 +3,7 @@
 // command and RPC shells; collection, draft building, the draft store, the upload and the TUI command flow live here.
 
 import { randomUUID } from "node:crypto"
-import {
-  createCredentialStore,
-  type CredentialStore,
-  quietNotice,
-  SignInError,
-} from "@oh-my-opencode/account-core"
+import { createCredentialStore, type CredentialStore, quietNotice, SignInError } from "@oh-my-opencode/account-core"
 import type { ComponentLogger } from "../../extension/types"
 
 import { collectHostSections, type HostSessionView } from "./collect-host"

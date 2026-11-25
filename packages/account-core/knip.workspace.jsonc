@@ -13,6 +13,8 @@
         "**/*.test-d.ts",
         "src/test-support.ts",
       ],
+      // secret-service-lock.test.ts runs dbus-run-session (moved from omo-opencode with the test; pre-existing there)
+      "ignoreBinaries": ["dbus-run-session"],
       "ignoreFiles": [
         // a child-process fixture: refresh-process.test.ts runs it under a scratch HOME, nothing imports it (#12978)
         "src/account-home.fixture.ts",

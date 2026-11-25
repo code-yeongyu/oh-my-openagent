@@ -1,14 +1,7 @@
 import { expect, onTestFinished, spyOn, test } from "bun:test"
 import type { CredentialStore } from "../../account-core/src/keystore"
 import { RecoveryExhausted, RecoveryPending } from "../../account-core/src/owned-refresh"
-import {
-  fakeApi,
-  grant,
-  memorySecrets,
-  privateKeys,
-  refusal,
-  temporaryHome,
-} from "../../account-core/src/test-support"
+import { fakeApi, grant, memorySecrets, privateKeys, refusal, temporaryHome } from "../../account-core/src/test-support"
 import { ACCOUNT_EXIT, runAccountVerb } from "../account-cli"
 
 const expired = { ...grant, ...privateKeys, accessTokenExpiresAt: "2000-01-01T00:00:00Z" }

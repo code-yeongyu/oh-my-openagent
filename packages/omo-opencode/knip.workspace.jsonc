@@ -344,7 +344,7 @@
         "src/tools/hashline-edit/hashline-edit-diff.ts",
       ],
       // pre-existing at origin dev 4686e425b5: executables this package runs that it does not declare
-      "ignoreBinaries": ["dbus-run-session", "gdbus", "nonexistent-binary-that-does-not-exist-12345", "sips"],
+      "ignoreBinaries": ["gdbus", "nonexistent-binary-that-does-not-exist-12345", "sips"],
       "ignoreIssues": {
         // pre-existing at origin dev 4686e425b5: imports of undeclared packages @code-yeongyu/comment-checker
         "src/cli/doctor/checks/dependencies.ts": ["unlisted"],

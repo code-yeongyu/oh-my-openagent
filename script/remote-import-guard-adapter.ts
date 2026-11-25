@@ -12,6 +12,8 @@ export type AdapterRules = {
   readonly sdkEntries: readonly string[]
   readonly forbidden: readonly string[]
   readonly forbiddenBuiltins: readonly string[]
+  // An adapter may name a core's types; a layer whose every import is a dependency (the account core) counts them too.
+  readonly includeTypeOnly?: boolean
 }
 
 const layerOf = (target: string, forbidden: readonly string[]): string | undefined =>
@@ -41,6 +43,14 @@ export function offenderGrowth(
         problems.push(`${file} gained ${use}, which the merge base's record does not list; route it through the SDK`)
   }
   return problems
+}
+
+// The specifiers a file depends on that are not import statements: triple-slash path and types references, and the
+// type-position `import("x")` queries (`typeof import("x")`, `import("x").T`) the edge scan does not record.
+export function referenceSpecifiers(text: string): string[] {
+  const triple = [...text.matchAll(/^\s*\/\/\/\s*<reference\s+(?:path|types)\s*=\s*["']([^"']+)["']/gm)]
+  const queries = [...text.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)]
+  return [...triple, ...queries].map((match) => match[1] ?? "")
 }
 
 // Each file outside `owner` that holds one of the markers, with the kinds of logic it names. Sources are the caller's:
@@ -83,7 +93,7 @@ export function checkAdapterImports(
       const current = queue.shift()
       if (current === undefined) break
       for (const edge of current.edges) {
-        if (edge.typeOnly) continue
+        if (edge.typeOnly && rules.includeTypeOnly !== true) continue
         const builtin = edge.specifier.replace(/^node:/, "")
         if (rules.forbiddenBuiltins.includes(builtin)) reached.add(`node:${builtin}`)
         const target = resolveOnce(current.file, edge.specifier)

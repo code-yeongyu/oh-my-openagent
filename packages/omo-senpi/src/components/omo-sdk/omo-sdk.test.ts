@@ -2,12 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import {
-  ApiRefusal,
-  type Credentials,
-  KeychainLockedError,
-  RequestFailure,
-} from "@oh-my-opencode/account-core"
+import { ApiRefusal, type Credentials, KeychainLockedError, RequestFailure } from "@oh-my-opencode/account-core"
 import { LocalApiError } from "@oh-my-opencode/device-service-core"
 import { createOmoSdk, type OmoResult, type OmoSdkPorts } from "."
 
