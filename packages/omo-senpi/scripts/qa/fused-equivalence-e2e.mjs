@@ -413,7 +413,8 @@ function diffExcerpt(golden, actual, width = 160) {
   let at = 0
   while (at < left.length && at < right.length && left[at] === right[at]) at++
   const from = Math.max(0, at - 40)
-  const cut = (text) => `${from > 0 ? "…" : ""}${text.slice(from, from + width)}${text.length > from + width ? "…" : ""}`
+  const cut = (text) =>
+    `${from > 0 ? "…" : ""}${text.slice(from, from + width)}${text.length > from + width ? "…" : ""}`
   return `golden=${cut(left)} actual=${cut(right)}${from > 0 ? ` (first difference at char ${at})` : ""}`
 }
 
