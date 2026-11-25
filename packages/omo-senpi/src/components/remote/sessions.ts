@@ -10,9 +10,9 @@ import { createRelayControl } from "../thread/control/relay-control"
 import { createRelaySessionHost } from "../thread/control/relay-session-host"
 import type { SessionOpenRequest } from "../thread/control/session-host"
 import type { ThreadToolFailure } from "../thread/errors"
-import { hashArgs } from "../thread/gateway/bindings"
+import { hashArgs } from "../thread/gateway/hash-args"
 import { resolveProvenance } from "../thread/gateway/provenance-resolver"
-import type { ToolReceiptBegin } from "../thread/gateway/store-relay-ops"
+import type { ToolReceiptBegin } from "../thread/gateway/store-tool-receipts"
 import type { GatewaySender } from "../thread/gateway/types"
 import { namedDeviceRow } from "../thread/remote/address-book"
 import { outcomeFailure } from "../thread/remote/outcome"
@@ -24,7 +24,8 @@ import { type ClientCore, ok, type Outcome, type RemoteClient } from "./client"
 import { nextActionFor, readFailureFromError, remoteFailure } from "./codes"
 import { DEADLINES } from "./deadlines"
 import { createDeviceServiceSessions } from "./port/device-service"
-import { budget, idShapedSession, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
+import { idShaped } from "@oh-my-opencode/thread-address-core"
+import { budget, listingIncomplete, resolveRemoteDevice, type Stage } from "./resolve"
 import { canonicalizeThreadHandle, handleOf } from "./seams"
 import { clientMessageIdOf } from "./client-message-id"
 import type { LocalSessions } from "./local-sessions"
@@ -232,6 +233,26 @@ function createReceipts(now: () => number): RelayTransportOptions["store"] {
       return held.delete(keyOf(request))
     },
     deliveryView: async () => null,
+    reconcileRemoteReceipt: async (request) => {
+      const known = held.get(keyOf({ ...request, operation: "thread_send:remote" }))
+      if (known === undefined || !known.settled || typeof known.result !== "object" || known.result === null)
+        return { kind: "outcome_unavailable" }
+      if (
+        Reflect.get(known.result, "delivery_id") !== request.delivery_id ||
+        Reflect.get(known.result, "device") !== request.device ||
+        Reflect.get(known.result, "thread_id") !== request.target_durable_id
+      )
+        return { kind: "outcome_unavailable" }
+      const old = Reflect.get(known.result, "outcome")
+      if (
+        typeof old === "object" &&
+        old !== null &&
+        (Reflect.get(old, "kind") === "applied" || Reflect.get(old, "kind") === "refused")
+      )
+        return old as import("../thread/gateway/types").ReceiptOutcome
+      known.result = { ...known.result, outcome: request.outcome }
+      return request.outcome
+    },
   }
 }
 
@@ -379,7 +400,7 @@ export function sessionMembers(core: ClientCore): SessionMembers {
       return ok({ device: ref.id, session: keyed.value.target.session, row: byDurable, deviceRow })
     // #13748: a session just opened is not in the listing yet; only an id-shaped session part passes to its device,
     // where the port's attach locates it and its own typed refusal answers. Anything else is this resolver's refusal.
-    if (idShapedSession(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
+    if (idShaped(target.session)) return ok({ device: ref.id, session: target.session, deviceRow })
     return (
       listingIncomplete(
         thread,

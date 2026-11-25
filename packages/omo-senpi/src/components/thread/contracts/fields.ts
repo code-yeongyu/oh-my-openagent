@@ -1,7 +1,5 @@
 import { Type } from "typebox"
 
-import { RELAY_TEXT_MAX_BYTES } from "../gateway/bindings"
-
 export const THREAD_MESSAGE_MAX_BYTES = 32768
 export const THREAD_SUMMARY_MAX_LENGTH = 200
 export const THREAD_READ_DEFAULT_BYTES = 131072
@@ -70,17 +68,6 @@ export const thinkingLevel = (description: string) =>
     ],
     { description },
   )
-
-export const BindingId = Type.String({
-  minLength: 1,
-  description: "Id of the chat binding the gateway keeps for the thread.",
-})
-
-// No schema maxLength: the cap is in UTF-8 bytes, and the relay enforces it as message_too_large
-// (a character cap here would answer invalid_arguments instead, and cannot count bytes).
-export const RelayText = Type.String({
-  description: `Text relayed to or from the external thread; longer than ${RELAY_TEXT_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
-})
 
 /**
  * The delivery mode of every send that names none: the thread tools (thread_send, thread_create's first prompt,

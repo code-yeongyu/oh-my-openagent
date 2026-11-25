@@ -57,8 +57,8 @@ const problemsOf = (lines: readonly string[]) => hintProblems(read(lines.join("\
 describe("model-facing thread text names the eval cell", () => {
   test("#given sentences that name a thread tool without its eval form #when scanned #then each one is reported", () => {
     const problems = problemsOf([
-      'export const a = "Read thread_outbox again and ack a cursor it returned."',
-      'export const b = "Run tool.thread_list() in an eval cell or thread_outbox to see the state."',
+      'export const a = "Read thread_archive again and check the state it returned."',
+      'export const b = "Run tool.thread_list() in an eval cell or thread_archive to see the state."',
       "// a comment's lone quote must not hide the next line",
       "export const c = `Send it to ${session}; thread_read shows the reply.`",
       `export const d = 'Retry with mode set to "tail", then thread_rename it.'`,
@@ -66,8 +66,8 @@ describe("model-facing thread text names the eval cell", () => {
     ])
 
     expect(problems).toEqual([
-      "bare thread_outbox",
-      "bare thread_outbox",
+      "bare thread_archive",
+      "bare thread_archive",
       "bare thread_read",
       "bare thread_rename",
       "thread_rename without the eval cell",
@@ -112,7 +112,7 @@ describe("model-facing thread text names the eval cell", () => {
       if (evalForms(sentences.join("\n")) !== evalForms(code)) unread.push(file)
     }
 
-    expect(files).toEqual(expect.arrayContaining(["gateway/relay.ts", "metadata.ts", "tools.ts"]))
+    expect(files).toEqual(expect.arrayContaining(["gateway/engine.ts", "metadata.ts", "tools.ts"]))
     expect(problems).toEqual([])
     expect(unread).toEqual([])
   })

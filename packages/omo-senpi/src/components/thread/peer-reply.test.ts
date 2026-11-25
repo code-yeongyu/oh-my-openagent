@@ -329,9 +329,6 @@ describe("#12886 a peer-delivered run replies to its sender", () => {
       created_at: 1,
       updated_at: 1,
       expires_at: 2,
-      binding_id: null,
-      binding_revision: null,
-      actor_user_id: null,
     } satisfies DeliveryRow
     const [, sentence = ""] = renderDeliveryText(row).split("\n")
     expect(sentence).toContain(GATEWAY_PEER_REPLY_SENTENCE)

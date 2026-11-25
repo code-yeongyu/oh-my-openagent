@@ -11,7 +11,7 @@ import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-adm
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
-import { readProcessCpuSeconds } from "../platform/native-process"
+import { readProcessTreeCpuSeconds } from "../platform/native-process"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
@@ -95,7 +95,7 @@ export class RpcProcessRunner {
       stallMs: options.startupStallMs ?? DEFAULT_STARTUP_STALL_MS,
       cpuCapS: options.startupCpuCapS ?? DEFAULT_STARTUP_CPU_CAP_S,
       outerBoundMs: options.startupOuterBoundMs ?? DEFAULT_STARTUP_OUTER_BOUND_MS,
-      readCpuSeconds: options.readCpuSeconds ?? readProcessCpuSeconds,
+      readCpuSeconds: options.readCpuSeconds ?? readProcessTreeCpuSeconds,
     }
   }
 

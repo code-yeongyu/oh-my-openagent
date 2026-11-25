@@ -22,11 +22,7 @@ function fakeSdk(answers: Record<string, unknown> = {}) {
     calls.push({ method: name, request })
     return answers[name] ?? { kind: "ok", method: name, request }
   }
-  const sdk = Object.fromEntries(
-    ["list", "read", "send", "bind", "unbind", "rebind", "bindings", "report", "outbox", "ack", "answer"].map(
-      (name) => [name, method(name)],
-    ),
-  )
+  const sdk = Object.fromEntries(["list", "read", "send"].map((name) => [name, method(name)]))
   return {
     calls,
     disposed: () => disposed,
@@ -203,14 +199,23 @@ describe("omo thread: argv to SDK calls", () => {
   })
 
   test("#given list --state repeated and comma-separated #when run #then the SDK lists exactly those states, each once", async () => {
-    const result = await run(["list", "--state", "archived,idle", "--state", "running", "--state", "idle", "--json"])
-    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "running"] } }])
+    const result = await run([
+      "list",
+      "--state",
+      "archived,idle,opening",
+      "--state",
+      "running",
+      "--state",
+      "idle",
+      "--json",
+    ])
+    expect(result.calls).toEqual([{ method: "list", request: { state: ["archived", "idle", "opening", "running"] } }])
   })
 
-  test("#given list --state with a state that is not one of the four #when run #then it is a usage error and the SDK is never loaded", async () => {
+  test("#given list --state with an unknown state #when run #then it is a usage error and the SDK is never loaded", async () => {
     const result = await run(["list", "--state", "idle,live"])
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
-    expect(result.stderr).toContain("--state must be one of running, idle, inactive, archived")
+    expect(result.stderr).toContain("--state must be one of opening, running, idle, inactive, archived")
   })
 
   test("#given send text that reads --json after -- #when run #then it is sent as text and the output stays human", async () => {
@@ -221,123 +226,6 @@ describe("omo thread: argv to SDK calls", () => {
     })
     expect(result.stdout.startsWith("sent: ")).toBe(true)
   })
-
-  test("#given send --binding with only a text #when run #then it is the inbound path with no target and the key as the event id", async () => {
-    const result = await run(["send", "--binding", "b-1", "--idempotency-key", "evt-9", "hello from outside", "--json"])
-    expect(JSON.parse(result.stdout)).toEqual({
-      kind: "ok",
-      method: "send",
-      request: { text: "hello from outside", binding_id: "b-1", idempotency_key: "evt-9" },
-    })
-  })
-
-  test("#given send --binding with an author and a per-message mode #when run #then the request carries the author record and the mode", async () => {
-    const result = await run([
-      "send",
-      "--binding",
-      "b-1",
-      "--author-id",
-      "U123",
-      "--author-name",
-      "Jane Doe",
-      "--author-user-id",
-      "u-jane",
-      "--mode",
-      "follow_up",
-      "--idempotency-key",
-      "evt-9",
-      "hi",
-      "--json",
-    ])
-    expect(JSON.parse(result.stdout).request).toEqual({
-      text: "hi",
-      binding_id: "b-1",
-      idempotency_key: "evt-9",
-      mode: "follow_up",
-      author: { platform_user_id: "U123", display: "Jane Doe", user_id: "u-jane" },
-    })
-  })
-
-  test("#given answer with an author #when run #then the answering human goes to the SDK", async () => {
-    const result = await run([
-      "answer",
-      "--binding",
-      "b-1",
-      "--token",
-      "rt1.x.y",
-      "--author-id",
-      "U123",
-      "--author-name",
-      "Jane",
-      "yes",
-      "--json",
-    ])
-    expect(JSON.parse(result.stdout).request).toEqual({
-      binding_id: "b-1",
-      reply_token: "rt1.x.y",
-      answer: "yes",
-      author: { platform_user_id: "U123", display: "Jane" },
-    })
-  })
-
-  test("#given bind flags #when run #then direction, events and a ttl of none map to the binding record's fields", async () => {
-    const result = await run([
-      "bind",
-      "my-tui",
-      "--platform",
-      "custom",
-      "--account",
-      "qa",
-      "--chat",
-      "c1",
-      "--direction",
-      "in",
-      "--events",
-      "milestone,report",
-      "--ttl",
-      "none",
-      "--json",
-    ])
-    expect(JSON.parse(result.stdout)).toEqual({
-      kind: "ok",
-      method: "bind",
-      request: {
-        session: "my-tui",
-        binding: {
-          platform: "custom",
-          account_id: "qa",
-          chat_id: "c1",
-          direction: { inbound: true, outbound: false },
-          outbound_events: ["milestone", "report"],
-          ttl_seconds: null,
-        },
-      },
-    })
-  })
-
-  test.each([
-    ["in", { inbound: true, outbound: false }],
-    ["out", { inbound: false, outbound: true }],
-    ["both", { inbound: true, outbound: true }],
-  ])(
-    "#given --direction %s #when bound #then the binding carries exactly that direction",
-    async (direction, expected) => {
-      const result = await run([
-        "bind",
-        "my-tui",
-        "--platform",
-        "custom",
-        "--account",
-        "qa",
-        "--chat",
-        "c1",
-        "--direction",
-        direction,
-        "--json",
-      ])
-      expect(JSON.parse(result.stdout).request.binding.direction).toEqual(expected)
-    },
-  )
 
   test("#given read --limit #when the transcript has more items #then only the newest ones are printed", async () => {
     const fake = fakeSdk({
@@ -355,109 +243,18 @@ describe("omo thread: argv to SDK calls", () => {
     const result = await run(["read", "t", "--limit", "1", "--json"], fake)
     expect(JSON.parse(result.stdout).items).toEqual([{ seq: 2, role: "assistant", content: "b" }])
   })
-
-  test("#given unbind, rebind, report and answer #when run #then each maps its positionals and flags", async () => {
-    const printed = [
-      JSON.parse((await run(["unbind", "b-1", "--revision", "2", "--json"])).stdout),
-      JSON.parse((await run(["rebind", "b-1", "other", "--revision", "2", "--json"])).stdout),
-      JSON.parse(
-        (
-          await run([
-            "report",
-            "my-tui",
-            "question",
-            "proceed?",
-            "--binding",
-            "b-1",
-            "--request-id",
-            "ui-1",
-            "--request-kind",
-            "confirm",
-            "--json",
-          ])
-        ).stdout,
-      ),
-      JSON.parse((await run(["answer", "--binding", "b-1", "--token", "rt1.x.y", "yes", "--json"])).stdout),
-    ]
-    expect(printed.map(({ method, request }) => ({ method, request }))).toEqual([
-      { method: "unbind", request: { binding_id: "b-1", expected_revision: 2 } },
-      { method: "rebind", request: { binding_id: "b-1", session: "other", expected_revision: 2 } },
-      {
-        method: "report",
-        request: {
-          session: "my-tui",
-          kind: "question",
-          text: "proceed?",
-          binding_id: "b-1",
-          request_id: "ui-1",
-          request_kind: "confirm",
-        },
-      },
-      { method: "answer", request: { binding_id: "b-1", reply_token: "rt1.x.y", answer: "yes" } },
-    ])
-  })
-})
-
-describe("omo thread: the connector outbox", () => {
-  test("#given outbox --after --ack #when rows come back #then the read continues after that cursor and the ack goes through the newest row", async () => {
-    const fake = fakeSdk({
-      outbox: {
-        kind: "ok",
-        binding_id: "b-1",
-        revision: 1,
-        status: "active",
-        rows: [{ cursor: 4 }, { cursor: 7 }],
-        next_cursor: 7,
-        acked_cursor: 3,
-      },
-      ack: { kind: "ok", binding_id: "b-1", acked_cursor: 7, changed: true },
-    })
-    const result = await run(["outbox", "b-1", "--after", "3", "--ack", "--json"], fake)
-    expect(result.calls.map((call) => call.method)).toEqual(["outbox", "ack"])
-    expect(result.calls[1]?.request).toEqual({ binding_id: "b-1", cursor: 7 })
-    expect(JSON.parse(result.stdout)).toMatchObject({
-      rows: [{ cursor: 4 }, { cursor: 7 }],
-      acked: { acked_cursor: 7, changed: true },
-    })
-  })
-
-  test("#given an empty page #when outbox --ack runs #then nothing is acked", async () => {
-    const fake = fakeSdk({
-      outbox: {
-        kind: "ok",
-        binding_id: "b-1",
-        revision: 1,
-        status: "active",
-        rows: [],
-        next_cursor: 7,
-        acked_cursor: 7,
-      },
-    })
-    const result = await run(["outbox", "b-1", "--ack", "--json"], fake)
-    expect(result.calls.map((call) => call.method)).toEqual(["outbox"])
-    expect(JSON.parse(result.stdout).acked).toBeNull()
-  })
-
-  test("#given ack with a provider message id #when run #then the cursor is a number", async () => {
-    const result = await run(["ack", "b-1", "12", "--provider-message-id", "m-1", "--json"])
-    expect(JSON.parse(result.stdout)).toEqual({
-      kind: "ok",
-      method: "ack",
-      request: { binding_id: "b-1", cursor: 12, provider_message_id: "m-1" },
-    })
-  })
 })
 
 describe("omo thread: exit codes", () => {
   test.each([
-    ["binding_mismatch", THREAD_EXIT.refused],
+    ["scope_denied", THREAD_EXIT.refused],
     ["host_unavailable", THREAD_EXIT.unavailable],
     ["internal_error", THREAD_EXIT.failed],
   ])(
     "#given the SDK answers %s #when run with --json #then the error is on stdout and the exit code classifies it",
     async (code, exitCode) => {
-      const fake = fakeSdk({ answer: { kind: "error", error: { code, message: "m", next_action: "n" } } })
-      const result = await run(["answer", "--binding", "Y", "--token", "rt1.x", "yes", "--json"], fake)
+      const fake = fakeSdk({ send: { kind: "error", error: { code, message: "m", next_action: "n" } } })
+      const result = await run(["send", "my-tui", "ping", "--json"], fake)
       expect(result.exitCode).toBe(exitCode)
       expect(JSON.parse(result.stdout)).toEqual({ kind: "error", error: { code, message: "m", next_action: "n" } })
       expect(result.stderr).toContain(code)
@@ -465,39 +262,37 @@ describe("omo thread: exit codes", () => {
   )
 
   test.each([
-    [["answer", "--token", "rt1.x", "yes"], "--binding is required"],
-    [["send", "--binding", "b-1", "--mode", "steer", "hi"], "--binding takes --mode auto or follow_up"],
-    [["send", "--binding", "b-1", "--expected-turn", "3", "hi"], "--binding takes no --expected-turn"],
-    [
-      ["send", "my-tui", "ping", "--author-id", "U1", "--author-name", "Jane"],
-      "--author-id/--author-name/--author-user-id need --binding",
-    ],
-    [["send", "--binding", "b-1", "--author-id", "U1", "hi"], "--author-id and --author-name go together"],
-    [["send", "--binding", "b-1", "--author-user-id", "u1", "hi"], "--author-id and --author-name go together"],
-    [
-      ["answer", "--binding", "b-1", "--token", "rt", "--author-name", "Jane", "yes"],
-      "--author-id and --author-name go together",
-    ],
-    [["send", "only-target"], "needs <target> <text>"],
-    [["unbind", "b-1", "--revision", "x"], "--revision must be a non-negative integer"],
+    [["send", "only-target"], "expects 2 argument(s), got 1"],
     [["list", "--bogus"], "unknown option '--bogus'"],
     [["nope"], "unknown subcommand 'nope'"],
     [["send", "my-tui", "ping", "--mode", "bogus"], "--mode must be one of auto, steer, follow_up"],
-    [
-      ["bind", "my-tui", "--platform", "p", "--account", "a", "--chat", "c", "--direction", "sideways"],
-      "--direction must be one of in, out, both",
-    ],
-    [
-      ["bind", "my-tui", "--platform", "p", "--account", "a", "--chat", "c", "--direction", "inbound"],
-      "--direction must be one of in, out, both",
-    ],
     [["send", "my-tui", "   "], "<text> is empty"],
-    [["send", "--binding", "b-1", ""], "<text> is empty"],
+    [["send", "--binding", "b-1", "my-tui", "hi"], "unknown option '--binding'"],
+    [["send", "my-tui", "hi", "--author-id", "U1"], "unknown option '--author-id'"],
   ])("#given %p #when run #then it is a usage error and the SDK is never loaded", async (args, message) => {
     const result = await run(args)
     expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
     expect(result.stderr).toContain(message)
     expect(result.stdout).toBe("")
+  })
+
+  // #14312: the binding verbs are gone, with no alias or deprecation path.
+  test.each(["bind", "unbind", "rebind", "bindings", "report", "answer", "outbox", "ack"])(
+    "#given the removed verb %s #when run #then it is an unknown subcommand and the SDK is never loaded",
+    async (verb) => {
+      const result = await run([verb, "--json"])
+      expect({ exitCode: result.exitCode, loaded: result.loaded }).toEqual({ exitCode: THREAD_EXIT.usage, loaded: 0 })
+      expect(JSON.parse(result.stdout).error).toMatchObject({
+        code: "invalid_arguments",
+        message: `omo thread: unknown subcommand '${verb}'`,
+      })
+    },
+  )
+
+  test("#given --help #when run #then the usage names exactly list, send, read and close", async () => {
+    const result = await run(["--help"])
+    expect(result.stdout.split("\n")[0]).toBe("usage: omo thread <list|send|read|close> [options] [--json]")
+    expect(result.stdout).not.toMatch(/\b(bind|unbind|rebind|bindings|report|answer|outbox|ack)\b|--binding/)
   })
 
   test.each([
