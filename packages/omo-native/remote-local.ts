@@ -79,15 +79,15 @@ export interface RemoteCommandDependencies {
 /** This device's real account read, local API and stdio: every dependency the local verbs need. */
 export function localRemoteDependencies(packageRoot?: string): RemoteCommandDependencies {
   const stateDir = deviceServiceStateDir()
-  const error = (line: string) => process.stderr.write(`${line}\n`)
+  const error = (line: string) => process.stderr.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`)
   return {
     accountShow: () => readAccountInProcess(error),
     stateDir,
     ...(packageRoot === undefined ? {} : { packageRoot }),
     connect: () => connectDeviceService({ version: packageJson.version, stateDir }),
     now: () => Date.now(),
-    output: (line) => process.stdout.write(`${line}\n`),
-    write: (text) => process.stdout.write(text),
+    output: (line) => process.stdout.write(`${escapeForDisplay(line, { keepLineFeeds: true })}\n`),
+    write: (text) => process.stdout.write(escapeForDisplay(text, { keepLineFeeds: true })),
     error,
   }
 }
