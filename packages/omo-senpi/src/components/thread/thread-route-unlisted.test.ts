@@ -71,7 +71,7 @@ describe("a session command refused route_unlisted by the device holding the thr
   // runs: find_session says an engine holds it open, yet locate finds no key. Nothing proves it stopped, so the send is a
   // busy host to retry, never "not running".
   test("#given b's engine holds the thread open but b's host routes neither the send nor the locate #when thread_send names it #then it is host_unavailable naming b and route_unlisted with a retry, not not_resumable (#15004)", async () => {
-    const a = account({ refuse: "route_unlisted", locateRefuse: "route_unlisted" })
+    const a = account({ refuseSessionCommands: "route_unlisted", locateRefuse: "route_unlisted" })
     const { run } = surface(a.remote)
     const result = await run("thread_send", { thread: "dur-on-b", message: "hello" })
     expect(result).toMatchObject({
