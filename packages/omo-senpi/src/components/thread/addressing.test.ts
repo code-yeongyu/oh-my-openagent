@@ -16,6 +16,7 @@ import {
   type ThreadNameConflictResult,
   type ThreadResolveResult,
 } from "./addressing"
+import { DISPLAY_UNSAFE, ORDINARY } from "@oh-my-opencode/utils/testing/display-unsafe"
 import type { ThreadErrorCode } from "./index"
 
 // ---------------------------------------------------------------------------
@@ -130,7 +131,7 @@ describe("resolveTarget exact ladder", () => {
       thread({ thread_id: "t-1", name: "payments lane" }),
       thread({ thread_id: "t-2", name: "renderer" }),
     ]
-    const result = resolveTarget(entries, "  Payments\tLANE  ", { callerWorkspaceRoot: CALLER })
+    const result = resolveTarget(entries, "  Payments   LANE  ", { callerWorkspaceRoot: CALLER })
 
     expect(result.kind).toBe("ok")
     if (result.kind !== "ok") throw new Error("expected ok")
@@ -338,6 +339,36 @@ describe("resolveTarget malformed input", () => {
   test("#given a target with embedded control characters #when resolved #then it is invalid_arguments and never matches anything", () => {
     expectError(resolveTarget(entries, "pay\u0007ments", { callerWorkspaceRoot: CALLER }), "invalid_arguments")
     expectError(resolveTarget(entries, "pay\u0000ments", { callerWorkspaceRoot: CALLER }), "invalid_arguments")
+  })
+})
+
+describe("typed references holding a display-unsafe character", () => {
+  const entries = [thread({ thread_id: "t-1", name: "ab" }), thread({ thread_id: "t-2", name: "a b" })]
+
+  test("#given every display fixture as a target, a fuzzy query and a new name #when checked #then each is refused with the same text and the value is not echoed", () => {
+    for (const fixture of DISPLAY_UNSAFE) {
+      const refusals = [
+        ["thread address", resolveTarget(entries, fixture, { callerWorkspaceRoot: CALLER })],
+        ["fuzzy query", fuzzyMatch(entries, `${fixture}cd`)],
+        ["thread name", checkNameConflict(entries, fixture)],
+      ] as const
+      for (const [what, result] of refusals) {
+        const error = expectError(result, "invalid_arguments")
+        expect({ fixture, message: error.message }).toEqual({
+          fixture,
+          message: `The ${what} contains control characters.`,
+        })
+        expect(error.next_action).not.toContain(fixture)
+      }
+    }
+  })
+
+  test("#given ordinary names #when resolved by name #then each resolves", () => {
+    const named = ORDINARY.map((name, index) => thread({ thread_id: `o-${index}`, name }))
+    for (const [index, name] of ORDINARY.entries()) {
+      const result = resolveTarget(named, name, { callerWorkspaceRoot: CALLER })
+      expect(result.kind === "ok" ? result.entry.thread_id : result.kind).toBe(`o-${index}`)
+    }
   })
 })
 
