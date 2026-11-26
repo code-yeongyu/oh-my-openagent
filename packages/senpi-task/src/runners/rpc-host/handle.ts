@@ -1,6 +1,7 @@
 import { log } from "@oh-my-opencode/utils"
 
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { abandonedAsyncWorkOutcome } from "../pending-async-work"
 import { exitTurnOutcome, promptFailureOutcome } from "../rpc/turn-outcome"
 import { sessionIsIdle } from "../rpc/turn-settlement"
 import { createTurnTracking } from "../rpc/turn-tracking"
@@ -101,9 +102,9 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     lastInputId: () => options.inputStore?.load(taskId)?.last_effect_id,
     port: () => client,
     observeState: tracking.observeState,
-    settle: (settled) => {
+    settle: (settled, held) => {
       if (settled.status === "completed") finalText = settled.finalResponse
-      settlement.adopt(settled)
+      settlement.adopt(settled, held)
     },
     continuing: () => {
       continuationState = "pending_delivery"
@@ -208,11 +209,12 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
   const park = (event: HostSessionParked): void => {
     // A parked session is idle on the host: an outcome held for `agent_idle` is final (omo#9069).
     const held = settlement.pending()
-    if (turnOutcome === undefined && held !== undefined) settleTurn(held)
+    const settledTurn = turnOutcome === undefined && held !== undefined
+    if (settledTurn) settleTurn(held)
     settlement.cancelConfirmation()
     parked = true
     stopHeartbeat()
-    listeners.emitParked(event)
+    listeners.emitParked(settledTurn ? { ...event, settledTurn: true } : event)
   }
 
   const settleClassified = (classified: ReturnType<typeof classifySessionExit>): void =>
@@ -414,14 +416,16 @@ export function createHostSessionHandle(options: HostSessionHandleOptions): Host
     reconcileTurn: (record) =>
       reconciliation.reconcile(identity.current().sessionPath, record, false, openDisposition === "reopened"),
     onReconciled: reconciliation.subscribe,
-    adoptFinishedTurn: async (finalResponse) => {
+    adoptFinishedTurn: async (finalResponse, held) => {
       if (turnOutcome !== undefined || settlement.pending() !== undefined) return
+      // A session reopened from its file runs nothing the old one started (omo#10487).
+      if (held !== undefined && openDisposition === "reopened") return settleTurn(abandonedAsyncWorkOutcome(held))
       // A state read that fails is not proof of idleness, and must never cost the reattach: stay busy.
       const state = await client.getState().catch(() => undefined)
       if (state === undefined || !sessionIsIdle(state)) return
       tracking.observeState(state)
       if (turnOutcome === undefined && settlement.pending() === undefined)
-        settlement.adopt({ status: "completed", finalResponse })
+        settlement.adopt({ status: "completed", finalResponse }, held)
     },
     waitForIdle: () => waiters.waitForIdle(reachedIdle || outcome !== undefined),
     hasExited: () => outcome !== undefined,

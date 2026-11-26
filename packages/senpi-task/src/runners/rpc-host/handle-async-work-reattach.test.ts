@@ -146,4 +146,21 @@ describe("re-joining a child whose turn waits on its own async work (omo#10487)"
       await h.handle.dispose()
     })
   }
+
+  test("#given a respawned process child #when its transcript's last answer was held on a pending cell #then adopting it ends the turn as async_work_pending", async () => {
+    // given - a new process reopened the session: the cell died with the process that started it
+    const h = processHarness()
+    const held = { sources: [{ source: "senpi-codemode", activeCount: 1, labels: ["eval cell"] }], children: 0 }
+
+    // when
+    await h.handle.adoptFinishedTurn?.(PROGRESS_NOTE, held)
+    await flushSettlement()
+
+    // then
+    const outcome = h.settled()
+    expect(outcome?.status).toBe("error")
+    if (outcome?.status !== "error") throw new Error("expected the typed failure")
+    expect(outcome.failure.kind).toBe("async_work_pending")
+    await h.handle.dispose()
+  })
 })

@@ -78,8 +78,9 @@ export type TurnSettlement = {
   // An outcome read outside the event stream (a re-joined session's reconciliation, a finished
   // transcript) ends the turn exactly as an `agent_end` then `agent_idle` would: a completed outcome
   // is held while the engine still reports the child's own async work (omo#10487). Re-offering the
-  // note a hold already keeps back leaves that hold alone.
-  readonly adopt: (outcome: RunnerOutcome) => void
+  // note a hold already keeps back leaves that hold alone. `held` is the work a durable record names
+  // as pending after that answer: it holds the note when the live engine reports none (omo#10487).
+  readonly adopt: (outcome: RunnerOutcome, held?: PendingAsyncWork) => void
   // The session that owned the held turn's work is gone (reopened from its file): the turn ends as
   // that abandoned work. `false` when no turn is held on async work.
   readonly abandon: () => boolean
@@ -206,13 +207,13 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
     disarmConfirmation()
   }
 
-  const atIdle = (): void => {
+  const atIdle = (durableWork?: PendingAsyncWork): void => {
     // A turn already held on its pending work ends only by a new run, the hold's own confirmation,
     // or teardown: a repeated idle record carries no answer (omo#10487).
     if (asyncWork?.holding() === true) return
     clearConfirmation()
     const outcome = held
-    const work = outcome?.status === "completed" ? input.pendingAsyncWork?.() : undefined
+    const work = outcome?.status === "completed" ? (input.pendingAsyncWork?.() ?? durableWork) : undefined
     if (asyncWork !== undefined && outcome?.status === "completed" && work !== undefined) {
       asyncWork.begin(outcome, work)
       return
@@ -258,7 +259,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
       disarmConfirmation()
     },
     reconfirmHeld: rearm,
-    adopt: (outcome) => {
+    adopt: (outcome, durableWork) => {
       const keptBack =
         asyncWork?.holding() === true &&
         held?.status === "completed" &&
@@ -267,7 +268,7 @@ export function createTurnSettlement(input: TurnSettlementInput): TurnSettlement
       if (keptBack) return
       clearConfirmation()
       held = outcome
-      atIdle()
+      atIdle(durableWork)
     },
     abandon: () => {
       const outcome = asyncWork?.abandoned()

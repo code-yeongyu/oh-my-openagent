@@ -10,8 +10,8 @@ import type { AwaitingInputReason, TaskRecord } from "../state"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle } from "./child-handle"
 import {
   sessionTailContinuationBlocker,
-  sessionTailFinishedText,
   sessionTailNeedsContinuation,
+  sessionTailReconciliation,
 } from "./interrupted-turn"
 import { buildRespawnManagedSpec, isTerminalRecord } from "./manager-helpers"
 import type { ManagedRunner, TrustedRespawnLaunchResolver } from "./types"
@@ -283,8 +283,8 @@ async function continueInterruptedTurn(
 // and let the ordinary outcome tracking complete the record (omo#9069).
 async function adoptFinishedTurn(record: TaskRecord, sessionPath: string, handle: RpcChildHandle): Promise<void> {
   if (isTerminalRecord(record) || handle.adoptFinishedTurn === undefined) return
-  const finished = await sessionTailFinishedText(sessionPath)
-  if (finished !== undefined) await handle.adoptFinishedTurn(finished)
+  const tail = await sessionTailReconciliation(sessionPath)
+  if (tail?.finishedText !== undefined) await handle.adoptFinishedTurn(tail.finishedText, tail.heldWork)
 }
 
 async function cleanupFailure(handle: RpcChildHandle, reason: string): Promise<RespawnResult> {

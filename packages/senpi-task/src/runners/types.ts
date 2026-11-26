@@ -5,6 +5,7 @@ import type { EffectiveModel } from "./pinned-model-equivalence"
 import type { TaskRecord } from "../state"
 import type { HostTurnReconciliation } from "./rpc-host/reconcile-turn"
 import type { NativeRunPause } from "../pause/native-child-pause"
+import type { PendingAsyncWork } from "./pending-async-work"
 
 export type RpcSwitchSessionResult = { readonly cancelled: boolean }
 
@@ -127,7 +128,9 @@ export type RpcChildHandle = ChildHandle & {
   // Fires when the child starts a run on its own after its turn settled (omo#9069).
   onSelfResumed?(listener: () => void): () => void
   // A revival found the turn already finished in the transcript: settle it with that answer (omo#9069).
-  adoptFinishedTurn?(finalResponse: string): Promise<void>
+  // `held`: the transcript records the child's own async work still pending after that answer, so it
+  // was an interim note held on that work, never the result (omo#10487).
+  adoptFinishedTurn?(finalResponse: string, held?: PendingAsyncWork): Promise<void>
   switchSession?(sessionPath: string): Promise<RpcSwitchSessionResult>
   getEntries?(since?: string): Promise<RpcEntriesResult>
   terminate(options?: TerminateOptions): Promise<void>

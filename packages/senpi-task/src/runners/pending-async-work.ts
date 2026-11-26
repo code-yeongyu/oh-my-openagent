@@ -90,6 +90,12 @@ function describePendingAsyncWork(work: PendingAsyncWork): string {
   return parts.join("; ")
 }
 
+// What a held turn amounts to once the session that owned its work is gone (teardown, a reopened
+// session): the same typed outcome everywhere, never the interim note.
+export function abandonedAsyncWorkOutcome(work: PendingAsyncWork): RunnerOutcome {
+  return asyncWorkPendingOutcome(work, "the child stopped before that work settled")
+}
+
 export function asyncWorkPendingOutcome(work: PendingAsyncWork, why: string): RunnerOutcome {
   return {
     status: "error",

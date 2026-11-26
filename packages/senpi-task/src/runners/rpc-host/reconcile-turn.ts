@@ -3,6 +3,7 @@ import { log } from "@oh-my-opencode/utils"
 import { sessionTailReconciliation } from "../../manager/interrupted-turn"
 import type { TaskRecord } from "../../state"
 import type { RunnerOutcome } from "../in-process/child-handle"
+import { abandonedAsyncWorkOutcome, type PendingAsyncWork } from "../pending-async-work"
 import { reattachContinuationPrompt } from "./reattach"
 import type { HostSessionLiveness } from "./handle-port"
 
@@ -38,7 +39,8 @@ export interface ReconcileTurnPort {
   /** The host reopened the session from its file, so no turn can be running there. */
   readonly reopened?: boolean
   readonly adoptedEntryId?: string
-  settle(outcome: RunnerOutcome): void
+  /** `held`: the transcript records the child's own async work still pending after this answer. */
+  settle(outcome: RunnerOutcome, held?: PendingAsyncWork): void
   notify(notice: ReconciledTurnNotice): void
 }
 
@@ -128,9 +130,17 @@ export async function reconcileHostTurn(
         (entryId === record.host_session?.adopted_entry_id && record.final_response !== undefined))
     )
       return "adopted"
+    // omo#10487: an answer the child gave while its own async work was still pending is an interim
+    // note. A session reopened from its file runs nothing the old one started, so that work is lost;
+    // a live one holds the note on its work until the turn that work wakes answers.
+    const held = tail?.heldWork
+    if (held !== undefined && port.reopened === true) {
+      port.settle(abandonedAsyncWorkOutcome(held))
+      return "failed"
+    }
     if (entryId !== undefined && entryId !== record.host_session?.adopted_entry_id)
       port.notify({ kind: "adopted", entryId })
-    port.settle({ status: "completed", finalResponse: finished ?? "" })
+    port.settle({ status: "completed", finalResponse: finished ?? "" }, held)
     return "adopted"
   }
   if (outcome === undefined && tail?.endsAtIgnoredUserPrompt === true) {

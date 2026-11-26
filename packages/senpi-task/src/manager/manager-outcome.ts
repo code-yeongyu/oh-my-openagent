@@ -128,6 +128,8 @@ function errnoField(error: unknown, key: "code" | "syscall" | "path"): string | 
 export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker {
   const provisional = createProvisionalExitTracker(ports)
   const turns = new Map<string, object>()
+  // A park that itself ended the run's turn waits here for that outcome's terminal write (omo#10487).
+  const parksAfterTerminal = new Map<string, () => void>()
   // A terminal outcome is never lost to a persistence fault (#8050). When the store cannot write the
   // terminal record (Windows EPERM on the rename after the store's own retries), the run is still
   // settled: the residency is released through forget() and every waiter receives a synthesized
@@ -153,9 +155,13 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
         updated_at: timestamp,
         terminal_at: timestamp,
       })
+      parksAfterTerminal.delete(taskId)
       return
     }
     ports.settleWaiters(taskId)
+    const park = parksAfterTerminal.get(taskId)
+    parksAfterTerminal.delete(taskId)
+    park?.()
   }
 
   async function settleErrorOutcome(input: ErrorOutcomeInput): Promise<void> {
@@ -181,8 +187,21 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
   // The session parked - the child itself (its recorded endpoint refused the reattach) or the host
   // (idle sweep, generation handoff). No outcome will settle on that handle again, so the record parks
   // at rpc_detached WITH the cause, keeping its status, and the run is released like a suspension.
-  function parkOwned(taskId: string, handle: ManagedChildHandle, epoch: number, reason: SuspensionReason): void {
+  // A park that itself ended the run's turn (a turn held on the child's own async work ends as that
+  // abandoned work) parks only once that outcome is persisted: forgetting the handle first would drop
+  // it and leave a running record whose reopened transcript ends on the held note (omo#10487).
+  function parkOwned(
+    taskId: string,
+    handle: ManagedChildHandle,
+    epoch: number,
+    reason: SuspensionReason,
+    settledTurn = false,
+  ): void {
     if (ownedRecord(ports, taskId, handle, epoch) === null) return
+    if (settledTurn) {
+      parksAfterTerminal.set(taskId, () => parkOwned(taskId, handle, epoch, reason))
+      return
+    }
     ports.store.mutate(taskId, (fresh) => {
       const { host_pid: _hostPid, ...rest } = fresh
       return { ...rest, residency_state: "rpc_detached", suspension_reason: reason, updated_at: nowIso(ports.now) }
@@ -244,6 +263,7 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
   function release(taskId: string): void {
     turns.delete(taskId)
+    parksAfterTerminal.delete(taskId)
     provisional.release(taskId)
     parkWatches.get(taskId)?.()
     parkWatches.delete(taskId)
@@ -253,7 +273,9 @@ export function createOutcomeTracker(ports: OutcomeTrackerPorts): OutcomeTracker
 
   function watchParks(taskId: string, handle: ManagedChildHandle, epoch: number): void {
     release(taskId)
-    const stop = handle.onParked?.((event) => parkOwned(taskId, handle, epoch, event.reason))
+    const stop = handle.onParked?.((event) =>
+      parkOwned(taskId, handle, epoch, event.reason, event.settledTurn === true),
+    )
     if (stop !== undefined) parkWatches.set(taskId, stop)
   }
 

@@ -1,5 +1,7 @@
 import { open } from "node:fs/promises"
 
+import { readLifecyclePendingWork, type PendingAsyncWork } from "../runners/pending-async-work"
+
 const INITIAL_TAIL_BYTES = 64 * 1024
 
 const BOOKKEEPING_CUSTOM_TYPES = new Set([
@@ -30,19 +32,6 @@ export async function sessionTailContinuationBlocker(
     const last = tail.lastMessage
     if (!messageNeedsContinuation(last)) return undefined
     return last.role === "assistant" && last.stopReason === "aborted" ? "aborted" : "unfinished"
-  } catch {
-    return undefined
-  }
-}
-
-/**
- * The final answer of a turn that already ENDED in the transcript: the last conversation message is
- * an assistant reply that stopped normally with text and no pending tool call. A child whose turn
- * finished while no parent was attached never delivers that end again, so a revival reads it here.
- */
-export async function sessionTailFinishedText(sessionPath: string): Promise<string | undefined> {
-  try {
-    return tailFinishedText(await readConversationTail(sessionPath))
   } catch {
     return undefined
   }
@@ -80,6 +69,7 @@ function messageNeedsContinuation(message: SessionMessageEntry["message"]): bool
 type TailVerdict =
   | { readonly kind: "message"; readonly message: SessionMessageEntry["message"]; readonly entryId?: string }
   | { readonly kind: "end"; readonly event: Record<string, unknown> }
+  | { readonly kind: "lifecycle"; readonly work: PendingAsyncWork | undefined }
   | { readonly kind: "skip" }
   | { readonly kind: "stop" }
 
@@ -88,6 +78,10 @@ export type ConversationTail = {
   readonly turnUser?: SessionMessageEntry["message"]
   readonly entryId?: string
   readonly endEvent?: Record<string, unknown>
+  // omo#10487: the child's own async work the engine recorded as still pending AFTER the last message
+  // (its durable `session-lifecycle` records): that message was a turn held on the work, an interim
+  // note, never the child's answer.
+  readonly heldWork?: PendingAsyncWork
 }
 
 export async function sessionTailReconciliation(
@@ -140,6 +134,8 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
     let lastMessage: SessionMessageEntry["message"] | undefined
     let entryId: string | undefined
     let endEvent: Record<string, unknown> | undefined
+    let heldWork: PendingAsyncWork | undefined
+    const held = (): { readonly heldWork?: PendingAsyncWork } => (heldWork === undefined ? {} : { heldWork })
     for (;;) {
       const start = size - bytes
       const buffer = Buffer.allocUnsafe(bytes)
@@ -154,22 +150,23 @@ async function readConversationTail(sessionPath: string): Promise<ConversationTa
         if (line.length === 0) continue
         const verdict = classifyRecord(line)
         if (verdict.kind === "end" && endEvent === undefined) endEvent = verdict.event
+        if (verdict.kind === "lifecycle" && lastMessage === undefined) heldWork ??= verdict.work
         if (verdict.kind === "message") {
           if (lastMessage === undefined) {
             lastMessage = verdict.message
             entryId = verdict.entryId
-            if (!messageNeedsContinuation(lastMessage)) return { lastMessage, entryId, endEvent }
+            if (!messageNeedsContinuation(lastMessage)) return { lastMessage, entryId, endEvent, ...held() }
           }
           if (verdict.message.role === "user") {
-            return { lastMessage, turnUser: verdict.message, entryId, endEvent }
+            return { lastMessage, turnUser: verdict.message, entryId, endEvent, ...held() }
           }
           if (verdict.message.role === "assistant" && !messageNeedsContinuation(verdict.message)) {
-            return { lastMessage, entryId, endEvent }
+            return { lastMessage, entryId, endEvent, ...held() }
           }
         }
         if (verdict.kind === "stop" && lastMessage === undefined) return undefined
       }
-      if (start === 0) return lastMessage === undefined ? undefined : { lastMessage, entryId, endEvent }
+      if (start === 0) return lastMessage === undefined ? undefined : { lastMessage, entryId, endEvent, ...held() }
       processedTailLines = complete.length
       bytes = Math.min(size, bytes * 2)
     }
@@ -190,6 +187,9 @@ function classifyRecord(line: string): TailVerdict {
   if (isRecord(parsed) && parsed.type === "custom" && isRecord(parsed.data) && parsed.data.type === "agent_end") {
     return { kind: "end", event: parsed.data }
   }
+  // The engine's own lifecycle record (senpi's LifecycleLedger) rides the session file after a turn ends.
+  if (isRecord(parsed) && parsed.type === "custom" && parsed.customType === "session-lifecycle")
+    return { kind: "lifecycle", work: readLifecyclePendingWork(parsed.data) ?? undefined }
   if (isNamedBookkeepingEntry(parsed)) return { kind: "skip" }
   return { kind: "stop" }
 }

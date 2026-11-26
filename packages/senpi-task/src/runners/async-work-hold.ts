@@ -1,5 +1,10 @@
 import type { RunnerOutcome } from "./in-process/child-handle"
-import { asyncWorkPendingOutcome, pendingWorkSignature, type PendingAsyncWork } from "./pending-async-work"
+import {
+  abandonedAsyncWorkOutcome,
+  asyncWorkPendingOutcome,
+  pendingWorkSignature,
+  type PendingAsyncWork,
+} from "./pending-async-work"
 
 export type AsyncWorkTimerHandle = { readonly cancel: () => void }
 export type AsyncWorkScheduler = (run: () => void, delayMs: number) => AsyncWorkTimerHandle
@@ -153,7 +158,6 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     cancel,
     disarm,
     holding: () => held !== undefined,
-    abandoned: () =>
-      held === undefined ? undefined : asyncWorkPendingOutcome(held.work, "the child stopped before that work settled"),
+    abandoned: () => (held === undefined ? undefined : abandonedAsyncWorkOutcome(held.work)),
   }
 }

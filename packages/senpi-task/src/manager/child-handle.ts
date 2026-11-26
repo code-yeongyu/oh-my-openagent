@@ -65,7 +65,8 @@ export type ManagedChildHandle = {
   effectiveModel?(): EffectiveModel | undefined
   // A daemon-session child whose session parked - itself (its recorded endpoint refused a reattach) or
   // by its host (idle sweep, generation handoff): the record parks with that reason either way.
-  onParked?(listener: (event: { readonly reason: SuspensionReason }) => void): () => void
+  // `settledTurn`: the park itself ended the run's turn, whose outcome is persisted before the record parks.
+  onParked?(listener: (event: { readonly reason: SuspensionReason; readonly settledTurn?: true }) => void): () => void
   // A daemon-session child the host swapped under its live routing handle: the record's session
   // identity is re-stamped from this event (F9); the child keeps running on the new transcript.
   onReplaced?(listener: (event: HostSessionReplaced) => void): () => void

@@ -1,5 +1,6 @@
 import type { TaskRecord } from "../../state"
 import type { RunnerOutcome } from "../in-process/child-handle"
+import type { PendingAsyncWork } from "../pending-async-work"
 import type { HostSessionPort } from "./handle-port"
 import { readInputReceipt } from "./input-receipt"
 import { reconcileHostTurn, type ReconciledTurnNotice } from "./reconcile-turn"
@@ -10,7 +11,7 @@ export function createHandleReconciliation(input: {
   readonly port: () => HostSessionPort
   // Every state the reconciliation reads also reports the engine's lifecycle (omo#10487).
   readonly observeState: (state: unknown) => void
-  readonly settle: (outcome: RunnerOutcome) => void
+  readonly settle: (outcome: RunnerOutcome, held?: PendingAsyncWork) => void
   readonly continuing: () => void
 }) {
   let record: Pick<TaskRecord, "host_session" | "final_response"> = {}
