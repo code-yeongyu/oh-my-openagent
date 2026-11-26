@@ -8,7 +8,8 @@ import { type BootstrapSetup, type DeviceLink, runBootstrapVerb, runEnableVerb }
 import { applyColdWake, type ColdWake } from "./remote-cold-wake"
 import type { RemoteOptOut } from "./remote-opt-out"
 import { REMOTE_EXIT, UsageError } from "./remote-exit"
-import { candidateLines, personNextAction } from "./remote-render"
+import { refusalLines } from "./remote-render"
+import { escapeForDisplay } from "@oh-my-opencode/utils/escape-for-display"
 import { isSessionTarget } from "./remote-session-args"
 import {
   accountNotice,
@@ -61,7 +62,7 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
       throw new UsageError(parsed.command === "" ? "" : `omo remote: unknown command ${parsed.command}`)
   } catch (error) {
     if (!(error instanceof UsageError)) throw error
-    if (error.message) dependencies.error(error.message)
+    if (error.message) dependencies.error(escapeForDisplay(error.message))
     dependencies.error(REMOTE_USAGE)
     return REMOTE_EXIT.usage
   }
@@ -111,7 +112,7 @@ export async function runRemoteVerb(dependencies: RemoteVerbDependencies, args: 
   // the verb's exit code: the unit goes even when the service could not be reached.
   if (parsed.command === "disable") await applyColdWake(dependencies.coldWake, false, dependencies.error)
   if (recordFailure !== undefined) {
-    dependencies.error(disableNotSavedNotice(recordFailure, code === REMOTE_EXIT.ok))
+    dependencies.error(escapeForDisplay(disableNotSavedNotice(recordFailure, code === REMOTE_EXIT.ok)))
     return REMOTE_EXIT.failed
   }
   return code
@@ -197,9 +198,7 @@ export async function prepareRemoteAttach(
     )
     if (resolved.kind === "error") {
       service.close()
-      dependencies.error(`omo remote: ${resolved.error.message}`)
-      dependencies.error(personNextAction(resolved.error.next_action))
-      for (const line of candidateLines(resolved.error)) dependencies.error(line)
+      for (const line of refusalLines(resolved.error)) dependencies.error(line)
       return REMOTE_EXIT.failed
     }
     const { attached: attach } = await attachAddressed(

@@ -11,7 +11,7 @@ import { createRpcModelAdmission, type RpcModelAdmission } from "./rpc/model-adm
 import { type MalformedLineHandler, RpcProtocolClient } from "./rpc/protocol-client"
 import { type RpcSpawnDescriptor, buildRpcSpawn } from "./rpc/spawn"
 import { discardUnstartedRpcHandle } from "./rpc/start-cleanup"
-import { readProcessTreeCpuSeconds } from "../platform/native-process"
+import { readProcessTreeCpuSeconds } from "../platform/process-tree-cpu"
 import { createTaskRecordStore } from "../store"
 import { InputUncertainError } from "./input-effects"
 import type { ChildDialogForwarder } from "./child-dialogs/forwarder"
