@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { SessionHostLaunch } from "../../device-service-core/src/index.ts"
 import { systemdSessionHostUnit } from "../../device-service-core/src/cold-wake/session-host-unit.ts"
@@ -43,7 +43,8 @@ describe("the omo a session host unit renders for", () => {
     const unit = systemdSessionHostUnit(
       SessionHostLaunch.from({ omoBin: omo, execPath: current, agentDir: "/srv/profile-b/agent" }),
     )
-    expect(unit).toContain(`ExecStart="${current}"`)
+    // systemd reads a backslash in a quoted ExecStart as an escape, so the unit writes each one doubled.
+    expect(unit).toContain(`ExecStart="${current.replaceAll("\\", "\\\\")}"`)
   })
 
   test("the npm launcher running the verb itself, over the same stale OMO_BIN", () => {
@@ -96,7 +97,7 @@ describe("the omo a session host unit renders for", () => {
 
   test("no OMO_BIN: the launcher script this process is, as before", () => {
     expect(omoBinaryPath({}, { execPath: "/h/.bun/bin/bun", argv1: "/h/run/pkg/bin/omo.js" })).toBe(
-      "/h/run/pkg/bin/omo.js",
+      resolve("/h/run/pkg/bin/omo.js"),
     )
   })
 })

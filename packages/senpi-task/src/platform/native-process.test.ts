@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { spawn } from "node:child_process"
 import { once } from "node:events"
-import { readProcessCpuSeconds, readProcessTreeCpuSeconds } from "./native-process"
+import { readProcessCpuSeconds } from "./native-process"
+import { readProcessTreeCpuSeconds } from "./process-tree-cpu"
 
 // The startup bounds (stall window, CPU cap) read a child's CPU seconds through this reader. A wrong unit silently moves
 // every bound: on Apple Silicon proc_taskinfo counts Mach ticks of 125/3 ns, so reading them as nanoseconds made the
