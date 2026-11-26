@@ -1,7 +1,8 @@
 // The one definition of an expected effect (design 7.2 and 7.3, amendment 5; field names as slice P1a's scenario table
 // wrote them). A scenario names its row, its input, and the calls the fake ports of design 4.6 must observe. Matching:
 // `args` is a subset of the observed call's arguments, `count` defaults to 1 and 0 means never called, order is not
-// enforced, and `result` is what the fake answers (the stimulus), so it never takes part in equality.
+// enforced, and `result` is what the fake answers and `takes_ms` how long each matching call takes on the scenario's
+// virtual clock (the stimulus), so neither takes part in equality.
 
 export type Expectation = {
   readonly port: string
@@ -9,7 +10,11 @@ export type Expectation = {
   readonly args?: Readonly<Record<string, unknown>>
   readonly count?: number
   readonly result?: unknown
+  readonly takes_ms?: number
 }
+
+/** A call's wait options (design 4.4) beside its input: the member's second argument, with the signal of `abort`. */
+export type CallOptions = { readonly deadline_ms?: number }
 
 // Design 4.6: one injected fault at a time, each meaningful on the ports listed here (a lost reply on the host socket,
 // the relay and the gateway store, where a committed reservation's reply is lost, a lock timeout on the store, unauthorized from the account session and the device service, a timeout read
@@ -39,6 +44,8 @@ export type ScenarioStep = {
   readonly kind: "effect" | "refusal"
   readonly refusal?: string
   readonly refusal_from?: "root" | "value"
+  /** This call's wait options; absent (and with no `abort`), the member is called with its input alone. */
+  readonly options?: CallOptions
   /** The expected answer of this step, a subset of the whole ok answer (a retry answering the first call's identity). */
   readonly answer?: Readonly<Record<string, unknown>>
   readonly expect: readonly Expectation[]
@@ -76,6 +83,9 @@ export type TableScenario = {
   /** The caller's signal fires this long after the call, on the virtual clock (design 4.4); the scenario must state with
    * `count: 0` the effect that must not have happened. */
   readonly abort?: { readonly after_ms: number }
+  /** The call's wait options, its second argument (a deadline runs on the virtual clock); absent, and with no `abort`, the
+   * member is called with its input alone. */
+  readonly options?: CallOptions
   /** A subset of the WHOLE ok answer the call resolved to, in either of the design's shapes: a thread call's flat
    * contract (`{ thread, ... }`) or `{ value }` for every other namespace. Checked beside `expect`, never instead of it. */
   readonly answer?: Readonly<Record<string, unknown>>

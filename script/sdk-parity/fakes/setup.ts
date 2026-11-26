@@ -10,6 +10,7 @@ import type { ScenarioRun, ScenarioSetup } from "../conformance-run"
 import type { TableScenario } from "../expectation"
 import { loadScenarioTable } from "../scenario-table"
 import { accountPorts } from "./account"
+import { virtualClock } from "./clock"
 import { hostPort } from "./host"
 import { type FakeFsPort, type FakeProcessPort, fsPort, processPort } from "./process-fs"
 import { createRecorder, type Recorder } from "./recorder"
@@ -73,7 +74,8 @@ function callScoped(target: unknown, begin: () => void, end: () => Promise<void>
 }
 
 export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {}): ScenarioSetup {
-  const recorder = createRecorder(scenario)
+  const clock = virtualClock(FIXED_NOW)
+  const recorder = createRecorder(scenario, clock)
   const scenarioRoot = join(tmpdir(), `${FAKE_HOME_PREFIX}${randomUUID()}`)
   const home = join(scenarioRoot, "home")
   const elsewhere = join(scenarioRoot, "elsewhere")
@@ -99,9 +101,10 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     ports: {
       ...accountPorts(recorder, { desktopLaunch: options.desktopLaunch === true }),
       host: hostPort(recorder, { agentDir, cwd: home, elsewhere }, deliveries),
-      store: storePort(recorder, () => FIXED_NOW, deliveries),
+      store: storePort(recorder, clock.now, deliveries),
       remote: remote.remote,
-      now: () => FIXED_NOW,
+      now: clock.now,
+      waitClock: clock,
     },
   }
   const cores = options.cores === undefined ? {} : { cores: options.cores(fakes) }
@@ -118,14 +121,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
     rmSync(scenarioRoot, { recursive: true, force: true })
     await remote.dispose()
   }
-  return { root: callScoped(root, begin, end), rootAs, calls: recorder.calls, after: atCallStart }
-}
-
-// The fakes' virtual clock (conformance-run.ts `after`): no fake advances it, so it stands at the call's start. An abort
-// at 0 ms fires there, before the call; one at a later virtual time needs a fake that advances it, which none is yet.
-function atCallStart(ms: number, fire: () => void): void {
-  if (ms !== 0) throw new Error(`the fakes' clock does not advance; an abort after ${ms} ms of virtual time cannot run`)
-  fire()
+  return { root: callScoped(root, begin, end), rootAs, calls: recorder.calls, after: clock.after }
 }
 
 export function scenarioRuns(

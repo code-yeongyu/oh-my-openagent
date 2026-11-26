@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
 import type { ConformanceContext, EffectEvidence } from "./conformance"
-import type { ObservedCall, ScenarioStep, TableScenario } from "./expectation"
+import type { CallOptions, ObservedCall, ScenarioStep, TableScenario } from "./expectation"
 import type { Row } from "./schema"
 
 // The effect-scenario runner of design 7.3. Each table scenario gets a root over fake ports (its setup), the runner calls
@@ -13,14 +13,16 @@ import type { Row } from "./schema"
 // The stream contract (review 6061874518 M3, design 4.4): a member that answers an AsyncIterable is consumed to its one
 // terminal event, `{ kind: "end", outcome | failure | cancelled }`; the run's answer is that event's outcome, a failure is
 // read as a root refusal, and a stream that ends with no terminal event is a failed run. A scenario's `abort` fires the
-// caller's signal after `after_ms` on the fakes' virtual clock, never wall time.
+// caller's signal after `after_ms` on the fakes' virtual clock, never wall time. A call's second argument is its stated
+// `options` with that signal; a call that states neither is made with its input alone.
 
 export type ScenarioSetup = {
   readonly root: unknown
   /** A root for another principal over the same fakes, for a `then` step that names its own principal. */
   readonly rootAs?: (principal: Readonly<Record<string, unknown>>) => unknown
   readonly calls: () => readonly ObservedCall[]
-  /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed. Needed only by an aborting scenario. */
+  /** The fakes' virtual clock: runs `fire` once `ms` of virtual time has passed (at once for 0). Needed only by an
+   * aborting scenario. */
   readonly after?: (ms: number, fire: () => void) => void
 }
 
@@ -109,12 +111,13 @@ type Call = {
   readonly input: Readonly<Record<string, unknown>>
   readonly refusal_from?: "root" | "value"
   readonly kind: "effect" | "refusal"
+  readonly options?: CallOptions
 }
 
 async function invoke(
   member: unknown,
   call: Call,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
 ): Promise<{
   readonly code?: string
   readonly codeSource?: "root" | "value"
@@ -122,8 +125,12 @@ async function invoke(
   readonly threw?: string
 }> {
   try {
+    const options =
+      call.options === undefined && signal === undefined
+        ? []
+        : [{ ...call.options, ...(signal === undefined ? {} : { signal }) }]
     const settled = await settle(
-      Reflect.apply(member as (input: unknown, options: unknown) => unknown, undefined, [call.input, { signal }]),
+      Reflect.apply(member as (...args: unknown[]) => unknown, undefined, [call.input, ...options]),
     )
     if ("broken" in settled) return { threw: settled.broken }
     const { code, source } = refusalOf(settled.answer)
@@ -153,8 +160,8 @@ export async function runEffectScenarios(
       for (const key of (row?.sdk ?? "").split(".")) member = Reflect.get(Object(member), key)
       return member
     }
-    const controller = new AbortController()
-    if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller.abort())
+    const controller = scenario.abort === undefined ? undefined : new AbortController()
+    if (scenario.abort !== undefined) after?.(scenario.abort.after_ms, () => controller?.abort())
     const sequence = [scenario, ...(scenario.then ?? [])]
     const records: EffectEvidence[] = []
     for (const [index, step] of sequence.entries()) {
@@ -165,7 +172,7 @@ export async function runEffectScenarios(
       const result =
         principal !== undefined && rootAs === undefined
           ? { threw: "the setup builds no root for a step's own principal" }
-          : await invoke(memberOf(principal === undefined ? root : rootAs?.(principal)), step, controller.signal)
+          : await invoke(memberOf(principal === undefined ? root : rootAs?.(principal)), step, controller?.signal)
       records.push({
         scenario: index === 0 ? scenario.id : `${scenario.id}#step${index + 1}`,
         row: scenario.row,
