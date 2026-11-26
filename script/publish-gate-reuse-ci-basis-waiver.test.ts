@@ -39,11 +39,12 @@ function stepRun(): string {
 const GH_STUB = [
   // The run pin-ci dispatched for the pin (id 55 on release-ci/<pin>-1-1): OWNED_STATES lists its status:conclusion per
   // read, the last one repeating; OWNED_BRANCH / OWNED_ACTOR override its branch and triggering actor; OWNED_RED_JOB is a
-  // job of it that already failed.
+  // job of it that already failed. ci.yml is workflow 11 and publish.yml workflow 12; run 1 is the parent release attempt
+  // the default ref names, of workflow PARENT_WORKFLOW.
   "owned_state() {",
   '  local n=0 IFS=,; [ -f "$STATE_DIR/owned-reads" ] && n=$(cat "$STATE_DIR/owned-reads"); printf "%s" $((n + 1)) > "$STATE_DIR/owned-reads"',
   "  local states=($OWNED_STATES) state; state=${states[$n]:-${states[${#states[@]}-1]}}",
-  '  printf \'{"id":55,"run_attempt":1,"head_sha":"%s","event":"workflow_dispatch","head_branch":"%s","triggering_actor":{"login":"%s"},"status":"%s","conclusion":%s}\' "$SOURCE_SHA_LOWER" "${OWNED_BRANCH:-release-ci/$SOURCE_SHA_LOWER-1-1}" "${OWNED_ACTOR:-github-actions[bot]}" "${state%%:*}" "$([ -n "${state#*:}" ] && printf \'"%s"\' "${state#*:}" || printf null)"',
+  '  printf \'{"id":55,"workflow_id":%s,"created_at":"2026-01-01T00:05:00Z","run_attempt":1,"head_sha":"%s","event":"workflow_dispatch","head_branch":"%s","triggering_actor":{"login":"%s"},"status":"%s","conclusion":%s}\' "${OWNED_WORKFLOW:-11}" "$SOURCE_SHA_LOWER" "${OWNED_BRANCH:-release-ci/$SOURCE_SHA_LOWER-1-1}" "${OWNED_ACTOR:-github-actions[bot]}" "${state%%:*}" "$([ -n "${state#*:}" ] && printf \'"%s"\' "${state#*:}" || printf null)"',
   "}",
   "leg_jobs() {",
   '  local test_step="$1" conclusion="$1"',
@@ -58,6 +59,9 @@ const GH_STUB = [
   '    *"/actions/runs/42/jobs"*) leg_jobs "$RUN_LEGS" | jq -r "$filter" ;;',
   '    *"/actions/runs/7/jobs"*) leg_jobs "$BASE_LEGS" | jq -r "$filter" ;;',
   '    *"/actions/runs/55 "*) owned_state | jq -r "$filter" ;;',
+  '    *"/actions/workflows/ci.yml "*) echo \'{"id":11}\' | jq -r "$filter" ;;',
+  '    *"/actions/workflows/publish.yml "*) echo \'{"id":12}\' | jq -r "$filter" ;;',
+  '    *"/actions/runs/1 "*) printf \'{"workflow_id":%s,"event":"workflow_dispatch","run_attempt":1,"created_at":"2026-01-01T00:00:00Z"}\' "${PARENT_WORKFLOW:-12}" | jq -r "$filter" ;;',
   '    *"/actions/runs/55/jobs?filter=latest"*) if [ -n "$OWNED_RED_JOB" ]; then printf \'{"jobs":[{"name":"%s","status":"completed","conclusion":"failure"}]}\' "$OWNED_RED_JOB"; else printf \'{"jobs":[{"name":"typecheck","status":"in_progress","conclusion":null}]}\'; fi | jq -r "$filter" ;;',
   '    *"/actions/runs/55/attempts/1/jobs?"*) cat "$OWNED_JOBS" ;;',
   '    *"actions/workflows/ci.yml/runs?branch=dev"*)',
@@ -121,6 +125,8 @@ interface Dispatch {
   readonly ownedStates?: readonly string[]
   readonly ownedBranch?: string
   readonly ownedActor?: string
+  readonly ownedWorkflow?: string
+  readonly parentWorkflow?: string
   readonly ownedRedJob?: string
   /** The tagged child carries the parent's run id without its ref name; the parent knows the exact ref. */
   readonly ownedInChild?: boolean
@@ -215,6 +221,8 @@ function dispatch(input: Dispatch): Outcome {
         input.ownedStates && !input.ownedInChild ? `release-ci/${(input.pin ?? "").toLowerCase()}-1-1` : "",
       OWNED_BRANCH: input.ownedBranch ?? "",
       OWNED_ACTOR: input.ownedActor ?? "",
+      OWNED_WORKFLOW: input.ownedWorkflow ?? "",
+      PARENT_WORKFLOW: input.parentWorkflow ?? "",
       OWNED_RED_JOB: input.ownedRedJob ?? "",
       SOURCE_SHA_LOWER: (input.pin ?? "").toLowerCase(),
       STATE_DIR: root,
@@ -308,6 +316,7 @@ describe("#given a pinned release", () => {
     test.each([
       ["on another release's ref", { ownedBranch: "release-ci/other-2-1" }],
       ["dispatched by someone else", { ownedActor: "maint" }],
+      ["of another workflow", { ownedWorkflow: "99" }],
     ] as const)("#when the recorded run is %s #then it is no receipt", (_name, run) => {
       const result = dispatch({
         pin: fixture.sha.B,
@@ -331,14 +340,33 @@ describe("#given a pinned release", () => {
       expect(result.output).toContain(`CI workflow run 55 ran and passed required validation for ${fixture.sha.B}.`)
     })
 
-    test("#when the tagged child gets the parent's own run and no push is green #then it revalidates and accepts it", () => {
-      const child = { pin: fixture.sha.B, prepared: fixture.sha.T, pushConclusion: "cancelled", ownedInChild: true }
-      const accepted = dispatch({ ...child, ownedStates: ["completed:success"] })
-      expect(accepted.status, accepted.output).toBe(0)
-      expect(accepted.output).toContain(`CI workflow run 55 ran and passed required validation for ${fixture.sha.B}.`)
-      const forged = dispatch({ ...child, ownedStates: ["completed:success"], ownedBranch: "release-ci/elsewhere" })
-      expect(forged.status).not.toBe(0)
-    })
+    test.each([
+      ["accepted", {}],
+      ["refused for a foreign branch", { ownedBranch: "release-ci/elsewhere" }],
+      ["refused when the ref names no publish.yml attempt", { parentWorkflow: "99" }],
+      ["refused when a person dispatched the child", { triggeringActor: "maint" }],
+      ["refused for another workflow's run", { ownedWorkflow: "99" }],
+    ] as const)(
+      "#when the tagged child is given the parent's own run and no push is green #then it is %s",
+      (name, change) => {
+        const result = dispatch({
+          pin: fixture.sha.B,
+          prepared: fixture.sha.T,
+          pushConclusion: "cancelled",
+          ownedInChild: true,
+          ownedStates: ["completed:success"],
+          triggeringActor: "github-actions[bot]",
+          ...change,
+        })
+        if (name === "accepted") {
+          expect(result.status, result.output).toBe(0)
+          expect(result.output).toContain(`CI workflow run 55 ran and passed required validation for ${fixture.sha.B}.`)
+        } else {
+          expect(result.status).not.toBe(0)
+          expect(result.output).toContain("CI run 55")
+        }
+      },
+    )
   })
 
   test("#when only non-push CI is green #then neither dispatch can proceed", () => {

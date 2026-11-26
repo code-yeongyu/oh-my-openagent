@@ -44,7 +44,7 @@ function stepRun(job: string, name: string): string {
 }
 
 // REF_POST: "lost" creates the ref but answers with an error, "fails" creates nothing. REF_READ: "error" answers HTTP 502.
-// DISPATCH: "no-id" answers without a run id. RUN_READ / CANCEL: "error" fails that call. RUN_STATUS: the run's status.
+// DISPATCH: "no-id" answers without a run id; the ref then has one unknown queued run, 78. RUN_LIST: "error" fails listing it. RUN_READ / CANCEL: "error" fails that call. RUN_STATUS: the run's status.
 const GH_STUB = [
   "gh() {",
   '  printf "%s\\n" "$*" >> "$GH_CALLS"',
@@ -57,6 +57,8 @@ const GH_STUB = [
   '    "api --method DELETE "*) touch "$STATE/deleted" ;;',
   '    *"/actions/workflows/ci.yml/dispatches "*) if [ "${DISPATCH:-}" = no-id ]; then echo "{}"; else echo \'{"workflow_run_id":77}\'; fi | jq -r "$filter" ;;',
   '    *"/actions/runs/77 "*) [ "${RUN_READ:-}" = error ] && return 1; printf \'{"status":"%s"}\' "$RUN_STATUS" | jq -r "$filter" ;;',
+  '    *"actions/workflows/ci.yml/runs"*) [ "${RUN_LIST:-}" = error ] && return 1; echo \'{"workflow_runs":[{"id":78,"status":"queued"}]}\' | jq -r "$filter" ;;',
+  '    "run cancel 78"*) touch "$STATE/cancelled-stray" ;;',
   '    "run cancel 77"*) [ "${CANCEL:-}" = error ] && return 1; touch "$STATE/cancelled" ;;',
   "    *) return 1 ;;",
   "  esac",
@@ -83,6 +85,7 @@ interface Pin {
   readonly ciYml?: string
   readonly refPost?: "lost" | "fails"
   readonly dispatch?: "no-id"
+  readonly refRead?: "error"
 }
 
 interface Cleanup {
@@ -90,6 +93,7 @@ interface Cleanup {
   readonly runRead?: "error"
   readonly cancel?: "error"
   readonly refRead?: "error"
+  readonly runList?: "error"
 }
 
 interface Outcome {
@@ -153,6 +157,7 @@ function pinCi(input: Pin): Outcome {
     GITHUB_RUN_ATTEMPT: "1",
     REF_POST: input.refPost ?? "",
     DISPATCH: input.dispatch ?? "",
+    REF_READ: input.refRead ?? "",
   })
   const outputs = Object.fromEntries(
     readFileSync(output, "utf8")
@@ -174,9 +179,15 @@ function unpinCi(after: Outcome, input: Cleanup) {
     RUN_READ: input.runRead ?? "",
     CANCEL: input.cancel ?? "",
     REF_READ: input.refRead ?? "",
+    RUN_LIST: input.runList ?? "",
   })
   const exists = (name: string) => spawnSync("test", ["-e", join(after.root, name)]).status === 0
-  return { ...result, deleted: exists("deleted"), cancelled: exists("cancelled") }
+  return {
+    ...result,
+    deleted: exists("deleted"),
+    cancelled: exists("cancelled"),
+    cancelledStray: exists("cancelled-stray"),
+  }
 }
 
 describe("publish.yml pin-ci (#15094)", () => {
@@ -229,11 +240,27 @@ describe("publish.yml pin-ci (#15094)", () => {
     expect(result.outputs.ref_owned).toBe("true")
   })
 
-  test("#when creating the ref fails #then it refuses, owns nothing and dispatches nothing", () => {
+  test("#when creating the ref fails #then it dispatches nothing, and unpin-ci finds no ref and succeeds", () => {
     const result = pinCi({ pin: fixture.sha.B, refPost: "fails" })
     expect(result.status).not.toBe(0)
-    expect(result.outputs.ref_owned).toBeUndefined()
+    expect(result.outputs.ref_owned).toBe("true")
     expect(result.ghCalls).not.toContain("dispatches")
+    const cleanup = unpinCi(result, { runStatus: "completed" })
+    expect(cleanup.status, cleanup.output).toBe(0)
+    expect(cleanup.output).toContain("is already gone")
+  })
+
+  test("#when the create's answer and its read-back both fail #then unpin-ci still reconciles the ref or fails unresolved", () => {
+    const uncertain = () => pinCi({ pin: fixture.sha.B, refPost: "lost", refRead: "error" })
+    const first = uncertain()
+    expect(first.status).not.toBe(0)
+    expect(first.outputs.ref_owned).toBe("true")
+    const cleaned = unpinCi(first, { runStatus: "completed" })
+    expect(cleaned.status, cleaned.output).toBe(0)
+    expect(cleaned.deleted).toBe(true)
+    const stuck = unpinCi(uncertain(), { runStatus: "completed", refRead: "error" })
+    expect(stuck.status).not.toBe(0)
+    expect(stuck.output).toContain("read-ref")
   })
 
   test("#when the dispatch answers no run id #then it fails without a second dispatch, and unpin-ci removes the ref", () => {
@@ -245,6 +272,14 @@ describe("publish.yml pin-ci (#15094)", () => {
     const cleanup = unpinCi(result, { runStatus: "completed" })
     expect(cleanup.status, cleanup.output).toBe(0)
     expect(cleanup.deleted).toBe(true)
+    expect(cleanup.cancelledStray).toBe(true)
+    const unlisted = unpinCi(pinCi({ pin: fixture.sha.B, dispatch: "no-id" }), {
+      runStatus: "completed",
+      runList: "error",
+    })
+    expect(unlisted.status).not.toBe(0)
+    expect(unlisted.deleted).toBe(true)
+    expect(unlisted.output).toContain("list-runs")
   })
 
   test("#when the gate is done while the release's own run still runs #then unpin-ci cancels it and removes the ref", () => {
