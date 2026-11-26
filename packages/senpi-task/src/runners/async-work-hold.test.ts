@@ -63,4 +63,21 @@ describe("createAsyncWorkHold never resolves to the held note (omo#10487)", () =
     // then
     expectTyped(h.settled(), "could not be read")
   })
+
+  test("#given a hold whose work drained #when every read stays readable but not idle (queued input, no turn) #then the no-progress bound still ends it as async_work_pending", async () => {
+    // given - the bound is 3 confirmations (3 s / 1 s), counted from the drain
+    const h = holdOver(() => false)
+    h.drain()
+
+    // when - the first read sees the drain (progress), then three unchanged non-idle reads
+    for (let check = 0; check < 3; check += 1) {
+      await h.confirm()
+      expect(h.settled()).toBeUndefined()
+    }
+    await h.confirm()
+
+    // then
+    expectTyped(h.settled(), "did not answer for 3 s")
+    expect(h.scheduler.pending()).toBe(0)
+  })
 })

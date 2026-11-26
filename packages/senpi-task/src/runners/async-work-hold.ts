@@ -5,6 +5,7 @@ export type AsyncWorkTimerHandle = { readonly cancel: () => void }
 export type AsyncWorkScheduler = (run: () => void, delayMs: number) => AsyncWorkTimerHandle
 
 const DEFAULT_ASYNC_WORK_STALE_LIMIT_MS = 60 * 60_000
+const DRAINED_SIGNATURE = "drained"
 
 type CompletedOutcome = Extract<RunnerOutcome, { readonly status: "completed" }>
 
@@ -85,14 +86,21 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     timer = input.schedule(check, input.intervalMs)
   }
 
-  const stillPending = (current: Held, next: PendingAsyncWork): boolean => {
-    const nextSignature = pendingWorkSignature(next)
+  // One no-progress bound for the whole unresolved hold: while the work is pending, and after it
+  // drained while the session stays readable but not idle (queued input that never starts a turn).
+  const stillUnresolved = (current: Held, next: PendingAsyncWork | undefined): boolean => {
+    const nextSignature = next === undefined ? DRAINED_SIGNATURE : pendingWorkSignature(next)
     staleChecks = progressed || nextSignature !== signature ? 0 : staleChecks + 1
     progressed = false
     signature = nextSignature
-    current.work = next
+    if (next !== undefined) current.work = next
     if (staleChecks < maxStaleChecks) return true
-    fail(current, `none of it progressed for ${duration(staleLimitMs)}`)
+    fail(
+      current,
+      next === undefined
+        ? `that work finished, but the child did not answer for ${duration(staleLimitMs)}`
+        : `none of it progressed for ${duration(staleLimitMs)}`,
+    )
     return false
   }
 
@@ -101,7 +109,7 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
     const next = input.pending()
     if (next !== undefined) {
       unreadable = 0
-      if (stillPending(current, next)) arm()
+      if (stillUnresolved(current, next)) arm()
       return
     }
     if (idle === undefined) {
@@ -111,8 +119,9 @@ export function createAsyncWorkHold(input: AsyncWorkHoldInput): AsyncWorkHold {
       return
     }
     unreadable = 0
-    if (!idle) arm()
-    else fail(current, "it finished, but nothing woke the child to answer it; resume it with task_send")
+    if (!idle) {
+      if (stillUnresolved(current, undefined)) arm()
+    } else fail(current, "it finished, but nothing woke the child to answer it; resume it with task_send")
   }
 
   function check(): void {
