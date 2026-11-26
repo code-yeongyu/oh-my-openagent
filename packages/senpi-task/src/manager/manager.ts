@@ -33,6 +33,7 @@ import type {
   TaskRunStats,
 } from "../state"
 import { reopenSelfResumedTurn, type SelfResumedTurnPorts } from "./self-resumed-turn"
+import { ContinuedRuns } from "./continued-run"
 import { createSteeringEngine } from "../steering"
 import type {
   CancelOptions,
@@ -230,6 +231,7 @@ class TaskManagerImpl implements TaskManager {
   readonly #names = new NameRegistry()
   readonly #taskSequence = new TaskSequence()
   readonly #live = new Map<string, LiveTask>()
+  readonly #continuedRuns = new ContinuedRuns()
   // Children whose teardown rejected and that have no pid or daemon session for the orphan path. They
   // are resident for the lifecycle (eviction, idle reclaim, shutdown and TTL see them and retry their
   // teardown) but are not live children: steering never reaches them, and only a teardown that
@@ -1212,6 +1214,7 @@ class TaskManagerImpl implements TaskManager {
     handle: ManagedChildHandle,
     awaitingInput?: { readonly reason: AwaitingInputReason },
   ): Promise<ReattachResult> {
+    const followContinuation = this.#continuedRuns.follower(record.task_id, handle)
     const result = await reattachManagedTask({
       record,
       handle,
@@ -1236,7 +1239,10 @@ class TaskManagerImpl implements TaskManager {
         void this.#steering.notifyStarted(fresh.task_id)
       },
       ...(awaitingInput === undefined ? {} : { awaitingInput }),
+      ...(followContinuation === undefined ? {} : { followContinuation }),
     })
+    // A concurrent revival attached first: this one is done when that one has decided its continued run.
+    if (!result.ok && result.kind === "already_attached") await this.#continuedRuns.settled(record.task_id)
     const paused = result.ok ? this.get(record.task_id) : undefined
     if (paused?.status === "paused") this.#runPause.park(paused.task_id, paused.notification.run_epoch)
     // The flag is user-visible state: a live progress row leaves "starting" for
@@ -1685,14 +1691,15 @@ class TaskManagerImpl implements TaskManager {
   }
 
   #subscribeChildFacts(handle: ManagedChildHandle, taskId: string): () => void {
-    return subscribeChildFacts({
+    const unsubscribe = subscribeChildFacts({
       handle,
       taskId,
       store: this.#options.store,
       now: this.#now,
       runStats: this.#runStats,
       fallbackExhaustions: this.#nativeFallbackExhaustions,
-      reopen: () => reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle),
+      reopen: () =>
+        this.#continuedRuns.reopening(handle, reopenSelfResumedTurn(this.#selfResumedPorts, taskId, handle)),
       onMotion: () => this.#clearAwaitingInput(taskId),
       onLiveness: (status) => {
         if (status.state === "running") void this.#steering.notifyStarted(taskId)
@@ -1703,6 +1710,10 @@ class TaskManagerImpl implements TaskManager {
         if (record != null && record.host_pid === this.#hostPid) this.#options.onChildExtensionEvent?.(event, record)
       },
     })
+    return () => {
+      unsubscribe()
+      this.#continuedRuns.released(handle)
+    }
   }
 
   async #tryRuntimeFallback(input: {
