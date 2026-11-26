@@ -37,8 +37,8 @@ describe("the keychain helper under the test preload", () => {
     expect({
       testFile: underTestRun("/repo/packages/account-core/src/calls/store.test.ts", unmarked),
       specFile: underTestRun("/repo/x.spec.mjs", unmarked),
-      launcher: underTestRun("/usr/local/lib/node_modules/omo-ai/bin/omo.js", unmarked),
-      compiled: underTestRun("/usr/local/bin/omo", unmarked),
+      launcher: underTestRun("/usr/local/lib/node_modules/omo-ai/launcher/main.js", unmarked),
+      compiled: underTestRun("/opt/omo-ai/omo-native", unmarked),
     }).toEqual({ testFile: true, specFile: true, launcher: false, compiled: false })
   })
 
