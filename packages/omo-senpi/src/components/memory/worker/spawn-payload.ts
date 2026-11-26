@@ -24,17 +24,31 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
   if (isDream && (input.systemTokenBudget === undefined || input.systemTokenTarget === undefined)) {
     throw new TypeError("dream spawn requires a system token budget and target")
   }
+  // Reflections get the token inputs too (#15054): they are the writer that grows system/.
+  const tokenBudget =
+    input.systemTokenBudget === undefined || input.systemTokenTarget === undefined
+      ? undefined
+      : {
+          budget: input.systemTokenBudget,
+          target: input.systemTokenTarget,
+          path: join(sessionDir, "system-tokens.json"),
+        }
   const dreamPaths = isDream
     ? {
         skillsUsage: join(sessionDir, "skills-usage.json"),
         memoryUsage: join(sessionDir, "memory-usage.json"),
         dreamState: join(sessionDir, "dream-state.json"),
         dreamPolicy: join(sessionDir, "dream-policy.json"),
-        systemTokens: join(sessionDir, "system-tokens.json"),
         audit: join(sessionDir, "audit.json"),
       }
     : undefined
-  const payloadPaths = [transcript, persona, prompt, ...(dreamPaths === undefined ? [] : Object.values(dreamPaths))]
+  const payloadPaths = [
+    transcript,
+    persona,
+    prompt,
+    ...(tokenBudget === undefined ? [] : [tokenBudget.path]),
+    ...(dreamPaths === undefined ? [] : Object.values(dreamPaths)),
+  ]
   // Payload files are chmod 0400 after writing, so a reused run directory (retry with the same
   // runId) must relax the mode before rewriting or the open() fails with EACCES.
   const chmodFile = input.chmodFile ?? chmod
@@ -55,6 +69,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ),
     writeFile(persona, isDream ? loadDreamPersona().markdown : loadReflectionPersona().markdown, "utf8"),
     writeFile(prompt, buildTaskPrompt(input.run, input.worktree.dir, transcript), "utf8"),
+    ...(tokenBudget === undefined ? [] : [writeSystemTokenEstimate(input.worktree.dir, tokenBudget.path)]),
     ...(dreamPaths === undefined
       ? []
       : [
@@ -66,7 +81,6 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
             `${JSON.stringify({ version: 1, people: input.peoplePolicy }, null, 2)}\n`,
             "utf8",
           ),
-          writeSystemTokenEstimate(input.worktree.dir, dreamPaths.systemTokens),
           (async () => {
             const systemTokens = await estimateSystemTokens(input.worktree.dir)
             const audit = await auditMemoryRepo(input.worktree.dir, {
@@ -98,6 +112,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     transcript,
     persona,
     prompt,
+    ...(tokenBudget === undefined ? {} : { systemTokens: tokenBudget.path }),
     ...dreamPaths,
     ...(dreamTarget === undefined ? {} : { dreamTarget }),
   }
@@ -106,6 +121,13 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...withoutForeignPackageDirEnv(input.env, launch),
     MEMORY_DIR: input.worktree.dir,
     TRANSCRIPT_PATH: transcript,
+    ...(tokenBudget === undefined
+      ? {}
+      : {
+          SYSTEM_TOKENS_PATH: tokenBudget.path,
+          SYSTEM_TOKEN_BUDGET: String(tokenBudget.budget),
+          SYSTEM_TOKEN_TARGET: String(tokenBudget.target),
+        }),
     ...(dreamPaths === undefined
       ? {}
       : {
@@ -113,10 +135,7 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
           MEMORY_USAGE_PATH: dreamPaths.memoryUsage,
           DREAM_STATE_PATH: dreamPaths.dreamState,
           DREAM_POLICY_PATH: dreamPaths.dreamPolicy,
-          SYSTEM_TOKENS_PATH: dreamPaths.systemTokens,
           AUDIT_PATH: dreamPaths.audit,
-          SYSTEM_TOKEN_BUDGET: String(input.systemTokenBudget),
-          SYSTEM_TOKEN_TARGET: String(input.systemTokenTarget),
           ...(dreamTarget === undefined ? {} : { DREAM_TARGET_PATH: dreamTarget }),
         }),
     SENPI_MEMORY_REFLECTION: "1",
@@ -168,12 +187,9 @@ export async function prepareReflectionSpawn(input: PrepareReflectionSpawnInput)
     ...(input.run.request.trigger === "dream" ? { origin: input.run.request.origin } : {}),
     mergePolicy: input.mergePolicy,
     ...(input.run.request.targetDoc === undefined ? {} : { targetDoc: input.run.request.targetDoc }),
-    ...(isDream
-      ? {
-          systemTokenBudget: input.systemTokenBudget,
-          systemTokenTarget: input.systemTokenTarget,
-        }
-      : {}),
+    ...(tokenBudget === undefined
+      ? {}
+      : { systemTokenBudget: tokenBudget.budget, systemTokenTarget: tokenBudget.target }),
     worktree: input.worktree,
     command: launch.command,
     args: [...launch.prefixArgs, ...args],

@@ -111,6 +111,7 @@ describe("dream shutdown evaluator", () => {
     let reserve: DreamTriggerSession["store"]["tryReserve"] | undefined
     const f = await fixture({
       reservationStore: {
+        readState: async () => ({}),
         tryReserve: async (request, signal) => {
           signalReservationStarted?.()
           await reservationReleased
@@ -208,6 +209,7 @@ describe("dream shutdown evaluator", () => {
     const f = await fixture({
       now: () => clock,
       reservationStore: {
+        readState: async () => ({}),
         tryReserve: async (request, signal) => {
           if (reserve === undefined) throw new Error("reservation delegate unavailable")
           const result = await reserve(request, signal)

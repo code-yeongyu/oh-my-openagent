@@ -18,6 +18,7 @@ import { createMemoryNoticeWiring } from "./memory-notice-wiring"
 import { createConfiguredFactsApplier, publishSessionFactsApplier } from "./facts-apply-rpc"
 import { createKibitzerComposition, type KibitzerComposition } from "./kibitzer"
 import { createPressureDreamAdmission } from "./pressure-dream-admission"
+import { systemPressureReached } from "./status"
 import { createMemoryRecallWiring, createSharedRecallCorpusCache } from "./recall-wiring"
 import { loadRecallStoreRuntime } from "./recall-store-runtime-loader"
 import { memoryBlockBuild } from "./memory-block-build"
@@ -218,8 +219,15 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
   })
 
   const dreamTriggerWiring = buildDreamTriggerWiring(options, runtimeWiring, activeSession, userActivity.has, work)
+  const pressureEstimates = new Map<string, number>()
   const pressureDreamAdmission = createPressureDreamAdmission({
     request: (sessionId) => dreamTriggerWiring.requestPressureDream(sessionId),
+    reached: async (sessionId) => {
+      const identity = resolveContext(sessionId)
+      if (identity === undefined) return false
+      const settings = resolveMemorySettings(options.loadConfig({ cwd: options.cwd() }).config.memory)
+      return systemPressureReached(identity, settings.compile_warn_tokens, pressureEstimates)
+    },
     work,
     ...(options.logger === undefined ? {} : { logger: options.logger }),
   })
@@ -315,9 +323,9 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
                 observer?.signal.throwIfAborted()
                 if (options.logger !== undefined) logBindReconcileFailure(options.logger, error)
               }
-              if (resolveContext(sessionId) !== identity) return
-              pressureDreamAdmission.requestDeferred(sessionId)
             })
+            if (resolveContext(sessionId) === identity && userActivity.has(sessionId))
+              pressureDreamAdmission.checkAfterSettle(sessionId)
           }
           observer?.phase("onSettled.status.sync")
           if (resolveContext(sessionId) !== identity) return
@@ -338,7 +346,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
         })
       activeSession.current = sessionId
       userActivity.reset(sessionId)
-      pressureDreamAdmission.reset(sessionId)
       lastEventCtx.current = eventCtx
       reflectionLive.attach(sessionId)
       registerMemoryFilesystemPolicy(pi, identity)
@@ -348,7 +355,7 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
       }
       factsWiringFor(identity).reconcileExtractor(sessionId)
       await reflectionLive.bind(pi, sessionId, identity, eventCtx, () => {
-        pressureDreamAdmission.deferOrRequest(sessionId, userActivity.has(sessionId))
+        pressureDreamAdmission.requestIfAdmitted(sessionId, userActivity.has(sessionId))
       })
     },
 
@@ -358,7 +365,6 @@ export function createMemoryWiring(options: MemoryWiringOptions): MemoryWiring {
 
     onSessionShutdown(input: ShutdownDrainInput): Promise<void> {
       const resetSession = (sessionId: string): void => {
-        pressureDreamAdmission.reset(sessionId)
         userActivity.reset(sessionId)
       }
       const parts = {

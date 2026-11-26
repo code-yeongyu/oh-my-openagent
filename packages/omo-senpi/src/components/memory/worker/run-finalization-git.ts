@@ -80,13 +80,20 @@ export async function resolveFinalizationDecision(
     } else if (validation.status === "no_changes") {
       // Every entry the run wrote was refused: say so instead of reading as "nothing to do".
       const note = validation.dropped?.length ? describeDroppedEntries(validation.dropped) : undefined
-      const decision = { outcome: "no_changes" as const, ...(note === undefined ? {} : { detail: note }) }
+      const budget = await validateSystemBudget(context, ledger, worktree, [])
+      const detail = [note, budget.detail].filter(Boolean).join("; ") || undefined
+      const decision = {
+        outcome: "no_changes" as const,
+        ...(budget.reason === undefined ? {} : { reason: budget.reason }),
+        ...(detail === undefined ? {} : { detail }),
+      }
       await updateRunLedger(ledgerPath, {
         finalizePhase: "validated",
         validatedTipSha: validation.tipSha,
         validatedChangedPaths: [],
         finalizeOutcome: decision.outcome,
-        ...(note === undefined ? {} : { finalizeDetail: note }),
+        ...(budget.reason === undefined ? {} : { finalizeReason: budget.reason }),
+        ...(detail === undefined ? {} : { finalizeDetail: detail }),
       })
       await cleanupAndRecord(context, ledger, runDir)
       return decision
@@ -107,7 +114,7 @@ export async function resolveFinalizationDecision(
     if (ledger.mergePolicy === "auto") {
       const legacy = await probeLegacyAutoRunReceipt(worktree, ledger.runId)
       if (legacy.status === "integrated") {
-        const budget = await validateIntegratedDreamBudget(context, ledger)
+        const budget = await validateSystemBudget(context, ledger, worktree, undefined)
         const decision = { outcome: "merged" as const, integrationSha: legacy.integrationSha, ...budget }
         await checkpointIntegrated(ledgerPath, decision)
         await cleanupAndRecord(context, ledger, runDir)
@@ -121,7 +128,7 @@ export async function resolveFinalizationDecision(
   }
 
   if (validated.tipSha === ledger.baseSha) {
-    const decision = { outcome: "no_changes" as const }
+    const decision = { outcome: "no_changes" as const, ...(await validateSystemBudget(context, ledger, worktree, [])) }
     await checkpointDecision(ledgerPath, decision)
     await cleanupAndRecord(context, ledger, runDir)
     return decision
@@ -133,7 +140,7 @@ export async function resolveFinalizationDecision(
     validatedTipSha: validated.tipSha,
   })
   if (probe.status === "integrated") {
-    const budget = await validateIntegratedDreamBudget(context, ledger)
+    const budget = await validateSystemBudget(context, ledger, worktree, validated.changedPaths)
     const decision = { outcome: "merged" as const, integrationSha: probe.integrationSha, ...budget }
     await checkpointIntegrated(ledgerPath, decision)
     await cleanupAndRecord(context, ledger, runDir)
@@ -155,7 +162,8 @@ export async function resolveFinalizationDecision(
     withWriterLock: (operation) => writerLock(context, operation),
   })
   maybeKillAt("after-merge")
-  const budget = integrated.outcome === "merged" ? await validateIntegratedDreamBudget(context, ledger) : {}
+  const budget =
+    integrated.outcome === "merged" ? await validateSystemBudget(context, ledger, worktree, validated.changedPaths) : {}
   const decision: DurableFinalizationDecision = {
     outcome: integrated.outcome,
     ...(integrated.detail === undefined && droppedNote === undefined
@@ -204,11 +212,30 @@ async function checkpointIntegrated(path: string, decision: DurableFinalizationD
   })
 }
 
-async function validateIntegratedDreamBudget(
+/**
+ * The committed system/ estimate against the run's target (#15054). Every dream owns the target, merged or
+ * not, except a document-maintenance dream that may only touch its target doc. A reflection is held to it
+ * only when it changed system/ and grew it: one that leaves system/ alone or shrinks it is not the cause.
+ */
+async function validateSystemBudget(
   context: RunFinalizationContext,
   ledger: ReservationRunLedger,
+  worktree: ReturnType<typeof worktreeFromLedger>,
+  changedPaths: readonly string[] | undefined,
 ): Promise<Pick<DurableFinalizationDecision, "reason" | "detail">> {
-  if (ledger.kind !== "dream" || ledger.origin === undefined || ledger.systemTokenTarget === undefined) return {}
+  if (ledger.systemTokenTarget === undefined) return {}
+  if (ledger.kind !== "dream") {
+    if (changedPaths === undefined || !changedPaths.some(isSystemMarkdown)) return {}
+    const estimate = await estimateSystemTokens(context.identity.paths.repo)
+    if (estimate.totalTokens < ledger.systemTokenTarget) return {}
+    const base = await systemTokensAt(worktree.exec, context.identity.paths.repo, ledger.baseSha)
+    if (estimate.totalTokens <= base) return {}
+    return {
+      reason: "budget_not_met",
+      detail: `Reflection grew committed system/ from ${base} to ${estimate.totalTokens} tokens; target is below ${ledger.systemTokenTarget} tokens`,
+    }
+  }
+  if (ledger.origin === undefined || ledger.targetDoc !== undefined) return {}
   const estimate = await estimateSystemTokens(context.identity.paths.repo)
   const validation = validateDreamTokenBudget({
     origin: ledger.origin,
@@ -221,6 +248,26 @@ async function validateIntegratedDreamBudget(
   return {
     detail: `Committed system/ estimate is ${validation.totalTokens} tokens; dream target is below ${validation.targetTokens} tokens`,
   }
+}
+
+function isSystemMarkdown(path: string): boolean {
+  return path.startsWith("system/") && path.endsWith(".md")
+}
+
+/** The same per-file `ceil(bytes / 4)` rule as `estimateSystemTokens`, read from a commit's tree. */
+async function systemTokensAt(
+  exec: ReturnType<typeof worktreeFromLedger>["exec"],
+  repoDir: string,
+  sha: string,
+): Promise<number> {
+  const listed = await exec.run(["ls-tree", "-r", "-l", sha, "--", "system"], { cwd: repoDir, timeoutMs: 30_000 })
+  if (listed.code !== 0) throw new Error(`git ls-tree ${sha} failed: ${listed.stderr.trim()}`)
+  let tokens = 0
+  for (const line of listed.stdout.split("\n")) {
+    const match = /^\d+ blob [0-9a-f]+ +(\d+)\t(.+)$/.exec(line)
+    if (match?.[1] !== undefined && match[2]?.endsWith(".md") === true) tokens += Math.ceil(Number(match[1]) / 4)
+  }
+  return tokens
 }
 
 /**

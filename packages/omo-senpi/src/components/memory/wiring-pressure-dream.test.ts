@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { realpathSync } from "node:fs"
-import { mkdtemp } from "node:fs/promises"
+import { mkdtemp, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { buildIdentityPaths, GitMemoryRepo } from "@oh-my-opencode/memory-core"
+import { buildIdentityPaths, GitMemoryRepo, InFlightReads } from "@oh-my-opencode/memory-core"
 import type { MemoryIdentityRuntime } from "./identity-runtime"
 import { createMemoryIdentityContext } from "./context"
 import { MemoryFakeExtensionAPI, componentContext, loadedMemoryConfig, memorySettings } from "./memory.test-support"
@@ -44,6 +44,7 @@ describe("memory pressure dream wiring", () => {
     const runtime = {
       reconcile: async () => {},
       store: {
+        readState: async () => ({}),
         tryReserve: async (request: unknown) => {
           reservationAttempts.push(request)
           reservationObserved()
@@ -116,5 +117,87 @@ describe("memory pressure dream wiring", () => {
         snapshots: [],
       },
     ])
+    await wiring.onSessionShutdown({ reason: "reload", sessionId, deadlineAt: Date.now() + 10_000 })
   }, 30_000)
+
+  test("#given system memory below pressure at bind #when a later commit pushes it past the target and a turn settles #then the settle requests a pressure dream (#15054)", async () => {
+    const root = realpathSync.native(await mkdtemp(join(tmpdir(), "omo-memory-pressure-dream-settle-")))
+    roots.push(root)
+    const identityName = "pressure-settle-agent"
+    const paths = buildIdentityPaths(root, identityName)
+    const repo = new GitMemoryRepo({ dir: paths.repo, agentId: identityName })
+    await repo.init({ seedFiles: [{ relativePath: "system/persona.md", content: "P".repeat(16) }] })
+    const identity = createMemoryIdentityContext({
+      identity: identityName,
+      identityPaths: paths,
+      binding: { identity: identityName, repoPathHash: "hash", boundAt: 1 },
+    })
+    const sessionId = "session-pressure-settle"
+    const reservationAttempts: unknown[] = []
+    let reservationObserved!: () => void
+    const reservation = new Promise<void>((resolve) => {
+      reservationObserved = resolve
+    })
+    const runtime = {
+      reconcile: async () => {},
+      store: {
+        readState: async () => ({}),
+        tryReserve: async (request: unknown) => {
+          reservationAttempts.push(request)
+          reservationObserved()
+          return { status: "pending", run: { runId: "run-pressure-settle", request } }
+        },
+      },
+      launch: () => {},
+    } as unknown as MemoryIdentityRuntime
+    const work = new InFlightReads()
+    const wiring = createMemoryWiring({
+      sessions: new Map([[sessionId, { context: identity }]]),
+      loadConfig: () => loadedMemoryConfig(memorySettings({ compile_warn_tokens: 50 })),
+      cwd: () => root,
+      env: {},
+      createRuntime: () => runtime,
+      work,
+    })
+    const pi = new MemoryFakeExtensionAPI()
+    wiring.registerStatic(pi, componentContext())
+    const eventCtx = {
+      sessionManager: { getSessionId: () => sessionId, getEntries: () => [] },
+      ui: { setStatus: () => {}, notify: () => {} },
+    }
+    await wiring.afterBind(pi, sessionId, identity, eventCtx)
+    await pi.dispatch("input", { source: "rpc", inputId: "below-input", text: "Continue." }, eventCtx)
+    await pi.dispatch("input_disposition", { inputId: "below-input", disposition: "started" }, eventCtx)
+    await pi.dispatch("agent_settled", {}, eventCtx)
+    await work.settled()
+    expect(reservationAttempts).toEqual([])
+
+    await writeFile(join(paths.repo, "system", "learned.md"), `---\ndescription: Learned\n---\n${"L".repeat(320)}`)
+    await repo.commitWrite(["system/learned.md"], "reflection grew system memory", {
+      agentId: identityName,
+      authorName: "Reflection Agent",
+    })
+
+    let reservationTimeout: ReturnType<typeof setTimeout> | undefined
+    const boundedReservation = Promise.race([
+      reservation,
+      new Promise<never>((_resolve, reject) => {
+        reservationTimeout = setTimeout(
+          () => reject(new Error("no pressure reservation after system/ crossed the target")),
+          remainingTestTime(),
+        )
+      }),
+    ])
+    try {
+      await pi.dispatch("input", { source: "rpc", inputId: "above-input", text: "Continue." }, eventCtx)
+      await pi.dispatch("input_disposition", { inputId: "above-input", disposition: "started" }, eventCtx)
+      await pi.dispatch("agent_settled", {}, eventCtx)
+      await boundedReservation
+    } finally {
+      if (reservationTimeout !== undefined) clearTimeout(reservationTimeout)
+      await wiring.onSessionShutdown({ reason: "reload", sessionId, deadlineAt: Date.now() + 10_000 })
+      await work.settled()
+    }
+    expect(reservationAttempts).toEqual([{ trigger: "dream", origin: "pressure", conversationIds: [], snapshots: [] }])
+  })
 })

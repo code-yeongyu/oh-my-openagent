@@ -48,6 +48,13 @@ export async function fireDream(input: {
   })
   if (!decision.allowed) return { fired: false, rejection: decision.rejection }
   if (stopped()) return { fired: false, rejection: "aborted" }
+  // Pressure is re-checked on every settled turn (#15054). A run already in flight settles first and the
+  // next turn re-checks, so queueing behind it would only merge a redundant dream into the pending slot.
+  if (origin === "pressure") {
+    const reservation = await session.store.readState()
+    if (reservation.active !== undefined || reservation.pending !== undefined)
+      return { fired: false, rejection: "run_in_flight" }
+  }
   const selected =
     origin === "pressure"
       ? []

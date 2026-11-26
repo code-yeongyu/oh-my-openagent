@@ -249,6 +249,20 @@ export async function estimateSystemTokensCached(
   return estimate
 }
 
+/** Whether committed system/ at HEAD has reached the pressure target, the line that requests a pressure dream. */
+export async function systemPressureReached(
+  context: MemoryIdentityContext,
+  compileWarnTokens: number,
+  cache: Map<string, number>,
+): Promise<boolean> {
+  const repo = createGitRepo(context.identityPaths.repo)
+  const head = await repo.head()
+  if (head === null) return false
+  return (
+    (await estimateSystemTokensCached(repo, head, cache)) >= Math.floor(MEMORY_PRESSURE_SOFT_RATIO * compileWarnTokens)
+  )
+}
+
 export async function estimateSystemTokens(repo: GitRepoForStatus, head: string): Promise<number> {
   const paths = await repo.lsTree(head)
   const systemMarkdownPaths = paths.filter(isSystemMarkdown)

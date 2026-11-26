@@ -7,6 +7,13 @@ import type { OmoMemorySettings } from "@oh-my-opencode/omo-config-core"
 /** Unreflected-volume floor for transcript-driven automatic dream origins, in UTF-8 bytes (plan todo 24). */
 export const DREAM_VOLUME_GATE_BYTES = 8192
 
+/**
+ * Pressure dreams keep their own short spacing instead of `min_hours_between` (#15054): an idle dream that
+ * ended `no_changes` must not hold the corrective trim back for a day, yet a trim that keeps missing its
+ * target must not relaunch on every settled turn either.
+ */
+const PRESSURE_DREAM_SPACING_MS = 3_600_000
+
 export interface DreamTriggerSettings {
   readonly enabled: boolean
   readonly idleMinutes: number
@@ -53,7 +60,7 @@ export interface DreamGateProbe {
 
 /**
  * The single dream gate evaluation. Manual bypasses every automatic gate. Pressure applies
- * dream.enabled and the shared min_hours_between spacing, but not transcript volume. Idle and
+ * dream.enabled and its own one-hour spacing, but not min_hours_between or transcript volume. Idle and
  * shutdown additionally require unreflected volume strictly greater than 8192 bytes, while
  * shutdown also requires shutdown_launch.
  */
@@ -66,7 +73,8 @@ export async function evaluateDreamGates(
   if (!settings.enabled) return { allowed: false, rejection: "disabled" }
   if (origin === "shutdown" && !settings.shutdownLaunch) return { allowed: false, rejection: "shutdown_disabled" }
   const lastDreamAtMs = await probe.lastDreamAtMs()
-  if (lastDreamAtMs !== null && probe.nowMs - lastDreamAtMs <= settings.minHoursBetween * 3_600_000) {
+  const spacingMs = origin === "pressure" ? PRESSURE_DREAM_SPACING_MS : settings.minHoursBetween * 3_600_000
+  if (lastDreamAtMs !== null && probe.nowMs - lastDreamAtMs <= spacingMs) {
     return { allowed: false, rejection: "too_soon" }
   }
   if (origin !== "pressure" && (await probe.unreflectedBytes()) <= DREAM_VOLUME_GATE_BYTES) {

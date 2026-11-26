@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readFile, writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { dirname, join } from "node:path"
 
 import {
   GitMemoryRepo,
@@ -203,6 +203,71 @@ describe("reflection finalization crash recovery", () => {
     })
     expect(result?.completion).toMatchObject({ outcome: "merged", reason: "budget_not_met" })
   }, 30_000)
+
+  test("#given a pressure dream that commits nothing while system/ is above target #when finalized #then no_changes still records budget_not_met (#15054)", async () => {
+    const item = await fixture(false)
+    const reset = await createNodeGitExec().run(["reset", "-q", "--hard", item.ledger.baseSha], {
+      cwd: item.worktree.dir,
+      timeoutMs: 30_000,
+    })
+    if (reset.code !== 0) throw new Error(reset.stderr)
+    const dreamLedger: ReservationRunLedger = {
+      ...item.ledger,
+      kind: "dream",
+      trigger: "dream",
+      origin: "pressure",
+      systemTokenBudget: 2,
+      systemTokenTarget: 1,
+    }
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), dreamLedger)
+
+    const result = await finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+      },
+      item.runDir,
+      dreamLedger,
+    )
+
+    expect(result).toMatchObject({ outcome: "no_changes", reason: "budget_not_met" })
+    expect(result?.completion).toMatchObject({ outcome: "no_changes", reason: "budget_not_met" })
+  })
+
+  async function reflectInto(path: string) {
+    const item = await fixture(false)
+    await mkdir(join(item.worktree.dir, dirname(path)), { recursive: true })
+    await writeFile(join(item.worktree.dir, path), `---\ndescription: Learned\n---\n${"L".repeat(400)}`)
+    await new GitMemoryRepo({ dir: item.worktree.dir, agentId: item.identity.id }).commitWrite(
+      [path],
+      "reflection learned something",
+      { agentId: item.identity.id, authorName: "Reflection Agent" },
+    )
+    const ledger: ReservationRunLedger = { ...item.ledger, systemTokenBudget: 100, systemTokenTarget: 80 }
+    await writeRunJsonAtomic(join(item.runDir, "ledger.json"), ledger)
+    return finalizeRecordedOutcome(
+      {
+        identity: item.identity,
+        reservation: item.store,
+        now: () => Date.parse("2026-08-11T10:01:00.000Z"),
+        withWriterLock: async (operation) => operation(),
+      },
+      item.runDir,
+      ledger,
+    )
+  }
+
+  test("#given a reflection that grows system/ past its token target #when finalized #then the merge records budget_not_met (#15054)", async () => {
+    expect(await reflectInto("system/learned.md")).toMatchObject({ outcome: "merged", reason: "budget_not_met" })
+  })
+
+  test("#given a reflection above target that writes only reference/ #when finalized #then no budget reason is recorded (#15054)", async () => {
+    const result = await reflectInto("reference/learned.md")
+    expect(result?.outcome).toBe("merged")
+    expect(result?.reason).toBeUndefined()
+  })
 
   test("#given parent_dirty was checkpointed before cleanup #when finalization retries #then the durable decision and user edit are preserved", async () => {
     // given

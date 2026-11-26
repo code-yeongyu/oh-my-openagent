@@ -56,14 +56,16 @@ export function validateDreamTokenBudget(input: {
   readonly totalTokens: number
   readonly targetTokens: number
 }): DreamTokenBudgetValidation {
-  if (input.origin !== "pressure" || input.totalTokens < input.targetTokens) {
+  // Every dream owns the target, whatever started it (#15054): an idle dream that leaves system/ above it is
+  // the same miss as a pressure dream that does.
+  if (input.totalTokens < input.targetTokens) {
     return { status: "valid", totalTokens: input.totalTokens, targetTokens: input.targetTokens }
   }
   return {
     status: "budget_not_met",
     totalTokens: input.totalTokens,
     targetTokens: input.targetTokens,
-    detail: `Committed system/ estimate is ${input.totalTokens} tokens; pressure dream target is below ${input.targetTokens} tokens`,
+    detail: `Committed system/ estimate is ${input.totalTokens} tokens; ${input.origin} dream target is below ${input.targetTokens} tokens`,
   }
 }
 
