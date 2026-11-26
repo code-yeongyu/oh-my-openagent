@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto"
-import { link, readFile, unlink, writeFile } from "node:fs/promises"
+import { link, open, readFile, stat, unlink } from "node:fs/promises"
 import { setTimeout as delay } from "node:timers/promises"
 
 import {
@@ -12,11 +12,16 @@ import {
 // owner's ruling on Y2): every append and the recovery step take it, so a prune never drops a record appended while it
 // ran and two recoveries never close one operation twice. It is a file beside the log, created whole (written aside,
 // then linked into place) with its holder's pid and start identity, and broken ONLY when that holder is proven dead: the
-// pid is gone, or the process under it now started at another time. A live holder's lock is never broken; a call waits
-// at most LOCK_WAIT_MS for it, then reports its record unwritten.
+// pid is gone, or the process under it now started at another time. A live holder's lock is never broken; one call
+// waits at most LOCK_WAIT_MS for it in total, then reports what it could not write as unwritten.
 
 export const LOCK_WAIT_MS = 2000
 const RETRY_MS = 5
+/**
+ * A lock is created whole, so a live holder's lock always names it. One that names no holder was left by a crash or a
+ * power loss inside the take; past this age it is treated as a dead holder's (review 6067451001 L1).
+ */
+const HOLDERLESS_GRACE_MS = 5000
 
 type Holder = { readonly pid: number; readonly start: string | null }
 
@@ -39,8 +44,12 @@ async function provenDead(holder: Holder): Promise<boolean> {
 }
 
 async function holderDead(path: string): Promise<boolean> {
-  const holder = holderOf(await readFile(path, "utf8").catch(() => ""))
-  return holder !== undefined && (await provenDead(holder))
+  const text = await readFile(path, "utf8").catch(() => undefined)
+  if (text === undefined) return false
+  const holder = holderOf(text)
+  if (holder !== undefined) return provenDead(holder)
+  const held = await stat(path).catch(() => undefined)
+  return held !== undefined && Date.now() - held.mtimeMs > HOLDERLESS_GRACE_MS
 }
 
 // Breakers are serialized by a second lock beside the first. Under it, the lock is judged again and removed: no taker can
@@ -63,9 +72,13 @@ async function breakIfDead(lockPath: string): Promise<boolean> {
 
 async function take(lockPath: string): Promise<boolean> {
   const staged = `${lockPath}.${randomUUID()}.taking`
-  await writeFile(staged, JSON.stringify({ pid: process.pid, start: await getProcessStartIdentity(process.pid) }), {
-    mode: 0o600,
-  })
+  const handle = await open(staged, "wx", 0o600)
+  try {
+    await handle.writeFile(JSON.stringify({ pid: process.pid, start: await getProcessStartIdentity(process.pid) }))
+    await handle.sync()
+  } finally {
+    await handle.close()
+  }
   try {
     await link(staged, lockPath)
     return true

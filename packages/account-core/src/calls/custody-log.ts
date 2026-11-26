@@ -55,13 +55,13 @@ export function custodyLog(options: {
   readonly home: string
   readonly principal: CustodyPrincipal
   readonly now?: () => number
-  /** How long one record waits for the log's lock held by a live process (custody-lock.ts); then it is unwritten. */
+  /** How long one call waits in total for the log's lock held by a live process (custody-lock.ts); then it is unwritten. */
   readonly lockWaitMs?: number
 }): CustodyLog {
   const path = custodyLogPath(options.home)
   const now = options.now ?? Date.now
   const deadline = () => Date.now() + (options.lockWaitMs ?? LOCK_WAIT_MS)
-  const append = async (record: Omit<CustodyRecord, "id" | "at">): Promise<boolean> => {
+  const append = async (record: Omit<CustodyRecord, "id" | "at">, until: number): Promise<boolean> => {
     try {
       await mkdir(dirname(path), { recursive: true, mode: 0o700 })
       const line = `${JSON.stringify({ id: randomUUID(), at: new Date(now()).toISOString(), ...record })}\n`
@@ -72,7 +72,7 @@ export function custodyLog(options: {
           await chmod(path, 0o600)
           return true
         },
-        deadline(),
+        until,
       )
       return written === true
     } catch {
@@ -85,21 +85,26 @@ export function custodyLog(options: {
     capability,
     destination: "store" as const,
   })
-  const recover = () => withCustodyLock(path, () => recoverCustodyLog(path, now()), deadline()).catch(() => undefined)
+  const recover = (until: number) =>
+    withCustodyLock(path, () => recoverCustodyLog(path, now()), until).catch(() => undefined)
   return {
+    // One wait budget per call (#15036, review 6067451001 L2): the recovery step and both records share it, so a lock a
+    // live process keeps holding costs the call LOCK_WAIT_MS at most, never once per record.
     async begin(capability) {
-      await recover()
+      const until = deadline()
+      await recover(until)
       const base = open(capability)
-      const recorded = await append({ ...base, phase: "started", pid: process.pid })
+      const recorded = await append({ ...base, phase: "started", pid: process.pid }, until)
       return {
         recorded,
         end: (outcome, code) =>
-          append({ ...base, phase: "terminal", outcome, ...(code === undefined ? {} : { code }) }),
+          append({ ...base, phase: "terminal", outcome, ...(code === undefined ? {} : { code }) }, until),
       }
     },
     async refused(capability, code) {
-      await recover()
-      return append({ ...open(capability), phase: "terminal", outcome: "refused", code })
+      const until = deadline()
+      await recover(until)
+      return append({ ...open(capability), phase: "terminal", outcome: "refused", code }, until)
     },
   }
 }

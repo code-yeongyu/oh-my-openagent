@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from "node:fs"
 import { dirname } from "node:path"
 
 import { getProcessStartIdentity } from "@oh-my-opencode/memory-core/process-identity"
@@ -90,5 +90,35 @@ describe("the custody log's lock", () => {
     )
     expect(answer).toEqual({ kind: "ok", value: { signedOut: true, revoked: true, auditUnavailable: true } })
     expect(await Bun.file(log).exists()).toBe(false)
+  })
+
+  test("#given a lock that names no holder, older than the grace #then it is broken; a fresh one is not", async () => {
+    const home = await temporaryHome()
+    const { log, lock } = await lockAt(home, await self())
+    writeFileSync(lock, "")
+    expect(await withCustodyLock(log, async () => "held", Date.now() + 50)).toBeUndefined()
+    const old = new Date(Date.now() - 60_000)
+    utimesSync(lock, old, old)
+    expect(await withCustodyLock(log, async () => "held", Date.now() + 1500)).toBe("held")
+  })
+
+  test("#given a dead holder's lock and a dead holder's break lock #then both are cleared and the lock is taken", async () => {
+    const { log, lock } = await lockAt(await temporaryHome(), { pid: await deadPid(), start: null })
+    writeFileSync(`${lock}.break`, JSON.stringify({ pid: await deadPid(), start: null }))
+    expect(await withCustodyLock(log, async () => "held", Date.now() + 1500)).toBe("held")
+    expect([existsSync(lock), existsSync(`${lock}.break`)]).toEqual([false, false])
+  })
+
+  test("#given a live process holding the lock #when a sign-out runs #then the whole call waits one budget, not one per record", async () => {
+    const home = await temporaryHome()
+    await lockAt(home, await self())
+    const budget = 300
+    const started = Date.now()
+    await audited(
+      custodyLog({ home, principal: { kind: "person", id: "501" }, lockWaitMs: budget }),
+      "account.signOut",
+      async () => ok({ signedOut: true, revoked: true }),
+    )
+    expect(Date.now() - started).toBeLessThan(budget * 2)
   })
 })
