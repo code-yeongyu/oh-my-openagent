@@ -15,6 +15,7 @@ import { DEADLINES } from "./deadlines"
 import { nextActionFor, remoteFailure } from "./codes"
 import { canonicalizeThreadHandle, type CanonicalThread } from "./seams"
 import type { DeviceRow, Opts, RemoteFailure, Scope, SessionRow, SessionsList } from "./types"
+import { held } from "../thread/remote/held-answers"
 
 /** What is left of one call's deadline, a stage's own table default capping its share. */
 export type Stage = (capMs?: number) => Opts
@@ -338,5 +339,3 @@ export function resolveMember(core: ClientCore): RemoteClient["sessions"]["resol
     )
   }
 }
-
-import { held } from "../thread/address/held-answers"

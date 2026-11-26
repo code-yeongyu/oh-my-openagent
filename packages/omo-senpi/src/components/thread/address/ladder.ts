@@ -8,6 +8,7 @@ import {
 import { threadToolFailure } from "../errors"
 import { UNKNOWN_CALLER } from "../tools/ports"
 import type { Resolution, ResolveContext, ResolveOptions } from "./types"
+import { held } from "../remote/held-answers"
 
 /** The ladder's answer with the resolution named the way Resolved names it (`self`, `session_id`). */
 export type LadderResult =
@@ -89,5 +90,3 @@ export function ladder(
   )
   return found.kind === "ok" ? { kind: "ok", entry: found.entry, resolution: "name" } : found
 }
-
-import { held } from "./held-answers"

@@ -1,6 +1,7 @@
 import { formatAddress, parseAddress } from "../../../../thread-address-core/src/parse"
 import { nextActionFor, remoteFailure } from "./codes"
 import type { RemoteFailure, Scope, SessionRow, ThreadHandle } from "./types"
+import { held } from "../thread/remote/held-answers"
 
 /** What a thread address names before any lookup: a session on a named device, or an address on this device's view. */
 export type CanonicalThread = {
@@ -52,5 +53,3 @@ export function describeThread(row: SessionRow): string {
   const label = row.name !== "" ? row.name : row.title !== "" ? row.title : "untitled thread"
   return `"${label}" on ${row.device.name} (${row.thread})`
 }
-
-import { held } from "../thread/address/held-answers"
