@@ -26,6 +26,8 @@ These are deliberate project choices. Violations are always wrong, not "style pr
 | Testing | `pytest` | unittest |
 | CLI | `typer` + `rich` | argparse, click, fire |
 
+The CI gate is one command: `ruff check . && basedpyright && pytest`.
+
 ### The iron list
 
 1. **Frozen by default** — `@dataclass(frozen=True, slots=True)`. Pydantic: `model_config = ConfigDict(frozen=True)`. Mutable only when mutation is the documented purpose.
