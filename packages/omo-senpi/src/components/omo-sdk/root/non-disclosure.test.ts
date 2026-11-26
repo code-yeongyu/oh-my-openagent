@@ -303,6 +303,7 @@ const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, 
   fault: {
     script: [
       "threads.list",
+      "threads.resolve",
       "threads.read",
       "threads.locate",
       "threads.send",
@@ -315,6 +316,7 @@ const EXPECTED_B8_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, 
     ],
     person: [
       "threads.list",
+      "threads.resolve",
       "threads.read",
       "threads.locate",
       "threads.send",
@@ -351,6 +353,7 @@ const ANSWERED_WITHOUT_A_PORT: Readonly<Record<string, readonly string[]>> = Obj
 const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<string, readonly string[]>>>> = {
   ok: {
     script: [
+      "threads.resolve",
       "threads.read",
       "threads.locate",
       "threads.send",
@@ -362,6 +365,7 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.extensions.call",
     ],
     person: [
+      "threads.resolve",
       "threads.read",
       "threads.locate",
       "threads.send",
@@ -372,6 +376,8 @@ const EXPECTED_INPUT_ECHO: Readonly<Record<"ok" | "fault", Readonly<Record<strin
       "threads.rename",
       "threads.extensions.call",
     ],
+    // A session's two resolution calls name the address the session itself sent in their refusal (security design 4.6).
+    session: ["threads.resolve", "threads.locate"],
   },
   fault: {},
 }

@@ -2,7 +2,7 @@ import { mock } from "bun:test"
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus } from "../remote"
+import type { DeviceRow, RemoteClient, RemoteFailure, ServiceStatus, SessionRow, ThreadHandle } from "../remote"
 import type { ThreadToolName, ThreadToolResult } from "./contracts"
 import type { RuntimePhase } from "./gateway/adapter"
 import { createInboxDrain } from "./gateway/drain"
@@ -100,6 +100,8 @@ export function fakeRemoteClient(account: {
   readonly devicesFail?: RemoteFailure
   /** Each account read, by member name, in call order. */
   readonly reads?: string[]
+  /** The account listing's rows (sessions.list); absent, sessions.list is unsupported. */
+  readonly sessions?: () => readonly RemoteSessionRow[]
 }): RemoteClient {
   const row = (device: RemoteDevice): DeviceRow => ({
     id: device.device,
@@ -143,7 +145,34 @@ export function fakeRemoteClient(account: {
       resolve: none("devices.resolve"),
     },
     sessions: {
-      list: none("sessions.list"),
+      list:
+        account.sessions === undefined
+          ? none("sessions.list")
+          : async (filter) => {
+              account.reads?.push("sessions.list")
+              if (account.fail !== undefined) return account.fail
+              const roster = account.devices()
+              const rows = (account.sessions?.() ?? []).flatMap((listed): SessionRow[] => {
+                const device = roster.find((known) => known.device === listed.device)
+                if (device === undefined || (filter?.device !== undefined && filter.device !== listed.device)) return []
+                return [
+                  {
+                    thread: `${listed.device}/${listed.session_id}` as ThreadHandle,
+                    ...(listed.durable_id === undefined ? {} : { durable_id: listed.durable_id }),
+                    name: listed.title,
+                    title: listed.title,
+                    device: row(device),
+                    project: listed.project,
+                    path: listed.path,
+                    state: listed.state === "running" || listed.state === "ended" ? listed.state : "idle",
+                    archived: false,
+                    updated_ms: listed.updated_ms,
+                    source: listed.source ?? "live",
+                  },
+                ]
+              })
+              return { kind: "ok", value: { revision: 1, rows, unanswered: [] } }
+            },
       resolve: none("sessions.resolve"),
       get: none("sessions.get"),
       open: none("sessions.open"),
@@ -754,6 +783,7 @@ export function createRemoteThreadFixture() {
         // This device's own id comes from the same account read: unknown names no device, a failed read fails it.
         here: options.selfDevice === "unknown" ? null : "here",
         devices: () => devices,
+        sessions: () => options.rows ?? [],
         reads: accountReads,
         ...(options.selfDevice === "throws"
           ? { fail: { kind: "error", code: "host_unavailable", message: "device.info failed", next_action: "Retry." } }

@@ -44,6 +44,7 @@ const ROWS = [
   "threads.locate",
   "threads.release",
   "threads.rename",
+  "threads.resolve",
   "config.status",
 ]
 const table = loadScenarioTable()

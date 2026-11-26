@@ -76,6 +76,31 @@ async function settledExtension<T>(run: () => Promise<T>): Promise<T | undefined
   }
 }
 
+// With no account surface there is no listing to read the row from: answered with the code the remote client's resolve
+// answers when this device is signed out (remote/codes.ts: signed_out is host_unavailable).
+const NO_ACCOUNT: OmoFailure = {
+  kind: "error",
+  error: {
+    code: "host_unavailable",
+    message: "This device reaches no omo account, so no account listing holds the thread's row.",
+    next_action: "Sign in (omo login), then retry.",
+  },
+}
+
+// A session's answer never carries an unexpected exception's text (the B8 echo of the thread core's thrown(), admitted
+// only for a script and a person until slice T1b removes it): internal_error is answered with fixed text.
+const sessionFailure = (error: Parameters<typeof threadFailure>[0]): OmoFailure =>
+  error.code === "internal_error"
+    ? {
+        kind: "error",
+        error: {
+          code: "internal_error",
+          message: "The thread operation failed unexpectedly.",
+          next_action: "Call it again; if it fails again, report the call and the time it failed.",
+        },
+      }
+    : threadFailure(error)
+
 const LIST = ["all_scope", "state"]
 const READ = ["thread", "max_bytes", "cursor", "all_scope"]
 const SEND = ["thread", "message", "delivery", "expected_turn_id", "all_scope", "idempotency_key", "collapse_key"]
@@ -107,11 +132,12 @@ export function threadsNamespace(options: {
   /** The public root refuses a module URL that is not an absolute file URL before any effect; the shipped facade does not. */
   readonly checkModuleUrl?: boolean
 }): NamespaceServing & { readonly releaseLocated: ThreadCore["releaseRow"] } {
-  // Only a script or a person reaches the thread core through the root; every allowed cell of another principal is
-  // slice T2's or X1b's (design lane ruling), and the refused cells are answered before this at the root's boundary.
-  if (options.principal.kind !== "script" && options.principal.kind !== "person")
-    return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
   let core: Promise<ThreadCore> | undefined
+  // The caller's remote sessions and store are the root's to release even when no thread call ever built the core.
+  const disposePorts = async (): Promise<void> => {
+    await options.ports?.remote?.sessions.close?.().catch(() => undefined)
+    await options.ports?.store?.dispose()
+  }
   const thread = (): Promise<ThreadCore> =>
     (core ??= import("../../thread/sdk-core").then(({ createThreadCore }) =>
       createThreadCore({
@@ -124,6 +150,32 @@ export function threadsNamespace(options: {
         ...options.ports,
       }),
     ))
+  // A session reaches the resolution calls only, projected to what the owner decided (security design 4.6, revision 22):
+  // identifiers for resolve, the located thread without its endpoint and session file path for locate. Every other
+  // allowed cell of a session or another principal is slice T2's or X1b's (design lane ruling), and the refused cells are
+  // answered before this at the root's boundary.
+  if (options.principal.kind === "session") {
+    const caller = { kind: "session", id: options.principal.session_id } as const
+    return {
+      members: {
+        "threads.resolve": async (input) => {
+          const decided = await (await thread()).resolveThread(input, caller)
+          if (decided.kind === "error") return sessionFailure(decided.error)
+          return { kind: "ok", thread: decided.thread, id: decided.id, device: decided.device }
+        },
+        "threads.locate": async (input) => {
+          const located = await (await thread()).locate(input, caller)
+          if (located.kind === "error") return sessionFailure(located.error)
+          const { endpoint: _endpoint, session_path: _path, ...shown } = located.thread
+          return { kind: "ok", thread: shown.address ?? shown.thread_id, located: shown }
+        },
+      },
+      releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }),
+      dispose: async () => (core === undefined ? disposePorts() : (await core).dispose()),
+    }
+  }
+  if (options.principal.kind !== "script" && options.principal.kind !== "person")
+    return { members: {}, releaseLocated: async () => ({ success: false, error: "sender_not_allowed" }) }
   const members: Members = {
     "threads.list": async (input = {}) =>
       (await unbuilt("threads.list", input, LIST)) ??
@@ -146,6 +198,31 @@ export function threadsNamespace(options: {
       const located = await (await thread()).locate(input)
       if (located.kind === "error") return threadFailure(located.error)
       return { kind: "ok", thread: located.thread.address ?? located.thread.thread_id, located: located.thread }
+    },
+    "threads.resolve": async (input) => {
+      const decided = await (await thread()).resolveThread(input)
+      if (decided.kind === "error") return threadFailure(decided.error)
+      const remote = options.ports?.remote
+      if (remote === undefined) return NO_ACCOUNT
+      // Design lane ruling A: the row is the account listing's row for the id the one resolver decided, read by that id.
+      const listed = await remote.client.sessions.list(decided.device === null ? undefined : { device: decided.device })
+      if (listed.kind === "error") return (await import("./remote-failures")).remoteFailure(listed)
+      const session = listed.value.rows.find(
+        (row) =>
+          (decided.device === null ? row.device.self === true : row.device.id === decided.device) &&
+          (row.thread === decided.thread || (decided.id !== "" && row.durable_id === decided.id)),
+      )
+      if (session === undefined)
+        return {
+          kind: "error",
+          error: {
+            code: "not_found",
+            message: `${decided.thread} is not in the account's listing of its device.`,
+            next_action: "Run omo thread list --all-scope.",
+            details: { thread: decided.thread },
+          },
+        }
+      return { kind: "ok", thread: decided.thread, session, device: session.device.id }
     },
     "threads.create": async (input) => {
       if (typeof input?.prompt === "object") return notImplemented("threads.create")() as Promise<OmoFailure>
@@ -213,11 +290,6 @@ export function threadsNamespace(options: {
         return { kind: "error", error: { code: "internal_error", message, next_action: "Run omo daemon run again." } }
       }
     },
-  }
-  // The caller's remote sessions and store are the root's to release even when no thread call ever built the core.
-  const disposePorts = async (): Promise<void> => {
-    await options.ports?.remote?.sessions.close?.().catch(() => undefined)
-    await options.ports?.store?.dispose()
   }
   return {
     members,

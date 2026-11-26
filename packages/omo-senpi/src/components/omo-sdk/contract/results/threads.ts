@@ -53,9 +53,19 @@ export type ThreadReadAfterWaitResult = Exclude<ThreadReadResult, { readonly kin
 }
 
 /** The canonical address and the row it resolved to; `thread` is the string every surface takes back (design 5). */
-export type ThreadResolveResult = Ok<{ readonly session: SessionRow; readonly device: string }>
+export type ThreadResolveResult =
+  Ok<{ readonly session: SessionRow; readonly device: string }> | ThreadResolveIdentifiers
 
-export type ThreadLocateResult = Ok<{ readonly located: LocatedThread }>
+/**
+ * A session principal's answer (security design 4.6, the owner's decision on revision 22): identifiers only, the thread
+ * id and its device id (null: this device, with no account), never a row, an endpoint, a path or another identity.
+ */
+export type ThreadResolveIdentifiers = Ok<{ readonly id: string; readonly device: string | null }>
+
+/** A session principal's located thread carries no endpoint and no session file path (the same decision). */
+export type SessionLocatedThread = Omit<LocatedThread, "endpoint" | "session_path">
+
+export type ThreadLocateResult = Ok<{ readonly located: LocatedThread | SessionLocatedThread }>
 
 export type ThreadEntriesResult = Ok<{ readonly page: ReadPage }>
 

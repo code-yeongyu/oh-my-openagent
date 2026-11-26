@@ -25,7 +25,7 @@ export const THREAD_LINES: readonly MatrixLine[] = [
     cells: columns({
       people: allow(),
       session: allow(
-        "under the same scope rules as the reads of 4.1: the workspace is the default scope and all_scope is an input the session supplies itself",
+        "the owner's decision on revision 22: under the scope rules of the reads of 4.1, resolve, devices.resolve and aliases.resolve answer identifiers only (the thread id, the device id, the alias's target id and display name; never an endpoint, a path or another principal's identity), and locate answers the thread tools' result shape with no endpoint and no session file path",
       ),
       connector: refuse("sender_not_allowed", { note: "new in revision 22, as for the reads of 4.1 and devices.list" }),
       service: refuse("sender_not_allowed", { note: "new in revision 22" }),

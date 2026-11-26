@@ -10,7 +10,8 @@ import { resolveAddress } from "./resolve"
 import type { Resolution, Resolved, ResolveOptions } from "./types"
 
 /** What the caller is about to do with the thread (design section 5): it names the call, never a branch in an adapter. */
-export type ResolveOperation = "deliver" | "control" | "read" | "attach" | "open_existing" | "fork_source" | "locate"
+export type ResolveOperation =
+  "deliver" | "control" | "read" | "attach" | "open_existing" | "fork_source" | "locate" | "resolve"
 
 export type { ResolvePrincipal } from "./principal"
 

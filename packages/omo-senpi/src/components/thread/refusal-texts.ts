@@ -20,7 +20,7 @@ export const REFUSAL_TEXTS = { ...CONTROL_TEXTS, ...ADDRESS_TEXTS, ...RELAY_TEXT
 export type RefusalId = keyof typeof REFUSAL_TEXTS
 
 /** What a repeat answers for a refusal no template produced (an engine's own message): fixed text for its code. */
-export const FIXED_TEXT: Readonly<Partial<Record<ThreadErrorCode, Omit<RefusalText, "code">>>> = {}
+const FIXED_TEXT: Readonly<Partial<Record<ThreadErrorCode, Omit<RefusalText, "code">>>> = {}
 
 const SLOT = /\{\{|\}\}|\{([a-z_]+)\}/g
 
@@ -64,12 +64,12 @@ export function carryProvenance<T extends object>(from: object, to: T): T {
 }
 
 /** `failure` with `details` merged in, keeping its provenance (a spread alone would drop it). */
-export function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
+function withDetails(failure: ThreadToolFailure, details: Readonly<Record<string, unknown>>): ThreadToolFailure {
   return carryProvenance(failure, { ...failure, details: { ...failure.details, ...details } })
 }
 
 /** A repeat of a refusal: its template filled again; a code with no template answers its fixed text. */
-export function replayRefusal(
+function replayRefusal(
   code: ThreadErrorCode,
   id: RefusalId | undefined,
   slots: Readonly<Record<string, string>>,
