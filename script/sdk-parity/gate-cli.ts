@@ -8,7 +8,7 @@ import { isolationProblems, prepareBaseTree } from "./base-tree"
 import { capabilityClosures, ImportGraph } from "./closures"
 import { gateReport, goldenProblems, renderReport, type Side } from "./gate"
 import { NATIVE_ENTRY_POINTS, nativeArgvInventory } from "./native-inventory"
-import { loadPresentation } from "./presentation"
+import { loadPresentation, parsePresentation } from "./presentation"
 import { allRows, loadDomainFiles, REPO_ROOT, ROWS_DIR } from "./registry"
 import type { Outcome } from "./scenario-run"
 import { offenderGrowth } from "../remote-import-guard-adapter"
@@ -120,6 +120,7 @@ try {
   const unresolved = JSON.parse(unresolvedText) as Baseline
   const goldens = JSON.parse(readFileSync(join(REPO_ROOT, GOLDENS_PATH), "utf8")) as Record<string, Outcome>
   const baseGoldensText = show(mergeBase, GOLDENS_PATH)
+  const baseRowsText = show(mergeBase, "script/sdk-parity/presentation.json")
   const report = gateReport({
     base,
     head: { rows, tools: headSide.tools, outcomes: headSide.outcomes, unresolved: unresolved.entries },
@@ -128,7 +129,10 @@ try {
     changedFiles,
     body,
     headSha: git("rev-parse", "HEAD").trim(),
-    presentation: loadPresentation(),
+    presentation: {
+      base: baseRowsText === undefined ? undefined : parsePresentation(baseRowsText),
+      head: loadPresentation(),
+    },
     goldens: {
       base: baseGoldensText === undefined ? undefined : (JSON.parse(baseGoldensText) as Record<string, Outcome>),
       head: goldens,

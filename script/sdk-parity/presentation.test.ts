@@ -30,10 +30,12 @@ describe("presentation attribution (positive control: train 12's usage line)", (
     expect(report.digest).toBe(
       candidateDigest(
         HEAD,
-        IDS.map((id) => `${id}#presentation`),
+        IDS.map((id) => `${id}#presentation=remote send`),
       ),
     )
-    expect(renderReport(report)).toContain("PRESENTATION ONLY: native-remote-help, native-remote-open-no-device")
+    expect(renderReport(report)).toContain(
+      "PRESENTATION ONLY: native-remote-help (row remote send), native-remote-open-no-device (row remote send), native-remote-unknown (row remote send)",
+    )
   })
 
   test("#given the same delta with no registry row #then every scenario fails as a capability change", () => {
@@ -158,7 +160,7 @@ describe("presentation attribution: the row and the goldens", () => {
       input({
         head: { ...input().head, outcomes: { s1: { exit: 2, stdout: "", stderr: "x" } } },
         base: { ...input().base, outcomes: { s1: { exit: 2, stdout: "", stderr: "y" } } },
-        presentation: [{ ...ROW, scenarios: ["s1"] }],
+        presentation: { base: [], head: [{ ...ROW, scenarios: ["s1"] }] },
       }),
     )
     expect(report.failures).toEqual([

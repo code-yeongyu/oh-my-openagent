@@ -30,13 +30,18 @@ export const ROW: PresentationRow = {
   reason: "the text argument also takes - to read the message from stdin; same verb, same exit codes",
 }
 
-export const run = (edit: Edit, rows: readonly PresentationRow[] = [ROW], goldens = headWith(edit)) =>
+export const run = (
+  edit: Edit,
+  rows: readonly PresentationRow[] = [ROW],
+  goldens = headWith(edit),
+  baseRows: readonly PresentationRow[] = [],
+) =>
   gateReport(
     input({
       scenarios,
       base: { ...input().base, outcomes: base },
       head: { ...input().head, outcomes: headWith(edit) },
-      presentation: rows,
+      presentation: { base: baseRows, head: rows },
       goldens: { base, head: goldens },
     }),
   )

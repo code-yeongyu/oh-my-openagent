@@ -30,7 +30,7 @@ export const input = (overrides: Partial<GateInput> = {}): GateInput => ({
   changedFiles: [],
   body: "",
   headSha: HEAD,
-  presentation: [],
+  presentation: { base: [], head: [] },
   goldens: { base: {}, head: {} },
   ...overrides,
 })

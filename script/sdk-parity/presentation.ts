@@ -21,9 +21,11 @@ export type PresentationRow = {
 
 const PRESENTATION_PATH = "script/sdk-parity/presentation.json"
 
+export const parsePresentation = (text: string): readonly PresentationRow[] =>
+  (JSON.parse(text) as { readonly rows: readonly PresentationRow[] }).rows
+
 export const loadPresentation = (root: string = REPO_ROOT): readonly PresentationRow[] =>
-  (JSON.parse(readFileSync(join(root, PRESENTATION_PATH), "utf8")) as { readonly rows: readonly PresentationRow[] })
-    .rows
+  parsePresentation(readFileSync(join(root, PRESENTATION_PATH), "utf8"))
 
 export type Goldens = {
   readonly base: Readonly<Record<string, Outcome>> | undefined
