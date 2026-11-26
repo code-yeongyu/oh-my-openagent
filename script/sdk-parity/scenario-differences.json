@@ -20,12 +20,6 @@
       "retires_with": "T1c"
     },
     {
-      "id": "threads.rename/idempotent-repeat",
-      "differs": "A repeat under the key is answered from the receipt book (control/receipts.ts) with no port call: the fake store keeps the book and never records it, so the store.idempotency_get this scenario names is never made, and an effect step whose trace is empty cannot be stated (an answer alone builds nothing). threads.rename/key-reused proves the book through its conflict step.",
-      "owner": "T1b",
-      "retires_with": "P1b"
-    },
-    {
       "id": "threads.rename/session-ended",
       "differs": "A thread with no live owner is refused not_resumable instead of renamed in its session file (control/rename.ts:31).",
       "owner": "T1a",
@@ -80,20 +74,26 @@
       "retires_with": "T1b"
     },
     {
-      "id": "threads.send/idempotent-repeat",
-      "differs": "The scenario expects store.idempotency_get, which no send makes: the send book (sdk-core/send-book.ts) answers a repeat from the receipt book the fake keeps unrecorded, and the first call delivers.",
-      "owner": "T1b",
-      "retires_with": "T1b"
-    },
-    {
-      "id": "threads.send/key-reused",
-      "differs": "The scenario expects store.idempotency_get with other arguments, which no send makes; a single call under a fresh key delivers.",
-      "owner": "T1b",
-      "retires_with": "T1b"
-    },
-    {
       "id": "threads.send/no-relay-transport",
       "differs": "The fake remote answers a stated {code} only; a relay outcome stated as {outcome} has no meaning there, so device b starts the turn.",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/one-key-script-then-connector",
+      "differs": "A connector principal's root send answers not_implemented, not the unsupported its matrix line states (it is no replay of the script's delivery either).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/one-key-script-then-person",
+      "differs": "The script and the person send to b as one relay sender, so b is handed the message once, but the person's repeat answers the relay receipt's first answer as recorded (deduplicated false, with its reconciled outcome), not deduplicated true (remote/relay-transport.ts).",
+      "owner": "T1b",
+      "retires_with": "T1b"
+    },
+    {
+      "id": "threads.send/one-key-script-then-session",
+      "differs": "The root builds threads.send for a person and a script only: the session principal's repeat answers not_implemented instead of the script's delivery, deduplicated.",
       "owner": "T1b",
       "retires_with": "T1b"
     },

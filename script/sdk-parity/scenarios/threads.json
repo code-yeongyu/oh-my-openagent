@@ -1530,23 +1530,45 @@
       "expect": [
         {
           "port": "store",
-          "op": "idempotency_get",
-          "args": {
-            "key": "k1"
-          },
-          "result": {
-            "stored": true
-          }
-        },
-        {
-          "port": "store",
           "op": "insert_delivery",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
         },
         {
           "port": "host",
           "op": "prompt",
-          "count": 0
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "deduplicated": true
+          }
         }
       ],
       "target": "this_device"
@@ -1746,28 +1768,210 @@
     {
       "id": "threads.send/key-reused",
       "row": "threads.send",
-      "kind": "refusal",
-      "refusal": "idempotency_conflict",
+      "kind": "effect",
       "input": {
         "thread": "t-1",
         "message": "status?",
-        "idempotency_key": "k2"
+        "idempotency_key": "k1"
       },
       "expect": [
         {
           "port": "store",
-          "op": "idempotency_get",
+          "op": "insert_delivery",
           "args": {
-            "key": "k2"
-          },
-          "result": {
-            "other_arguments": true
+            "thread": "t-1",
+            "mode": "auto"
           }
         },
         {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "other",
+            "idempotency_key": "k1"
+          },
+          "kind": "refusal",
+          "refusal": "idempotency_conflict",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ]
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-session",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
           "port": "store",
           "op": "insert_delivery",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "session",
+            "session_id": "session-1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "deduplicated": true
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-person",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "studio/t-2",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "remote",
+          "op": "sessions.send",
+          "args": {
+            "thread": "studio/t-2"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "studio/t-2",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "person",
+            "uid": 501
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "remote",
+              "op": "sessions.send",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "device": "b",
+            "deduplicated": true
+          }
+        }
+      ],
+      "target": "other_device"
+    },
+    {
+      "id": "threads.send/one-key-script-then-connector",
+      "row": "threads.send",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "message": "status?",
+        "idempotency_key": "k1"
+      },
+      "expect": [
+        {
+          "port": "store",
+          "op": "insert_delivery",
+          "args": {
+            "thread": "t-1",
+            "mode": "auto"
+          }
+        },
+        {
+          "port": "host",
+          "op": "prompt",
+          "args": {
+            "thread": "t-1"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "message": "status?",
+            "idempotency_key": "k1"
+          },
+          "principal": {
+            "kind": "connector",
+            "binding": "binding-1"
+          },
+          "kind": "refusal",
+          "refusal": "unsupported",
+          "expect": [
+            {
+              "port": "store",
+              "op": "insert_delivery",
+              "count": 0
+            },
+            {
+              "port": "host",
+              "op": "prompt",
+              "count": 0
+            }
+          ]
         }
       ],
       "target": "this_device"
@@ -3809,19 +4013,34 @@
       },
       "expect": [
         {
-          "port": "store",
-          "op": "idempotency_get",
-          "args": {
-            "key": "k1"
-          },
-          "result": {
-            "stored": true
-          }
-        },
-        {
           "port": "host",
           "op": "rename_session",
-          "count": 0
+          "args": {
+            "thread": "t-1",
+            "name": "review"
+          }
+        }
+      ],
+      "then": [
+        {
+          "input": {
+            "thread": "t-1",
+            "name": "review",
+            "idempotency_key": "k1"
+          },
+          "kind": "effect",
+          "expect": [
+            {
+              "port": "host",
+              "op": "rename_session",
+              "count": 0
+            }
+          ],
+          "answer": {
+            "kind": "ok",
+            "thread": "t-1",
+            "name": "review"
+          }
         }
       ],
       "target": "this_device"
