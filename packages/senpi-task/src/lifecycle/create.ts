@@ -23,6 +23,7 @@ import { suspendOnSessionShutdown } from "./shutdown"
 import { cleanupExpiredRecords } from "./ttl"
 import type { SuspendInput, TaskLifecycle } from "./types"
 import { startLiveParentRecovery } from "./live-parent-recovery"
+import { createPendingRevivals } from "./revival-pending"
 import { retrySuspendedClosures } from "./suspended-closures"
 
 /**
@@ -38,7 +39,8 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     retrySuspendedClosures(context)
     return cleanupExpiredRecords(context)
   }
-  const recovery = startLiveParentRecovery(context, deps.onStoreMutation)
+  const revivals = createPendingRevivals(context)
+  const recovery = startLiveParentRecovery(context, deps.onStoreMutation, revivals.inspected)
   registerLifecycleDetachedRevival(context.store, (taskId) => reviveDetachedTerminal(context, taskId))
   registerLifecycleDetachedRevivalRollback(context.store, (prior) => rollbackDetachedRevival(context, prior))
   const stopIdleReclaimer = startIdleResidentReclaimer(context, cleanup)
@@ -47,6 +49,7 @@ export function createTaskLifecycle(deps: LifecycleDeps): TaskLifecycle {
     rollbackDetachedRevival: (prior) => rollbackDetachedRevival(context, prior),
     reclaimIdleResidents: () => reclaimIdleResidents(context),
     parkTerminalResident: (taskId: string) => parkTerminalResident(context, taskId, "cancel"),
+    pendingRevivals: revivals.port,
     hostSessionCancel: {
       end: (record) => endHostSessionChild(context, record),
       drive: (record, sink) => driveHostSessionCancel(context, record, sink),

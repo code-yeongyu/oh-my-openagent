@@ -19,6 +19,7 @@ type InstallEffects = {
     errors: Map<DagNodeId, DagNodeError>,
     results: Map<DagNodeId, RecoveryPendingTerminalResult>,
     tasks: Map<DagNodeId, string>,
+    awaiting: Map<DagNodeId, string>,
   ): Promise<void>
   release(): void
 }
@@ -47,8 +48,16 @@ export async function installRecoveredDag(
     const journal = effects.journal(claimed, pendingErrors, pendingTerminalResults)
     const reusedOutputs = new Map<DagNodeId, string>()
     const reattachedTasks = new Map<DagNodeId, string>()
+    const awaitingRevival = new Map<DagNodeId, string>()
     if ((claimed.retryOnResume?.length ?? 0) > 0) resetDagNodes(journal, claimed.retryOnResume ?? [])
-    await effects.reconcile(journal, reusedOutputs, pendingErrors, pendingTerminalResults, reattachedTasks)
+    await effects.reconcile(
+      journal,
+      reusedOutputs,
+      pendingErrors,
+      pendingTerminalResults,
+      reattachedTasks,
+      awaitingRevival,
+    )
     const generation = journal.snapshot().generation + 1
     journal.append(dagRunResumedEvent({ generation }))
     const scheduler = createDagScheduler({
@@ -58,6 +67,9 @@ export async function installRecoveredDag(
       ...(context.subscriberRing === undefined ? {} : { subscriberRing: context.subscriberRing }),
       ...(context.nodeSpawnPolicy === undefined ? {} : { nodeSpawnPolicy: context.nodeSpawnPolicy }),
       ...(reattachedTasks.size === 0 ? {} : { preAttachedTasks: reattachedTasks }),
+      ...(awaitingRevival.size === 0 || context.pendingRevivals === undefined
+        ? {}
+        : { awaitingRevival: { tasks: awaitingRevival, revivals: context.pendingRevivals } }),
       ...(context.ancestry === undefined ? {} : { ancestry: context.ancestry }),
       ...(context.resumeCredential === undefined ? {} : { resumeCredential: context.resumeCredential }),
       now: context.now,

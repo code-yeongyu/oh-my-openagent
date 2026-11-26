@@ -24,6 +24,8 @@ export const TERMINAL_NODE_STATES: ReadonlySet<DagNodeState> = new Set(["complet
 export type AttachedTaskSettlement =
   | { readonly nodeId: DagNodeId; readonly kind: "record"; readonly record: TaskRecord }
   | { readonly nodeId: DagNodeId; readonly kind: "error"; readonly error: unknown }
+  // A child whose pending revival ended without bringing it back (#15150).
+  | { readonly nodeId: DagNodeId; readonly kind: "orphaned"; readonly message: string }
 
 export type AttachedTask = {
   readonly nodeId: DagNodeId

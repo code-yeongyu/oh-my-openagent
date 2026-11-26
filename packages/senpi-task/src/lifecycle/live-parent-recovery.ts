@@ -6,6 +6,7 @@ import { PERMANENT_REVIVAL_REASONS } from "./deferred-revival-reasons"
 import { isHostSessionRecord } from "./host-session"
 import type { IdleReclaimerTimer, LifecycleDeps } from "./port"
 import { reconcileScopedRevival } from "./reconcile-revival"
+import { awaitsLiveParentRecovery } from "./revival-pending"
 import { isSuspendedResidency } from "./revival-selection"
 import { newestSessionPath } from "./session-path"
 import { suspendHandle } from "./shutdown"
@@ -26,7 +27,11 @@ type Episode = {
   deadlineAttempted: boolean
 }
 
-export function startLiveParentRecovery(context: LifecycleContext, subscribe: LifecycleDeps["onStoreMutation"]) {
+export function startLiveParentRecovery(
+  context: LifecycleContext,
+  subscribe: LifecycleDeps["onStoreMutation"],
+  inspected: () => void = () => undefined,
+) {
   const episodes = new Map<string, Episode>()
   let timer: IdleReclaimerTimer | undefined
   let disposed = false
@@ -41,19 +46,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
   }
 
   function eligible(record: TaskRecord): boolean {
-    // All suspension causes (including old records with none) qualify. Terminal statuses, notably
-    // interrupted and completed idle evictions, do not represent unfinished runs. Accepted user
-    // cancels retain their existing confirmed-stop semantics.
-    return (
-      owned(record) &&
-      (record.status === "pending" || record.status === "running") &&
-      (record.residency_state !== "resident" ||
-        record.suspension_reason !== undefined ||
-        (record.recovery_deadline_at !== undefined && context.registry.get(record.task_id) === undefined) ||
-        isSuspensionExpiry(record)) &&
-      record.cancel_requested === undefined &&
-      (record.killed !== true || isSuspensionExpiry(record))
-    )
+    return owned(record) && awaitsLiveParentRecovery(context, record)
   }
 
   async function attempt(record: TaskRecord, episode: Episode): Promise<void> {
@@ -154,6 +147,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
         error: String(error),
       })
     } finally {
+      inspected()
       episode.busy = false
       const fresh = context.store.load(record.task_id)
       if (fresh === null || !eligible(fresh) || fresh.notification.run_epoch !== episode.epoch)
@@ -230,6 +224,7 @@ export function startLiveParentRecovery(context: LifecycleContext, subscribe: Li
       context.idleReclaimerScheduler.clearInterval(timer)
       timer = undefined
     }
+    inspected()
   }
 
   function scan(): void {
