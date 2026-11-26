@@ -125,6 +125,66 @@ test("#given a probe start that resolves after its run moved on #when the stale 
   }
 })
 
+async function probeStartPending(f: ReturnType<typeof fixture>) {
+  const result = await f.manager.start(baseSpec())
+  if (result.kind !== "started") throw new Error("expected start")
+  let failStart: (error: Error) => void = () => {}
+  f.runner.gate = () => new Promise((_resolve, reject) => (failStart = reject))
+  const probeStarted = f.runner.started(2)
+  f.runner.handles.get(result.task_id)?.settle({
+    status: "error",
+    failure: { kind: "child-turn-failed", message: AMBIGUOUS },
+  })
+  await probeStarted
+  const record = f.store.load(result.task_id)
+  if (record === null) throw new Error("expected the record")
+  return { taskId: result.task_id, record, failStart }
+}
+
+test("#given a probe start that rejects after its run was cancelled #when the rejection settles #then no provider-wide limit is written and that run's probe is cleared (review 15140 delta MEDIUM)", async () => {
+  // given
+  const f = fixture()
+  try {
+    const { taskId, record, failStart } = await probeStartPending(f)
+    const epoch = record.notification.run_epoch
+    expect(f.memory.probeOf(taskId, epoch)).toBeDefined()
+    const settled = f.manager.waitFor(taskId)
+    f.store.replace({ ...record, status: "cancelled" })
+
+    // when: the cancel's teardown makes the pending start fail.
+    failStart(new Error("child torn down before it started"))
+    await settled
+
+    // then
+    expect(f.memory.accountSpent(next.provider)).toBe(false)
+    expect(f.memory.probeOf(taskId, epoch)).toBeUndefined()
+  } finally {
+    f.manager.workpools.dispose()
+  }
+})
+
+test("#given a probe start that rejects after a newer run began its own probe #when the rejection settles #then the newer run's probe is untouched (review 15140 delta MEDIUM)", async () => {
+  // given
+  const f = fixture()
+  try {
+    const { taskId, record, failStart } = await probeStartPending(f)
+    const newer = record.notification.run_epoch + 1
+    const settled = f.manager.waitFor(taskId)
+    f.store.replace({ ...record, status: "cancelled", notification: { ...record.notification, run_epoch: newer } })
+    f.memory.beginProbe(taskId, next.provider, AMBIGUOUS, newer)
+
+    // when
+    failStart(new Error("child torn down before it started"))
+    await settled
+
+    // then
+    expect(f.memory.probeOf(taskId, newer)).toBeDefined()
+    expect(f.memory.accountSpent(next.provider)).toBe(false)
+  } finally {
+    f.manager.workpools.dispose()
+  }
+})
+
 test("#given a probe begun an hour ago #when its task settles an ordinary failure #then the stale probe no longer decides the provider's scope (review 15140 #2)", () => {
   // given
   let now = Date.parse("2026-10-26T05:00:00Z")

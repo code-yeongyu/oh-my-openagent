@@ -31,6 +31,20 @@ export function recordRunLimit(
   return probeTimedOut
 }
 
+/**
+ * A probe rung that could not even start confirms its provider's limit, recorded with the sanitized start-failure text.
+ * The caller passes only a start of the run that still owns its task.
+ */
+export function recordProbeStartFailure(
+  limits: UsageLimitMemory,
+  run: { readonly taskId: string; readonly epoch: number },
+  route: ResolvedModelRecord | undefined,
+  failure: { readonly errorMessage: string },
+): void {
+  if (route !== undefined && limits.probeOf(run.taskId, run.epoch) !== undefined)
+    limits.settle(run.taskId, route.provider, route.model_id, failure.errorMessage, true, run.epoch)
+}
+
 function answered(event: ManagedChildEvent): boolean {
   if (event.type === "message_update") return true
   if (event.type !== "message_end" || typeof event.message !== "object" || event.message === null) return false

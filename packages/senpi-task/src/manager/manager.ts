@@ -61,7 +61,7 @@ import {
   routeAroundSpentLimits,
   type UsageLimitMemory,
 } from "./usage-limit-memory"
-import { boundedProbeOutcome, recordRunLimit } from "./usage-limit-probe"
+import { boundedProbeOutcome, recordProbeStartFailure, recordRunLimit } from "./usage-limit-probe"
 import { prepareLimitRevival } from "./usage-limit-revival"
 import { createProbeRequestSignal } from "../runners/probe-request"
 import { chainWithoutRefusingProvider, startCredentialsRefusal } from "./start-credentials-refusal"
@@ -2084,25 +2084,27 @@ class TaskManagerImpl implements TaskManager {
 
     const request = createProbeRequestSignal(this.#now)
     const probing = this.#limits.probeOf(context.record.task_id, epoch) !== undefined
-    let handle: ManagedChildHandle
+    let started: { readonly handle: ManagedChildHandle } | { readonly error: unknown }
     try {
-      handle = await context.runner.start(
-        probing
-          ? { ...context.managedSpec, onProviderRequest: request.started, probeProviderRequest: true }
-          : context.managedSpec,
-      )
-    } catch (error) {
-      const route = context.record.resolved_model
-      if (route !== undefined && this.#limits.probeOf(context.record.task_id, epoch) !== undefined) {
-        this.#limits.settle(
-          context.record.task_id,
-          route.provider,
-          route.model_id,
-          describeStartFailure(error).errorMessage,
-          true,
-          epoch,
-        )
+      started = {
+        handle: await context.runner.start(
+          probing
+            ? { ...context.managedSpec, onProviderRequest: request.started, probeProviderRequest: true }
+            : context.managedSpec,
+        ),
       }
+    } catch (error) {
+      started = { error }
+    }
+    // The start awaited: a cancel, interrupt or another owner may have moved the task meanwhile. Whichever way the start
+    // settled, a run that is no longer this one's only ends its own probe: it records no limit evidence and a late child
+    // of it is discarded, never attached.
+    const owned = this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))
+    if (!owned) this.#limits.endProbe(context.record.task_id, epoch)
+    if ("error" in started) {
+      const { error } = started
+      const run = { taskId: context.record.task_id, epoch }
+      if (owned) recordProbeStartFailure(this.#limits, run, context.record.resolved_model, describeStartFailure(error))
       const advanced = this.#advanceStartFallback(context, error)
       if (advanced !== undefined) {
         if (advanced.kind === "retry") void this.#launchRuntimeFallback(advanced.context)
@@ -2118,10 +2120,8 @@ class TaskManagerImpl implements TaskManager {
       return
     }
 
-    // The start awaited: a cancel, interrupt or another owner may have moved the task meanwhile. A
-    // late child of a run that is no longer this one's is discarded, never attached.
-    if (!this.#ownsLaunch(context, this.#tryLoad(context.record.task_id))) {
-      this.#limits.endProbe(context.record.task_id, epoch)
+    const { handle } = started
+    if (!owned) {
       await this.#discardStaleLaunch(context, handle)
       return
     }
