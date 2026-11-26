@@ -32,6 +32,21 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
     const inFlight = new Map<DagNodeId, Promise<void>>()
     let leaseDenied = false
     let folded = false
+    // The batch's first processing error (a journal or attachment fault while a start is handled, a
+    // fold fault while it waits). Every handling step runs through `handle`, so the error is kept
+    // here whichever event the batch was waiting on, and from then on the batch only retires: no
+    // start is handled or launched, every start still in flight is drained, and the error is thrown
+    // once the latch is released - the same writes a batch ending on that error after all its
+    // starts had settled would make (#10057 review finding 1).
+    let failure: { readonly error: unknown } | undefined
+    const handle = (step: () => void): void => {
+      if (failure !== undefined) return
+      try {
+        step()
+      } catch (error) {
+        failure = { error }
+      }
+    }
     const admitOne = (nodeId: DagNodeId, settled: PromiseSettledResult<OwnedStartResult>): void => {
       // The task owner record is durable even when admission finishes after suspension. Recovery
       // resolves it by owner; this retired controller must not attach, fail, or promote the node.
@@ -82,7 +97,7 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
           // Leaves the in-flight set in the same step that parks, attaches or fails the node, so a
           // fold can never see it both parked and still in flight.
           inFlight.delete(nodeId)
-          admitOne(nodeId, settled)
+          handle(() => admitOne(nodeId, settled))
         })()
         // The start removes itself in the step that admits it; a later delete here would remove a
         // re-launched start's entry instead (#10057 review D4-H1).
@@ -106,39 +121,43 @@ export async function admitFrontier(context: SchedulerContext): Promise<boolean>
       launch(runnable)
     }
 
-    launch(denied)
-    admitReady()
-    if (inFlight.size === 0) return true
     context.admissionInProgress = true
     try {
-      while (inFlight.size > 0) {
+      handle(() => {
+        launch(denied)
+        admitReady()
+      })
+      while (inFlight.size > 0 && failure === undefined) {
         const next = await Promise.race([
           Promise.race(inFlight.values()).then(() => ({ kind: "start" as const })),
           nextOwnSettlement(context).then((settled) => ({ kind: "settled" as const, settled })),
           // A child attached (or a foreign commit) mid-batch re-arms the race above.
           context.settlementChanged().then(() => ({ kind: "wake" as const })),
         ])
-        if (context.suspended || context.cancellationStarted) {
-          await Promise.all(inFlight.values())
-          break
-        }
-        if (next.kind === "settled") {
-          foldSettlement(context, next.settled)
-          folded = true
-          emitCompletedWaves(context)
-          // The slot a fold may free goes to the oldest denial first, before the nodes it unblocks.
-          // A node parked a microtask ago may still be in flight until its start settles; it stays
-          // parked and is retried on the next fold or at the end of the pass.
-          const retry = admissionOrder.filter((nodeId) => parked.has(nodeId) && !inFlight.has(nodeId))
-          for (const nodeId of retry) parked.delete(nodeId)
-          launch(retry)
-        }
-        if (next.kind !== "start") admitReady()
+        if (context.suspended || context.cancellationStarted) break
+        handle(() => {
+          if (next.kind === "settled") {
+            foldSettlement(context, next.settled)
+            folded = true
+            emitCompletedWaves(context)
+            // The slot a fold may free goes to the oldest denial first, before the nodes it unblocks.
+            // A node parked a microtask ago may still be in flight until its start settles; it stays
+            // parked and is retried on the next fold or at the end of the pass.
+            const retry = admissionOrder.filter((nodeId) => parked.has(nodeId) && !inFlight.has(nodeId))
+            for (const nodeId of retry) parked.delete(nodeId)
+            launch(retry)
+          }
+          if (next.kind !== "start") admitReady()
+        })
       }
+      // Suspension, cancellation and a processing error all leave starts in flight; each is handled
+      // (or, once retiring, skipped) as it returns, and none of them launches another.
+      while (inFlight.size > 0) await Promise.all(inFlight.values())
     } finally {
       context.admissionInProgress = false
       resolveAdmissionIdle(context)
     }
+    if (failure !== undefined) throw failure.error
     if (context.suspended || context.cancellationStarted) return false
     const nextDenied = admissionOrder.filter((nodeId) => parked.has(nodeId))
     context.pendingAdmission.push(...nextDenied)
