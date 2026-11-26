@@ -63,11 +63,12 @@ class StaleClaimManager extends SelfResumingTaskManager {
   }
 }
 
-function recoveringRunWithStaleClaim(stopLands: boolean) {
+// consumedByB: B already ran on A's earlier output and completed; C, also dependent on A, never started.
+function recoveringRunWithStaleClaim(stopLands: boolean, consumedByB = false) {
   const root = fs.mkdtempSync(join(tmpdir(), "senpi-dag-recovery-gate-"))
   roots.push(root)
   const store = createDagFileStore(ownedTaskState(root))
-  const compiled = recordFor([node("A"), node("B", ["A"])])
+  const compiled = recordFor([node("A"), node("B", ["A"]), ...(consumedByB ? [node("C", ["A"])] : [])])
   const paused: DagRunRecordV1 & { readonly previousLeaseHolderPid: number } = {
     ...compiled,
     status: "paused",
@@ -82,11 +83,18 @@ function recoveringRunWithStaleClaim(stopLands: boolean) {
             execAttempt: 1,
             completedAt: compiled.createdAt,
           }
-        : entry,
+        : entry.id === "B" && consumedByB
+          ? { ...entry, state: "completed", taskId: "task-B", attempt: 1, completedAt: compiled.createdAt }
+          : entry,
     ),
   }
   store.writeCheckpoint(runId, paused)
   const manager = new StaleClaimManager({ onStart: (nodeId) => queueMicrotask(() => manager.complete(nodeId)) })
+  if (consumedByB) {
+    manager.seed("B", "completed")
+    manager.complete("B", "completed")
+    persistDagNodeResult({ store, runId, nodeId: "B" as DagNodeId, record: manager.taskOf("B") })
+  }
   manager.seed("A", "completed")
   manager.complete("A", "completed")
   persistDagNodeResult({ store, runId, nodeId: "A" as DagNodeId, record: manager.taskOf("A") })
@@ -113,6 +121,21 @@ describe("recovery re-opens a completed node for its ended self-resumed run only
     expect(aTransitions()).toEqual(["completed->failed"])
     expect(outcome?.record?.nodes.find((entry) => entry.id === "A")?.error?.code).toBe("stale_attempt_alive")
     expect(manager.get(staleTaskId)?.status).toBe("running")
+    expect(manager.starts).toEqual([])
+  })
+
+  test("#given a completed node consumed by a dependent and a live stale claim that cannot be stopped #when recovery fails the node closed #then the dependent keeps its outcome but is flagged as invalidated by it, and an unstarted dependent is skipped", async () => {
+    const { manager, recovery, aTransitions } = recoveringRunWithStaleClaim(false, true)
+
+    const [outcome] = await recovery.resumePausedRuns("ses-parent")
+
+    expect(aTransitions()).toEqual(["completed->failed"])
+    const states = outcome?.record?.nodes.map((entry) => `${entry.id}:${entry.state}:${entry.error?.code ?? ""}`)
+    expect(states).toEqual(["A:failed:stale_attempt_alive", "B:completed:", "C:skipped:"])
+    const flags = outcome?.record?.diagnostics.flatMap((entry) =>
+      entry.kind === "node_flag" ? [{ nodeId: String(entry.nodeId), invalidatedBy: String(entry.invalidatedBy) }] : [],
+    )
+    expect(flags).toEqual([{ nodeId: "B", invalidatedBy: "A" }])
     expect(manager.starts).toEqual([])
   })
 
