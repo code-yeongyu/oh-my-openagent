@@ -229,7 +229,6 @@ export function createDagRuntime(deps: DagRuntimeDeps): DagRuntime {
     schedulers,
     reservations,
     holders,
-    children: deps.engine.manager,
     holdsRun,
   })
   const cancel = async (runId: DagRunId, reason?: string): Promise<void> => {
