@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test"
 
 import type { TableScenario } from "../../../../../../script/sdk-parity/expectation"
 import { scenarioSetup } from "../../../../../../script/sdk-parity/fakes/setup"
-import { listProjectedCandidates } from "./refusal-candidates"
+import { THREAD_SUMMARY_MAX_LENGTH } from "../../thread/contracts/fields"
+import { PRINCIPAL_MATRIX } from "../contract"
+import { listProjectedCandidates, mayReadThreads } from "./refusal-candidates"
 
 // The owner's ruling B2: a resolution call's refusal candidates carry the caller's own threads.list fields for the same
 // rows plus the preview of a row it may read, and no candidate is a row the caller's list would not return.
@@ -90,5 +92,23 @@ describe("the projection itself", () => {
     expect(listProjectedCandidates([{ device: "b", name: "studio", online: true }], [], () => true)).toEqual([
       { device: "b", name: "studio" },
     ])
+  })
+
+  test("#given a producer that sets an over-long preview of astral characters #when projected #then the candidate carries at most the bound, cut on a code-point boundary", () => {
+    const long = "\u{1F600}".repeat(THREAD_SUMMARY_MAX_LENGTH + 50)
+    const [projected] = listProjectedCandidates([{ ...candidates[0], preview: long }], rows, () => true)
+    const preview = String(projected?.["preview"])
+    expect([...preview]).toHaveLength(THREAD_SUMMARY_MAX_LENGTH)
+    expect(preview.isWellFormed()).toBe(true)
+  })
+})
+
+describe("whether a caller may read is checked against the read line of the matrix, not assumed from the list line", () => {
+  test("#given each principal kind #when asked #then it answers the cell of the line governing threads.read", () => {
+    const readLine = PRINCIPAL_MATRIX.find((line) => line.rows.includes("threads.read") && line.input === undefined)
+    for (const kind of ["person", "script", "session", "connector", "service"] as const)
+      expect({ kind, reads: mayReadThreads(kind) }).toEqual({ kind, reads: readLine?.cells[kind].outcome === "allow" })
+    // Control: a connector's read cell refuses, so the answer is not a constant.
+    expect(mayReadThreads("connector")).toBe(false)
   })
 })

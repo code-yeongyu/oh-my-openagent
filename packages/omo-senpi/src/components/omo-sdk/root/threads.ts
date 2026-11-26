@@ -175,7 +175,7 @@ export function threadsNamespace(options: {
   // Ruling B (the owner's, T1a review LOW 1): a resolution call's refusal candidates are the caller's own list rows for
   // the same threads under the call's scope, plus the preview of a row it may read.
   const candidateRefusal = (failure: OmoFailure, allScope?: boolean) =>
-    projectedCandidates(failure, async () => {
+    projectedCandidates(failure, options.principal.kind, async () => {
       const listed = await (await thread()).list(allScope === true ? { all_scope: true } : {})
       const rows = Reflect.get(Object(listed), "threads")
       return Array.isArray(rows) ? rows : []
