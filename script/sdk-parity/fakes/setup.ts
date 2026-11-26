@@ -38,6 +38,13 @@ export type SetupOptions = {
 }
 
 const FIXED_NOW = 1_764_000_000_000
+
+// The engine's delivery ids, counted per scenario, so a scenario stated twice draws the same ids and its answers that
+// name one (a repeat answering the first delivery) are the same in both runs.
+function deliveryIds(): () => string {
+  let issued = 0
+  return () => `00000000-0000-4000-8000-${(++issued).toString(16).padStart(12, "0")}`
+}
 export const FAKE_HOME_PREFIX = "sdk-parity-fakes-"
 
 const isStream = (value: unknown): value is AsyncIterable<unknown> =>
@@ -104,6 +111,7 @@ export function scenarioSetup(scenario: TableScenario, options: SetupOptions = {
       store: storePort(recorder, clock.now, deliveries),
       remote: remote.remote,
       now: clock.now,
+      deliveryId: deliveryIds(),
       waitClock: clock,
     },
   }

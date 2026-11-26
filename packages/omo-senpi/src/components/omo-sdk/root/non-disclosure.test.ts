@@ -148,6 +148,7 @@ const PORT_NAMES = {
   store: true,
   remote: true,
   now: true,
+  deliveryId: true,
   deviceServiceStatus: true,
   signInProcess: true,
   onUnexpected: true,
@@ -205,6 +206,7 @@ function canaryPorts(fault: boolean, home: string): OmoSdkPorts {
     store: fault ? faultingStore() : createGatewayStore({ agentDir: home }),
     remote: fault ? (fakeRemote(true) as RemoteThreadSurface) : listingRemote(),
     now: () => 1_764_000_000_000,
+    deliveryId: () => "00000000-0000-4000-8000-000000000001",
     // B8's logger port: the scan's canaries reach it by design (it is the local log), so it records nothing here.
     onUnexpected: () => undefined,
     // The thread controls honour the scan's 5 ms deadline (slice T1b); a clock that never moves keeps each on its ok path.

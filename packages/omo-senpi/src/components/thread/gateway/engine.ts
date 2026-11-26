@@ -60,6 +60,8 @@ export type GatewayEngineOptions = {
   readonly endpoints: GatewayEndpointPort
   readonly resolve: GatewayResolve
   readonly now?: () => number
+  /** Where each delivery's id comes from; absent, a random UUID (test seam: the scenario fakes count). */
+  readonly deliveryId?: () => string
 }
 
 export function resolveFromEntries(
@@ -151,6 +153,7 @@ function deliveryArgsHash(fields: {
 export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngine {
   const store = options.store
   const now = options.now ?? store.now
+  const newDeliveryId = options.deliveryId ?? randomUUID
 
   async function deliver(request: GatewayDeliverRequest): Promise<GatewayDeliveryResult> {
     const mode = request.mode ?? DEFAULT_THREAD_DELIVERY
@@ -173,7 +176,7 @@ export function createGatewayEngine(options: GatewayEngineOptions): GatewayEngin
       request.sender,
       await (options.senderProvenance?.() ?? resolveProvenance({ cwd: process.cwd() })),
     )
-    const deliveryId = randomUUID()
+    const deliveryId = newDeliveryId()
     const idempotencyKey = request.idempotency_key ?? `auto:${deliveryId}`
     const outcome = await store.enqueue({
       provenance: facts.provenance,

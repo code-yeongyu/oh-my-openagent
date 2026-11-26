@@ -260,6 +260,8 @@ export type ThreadToolSurfaceOptions = {
     readonly device?: string
   }[]
   readonly now?: () => number
+  /** Where the engine draws each delivery's id; absent, a random UUID (test seam). */
+  readonly deliveryId?: () => string
   /**
    * Where an unexpected exception goes (security ruling B8): its message and stack reach this port only, never an answer,
    * a stream event or a log line the caller sees. Absent, nothing is written (the CLI's standard error is an output too).

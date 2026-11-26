@@ -35,6 +35,7 @@ export function threadsServing(
       ...(ports.store === undefined ? {} : { store: ports.store }),
       ...(ports.remote === undefined ? {} : { remote: ports.remote }),
       ...(ports.now === undefined ? {} : { now: ports.now }),
+      ...(ports.deliveryId === undefined ? {} : { deliveryId: ports.deliveryId }),
       ...(ports.waitClock === undefined ? {} : { waitClock: ports.waitClock }),
       ...(ports.onUnexpected === undefined ? {} : { onUnexpected: ports.onUnexpected }),
     },

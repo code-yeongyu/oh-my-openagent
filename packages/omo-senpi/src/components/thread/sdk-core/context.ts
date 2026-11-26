@@ -34,6 +34,8 @@ export type ThreadCoreOptions = {
   /** How long a create waits for its first prompt to start on this device; absent, FIRST_PROMPT_START_WAIT_MS (test seam). */
   readonly firstPromptWaitMs?: number
   readonly now?: () => number
+  /** Where the engine draws each delivery's id; absent, a random UUID (test seam). */
+  readonly deliveryId?: () => string
   /** The clock a control's wait (signal, deadline_ms) reads; absent, the system clock (test seam). */
   readonly waitClock?: WaitClock
   /**
@@ -81,6 +83,7 @@ export function createThreadCoreContext(options: ThreadCoreOptions) {
     callerSessionId: () => UNKNOWN_CALLER,
     callerWorkspaceRoot: () => options.cwd,
     now,
+    ...(options.deliveryId === undefined ? {} : { deliveryId: options.deliveryId }),
     ...(options.onUnexpected === undefined ? {} : { onUnexpected: options.onUnexpected }),
   }
   const view = () => hostView(surface)

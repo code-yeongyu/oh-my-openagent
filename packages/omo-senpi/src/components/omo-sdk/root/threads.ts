@@ -24,6 +24,8 @@ export type ThreadPorts = {
   readonly store?: GatewayStore
   readonly remote?: RemoteThreadSurface
   readonly now?: () => number
+  /** Where the engine draws each delivery's id; absent, a random UUID (test seam). */
+  readonly deliveryId?: () => string
   /** The clock a control's wait (signal, deadline_ms) reads; absent, the system clock (test seam). */
   readonly waitClock?: WaitClock
   /**
