@@ -33,6 +33,7 @@ const MEANT: Readonly<Record<string, readonly string[]>> = {
   title: ["name"],
   mode: ["delivery"],
   level: ["reasoning"],
+  reasoning: ["level"],
   thinking: ["reasoning", "level"],
   thinking_level: ["reasoning", "level"],
   directory: ["cwd"],

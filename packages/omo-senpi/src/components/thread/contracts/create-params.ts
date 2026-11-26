@@ -109,7 +109,7 @@ export const ThreadCreateParams = Type.Object({
   all_scope: Type.Optional(
     Type.Literal(true, {
       description:
-        "Accepted as on the other thread tools: thread_create already finds an existing thread in every workspace and on every device, so true changes nothing.",
+        "Accepted as on the other thread tools: this tool already finds an existing thread in every workspace and on every device, so true changes nothing.",
     }),
   ),
   idempotency_key: IdempotencyKey,

@@ -1,7 +1,10 @@
 {
   "domain": "threads",
   "inert": {
-    "threads.create.fork_from": "every value is refused unsupported (details.reason fork_unsupported) until the engine forks on open (#13031); scenario threads.create/fork pins that refusal"
+    "threads.create.fork_from": "every value is refused unsupported (details.reason fork_unsupported) until the engine forks on open (#13031); scenario threads.create/fork pins that refusal",
+    "threads.create.all_scope": "accepted as on the other thread tools and changes no call: create already looks an existing thread up in every workspace and on every device (#15073)",
+    "threads.list.query": "narrows the returned rows after the listing; the port calls are those of the same call without it (#15073)",
+    "threads.list.limit": "cuts the returned rows after the listing and counts the rest as rows_omitted; the port calls are those of the same call without it (#15073)"
   },
   "scenarios": [
     {
@@ -697,6 +700,47 @@
             "thread": "t-1",
             "max_bytes": 4096
           }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.readAfterWait/limit",
+      "row": "threads.readAfterWait",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "wait_ms": 5000,
+        "limit": 5
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "wait_idle",
+          "args": {
+            "thread": "t-1",
+            "wait_ms": 5000
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "max_bytes": 131072
+          },
+          "result": {
+            "items": 9
+          }
+        },
+        {
+          "port": "host",
+          "op": "get_messages",
+          "args": {
+            "thread": "t-1",
+            "limit": 5
+          },
+          "count": 0
         }
       ],
       "target": "this_device"
@@ -4666,6 +4710,209 @@
           "args": {
             "thread": "t-1",
             "model": "m-1"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-off",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "off"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "off"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-minimal",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "minimal"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "minimal"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-low",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "low"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "low"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-medium",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "medium"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "medium"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-high",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "high"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "high"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-xhigh",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "xhigh"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "xhigh"
+          }
+        }
+      ],
+      "target": "this_device"
+    },
+    {
+      "id": "threads.setModel/reasoning-max",
+      "row": "threads.setModel",
+      "kind": "effect",
+      "input": {
+        "thread": "t-1",
+        "model": "anthropic/m-1",
+        "reasoning": "max"
+      },
+      "expect": [
+        {
+          "port": "host",
+          "op": "set_model",
+          "args": {
+            "thread": "t-1",
+            "model": "anthropic/m-1"
+          }
+        },
+        {
+          "port": "host",
+          "op": "set_thinking_level",
+          "args": {
+            "thread": "t-1",
+            "level": "max"
           }
         }
       ],

@@ -52,7 +52,7 @@ export const Summary = Type.Optional(
 
 export const Message = Type.String({
   maxLength: THREAD_MESSAGE_MAX_BYTES,
-  description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large. Also accepted as text, body, content or prompt.`,
+  description: `Instruction to deliver to the target thread; longer than ${THREAD_MESSAGE_MAX_BYTES} UTF-8 bytes returns message_too_large.`,
 })
 
 export const THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"] as const

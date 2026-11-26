@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 // #15073 on a REAL rpc host with the built omo extension: a session's js cell calls the thread tools with the argument
-// names the fleet census found agents predicting (thread_read limit/tail, thread_list query/limit, thread_send text), and
-// with a field no tool takes. Every familiar name must do what it says; the unknown field must be refused with a
-// corrected call that the cell can run as given.
+// names the fleet census found agents predicting (thread_read limit/tail, thread_list query/limit), and with a field no
+// tool takes. Every familiar name must do what it says; the unknown field must be refused with a corrected call that the
+// cell can run as given; a send without its required message (text instead) must be refused naming message.
 import { join } from "node:path"
 import { mkdirSync } from "node:fs"
 import {
@@ -31,6 +31,8 @@ const thread = peer.thread
 const query = await j(tool.thread_list({ query: "QA-15073" }))
 const limit = await j(tool.thread_list({ limit: 1 }))
 const send = await j(tool.thread_send({ thread, text: "QA-15073-TEXT reply with exactly PEER_OK." }))
+const sendShown = String(send.threw ?? JSON.stringify(send)).split("Received arguments")[0]
+const sendNamesMessage = sendShown.includes("required") && sendShown.includes("message")
 const readLimit = await j(tool.thread_read({ thread: "self", limit: 2 }))
 const readTail = await j(tool.thread_read({ thread: "self", tail: 2 }))
 const readBoth = await j(tool.thread_read({ thread: "self", limit: 2, cursor: "t1.x" }))
@@ -41,7 +43,7 @@ print("QA15073=" + JSON.stringify({
   create: outcome(peer),
   query: outcome(query), queryNames: (query.threads ?? []).map((row) => row.name),
   limit: outcome(limit), limitRows: limit.threads?.length, limitOmitted: limit.rows_omitted,
-  send: outcome(send),
+  send: send.threw !== undefined ? "refused_by_host" : outcome(send), sendNamesMessage, sendShown: sendShown.split(String.fromCharCode(10)).join(" ").slice(0, 160),
   readLimit: outcome(readLimit), readLimitN: readLimit.items?.length,
   readTail: outcome(readTail), readTailN: readTail.items?.length,
   readBoth: outcome(readBoth),
@@ -126,7 +128,11 @@ report.assert(
   out?.limit === "ok" && out.limitRows === 1 && out.limitOmitted >= 1,
   `limit=${out?.limit} rows=${out?.limitRows} omitted=${out?.limitOmitted}`,
 )
-report.assert("thread_send-text-is-message", out?.send === "ok", `send=${out?.send}`)
+report.assert(
+  "thread_send-without-message-refused-naming-it",
+  out?.send !== undefined && out.send !== "ok" && out.sendNamesMessage === true,
+  `send=${out?.send} shown=${out?.sendShown}`,
+)
 report.assert(
   "thread_read-limit-and-tail-take-the-newest",
   out?.readLimit === "ok" && out.readLimitN >= 1 && out.readLimitN <= 2 && out?.readTail === "ok" && out.readTailN === out.readLimitN,

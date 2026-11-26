@@ -24,7 +24,6 @@ export const ThreadsResolve = Type.Object({
 
 export const ThreadsRead = Type.Object({
   ...Type.Omit(ThreadReadParams, ["delivery_id", "wait_ms"]).properties,
-  limit: Type.Optional(PositiveInteger),
 })
 
 export const ThreadsReadAfterWait = Type.Object({

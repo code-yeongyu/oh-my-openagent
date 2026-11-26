@@ -225,7 +225,7 @@ const CENSUS_CALLS: readonly CensusCase[] = [
   { tool: "thread_read", call: { thread: T, query: "review CLEAR" }, refused: { field: "query" } },
   { tool: "thread_send", call: { thread: T, message: "hi", timeout: 60 }, refused: { field: "timeout", suggestion: undefined } },
   { tool: "thread_send", call: { thread: T, message: "hi", mode: "steer" }, ok: { thread: T, message: "hi", delivery: "steer" } },
-  { tool: "thread_send", call: { thread: T, text: "hi" }, ok: { thread: T, message: "hi" } },
+  { tool: "thread_send", call: { thread: T, text: "hi" }, refused: { field: "text", suggestion: "message" } },
   { tool: "thread_list", call: { limit: 5 }, ok: { limit: 5 } },
   { tool: "thread_list", call: { query: "gw-29" }, ok: { query: "gw-29" } },
   { tool: "thread_list", call: { message: "x" }, refused: { field: "message" } },
@@ -239,7 +239,7 @@ const CENSUS_CALLS: readonly CensusCase[] = [
     call: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
     ok: { thread: T, model: "anthropic/claude-opus-5-5", reasoning: "medium" },
   },
-  { tool: "thread_set_reasoning", call: { thread: T, reasoning: "high" }, ok: { thread: T, level: "high" } },
+  { tool: "thread_set_reasoning", call: { thread: T, reasoning: "high" }, refused: { field: "reasoning", suggestion: "level" } },
   { tool: "thread_rename", call: { thread: T, title: "lane-2" }, ok: { thread: T, name: "lane-2" } },
 ]
 
@@ -268,10 +268,10 @@ describe("the census's wrong calls (#15073)", () => {
   )
 
   test("#given an alias and its field with different values #when parsed #then it is refused naming both, never one dropped", () => {
-    const outcome = parseThreadParams(threadToolParamSchemas.thread_send, { thread: T, message: "a", text: "b" })
+    const outcome = parseThreadParams(threadToolParamSchemas.thread_read, { thread: T, limit: 5, tail: 6 })
     expect(outcome).toMatchObject({
       kind: "error",
-      error: { code: "invalid_arguments", details: { field: "text", canonical: "message" } },
+      error: { code: "invalid_arguments", details: { field: "tail", canonical: "limit" } },
     })
   })
 })

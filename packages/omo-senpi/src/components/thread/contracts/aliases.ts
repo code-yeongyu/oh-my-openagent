@@ -1,9 +1,10 @@
 /**
  * Field names a thread tool accepts in place of its own, each naming the same thing (#15073). The census of refused
  * calls across the fleet found agents reaching for the names the core tools and the other thread tools use: `limit` on
- * thread_read like `read`, `text` on thread_send like the thread SDK, `reasoning` on thread_set_reasoning like
- * thread_create. Each alias is rewritten to its field before validation; an alias given together with its field and a
- * different value is refused, so an alias is never dropped silently.
+ * thread_read like `read`, `mode` on thread_send like the thread SDK, `thinking` on thread_create. Each alias is
+ * rewritten to its field before validation; an alias given together with its field and a different value is refused,
+ * so an alias is never dropped silently. A required field has no alias: the host validates the declared schema before
+ * the tool runs, so a call without the field never reaches this map, and the SDK calls keep that field required.
  */
 export const THREAD_PARAM_ALIASES: Readonly<Record<string, Readonly<Record<string, string>>>> = {
   thread_create: {
@@ -22,10 +23,9 @@ export const THREAD_PARAM_ALIASES: Readonly<Record<string, Readonly<Record<strin
     limit_bytes: "max_bytes",
     bytes: "max_bytes",
   },
-  thread_send: { text: "message", body: "message", content: "message", prompt: "message", mode: "delivery" },
-  thread_handoff: { text: "message", body: "message", content: "message", prompt: "message", mode: "delivery" },
+  thread_send: { mode: "delivery" },
+  thread_handoff: { mode: "delivery" },
   thread_rename: { title: "name" },
-  thread_set_reasoning: { reasoning: "level", thinking: "level", thinking_level: "level" },
 }
 
 const WAIT_FOR_REPLY =
